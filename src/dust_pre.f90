@@ -131,7 +131,6 @@ call prms%read_options(input_file_name, printout_val=.false.)
 
 n_geo = countoption(prms,'GeoFile')
 
-!sbprms =  getsuboption(prms,'sottopzioni')
 !call getsuboption(prms,'sottopzioni',sbprms)
 !aa = getint(sbprms,'aaa')
 !bb = getint(sbprms,'bbb')

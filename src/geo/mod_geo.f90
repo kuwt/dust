@@ -40,6 +40,9 @@ module mod_geometry
 use mod_param, only: &
   wp, max_char_len, nl, prev_tri, next_tri, prev_qua, next_qua
 
+use mod_sim_param, only: &
+  t_sim_param
+
 use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption &
   , finalizeparameters
@@ -285,13 +288,14 @@ end subroutine set_parameters_geo
 !! -# The element pointer array used to build/solve the linear system is
 !!    created, pointed at each element and then re-ordered with the static
 !!    elements first, and the dynamic elements at the end
-subroutine create_geometry(prms, in_file_name,  geo, te, elems, tstart)
+subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
  type(t_parse), intent(inout) :: prms
  character(len=*), intent(in) :: in_file_name
  type(t_geo), intent(out), target :: geo
  type(t_elem_p), allocatable, intent(out) :: elems(:)
- real(wp), intent(in)         :: tstart
  type(t_tedge), intent(out) :: te
+ type(t_sim_param) , intent(inout) :: sim_param
+ real(wp)                     :: tstart
 
  character(len=max_char_len) :: reference_file
  character(len=max_char_len) :: geo_file_name
@@ -306,6 +310,8 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, tstart)
 
  integer :: fid , i1
 
+  tstart = sim_param%t0
+
   t0 = dust_time()
   call printout(nl//'Starting creating geometry')
 
@@ -318,22 +324,13 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, tstart)
     reference_file = trim(in_file_name)
   endif
 
-  call build_references(geo%refs, reference_file)
+! write(*,*) ' sim_param%n_timesteps : ' , sim_param%n_timesteps 
+  call build_references(geo%refs, reference_file, sim_param)
 
   !Load the components from the file created by the preprocessor
   geo_file_name = getstr(prms, 'GeometryFile')
   call check_preproc(geo_file_name)
   call load_components(geo, geo_file_name, te)
-
-! debug ----
-  write(*,*) ' out :  size(e_te,2) : ' , size(te%e,2) 
-  write(*,*) ' out :  size(i_te,2) : ' , size(te%i,2) 
-! open(unit=21,file='./check_ete')
-  do i = 1,size(te%e,2)
-    write(*,*) te%e(:,i)
-  end do  
-! close(21)
-! debug ----
 
   ! Initialisation
   geo%nelem    = 0
@@ -446,6 +443,10 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, tstart)
 
   deallocate(temp_static, temp_moving)
   deallocate(el_id_old, el_id_old_static, el_id_old_moving)
+
+! check rr , ee , neigh
+
+
 
 ! old: now load neigh and te in load component +++++++++++
 ! ! neighboring elements ---------------
@@ -686,7 +687,8 @@ subroutine load_components(geo, in_file, te)
       ne_te_prev = size(te%e,2)
       allocate(e_te_tmp(2,size(te%e,2)+ne_te)) 
       e_te_tmp(:,             1:size(te%e,2)    ) = te%e
-      e_te_tmp(:,size(te%e,2)+1:size(e_te_tmp,2)) = e_te + elems_offset
+      where( e_te .ne. 0 ) e_te = e_te + elems_offset
+      e_te_tmp(:,size(te%e,2)+1:size(e_te_tmp,2)) = e_te
       call move_alloc(e_te_tmp,te%e) 
       allocate(i_te_tmp(2,size(te%i,2)+nn_te)) 
       i_te_tmp(:,             1:size(te%i,2)    ) = te%i

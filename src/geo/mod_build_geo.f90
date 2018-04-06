@@ -194,7 +194,7 @@ subroutine build_component(gloc, geo_file, comp_id)
     ! TODO : actually it is possible to define the parameters in the GeoFile directly, find a good way to do this
     call read_mesh_parametric(trim(mesh_file),ee, rr, &
                               npoints_chord_tot, nelems_span )
-    ! nelems_span_tot will be overwritten if symmetry is required
+    ! nelems_span_tot will be overwritten if symmetry is required (around l.222)
     nelems_span_tot =   nelems_span
    case default
     call error(this_sub_name, this_mod_name, 'Unknown mesh file type')
@@ -236,7 +236,8 @@ subroutine build_component(gloc, geo_file, comp_id)
   !allocate(geo%components(i_comp)%loc_points(3,size(rr,2)))
   !geo%components(i_comp)%loc_points = rr
   !
-  !!Now for the moments the points are stored here without moving them, 
+  
+!!Now for the moments the points are stored here without moving them, 
   !!will be moved later, consider not storing them here at all
   !allocate(points_tmp(3,size(rr,2)+points_offset))
   !if (points_offset .gt. 0) points_tmp(:,1:points_offset) = geo%points
@@ -272,7 +273,29 @@ subroutine build_component(gloc, geo_file, comp_id)
   !  -> create_local_velocity_stencil ( 3dP )  ||
   !  -> create_strip_connecivity      ( vr )   ||
   selectcase(trim(mesh_file_type))
-    case( 'basic' , 'cgns' )
+    case( 'basic' )
+
+! TODO: add WARNING and CHECK conventions if ElType = 'v'
+
+      call build_connectivity_general( ee , neigh )
+
+      if ( ElType .eq. 'v' ) then
+        write(*,*) nl//' WARNING: component with id.', comp_id
+        write(*,*) '  defined as ''basic'' with ''vortex ring'' elements:'
+        write(*,*) '  be sure to your input files comply with the conventions '
+        write(*,*) '  of parameteric component structures.'//nl
+        call build_te_parametric( ee , rr , ElType ,  &
+           npoints_chord_tot , nelems_span_tot , ref_tag , &
+           e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, ref_te ) !te as an output
+      else
+        call build_te_general ( ee , rr , neigh , ElType , ref_tag ,  &
+                  e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, ref_te ) !te as an output
+      end if
+
+!     call create_local_velocity_stencil_general()
+!     call create_strip_connectivity_general()
+
+    case( 'cgns' )
 
       call build_connectivity_general( ee , neigh )
 

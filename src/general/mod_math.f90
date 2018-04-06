@@ -40,7 +40,18 @@ use mod_param, only: &
 
 implicit none
 
+public :: cross , linear_interp
+
+private
+
+interface linear_interp
+  module procedure linear_interp_vector, &
+                   linear_interp_array
+end interface linear_interp
+
 contains
+
+! ----------------------------------------------------------------------
 
 function cross(a, b)
   real(wp), dimension(3) :: cross
@@ -52,6 +63,96 @@ function cross(a, b)
 
 end function cross
 
+! ----------------------------------------------------------------------
+
+subroutine linear_interp_vector( val_vec , t_vec , t , val ) 
+  real(wp) , intent(in) :: val_vec(:)
+  real(wp) , intent(in) :: t_vec(:)
+  real(wp) , intent(in) :: t
+  real(wp) , intent(out) :: val
+
+  integer :: it , nt
+
+  nt = size(t_vec)
+  ! Check dimensions -----
+  if ( size(val_vec) .ne. nt ) then
+    write(*,*) ' ERROR: wrong sizes: size(val_vec) .ne. size(t_vec).'
+    stop
+  end if
+
+  ! Check if t \in [ minval(t_vec) , maxval(t_vec) ]
+  if ( t .lt. minval(t_vec) ) then
+    write(*,*) ' ERROR: t .lt. t_vec ' 
+  end if
+  if ( t .gt. maxval(t_vec) ) then
+    write(*,*) ' ERROR: t .gt. t_vec ' 
+    write(*,*) ' t             = ' , t 
+    write(*,*) ' maxval(t_vec) = ' , maxval(t_vec)
+  end if
+
+  do it = 1 , nt-1 
+
+    if ( ( t .ge. t_vec( it ) ) .and. ( t .le. t_vec( it+1 ) ) ) then
+      
+      val = val_vec(it) + (t-t_vec(it))/(t_vec(it+1)-t_vec(it)) * &
+                                   ( val_vec(it+1)-val_vec(it) )
+      
+    end if
+
+  end do
+
+end subroutine linear_interp_vector
+
+! ----------------------------------------------------------------------
+
+subroutine linear_interp_array( val_arr , t_vec , t , val ) 
+  real(wp) , intent(in) :: val_arr(:,:)
+  real(wp) , intent(in) :: t_vec(:)
+  real(wp) , intent(in) :: t
+  real(wp) , allocatable , intent(out) :: val(:)
+
+  integer :: it , nt 
+
+  nt = size(t_vec)
+  allocate(val(size(val_arr,1)))
+
+  write(*,*) ' size(val_arr) : ' , size(val_arr,1) , size(val_arr,2)
+  write(*,*) ' nt            : ' , nt
+  write(*,*) ' tv : ' 
+  do it = 1 , nt
+    write(*,*) t_vec(it) , val_arr(:,it)
+  end do
+
+  ! Check dimensions -----
+  if ( size(val_arr,2) .ne. nt ) then
+    write(*,*) ' ERROR: wrong sizes: size(val_vec,2) .ne. size(t_vec).'
+    stop
+  end if
+
+  ! Check if t \in [ minval(t_vec) , maxval(t_vec) ]
+  if ( t .lt. minval(t_vec) ) then
+    write(*,*) ' ERROR: t .lt. t_vec ' 
+  end if
+  if ( t .gt. maxval(t_vec) ) then
+    write(*,*) ' ERROR: t .gt. t_vec '
+    write(*,*) ' t             = ' , t 
+    write(*,*) ' maxval(t_vec) = ' , maxval(t_vec)
+  end if
+  
+  do it = 1 , nt-1 
+
+    if ( ( t .ge. t_vec( it ) ) .and. ( t .le. t_vec( it+1 ) ) ) then
+      
+      val = val_arr(:,it) + (t-t_vec(it))/(t_vec(it+1)-t_vec(it)) * &
+                                   ( val_arr(:,it+1)-val_arr(:,it) )
+      
+    end if
+
+  end do
+
+end subroutine linear_interp_array
+
+! ----------------------------------------------------------------------
 
 
 end module mod_math
