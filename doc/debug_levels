@@ -1,0 +1,16 @@
+This is the increasing list of the debug levels, for reference.
+
+Generally debug levels 1-10 add terminal output, levels 11-99 add file output
+and levels >100 alter the execution of the program (stop at certain locations)
+
+All the levels are CUMULATIVE (i.e. a certain level produced also ALL the lower
+levels effects)
+
+level    effect
+1        standard detailed info output
+
+15       print out files with geometry details
+
+20       print out the array of linear system results
+
+50       dump the whole linear system

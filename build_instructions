@@ -1,0 +1,6 @@
+Build instructions:
+1) create a build folder here (can be "build" or anything else)
+2) move to the build directory
+3) ccmake ../  and configure (change values, c to configure iteratively, g to generate makefile)
+4) make
+5) The executable should be in build/bin
