@@ -398,19 +398,22 @@ subroutine build_references(refs, reference_file, sim_param)
         allocate(refs(iref)%pol_tim(  nt)) 
         allocate(refs(iref)%rot_pos(  nt)) 
         allocate(refs(iref)%rot_vel(  nt)) 
-        allocate(refs(iref)%rot_tim(  nt)) 
+        allocate(refs(iref)%rot_tim(  nt))
+        refs(iref)%pol_tim = omega_mat(:,1) 
+        refs(iref)%rot_tim = omega_mat(:,1) 
+        refs(iref)%rot_vel = omega_mat(:,2) 
         do it = 1,nt
           refs(iref)%pol_pos(:,it) = refs(iref)%pole
           refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
-          refs(iref)%pol_tim(  it) = omega_mat(it,1)
+!         refs(iref)%pol_tim(  it) = 
           if ( it .gt. 1 ) then
             refs(iref)%rot_pos(  it) = refs(iref)%rot_pos(it-1) + &
                  omega_mat(it,2) * ( omega_mat(it,1) - omega_mat(it-1,1) )    ! <---- CHECK !!!!
           else
             refs(iref)%rot_pos(  it) = refs(iref)%psi_0 
           end if
-          refs(iref)%rot_vel(  it) = omega_mat(it,2) 
-          refs(iref)%rot_tim(  it) = omega_mat(it,1) 
+!         refs(iref)%rot_vel(  it) =
+!         refs(iref)%rot_tim(  it) =
         end do 
 
         deallocate(omega_mat)
@@ -430,15 +433,18 @@ subroutine build_references(refs, reference_file, sim_param)
         write(*,*) ' nt : ' , nt
         ! build general arrays: pol_pos, pol_vel, pol_time, ----------------
         !                       rot_pos, rot_vel, rot_time
-        allocate(refs(iref)%pol_pos(3,nt)) 
+        allocate(refs(iref)%pol_pos(3,nt))  
         allocate(refs(iref)%pol_vel(3,nt)) 
-        allocate(refs(iref)%pol_tim(  nt)) 
+        allocate(refs(iref)%pol_tim(  nt))
         allocate(refs(iref)%rot_pos(  nt)) 
         allocate(refs(iref)%rot_vel(  nt)) 
         allocate(refs(iref)%rot_tim(  nt)) 
+        refs(iref)%pol_pos = transpose(pol_pos_mat(:,2:4))
+        refs(iref)%pol_tim = pol_pos_mat(:,1) 
+        refs(iref)%rot_tim = pol_pos_mat(:,1) 
         do it = 1,nt
-          refs(iref)%pol_tim(  it) = pol_pos_mat(it,1) 
-          refs(iref)%pol_pos(:,it) = pol_pos_mat(it,2:4)
+!         refs(iref)%pol_tim(  it) = 
+!         refs(iref)%pol_pos(:,it) = 
           if ( it .eq. 1) then
             refs(iref)%pol_vel(:,it) = ( refs(iref)%pol_pos(:,2) - &
                                          refs(iref)%pol_pos(:,1) ) /  &
@@ -452,11 +458,22 @@ subroutine build_references(refs, reference_file, sim_param)
                                          refs(iref)%pol_pos(:,nt-1) ) /  &
               ( refs(iref)%pol_tim(nt) - refs(iref)%pol_tim(nt-1) )
           end if
-          refs(iref)%rot_tim(  it) = pol_pos_mat(it,1) 
+!         refs(iref)%rot_tim(  it) = 
           refs(iref)%rot_pos(  it) = refs(iref)%psi_0 + &
                  refs(iref)%Omega * ( refs(iref)%rot_tim(it) - refs(iref)%rot_tim(1) )    ! <---- CHECK !!!!
           refs(iref)%rot_vel(  it) = refs(iref)%Omega
         end do 
+
+! write(*,*) ! check ----
+! write(*,*) trim(refs(iref)%mov_type)
+! write(*,*) ' pol_tim , pol_vel , pol_pos '
+! do it = 1 , nt
+!  write(*,*) refs(iref)%pol_tim(  it) , &
+!             refs(iref)%pol_vel(:,it) , &
+!             refs(iref)%pol_pos(:,it)
+! end do
+! stop
+! write(*,*) ! check ----
 
         deallocate(pol_pos_mat)
 
@@ -634,7 +651,7 @@ subroutine reference_update_self(this, t, R_par, of_par, R_loc, of_loc, &
  integer :: i1
 
 ! check ---
-  write(*,*) ' this%self_moving : ' ,this%self_moving
+! write(*,*) ' this%self_moving : ' ,this%self_moving
 ! check ---
 
   if (.not.this%self_moving) then 

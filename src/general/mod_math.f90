@@ -116,12 +116,11 @@ subroutine linear_interp_array( val_arr , t_vec , t , val )
   nt = size(t_vec)
   allocate(val(size(val_arr,1)))
 
-  write(*,*) ' size(val_arr) : ' , size(val_arr,1) , size(val_arr,2)
-  write(*,*) ' nt            : ' , nt
-  write(*,*) ' tv : ' 
-  do it = 1 , nt
-    write(*,*) t_vec(it) , val_arr(:,it)
-  end do
+! check ----
+! write(*,*) ' size(val_arr) : ' , size(val_arr,1) , size(val_arr,2)
+! write(*,*) ' nt            : ' , nt
+! write(*,*) ' tv : ' 
+! check ----
 
   ! Check dimensions -----
   if ( size(val_arr,2) .ne. nt ) then

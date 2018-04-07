@@ -193,7 +193,6 @@ subroutine read_real_array_from_file ( n_cols , filen , A )
  open(unit=fid, file=trim(adjustl(filen)), action='read', iostat=io_error )
  do i1 = 1 , 1000000
    read(fid,*,iostat=io_error) ! dummy
-   write(*,*) i1 , io_error
    if ( io_error  .lt. 0 ) then
      n_rows = i1-1
      exit
