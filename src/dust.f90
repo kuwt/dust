@@ -40,6 +40,9 @@ program dust
 use mod_param, only: &
   wp, nl, max_char_len, extended_char_len
 
+use mod_sim_param, only: &
+  t_sim_param
+
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
 
@@ -87,6 +90,9 @@ character(len=*), parameter :: input_file_name_def = 'dust.in'
 character(len=max_char_len) :: input_file_name
 character(len=extended_char_len) :: message
 
+!Simulation parameters
+type(t_sim_param) :: sim_param
+
 !Time parameters
 real(wp) :: tstart, tend, dt, time
 integer  :: it, nstep
@@ -119,8 +125,7 @@ character(len=max_char_len) :: frmt
 character(len=max_char_len) :: basename
 character(len=max_char_len) :: basename_debug
 
-integer :: i_el
-
+integer :: i_el , i
 
 
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
@@ -166,6 +171,7 @@ n_wake_panels = getint(prms, 'n_wake_panels')
 basename = getstr(prms,'basename')
 basename_debug = getstr(prms,'basename_debug')
 
+
 if (debug_level .ge. 3) then
   write(message,*) 'Initial time tstart: ', tstart; call printout(message)
   write(message,*) 'Final time tend:     ', tend; call printout(message)
@@ -175,11 +181,22 @@ endif
 !for the moment hard-coded
 uinf = (/1.0_wp, 0.0_wp, 0.0_wp/)
 
+!---- Simulation parameters ----
+nstep = ceiling((tend-tstart)/dt) + 1 !(for the zero time step)
+sim_param%t0          = tstart
+sim_param%tfin        = tend
+sim_param%dt          = dt
+sim_param%n_timesteps = nstep
+write(*,*) ' sim_param%n_timesteps : ' , sim_param%n_timesteps 
+allocate(sim_param%time_vec(sim_param%n_timesteps))
+sim_param%time_vec = (/ ( sim_param%t0 + &
+         dble(i-1)*sim_param%dt, i=1,sim_param%n_timesteps ) /)
+allocate(sim_param%u_inf(3)) 
+sim_param%u_inf = uinf
+
 !------ Geometry creation ------
-
-
 call printout(nl//'====== Geometry Creation ======')
-call create_geometry(prms, input_file_name, geo, te, elems, tstart)
+call create_geometry(prms, input_file_name, geo, te, elems, sim_param)
 
 if(debug_level .ge. 15) &
             call debug_printout_geometry_minimal(elems, geo, basename_debug, 0)
@@ -208,7 +225,6 @@ write(message,'(A,F9.3,A)') '------ Completed all preliminary operations &
 call printout(message)
 
 !====== Time Cycle ======
-nstep = ceiling((tend-tstart)/dt) + 1 !(for the zero time step)
 time = tstart
 t_last_out = time; t_last_debug_out = time
 

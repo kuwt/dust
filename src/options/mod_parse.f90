@@ -1284,7 +1284,8 @@ use MOD_Options
         !end select
       end select
       ! print option and value to stdout
-      call opt%print(prms%maxNameLen, prms%maxValueLen, mode=0)
+      !MATTEO: at the moment hardcoded NOT to print values
+      !call opt%print(prms%maxNameLen, prms%maxValueLen, mode=0)
       ! remove the option from the linked list of all parameters
       current%opt%isRemoved = .true.
       return

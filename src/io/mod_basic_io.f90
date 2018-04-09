@@ -47,7 +47,7 @@ use mod_handling, only: &
 
 implicit none
 
-public :: read_mesh_basic, write_basic
+public :: read_mesh_basic, write_basic , read_real_array_from_file 
 
 private
 
@@ -176,6 +176,41 @@ subroutine write_basic_int(aa, filename)
  close(fid)
 
 end subroutine write_basic_int
+
 !----------------------------------------------------------------------
+
+subroutine read_real_array_from_file ( n_cols , filen , A )
+ integer         , intent(in)  :: n_cols 
+ character(len=*), intent(in)  :: filen
+ real(wp)        , allocatable :: A(:,:) 
+
+ integer :: n_rows
+ integer :: fid , fid_err , io_error , i1
+  
+ ! read # of lines
+ call new_file_unit(fid, fid_err)
+ write(*,*) trim(adjustl(filen))
+ open(unit=fid, file=trim(adjustl(filen)), action='read', iostat=io_error )
+ do i1 = 1 , 1000000
+   read(fid,*,iostat=io_error) ! dummy
+   if ( io_error  .lt. 0 ) then
+     n_rows = i1-1
+     exit
+   end if
+ end do
+ close(fid)
+
+ allocate(A(n_rows, n_cols)) ; A = 0.0_wp 
+ call new_file_unit(fid, fid_err)
+ open(unit=fid, file=trim(adjustl(filen)), action='read', iostat=io_error )
+ do i1 = 1 , n_rows
+   read(fid,*) A(i1,:)
+ end do
+ close(fid)
+
+end subroutine read_real_array_from_file
+
+!----------------------------------------------------------------------
+
 
 end module mod_basic_io
