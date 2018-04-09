@@ -48,6 +48,7 @@ public :: wp, &
           extended_char_len, &
           nl, &
           pi , &
+          eps, &
           prev_tri , next_tri , &
           prev_qua , next_qua
 
@@ -84,6 +85,8 @@ integer, parameter :: next_tri(3) = (/ 2 , 3 , 1 /)
 integer, parameter :: prev_qua(4) = (/ 4 , 1 , 2 , 3 /)
 integer, parameter :: next_qua(4) = (/ 2 , 3 , 4 , 1 /)
 
+
+real(wp), parameter :: eps = 1.0e-10_wp
 
 !----------------------------------------------------------------------
 

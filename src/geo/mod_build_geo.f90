@@ -781,17 +781,6 @@ subroutine build_te_general ( ee , rr , neigh , ElType ,  &
 
  write(*,*) '   build_connectivity_general ... done.'
 
- fid = 31
- open(unit=fid,file='./check/rr.dat')
- do i1 = 1 , size(rr,2) 
-   write(fid,*) rr(:,i1)
- end do
- close(fid)
- open(unit=fid,file='./check/ee.dat')
- do i1 = 1 , size(ee,2) 
-   write(fid,*) ee(:,i1)
- end do
- close(fid)
 
  call find_te_general ( rr , ee , neigh , ee_m , neigh_m , &  
                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output

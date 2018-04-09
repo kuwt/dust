@@ -175,6 +175,13 @@ do i=1,n_geo
   geo_files(i) = getstr(prms,'GeoFile')
 enddo
 
+
+n = 3
+do i = 1,n
+
+  n = n+1
+  write(*,*) 'i',i
+enddo 
 if (.not. cmd_set_filename) output_file_name = output_file_name_read
 
 call build_geometry(geo_files,trim(output_file_name))

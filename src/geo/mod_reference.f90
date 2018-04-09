@@ -58,10 +58,10 @@
 module mod_reference
 
 use mod_math, only: &
-  linear_interp
+  linear_interp, cross
 
 use mod_param, only: &
-  wp, max_char_len, nl
+  wp, eps, max_char_len, nl
 
 use mod_sim_param, only: &
   t_sim_param
@@ -129,15 +129,27 @@ type :: t_ref
   !! moving parent)
   logical :: moving
 
-
   !> Moviment type
   character(len=max_char_len) :: mov_type
+
+  !> Is the reference frame the root of multiple reference frames?
+  logical :: multiple
+
+  !> Which kind of multiple reference frame is employed
+  character(len=max_char_len) :: mult_type
+
+  !> Number of multiple (final) reference frames
+  integer :: n_mult
+
   !> Rotation pole
   real(wp), allocatable :: pole(:)
+
   !> Rotation axis
   real(wp), allocatable :: axis(:)
+
   !> Rotation rate around the axis
   real(wp) :: Omega
+
   !> Starting rotation angle
   real(wp) :: psi_0
 
@@ -244,14 +256,19 @@ subroutine build_references(refs, reference_file, sim_param)
  character(len=*), intent(in) :: reference_file
  type(t_sim_param) , intent(inout) :: sim_param
 
+ type(t_ref), allocatable :: refs_temp(:)
  type(t_parse) :: ref_prs
  type(t_parse), pointer :: sbprms , ssbprms
- integer :: n_refs
- integer :: iref, iref2
+ integer :: n_refs, n_refs_input
+ integer :: n_mult_refs
+ integer :: iref, iref_input, iref2, i_mult_ref
  integer :: n_child
  integer, allocatable :: temp_chil(:)
  character(len=max_char_len) :: msg
+ integer :: prev_id
  type(t_link), pointer :: lnk
+ real(wp), allocatable :: psi_0(:)
+ real(wp) :: hub_offset, norm(3), rot_axis(3), rot_rate
 
  character(len=*), parameter :: this_sub_name = 'build_references'
 
@@ -268,12 +285,14 @@ subroutine build_references(refs, reference_file, sim_param)
                multiple=.true.)
   call ref_prs%CreateStringOption('Parent_Tag','Tag of the parent reference', &
                multiple=.true.)
-  call ref_prs%CreateLogicalOption('Moving','Is the reference moving', &
-               multiple=.true.)
   call ref_prs%CreateRealArrayOption('Origin','Origin of reference frame with&
                &respect to the parent', multiple=.true.)
   call ref_prs%CreateRealArrayOption('Orientation','Orientation of reference &
                &frame with respect to the parent', multiple=.true.)
+  call ref_prs%CreateLogicalOption('Moving','Is the reference moving', &
+               multiple=.true.)
+  call ref_prs%CreateLogicalOption('Multiple','Is the reference multiple', &
+               multiple=.true.)
 ! call ref_prs%CreateStringOption('MovementType','Kind of moving imposed', &
 !              multiple=.true.)
 ! !For the moment allowing just rotation with a certain angular speed around
@@ -299,14 +318,27 @@ subroutine build_references(refs, reference_file, sim_param)
                &reference frame')
   call sbprms%CreateRealOption('Rot_Rate','Rate of rotation around axis')
   call sbprms%CreateRealOption('Psi_0','Starting rotation angle') 
+  sbprms => null()
   ! Motion sub-parser ---------------------------------------------
+
+  ! Multiple sub-parser -------------------------------------------
+  call ref_prs%CreateSubOption('Multiplicity','Parameters for multiple frames',&
+                sbprms, multiple=.true.)
+  call sbprms%CreateStringOption('MultType','Kind of multiplicity')
+  call sbprms%CreateIntOption('N_Frames', 'Number of reference frames')
+  call sbprms%CreateRealArrayOption('Rot_Axis','Axis of rotation in parent &
+               &reference frame')
+  call sbprms%CreateRealOption('Hub_Offset','Offset from the pole')
+  call sbprms%CreateRealOption('Rot_Rate','Rate of rotation around axis')
+  call sbprms%CreateRealArrayOption('Psi_0','Starting rotation angle') 
+  ! Multiple sub-parser -------------------------------------------
  
  
   !read the file
   call ref_prs%read_options(trim(reference_file),printout_val=.true.)
 
   n_refs = countoption(ref_prs,'Reference_Tag') 
-  
+  n_refs_input = n_refs  
   !TODO: here we should check that all the other options have the same number
   !of occurrencies
 
@@ -337,7 +369,11 @@ subroutine build_references(refs, reference_file, sim_param)
                           0.0_wp, 1.0_wp, 0.0_wp, & 
                           0.0_wp, 0.0_wp, 1.0_wp/),(/3,3/))
   !Setup the other references
-  do iref = 1,n_refs
+  iref = 0
+  do iref_input = 1,n_refs_input
+
+    iref = iref+1
+
     refs(iref)%id = iref
     refs(iref)%tag = getstr(ref_prs,'Reference_Tag')
     refs(iref)%parent_tag = getstr(ref_prs,'Parent_Tag')
@@ -352,6 +388,7 @@ subroutine build_references(refs, reference_file, sim_param)
 
     refs(iref)%self_moving = getlogical(ref_prs,'Moving')
     refs(iref)%moving = .false. !standard, will be checked later
+
     
     if (refs(iref)%self_moving) then
 
@@ -483,13 +520,99 @@ subroutine build_references(refs, reference_file, sim_param)
       ! CHECK -----> interpolate value at t = 0
       refs(iref)%orig_pol_0 = refs(iref)%orig - refs(iref)%pol_pos(:,1)
 
+      ! Motion sub-parser ---------------------------------------------
+      sbprms => null() 
+      ! Motion sub-parser ---------------------------------------------
 
     endif
 
-    ! Motion sub-parser ---------------------------------------------
-    sbprms => null() 
-    ! Motion sub-parser ---------------------------------------------
 
+    refs(iref)%multiple = getlogical(ref_prs,'Multiple')
+
+    if (refs(iref)%multiple) then
+
+      call getsuboption(ref_prs,'Multiplicity',sbprms)
+      refs(iref)%mult_type = trim(getstr(sbprms,'MultType'))
+
+      select case(trim(refs(iref)%mult_type))
+       case('simple_rotor')
+
+        n_mult_refs = getint(sbprms,'N_Frames')
+        refs(iref)%n_mult = n_mult_refs
+
+        !1) allocate a series of extra reference frames and move-alloc everything
+        n_refs = n_refs+n_mult_refs
+        allocate(refs_temp(0:n_refs+n_mult_refs))
+        refs_temp(0:iref) = refs(0:iref)
+        deallocate(refs)
+        call move_alloc(refs_temp, refs)
+
+        !2) Read the inputs
+        allocate( psi_0(n_mult_refs))
+        rot_axis = getrealarray(sbprms,'Rot_Axis',3)
+        rot_rate = getreal(sbprms,'Rot_Rate')
+        psi_0 = getrealarray(sbprms,'Psi_0',n_mult_refs)
+        hub_offset = getreal(sbprms,'Hub_Offset')
+
+
+        !3) for each new reference insert all the parameters
+        prev_id = refs(iref)%id
+        do i_mult_ref=1,n_mult_refs
+          iref = iref+1
+          refs(iref)%id = iref
+          write(msg,'(A,I2.2)') trim(refs(prev_id)%tag)//'__',i_mult_ref
+          refs(iref)%tag = trim(msg)
+          refs(iref)%parent_tag = trim(refs(prev_id)%tag)
+          refs(iref)%n_chil = 0
+          allocate(refs(iref)%pole(3), refs(iref)%axis(3))
+          allocate(refs(iref)%orig(3), refs(iref)%frame(3,3))
+          refs(iref)%axis  = rot_axis
+          refs(iref)%pole  = (/0.0_wp, 0.0_wp, 0.0_wp/)
+          refs(iref)%Omega = rot_rate
+          refs(iref)%psi_0 = psi_0(i_mult_ref)
+          norm = cross(refs(iref)%axis,(/0.0_wp, 1.0_wp, 0.0_wp/))
+          if (norm2(norm) .le. eps) &
+            norm = cross(refs(iref)%axis,(/1.0_wp, 0.0_wp, 0.0_wp/))
+          refs(iref)%orig = hub_offset * norm/norm2(norm)
+          refs(iref)%frame(1:3,3) = refs(iref)%axis/norm2(refs(iref)%axis)
+          refs(iref)%frame(1:3,2) = norm/norm2(norm)
+          refs(iref)%frame(1:3,1) = cross(refs(iref)%frame(1:3,2), &
+                                          refs(iref)%frame(1:3,3))
+          !allocated here, will be set in update_all_refs
+          allocate(refs(iref)%of_g(3), refs(iref)%R_g(3,3))
+          refs(iref)%self_moving = .true.
+          refs(iref)%moving = .false. !standard, will be checked later
+
+          allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps)) 
+          allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps)) 
+          allocate(refs(iref)%pol_tim(  sim_param%n_timesteps)) 
+          allocate(refs(iref)%rot_pos(  sim_param%n_timesteps)) 
+          allocate(refs(iref)%rot_vel(  sim_param%n_timesteps)) 
+          allocate(refs(iref)%rot_tim(  sim_param%n_timesteps)) 
+          do it = 1,sim_param%n_timesteps
+            refs(iref)%pol_pos(:,it) = refs(iref)%pole
+            refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
+            refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
+            refs(iref)%rot_pos(  it) = refs(iref)%psi_0 + &
+                 refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1)  )    ! <---- CHECK !!!!
+            refs(iref)%rot_vel(  it) = refs(iref)%Omega
+            refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
+          end do 
+          allocate(refs(iref)%orig_pol_0(3))
+          refs(iref)%orig_pol_0 = refs(iref)%orig - refs(iref)%pol_pos(:,1)
+
+        enddo
+        deallocate(psi_0)
+       case default
+         call error(this_sub_name, this_mod_name, 'Unknown type of movement')
+      end select
+      
+      ! Motion sub-parser ---------------------------------------------
+      sbprms => null() 
+      ! Motion sub-parser ---------------------------------------------
+
+    endif
+    
   enddo
 
   !Generate the parent-children references
@@ -593,10 +716,12 @@ recursive subroutine reference_update_ref(this,refs,t,R,of,G,f)
  real(wp) :: R_loc(3,3), of_loc(3)
  real(wp) :: G_loc(3,3), f_loc(3)
  integer :: i1
+  
 
   !Update the local transformation with respect to the parent 
   
   call this%update_self(t,R, of,  R_loc, of_loc, G_loc, f_loc)
+
 
   !Update the transformation with respect to the base system
   this%R_g  = matmul( R , R_loc )
@@ -605,6 +730,8 @@ recursive subroutine reference_update_ref(this,refs,t,R,of,G,f)
   this%G_g = G + matmul(R, G_loc)
   this%f_g = f + matmul(R, f_loc)
   
+
+
   
   !For all the reference children call the same updating subroutine, passing
   !this reference global matrices
