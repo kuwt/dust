@@ -142,7 +142,8 @@ type :: t_geo_component
  integer, allocatable :: i_points(:)
 
  !> Reference frame tag 
- integer :: ref_tag
+ !integer :: ref_tag
+ character(len=max_char_len) :: ref_tag
 
  ! Reference frame id
  integer :: ref_id
@@ -455,52 +456,6 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
 ! ! trailing edge ----------------------
 ! call build_te(geo,elems,te)
 
-  fid = 26
-  open(unit=fid,file='./check//e_te.dat')
-  do i1 = 1 , size(te%e,2)
-    write(fid,*) te%e(:,i1)
-  end do
-  close(fid)
-  open(unit=fid,file='./check//i_te.dat')
-  do i1 = 1 , size(te%i,2)
-    write(fid,*) te%i(:,i1)
-  end do
-  close(fid)
-  open(unit=fid,file='./check//rr_te.dat')
-  do i1 = 1 , size(te%rr,2)
-    write(fid,*) te%rr(:,i1)
-  end do
-  close(fid)
-  open(unit=fid,file='./check//ii_te.dat')
-  do i1 = 1 , size(te%ii,2)
-    write(fid,*) te%ii(:,i1)
-  end do
-  close(fid)
-  open(unit=fid,file='./check//neigh_te.dat')
-  do i1 = 1 , size(te%neigh,2)
-    write(fid,*) te%neigh(:,i1)
-  end do
-  close(fid)
-  open(unit=fid,file='./check//o_te.dat')
-  do i1 = 1 , size(te%o,2)
-    write(fid,*) te%o(:,i1)
-  end do
-  close(fid)
-  open(unit=fid,file='./check//ref_te.dat')
-  do i1 = 1 , size(te%ref)
-    write(fid,*) te%ref(i1)
-  end do
-  close(fid)
-  open(unit=fid,file='./check//t_te.dat')
-  do i1 = 1 , size(te%t,2)
-    write(fid,*) te%t(:,i1)
-  end do
-  close(fid)
-
-
-
-
-
   ! connectivity needed for computing velocity and cp
   ! ----
   call create_local_velocity_stencil(geo,elems)    ! for surfpan only (3dP)
@@ -528,7 +483,8 @@ subroutine load_components(geo, in_file, te)
  character(len=max_char_len) :: comp_el_type
  integer :: points_offset, n_vert , elems_offset
  real(wp), allocatable :: points_tmp(:,:)
- integer :: ref_tag, ref_id, iref
+ character(len=max_char_len) :: ref_tag
+ integer :: ref_id, iref
  character(len=max_char_len) :: msg, cname
  integer(h5loc) :: floc, gloc, cloc , geo_loc , te_loc
  integer :: n_comp, i_comp
@@ -568,7 +524,7 @@ subroutine load_components(geo, in_file, te)
     !Look for the reference frame of the component
     ref_id = -1
     do iref = 0,ubound(geo%refs,1)
-      if (geo%refs(iref)%tag .eq. ref_tag) then
+      if (trim(geo%refs(iref)%tag) .eq. trim(ref_tag)) then
         !set id
         ref_id = iref
       endif
@@ -576,12 +532,12 @@ subroutine load_components(geo, in_file, te)
     !if not found the reference
     if (ref_id .lt. 0) then
       write(msg,'(A,I2,A,I2,A)') 'For component ',i_comp, &
-                   ' a reference with tag ',ref_tag,' was not found'
+                   ' a reference with tag ',trim(ref_tag),' was not found'
       call error(this_sub_name, this_mod_name, msg)
     endif
 
     geo%components(i_comp)%ref_id  = ref_id
-    geo%components(i_comp)%ref_tag = ref_tag
+    geo%components(i_comp)%ref_tag = trim(ref_tag)
     geo%components(i_comp)%moving  = geo%refs(ref_id)%moving
 
     ! Geometry and Solution --------------------------
@@ -600,7 +556,7 @@ subroutine load_components(geo, in_file, te)
     call read_hdf5_al(neigh_te,'neigh_te',te_loc)
     call read_hdf5_al(    o_te,    'o_te',te_loc)
     call read_hdf5_al(    t_te,    't_te',te_loc)
-    call read_hdf5_al(  ref_te,  'ref_te',te_loc)
+    !call read_hdf5_al(  ref_te,  'ref_te',te_loc)
     call close_hdf5_group(te_loc)
  
     call read_hdf5(comp_el_type,'ElType',cloc)
@@ -669,7 +625,6 @@ subroutine load_components(geo, in_file, te)
     if(comp_el_type(1:1) .eq. 'v') geo%components(i_comp)%nVortRin = size(ee,2)
 
     ! Trailing Edge ------------
-    ! TODO: add offsets !!!! 
     ne_te = size(e_te,2)
     nn_te = size(i_te,2)
     write(*,*) ' ne_te , nn_te = ' , ne_te , nn_te
@@ -681,7 +636,7 @@ subroutine load_components(geo, in_file, te)
       allocate(te%neigh(2,ne_te) ) ; te%neigh = neigh_te
       allocate(te%o    (2,ne_te) ) ; te%o     =     o_te
       allocate(te%t    (2,nn_te) ) ; te%t     =     t_te
-      allocate(te%ref  (  nn_te) ) ; te%ref   =   ref_te
+      allocate(te%ref  (  nn_te) ) ; te%ref   =   geo%components(i_comp)%ref_id
     else
       nn_te_prev = size(te%i,2)
       ne_te_prev = size(te%e,2)
@@ -717,7 +672,9 @@ subroutine load_components(geo, in_file, te)
       call move_alloc(t_te_tmp,te%t ) 
       allocate(ref_te_tmp(size(te%ref   )+nn_te)) 
       ref_te_tmp(                 1:size(te%ref   )   ) =  te%ref 
-      ref_te_tmp(  size(te%ref  )+1:size(ref_te_tmp  )) = ref_te 
+      ref_te_tmp(  size(te%ref  )+1:size(ref_te_tmp  )) = &
+                                                geo%components(i_comp)%ref_id
+
       call move_alloc(ref_te_tmp,te%ref) 
     end if 
 

@@ -126,7 +126,8 @@ subroutine build_component(gloc, geo_file, comp_id)
  real(wp) :: reflection_point(3), reflection_normal(3)
  integer :: points_offset, n_vert
  real(wp), allocatable :: points_tmp(:,:)
- integer :: ref_tag, ref_id, iref
+ character(len=max_char_len) :: ref_tag
+ integer :: ref_id, iref
  character(len=max_char_len) :: msg, comp_name
  integer(h5loc) :: comp_loc , geo_loc , te_loc
 
@@ -152,7 +153,7 @@ subroutine build_component(gloc, geo_file, comp_id)
   call geo_prs%CreateStringOption('ElType', &
               'element type (temporary) p panel v vortex ring')
   !reference frame
-  call geo_prs%CreateIntOption('Reference_Tag',&
+  call geo_prs%CreateStringOption('Reference_Tag',&
                                    'reference frame tag of the component','0')
   !reflections
   call geo_prs%CreateLogicalOption('mesh_reflection',&
@@ -171,7 +172,7 @@ subroutine build_component(gloc, geo_file, comp_id)
 
   mesh_file      = getstr(geo_prs,'MeshFile')
   mesh_file_type = getstr(geo_prs,'MeshFileType')
-  ref_tag        = getint(geo_prs,'Reference_Tag')
+  ref_tag        = getstr(geo_prs,'Reference_Tag')
 
   mesh_reflection   = getlogical(geo_prs, 'mesh_reflection')
   reflection_point  = getrealarray(geo_prs, 'reflection_point',3)
@@ -285,11 +286,11 @@ subroutine build_component(gloc, geo_file, comp_id)
         write(*,*) '  be sure to your input files comply with the conventions '
         write(*,*) '  of parameteric component structures.'//nl
         call build_te_parametric( ee , rr , ElType ,  &
-           npoints_chord_tot , nelems_span_tot , ref_tag , &
-           e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, ref_te ) !te as an output
+           npoints_chord_tot , nelems_span_tot , &
+           e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
       else
-        call build_te_general ( ee , rr , neigh , ElType , ref_tag ,  &
-                  e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, ref_te ) !te as an output
+        call build_te_general ( ee , rr , neigh , ElType ,  &
+                  e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
       end if
 
 !     call create_local_velocity_stencil_general()
@@ -299,8 +300,8 @@ subroutine build_component(gloc, geo_file, comp_id)
 
       call build_connectivity_general( ee , neigh )
 
-      call build_te_general ( ee , rr , neigh , ElType , ref_tag ,  &
-                e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, ref_te ) !te as an output
+      call build_te_general ( ee , rr , neigh , ElType ,  &
+                e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
 
 !     call create_local_velocity_stencil_general()
 !     call create_strip_connectivity_general()
@@ -310,57 +311,14 @@ subroutine build_component(gloc, geo_file, comp_id)
                     ElType , npoints_chord_tot , nelems_span_tot , mesh_reflection , &
                     neigh )
       call build_te_parametric( ee , rr , ElType ,  &
-         npoints_chord_tot , nelems_span_tot , ref_tag , &
-         e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, ref_te ) !te as an output
+         npoints_chord_tot , nelems_span_tot , &
+         e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
 
 !     call create_local_velocity_stencil_parametric()
 !     call create_strip_connectivity_parametric()
 
   end select    
 
-! check ----
-  fid = 26
-  open(unit=fid,file='./check//e_te.dat')
-  do i1 = 1 , size(e_te,2)
-    write(fid,*) e_te(:,i1)
-  end do
-  close(fid)
-  open(unit=fid,file='./check//i_te.dat')
-  do i1 = 1 , size(i_te,2)
-    write(fid,*) i_te(:,i1)
-  end do
-  close(fid)
-  open(unit=fid,file='./check//rr_te.dat')
-  do i1 = 1 , size(rr_te,2)
-    write(fid,*) rr_te(:,i1)
-  end do
-  close(fid)
-  open(unit=fid,file='./check//ii_te.dat')
-  do i1 = 1 , size(ii_te,2)
-    write(fid,*) ii_te(:,i1)
-  end do
-  close(fid)
-  open(unit=fid,file='./check//neigh_te.dat')
-  do i1 = 1 , size(neigh_te,2)
-    write(fid,*) neigh_te(:,i1)
-  end do
-  close(fid)
-  open(unit=fid,file='./check//o_te.dat')
-  do i1 = 1 , size(o_te,2)
-    write(fid,*) o_te(:,i1)
-  end do
-  close(fid)
-  open(unit=fid,file='./check//ref_te.dat')
-  do i1 = 1 , size(ref_te)
-    write(fid,*) ref_te(i1)
-  end do
-  close(fid)
-  open(unit=fid,file='./check//t_te.dat')
-  do i1 = 1 , size(t_te,2)
-    write(fid,*) t_te(:,i1)
-  end do
-  close(fid)
-! check ----
  
   call write_hdf5(neigh,'neigh',geo_loc)
   call close_hdf5_group(geo_loc)
@@ -373,7 +331,6 @@ subroutine build_component(gloc, geo_file, comp_id)
   call write_hdf5(neigh_te,'neigh_te',te_loc)
   call write_hdf5(    o_te,    'o_te',te_loc)
   call write_hdf5(    t_te,    't_te',te_loc)
-  call write_hdf5(  ref_te,  'ref_te',te_loc)
   call close_hdf5_group(te_loc)
 
  
@@ -785,18 +742,17 @@ end subroutine build_connectivity_parametric
 
 !----------------------------------------------------------------------
 
-subroutine build_te_general ( ee , rr , neigh , ElType , ref_tag ,  &
-                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, ref_te ) !te as an output
+subroutine build_te_general ( ee , rr , neigh , ElType ,  &
+                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
 
  integer   , intent(in) :: ee(:,:)
  real(wp)  , intent(in) :: rr(:,:)
  integer   , intent(in) :: neigh(:,:)
  character , intent(in) :: ElType
- integer   , intent(in) :: ref_tag
 
  ! te structures
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
- integer , allocatable :: neigh_te(:,:) , o_te(:,:) , ref_te(:)
+ integer , allocatable :: neigh_te(:,:) , o_te(:,:)
  real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
 
  ! merge ------
@@ -838,7 +794,7 @@ subroutine build_te_general ( ee , rr , neigh , ElType , ref_tag ,  &
  close(fid)
 
  call find_te_general ( rr , ee , neigh , ee_m , neigh_m , &  
-                e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, ref_te ) !te as an output
+                e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
 
 
 contains
@@ -913,7 +869,7 @@ end subroutine merge_nodes_general
 ! -------------
 
 subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &  
-                e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, ref_te ) !te as an output
+                e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
 
  real(wp), intent(in) :: rr(:,:)
  integer , intent(in) :: ee(:,:) , neigh(:,:) , ee_m(:,:) , neigh_m(:,:)
@@ -922,7 +878,6 @@ subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &
  integer , allocatable , intent(out) :: e_te(:,:) , i_te(:,:) , ii_te(:,:) 
  integer , allocatable , intent(out) :: neigh_te(:,:) , o_te(:,:)
  real(wp), allocatable , intent(out) :: rr_te(:,:) , t_te(:,:) 
- integer , allocatable , intent(out) :: ref_te(:)
  
  ! tmp arrays --------
  integer , allocatable               :: e_te_tmp(:,:) , i_te_tmp(:,:) , ii_te_tmp(:,:) 
@@ -1119,7 +1074,6 @@ subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &
  ! Compute unit vector at the te nodes ----------------
  !  for the first implicit wake panel  ----------------
  allocate(t_te  (3,nn_te)) ; t_te = 0.0_wp  
- allocate(ref_te(  nn_te)) ; ref_te = ref_tag
  do i_n = 1 , nn_te
    vec1 = 0.0_wp
    do i_e = 1 , ne_te 
@@ -1230,18 +1184,17 @@ end subroutine build_te_general
 !----------------------------------------------------------------------
 
 subroutine build_te_parametric ( ee , rr , ElType , &
-                npoints_chord_tot , nelems_span , ref_tag , &
-                e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, ref_te ) !te as an output
+                npoints_chord_tot , nelems_span , &
+                e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
  
  integer , intent(in) :: ee(:,:)
  real(wp), intent(in) :: rr(:,:)
  character,intent(in) :: ElType
  integer , intent(in) :: npoints_chord_tot , nelems_span
- integer , intent(in) :: ref_tag
  
  ! te structures
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
- integer , allocatable :: neigh_te(:,:) , o_te(:,:) , ref_te(:)
+ integer , allocatable :: neigh_te(:,:) , o_te(:,:)
  real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
  
  integer :: nelems_chord
@@ -1293,8 +1246,6 @@ subroutine build_te_parametric ( ee , rr , ElType , &
  o_te(2,1) = 0
  o_te(1,nelems_span) = 0
  
- ! ref_te --------
- allocate(ref_te(nelems_span+1)) ; ref_te = ref_tag
  
  ! t_te ----------
  allocate(t_te(3,nelems_span+1)) ; t_te = 0.0_wp

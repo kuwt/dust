@@ -68,7 +68,7 @@ use mod_sim_param, only: &
 
 use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption, &
-  getsuboption,&
+  getsuboption, getstr, &
   finalizeparameters, t_link, check_opt_consistency
   
 
@@ -97,7 +97,8 @@ type :: t_ref
   integer :: id
 
   !> Reference tag (can be non-consecutive)
-  integer :: tag
+  !integer :: tag
+  character(len=max_char_len) :: tag
 
   !> Reference Name
   character(len=max_char_len) :: name
@@ -106,7 +107,8 @@ type :: t_ref
   integer :: parent_id
 
   !> Parent tag, can be non consecutive
-  integer :: parent_tag
+  !integer :: parent_tag
+  character(len=max_char_len) :: parent_tag
 
   !> Number of children references
   integer :: n_chil
@@ -258,9 +260,13 @@ subroutine build_references(refs, reference_file, sim_param)
  integer :: it , nt
 
   !Define all the parameters to be read
-  call ref_prs%CreateIntOption('Reference_Tag','Integer tag of reference frame',&
+  !call ref_prs%CreateIntOption('Reference_Tag','Integer tag of reference frame',&
+  !             multiple=.true.)
+  !call ref_prs%CreateIntOption('Parent_Tag','Tag of the parent reference', &
+  !             multiple=.true.)
+  call ref_prs%CreateStringOption('Reference_Tag','Integer tag of reference frame',&
                multiple=.true.)
-  call ref_prs%CreateIntOption('Parent_Tag','Tag of the parent reference', &
+  call ref_prs%CreateStringOption('Parent_Tag','Tag of the parent reference', &
                multiple=.true.)
   call ref_prs%CreateLogicalOption('Moving','Is the reference moving', &
                multiple=.true.)
@@ -314,9 +320,9 @@ subroutine build_references(refs, reference_file, sim_param)
 ! write(*,*) ' build_references(1) : sim_param%n_timesteps : ' , sim_param%n_timesteps 
   !Setup the base reference
   refs(0)%id = 0
-  refs(0)%tag = 0
+  refs(0)%tag = '0'
   refs(0)%parent_id = -1
-  refs(0)%parent_tag = -1
+  refs(0)%parent_tag = '-1'
   refs(0)%n_chil = 0
   allocate(refs(0)%orig(3), refs(0)%frame(3,3))
   refs(0)%orig = (/0.0_wp, 0.0_wp, 0.0_wp/)
@@ -333,8 +339,8 @@ subroutine build_references(refs, reference_file, sim_param)
   !Setup the other references
   do iref = 1,n_refs
     refs(iref)%id = iref
-    refs(iref)%tag = getint(ref_prs,'Reference_Tag')
-    refs(iref)%parent_tag = getint(ref_prs,'Parent_Tag')
+    refs(iref)%tag = getstr(ref_prs,'Reference_Tag')
+    refs(iref)%parent_tag = getstr(ref_prs,'Parent_Tag')
     refs(iref)%n_chil = 0
 
     allocate(refs(iref)%orig(3), refs(iref)%frame(3,3))
@@ -464,16 +470,6 @@ subroutine build_references(refs, reference_file, sim_param)
           refs(iref)%rot_vel(  it) = refs(iref)%Omega
         end do 
 
-! write(*,*) ! check ----
-! write(*,*) trim(refs(iref)%mov_type)
-! write(*,*) ' pol_tim , pol_vel , pol_pos '
-! do it = 1 , nt
-!  write(*,*) refs(iref)%pol_tim(  it) , &
-!             refs(iref)%pol_vel(:,it) , &
-!             refs(iref)%pol_pos(:,it)
-! end do
-! stop
-! write(*,*) ! check ----
 
         deallocate(pol_pos_mat)
 
@@ -503,7 +499,7 @@ subroutine build_references(refs, reference_file, sim_param)
     !look for the parent in all the other references (master included)
     do iref2 = 0,n_refs
       !if found
-      if (refs(iref2)%tag .eq. refs(iref)%parent_tag) then
+      if (trim(refs(iref2)%tag) .eq. trim(refs(iref)%parent_tag)) then
         !set parent id
         refs(iref)%parent_id = iref2
         !Update parent's children list
@@ -519,8 +515,8 @@ subroutine build_references(refs, reference_file, sim_param)
   
     !if not found a parent
     if (refs(iref)%parent_id .lt. 0) then
-      write(msg,'(A,I2,A,I2,A)') 'For reference tag ',refs(iref)%tag, &
-                   ' a parent with tag ',refs(iref)%parent_tag,' was not found'
+      write(msg,'(A,I2,A,I2,A)') 'For reference tag ',trim(refs(iref)%tag), &
+                   ' a parent with tag ',trim(refs(iref)%parent_tag),' was not found'
       call error(this_sub_name, this_mod_name, msg)
     endif
     
