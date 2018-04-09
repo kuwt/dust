@@ -129,7 +129,7 @@ implicit none
 !-----------------------------------------------------------------------
 
 public :: t_parse, ignoredParameters, finalizeparameters, &
-          getstr, getlogical, getreal, getrealarray, getint, countoption, &
+          getstr, getlogical, getreal, getrealarray, getint, getintarray, countoption, &
           t_link, check_opt_consistency, getsuboption
 
 private

@@ -67,7 +67,7 @@ use mod_sim_param, only: &
   t_sim_param
 
 use mod_parse, only: &
-  t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption, &
+  t_parse, getstr, getint, getintarray, getreal, getrealarray, getlogical, countoption, &
   getsuboption,&
   finalizeparameters, t_link, check_opt_consistency
   
@@ -243,7 +243,7 @@ subroutine build_references(refs, reference_file, sim_param)
  type(t_sim_param) , intent(inout) :: sim_param
 
  type(t_parse) :: ref_prs
- type(t_parse), pointer :: sbprms , ssbprms
+ type(t_parse), pointer :: sbprms , sbprms_pol , sbprms_rot ! ssbprms
  integer :: n_refs
  integer :: iref, iref2
  integer :: n_child
@@ -253,9 +253,22 @@ subroutine build_references(refs, reference_file, sim_param)
 
  character(len=*), parameter :: this_sub_name = 'build_references'
 
+! old ---
  character(len=max_char_len) :: omega_filen , pol_pos_filen , pol_vel_filen
  real(wp) , allocatable :: omega_mat(:,:) , pol_pos_mat(:,:) , pol_vel_mat(:,:)
+! old ---
+ character(len=max_char_len) :: rot_filen , pol_filen 
+ real(wp) , allocatable :: rot_mat(:,:) , pol_mat(:,:)
+ integer , allocatable :: pol_fun_int(:)
+ real(wp), allocatable :: pol_vec(:) , pol_ome(:) , pol_pha(:) 
+ real(wp), allocatable :: pol_off(:) , pol_pos0(:)
+ real(wp) :: pol_amp
+ integer  :: rot_fun_int
+ real(wp), allocatable :: rot_axis(:)
+ real(wp) :: rot_amp, rot_ome, rot_pha, rot_off, rot_pos0
  integer :: it , nt
+ character(len=max_char_len) :: ref_tag_str
+ integer :: i1
 
   !Define all the parameters to be read
   call ref_prs%CreateIntOption('Reference_Tag','Integer tag of reference frame',&
@@ -268,32 +281,60 @@ subroutine build_references(refs, reference_file, sim_param)
                &respect to the parent', multiple=.true.)
   call ref_prs%CreateRealArrayOption('Orientation','Orientation of reference &
                &frame with respect to the parent', multiple=.true.)
-! call ref_prs%CreateStringOption('MovementType','Kind of moving imposed', &
-!              multiple=.true.)
-! !For the moment allowing just rotation with a certain angular speed around
-! !an axis
-! call ref_prs%CreateRealArrayOption('Rot_Pole','Pole of rotation in parent &
-!              &reference frame', multiple=.true.)
-! call ref_prs%CreateRealArrayOption('Rot_Axis','Axis of rotation in parent &
-!              &reference frame', multiple=.true.)
-! call ref_prs%CreateRealOption('Rot_Rate','Rate of rotation around axis', &
-!               multiple=.true.)
-! call ref_prs%CreateRealOption('Psi_0','Starting rotation angle', &
-!               multiple=.true.)
 
   ! Motion sub-parser ---------------------------------------------
   call ref_prs%CreateSubOption('Motion','Definition of the motion of a frame',sbprms, &
                multiple=.true.)
-  call sbprms%CreateStringOption('MovementType','Kind of moving imposed')
-  call sbprms%CreateStringOption('Rot_Vel_File','File containing Time and Angular Velocity')
-  call sbprms%CreateStringOption('Pol_Pos_File','File containing Time and Angular Velocity')
-  call sbprms%CreateRealArrayOption('Rot_Pole','Pole of rotation in parent &
-               &reference frame')
-  call sbprms%CreateRealArrayOption('Rot_Axis','Axis of rotation in parent &
-               &reference frame')
-  call sbprms%CreateRealOption('Rot_Rate','Rate of rotation around axis')
-  call sbprms%CreateRealOption('Psi_0','Starting rotation angle') 
-  ! Motion sub-parser ---------------------------------------------
+  ! Pole motion sub-parser ----------------------------------------
+  call sbprms%CreateSubOption('Pole','Definition of the motion of the pole', &
+              sbprms_pol, multiple=.true.)
+  call sbprms_pol%CreateStringOption('Input','Input: velocity or position',&
+              multiple=.true.)
+  call sbprms_pol%CreateStringOption('Input_Type','from_file or simple_function',&
+              multiple=.true.)
+  ! TODO: add %CreateStrinArrayOption(...) to options/mod_parse.f90
+  call sbprms_pol%CreateIntArrayOption('Function','fun definition. 0:constant,1:sin,...',&
+              multiple=.true.)
+  call sbprms_pol%CreateStringOption('File','file .dat containing the motion',&
+              multiple=.true.)
+  call sbprms_pol%CreateRealOption('Amplitude','Multiplicative factor for the motion',&
+              multiple=.true.)
+  call sbprms_pol%CreateRealArrayOption('Vector','Relative amplitude of the three coordinates',&
+              multiple=.true.)
+  call sbprms_pol%CreateRealArrayOption('Omega','Pulsation of the motion for each coordinate',&
+              multiple=.true.)
+  call sbprms_pol%CreateRealArrayOption('Phase','Phase of the motion for each coordinate',&
+              multiple=.true.)
+  call sbprms_pol%CreateRealArrayOption('Offset','Phase of the motion for each coordinate',&
+              multiple=.true.)
+  call sbprms_pol%CreateRealArrayOption('Position_0','Initial position for each coordinate',&
+              multiple=.true.)
+  ! Pole motion sub-parser ----------------------------------------
+  ! Rotation motion sub-parser ------------------------------------
+  call sbprms%CreateSubOption('Rotation','Definition of the rotation of the frame',&
+              sbprms_rot, multiple=.true.)
+  call sbprms_rot%CreateStringOption('Input','Input: velocity or position',&
+              multiple=.true.)
+  call sbprms_rot%CreateStringOption('Input_Type','from_file or simple_function',&
+              multiple=.true.)
+  ! TODO: add %CreateStrinArrayOption(...) to options/mod_parse.f90
+  call sbprms_rot%CreateIntOption('Function','fun definition. 0:constant,1:sin,...',&
+              multiple=.true.)
+  call sbprms_rot%CreateStringOption('File','file .dat containing the motion',&
+              multiple=.true.)
+  call sbprms_rot%CreateRealArrayOption('Axis','axis of rotation',&
+              multiple=.true.)
+  call sbprms_rot%CreateRealOption('Amplitude','Multiplicative factor for the motion',&
+              multiple=.true.)
+  call sbprms_rot%CreateRealOption('Omega','Pulsation of the motion for each coordinate',&
+              multiple=.true.)
+  call sbprms_rot%CreateRealOption('Phase','Phase of the motion for each coordinate',&
+              multiple=.true.)
+  call sbprms_rot%CreateRealOption('Offset','Phase of the motion for each coordinate',&
+              multiple=.true.)
+  call sbprms_rot%CreateRealOption('Psi_0','Initial position for each coordinate',&
+              multiple=.true.)
+  ! Rotation motion sub-parser ------------------------------------
  
  
   !read the file
@@ -311,6 +352,11 @@ subroutine build_references(refs, reference_file, sim_param)
   allocate(refs(0:n_refs))
 
 
+          if ( countoption(sbprms_pol,'Input_Type') .eq. 0 ) then
+            write(ref_tag_str,'(I5)') refs(iref)%tag
+            call error(this_sub_name, this_mod_name, '"Input" field not defined &
+                  &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
+          end if
 ! write(*,*) ' build_references(1) : sim_param%n_timesteps : ' , sim_param%n_timesteps 
   !Setup the base reference
   refs(0)%id = 0
@@ -350,137 +396,513 @@ subroutine build_references(refs, reference_file, sim_param)
     if (refs(iref)%self_moving) then
 
       call getsuboption(ref_prs,'Motion',sbprms)
+      call getsuboption(sbprms,'Pole',sbprms_pol)
 
-      refs(iref)%mov_type = trim(getstr(sbprms,'MovementType'))
-      select case (trim(refs(iref)%mov_type))
+      select case( trim(getstr(sbprms_pol,'Input')) )
 
-       case('constant_rotation')
-        allocate(refs(iref)%pole(3), refs(iref)%axis(3))
-        refs(iref)%pole  = getrealarray(sbprms,'Rot_Pole',3)
-        refs(iref)%axis  = getrealarray(sbprms,'Rot_Axis',3)
-        refs(iref)%Omega = getreal(sbprms,'Rot_Rate')
-        refs(iref)%psi_0 = getreal(sbprms,'Psi_0')
-!       write(*,*) ' sim_param%n_timesteps : ' , sim_param%n_timesteps
-        ! build general arrays: pol_pos, pol_vel, pol_time, ----------------
-        !                       rot_pos, rot_vel, rot_time
-        allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps)) 
-        allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps)) 
-        allocate(refs(iref)%pol_tim(  sim_param%n_timesteps)) 
-        allocate(refs(iref)%rot_pos(  sim_param%n_timesteps)) 
-        allocate(refs(iref)%rot_vel(  sim_param%n_timesteps)) 
-        allocate(refs(iref)%rot_tim(  sim_param%n_timesteps)) 
-        do it = 1,sim_param%n_timesteps
-          refs(iref)%pol_pos(:,it) = refs(iref)%pole
-          refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
-          refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
-          refs(iref)%rot_pos(  it) = refs(iref)%psi_0 + &
-               refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1)  )    ! <---- CHECK !!!!
-          refs(iref)%rot_vel(  it) = refs(iref)%Omega
-          refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
-        end do 
-       case('rotation_from_file')
+        case('position')
 
-        allocate(refs(iref)%pole(3), refs(iref)%axis(3))
-        refs(iref)%pole  = getrealarray(sbprms,'Rot_Pole',3)
-        refs(iref)%axis  = getrealarray(sbprms,'Rot_Axis',3)
-!       refs(iref)%Omega = getreal(sbprms,'Rot_Rate')
-        refs(iref)%psi_0 = getreal(sbprms,'Psi_0')
-        omega_filen = trim(getstr(sbprms,'Rot_Vel_File'))
-        ! Read array
-!       write(*,*) trim(omega_filen)
-        call read_real_array_from_file ( 2 , trim(omega_filen) , omega_mat )
-        nt = size(omega_mat,1)
-!       write(*,*) ' nt : ' , nt
-        ! build general arrays: pol_pos, pol_vel, pol_time, ----------------
-        !                       rot_pos, rot_vel, rot_time
-        allocate(refs(iref)%pol_pos(3,nt)) 
-        allocate(refs(iref)%pol_vel(3,nt)) 
-        allocate(refs(iref)%pol_tim(  nt)) 
-        allocate(refs(iref)%rot_pos(  nt)) 
-        allocate(refs(iref)%rot_vel(  nt)) 
-        allocate(refs(iref)%rot_tim(  nt))
-        refs(iref)%pol_tim = omega_mat(:,1) 
-        refs(iref)%rot_tim = omega_mat(:,1) 
-        refs(iref)%rot_vel = omega_mat(:,2) 
-        do it = 1,nt
-          refs(iref)%pol_pos(:,it) = refs(iref)%pole
-          refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
-!         refs(iref)%pol_tim(  it) = 
-          if ( it .gt. 1 ) then
-            refs(iref)%rot_pos(  it) = refs(iref)%rot_pos(it-1) + &
-                 omega_mat(it,2) * ( omega_mat(it,1) - omega_mat(it-1,1) )    ! <---- CHECK !!!!
-          else
-            refs(iref)%rot_pos(  it) = refs(iref)%psi_0 
+          if ( countoption(sbprms_pol,'Input_Type') .eq. 0 ) then
+            write(ref_tag_str,'(I5)') refs(iref)%tag
+            call error(this_sub_name, this_mod_name, '"Input" field not defined &
+                  &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
           end if
-!         refs(iref)%rot_vel(  it) =
-!         refs(iref)%rot_tim(  it) =
-        end do 
 
-        deallocate(omega_mat)
+          ! Input type : from_file , simple_function
+          select case( trim(getstr(sbprms_pol,'Input_Type')) )    
 
-       case('position_from_file')
+            case('from_file')
+              if ( countoption(sbprms_pol,'File') .eq. 0 ) then
+                write(ref_tag_str,'(I5)') refs(iref)%tag
+                call error(this_sub_name, this_mod_name, '"File" field not defined &
+                      &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
+              end if 
 
-        allocate(refs(iref)%pole(3), refs(iref)%axis(3))
-        refs(iref)%pole  = getrealarray(sbprms,'Rot_Pole',3)
-        refs(iref)%axis  = getrealarray(sbprms,'Rot_Axis',3)
-        refs(iref)%Omega = getreal(sbprms,'Rot_Rate')
-        refs(iref)%psi_0 = getreal(sbprms,'Psi_0')
-        pol_pos_filen = trim(getstr(sbprms,'Pol_Pos_File'))
-        ! Read array
-!       write(*,*) trim(omega_filen)
-        call read_real_array_from_file ( 4 , trim(pol_pos_filen) , pol_pos_mat )
-        nt = size(pol_pos_mat,1)
-        write(*,*) ' nt : ' , nt
-        ! build general arrays: pol_pos, pol_vel, pol_time, ----------------
-        !                       rot_pos, rot_vel, rot_time
-        allocate(refs(iref)%pol_pos(3,nt))  
-        allocate(refs(iref)%pol_vel(3,nt)) 
-        allocate(refs(iref)%pol_tim(  nt))
-        allocate(refs(iref)%rot_pos(  nt)) 
-        allocate(refs(iref)%rot_vel(  nt)) 
-        allocate(refs(iref)%rot_tim(  nt)) 
-        refs(iref)%pol_pos = transpose(pol_pos_mat(:,2:4))
-        refs(iref)%pol_tim = pol_pos_mat(:,1) 
-        refs(iref)%rot_tim = pol_pos_mat(:,1) 
-        do it = 1,nt
-!         refs(iref)%pol_tim(  it) = 
-!         refs(iref)%pol_pos(:,it) = 
-          if ( it .eq. 1) then
-            refs(iref)%pol_vel(:,it) = ( refs(iref)%pol_pos(:,2) - &
-                                         refs(iref)%pol_pos(:,1) ) /  &
-             ( refs(iref)%pol_tim(2) - refs(iref)%pol_tim(1) )
-          elseif ( it .lt. nt ) then
-            refs(iref)%pol_vel(:,it) = ( refs(iref)%pol_pos(:,it+1) - &
-                                         refs(iref)%pol_pos(:,it-1) ) /  &
-            ( refs(iref)%pol_tim(it+1) - refs(iref)%pol_tim(it-1) )
-          elseif ( it .eq. nt ) then
-            refs(iref)%pol_vel(:,nt) = ( refs(iref)%pol_pos(:,nt) - &
-                                         refs(iref)%pol_pos(:,nt-1) ) /  &
-              ( refs(iref)%pol_tim(nt) - refs(iref)%pol_tim(nt-1) )
+              pol_filen = trim(getstr(sbprms_pol,'File'))
+              call read_real_array_from_file ( 4 , trim(pol_filen) , pol_mat )
+              nt = size(pol_mat,1)
+
+              allocate(refs(iref)%pol_pos(3,nt)) 
+              allocate(refs(iref)%pol_vel(3,nt)) 
+              allocate(refs(iref)%pol_tim(  nt)) 
+
+              ! Read time and position
+              refs(iref)%pol_tim = pol_mat(:,1) 
+              refs(iref)%pol_pos = transpose(pol_pos_mat(:,2:4))
+              ! Compute velocity with Finite Difference 
+              do it = 1,nt
+                if ( it .eq. 1) then
+                  refs(iref)%pol_vel(:,it) = ( refs(iref)%pol_pos(:,2) - &
+                                               refs(iref)%pol_pos(:,1) ) /  &
+                   ( refs(iref)%pol_tim(2) - refs(iref)%pol_tim(1) )
+                elseif ( it .lt. nt ) then
+                  refs(iref)%pol_vel(:,it) = ( refs(iref)%pol_pos(:,it+1) - &
+                                               refs(iref)%pol_pos(:,it-1) ) /  &
+                  ( refs(iref)%pol_tim(it+1) - refs(iref)%pol_tim(it-1) )
+                elseif ( it .eq. nt ) then
+                  refs(iref)%pol_vel(:,nt) = ( refs(iref)%pol_pos(:,nt) - &
+                                               refs(iref)%pol_pos(:,nt-1) ) /  &
+                    ( refs(iref)%pol_tim(nt) - refs(iref)%pol_tim(nt-1) )
+                end if
+              end do
+ 
+            case('simple_function')
+              if ( countoption(sbprms_pol,'Function') .eq. 0 ) then
+                write(ref_tag_str,'(I5)') refs(iref)%tag
+                call error(this_sub_name, this_mod_name, '"Function" field not defined &
+                  &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
+              end if 
+
+              allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps)) 
+              allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps)) 
+              allocate(refs(iref)%pol_tim(  sim_param%n_timesteps)) 
+
+              ! Read the integer id for the user defined functions 0:constant,1:sin              
+              pol_fun_int = getintarray(sbprms_pol,'Function',3)
+              pol_amp = getreal(sbprms_pol,'Amplitude')
+              pol_vec = getrealarray(sbprms_pol,'Vector',3)
+              pol_ome = getrealarray(sbprms_pol,'Omega',3)
+              pol_pha = getrealarray(sbprms_pol,'Phase',3)
+              pol_off = getrealarray(sbprms_pol,'Offset',3)
+               
+              refs(iref)%pol_tim = sim_param%time_vec
+
+              do i1 = 1 , 3
+                if ( pol_fun_int(i1) .eq. 0 ) then ! constant function
+
+                  do it = 1 , sim_param%n_timesteps
+                    refs(iref)%pol_pos(i1,it) = pol_amp * pol_vec(i1) + pol_off(i1)
+                    refs(iref)%pol_vel(i1,it) = 0.0_wp
+                  end do
+
+                elseif ( pol_fun_int(i1) .eq. 1 ) then ! sin function
+
+                  do it = 1 , sim_param%n_timesteps 
+                    refs(iref)%pol_pos(i1,it) = pol_amp * pol_vec(i1) * &
+                       sin( pol_ome(i1) * refs(iref)%pol_tim(it) - pol_pha(i1) ) + &
+                       pol_off(i1)
+                    refs(iref)%pol_vel(i1,it) = pol_amp * pol_vec(i1) * pol_ome(i1) * &
+                       cos( pol_ome(i1) * refs(iref)%pol_tim(it) - pol_pha(i1) )
+                  end do
+
+                else
+                call error(this_sub_name, this_mod_name, 'Undefined "Function" field &
+                  &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
+                  &'. It must be 0:constant or 1:sin')
+                end if
+              end do
+
+            case default
+              write(ref_tag_str,'(I5)') refs(iref)%tag
+              call error(this_sub_name, this_mod_name, 'Undefined "Input_Type" field &
+                  &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
+                  &'. It must be "from_file" or "simple_function".')
+     
+          
+          end select
+
+        case('velocity')
+
+          if ( countoption(sbprms_pol,'Input_Type') .eq. 0 ) then
+            write(ref_tag_str,'(I5)') refs(iref)%tag
+            call error(this_sub_name, this_mod_name, '"Input" field not defined &
+                  &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
           end if
-!         refs(iref)%rot_tim(  it) = 
-          refs(iref)%rot_pos(  it) = refs(iref)%psi_0 + &
-                 refs(iref)%Omega * ( refs(iref)%rot_tim(it) - refs(iref)%rot_tim(1) )    ! <---- CHECK !!!!
-          refs(iref)%rot_vel(  it) = refs(iref)%Omega
-        end do 
+          if ( countoption(sbprms_pol,'Position_0') .eq. 0 ) then
+            write(ref_tag_str,'(I5)') refs(iref)%tag
+            call error(this_sub_name, this_mod_name, '"Position_0" field not defined &
+                  &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
+          end if
 
-! write(*,*) ! check ----
-! write(*,*) trim(refs(iref)%mov_type)
-! write(*,*) ' pol_tim , pol_vel , pol_pos '
-! do it = 1 , nt
-!  write(*,*) refs(iref)%pol_tim(  it) , &
-!             refs(iref)%pol_vel(:,it) , &
-!             refs(iref)%pol_pos(:,it)
-! end do
-! stop
-! write(*,*) ! check ----
+          pol_pos0 = getrealarray(sbprms_pol,'Position_0',3)
 
-        deallocate(pol_pos_mat)
+          ! Read the integer id for the user defined functions 0:constant,1:sin              
+          pol_fun_int = getintarray(sbprms_pol,'Function',3)
+          pol_amp = getreal(sbprms_pol,'Amplitude')
+          pol_vec = getrealarray(sbprms_pol,'Vector',3)
+          pol_ome = getrealarray(sbprms_pol,'Omega',3)
+          pol_pha = getrealarray(sbprms_pol,'Phase',3)
+          pol_off = getrealarray(sbprms_pol,'Offset',3)
+          write(*,*) ' pol_fun_int : ' , pol_fun_int
+          write(*,*) ' pol_amp     : ' , pol_amp
+          write(*,*) ' pol_vec     : ' , pol_vec
+          write(*,*) ' pol_ome     : ' , pol_ome
+          write(*,*) ' pol_pha     : ' , pol_pha
+          write(*,*) ' pol_off     : ' , pol_off
+               
+          ! Input type : from_file , simple_function
+          select case( trim(getstr(sbprms_pol,'Input_Type')) )    
 
-       case default
-         call error(this_sub_name, this_mod_name, 'Unknown type of movement')
+            case('from_file')
+              if ( countoption(sbprms_pol,'File') .eq. 0 ) then
+                write(ref_tag_str,'(I5)') refs(iref)%tag
+                call error(this_sub_name, this_mod_name, '"File" field not defined &
+                      &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
+              end if 
+
+              pol_filen = trim(getstr(sbprms_pol,'File'))
+              call read_real_array_from_file ( 4 , trim(pol_filen) , pol_mat )
+              nt = size(pol_mat,1)
+
+              allocate(refs(iref)%pol_pos(3,nt)) 
+              allocate(refs(iref)%pol_vel(3,nt)) 
+              allocate(refs(iref)%pol_tim(  nt)) 
+
+              ! Read time and velocity
+              refs(iref)%pol_tim = pol_mat(:,1) 
+              refs(iref)%pol_vel = transpose(pol_pos_mat(:,2:4))
+              ! Compute velocity with Esplicit Euler integration
+              refs(iref)%pol_pos(:,1) = pol_pos0  ! Initial condition ...
+              do it = 2 , nt
+                refs(iref)%pol_pos(:,it) = refs(iref)%pol_pos(:,it-1) + &
+                     refs(iref)%pol_vel(:,it-1) * &
+                   ( refs(iref)%pol_tim(it) - refs(iref)%pol_tim(it-1) )
+              end do
+ 
+            case('simple_function')
+              if ( countoption(sbprms_pol,'Function') .eq. 0 ) then
+                write(ref_tag_str,'(I5)') refs(iref)%tag
+                call error(this_sub_name, this_mod_name, '"Function" field not defined &
+                  &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
+              end if 
+
+              allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps)) 
+              allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps)) 
+              allocate(refs(iref)%pol_tim(  sim_param%n_timesteps)) 
+
+              refs(iref)%pol_tim = sim_param%time_vec
+
+              do i1 = 1 , 3
+                if ( pol_fun_int(i1) .eq. 0 ) then ! constant function
+
+                  do it = 1 , sim_param%n_timesteps
+                    refs(iref)%pol_vel(i1,it) = pol_amp * pol_vec(it)
+                    refs(iref)%pol_pos(i1,it) = pol_pos0(i1) + & 
+                            pol_amp * pol_vec(i1) * &
+                          ( refs(iref)%pol_tim(it) - refs(iref)%pol_tim(1) )
+                  end do
+
+                elseif ( pol_fun_int(i1) .eq. 1 ) then ! sin function
+
+                  do it = 1 , sim_param%n_timesteps 
+                    refs(iref)%pol_vel(i1,it) = pol_amp * pol_vec(i1) * &
+                       sin( pol_ome(i1) * refs(iref)%pol_tim(it) - pol_pha(i1) ) + &
+                       pol_off(i1)
+                    if ( pol_ome(i1) .ne. 0.0_wp ) then
+                      refs(iref)%pol_pos(i1,it) = - pol_amp * pol_vec(i1) / pol_ome(i1) * &
+                         cos( pol_ome(i1) * refs(iref)%pol_tim(it) - pol_pha(i1) ) + &
+                         pol_off(i1) * ( refs(iref)%pol_tim(it) - refs(iref)%pol_tim(it-1) ) + &
+                         pol_pos0(i1)
+                    else 
+                    refs(iref)%pol_pos(i1,it) = &
+                     ( pol_amp * pol_vec(i1) * sin( - pol_pha(i1) ) + pol_off(i1) ) * &
+                     ( refs(iref)%pol_tim(it) - refs(iref)%pol_tim(it-1) ) + &
+                       pol_pos0(i1)
+                    end if
+                  end do
+
+                else
+                call error(this_sub_name, this_mod_name, 'Undefined "Function" field &
+                  &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
+                  &'. It must be 0:constant or 1:sin')
+                end if
+              end do
+
+            case default
+              write(ref_tag_str,'(I5)') refs(iref)%tag
+              call error(this_sub_name, this_mod_name, 'Undefined "Input_Type" field &
+                  &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
+                  &'. It must be "from_file" or "simple_function".')
+     
+          end select
+
+        case default
+          write(ref_tag_str,'(I5)') refs(iref)%tag
+          call error(this_sub_name, this_mod_name, 'Undefined "Input" field &
+                &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
+                &'. It must be "position" or "velocity".')
 
       end select
+
+
+      call getsuboption(sbprms,'Rotation',sbprms_rot)
+
+      select case(trim(getstr(sbprms_rot,'Input')) )
+
+        case('velocity')
+
+          if ( countoption(sbprms_rot,'Input_Type') .eq. 0 ) then
+            write(ref_tag_str,'(I5)') refs(iref)%tag
+            call error(this_sub_name, this_mod_name, '"Input" field not defined &
+                  &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
+          end if
+          if ( countoption(sbprms_rot,'Axis') .eq. 0 ) then
+            write(ref_tag_str,'(I5)') refs(iref)%tag
+            call error(this_sub_name, this_mod_name, '"Axis" field not defined &
+                  &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
+          end if
+          if ( countoption(sbprms_rot,'Psi_0') .eq. 0 ) then
+            write(ref_tag_str,'(I5)') refs(iref)%tag
+            call error(this_sub_name, this_mod_name, '"Psi_0" field not defined &
+                  &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
+          end if
+
+          refs(iref)%axis = getrealarray(sbprms_rot,'Axis',3)
+          rot_pos0 = getreal(sbprms_rot,'Psi_0')
+
+          ! Input type : from_file , simple_function
+          select case( trim(getstr(sbprms_rot,'Input_Type')) )    
+
+            case('from_file')
+              if ( countoption(sbprms_rot,'File') .eq. 0 ) then
+                write(ref_tag_str,'(I5)') refs(iref)%tag
+                call error(this_sub_name, this_mod_name, '"File" field not defined &
+                      &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
+              end if 
+
+!             write(*,*) ' +++++++++++ '
+!             write(*,*) ' Rotation. Velocity from file ' 
+
+              rot_filen = trim(getstr(sbprms_rot,'File'))
+              call read_real_array_from_file ( 2 , trim(rot_filen) , rot_mat )
+              nt = size(rot_mat,1)
+
+!             ! check ----
+!             write(*,*) ' rot_filen ' , trim(rot_filen)
+!             write(*,*) ' nt : ', nt
+!             ! check ----
+
+              allocate(refs(iref)%rot_pos(nt)) 
+              allocate(refs(iref)%rot_vel(nt)) 
+              allocate(refs(iref)%rot_tim(nt)) 
+
+              ! Read time and velocity
+              refs(iref)%rot_tim = rot_mat(:,1) 
+              refs(iref)%rot_vel = rot_mat(:,2)
+              ! Compute velocity with Esplicit Euler integration
+              refs(iref)%rot_pos(1) = rot_pos0  ! Initial condition ...
+              do it = 2 , nt
+                refs(iref)%rot_pos(it) = refs(iref)%rot_pos(it-1) + &
+                     refs(iref)%rot_vel(it-1) * &
+                   ( refs(iref)%rot_tim(it) - refs(iref)%rot_tim(it-1) )
+              end do
+ 
+            case('simple_function')
+              if ( countoption(sbprms_rot,'Function') .eq. 0 ) then
+                write(ref_tag_str,'(I5)') refs(iref)%tag
+                call error(this_sub_name, this_mod_name, '"Function" field not defined &
+                  &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
+              end if 
+
+              write(*,*) ' +++++++++++ '
+              write(*,*) ' Rotation. Velocity from simple function '
+
+              allocate(refs(iref)%rot_pos(sim_param%n_timesteps)) 
+              allocate(refs(iref)%rot_vel(sim_param%n_timesteps)) 
+              allocate(refs(iref)%rot_tim(sim_param%n_timesteps)) 
+
+              ! Read the integer id for the user defined functions 0:constant,1:sin              
+              rot_fun_int = getint(sbprms_rot,'Function')
+              rot_amp = getreal(sbprms_rot,'Amplitude')
+              write(*,*) ' rot_amp : ' , rot_amp
+              rot_ome = getreal(sbprms_rot,'Omega')
+              rot_pha = getreal(sbprms_rot,'Phase')
+              rot_off = getreal(sbprms_rot,'Offset')
+               
+              refs(iref)%rot_tim = sim_param%time_vec
+
+              if ( rot_fun_int .eq. 0 ) then ! constant function
+
+                do it = 1 , sim_param%n_timesteps
+                  refs(iref)%rot_vel(it) = rot_amp 
+                  refs(iref)%rot_pos(it) = rot_pos0 + rot_amp * &
+                        ( refs(iref)%rot_tim(it) - refs(iref)%rot_tim(1) )
+                end do
+
+              elseif ( rot_fun_int .eq. 1 ) then ! sin function
+                  refs(iref)%rot_vel(1) = rot_amp * &
+                     sin( rot_ome * refs(iref)%rot_tim(1) - rot_pha ) + rot_off
+                  refs(iref)%rot_pos(1) = rot_pos0  ! Initial condition ...
+                do it = 2 , sim_param%n_timesteps 
+                  refs(iref)%rot_vel(it) = rot_amp * &
+                     sin( rot_ome * refs(iref)%rot_tim(it) - rot_pha ) + &
+                     rot_off
+                  if ( rot_ome .ne. 0.0_wp ) then
+                    refs(iref)%rot_pos(it) = - rot_amp / rot_ome * &
+                       cos( rot_ome * refs(iref)%rot_tim(it) - rot_pha ) + &
+                       rot_off * ( refs(iref)%rot_tim(it) - refs(iref)%rot_tim(it-1) ) + &
+                       rot_pos0
+                  else 
+                  refs(iref)%rot_pos(it) = &
+                   ( rot_amp * sin( - rot_pha ) + rot_off ) * &
+                   ( refs(iref)%rot_tim(it) - refs(iref)%rot_tim(it-1) ) + &
+                     rot_pos0
+                  end if
+                end do
+
+              else
+              call error(this_sub_name, this_mod_name, 'Undefined "Function" field &
+                &in Motion={RotatioRotationfor Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
+                &'. It must be 0:constant or 1:sin')
+              end if
+
+            case default
+              write(ref_tag_str,'(I5)') refs(iref)%tag
+              call error(this_sub_name, this_mod_name, 'Undefined "Input_Type" field &
+                  &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
+                  &'. It must be "from_file" or "simple_function".')
+     
+          end select
+
+        case default
+          write(ref_tag_str,'(I5)') refs(iref)%tag
+          call error(this_sub_name, this_mod_name, 'Undefined "Input" field &
+                &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
+                &'. It must be "velocity".')
+
+      end select
+
+
+
+
+
+
+
+! check ----
+!     stop
+! check ----
+
+
+!!!!       refs(iref)%mov_type = trim(getstr(sbprms,'MovementType'))
+!!!!       select case (trim(refs(iref)%mov_type))
+!!!! 
+!!!!        case('constant_rotation')
+!!!!         allocate(refs(iref)%pole(3), refs(iref)%axis(3))
+!!!!         refs(iref)%pole  = getrealarray(sbprms,'Rot_Pole',3)
+!!!!         refs(iref)%axis  = getrealarray(sbprms,'Rot_Axis',3)
+!!!!         refs(iref)%Omega = getreal(sbprms,'Rot_Rate')
+!!!!         refs(iref)%psi_0 = getreal(sbprms,'Psi_0')
+!!!! !       write(*,*) ' sim_param%n_timesteps : ' , sim_param%n_timesteps
+!!!!         ! build general arrays: pol_pos, pol_vel, pol_time, ----------------
+!!!!         !                       rot_pos, rot_vel, rot_time
+!!!!         allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps)) 
+!!!!         allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps)) 
+!!!!         allocate(refs(iref)%pol_tim(  sim_param%n_timesteps)) 
+!!!!         allocate(refs(iref)%rot_pos(  sim_param%n_timesteps)) 
+!!!!         allocate(refs(iref)%rot_vel(  sim_param%n_timesteps)) 
+!!!!         allocate(refs(iref)%rot_tim(  sim_param%n_timesteps)) 
+!!!!         do it = 1,sim_param%n_timesteps
+!!!!           refs(iref)%pol_pos(:,it) = refs(iref)%pole
+!!!!           refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
+!!!!           refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
+!!!!           refs(iref)%rot_pos(  it) = refs(iref)%psi_0 + &
+!!!!                refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1)  )    ! <---- CHECK !!!!
+!!!!           refs(iref)%rot_vel(  it) = refs(iref)%Omega
+!!!!           refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
+!!!!         end do 
+!!!!        case('rotation_from_file')
+!!!! 
+!!!!         allocate(refs(iref)%pole(3), refs(iref)%axis(3))
+!!!!         refs(iref)%pole  = getrealarray(sbprms,'Rot_Pole',3)
+!!!!         refs(iref)%axis  = getrealarray(sbprms,'Rot_Axis',3)
+!!!! !       refs(iref)%Omega = getreal(sbprms,'Rot_Rate')
+!!!!         refs(iref)%psi_0 = getreal(sbprms,'Psi_0')
+!!!!         omega_filen = trim(getstr(sbprms,'Rot_Vel_File'))
+!!!!         ! Read array
+!!!! !       write(*,*) trim(omega_filen)
+!!!!         call read_real_array_from_file ( 2 , trim(omega_filen) , omega_mat )
+!!!!         nt = size(omega_mat,1)
+!!!! !       write(*,*) ' nt : ' , nt
+!!!!         ! build general arrays: pol_pos, pol_vel, pol_time, ----------------
+!!!!         !                       rot_pos, rot_vel, rot_time
+!!!!         allocate(refs(iref)%pol_pos(3,nt)) 
+!!!!         allocate(refs(iref)%pol_vel(3,nt)) 
+!!!!         allocate(refs(iref)%pol_tim(  nt)) 
+!!!!         allocate(refs(iref)%rot_pos(  nt)) 
+!!!!         allocate(refs(iref)%rot_vel(  nt)) 
+!!!!         allocate(refs(iref)%rot_tim(  nt))
+!!!!         refs(iref)%pol_tim = omega_mat(:,1) 
+!!!!         refs(iref)%rot_tim = omega_mat(:,1) 
+!!!!         refs(iref)%rot_vel = omega_mat(:,2) 
+!!!!         do it = 1,nt
+!!!!           refs(iref)%pol_pos(:,it) = refs(iref)%pole
+!!!!           refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
+!!!! !         refs(iref)%pol_tim(  it) = 
+!!!!           if ( it .gt. 1 ) then
+!!!!             refs(iref)%rot_pos(  it) = refs(iref)%rot_pos(it-1) + &
+!!!!                  omega_mat(it,2) * ( omega_mat(it,1) - omega_mat(it-1,1) )    ! <---- CHECK !!!!
+!!!!           else
+!!!!             refs(iref)%rot_pos(  it) = refs(iref)%psi_0 
+!!!!           end if
+!!!! !         refs(iref)%rot_vel(  it) =
+!!!! !         refs(iref)%rot_tim(  it) =
+!!!!         end do 
+!!!! 
+!!!!         deallocate(omega_mat)
+!!!! 
+!!!!        case('position_from_file')
+!!!! 
+!!!!         allocate(refs(iref)%pole(3), refs(iref)%axis(3))
+!!!!         refs(iref)%pole  = getrealarray(sbprms,'Rot_Pole',3)
+!!!!         refs(iref)%axis  = getrealarray(sbprms,'Rot_Axis',3)
+!!!!         refs(iref)%Omega = getreal(sbprms,'Rot_Rate')
+!!!!         refs(iref)%psi_0 = getreal(sbprms,'Psi_0')
+!!!!         pol_pos_filen = trim(getstr(sbprms,'Pol_Pos_File'))
+!!!!         ! Read array
+!!!! !       write(*,*) trim(omega_filen)
+!!!!         call read_real_array_from_file ( 4 , trim(pol_pos_filen) , pol_pos_mat )
+!!!!         nt = size(pol_pos_mat,1)
+!!!!         write(*,*) ' nt : ' , nt
+!!!!         ! build general arrays: pol_pos, pol_vel, pol_time, ----------------
+!!!!         !                       rot_pos, rot_vel, rot_time
+!!!!         allocate(refs(iref)%pol_pos(3,nt))  
+!!!!         allocate(refs(iref)%pol_vel(3,nt)) 
+!!!!         allocate(refs(iref)%pol_tim(  nt))
+!!!!         allocate(refs(iref)%rot_pos(  nt)) 
+!!!!         allocate(refs(iref)%rot_vel(  nt)) 
+!!!!         allocate(refs(iref)%rot_tim(  nt)) 
+!!!!         refs(iref)%pol_pos = transpose(pol_pos_mat(:,2:4))
+!!!!         refs(iref)%pol_tim = pol_pos_mat(:,1) 
+!!!!         refs(iref)%rot_tim = pol_pos_mat(:,1) 
+!!!!         do it = 1,nt
+!!!! !         refs(iref)%pol_tim(  it) = 
+!!!! !         refs(iref)%pol_pos(:,it) = 
+!!!!           if ( it .eq. 1) then
+!!!!             refs(iref)%pol_vel(:,it) = ( refs(iref)%pol_pos(:,2) - &
+!!!!                                          refs(iref)%pol_pos(:,1) ) /  &
+!!!!              ( refs(iref)%pol_tim(2) - refs(iref)%pol_tim(1) )
+!!!!           elseif ( it .lt. nt ) then
+!!!!             refs(iref)%pol_vel(:,it) = ( refs(iref)%pol_pos(:,it+1) - &
+!!!!                                          refs(iref)%pol_pos(:,it-1) ) /  &
+!!!!             ( refs(iref)%pol_tim(it+1) - refs(iref)%pol_tim(it-1) )
+!!!!           elseif ( it .eq. nt ) then
+!!!!             refs(iref)%pol_vel(:,nt) = ( refs(iref)%pol_pos(:,nt) - &
+!!!!                                          refs(iref)%pol_pos(:,nt-1) ) /  &
+!!!!               ( refs(iref)%pol_tim(nt) - refs(iref)%pol_tim(nt-1) )
+!!!!           end if
+!!!! !         refs(iref)%rot_tim(  it) = 
+!!!!           refs(iref)%rot_pos(  it) = refs(iref)%psi_0 + &
+!!!!                  refs(iref)%Omega * ( refs(iref)%rot_tim(it) - refs(iref)%rot_tim(1) )    ! <---- CHECK !!!!
+!!!!           refs(iref)%rot_vel(  it) = refs(iref)%Omega
+!!!!         end do 
+!!!! 
+!!!! ! write(*,*) ! check ----
+!!!! ! write(*,*) trim(refs(iref)%mov_type)
+!!!! ! write(*,*) ' pol_tim , pol_vel , pol_pos '
+!!!! ! do it = 1 , nt
+!!!! !  write(*,*) refs(iref)%pol_tim(  it) , &
+!!!! !             refs(iref)%pol_vel(:,it) , &
+!!!! !             refs(iref)%pol_pos(:,it)
+!!!! ! end do
+!!!! ! stop
+!!!! ! write(*,*) ! check ----
+!!!! 
+!!!!         deallocate(pol_pos_mat)
+!!!! 
+!!!!        case default
+!!!!          call error(this_sub_name, this_mod_name, 'Unknown type of movement')
+!!!! 
+!!!!       end select
 
 
       allocate(refs(iref)%orig_pol_0(3))
@@ -491,7 +913,9 @@ subroutine build_references(refs, reference_file, sim_param)
     endif
 
     ! Motion sub-parser ---------------------------------------------
-    sbprms => null() 
+    sbprms     => null() 
+    sbprms_pol => null() 
+    sbprms_rot => null() 
     ! Motion sub-parser ---------------------------------------------
 
   enddo
