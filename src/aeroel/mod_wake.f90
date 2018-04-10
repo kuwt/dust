@@ -105,6 +105,10 @@ type :: t_wake_panels
  !! (3 x n_wake_points x npan+1)
  real(wp), allocatable :: w_points(:,:,:)
 
+ !> Old points position for time stepping
+ real(wp), allocatable :: w_points_old(:,:,:)
+
+ !> Mainly for output reasons
  real(wp), allocatable :: w_vel(:,:,:)
 
  !> elements of the panels
@@ -124,13 +128,17 @@ contains
 !----------------------------------------------------------------------
 
 !> Initialize the panel wake
-subroutine initialize_wake_panels(wake, geo, te,  npan)
+subroutine initialize_wake_panels(wake, geo, te,  npan, dt, uinf)
  type(t_wake_panels), intent(out),target :: wake
  type(t_geo), intent(in) :: geo
  type(t_tedge), intent(in) :: te
  integer, intent(in) :: npan
+ real(wp), intent(in) :: dt
+ real(wp), intent(in) :: uinf(3)
 
+ integer :: p1, p2
  integer :: iw, ip
+ real(wp) :: dist(3)
 
 
   !set and allocate all the relevant variables
@@ -144,6 +152,7 @@ subroutine initialize_wake_panels(wake, geo, te,  npan)
   allocate(wake%w_start_points(3,wake%n_wake_points))
   allocate(wake%i_start_points(2,wake%n_wake_stripes))
   allocate(wake%w_points(3,wake%n_wake_points,npan+1))
+  allocate(wake%w_points_old(3,wake%n_wake_points,npan+1))
   allocate(wake%w_vel(3,wake%n_wake_points,npan+1))
   allocate(wake%wake_panels(wake%n_wake_stripes,npan))
   allocate(wake%ivort(wake%n_wake_stripes,npan))
@@ -169,9 +178,25 @@ subroutine initialize_wake_panels(wake, geo, te,  npan)
   wake%w_start_points = 0.5_wp * (geo%points(:,wake%gen_points(1,:)) + &
                                   geo%points(:,wake%gen_points(2,:)))
   wake%w_points(:,:,1) = wake%w_start_points
+
+  !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
+  do ip=1,wake%n_wake_points
+    dist = matmul(geo%refs(wake%gen_ref(ip))%R_g,wake%gen_dir(:,ip))
+    wake%w_points(:,ip,2) = wake%w_points(:,ip,1) + dist*0.3_wp*norm2(uinf)*dt
+  enddo
+
+  !Calculate geometrical quantities
+  do iw = 1,wake%n_wake_stripes
+    p1 = wake%i_start_points(1,iw)
+    p2 = wake%i_start_points(2,iw)
+    call calc_geo_data(wake%wake_panels(iw,1), &
+         reshape((/wake%w_points(:,p1,1),   wake%w_points(:,p2,1), &
+                   wake%w_points(:,p2,1+1), wake%w_points(:,p1,1+1)/),&
+                                                                   (/3,4/)))
+  enddo
   
   !Starting length of the wake is 
-  wake%wake_len = 1
+  wake%wake_len = 0
 
   !TODO : initialize first row of wake here
   allocate(wake%pan_p(wake%n_wake_stripes))
@@ -198,17 +223,22 @@ end subroutine
 !> Prepare the first row of panels to be inserted inside the linear system
 !!
 subroutine prepare_wake_panels(wake, elems, geo, dt, uinf)
- type(t_wake_panels), intent(inout) :: wake
+ type(t_wake_panels), intent(inout), target :: wake
  type(t_elem_p), intent(in) :: elems(:)
  type(t_geo), intent(in) :: geo
  real(wp), intent(in) :: dt
  real(wp), intent(in) :: uinf(3)
  
+ integer :: iw, ipan, ie, ip, np
  integer :: p1, p2
- integer :: ip, iw
+ real(wp) :: pos_p(3), vel_p(3), v(3)
+ type(t_elem_p), allocatable :: pan_p_temp(:)
  real(wp) :: dist(3)
 
-  !Update the first row of panels: set points positions
+  !1) Save the old points to update the point positions
+  wake%w_points_old = wake%w_points
+
+  !2) Update the first row of panels: set points positions
 
   !first row  of new points comes from geometry
   wake%w_start_points = 0.5_wp * (geo%points(:,wake%gen_points(1,:)) + &
@@ -229,6 +259,104 @@ subroutine prepare_wake_panels(wake, elems, geo, dt, uinf)
          reshape((/wake%w_points(:,p1,1),   wake%w_points(:,p2,1), &
                    wake%w_points(:,p2,1+1), wake%w_points(:,p1,1+1)/),&
                                                                    (/3,4/)))
+  enddo
+
+
+  !3) calculate the velocities at the old positions of the points and then
+  !update the positions (from the third row of points: the first is the 
+  !trailing edge, the second is extrapolated from the trailing edge)
+  np = wake%wake_len+1
+  if(wake%wake_len .lt. wake%npan) np = np + 1
+
+  do ipan = 3,np
+
+    do iw = 1,wake%n_wake_points
+      pos_p = wake%w_points_old(:,iw,ipan-1) 
+      vel_p = 0.0_wp
+
+      !calculate the influence of the solid bodies 
+      do ie=1,size(elems)
+        v = 0.0_wp
+        call elems(ie)%p%compute_vel(pos_p, v)
+        vel_p = vel_p + v/(4*pi)
+      enddo
+
+
+      ! calculate the influence of the wake
+      do ie=1,size(wake%pan_p)
+        v = 0.0_wp
+        call wake%pan_p(ie)%p%compute_vel(pos_p,v)
+        vel_p = vel_p + v/(4*pi)
+      enddo
+
+      !calculate the influence of particles
+
+      ! for OUTPUT only -----
+      wake%w_vel(:,iw,ipan-1) = vel_p
+
+      vel_p    = vel_p   +uinf   
+
+      !update the position in time
+      wake%w_points(:,iw,ipan) = wake%w_points_old(:,iw,ipan-1) + vel_p*dt
+! Check ----
+      ! Prescribed rigid wake ----
+!      wake%w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + (/1.0_wp, 0.0_wp, 0.0_wp/)*dt
+! Check ----
+      
+    enddo
+  enddo
+
+  !4) Increase the length of the wake, if it is necessary
+  if (wake%wake_len .lt. wake%npan) then
+      wake%wake_len = wake%wake_len + 1
+      allocate(pan_p_temp(wake%n_wake_stripes*wake%wake_len))
+
+      !debug: doing it all explicitly
+      !if (wake%wake_len .gt. 2) then
+      !  pan_p_temp(1:(wake%n_wake_stripes*(wake%wake_len-1))) = wake%pan_p
+      !endif
+      !do iw = 1,wake%n_wake_stripes
+      !  pan_p_temp(wake%n_wake_stripes*(wake%wake_len-1)+iw)%p &
+      !                                  => wake%wake_panels(iw,wake%wake_len)
+      !enddo
+      !call move_alloc(pan_p_temp,wake%pan_p)
+
+      do ip = 1,size(wake%pan_p)
+        pan_p_temp(ip) = wake%pan_p(ip)
+      enddo
+      do iw = 1,wake%n_wake_stripes
+        pan_p_temp(wake%n_wake_stripes*(wake%wake_len-1)+iw)%p &
+                                        => wake%wake_panels(iw,wake%wake_len)
+      enddo
+      if(allocated(wake%pan_p)) deallocate(wake%pan_p)
+      allocate(wake%pan_p(size(pan_p_temp)))
+      do ip = 1,size(wake%pan_p)
+        wake%pan_p(ip) = pan_p_temp(ip)
+      enddo
+      deallocate(pan_p_temp)
+
+  endif
+
+  !5) Update the panels geometrical quantities:
+  do ipan = 2,wake%wake_len
+    do iw = 1,wake%n_wake_stripes
+      p1 = wake%i_start_points(1,iw)
+      p2 = wake%i_start_points(2,iw)
+      call calc_geo_data(wake%wake_panels(iw,ipan), &
+           reshape((/wake%w_points(:,p1,ipan),   wake%w_points(:,p2,ipan), &
+                     wake%w_points(:,p2,ipan+1), wake%w_points(:,p1,ipan+1)/),&
+                                                                     (/3,4/)))
+    enddo
+  enddo
+
+
+
+  !6) Update the intensities of the panels
+  ! From the back, all the vortex intensities come from the previous panel
+  do ipan = wake%wake_len,2,-1
+    do iw = 1,wake%n_wake_stripes
+      wake%wake_panels(iw,ipan)%idou = wake%wake_panels(iw,ipan-1)%idou
+    enddo
   enddo
 
 end subroutine prepare_wake_panels
@@ -267,111 +395,126 @@ subroutine update_wake_panels(wake, elems, geo, dt, uinf)
 
   !==> 2) Update wake points position ==
   
-  !Save the old positions for the integration
-  allocate(point_old(size(wake%w_points,1),size(wake%w_points,2), &
-                                                        size(wake%w_points,3)))
-  point_old = wake%w_points
+  !!Save the old positions for the integration
+  !!allocate(point_old(size(wake%w_points,1),size(wake%w_points,2), &
+  !!                                                      size(wake%w_points,3)))
+  !!point_old = wake%w_points
 
 
-  !calculate the velocities at the old positions of the points and then
-  !update the positions (from the third row of points: the first is the 
-  !trailing edge, the second is extrapolated from the trailing edge)
-  np = wake%wake_len+1
-  if(wake%wake_len .lt. wake%npan) np = np + 1
+  !!calculate the velocities at the old positions of the points and then
+  !!update the positions (from the third row of points: the first is the 
+  !!trailing edge, the second is extrapolated from the trailing edge)
+  !np = wake%wake_len+1
+  !if(wake%wake_len .lt. wake%npan) np = np + 1
 
-  do ipan = 3,np
-    do iw = 1,wake%n_wake_points
-      pos_p = point_old(:,iw,ipan-1) 
-      vel_p = 0.0_wp
+  !!DEBUG: 
+  !write(*,*) 'Size pan_p',size(wake%pan_p)
+  !write(*,*) 'np',np
 
-      !calculate the influence of the solid bodies 
-      do ie=1,size(elems)
-        v = 0.0_wp
-        call elems(ie)%p%compute_vel(pos_p, v)
-        vel_p = vel_p + v/(4*pi)
-      enddo
+  !do ipan = 3,np
 
-      ! calculate the influence of the wake
-      do ie=1,size(wake%pan_p)
-        v = 0.0_wp
-        call wake%pan_p(ie)%p%compute_vel(pos_p,v)
-        vel_p = vel_p + v/(4*pi)
-      enddo
+  !  !DEBUG:
+  !  write(*,*) 'updating wake row ',ipan
+  !  do iw = 1,wake%n_wake_points
+  !    !DEBUG:
+  !    write(*,*) 'point  ',iw
+  !    pos_p = point_old(:,iw,ipan-1) 
+  !    vel_p = 0.0_wp
 
-      !calculate the influence of particles
+  !    !!calculate the influence of the solid bodies 
+  !    !do ie=1,size(elems)
+  !    !  v = 0.0_wp
+  !    !  call elems(ie)%p%compute_vel(pos_p, v)
+  !    !  vel_p = vel_p + v/(4*pi)
+  !    !enddo
 
-      ! for OUTPUT only -----
-      wake%w_vel(:,iw,ipan-1) = vel_p
+  !    !DEBUG
+  !    write(*,*) 'Body velocity', vel_p
 
-!     vel_p(1) = vel_p(1)+uinf(1)
-      vel_p    = vel_p   +uinf   
+  !    !! calculate the influence of the wake
+  !    !do ie=1,size(wake%pan_p)
+  !    !  v = 0.0_wp
+  !    !  call wake%pan_p(ie)%p%compute_vel(pos_p,v)
+  !    !  vel_p = vel_p + v/(4*pi)
+  !    !enddo
+
+  !    !calculate the influence of particles
+
+  !    ! for OUTPUT only -----
+  !    wake%w_vel(:,iw,ipan-1) = vel_p
+  !    !DEBUG
+  !    write(*,*) 'Total velocity', vel_p
+
+! !    vel_p(1) = vel_p(1)+uinf(1)
+  !    vel_p    = vel_p   +uinf   
 
 
-      !update the position in time
-      wake%w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + vel_p*dt
-! Check ----
-      ! Prescribed rigid wake ----
-!      wake%w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + (/1.0_wp, 0.0_wp, 0.0_wp/)*dt
-! Check ----
-      
-    enddo
-  enddo
 
-  deallocate(point_old)
+  !    !update the position in time
+  !    wake%w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + vel_p*dt
+! !Check ----
+  !    ! Prescribed rigid wake ----
+! !     wake%w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + (/1.0_wp, 0.0_wp, 0.0_wp/)*dt
+! !Check ----
+  !    
+  !  enddo
+  !enddo
+
+  !deallocate(point_old)
 
  
-  !==> 3) Increase the length of the wake, if it is necessary
-  if (wake%wake_len .lt. wake%npan) then
-      wake%wake_len = wake%wake_len + 1
-      allocate(pan_p_temp(wake%n_wake_stripes*wake%wake_len))
+  !!==> 3) Increase the length of the wake, if it is necessary
+  !if (wake%wake_len .lt. wake%npan) then
+  !    wake%wake_len = wake%wake_len + 1
+  !    allocate(pan_p_temp(wake%n_wake_stripes*wake%wake_len))
 
-      !debug: doing it all explicitly
-      !if (wake%wake_len .gt. 2) then
-      !  pan_p_temp(1:(wake%n_wake_stripes*(wake%wake_len-1))) = wake%pan_p
-      !endif
-      !do iw = 1,wake%n_wake_stripes
-      !  pan_p_temp(wake%n_wake_stripes*(wake%wake_len-1)+iw)%p &
-      !                                  => wake%wake_panels(iw,wake%wake_len)
-      !enddo
-      !call move_alloc(pan_p_temp,wake%pan_p)
+  !    !debug: doing it all explicitly
+  !    !if (wake%wake_len .gt. 2) then
+  !    !  pan_p_temp(1:(wake%n_wake_stripes*(wake%wake_len-1))) = wake%pan_p
+  !    !endif
+  !    !do iw = 1,wake%n_wake_stripes
+  !    !  pan_p_temp(wake%n_wake_stripes*(wake%wake_len-1)+iw)%p &
+  !    !                                  => wake%wake_panels(iw,wake%wake_len)
+  !    !enddo
+  !    !call move_alloc(pan_p_temp,wake%pan_p)
 
-      do ip = 1,size(wake%pan_p)
-        pan_p_temp(ip) = wake%pan_p(ip)
-      enddo
-      do iw = 1,wake%n_wake_stripes
-        pan_p_temp(wake%n_wake_stripes*(wake%wake_len-1)+iw)%p &
-                                        => wake%wake_panels(iw,wake%wake_len)
-      enddo
-      if(allocated(wake%pan_p)) deallocate(wake%pan_p)
-      allocate(wake%pan_p(size(pan_p_temp)))
-      do ip = 1,size(wake%pan_p)
-        wake%pan_p(ip) = pan_p_temp(ip)
-      enddo
-      deallocate(pan_p_temp)
+  !    do ip = 1,size(wake%pan_p)
+  !      pan_p_temp(ip) = wake%pan_p(ip)
+  !    enddo
+  !    do iw = 1,wake%n_wake_stripes
+  !      pan_p_temp(wake%n_wake_stripes*(wake%wake_len-1)+iw)%p &
+  !                                      => wake%wake_panels(iw,wake%wake_len)
+  !    enddo
+  !    if(allocated(wake%pan_p)) deallocate(wake%pan_p)
+  !    allocate(wake%pan_p(size(pan_p_temp)))
+  !    do ip = 1,size(wake%pan_p)
+  !      wake%pan_p(ip) = pan_p_temp(ip)
+  !    enddo
+  !    deallocate(pan_p_temp)
 
-  endif
+  !endif
 
-  !==> 4) Update the panels geometrical quantities:
-  do ipan = 2,wake%wake_len
-    do iw = 1,wake%n_wake_stripes
-      p1 = wake%i_start_points(1,iw)
-      p2 = wake%i_start_points(2,iw)
-      call calc_geo_data(wake%wake_panels(iw,ipan), &
-           reshape((/wake%w_points(:,p1,ipan),   wake%w_points(:,p2,ipan), &
-                     wake%w_points(:,p2,ipan+1), wake%w_points(:,p1,ipan+1)/),&
-                                                                     (/3,4/)))
-    enddo
-  enddo
+  !!==> 4) Update the panels geometrical quantities:
+  !do ipan = 2,wake%wake_len
+  !  do iw = 1,wake%n_wake_stripes
+  !    p1 = wake%i_start_points(1,iw)
+  !    p2 = wake%i_start_points(2,iw)
+  !    call calc_geo_data(wake%wake_panels(iw,ipan), &
+  !         reshape((/wake%w_points(:,p1,ipan),   wake%w_points(:,p2,ipan), &
+  !                   wake%w_points(:,p2,ipan+1), wake%w_points(:,p1,ipan+1)/),&
+  !                                                                   (/3,4/)))
+  !  enddo
+  !enddo
 
 
 
-  !==> 5) Update the intensities of the panels
-  !       From the back, all the vortex intensities come from the previous panel
-  do ipan = wake%wake_len,2,-1
-    do iw = 1,wake%n_wake_stripes
-      wake%wake_panels(iw,ipan)%idou = wake%wake_panels(iw,ipan-1)%idou
-    enddo
-  enddo
+  !!==> 5) Update the intensities of the panels
+  !!       From the back, all the vortex intensities come from the previous panel
+  !do ipan = wake%wake_len,2,-1
+  !  do iw = 1,wake%n_wake_stripes
+  !    wake%wake_panels(iw,ipan)%idou = wake%wake_panels(iw,ipan-1)%idou
+  !  enddo
+  !enddo
 
 
 end subroutine update_wake_panels

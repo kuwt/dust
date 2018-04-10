@@ -207,8 +207,8 @@ call finalizeParameters(prms)
 
 !------ Initialization ------
 call printout(nl//'====== Initializing Wake ======')
-call initialize_wake_panels(wake_panels, geo, te, n_wake_panels)
-call prepare_wake_panels(wake_panels, elems, geo, dt, uinf)
+call initialize_wake_panels(wake_panels, geo, te, n_wake_panels, dt, uinf)
+!call prepare_wake_panels(wake_panels, elems, geo, dt, uinf)
 
 call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
@@ -359,7 +359,7 @@ subroutine output_status(elems, geo, wake_panels, basename, it)
  integer,          intent(in) :: it
 
  integer, allocatable :: el(:,:), w_el(:,:)
- real(wp), allocatable :: w_points(:,:), w_res(:)
+ real(wp), allocatable :: w_points(:,:), w_res(:), w_vel(:,:)
  integer :: ie, of, p1, p2
  integer(h5loc) :: floc
  character(len=max_char_len) :: sit
@@ -367,6 +367,7 @@ subroutine output_status(elems, geo, wake_panels, basename, it)
   allocate(el(4,size(elems))); el = 0
   allocate(w_el(4,size(wake_panels%pan_p))); w_el = 0
   allocate(w_points(3,(wake_panels%n_wake_points)*(wake_panels%wake_len+1)))
+  allocate(w_vel(3,(wake_panels%n_wake_points)*(wake_panels%wake_len+1)))
   allocate(w_res(size(wake_panels%pan_p)))
 
   !=== VTK output ===
@@ -384,10 +385,13 @@ subroutine output_status(elems, geo, wake_panels, basename, it)
   enddo
   w_points = reshape(wake_panels%w_points(:,:,1:wake_panels%wake_len+1),&
     (/3,(wake_panels%n_wake_points)*(wake_panels%wake_len+1)/))
+  w_vel = reshape(wake_panels%w_vel(:,:,1:wake_panels%wake_len+1),&
+    (/3,(wake_panels%n_wake_points)*(wake_panels%wake_len+1)/))
   write(sit,'(I4.4)') it
   call vtk_out_bin (geo%points, el, linsys%res,  &
                     w_points, w_el, w_res,  &
-                    trim(basename)//'res_'//trim(sit)//'.vtu')
+                    w_vel, &
+                    out_filename = trim(basename)//'res_'//trim(sit)//'.vtu')
 
 
   !=== Hdf5 output ===
@@ -397,7 +401,7 @@ subroutine output_status(elems, geo, wake_panels, basename, it)
   call write_hdf5(el,'elements',floc)
 
   call close_hdf5_file(floc)
-  deallocate(el,w_el,w_points,w_res)
+  deallocate(el,w_el,w_points,w_res,w_vel)
 
 end subroutine output_status
 
