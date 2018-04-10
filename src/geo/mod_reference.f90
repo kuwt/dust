@@ -966,8 +966,8 @@ subroutine reference_update_self(this, t, R_par, of_par, R_loc, of_loc, &
                   Omega*this%axis(2), -Omega*this%axis(1),              0.0_wp/)&
                 ,(/3,3/))
     G_loc = matmul(Omega_vec,transpose(R_par))
-    f_loc = matmul(Omega_vec,(-matmul(transpose(R_par),of_par)- xPole)) ! + &
-!            matmul(R_par,vPole)
+    f_loc = matmul(Omega_vec,(-matmul(transpose(R_par),of_par)- xPole))  + &
+                      vPole
 
   endif
 
