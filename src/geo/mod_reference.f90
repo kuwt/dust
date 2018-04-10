@@ -762,149 +762,6 @@ subroutine build_references(refs, reference_file, sim_param)
 
       end select
 
-
-
-
-
-
-
-! check ----
-!     stop
-! check ----
-
-
-!!!!       refs(iref)%mov_type = trim(getstr(sbprms,'MovementType'))
-!!!!       select case (trim(refs(iref)%mov_type))
-!!!! 
-!!!!        case('constant_rotation')
-!!!!         allocate(refs(iref)%pole(3), refs(iref)%axis(3))
-!!!!         refs(iref)%pole  = getrealarray(sbprms,'Rot_Pole',3)
-!!!!         refs(iref)%axis  = getrealarray(sbprms,'Rot_Axis',3)
-!!!!         refs(iref)%Omega = getreal(sbprms,'Rot_Rate')
-!!!!         refs(iref)%psi_0 = getreal(sbprms,'Psi_0')
-!!!! !       write(*,*) ' sim_param%n_timesteps : ' , sim_param%n_timesteps
-!!!!         ! build general arrays: pol_pos, pol_vel, pol_time, ----------------
-!!!!         !                       rot_pos, rot_vel, rot_time
-!!!!         allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps)) 
-!!!!         allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps)) 
-!!!!         allocate(refs(iref)%pol_tim(  sim_param%n_timesteps)) 
-!!!!         allocate(refs(iref)%rot_pos(  sim_param%n_timesteps)) 
-!!!!         allocate(refs(iref)%rot_vel(  sim_param%n_timesteps)) 
-!!!!         allocate(refs(iref)%rot_tim(  sim_param%n_timesteps)) 
-!!!!         do it = 1,sim_param%n_timesteps
-!!!!           refs(iref)%pol_pos(:,it) = refs(iref)%pole
-!!!!           refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
-!!!!           refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
-!!!!           refs(iref)%rot_pos(  it) = refs(iref)%psi_0 + &
-!!!!                refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1)  )    ! <---- CHECK !!!!
-!!!!           refs(iref)%rot_vel(  it) = refs(iref)%Omega
-!!!!           refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
-!!!!         end do 
-!!!!        case('rotation_from_file')
-!!!! 
-!!!!         allocate(refs(iref)%pole(3), refs(iref)%axis(3))
-!!!!         refs(iref)%pole  = getrealarray(sbprms,'Rot_Pole',3)
-!!!!         refs(iref)%axis  = getrealarray(sbprms,'Rot_Axis',3)
-!!!! !       refs(iref)%Omega = getreal(sbprms,'Rot_Rate')
-!!!!         refs(iref)%psi_0 = getreal(sbprms,'Psi_0')
-!!!!         omega_filen = trim(getstr(sbprms,'Rot_Vel_File'))
-!!!!         ! Read array
-!!!! !       write(*,*) trim(omega_filen)
-!!!!         call read_real_array_from_file ( 2 , trim(omega_filen) , omega_mat )
-!!!!         nt = size(omega_mat,1)
-!!!! !       write(*,*) ' nt : ' , nt
-!!!!         ! build general arrays: pol_pos, pol_vel, pol_time, ----------------
-!!!!         !                       rot_pos, rot_vel, rot_time
-!!!!         allocate(refs(iref)%pol_pos(3,nt)) 
-!!!!         allocate(refs(iref)%pol_vel(3,nt)) 
-!!!!         allocate(refs(iref)%pol_tim(  nt)) 
-!!!!         allocate(refs(iref)%rot_pos(  nt)) 
-!!!!         allocate(refs(iref)%rot_vel(  nt)) 
-!!!!         allocate(refs(iref)%rot_tim(  nt))
-!!!!         refs(iref)%pol_tim = omega_mat(:,1) 
-!!!!         refs(iref)%rot_tim = omega_mat(:,1) 
-!!!!         refs(iref)%rot_vel = omega_mat(:,2) 
-!!!!         do it = 1,nt
-!!!!           refs(iref)%pol_pos(:,it) = refs(iref)%pole
-!!!!           refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
-!!!! !         refs(iref)%pol_tim(  it) = 
-!!!!           if ( it .gt. 1 ) then
-!!!!             refs(iref)%rot_pos(  it) = refs(iref)%rot_pos(it-1) + &
-!!!!                  omega_mat(it,2) * ( omega_mat(it,1) - omega_mat(it-1,1) )    ! <---- CHECK !!!!
-!!!!           else
-!!!!             refs(iref)%rot_pos(  it) = refs(iref)%psi_0 
-!!!!           end if
-!!!! !         refs(iref)%rot_vel(  it) =
-!!!! !         refs(iref)%rot_tim(  it) =
-!!!!         end do 
-!!!! 
-!!!!         deallocate(omega_mat)
-!!!! 
-!!!!        case('position_from_file')
-!!!! 
-!!!!         allocate(refs(iref)%pole(3), refs(iref)%axis(3))
-!!!!         refs(iref)%pole  = getrealarray(sbprms,'Rot_Pole',3)
-!!!!         refs(iref)%axis  = getrealarray(sbprms,'Rot_Axis',3)
-!!!!         refs(iref)%Omega = getreal(sbprms,'Rot_Rate')
-!!!!         refs(iref)%psi_0 = getreal(sbprms,'Psi_0')
-!!!!         pol_pos_filen = trim(getstr(sbprms,'Pol_Pos_File'))
-!!!!         ! Read array
-!!!! !       write(*,*) trim(omega_filen)
-!!!!         call read_real_array_from_file ( 4 , trim(pol_pos_filen) , pol_pos_mat )
-!!!!         nt = size(pol_pos_mat,1)
-!!!!         write(*,*) ' nt : ' , nt
-!!!!         ! build general arrays: pol_pos, pol_vel, pol_time, ----------------
-!!!!         !                       rot_pos, rot_vel, rot_time
-!!!!         allocate(refs(iref)%pol_pos(3,nt))  
-!!!!         allocate(refs(iref)%pol_vel(3,nt)) 
-!!!!         allocate(refs(iref)%pol_tim(  nt))
-!!!!         allocate(refs(iref)%rot_pos(  nt)) 
-!!!!         allocate(refs(iref)%rot_vel(  nt)) 
-!!!!         allocate(refs(iref)%rot_tim(  nt)) 
-!!!!         refs(iref)%pol_pos = transpose(pol_pos_mat(:,2:4))
-!!!!         refs(iref)%pol_tim = pol_pos_mat(:,1) 
-!!!!         refs(iref)%rot_tim = pol_pos_mat(:,1) 
-!!!!         do it = 1,nt
-!!!! !         refs(iref)%pol_tim(  it) = 
-!!!! !         refs(iref)%pol_pos(:,it) = 
-!!!!           if ( it .eq. 1) then
-!!!!             refs(iref)%pol_vel(:,it) = ( refs(iref)%pol_pos(:,2) - &
-!!!!                                          refs(iref)%pol_pos(:,1) ) /  &
-!!!!              ( refs(iref)%pol_tim(2) - refs(iref)%pol_tim(1) )
-!!!!           elseif ( it .lt. nt ) then
-!!!!             refs(iref)%pol_vel(:,it) = ( refs(iref)%pol_pos(:,it+1) - &
-!!!!                                          refs(iref)%pol_pos(:,it-1) ) /  &
-!!!!             ( refs(iref)%pol_tim(it+1) - refs(iref)%pol_tim(it-1) )
-!!!!           elseif ( it .eq. nt ) then
-!!!!             refs(iref)%pol_vel(:,nt) = ( refs(iref)%pol_pos(:,nt) - &
-!!!!                                          refs(iref)%pol_pos(:,nt-1) ) /  &
-!!!!               ( refs(iref)%pol_tim(nt) - refs(iref)%pol_tim(nt-1) )
-!!!!           end if
-!!!! !         refs(iref)%rot_tim(  it) = 
-!!!!           refs(iref)%rot_pos(  it) = refs(iref)%psi_0 + &
-!!!!                  refs(iref)%Omega * ( refs(iref)%rot_tim(it) - refs(iref)%rot_tim(1) )    ! <---- CHECK !!!!
-!!!!           refs(iref)%rot_vel(  it) = refs(iref)%Omega
-!!!!         end do 
-!!!! 
-!!!! ! write(*,*) ! check ----
-!!!! ! write(*,*) trim(refs(iref)%mov_type)
-!!!! ! write(*,*) ' pol_tim , pol_vel , pol_pos '
-!!!! ! do it = 1 , nt
-!!!! !  write(*,*) refs(iref)%pol_tim(  it) , &
-!!!! !             refs(iref)%pol_vel(:,it) , &
-!!!! !             refs(iref)%pol_pos(:,it)
-!!!! ! end do
-!!!! ! stop
-!!!! ! write(*,*) ! check ----
-!!!! 
-!!!!         deallocate(pol_pos_mat)
-!!!! 
-!!!!        case default
-!!!!          call error(this_sub_name, this_mod_name, 'Unknown type of movement')
-!!!! 
-!!!!       end select
-
-
       allocate(refs(iref)%orig_pol_0(3))
       ! CHECK -----> interpolate value at t = 0
       refs(iref)%orig_pol_0 = refs(iref)%orig - refs(iref)%pol_pos(:,1)
@@ -989,7 +846,7 @@ end subroutine set_movement
 subroutine check_references(refs)
  type(t_ref), intent(inout) :: refs(0:)
 
- !TODO TODO TODO
+ !TODO:TODO:TODO:
  !check that the orientation is orthogonal
 
  !chech that the orientation is unitarian, otherwise normalize
@@ -1065,10 +922,10 @@ subroutine reference_update_self(this, t, R_par, of_par, R_loc, of_loc, &
  real(wp), intent(out)       :: G_loc(:,:)
  real(wp), intent(out)       :: f_loc(:)
 
- real(wp)  :: Psi , Omega
- real(wp) , allocatable :: xPole(:) , vPole(:)
- real(wp)  :: R_01_t(3,3)   , R_10_0(3,3)
- real(wp)  :: Omega_vec(3,3)
+ real(wp) :: Psi , Omega
+ real(wp), allocatable :: xPole(:) , vPole(:)
+ real(wp) :: R_01_t(3,3)   , R_10_0(3,3)
+ real(wp) :: Omega_vec(3,3)
 
  character(len=*), parameter :: this_sub_name = 'reference_update_self'
 
@@ -1082,73 +939,35 @@ subroutine reference_update_self(this, t, R_par, of_par, R_loc, of_loc, &
     
     !not moving with respect to the parent: orientation is the original
     ! one, and motion related matrices are zero
-    R_loc = this%frame
+    R_loc  = this%frame
     of_loc = this%orig
     G_loc = 0.0_wp
     f_loc = 0.0_wp
 
   else
 
-!   select case (trim(this%mov_type))
-!
-!    case('constant_rotation')
-!     !Actual rotation angle
-!     Psi = this%psi_0 + this%Omega * t
-!
-!     ! R01(t) -----
-!     call rot_mat_axis_angle( this%axis, Psi, R_01_t )
-!     R_loc = matmul(R_01_t, this%frame) 
-!     ! R10(0) -----
-!     R_10_0 = transpose(this%frame)
-!     of_loc = matmul( matmul(R_loc,R_10_0) , this%orig-this%pole) + this%pole
-!
-!     !Matrix of the vector product of Omega: OmegaX_
-!     Omega_vec = reshape( &
-!                (/0.0_wp, this%Omega*this%axis(3), -this%Omega*this%axis(2), &
-!                  -this%Omega*this%axis(3), 0.0_wp, this%Omega*this%axis(1), &
-!                  this%Omega*this%axis(2), -this%Omega*this%axis(1), 0.0_wp/)&
-!                 ,(/3,3/))
-!     G_loc = matmul(Omega_vec,transpose(R_par))
-!     f_loc = matmul(Omega_vec,(-matmul(transpose(R_par),of_par)-this%pole))
-!
-!
-!    case('from_file')
+    ! Actual rotation angle
+    call linear_interp( this%rot_pos, this%rot_tim , t , Psi )
+    call linear_interp( this%rot_vel, this%rot_tim , t , Omega )
+    call linear_interp( this%pol_pos, this%pol_tim , t , xPole )
+    call linear_interp( this%pol_vel, this%pol_tim , t , vPole )
 
-     ! Actual rotation angle
-!    Psi = this%psi_0 + this%Omega * t
-     call linear_interp( this%rot_pos, this%rot_tim , t , Psi )
-     call linear_interp( this%rot_vel, this%rot_tim , t , Omega )
-     call linear_interp( this%pol_pos, this%pol_tim , t , xPole )
-!    call linear_interp( this%pol_vel, this%pol_tim , t , vPole )
+    ! R01(t) -----
+    call rot_mat_axis_angle( this%axis, Psi, R_01_t )
+    R_loc = matmul(R_01_t, this%frame) 
+    ! R10(0) -----
+    R_10_0 = transpose(this%frame)
+    of_loc = matmul( matmul(R_loc,R_10_0) , this%orig_pol_0) + xPole
 
-     ! R01(t) -----
-     call rot_mat_axis_angle( this%axis, Psi, R_01_t )
-     R_loc = matmul(R_01_t, this%frame) 
-     ! R10(0) -----
-     R_10_0 = transpose(this%frame)
-!    of_loc = matmul( matmul(R_loc,R_10_0) , this%orig-this%pole) + this%pole
-     of_loc = matmul( matmul(R_loc,R_10_0) , this%orig_pol_0) + xPole
-
-     ! Matrix of the vector product of Omega: OmegaX_
-!    Omega_vec = reshape( &
-!               (/0.0_wp, this%Omega*this%axis(3), -this%Omega*this%axis(2), &
-!                 -this%Omega*this%axis(3), 0.0_wp, this%Omega*this%axis(1), &
-!                 this%Omega*this%axis(2), -this%Omega*this%axis(1), 0.0_wp/)&
-!                ,(/3,3/))
-     Omega_vec = reshape( &
-                (/             0.0_wp,  Omega*this%axis(3), -Omega*this%axis(2), &
-                  -Omega*this%axis(3),              0.0_wp,  Omega*this%axis(1), &
-                   Omega*this%axis(2), -Omega*this%axis(1),              0.0_wp/)&
-                 ,(/3,3/))
-     G_loc = matmul(Omega_vec,transpose(R_par))
-     f_loc = matmul(Omega_vec,(-matmul(transpose(R_par),of_par)- xPole)) ! + vPole
-
-
-!    case default
-!
-!      call error(this_sub_name, this_mod_name, 'Unknown type of movement')
-!    
-!    end select
+    ! Matrix of the vector product of Omega: OmegaX_
+    Omega_vec = reshape( &
+               (/             0.0_wp,  Omega*this%axis(3), -Omega*this%axis(2), &
+                 -Omega*this%axis(3),              0.0_wp,  Omega*this%axis(1), &
+                  Omega*this%axis(2), -Omega*this%axis(1),              0.0_wp/)&
+                ,(/3,3/))
+    G_loc = matmul(Omega_vec,transpose(R_par))
+    f_loc = matmul(Omega_vec,(-matmul(transpose(R_par),of_par)- xPole)) ! + &
+!            matmul(R_par,vPole)
 
   endif
 
@@ -1169,7 +988,7 @@ subroutine update_all_references(refs, t)
  R  = reshape((/1.0_wp, 0.0_wp, 0.0_wp, &
                 0.0_wp, 1.0_wp, 0.0_wp, &
                 0.0_wp, 0.0_wp, 1.0_wp /),(/3,3/))
- f = (/0.0_wp, 0.0_wp, 0.0_wp/)
+ f  = (/0.0_wp, 0.0_wp, 0.0_wp/)
  G  = reshape((/0.0_wp, 0.0_wp, 0.0_wp, &
                 0.0_wp, 0.0_wp, 0.0_wp, &
                 0.0_wp, 0.0_wp, 0.0_wp /),(/3,3/))

@@ -306,7 +306,6 @@ subroutine update_wake_panels(wake, elems, geo, dt, uinf)
 !     vel_p(1) = vel_p(1)+uinf(1)
       vel_p    = vel_p   +uinf   
 
-
       !update the position in time
       wake%w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + vel_p*dt
 ! Check ----

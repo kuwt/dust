@@ -1253,13 +1253,8 @@ subroutine build_te_parametric ( ee , rr , ElType , &
  ! e_te ----------
  allocate(e_te(2,nelems_span)) ; e_te = 0
  if ( ElType .eq. 'p' ) then
-! <<<<<<<<<
-!  e_te(1,:) = (/ ( 1+(i1-1)*nelems_chord , i1=1,nelems_span) /)   
-!  e_te(2,:) = (/ (   (i1  )*nelems_chord , i1=1,nelems_span) /)
-! >>>>>>>>>
-   e_te(1,:) = (/ (   (i1  )*nelems_chord , i1=1,nelems_span) /)
-   e_te(2,:) = (/ ( 1+(i1-1)*nelems_chord , i1=1,nelems_span) /)   
-! >>>>>>>>>
+   e_te(1,:) = (/ ( 1+(i1-1)*nelems_chord , i1=1,nelems_span) /)
+   e_te(2,:) = (/ (   (i1  )*nelems_chord , i1=1,nelems_span) /)
  else
    e_te(1,:) = (/ (   (i1  )*nelems_chord , i1=1,nelems_span) /)
  ! e_te(2,:) = 0 
@@ -1284,13 +1279,8 @@ subroutine build_te_parametric ( ee , rr , ElType , &
  ! ii_te ---------
  allocate(ii_te(2,nelems_span)) ; ii_te = 0
  if ( ElType .eq. 'p' ) then 
-! <<<<<<<<<
-!  ii_te(1,:) = (/ ( i1 , i1 = 1,nelems_span   ) /)
-!  ii_te(2,:) = (/ ( i1 , i1 = 2,nelems_span+1 ) /)
-! >>>>>>>>>
-   ii_te(1,:) = (/ ( i1 , i1 = 2,nelems_span+1 ) /)
-   ii_te(2,:) = (/ ( i1 , i1 = 1,nelems_span   ) /)
-! >>>>>>>>>
+   ii_te(1,:) = (/ ( i1 , i1 = 1,nelems_span   ) /)
+   ii_te(2,:) = (/ ( i1 , i1 = 2,nelems_span+1 ) /)
  elseif ( ElType .eq. 'v' ) then 
    ii_te(1,:) = (/ ( i1 , i1 = 2,nelems_span+1 ) /)
    ii_te(2,:) = (/ ( i1 , i1 = 1,nelems_span   ) /)
@@ -1314,21 +1304,12 @@ subroutine build_te_parametric ( ee , rr , ElType , &
  ! t_te ----------
  allocate(t_te(3,nelems_span+1)) ; t_te = 0.0_wp
  if ( ElType .eq. 'p' ) then
-! <<<<<<<<<
-!  t_te(:,1) = 0.5 * ( rr(:,ee(2,e_te(1,1))) - rr(:,ee(3,e_te(1,1))) + & 
-!                      rr(:,ee(3,e_te(2,1))) - rr(:,ee(2,e_te(2,1)))     )
-! >>>>>>>>>
-   t_te(:,1) = 0.5 * ( rr(:,ee(3,e_te(1,1))) - rr(:,ee(2,e_te(1,1))) + & 
-                       rr(:,ee(2,e_te(2,1))) - rr(:,ee(3,e_te(2,1)))     )
+   t_te(:,1) = 0.5 * ( rr(:,ee(2,e_te(1,1))) - rr(:,ee(3,e_te(1,1))) + & 
+                       rr(:,ee(3,e_te(2,1))) - rr(:,ee(2,e_te(2,1)))     )
    t_te(:,1) = t_te(:,1) / norm2(t_te(:,1))
-! >>>>>>>>>
    do i1 = 1 , nelems_span 
-! <<<<<<<<<
-!    t_te(:,i1+1) = 0.5 * ( rr(:,ee(1,e_te(1,i1))) - rr(:,ee(4,e_te(1,i1))) + & 
-!                           rr(:,ee(4,e_te(2,i1))) - rr(:,ee(1,e_te(2,i1)))     )
-! >>>>>>>>>
-     t_te(:,i1+1) = 0.5 * ( rr(:,ee(4,e_te(1,i1))) - rr(:,ee(1,e_te(1,i1))) + & 
-                            rr(:,ee(1,e_te(2,i1))) - rr(:,ee(4,e_te(2,i1)))     )
+     t_te(:,i1+1) = 0.5 * ( rr(:,ee(1,e_te(1,i1))) - rr(:,ee(4,e_te(1,i1))) + & 
+                            rr(:,ee(4,e_te(2,i1))) - rr(:,ee(1,e_te(2,i1)))     )
      t_te(:,i1+1) = t_te(:,i1+1) / norm2(t_te(:,i1+1))
    end do
  else

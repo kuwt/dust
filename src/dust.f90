@@ -298,7 +298,7 @@ do it = 1,nstep
                       call debug_printout_wake(wake_panels, basename_debug, it)
 
   !Print the results
-  if(time_2_out) call output_status(elems, geo, wake_panels, basename, it)
+  if(time_2_out) write(*,*) ' it : ' , it ; call output_status(elems, geo, wake_panels, basename, it)
 
   time = min(tend, time+dt)
 enddo
