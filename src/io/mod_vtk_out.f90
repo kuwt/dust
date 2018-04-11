@@ -62,14 +62,13 @@ contains
 !!
 !! This is a very preliminary version, it is set to take stupid ee and rr
 !! vectors, padded with zeros
-subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, w_vel, out_filename)
+subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
  real(wp), intent(in) :: rr(:,:)
  integer, intent(in) :: ee(:,:)
  real(wp), intent(in) :: vort(:)
  real(wp), intent(in) :: w_rr(:,:)
  integer, intent(in) :: w_ee(:,:)
  real(wp), intent(in) :: w_vort(:)
- real(wp), intent(in), optional :: w_vel(:,:)
  character(len=*), intent(in) :: out_filename 
 
  integer :: fu, ierr, i, j, i_shift, ivar
@@ -237,19 +236,6 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, w_vel, out_filename)
 
   buffer = '   </CellData>'//lf; write(fu) trim(buffer)
 
-  if(present(w_vel)) then
-    buffer =  '   <PointData Vectors="wake_vel">'//lf; 
-    write(fu) trim(buffer)
-    write(ostr,'(I0)') offset
-    buffer =  '    <DataArray type="Float32" Name="'// &
-            'wake_vel' // &
-            '" NumberOfComponents="3" Format="appended" offset="'&
-                                                  //trim(ostr)//'"/>'//lf
-    write(fu) trim(buffer)
-    offset = offset + vtk_isize + vtk_fsize*3*nw
-    buffer = '   </PointData>'//lf; write(fu) trim(buffer)
-  endif
-
 
   buffer = '  </Piece>'//lf; write(fu) trim(buffer)
 
@@ -344,14 +330,6 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, w_vel, out_filename)
   do i=1,size(w_vort,1)
     write(fu) real(w_vort(i), vtk_fsize)
   enddo
-  
-  !Wake points velocity
-  if(present(w_vel)) then
-    nbytes =  vtk_fsize*3*nw; write(fu) nbytes
-    do i=1,size(w_vort,1)
-      write(fu) real(w_vel(:,i), vtk_fsize)
-    enddo
-  endif
   
   !!All the variables data
   !do ivar=1,pv_data%n_vars
