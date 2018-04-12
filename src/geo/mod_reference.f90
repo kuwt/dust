@@ -262,7 +262,6 @@ subroutine build_references(refs, reference_file, sim_param)
  integer :: n_refs, n_refs_input
  integer :: n_mult_refs
  integer :: iref, iref_input, iref2, i_mult_ref
- integer :: n_child
  integer, allocatable :: temp_chil(:)
  character(len=max_char_len) :: msg
  integer :: prev_id
@@ -273,8 +272,8 @@ subroutine build_references(refs, reference_file, sim_param)
  character(len=*), parameter :: this_sub_name = 'build_references'
 
 ! old ---
- character(len=max_char_len) :: omega_filen , pol_pos_filen , pol_vel_filen
- real(wp) , allocatable :: omega_mat(:,:) , pol_pos_mat(:,:) , pol_vel_mat(:,:)
+ !character(len=max_char_len) :: omega_filen , pol_pos_filen , pol_vel_filen
+ !real(wp) , allocatable :: omega_mat(:,:) , pol_pos_mat(:,:) , pol_vel_mat(:,:)
 ! old ---
  character(len=max_char_len) :: rot_filen , pol_filen 
  real(wp) , allocatable :: rot_mat(:,:) , pol_mat(:,:)
@@ -470,7 +469,7 @@ subroutine build_references(refs, reference_file, sim_param)
 
               ! Read time and position
               refs(iref)%pol_tim = pol_mat(:,1) 
-              refs(iref)%pol_pos = transpose(pol_pos_mat(:,2:4))
+              refs(iref)%pol_pos = transpose(pol_mat(:,2:4))
               ! Compute velocity with Finite Difference 
               do it = 1,nt
                 if ( it .eq. 1) then
@@ -592,7 +591,7 @@ subroutine build_references(refs, reference_file, sim_param)
 
               ! Read time and velocity
               refs(iref)%pol_tim = pol_mat(:,1) 
-              refs(iref)%pol_vel = transpose(pol_pos_mat(:,2:4))
+              refs(iref)%pol_vel = transpose(pol_mat(:,2:4))
               ! Compute velocity with Esplicit Euler integration
               refs(iref)%pol_pos(:,1) = pol_pos0  ! Initial condition ...
               do it = 2 , nt
@@ -951,6 +950,10 @@ end subroutine build_references
 subroutine destroy_references(refs)
  type(t_ref), allocatable, intent(out)   :: refs(:)
 
+ integer :: i
+
+ i = size(refs) !dummy operation to avoid warnings
+
 end subroutine destroy_references
 
 !----------------------------------------------------------------------
@@ -1064,12 +1067,6 @@ subroutine reference_update_self(this, t, R_par, of_par, R_loc, of_loc, &
 
  character(len=*), parameter :: this_sub_name = 'reference_update_self'
 
- integer :: i1
-
-! check ---
-! write(*,*) ' this%self_moving : ' ,this%self_moving
-! check ---
-
   if (.not.this%self_moving) then 
     
     !not moving with respect to the parent: orientation is the original
@@ -1160,7 +1157,7 @@ subroutine rot_mat_axis_angle ( axis, angle, R )
          ny*nx , ny*ny , ny*nz , &
          nz*nx , nz*ny , nz*nz     /)
 
- R = reshape ( r0*cos(angle)+r1*sin(angle)+r2*(1-cos(angle)) ,  &
+ R = reshape ( r0*cos(angle)+r1*sin(angle)+r2*(1.0_wp-cos(angle)) ,  &
                (/3,3/) , order=(/2,1/) ) 
 
 end subroutine rot_mat_axis_angle

@@ -116,10 +116,7 @@ integer :: debug_level
 ! Asymptotic conditions
 real(wp) :: uinf(3)
 real(wp), parameter :: rho = 1.0_wp
-real(wp), allocatable :: F_aero(:,:)
 
-!!debug output
-real(wp), allocatable ::  vel(:,:),   cp(:,:)
 
 character(len=max_char_len) :: frmt
 character(len=max_char_len) :: basename
@@ -211,7 +208,7 @@ call finalizeParameters(prms)
 !------ Initialization ------
 call printout(nl//'====== Initializing Wake ======')
 call initialize_wake_panels(wake_panels, geo, te, n_wake_panels)
-call prepare_wake_panels(wake_panels, elems, geo, dt, uinf)
+call prepare_wake_panels(wake_panels,  geo, dt, uinf)
 
 call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
@@ -252,7 +249,7 @@ do it = 1,nstep
 
 
   !------ Assemble the system ------
-  call prepare_wake_panels(wake_panels, elems, geo, dt, uinf)
+  call prepare_wake_panels(wake_panels, geo, dt, uinf)
   t0 = dust_time()
   call assemble_linsys(linsys, elems, wake_panels, uinf)
   t1 = dust_time()
@@ -302,7 +299,7 @@ do it = 1,nstep
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
   !  next iteration)
-  call update_wake_panels(wake_panels, elems, geo, dt, uinf)
+  call update_wake_panels(wake_panels, elems, dt, uinf)
 
   time = min(tend, time+dt)
 enddo
@@ -491,9 +488,9 @@ end subroutine debug_printout_geometry_minimal
 
 !----------------------------------------------------------------------
 
-subroutine debug_printout_loads(elems, basename, it)
+subroutine debug_printout_loads(elems, basename_debug, it)
  type(t_elem_p),   intent(in) :: elems(:)
- character(len=*), intent(in) :: basename
+ character(len=*), intent(in) :: basename_debug
  integer,          intent(in) :: it
 
  real(wp), allocatable :: vel(:,:), cp(:,:), F_aero(:,:)

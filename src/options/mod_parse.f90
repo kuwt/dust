@@ -566,7 +566,6 @@ recursive subroutine copy_parser(source_p, target_p)
  type(t_parse), pointer, intent(out)  :: target_p
  !type(t_parse), allocatable, intent(out)  :: target_p
 
- type(t_parse), allocatable, target  :: newParser
  class(t_link), pointer :: newLink
  class(option), pointer  :: newopt
  class(t_link), pointer :: current_source, current_target
@@ -624,7 +623,7 @@ subroutine read_options(this, filename, printout_val)
  class(t_link), pointer  :: prev_read
  class(t_parse), pointer :: actually_reading, root_reading
  class(t_parse), pointer :: sub_option
- integer               :: stat,iniUnit,iExt
+ integer               :: stat,iniUnit!,iExt
  type(Varying_String)  :: aStr,bStr
  character(len=max_char_len)    :: HelpStr
  logical               :: firstWarn=.true.,file_exists
@@ -752,7 +751,7 @@ function read_option(this, line, sub_option, prev_read) result(found)
  character(len=max_char_len)           :: rest
  class(t_link), pointer         :: current
  class(option),allocatable    :: newopt
- type(t_parse),allocatable,target    :: newparse
+ !type(t_parse),allocatable,target    :: newparse
  integer                      :: i
  character(len=*), parameter :: this_sub_name = 'read_option'
 
@@ -830,31 +829,31 @@ end function read_option
 
 !-----------------------------------------------------------------------
 
-subroutine check_arg_order(prms)
- class(t_parse),intent(in) :: prms  !< class(t_parse)
-
- class(t_link), pointer :: current
- class(t_link), pointer :: prev, next
-
- current => prms%firstLink
-
- do while(associated(current))
-
-  write(*,*) 'Parameter name: ',trim(current%opt%name)
-  prev => current%prev_read
-  if (associated(prev)) then
-    write(*,*) 'Previously read name: ',trim(prev%opt%name)
-  endif
-  next => current%next_read
-  if (associated(next)) then
-    write(*,*) 'Next read name: ',trim(next%opt%name)
-  endif
-
-
-  current => current%next
- enddo
-
-end subroutine
+!subroutine check_arg_order(prms)
+! class(t_parse),intent(in) :: prms  !< class(t_parse)
+!
+! class(t_link), pointer :: current
+! class(t_link), pointer :: prev, next
+!
+! current => prms%firstLink
+!
+! do while(associated(current))
+!
+!  write(*,*) 'Parameter name: ',trim(current%opt%name)
+!  prev => current%prev_read
+!  if (associated(prev)) then
+!    write(*,*) 'Previously read name: ',trim(prev%opt%name)
+!  endif
+!  next => current%next_read
+!  if (associated(next)) then
+!    write(*,*) 'Next read name: ',trim(next%opt%name)
+!  endif
+!
+!
+!  current => current%next
+! enddo
+!
+!end subroutine
 
 !> Check the consistency of a given option
 !!
@@ -1337,7 +1336,7 @@ subroutine getsuboption(prms, name, value, olink) !result(value)
 
  class(t_link),pointer   :: current
  class(Option),pointer :: opt
- character(len=max_char_len)    :: proposal_loc
+ !character(len=max_char_len)    :: proposal_loc
  character(len=*), parameter :: this_sub_name = 'GetSubOption'
 
   ! iterate over all options
@@ -1400,7 +1399,7 @@ function getreal(prms, name, proposal, olink) result(value)
  type(t_link), intent(out), pointer, optional :: olink   !< link to the option
  real(wp)                                 :: value    !< parameter value
 
-  value = -1.0
+  value = -1.0_wp
   call GetGeneralOption(prms, value, name, proposal, olink)
 end function getreal
 
@@ -1465,7 +1464,7 @@ function getrealarray(prms, name, no, proposal, olink) result(value)
  type(t_link), intent(out), pointer, optional :: olink   !< link to the option
  real(wp)                                 :: value(no) !< array of reals
 
-  value = -1.
+  value = -1.0_wp
   call GetGeneralArrayOption(prms, value, name, no, proposal, olink)
 end function getrealarray
 

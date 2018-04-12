@@ -309,7 +309,6 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
  character(len=max_char_len) :: msg
  real(t_realtime) :: t0, t1
 
- integer :: fid , i1, ie
 
   tstart = sim_param%t0
 
@@ -500,7 +499,7 @@ subroutine load_components(geo, in_file, te)
 
  ! trailing edge ------
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
- integer , allocatable :: neigh_te(:,:) , o_te(:,:) , ref_te(:)
+ integer , allocatable :: neigh_te(:,:) , o_te(:,:)
  real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
  integer :: ne_te , nn_te
  ! tmp arrays --------
@@ -1249,14 +1248,13 @@ end subroutine build_connectivity
 !  Up to now, the relative velocity is assumed to be "mainly oriented" as
 !  the x-axis in the local reference frame. 
 ! - identify the trailing edge for vortex ring elements
+! TODO: REMOVE THE SUBROUTINE it is not used anymore
 subroutine build_te(geo,elems,te)
  type(t_geo)   , intent(in), target :: geo
  type(t_elem_p), intent(in)  :: elems(:)
  type(t_tedge) , intent(out) :: te
  
  real(wp) , parameter :: tol_sewing = 3e-3_wp   ! 3e-6_wp  ! 1e-0 for nasa-crm , 3e-3_wp for naca0012
- real(wp) , allocatable :: rr_m(:,:)
- integer  , allocatable :: ee_m(:,:) , i_m(:,:)
 
  type(t_elem_p) , allocatable :: elems_m(:)
 

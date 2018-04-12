@@ -197,9 +197,8 @@ end subroutine
 
 !> Prepare the first row of panels to be inserted inside the linear system
 !!
-subroutine prepare_wake_panels(wake, elems, geo, dt, uinf)
+subroutine prepare_wake_panels(wake, geo, dt, uinf)
  type(t_wake_panels), intent(inout) :: wake
- type(t_elem_p), intent(in) :: elems(:)
  type(t_geo), intent(in) :: geo
  real(wp), intent(in) :: dt
  real(wp), intent(in) :: uinf(3)
@@ -242,15 +241,13 @@ end subroutine prepare_wake_panels
 !> Update the position and the intensities of the wake panels
 !!
 !!
-subroutine update_wake_panels(wake, elems, geo, dt, uinf)
+subroutine update_wake_panels(wake, elems, dt, uinf)
  type(t_wake_panels), intent(inout), target :: wake
  type(t_elem_p), intent(in) :: elems(:)
- type(t_geo), intent(in) :: geo
  real(wp), intent(in) :: dt
  real(wp), intent(in) :: uinf(3)
 
  integer :: iw, ipan, ie, ip, np
- integer :: p1, p2
  real(wp) :: pos_p(3), vel_p(3), v(3)
  type(t_elem_p), allocatable :: pan_p_temp(:)
  real(wp), allocatable :: point_old(:,:,:)

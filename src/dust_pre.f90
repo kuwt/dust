@@ -72,18 +72,17 @@ character(len=max_char_len) :: output_file_name
 character(len=max_char_len) :: output_file_name_read
 logical :: cmd_set_filename
 character(len=max_char_len), allocatable :: geo_files(:)
-character(len=extended_char_len) :: message
+!character(len=extended_char_len) :: message
 
 !Time parameters
-real(wp) :: tstart, tend, dt, time
+!real(wp) :: tstart, tend, dt, time
 
 !Geometry parameters
-type(t_elem_p), allocatable :: elems(:)
+!type(t_elem_p), allocatable :: elems(:)
 type(t_parse) :: prms
-type(t_parse), pointer :: sbprms, ssbprms
-integer :: aa, bb, cc, dd, ee, ff
-type(t_geo) :: geo
-type(t_tedge) :: te
+type(t_parse), pointer :: sbprms!, ssbprms
+!integer :: aa, bb, cc, dd, ee, ff
+!type(t_geo) :: geo
 
 
 integer :: n_geo, i
