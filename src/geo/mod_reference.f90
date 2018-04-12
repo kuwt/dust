@@ -268,6 +268,7 @@ subroutine build_references(refs, reference_file, sim_param)
  type(t_link), pointer :: lnk
  real(wp), allocatable :: psi_0(:)
  real(wp) :: hub_offset, norm(3), rot_axis(3), rot_rate
+ integer :: n_in, n_mov, n_mult
 
  character(len=*), parameter :: this_sub_name = 'build_references'
 
@@ -307,54 +308,49 @@ subroutine build_references(refs, reference_file, sim_param)
 
   ! Pole motion sub-parser ----------------------------------------
   call sbprms%CreateSubOption('Pole','Definition of the motion of the pole', &
-              sbprms_pol, multiple=.true.)
-  call sbprms_pol%CreateStringOption('Input','Input: velocity or position',&
-              multiple=.true.)
-  call sbprms_pol%CreateStringOption('Input_Type','from_file or simple_function',&
-              multiple=.true.)
+              sbprms_pol)
+  call sbprms_pol%CreateStringOption('Input','Input: velocity or position')
+  call sbprms_pol%CreateStringOption('Input_Type','from_file or &
+                                                             &simple_function')
   ! TODO: add %CreateStrinArrayOption(...) to options/mod_parse.f90
-  call sbprms_pol%CreateIntArrayOption('Function','fun definition. 0:constant,1:sin,...',&
-              multiple=.true.)
-  call sbprms_pol%CreateStringOption('File','file .dat containing the motion',&
-              multiple=.true.)
-  call sbprms_pol%CreateRealOption('Amplitude','Multiplicative factor for the motion',&
-              multiple=.true.)
-  call sbprms_pol%CreateRealArrayOption('Vector','Relative amplitude of the three coordinates',&
-              multiple=.true.)
-  call sbprms_pol%CreateRealArrayOption('Omega','Pulsation of the motion for each coordinate',&
-              multiple=.true.)
-  call sbprms_pol%CreateRealArrayOption('Phase','Phase of the motion for each coordinate',&
-              multiple=.true.)
-  call sbprms_pol%CreateRealArrayOption('Offset','Phase of the motion for each coordinate',&
-              multiple=.true.)
-  call sbprms_pol%CreateRealArrayOption('Position_0','Initial position for each coordinate',&
-              multiple=.true.)
+  call sbprms_pol%CreateIntArrayOption('Function','fun definition. &
+                                                        &0:constant,1:sin,...')
+  call sbprms_pol%CreateStringOption('File','file .dat containing the motion')
+  call sbprms_pol%CreateRealOption('Amplitude','Multiplicative factor &
+                                                              &for the motion')
+  call sbprms_pol%CreateRealArrayOption('Vector','Relative amplitude of the &
+                                                           &three coordinates')
+  call sbprms_pol%CreateRealArrayOption('Omega','Pulsation of the motion for &
+                                                             &each coordinate')
+  call sbprms_pol%CreateRealArrayOption('Phase','Phase of the motion for &
+                                                             &each coordinate')
+  call sbprms_pol%CreateRealArrayOption('Offset','Phase of the motion for &
+                                                             &each coordinate')
+  call sbprms_pol%CreateRealArrayOption('Position_0','Initial position &
+                                                         &for each coordinate')
   ! End Pole motion sub-parser ----------------------------------------
 
   ! Rotation motion sub-parser ------------------------------------
-  call sbprms%CreateSubOption('Rotation','Definition of the rotation of the frame',&
-              sbprms_rot, multiple=.true.)
-  call sbprms_rot%CreateStringOption('Input','Input: velocity or position',&
-              multiple=.true.)
-  call sbprms_rot%CreateStringOption('Input_Type','from_file or simple_function',&
-              multiple=.true.)
+  call sbprms%CreateSubOption('Rotation','Definition of the rotation of &
+                              &the frame', sbprms_rot)
+  call sbprms_rot%CreateStringOption('Input','Input: velocity or position')
+  call sbprms_rot%CreateStringOption('Input_Type','from_file or &
+                                                             &simple_function')
   ! TODO: add %CreateStrinArrayOption(...) to options/mod_parse.f90
-  call sbprms_rot%CreateIntOption('Function','fun definition. 0:constant,1:sin,...',&
-              multiple=.true.)
-  call sbprms_rot%CreateStringOption('File','file .dat containing the motion',&
-              multiple=.true.)
-  call sbprms_rot%CreateRealArrayOption('Axis','axis of rotation',&
-              multiple=.true.)
-  call sbprms_rot%CreateRealOption('Amplitude','Multiplicative factor for the motion',&
-              multiple=.true.)
-  call sbprms_rot%CreateRealOption('Omega','Pulsation of the motion for each coordinate',&
-              multiple=.true.)
-  call sbprms_rot%CreateRealOption('Phase','Phase of the motion for each coordinate',&
-              multiple=.true.)
-  call sbprms_rot%CreateRealOption('Offset','Phase of the motion for each coordinate',&
-              multiple=.true.)
-  call sbprms_rot%CreateRealOption('Psi_0','Initial position for each coordinate',&
-              multiple=.true.)
+  call sbprms_rot%CreateIntOption('Function','fun definition.&
+                                                         0:constant,1:sin,...')
+  call sbprms_rot%CreateStringOption('File','file .dat containing the motion')
+  call sbprms_rot%CreateRealArrayOption('Axis','axis of rotation')
+  call sbprms_rot%CreateRealOption('Amplitude','Multiplicative factor for &
+                                                                  &the motion')
+  call sbprms_rot%CreateRealOption('Omega','Pulsation of the motion for &
+                                                             &each coordinate')
+  call sbprms_rot%CreateRealOption('Phase','Phase of the motion &
+                                                         &for each coordinate')
+  call sbprms_rot%CreateRealOption('Offset','Phase of the motion &
+                                                         &for each coordinate')
+  call sbprms_rot%CreateRealOption('Psi_0','Initial position &
+                                                         &for each coordinate')
   ! End Rotation motion sub-parser ------------------------------------
 
   ! End Motion sub-parser ---------------------------------------------
@@ -376,10 +372,31 @@ subroutine build_references(refs, reference_file, sim_param)
   !read the file
   call ref_prs%read_options(trim(reference_file),printout_val=.true.)
 
+  !Get the number of reference frames and check that all the required params
+  !are actually present
   n_refs = countoption(ref_prs,'Reference_Tag') 
   n_refs_input = n_refs  
-  !TODO: here we should check that all the other options have the same number
-  !of occurrencies
+
+  n_in = countoption(ref_prs,'Parent_Tag')
+  if(n_in .ne. n_refs_input) call error(this_sub_name, this_mod_name, &
+   'Inconsistent number of Reference_Tag and Parent_Tag inputs in reference& 
+   & frames. Forgot a "Parent_tag = ..." ?')
+  n_in = countoption(ref_prs,'Origin')
+  if(n_in .ne. n_refs_input) call error(this_sub_name, this_mod_name, &
+   'Inconsistent number of Reference_Tag and Origin inputs in reference& 
+   & frames. Forgot a "Origin = ..." ?')
+  n_in = countoption(ref_prs,'Orientation')
+  if(n_in .ne. n_refs_input) call error(this_sub_name, this_mod_name, &
+   'Inconsistent number of Reference_Tag and Orientation inputs in reference& 
+   & frames. Forgot a "Orientation = ..." ?')
+  n_in = countoption(ref_prs,'Moving')
+  if(n_in .ne. n_refs_input) call error(this_sub_name, this_mod_name, &
+   'Inconsistent number of Reference_Tag and Moving inputs in reference& 
+   & frames. Forgot a "Moving = ..." ?')
+  n_in = countoption(ref_prs,'Multiple')
+  if(n_in .ne. n_refs_input) call error(this_sub_name, this_mod_name, &
+   'Inconsistent number of Reference_Tag and Multiple inputs in reference& 
+   & frames. Forgot a "Multiple = ..." ?')
 
   ! IMPORTANT: the references are allocated starting from zero, zero is the 
   ! base reference, and then all the other references occupy the following
@@ -413,7 +430,7 @@ subroutine build_references(refs, reference_file, sim_param)
                           0.0_wp, 1.0_wp, 0.0_wp, & 
                           0.0_wp, 0.0_wp, 1.0_wp/),(/3,3/))
   !Setup the other references
-  iref = 0
+  iref = 0; n_mov = 0; n_mult = 0
   do iref_input = 1,n_refs_input
 
     iref = iref+1
@@ -430,12 +447,14 @@ subroutine build_references(refs, reference_file, sim_param)
     !allocated here, will be set in update_all_refs
     allocate(refs(iref)%of_g(3), refs(iref)%R_g(3,3))
 
-    refs(iref)%self_moving = getlogical(ref_prs,'Moving')
+    refs(iref)%self_moving = getlogical(ref_prs,'Moving', olink=lnk)
     refs(iref)%moving = .false. !standard, will be checked later
 
     
     if (refs(iref)%self_moving) then
-
+     
+      n_mov = n_mov + 1
+      call check_opt_consistency(lnk, next=.true., next_opt='Motion')
       call getsuboption(ref_prs,'Motion',sbprms)
       call getsuboption(sbprms,'Pole',sbprms_pol)
 
@@ -822,7 +841,8 @@ subroutine build_references(refs, reference_file, sim_param)
     refs(iref)%multiple = getlogical(ref_prs,'Multiple')
 
     if (refs(iref)%multiple) then
-
+      
+      n_mult = n_mult + 1
       call getsuboption(ref_prs,'Multiplicity',sbprms)
       refs(iref)%mult_type = trim(getstr(sbprms,'MultType'))
 
@@ -906,6 +926,15 @@ subroutine build_references(refs, reference_file, sim_param)
     endif
     
   enddo
+
+  n_in = countoption(ref_prs,'Motion')
+  if(n_in .ne. n_mov) call error(this_sub_name, this_mod_name, &
+   'Inconsistent number of Motion sections and Moving=T references')
+  n_in = countoption(ref_prs,'Multiplicity')
+  if(n_in .ne. n_mult) call error(this_sub_name, this_mod_name, &
+   'Inconsistent number of Multiplicity sections and Multiple=T references')
+
+
 
   !Generate the parent-children references
   do iref = 1,n_refs
