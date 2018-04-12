@@ -291,7 +291,7 @@ do it = 1,nstep
     call debug_printout_loads(elems, basename_debug, it)
   endif
 
-
+  !------ Output the results  ------
   !Printout the wake
   if((debug_level .ge. 17).and.time_2_debug_out)  &
                       call debug_printout_wake(wake_panels, basename_debug, it)
@@ -300,6 +300,8 @@ do it = 1,nstep
   if(time_2_out) write(*,*) ' it : ' , it ; call output_status(elems, geo, wake_panels, basename, it)
 
   !------ Treat the wake ------
+  ! (this needs to be done after output, in practice the update is for the
+  !  next iteration)
   call update_wake_panels(wake_panels, elems, geo, dt, uinf)
 
   time = min(tend, time+dt)
