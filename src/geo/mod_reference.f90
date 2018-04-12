@@ -576,7 +576,7 @@ subroutine build_references(refs, reference_file, sim_param)
                 if ( pol_fun_int(i1) .eq. 0 ) then ! constant function
 
                   do it = 1 , sim_param%n_timesteps
-                    refs(iref)%pol_vel(i1,it) = pol_amp * pol_vec(it)
+                    refs(iref)%pol_vel(i1,it) = pol_amp * pol_vec(i1)
                     refs(iref)%pol_pos(i1,it) = pol_pos0(i1) + & 
                             pol_amp * pol_vec(i1) * &
                           ( refs(iref)%pol_tim(it) - refs(iref)%pol_tim(1) )

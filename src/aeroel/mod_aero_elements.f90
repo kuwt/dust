@@ -248,11 +248,12 @@ end interface
 !----------------------------------------------------------------------
 
 abstract interface
-  subroutine i_compute_vel(this, pos, vel)
+  subroutine i_compute_vel(this, pos, uinf, vel)
     import :: c_elem , wp 
     implicit none
     class(c_elem), intent(inout) :: this
     real(wp), intent(in) :: pos(:)
+    real(wp), intent(in) :: uinf(3)
     real(wp), intent(out) :: vel(3)
   end subroutine
 end interface

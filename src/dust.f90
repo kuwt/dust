@@ -68,7 +68,7 @@ use mod_basic_io, only: &
 
 use mod_parse, only: &
   t_parse, &
-  getstr, getlogical, getreal, getint, &
+  getstr, getlogical, getreal, getint, getrealarray, &
   ignoredParameters, finalizeParameters
 
 use mod_wake, only: &
@@ -150,6 +150,8 @@ call prms%CreateRealOption( 'dt',     "time step")
 call prms%CreateRealOption( 'dt_out', "output time interval")
 call prms%CreateRealOption( 'dt_debug_out', "debug output time interval")
 call prms%CreateLogicalOption( 'output_start', "output values at starting iteration", 'F')
+call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
+'(/1.0, 0.0, 0.0/)')
 call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output','0')
 call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
 call prms%CreateStringOption('basename','oputput basename','./')
@@ -166,6 +168,9 @@ dt     = getreal(prms, 'dt')
 dt_out = getreal(prms,'dt_out')
 dt_debug_out = getreal(prms, 'dt_debug_out')
 output_start = getlogical(prms, 'output_start')
+
+uinf = getrealarray(prms, 'u_inf', 3)
+
 debug_level = getint(prms, 'debug_level')
 n_wake_panels = getint(prms, 'n_wake_panels')
 basename = getstr(prms,'basename')
@@ -178,8 +183,6 @@ if (debug_level .ge. 3) then
   write(message,*) 'Time step dt:        ', dt; call printout(message)
 endif
 
-!for the moment hard-coded
-uinf = (/1.0_wp, 0.0_wp, 0.0_wp/)
 
 !---- Simulation parameters ----
 nstep = ceiling((tend-tstart)/dt) + 1 !(for the zero time step)
@@ -289,16 +292,15 @@ do it = 1,nstep
   endif
 
 
-  !------ Treat the wake ------
-  call update_wake_panels(wake_panels, elems, geo, dt, uinf)
-
-
   !Printout the wake
   if((debug_level .ge. 17).and.time_2_debug_out)  &
                       call debug_printout_wake(wake_panels, basename_debug, it)
 
   !Print the results
   if(time_2_out) write(*,*) ' it : ' , it ; call output_status(elems, geo, wake_panels, basename, it)
+
+  !------ Treat the wake ------
+  call update_wake_panels(wake_panels, elems, geo, dt, uinf)
 
   time = min(tend, time+dt)
 enddo

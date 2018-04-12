@@ -281,9 +281,10 @@ end subroutine compute_psi_vortring
 !! WARNING: the velocity calculated, to be consistent with the formulation of 
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the 
 !! result of the present subroutine MUST be DIVIDED by 4*pi
-subroutine compute_vel_vortring(this, pos, vel)
+subroutine compute_vel_vortring(this, pos, uinf, vel)
   class(t_vortring), intent(inout) :: this
   real(wp), intent(in) :: pos(:)
+  real(wp), intent(in) :: uinf(3)
   real(wp), intent(out) :: vel(3)
 
   real(wp) :: vdou(3)
