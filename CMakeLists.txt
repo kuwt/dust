@@ -88,9 +88,17 @@ include_directories(${CGNS_INC} ${HDF5_INCLUDE_DIRS})
 #set the link path
 link_directories(${CGNS_LIB} ${HDF5_LIBRARY_DIRS})
 
-#add executables to be compiled
-add_executable(dust  ${PROJECT_SOURCE_DIR}/src/dust.f90 ${sources})
-target_link_libraries(dust ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} ${HDF5_LIBRARIES} cgns)
+#create a library
+add_library(dustlibF90 OBJECT ${sources})
+add_library(dustlib STATIC $<TARGET_OBJECTS:dustlibF90>)
 
-add_executable(dust_pre  ${PROJECT_SOURCE_DIR}/src/dust_pre.f90 ${sources})
-target_link_libraries(dust_pre ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} ${HDF5_LIBRARIES} cgns)
+#add executables to be compiled
+#add_executable(dust  ${PROJECT_SOURCE_DIR}/src/dust.f90 ${sources})
+add_executable(dust  ${PROJECT_SOURCE_DIR}/src/dust.f90)
+add_dependencies(dust dustlib)
+target_link_libraries(dust ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} ${HDF5_LIBRARIES} cgns dustlib)
+
+#add_executable(dust_pre  ${PROJECT_SOURCE_DIR}/src/dust_pre.f90 ${sources})
+add_executable(dust_pre  ${PROJECT_SOURCE_DIR}/src/dust_pre.f90)
+add_dependencies(dust_pre dustlib)
+target_link_libraries(dust_pre ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} ${HDF5_LIBRARIES} cgns dustlib)
