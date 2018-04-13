@@ -270,7 +270,6 @@ subroutine set_parameters_geo(prms)
  type(t_parse), intent(inout) :: prms
 
   call prms%CreateStringOption('GeometryFile','Main geometry definition file')
-  call prms%CreateStringOption('AddGeoFile','Additional geometry definition files', multiple=.true.)
   call prms%CreateStringOption('ReferenceFile','Reference frames file','no_set')
 
 end subroutine set_parameters_geo
@@ -312,8 +311,7 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
 
   tstart = sim_param%t0
 
-  t0 = dust_time()
-  call printout(nl//'Starting creating geometry')
+!  t0 = dust_time()
 
  
   !build the reference frames
@@ -324,13 +322,12 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
     reference_file = trim(in_file_name)
   endif
 
-! write(*,*) ' sim_param%n_timesteps : ' , sim_param%n_timesteps 
   call build_references(geo%refs, reference_file, sim_param)
 
   !Load the components from the file created by the preprocessor
   geo_file_name = getstr(prms, 'GeometryFile')
   call check_preproc(geo_file_name)
-  call load_components(geo, geo_file_name, te)
+  call load_components(geo, geo_file_name, sim_param, te)
 
 
 
@@ -364,18 +361,19 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
 
   call update_geometry(geo, tstart, update_static=.true.)
 
-
-  call printout(nl//'Geometry details:' ) 
-  write(msg,'(A,I9)') ' number of elements:        ' ,geo%nelem
-  call printout(msg)
-  write(msg,'(A,I9)') ' number of static elements: ' ,geo%nstatic
-  call printout(msg)
-  write(msg,'(A,I9)') ' number of moving elements: ' ,geo%nmoving
-  call printout(msg)
-  write(msg,'(A,I9)') ' number of surface panels:  ' ,geo%nsurfpan
-  call printout(msg)
-  write(msg,'(A,I9)') ' number of vortex rings:    ' ,geo%nvortrin
-  call printout(msg)
+  if(sim_param%debug_level .ge. 3) then
+    call printout(nl//' Geometry details:' ) 
+    write(msg,'(A,I9)') '  number of elements:        ' ,geo%nelem
+    call printout(msg)
+    write(msg,'(A,I9)') '  number of static elements: ' ,geo%nstatic
+    call printout(msg)
+    write(msg,'(A,I9)') '  number of moving elements: ' ,geo%nmoving
+    call printout(msg)
+    write(msg,'(A,I9)') '  number of surface panels:  ' ,geo%nsurfpan
+    call printout(msg)
+    write(msg,'(A,I9)') '  number of vortex rings:    ' ,geo%nvortrin
+    call printout(msg)
+  endif
 
   !Create the vector of pointers to all the elements
   allocate(elems(geo%nelem)) 
@@ -423,7 +421,6 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
   do i = 1,geo%nelem
     do j = 1,elems(i)%p%n_ver
       if ( elems(i)%p%i_neigh(j) .ne. 0 ) then
-!       write(*,*) elems(i)%p%n_ver , elems(i)%p%i_neigh(j)
         elems(i)%p%i_neigh(j) = el_id_old( elems(i)%p%i_neigh(j) )
       else
         elems(i)%p%i_neigh(j) = 0 
@@ -434,7 +431,6 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
   do i = 1,size(te%e,2)
     do j = 1,2
       if ( te%e(j,i) .ne. 0 ) then
-!       write(*,*) elems(i)%p%n_ver , elems(i)%p%i_neigh(j)
         te%e(j,i) = el_id_old( te%e(j,i) )
       else
         te%e(j,i) = 0 
@@ -465,19 +461,21 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
   ! ----
   call create_strip_connectivity(geo)
 
-  t1 = dust_time()
-  write(msg,'(A,F9.3,A)') 'Geometry generation completed in ', t1-t0, ' s.'
-  call printout(msg)
+!  t1 = dust_time()
+!  write(msg,'(A,F9.3,A)') 'Geometry generation completed in ', t1-t0, ' s.'
+!  call printout(msg)
 
 
 end subroutine create_geometry
 
 !----------------------------------------------------------------------
 
-subroutine load_components(geo, in_file, te)
+subroutine load_components(geo, in_file, sim_param, te)
  type(t_geo), intent(inout),target :: geo
  character(len=*), intent(in) :: in_file
+ type(t_sim_param) :: sim_param
  type(t_tedge), intent(out) :: te
+
 
  type(t_geo_component), allocatable :: comp_temp(:)
  integer :: i2, i3
@@ -672,7 +670,11 @@ subroutine load_components(geo, in_file, te)
       ! Trailing Edge ------------
       ne_te = size(e_te,2)
       nn_te = size(i_te,2)
-      write(*,*) ' ne_te , nn_te = ' , ne_te , nn_te
+      if (sim_param%debug_level .ge. 3) then
+        write(msg,'(A,I0,A,I0)') ' Trailing edge: elements: ', &
+                                                       ne_te, ' nodes ', nn_te
+        call printout(msg)
+      endif
       if (.not.allocated(te%e)) then ! it should be enough
         allocate(te%e    (2,ne_te) ) ; te%e     =     e_te 
         allocate(te%i    (2,nn_te) ) ; te%i     =     i_te 
@@ -738,9 +740,6 @@ subroutine load_components(geo, in_file, te)
   enddo !i_comp
   call close_hdf5_group(gloc)
   call close_hdf5_file(floc)
-
-  write(*,*) ' size(e_te,2) : ' , size(te%e,2) 
-  write(*,*) ' size(i_te,2) : ' , size(te%i,2) 
 
 end subroutine load_components
 
@@ -1236,7 +1235,7 @@ subroutine build_connectivity(elems)
     enddo
   enddo
   t1 = dust_time()
-  write(msg,'(A,F9.3,A)') 'Connectivity built in ', t1-t0, ' s.'
+  !write(msg,'(A,F9.3,A)') 'Connectivity built in ', t1-t0, ' s.'
   call printout(msg)
 
 end subroutine build_connectivity
@@ -2054,8 +2053,8 @@ subroutine create_local_velocity_stencil (geo, elems)
 
  end do
  
- call cpu_time(t1)
- write(*,*) ' create_local_velocity_stencil. Elapsed time: ' , t1-t0
+ !call cpu_time(t1)
+ !write(*,*) ' create_local_velocity_stencil. Elapsed time: ' , t1-t0
 
 end subroutine create_local_velocity_stencil
 
@@ -2121,7 +2120,6 @@ subroutine create_strip_connectivity(geo)
  
   end if 
 
-  write(*,*) ' In create_strip_conectivity. comp.' , i_comp  
   end associate
  end do
 

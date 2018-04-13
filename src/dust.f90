@@ -178,6 +178,14 @@ if (debug_level .ge. 3) then
   write(message,*) 'Initial time tstart: ', tstart; call printout(message)
   write(message,*) 'Final time tend:     ', tend; call printout(message)
   write(message,*) 'Time step dt:        ', dt; call printout(message)
+  write(message,*) 'Output interval:     ', dt_out; call printout(message)
+  write(message,*) 'Debug output interval:', dt_out; call printout(message)
+  write(message,*) 'Output first step:   ', output_start; call printout(message)
+  write(message,*) 'Debug level:', debug_level; call printout(message)
+  write(message,*) 'Free stream velocity:', uinf; call printout(message)
+  write(message,*) 'Maximum wake panels:', n_wake_panels; call printout(message)
+  write(message,*) 'Results basename: ', trim(basename); call printout(message)
+  write(message,*) 'Debug basename: ', trim(basename); call printout(message)
 endif
 
 
@@ -187,16 +195,22 @@ sim_param%t0          = tstart
 sim_param%tfin        = tend
 sim_param%dt          = dt
 sim_param%n_timesteps = nstep
-write(*,*) ' sim_param%n_timesteps : ' , sim_param%n_timesteps 
 allocate(sim_param%time_vec(sim_param%n_timesteps))
 sim_param%time_vec = (/ ( sim_param%t0 + &
          dble(i-1)*sim_param%dt, i=1,sim_param%n_timesteps ) /)
 allocate(sim_param%u_inf(3)) 
 sim_param%u_inf = uinf
+sim_param%debug_level = debug_level
 
 !------ Geometry creation ------
 call printout(nl//'====== Geometry Creation ======')
+t0 = dust_time()
 call create_geometry(prms, input_file_name, geo, te, elems, sim_param)
+t1 = dust_time()
+if(debug_level .ge. 1) then
+  write(message,'(A,F9.3,A)') 'Created geometry in: ' , t1 - t0,' s.'
+  call printout(message)
+endif
 
 if(debug_level .ge. 15) &
             call debug_printout_geometry_minimal(elems, geo, basename_debug, 0)
@@ -220,7 +234,7 @@ if(debug_level .ge. 1) then
 endif
 
 t22 = dust_time()
-write(message,'(A,F9.3,A)') '------ Completed all preliminary operations &
+write(message,'(A,F9.3,A)') nl//'------ Completed all preliminary operations &
                              &in: ' , t22 - t00,' s.'
 call printout(message)
 
@@ -231,7 +245,7 @@ t_last_out = time; t_last_debug_out = time
 t11 = dust_time()
 do it = 1,nstep
 
-  if(debug_level .ge. 3) then
+  if(debug_level .ge. 1) then
     write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
                                                          nstep, ' time: ', time
     call printout(message)
@@ -271,7 +285,7 @@ do it = 1,nstep
   call solve_linsys(linsys)
   t1 = dust_time()
 
-  if(debug_level .ge. 3) then
+  if(debug_level .ge. 1) then
     write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
     call printout(message)
   endif
@@ -294,7 +308,7 @@ do it = 1,nstep
                       call debug_printout_wake(wake_panels, basename_debug, it)
 
   !Print the results
-  if(time_2_out) write(*,*) ' it : ' , it ; call output_status(elems, geo, wake_panels, basename, it)
+  if(time_2_out)  call output_status(elems, geo, wake_panels, basename, it)
 
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the

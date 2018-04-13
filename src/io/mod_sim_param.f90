@@ -47,10 +47,20 @@ public :: t_sim_param
 private
 
 type t_sim_param
-  real(wp) :: t0 , dt , tfin
+  !> Start time
+  real(wp) :: t0 
+  !> Time step
+  real(wp) :: dt
+  !> Final time
+  real(wp) :: tfin
+  !> Number of timesteps
   integer  :: n_timesteps
+  !> Vector of time instants
   real(wp) , allocatable :: time_vec(:)
+  !> Free stream velocity
   real(wp) , allocatable :: u_inf(:)
+  !> Debug level
+  integer :: debug_level
 end type t_sim_param
 
 

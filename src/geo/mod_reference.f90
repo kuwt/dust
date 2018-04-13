@@ -410,7 +410,6 @@ subroutine build_references(refs, reference_file, sim_param)
             call error(this_sub_name, this_mod_name, '"Input" field not defined &
                   &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
           end if
-! write(*,*) ' build_references(1) : sim_param%n_timesteps : ' , sim_param%n_timesteps 
   !Setup the base reference
   refs(0)%id = 0
   refs(0)%tag = '0'
@@ -583,12 +582,6 @@ subroutine build_references(refs, reference_file, sim_param)
           pol_ome = getrealarray(sbprms_pol,'Omega',3)
           pol_pha = getrealarray(sbprms_pol,'Phase',3)
           pol_off = getrealarray(sbprms_pol,'Offset',3)
-          write(*,*) ' pol_fun_int : ' , pol_fun_int
-          write(*,*) ' pol_amp     : ' , pol_amp
-          write(*,*) ' pol_vec     : ' , pol_vec
-          write(*,*) ' pol_ome     : ' , pol_ome
-          write(*,*) ' pol_pha     : ' , pol_pha
-          write(*,*) ' pol_off     : ' , pol_off
                
           ! Input type : from_file , simple_function
           select case( trim(getstr(sbprms_pol,'Input_Type')) )    
@@ -720,17 +713,11 @@ subroutine build_references(refs, reference_file, sim_param)
                       &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
               end if 
 
-!             write(*,*) ' +++++++++++ '
-!             write(*,*) ' Rotation. Velocity from file ' 
 
               rot_filen = trim(getstr(sbprms_rot,'File'))
               call read_real_array_from_file ( 2 , trim(rot_filen) , rot_mat )
               nt = size(rot_mat,1)
 
-!             ! check ----
-!             write(*,*) ' rot_filen ' , trim(rot_filen)
-!             write(*,*) ' nt : ', nt
-!             ! check ----
 
               allocate(refs(iref)%rot_pos(nt)) 
               allocate(refs(iref)%rot_vel(nt)) 
@@ -754,8 +741,6 @@ subroutine build_references(refs, reference_file, sim_param)
                   &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
               end if 
 
-              write(*,*) ' +++++++++++ '
-              write(*,*) ' Rotation. Velocity from simple function '
 
               allocate(refs(iref)%rot_pos(sim_param%n_timesteps)) 
               allocate(refs(iref)%rot_vel(sim_param%n_timesteps)) 
@@ -764,7 +749,6 @@ subroutine build_references(refs, reference_file, sim_param)
               ! Read the integer id for the user defined functions 0:constant,1:sin              
               rot_fun_int = getint(sbprms_rot,'Function')
               rot_amp = getreal(sbprms_rot,'Amplitude')
-              write(*,*) ' rot_amp : ' , rot_amp
               rot_ome = getreal(sbprms_rot,'Omega')
               rot_pha = getreal(sbprms_rot,'Phase')
               rot_off = getreal(sbprms_rot,'Offset')
