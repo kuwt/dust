@@ -317,17 +317,17 @@ subroutine build_references(refs, reference_file, sim_param)
                                                         &0:constant,1:sin,...')
   call sbprms_pol%CreateStringOption('File','file .dat containing the motion')
   call sbprms_pol%CreateRealOption('Amplitude','Multiplicative factor &
-                                                              &for the motion')
+                                            &for the motion, defult 1.0','1.0')
   call sbprms_pol%CreateRealArrayOption('Vector','Relative amplitude of the &
-                                                           &three coordinates')
+                        &three coordinates, default 1 1 1','(/1.0, 1.0, 1.0/)')
   call sbprms_pol%CreateRealArrayOption('Omega','Pulsation of the motion for &
-                                                             &each coordinate')
+                          &each coordinate, default 1 1 1','(/1.0, 1.0, 1.0/)')
   call sbprms_pol%CreateRealArrayOption('Phase','Phase of the motion for &
-                                                             &each coordinate')
+                          &each coordinate, default 0 0 0','(/0.0, 0.0, 0.0/)')
   call sbprms_pol%CreateRealArrayOption('Offset','Phase of the motion for &
-                                                             &each coordinate')
+                          &each coordinate, default 0 0 0','(/0.0, 0.0, 0.0/)')
   call sbprms_pol%CreateRealArrayOption('Position_0','Initial position &
-                                                         &for each coordinate')
+                      &for each coordinate, default 0 0 0','(/0.0, 0.0, 0.0/)')
   ! End Pole motion sub-parser ----------------------------------------
 
   ! Rotation motion sub-parser ------------------------------------
@@ -342,15 +342,15 @@ subroutine build_references(refs, reference_file, sim_param)
   call sbprms_rot%CreateStringOption('File','file .dat containing the motion')
   call sbprms_rot%CreateRealArrayOption('Axis','axis of rotation')
   call sbprms_rot%CreateRealOption('Amplitude','Multiplicative factor for &
-                                                                  &the motion')
+                                                  &the motion, default 1','1')
   call sbprms_rot%CreateRealOption('Omega','Pulsation of the motion for &
-                                                             &each coordinate')
+                                            &each coordinate, default 1','1.0')
   call sbprms_rot%CreateRealOption('Phase','Phase of the motion &
-                                                         &for each coordinate')
-  call sbprms_rot%CreateRealOption('Offset','Phase of the motion &
-                                                         &for each coordinate')
+                            &each coordinate, default 0','0.0')
+  call sbprms_rot%CreateRealOption('Offset','Offset of the motion &
+                        &for each coordinate, default 0','0.0')
   call sbprms_rot%CreateRealOption('Psi_0','Initial position &
-                                                         &for each coordinate')
+                        &for each coordinate, default 0','0.0')
   ! End Rotation motion sub-parser ------------------------------------
 
   ! End Motion sub-parser ---------------------------------------------
@@ -405,11 +405,6 @@ subroutine build_references(refs, reference_file, sim_param)
   allocate(refs(0:n_refs))
 
 
-          if ( countoption(sbprms_pol,'Input_Type') .eq. 0 ) then
-            write(ref_tag_str,'(I5)') refs(iref)%tag
-            call error(this_sub_name, this_mod_name, '"Input" field not defined &
-                  &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
-          end if
   !Setup the base reference
   refs(0)%id = 0
   refs(0)%tag = '0'
@@ -507,7 +502,7 @@ subroutine build_references(refs, reference_file, sim_param)
  
             case('simple_function')
               if ( countoption(sbprms_pol,'Function') .eq. 0 ) then
-                write(ref_tag_str,'(I5)') refs(iref)%tag
+                write(ref_tag_str,'(A)') refs(iref)%tag
                 call error(this_sub_name, this_mod_name, '"Function" field not defined &
                   &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
               end if 
@@ -567,11 +562,11 @@ subroutine build_references(refs, reference_file, sim_param)
             call error(this_sub_name, this_mod_name, '"Input" field not defined &
                   &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
           end if
-          if ( countoption(sbprms_pol,'Position_0') .eq. 0 ) then
-            write(ref_tag_str,'(I5)') refs(iref)%tag
-            call error(this_sub_name, this_mod_name, '"Position_0" field not defined &
-                  &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
-          end if
+          !if ( countoption(sbprms_pol,'Position_0') .eq. 0 ) then
+          !  write(ref_tag_str,'(I5)') refs(iref)%tag
+          !  call error(this_sub_name, this_mod_name, '"Position_0" field not defined &
+          !        &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
+          !end if
 
           pol_pos0 = getrealarray(sbprms_pol,'Position_0',3)
 
@@ -685,20 +680,20 @@ subroutine build_references(refs, reference_file, sim_param)
         case('velocity')
 
           if ( countoption(sbprms_rot,'Input_Type') .eq. 0 ) then
-            write(ref_tag_str,'(I5)') refs(iref)%tag
+            write(ref_tag_str,'(A)') trim(refs(iref)%tag)
             call error(this_sub_name, this_mod_name, '"Input" field not defined &
                   &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
           end if
           if ( countoption(sbprms_rot,'Axis') .eq. 0 ) then
-            write(ref_tag_str,'(I5)') refs(iref)%tag
+            write(ref_tag_str,'(A)') trim(refs(iref)%tag)
             call error(this_sub_name, this_mod_name, '"Axis" field not defined &
                   &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
           end if
-          if ( countoption(sbprms_rot,'Psi_0') .eq. 0 ) then
-            write(ref_tag_str,'(I5)') refs(iref)%tag
-            call error(this_sub_name, this_mod_name, '"Psi_0" field not defined &
-                  &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
-          end if
+          !if ( countoption(sbprms_rot,'Psi_0') .eq. 0 ) then
+          !  write(ref_tag_str,'(A)') trim(refs(iref)%tag)
+          !  call error(this_sub_name, this_mod_name, '"Psi_0" field not defined &
+          !        &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
+          !end if
 
           refs(iref)%axis = getrealarray(sbprms_rot,'Axis',3)
           rot_pos0 = getreal(sbprms_rot,'Psi_0')
@@ -773,17 +768,17 @@ subroutine build_references(refs, reference_file, sim_param)
                      rot_off
                   if ( rot_ome .ne. 0.0_wp ) then
                     refs(iref)%rot_pos(it) = - rot_amp / rot_ome * &
-                       cos( rot_ome * refs(iref)%rot_tim(it) - rot_pha ) + &
-                       rot_off * ( refs(iref)%rot_tim(it) - refs(iref)%rot_tim(it-1) ) + &
+                       (cos( rot_ome * refs(iref)%rot_tim(it) - rot_pha ) - &
+                        cos( - rot_pha )) + &
+                       rot_off * ( refs(iref)%rot_tim(it) - refs(iref)%rot_tim(1) ) + &
                        rot_pos0
                   else 
-                  refs(iref)%rot_pos(it) = &
-                   ( rot_amp * sin( - rot_pha ) + rot_off ) * &
-                   ( refs(iref)%rot_tim(it) - refs(iref)%rot_tim(it-1) ) + &
-                     rot_pos0
+                    refs(iref)%rot_pos(it) = &
+                     ( rot_amp * sin( - rot_pha ) + rot_off ) * &
+                     ( refs(iref)%rot_tim(it) - refs(iref)%rot_tim(it-1) ) + &
+                       rot_pos0
                   end if
                 end do
-
               else
               call error(this_sub_name, this_mod_name, 'Undefined "Function" field &
                 &in Motion={RotatioRotationfor Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
@@ -791,7 +786,121 @@ subroutine build_references(refs, reference_file, sim_param)
               end if
 
             case default
-              write(ref_tag_str,'(I5)') refs(iref)%tag
+              write(ref_tag_str,'(A)') refs(iref)%tag
+              call error(this_sub_name, this_mod_name, 'Undefined "Input_Type" field &
+                  &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
+                  &'. It must be "from_file" or "simple_function".')
+     
+          end select
+
+        case('position')
+
+          if ( countoption(sbprms_rot,'Input_Type') .eq. 0 ) then
+            write(ref_tag_str,'(A)') trim(refs(iref)%tag)
+            call error(this_sub_name, this_mod_name, '"Input" field not defined &
+                  &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
+          end if
+          if ( countoption(sbprms_rot,'Axis') .eq. 0 ) then
+            write(ref_tag_str,'(A)') trim(refs(iref)%tag)
+            call error(this_sub_name, this_mod_name, '"Axis" field not defined &
+                  &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
+          end if
+          !if ( countoption(sbprms_rot,'Psi_0') .eq. 0 ) then
+          !  write(ref_tag_str,'(A)') trim(refs(iref)%tag)
+          !  call error(this_sub_name, this_mod_name, '"Psi_0" field not defined &
+          !        &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
+          !end if
+
+          refs(iref)%axis = getrealarray(sbprms_rot,'Axis',3)
+          !rot_pos0 = getreal(sbprms_rot,'Psi_0')
+
+          ! Input type : from_file , simple_function
+          select case( trim(getstr(sbprms_rot,'Input_Type')) )    
+
+            case('from_file')
+              if ( countoption(sbprms_rot,'File') .eq. 0 ) then
+                write(ref_tag_str,'(I5)') refs(iref)%tag
+                call error(this_sub_name, this_mod_name, '"File" field not defined &
+                      &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
+              end if 
+
+
+              rot_filen = trim(getstr(sbprms_rot,'File'))
+              call read_real_array_from_file ( 2 , trim(rot_filen) , rot_mat )
+              nt = size(rot_mat,1)
+
+
+              allocate(refs(iref)%rot_pos(nt)) 
+              allocate(refs(iref)%rot_vel(nt)) 
+              allocate(refs(iref)%rot_tim(nt)) 
+
+              ! Read time and velocity
+              refs(iref)%rot_tim = rot_mat(:,1) 
+              refs(iref)%rot_pos = rot_mat(:,2)
+              ! Compute velocity with Finite Difference 
+              do it = 1,nt
+                if ( it .eq. 1) then
+                  refs(iref)%rot_vel(it) = ( refs(iref)%rot_pos(2) - &
+                                               refs(iref)%rot_pos(1) ) /  &
+                   ( refs(iref)%rot_tim(2) - refs(iref)%rot_tim(1) )
+                elseif ( it .lt. nt ) then
+                  refs(iref)%rot_vel(it) = ( refs(iref)%rot_pos(it+1) - &
+                                               refs(iref)%rot_pos(it-1) ) /  &
+                  ( refs(iref)%rot_tim(it+1) - refs(iref)%rot_tim(it-1) )
+                elseif ( it .eq. nt ) then
+                  refs(iref)%rot_vel(nt) = ( refs(iref)%rot_pos(nt) - &
+                                               refs(iref)%rot_pos(nt-1) ) /  &
+                    ( refs(iref)%rot_tim(nt) - refs(iref)%rot_tim(nt-1) )
+                end if
+              end do
+ 
+            case('simple_function')
+              if ( countoption(sbprms_rot,'Function') .eq. 0 ) then
+                write(ref_tag_str,'(A)') refs(iref)%tag
+                call error(this_sub_name, this_mod_name, '"Function" field not defined &
+                  &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
+              end if 
+
+
+              allocate(refs(iref)%rot_pos(sim_param%n_timesteps)) 
+              allocate(refs(iref)%rot_vel(sim_param%n_timesteps)) 
+              allocate(refs(iref)%rot_tim(sim_param%n_timesteps)) 
+
+              ! Read the integer id for the user defined functions 0:constant,1:sin              
+              rot_fun_int = getint(sbprms_rot,'Function')
+              rot_amp = getreal(sbprms_rot,'Amplitude')
+              rot_ome = getreal(sbprms_rot,'Omega')
+              rot_pha = getreal(sbprms_rot,'Phase')
+              rot_off = getreal(sbprms_rot,'Offset')
+               
+              refs(iref)%rot_tim = sim_param%time_vec
+
+              if ( rot_fun_int .eq. 0 ) then ! constant function
+
+                do it = 1 , sim_param%n_timesteps
+                  refs(iref)%rot_pos(it) = rot_amp + rot_off
+                  refs(iref)%rot_vel(it) = 0.0_wp
+                end do
+
+              elseif ( rot_fun_int .eq. 1 ) then ! sin function
+                  refs(iref)%rot_vel(1) = rot_amp * &
+                     sin( rot_ome * refs(iref)%rot_tim(1) - rot_pha ) + rot_off
+                  refs(iref)%rot_pos(1) = rot_pos0  ! Initial condition ...
+                do it = 1 , sim_param%n_timesteps 
+                  refs(iref)%rot_pos(it) = rot_amp * &
+                     sin( rot_ome * refs(iref)%rot_tim(it) - rot_pha ) + &
+                     rot_off
+                  refs(iref)%rot_vel(it) = rot_amp * &
+                     cos( rot_ome * refs(iref)%rot_tim(it) - rot_pha ) * rot_ome
+                end do
+              else
+              call error(this_sub_name, this_mod_name, 'Undefined "Function" field &
+                &in Motion={RotatioRotationfor Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
+                &'. It must be 0:constant or 1:sin')
+              end if
+
+            case default
+              write(ref_tag_str,'(A)') refs(iref)%tag
               call error(this_sub_name, this_mod_name, 'Undefined "Input_Type" field &
                   &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
                   &'. It must be "from_file" or "simple_function".')
@@ -799,10 +908,10 @@ subroutine build_references(refs, reference_file, sim_param)
           end select
 
         case default
-          write(ref_tag_str,'(I5)') refs(iref)%tag
+          write(ref_tag_str,'(A)') refs(iref)%tag
           call error(this_sub_name, this_mod_name, 'Undefined "Input" field &
                 &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
-                &'. It must be "velocity".')
+                &'. It must be "velocity" or "position".')
 
       end select
 
@@ -943,7 +1052,7 @@ subroutine build_references(refs, reference_file, sim_param)
   
     !if not found a parent
     if (refs(iref)%parent_id .lt. 0) then
-      write(msg,'(A,I2,A,I2,A)') 'For reference tag ',trim(refs(iref)%tag), &
+      write(msg,'(A,A,A,A,A)') 'For reference tag ',trim(refs(iref)%tag), &
                    ' a parent with tag ',trim(refs(iref)%parent_tag),' was not found'
       call error(this_sub_name, this_mod_name, msg)
     endif

@@ -541,20 +541,6 @@ subroutine reflect_mesh_structured( ee, rr, &
   call move_alloc(rr_temp, rr)
   call move_alloc(ee_sort, ee)
 
-! check -----
-  open(unit=25,file='./ee_symm.dat')
-  do i1 = 1 , size(ee,2)
-    write(25,*) ee(:,i1)
-  end do
-  close(25)
-  open(unit=25,file='./rr_symm.dat')
-  do i1 = 1 , size(rr,2)
-    write(25,*) rr(:,i1)
-  end do
-  close(25)
-!
-! stop
-! check ----
 
   if ( allocated(ee_temp) )  deallocate(ee_temp)
 
@@ -754,6 +740,7 @@ subroutine build_te_general ( ee , rr , neigh , ElType ,  &
  ! merge ------
  ! 1e-0 for nasa-crm , 3e-3_wp for naca0012
  real(wp),   parameter :: tol_sewing = 1e-3_wp  
+ !real(wp),   parameter :: tol_sewing = 1e-0_wp  
  real(wp), allocatable :: rr_m(:,:)
  integer , allocatable :: ee_m(:,:) , i_m(:,:)
  ! 'closed-te' connectivity -----
