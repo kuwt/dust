@@ -521,10 +521,9 @@ subroutine compute_cp_surfpan(this, elems, uinf) !, uinf)
              uinf
 
   ! pressure coefficient, cp ---------------------------------
-  ! steady problems  : cp = 1 - (V/V_inf)^2
-  this%cp  = 1.0_wp - ( norm2(this%vel) / norm2(uinf) )**2.0_wp
-  ! unsteady problems: cp = cp_steady - dphi/dt * 2/(V_inf^2)
-! this%cp  = 1.0_wp - ( norm2(this%vel) / norm2(uinf) )**2.0_wp - ...
+  ! steady problems  : cp = 1 - (V/V_inf)^2 - dphi/dt * 2/(V_inf^2)
+  this%cp  = 1.0_wp - ( norm2(this%vel) / norm2(uinf) )**2.0_wp  &
+           + 2.0_wp * this%didou_dt / norm2(uinf)**2.0_wp
  
 
 end subroutine compute_cp_surfpan

@@ -58,6 +58,7 @@ type, abstract :: c_elem
 
   !> Intensity of the doublets/vortexes
   real(wp), pointer :: idou
+  real(wp)          :: didou_dt
  
   !> Element id
   integer :: id
@@ -97,6 +98,8 @@ type, abstract :: c_elem
   real(wp)              :: dy
   !> Previous element in a stripe (for vortring only)
   integer               :: stripe_1
+  !> Element indices in the component%strip_elem array (for vortring only)
+  integer, allocatable  :: stripe_elem(:)
 
   !> Fluid velocity at center for boundary condition (U_inf-rel vel)
   real(wp), allocatable :: vel(:)

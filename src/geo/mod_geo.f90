@@ -162,6 +162,11 @@ type :: t_geo_component
  !> Is the component moving?
  logical :: moving
 
+! old idea ---> now each element knwos the indices of the previous elements
+!               on the same strip
+!!> Strip for vortex ring (structured) elements
+!integer , allocatable :: strip_elem(:,:)
+
 end type  t_geo_component
 
 !-----------------------------------
@@ -418,6 +423,13 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
     elems(i)%p%id = i
   end do
   !Update elem-elem connectivity after re-ordering
+  ! debug ----
+  write(*,*) ' geo%nelem : ' , geo%nelem
+  do i = 1 , geo%nelem
+    write(*,*) ' elems(',i,')%p%n_ver   : ' , elems(i)%p%n_ver
+    write(*,*) ' elems(',i,')%p%i_neigh : ' , elems(i)%p%i_neigh(:)
+  end do
+  ! debug ----
   do i = 1,geo%nelem
     do j = 1,elems(i)%p%n_ver
       if ( elems(i)%p%i_neigh(j) .ne. 0 ) then
@@ -2060,6 +2072,7 @@ end subroutine create_local_velocity_stencil
 
 !----------------------------------------------------------------------
 
+! Updatad node-element connectivity ( ee array )
 ! It is assumed that nodes and elements are sorted as follows
 !
 !  1-----5-----9-----13----17----21   <--- LE
@@ -2069,12 +2082,12 @@ end subroutine create_local_velocity_stencil
 !  3-----7-----11----15----19----23
 !  |  3  |  6  |  9  |  12 |  15 |
 !  4-----8-----12----16----20----24   <--- TE
-! and the ee array is built is  1, 2, 6, 5
-!                               2, 3, 7, 6
-!                               3, 4, 8, 7
-!                               5, 6,10, 9
-!                              ...
-!                              19,20,24,23
+! and the ee array is built as  5, 1, 2, 6 
+!                               6, 2, 3, 7 
+!                               7, 3, 4, 8 
+!                               9, 5, 6,10 
+!                                , ...
+!                              23,19,20,24 
 subroutine create_strip_connectivity(geo)
  type(t_geo),  intent(inout) :: geo
 
@@ -2084,6 +2097,8 @@ subroutine create_strip_connectivity(geo)
  integer :: n_el , ie_ind
  integer :: i_comp , i_el 
 
+ integer :: i_c , i_s , n_s , n_c , i_c2
+ character(len=*), parameter :: this_sub_name = 'create_strip_connectivity'
 
  do i_comp = 1 , size(geo%components)
   associate(comp => geo%components(i_comp))
@@ -2092,24 +2107,34 @@ subroutine create_strip_connectivity(geo)
   if ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'v' ) then
 
     n_el = size(comp%el)
-    
-    io_tip = 1 ; io_te = 0 ! initialisation
+
+    ! Some checks added: the first element must be at the LE, the last at the TE
+    if ( comp%el(  1 )%i_neigh(1) .ne. 0 ) then
+      call error(this_sub_name, this_mod_name, 'First element must be at the LE')
+    end if
+    if ( comp%el(n_el)%i_neigh(3) .ne. 0 ) then
+      call error(this_sub_name, this_mod_name, 'Last element must be at the TE')
+    end if
+
+    ! initialisation
+    io_tip = 1 ; io_te = 0 ; n_s = 0 
     do i_el = 1 , n_el     
     
      ie_ind = comp%el(i_el)%id
     
-     if ( comp%el(i_el)%i_neigh(4) .eq. 0 ) then
-      comp%el(i_el)%stripe_1 = 0
+     if ( comp%el(i_el)%i_neigh(1) .eq. 0 ) then
+       comp%el(i_el)%stripe_1 = 0
+       n_s = n_s + 1 
      else 
-      comp%el(i_el)%stripe_1 = comp%el(i_el)%i_neigh(4)
+       comp%el(i_el)%stripe_1 = comp%el(i_el)%i_neigh(1)
      end if
     
-     comp%el(i_el)%dy = sum( cross( comp%el(i_el)%edge_uni(:,1) ,    &
-                                     comp%el(i_el)%edge_vec(:,2)  ) * &
-                              comp%el(i_el)%nor )
+     comp%el(i_el)%dy = sum( cross( comp%el(i_el)%edge_uni(:,2) ,    &
+                                    comp%el(i_el)%edge_vec(:,3)  ) * &
+                             comp%el(i_el)%nor )
     
-     h2 = sum( cross( comp%el(i_el)%edge_uni(:,1) ,                        &
-                      comp%el(i_el)%ver(:,4) - comp%el(i_el)%ver(:,2) ) * &  
+     h2 = sum( cross( comp%el(i_el)%edge_uni(:,2) ,                        &
+                      comp%el(i_el)%ver(:,1) - comp%el(i_el)%ver(:,3) ) * &  
                comp%el(i_el)%nor )
     
      if ( abs( h2 - comp%el(i_el)%dy ) .gt. 1e-4 ) then
@@ -2117,14 +2142,111 @@ subroutine create_strip_connectivity(geo)
      end if
     
     end do
+
+    ! allocate and fill comp%strip_elem array
+    if ( mod(n_el,n_s) .ne. 0 ) then
+      call error(this_sub_name, this_mod_name, ' mod(n_elem,n_s) .ne. 0. &
+         & Wrong input file for vortring component.')
+    end if
+    n_c = n_el / n_s  ! integer division to find number of chord panels
+
+    do i_s = 1 , n_s
+      do i_c = 1 , n_c
+!       write(*,*) ' comp%el(',i_c+(i_s-1)*n_c,')%stripe_elem : '
+        allocate( comp%el(i_c+(i_s-1)*n_c)%stripe_elem(i_c) )
+        do i_c2 = 1 , i_c
+          comp%el(i_c+(i_s-1)*n_c)%stripe_elem(i_c2) = &
+                                        comp%el(i_c2+(i_s-1)*n_c)%id
+!         write(*,*) comp%el(i_c+(i_s-1)*n_c)%stripe_elem(i_c2)
+        end do
+      end do
+    end do
+
+! elseif ( el_type .eq. 'v' ) do_nothing
  
   end if 
 
   end associate
  end do
 
+! check ----
+!  write(*,*) ' check strip in create_strip_connectivity '
+!  do i_el = 1 , n_el
+!    write(*,*) geo%components(1)%el(i_el)%stripe_1
+!  end do
+!  stop
+! check ----
 
 end subroutine create_strip_connectivity
+
+
+!! OLD node-element connectivity ( ee array )
+!! ! It is assumed that nodes and elements are sorted as follows
+!! !
+!! !  1-----5-----9-----13----17----21   <--- LE
+!! !  |  1  |  4  |  7  |  10 |  13 |
+!! !  2-----6-----10----14----18----22
+!! !  |  2  |  5  |  8  |  11 |  14 |
+!! !  3-----7-----11----15----19----23
+!! !  |  3  |  6  |  9  |  12 |  15 |
+!! !  4-----8-----12----16----20----24   <--- TE
+!! ! and the ee array is built is  1, 2, 6, 5
+!! !                               2, 3, 7, 6
+!! !                               3, 4, 8, 7
+!! !                               5, 6,10, 9
+!! !                              ...
+!! !                              19,20,24,23
+!! subroutine create_strip_connectivity(geo)
+!!  type(t_geo),  intent(inout) :: geo
+!! 
+!!  real(wp) :: h2
+!! 
+!!  integer :: io_te , io_tip
+!!  integer :: n_el , ie_ind
+!!  integer :: i_comp , i_el 
+!! 
+!! 
+!!  do i_comp = 1 , size(geo%components)
+!!   associate(comp => geo%components(i_comp))
+!! 
+!!   ! connectivity built for lifting surface only
+!!   if ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'v' ) then
+!! 
+!!     n_el = size(comp%el)
+!!     
+!!     io_tip = 1 ; io_te = 0 ! initialisation
+!!     do i_el = 1 , n_el     
+!!     
+!!      ie_ind = comp%el(i_el)%id
+!!     
+!!      if ( comp%el(i_el)%i_neigh(4) .eq. 0 ) then
+!!       comp%el(i_el)%stripe_1 = 0
+!!      else 
+!!       comp%el(i_el)%stripe_1 = comp%el(i_el)%i_neigh(4)
+!!      end if
+!!     
+!!      comp%el(i_el)%dy = sum( cross( comp%el(i_el)%edge_uni(:,1) ,    &
+!!                                     comp%el(i_el)%edge_vec(:,2)  ) * &
+!!                              comp%el(i_el)%nor )
+!!     
+!!      h2 = sum( cross( comp%el(i_el)%edge_uni(:,1) ,                        &
+!!                       comp%el(i_el)%ver(:,4) - comp%el(i_el)%ver(:,2) ) * &  
+!!                comp%el(i_el)%nor )
+!!     
+!!      if ( abs( h2 - comp%el(i_el)%dy ) .gt. 1e-4 ) then
+!!        write(*,*) ' WARNING: non parallel stripe edges (rough check) '
+!!      end if
+!!     
+!!     end do
+!!  
+!!   end if 
+!! 
+!!   write(*,*) ' In create_strip_conectivity. comp.' , i_comp  
+!!   end associate
+!!  end do
+!! 
+!! 
+!! end subroutine create_strip_connectivity
 
 !----------------------------------------------------------------------
 

@@ -304,15 +304,41 @@ subroutine compute_cp_vortring(this, elems, uinf)
   type(t_elem_p), intent(in) :: elems(:)
   real(wp), intent(in) :: uinf(:)
 
+  integer  :: i_stripe , i_c
+  real(wp) :: dG_dt
+
   this%cp = 0.0_wp
 
-  if ( this%stripe_1 .ne. 0 ) then
-    this%cp = 2.0_wp * norm2(uinf - this%ub) * this%dy / &
-            ( norm2(uinf)**2.0_wp * this%area ) * ( elems(this%id)%p%idou - elems(this%stripe_1)%p%idou )
+  i_stripe = size(this%stripe_elem)
+! WRONG(?): effective circulation (Gamma_i^{(e)} = Gamma_i - Gamma_{i-1})
+!  must be used, s.t.  dG_dt = sum_{j=1}^{i} dGamma_j^{(e)} = dGamma_i
+! dG_dt = 0.0_wp
+! do i_c = 1 , i_stripe
+!   dG_dt = dG_dt + elems(this%stripe_elem(i_c))%p%didou_dt 
+! end do 
+
+  dG_dt = this%didou_dt
+
+  if ( i_stripe .gt. 1 ) then
+    this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &
+          ( norm2(uinf - this%ub) * this%dy / this%area * &
+               ( elems(this%id)%p%idou - elems(this%stripe_elem(i_stripe-1))%p%idou ) + &
+               dG_dt )
   else
-    this%cp = 2.0_wp * norm2(uinf - this%ub) * this%dy / &
-            ( norm2(uinf)**2.0_wp * this%area ) *   elems(this%id)%p%idou
+    this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &
+          ( norm2(uinf - this%ub) * this%dy / this%area * &
+                 elems(this%id)%p%idou + &
+               dG_dt )
   end if
+
+! old structures (it should be working as well). For stationary problems
+! if ( this%stripe_1 .ne. 0 ) then
+!   this%cp = 2.0_wp * norm2(uinf - this%ub) * this%dy / &
+!           ( norm2(uinf)**2.0_wp * this%area ) * ( elems(this%id)%p%idou - elems(this%stripe_1)%p%idou )
+! else
+!   this%cp = 2.0_wp * norm2(uinf - this%ub) * this%dy / &
+!           ( norm2(uinf)**2.0_wp * this%area ) *   elems(this%id)%p%idou
+! end if
 
 end subroutine compute_cp_vortring
 

@@ -122,6 +122,8 @@ character(len=max_char_len) :: frmt
 character(len=max_char_len) :: basename
 character(len=max_char_len) :: basename_debug
 
+real(wp) , allocatable :: res_old(:)
+
 integer :: i_el , i
 
 
@@ -242,6 +244,7 @@ call printout(message)
 time = tstart
 t_last_out = time; t_last_debug_out = time
 
+allocate(res_old(size(elems))) ; res_old = 0.0_wp
 t11 = dust_time()
 do it = 1,nstep
 
@@ -279,11 +282,22 @@ do it = 1,nstep
                              trim(basename_debug)//'b_'//trim(frmt)//'.dat' )
   endif
 
-
   !------ Solve the system ------
   t0 = dust_time()
   call solve_linsys(linsys)
   t1 = dust_time()
+
+  ! compute time derivative of the result ( = i_vortex = -i_doublet ) ----------
+  write(*,*) ' dt = ' , sim_param%dt
+  do i_el = 1 , size(elems)
+    elems(i_el)%p%didou_dt = ( linsys%res(i_el) - res_old(i_el) ) / sim_param%dt 
+!   if ( it .eq. 2 ) then
+!     write(*,*) ' d , d_old , dd_dt ' ,  linsys%res(i_el) , res_old(i_el) , elems(i_el)%p%didou_dt 
+!   end if
+  end do
+! if ( it .eq. 2 ) stop
+  ! update res_old for next time step -------
+  res_old = linsys%res
 
   if(debug_level .ge. 1) then
     write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
@@ -316,7 +330,10 @@ do it = 1,nstep
   call update_wake_panels(wake_panels, elems, dt, uinf)
 
   time = min(tend, time+dt)
+
 enddo
+
+deallocate( res_old )
 !===== End Time Cycle ======
 
 

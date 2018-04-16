@@ -676,17 +676,17 @@ if ( allocated(neigh) )   deallocate(neigh)
 allocate(neigh(4,size(ee,2))) ; neigh = 0
 
 nelems_chord = npoints_chord_tot - 1
-! if ( .not. symm ) then
-  ! first strip ------
-  do i2 = 1 , nelems_chord
-    iel = i2
-    neigh(1,iel) = iel - 1
-    neigh(2,iel) = 0  ! iel - nelems_chord
-    neigh(3,iel) = iel + 1
-    neigh(4,iel) = iel + nelems_chord
-  end do
+!!! if ( .not. symm ) then
+! ! first strip ------
+! do i2 = 1 , nelems_chord
+!   iel = i2
+!   neigh(1,iel) = iel - 1
+!   neigh(2,iel) = 0  ! iel - nelems_chord
+!   neigh(3,iel) = iel + 1
+!   neigh(4,iel) = iel + nelems_chord
+! end do
   ! inner strips -----
-  do i1 = 2 , nelems_span - 1 
+  do i1 = 1 , nelems_span
     do i2 = 1 , nelems_chord
       iel = i2+(i1-1) * nelems_chord
       neigh(1,iel) = iel - 1
@@ -695,14 +695,17 @@ nelems_chord = npoints_chord_tot - 1
       neigh(4,iel) = iel + nelems_chord
     end do
   end do
-  ! last strip -------
-  do i2 = 1 , nelems_chord
-    iel = i2 + ( nelems_span - 1 ) * nelems_chord
-    neigh(1,iel) = iel - 1
-    neigh(2,iel) = iel - nelems_chord
-    neigh(3,iel) = iel + 1
-    neigh(4,iel) = 0 ! iel + nelems_chord
-  end do
+! ! last strip -------
+! do i2 = 1 , nelems_chord
+!   iel = i2 + ( nelems_span - 1 ) * nelems_chord
+!   neigh(1,iel) = iel - 1
+!   neigh(2,iel) = iel - nelems_chord
+!   neigh(3,iel) = iel + 1
+!   neigh(4,iel) = 0 ! iel + nelems_chord
+! end do
+  ! correct tip   elements
+  neigh(2,(/ (    i1                          , i1 = 1,nelems_chord) /)) = 0
+  neigh(4,(/ (i1+(nelems_span-1)*nelems_chord , i1 = 1,nelems_chord) /)) = 0
   ! correct le-te elements
   neigh(1,(/ ( 1+(i1-1)*nelems_chord , i1 = 1,nelems_span) /)) = 0
   neigh(3,(/ (   (i1  )*nelems_chord , i1 = 1,nelems_span) /)) = 0
@@ -1322,6 +1325,15 @@ subroutine build_te_parametric ( ee , rr , ElType , &
 ! check ----
 
 end subroutine build_te_parametric
+
+!----------------------------------------------------------------------
+! subroutines :
+!   create_local_velocity_stencil_...      ... = general, parametric
+!   create_strip_connectivity_...
+
+
+
+
 
 !----------------------------------------------------------------------
 
