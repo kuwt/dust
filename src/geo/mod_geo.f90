@@ -423,13 +423,6 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
     elems(i)%p%id = i
   end do
   !Update elem-elem connectivity after re-ordering
-  ! debug ----
-  write(*,*) ' geo%nelem : ' , geo%nelem
-  do i = 1 , geo%nelem
-    write(*,*) ' elems(',i,')%p%n_ver   : ' , elems(i)%p%n_ver
-    write(*,*) ' elems(',i,')%p%i_neigh : ' , elems(i)%p%i_neigh(:)
-  end do
-  ! debug ----
   do i = 1,geo%nelem
     do j = 1,elems(i)%p%n_ver
       if ( elems(i)%p%i_neigh(j) .ne. 0 ) then
@@ -2169,13 +2162,6 @@ subroutine create_strip_connectivity(geo)
   end associate
  end do
 
-! check ----
-!  write(*,*) ' check strip in create_strip_connectivity '
-!  do i_el = 1 , n_el
-!    write(*,*) geo%components(1)%el(i_el)%stripe_1
-!  end do
-!  stop
-! check ----
 
 end subroutine create_strip_connectivity
 
