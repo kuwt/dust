@@ -714,11 +714,11 @@ nelems_chord = npoints_chord_tot - 1
 ! end if
 
 ! check ----
-open(unit=25,file='./neigh_symm.dat')
-do i1 = 1 , size(neigh,2)
-  write(25,*) neigh(:,i1)
-end do
-close(25)
+!open(unit=25,file='./neigh_symm.dat')
+!do i1 = 1 , size(neigh,2)
+!  write(25,*) neigh(:,i1)
+!end do
+!close(25)
 ! check ----
 
 
