@@ -60,7 +60,7 @@ use mod_parametric_io, only: &
   read_mesh_parametric
 
 use mod_aero_elements, only: &
-  c_elem, t_elem_p
+  c_elem, t_elem_p, c_elem_pan, c_elem_lin
 
 use mod_surfpan, only: &
   t_surfpan
@@ -104,15 +104,15 @@ private
 !> Element type
 !!
 !! Employed to build the geometry
-type :: t_e
- 
- !> Vertices indexes
- integer, allocatable :: vert(:)
-
- !> element type
- character :: etype
-
-end type t_e
+!type :: t_e
+! 
+! !> Vertices indexes
+! integer, allocatable :: vert(:)
+!
+! !> element type
+! character :: etype
+!
+!end type t_e
 
 !-----------------------------------
 
@@ -136,7 +136,7 @@ type :: t_geo_component
  !> Elements of the group
  !! The main memory allocation happens here, they will be pointed from
  !! somewhere else
- class(c_elem), allocatable :: el(:)
+ class(c_elem_pan), allocatable :: el(:)
 
  !> Global indexes of the points in the component
  integer, allocatable :: i_points(:)
@@ -152,12 +152,14 @@ type :: t_geo_component
  real(wp), allocatable :: loc_points(:,:)
 
  !> Temporary to build the component
- type(t_e), allocatable :: temp_elems(:)
+ !type(t_e), allocatable :: temp_elems(:)
  
  !> Number of surface panels in the component
  integer :: nSurfPan
  !> Number of vortex rings in the component
  integer :: nVortRin
+ !> Number of lifting line elements in the component
+ integer :: nLiftLin
 
  !> Is the component moving?
  logical :: moving
@@ -193,18 +195,17 @@ end type  t_geo_group
 !! also all the solution
 type :: t_geo
 
- !> Total number of elements
+ !> Total number of implicit (panel) elements
  integer :: nelem
 
  !> Number of surface panel elements
  integer :: nSurfPan
- !> Surface panels 
- !type(t_surfpan), allocatable :: SurfPan(:)
 
  !> Number of vortex ring elements
  integer :: nVortRin
- !> Vortex rings
- !type(t_vortring), allocatable :: VortRin(:)
+
+ !> Number of lifting line elements
+ integer :: nLiftLin
 
  !> Number of statical elements
  integer :: nstatic
@@ -342,22 +343,31 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
   geo%nmoving  = 0
   geo%nSurfPan = 0
   geo%nVortRin = 0
+  geo%nLiftLin = 0
 
   ! count the elements
   do i_comp = 1,size(geo%components)
-    if(geo%components(i_comp)%moving) then
-      geo%nmoving = geo%nmoving + geo%components(i_comp)%nelems
-    else
-      geo%nstatic = geo%nstatic + geo%components(i_comp)%nelems
-    endif
 
     if (geo%components(i_comp)%comp_el_type .eq. 'p') then
       geo%nSurfPan = geo%nSurfPan + geo%components(i_comp)%nelems
+      geo%nelem = geo%nelem + geo%components(i_comp)%nelems
+      if(geo%components(i_comp)%moving) then
+        geo%nmoving = geo%nmoving + geo%components(i_comp)%nelems
+      else
+        geo%nstatic = geo%nstatic + geo%components(i_comp)%nelems
+      endif
     elseif (geo%components(i_comp)%comp_el_type .eq. 'v') then
       geo%nVortRin = geo%nVortRin + geo%components(i_comp)%nelems
+      geo%nelem = geo%nelem + geo%components(i_comp)%nelems
+      if(geo%components(i_comp)%moving) then
+        geo%nmoving = geo%nmoving + geo%components(i_comp)%nelems
+      else
+        geo%nstatic = geo%nstatic + geo%components(i_comp)%nelems
+      endif
+    elseif (geo%components(i_comp)%comp_el_type .eq. 'l') then
+      geo%nLiftLin = geo%nLiftLin + geo%components(i_comp)%nelems
     endif
     
-    geo%nelem = geo%nelem + geo%components(i_comp)%nelems
   enddo
 
   ! calculate the geometric quantities
@@ -365,6 +375,7 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
   ! starting geometrical condition
 
   call update_geometry(geo, tstart, update_static=.true.)
+
 
   if(sim_param%debug_level .ge. 3) then
     call printout(nl//' Geometry details:' ) 
@@ -378,18 +389,24 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
     call printout(msg)
     write(msg,'(A,I9)') '  number of vortex rings:    ' ,geo%nvortrin
     call printout(msg)
+    write(msg,'(A,I9)') '  number of lifting lines:    ' ,geo%nLiftLin
+    call printout(msg)
   endif
 
   !Create the vector of pointers to all the elements
   allocate(elems(geo%nelem)) 
   i=0
   do i_comp = 1,size(geo%components)
-    do j = 1,size(geo%components(i_comp)%el)
-      
-      i = i+1
-      elems(i)%p => geo%components(i_comp)%el(j)
+    
+    if (geo%components(i_comp)%comp_el_type .eq. 'p' .or. &
+        geo%components(i_comp)%comp_el_type .eq. 'v') then
+      do j = 1,size(geo%components(i_comp)%el)
+        
+        i = i+1
+        elems(i)%p => geo%components(i_comp)%el(j)
 
-    enddo
+      enddo
+    endif
   enddo
 
   ! Sort elements: first static, then moving ------- 
@@ -588,156 +605,168 @@ subroutine load_components(geo, in_file, sim_param, te)
       geo%components(i_comp)%ref_tag = trim(ref_tag_m)
       geo%components(i_comp)%moving  = geo%refs(ref_id)%moving
 
-      ! Geometry and Solution --------------------------
-      call open_hdf5_group(cloc,'Geometry_and_Solution',geo_loc)
-      call read_hdf5_al(ee   ,'ee'   ,geo_loc)
-      call read_hdf5_al(rr   ,'rr'   ,geo_loc)
-      call read_hdf5_al(neigh,'neigh',geo_loc)
-      call close_hdf5_group(geo_loc)
-
-      ! Trailing Edge ----------------------------------
-      call open_hdf5_group(cloc,'Trailing_Edge',te_loc)
-      call read_hdf5_al(    e_te,    'e_te',te_loc)
-      call read_hdf5_al(    i_te,    'i_te',te_loc)
-      call read_hdf5_al(   rr_te,   'rr_te',te_loc)
-      call read_hdf5_al(   ii_te,   'ii_te',te_loc)
-      call read_hdf5_al(neigh_te,'neigh_te',te_loc)
-      call read_hdf5_al(    o_te,    'o_te',te_loc)
-      call read_hdf5_al(    t_te,    't_te',te_loc)
-      !call read_hdf5_al(  ref_te,  'ref_te',te_loc)
-      call close_hdf5_group(te_loc)
- 
       call read_hdf5(comp_el_type,'ElType',cloc)
       geo%components(i_comp)%comp_el_type = trim(comp_el_type)
       
-      ! --- treat the points ---
-      if(allocated(geo%points)) then
-        points_offset = size(geo%points,2) 
-      else
-        points_offset = 0
-      endif
+      select case(trim(comp_el_type))
+       case('p','v')
 
-      !store the read points into the local points
-      allocate(geo%components(i_comp)%loc_points(3,size(rr,2)))
-      geo%components(i_comp)%loc_points = rr
-      
-      !Now for the moments the points are stored here without moving them, 
-      !will be moved later, consider not storing them here at all
-      allocate(points_tmp(3,size(rr,2)+points_offset))
-      if (points_offset .gt. 0) points_tmp(:,1:points_offset) = geo%points
-      points_tmp(:,points_offset+1:points_offset+size(rr,2)) = rr
-      call move_alloc(points_tmp, geo%points)
-      allocate(geo%components(i_comp)%i_points(size(rr,2)))
-      geo%components(i_comp)%i_points = &
-                         (/((i3),i3=points_offset+1,points_offset+size(rr,2))/)
+        ! Geometry and Solution --------------------------
+        call open_hdf5_group(cloc,'Geometry_and_Solution',geo_loc)
+        call read_hdf5_al(ee   ,'ee'   ,geo_loc)
+        call read_hdf5_al(rr   ,'rr'   ,geo_loc)
+        call read_hdf5_al(neigh,'neigh',geo_loc)
+        call close_hdf5_group(geo_loc)
 
-      ! --- treat the elements ---
-      !allocate the elements of the component of the right kind
-      geo%components(i_comp)%nelems = size(ee,2)
-      !allocate(geo%components(i_comp)%e(size(ee,2)))
-      select case(trim(geo%components(i_comp)%comp_el_type))
-       case('p')
-        allocate(t_surfpan::geo%components(i_comp)%el(size(ee,2)))
-       case('v')
-        allocate(t_vortring::geo%components(i_comp)%el(size(ee,2)))
-       case default
-        call error(this_sub_name, this_mod_name, &
-                 'Unknown type of element: '//geo%components(i_comp)%comp_el_type)
-      end select
-
-      do i2=1,size(ee,2)
-        n_vert = count(ee(:,i2).ne.0)
-        allocate(geo%components(i_comp)%el(i2)%i_ver(n_vert))
-        allocate(geo%components(i_comp)%el(i2)%i_neigh(n_vert))
-        geo%components(i_comp)%el(i2)%n_ver = n_vert
-        geo%components(i_comp)%el(i2)%i_ver(1:n_vert) = &
-                                              ee(1:n_vert,i2) + points_offset
-        do i3=1,n_vert
-          if ( neigh(i3,i2) .ne. 0 ) then
-            geo%components(i_comp)%el(i2)%i_neigh(i3) = &
-                                              neigh(i3,i2) + elems_offset
-          else
-            geo%components(i_comp)%el(i2)%i_neigh(i3) = &
-                                              neigh(i3,i2)
-          end if
-        end do
-
-        geo%components(i_comp)%el(i2)%moving = geo%components(i_comp)%moving
-        allocate(geo%components(i_comp)%el(i2)%vel(3))
-        !TEMPORARY: only for backward compatibility
-        !geo%components(i_comp)%e(i2)%p => geo%components(i_comp)%el(i2)
-      enddo
-
-      geo%components(i_comp)%nSurfPan = 0; geo%components(i_comp)%nVortRin = 0;
-      if(comp_el_type(1:1) .eq. 'p') geo%components(i_comp)%nSurfPan = size(ee,2)
-      if(comp_el_type(1:1) .eq. 'v') geo%components(i_comp)%nVortRin = size(ee,2)
-
-      ! Trailing Edge ------------
-      ne_te = size(e_te,2)
-      nn_te = size(i_te,2)
-      if (sim_param%debug_level .ge. 3) then
-        write(msg,'(A,I0,A,I0)') ' Trailing edge: elements: ', &
-                                                       ne_te, ' nodes ', nn_te
-        call printout(msg)
-      endif
-      if (.not.allocated(te%e)) then ! it should be enough
-        allocate(te%e    (2,ne_te) ) ; te%e     =     e_te 
-        allocate(te%i    (2,nn_te) ) ; te%i     =     i_te 
-        allocate(te%rr   (3,nn_te) ) ; te%rr    =    rr_te
-        allocate(te%ii   (2,ne_te) ) ; te%ii    =    ii_te 
-        allocate(te%neigh(2,ne_te) ) ; te%neigh = neigh_te
-        allocate(te%o    (2,ne_te) ) ; te%o     =     o_te
-        allocate(te%t    (2,nn_te) ) ; te%t     =     t_te
-        allocate(te%ref  (  nn_te) ) ; te%ref   =   geo%components(i_comp)%ref_id
-      else
-        nn_te_prev = size(te%i,2)
-        ne_te_prev = size(te%e,2)
-        allocate(e_te_tmp(2,size(te%e,2)+ne_te)) 
-        e_te_tmp(:,             1:size(te%e,2)    ) = te%e
-        where( e_te .ne. 0 ) e_te = e_te + elems_offset
-        e_te_tmp(:,size(te%e,2)+1:size(e_te_tmp,2)) = e_te
-        call move_alloc(e_te_tmp,te%e) 
-        allocate(i_te_tmp(2,size(te%i,2)+nn_te)) 
-        i_te_tmp(:,             1:size(te%i,2)    ) = te%i
-        i_te_tmp(:,size(te%i,2)+1:size(i_te_tmp,2)) = i_te + points_offset
-        call move_alloc(i_te_tmp,te%i) 
-        allocate(rr_te_tmp(3,size(te%rr,2)+nn_te)) 
-        rr_te_tmp(:,              1:size(te%rr,2)    ) = te%rr
-        rr_te_tmp(:,size(te%rr,2)+1:size(rr_te_tmp,2)) = rr_te
-        call move_alloc(rr_te_tmp,te%rr) 
-        allocate(ii_te_tmp(2,size(te%ii,2)+ne_te)) 
-        ii_te_tmp(:,              1:size(te%ii,2)    ) = te%ii
-        ii_te_tmp(:,size(te%ii,2)+1:size(ii_te_tmp,2)) = ii_te + nn_te_prev 
-        call move_alloc(ii_te_tmp,te%ii) 
-        allocate(neigh_te_tmp(2,size(te%neigh,2)+ne_te)) 
-        neigh_te_tmp(:,                 1:size(te%neigh,2)    ) = te%neigh
-        where ( neigh_te .ne. 0 ) neigh_te = neigh_te + ne_te_prev
-        neigh_te_tmp(:,size(te%neigh,2)+1:size(neigh_te_tmp,2)) = neigh_te
-        call move_alloc(neigh_te_tmp,te%neigh) 
-        allocate( o_te_tmp(2,size(te%o ,2)+ne_te)) 
-        o_te_tmp(:,              1:size(te%o ,2)    ) = te%o 
-        o_te_tmp(:,size(te%o ,2)+1:size( o_te_tmp,2)) =  o_te 
-        call move_alloc(o_te_tmp,te%o ) 
-        allocate( t_te_tmp(3,size(te%t ,2)+nn_te)) 
-        t_te_tmp(:,              1:size(te%t ,2)    ) = te%t 
-        t_te_tmp(:,size(te%t ,2)+1:size( t_te_tmp,2)) =  t_te 
-        call move_alloc(t_te_tmp,te%t ) 
-        allocate(ref_te_tmp(size(te%ref   )+nn_te)) 
-        ref_te_tmp(                 1:size(te%ref   )   ) =  te%ref 
-        ref_te_tmp(  size(te%ref  )+1:size(ref_te_tmp  )) = &
-                                                  geo%components(i_comp)%ref_id
-
-        call move_alloc(ref_te_tmp,te%ref) 
-      end if 
-
-      !:::::::::::::::::::::::::::::::::::::::::::::::::::
+        ! Trailing Edge ----------------------------------
+        call open_hdf5_group(cloc,'Trailing_Edge',te_loc)
+        call read_hdf5_al(    e_te,    'e_te',te_loc)
+        call read_hdf5_al(    i_te,    'i_te',te_loc)
+        call read_hdf5_al(   rr_te,   'rr_te',te_loc)
+        call read_hdf5_al(   ii_te,   'ii_te',te_loc)
+        call read_hdf5_al(neigh_te,'neigh_te',te_loc)
+        call read_hdf5_al(    o_te,    'o_te',te_loc)
+        call read_hdf5_al(    t_te,    't_te',te_loc)
+        !call read_hdf5_al(  ref_te,  'ref_te',te_loc)
+        call close_hdf5_group(te_loc)
  
-      ! Update elems_offset for the next component
-      elems_offset = elems_offset + size(ee,2)
+        
+        ! --- treat the points ---
+        if(allocated(geo%points)) then
+          points_offset = size(geo%points,2) 
+        else
+          points_offset = 0
+        endif
 
-      !cleanup
-      deallocate(ee,rr,neigh)
-      i_comp = i_comp + 1
+        !store the read points into the local points
+        allocate(geo%components(i_comp)%loc_points(3,size(rr,2)))
+        geo%components(i_comp)%loc_points = rr
+        
+        !Now for the moments the points are stored here without moving them, 
+        !will be moved later, consider not storing them here at all
+        allocate(points_tmp(3,size(rr,2)+points_offset))
+        if (points_offset .gt. 0) points_tmp(:,1:points_offset) = geo%points
+        points_tmp(:,points_offset+1:points_offset+size(rr,2)) = rr
+        call move_alloc(points_tmp, geo%points)
+        allocate(geo%components(i_comp)%i_points(size(rr,2)))
+        geo%components(i_comp)%i_points = &
+                           (/((i3),i3=points_offset+1,points_offset+size(rr,2))/)
+
+        ! --- treat the elements ---
+        !allocate the elements of the component of the right kind
+        geo%components(i_comp)%nelems = size(ee,2)
+        !allocate(geo%components(i_comp)%e(size(ee,2)))
+        select case(trim(geo%components(i_comp)%comp_el_type))
+         case('p')
+          allocate(t_surfpan::geo%components(i_comp)%el(size(ee,2)))
+         case('v')
+          allocate(t_vortring::geo%components(i_comp)%el(size(ee,2)))
+         case default
+          call error(this_sub_name, this_mod_name, &
+                   'Unknown type of element: '//geo%components(i_comp)%comp_el_type)
+        end select
+
+        do i2=1,size(ee,2)
+          n_vert = count(ee(:,i2).ne.0)
+          allocate(geo%components(i_comp)%el(i2)%i_ver(n_vert))
+          allocate(geo%components(i_comp)%el(i2)%i_neigh(n_vert))
+          geo%components(i_comp)%el(i2)%n_ver = n_vert
+          geo%components(i_comp)%el(i2)%i_ver(1:n_vert) = &
+                                                ee(1:n_vert,i2) + points_offset
+          do i3=1,n_vert
+            if ( neigh(i3,i2) .ne. 0 ) then
+              geo%components(i_comp)%el(i2)%i_neigh(i3) = &
+                                                neigh(i3,i2) + elems_offset
+            else
+              geo%components(i_comp)%el(i2)%i_neigh(i3) = &
+                                                neigh(i3,i2)
+            end if
+          end do
+
+          geo%components(i_comp)%el(i2)%moving = geo%components(i_comp)%moving
+          allocate(geo%components(i_comp)%el(i2)%vel(3))
+          !TEMPORARY: only for backward compatibility
+          !geo%components(i_comp)%e(i2)%p => geo%components(i_comp)%el(i2)
+        enddo
+
+        geo%components(i_comp)%nSurfPan = 0; geo%components(i_comp)%nVortRin = 0;
+        if(comp_el_type(1:1) .eq. 'p') geo%components(i_comp)%nSurfPan = size(ee,2)
+        if(comp_el_type(1:1) .eq. 'v') geo%components(i_comp)%nVortRin = size(ee,2)
+
+        ! Trailing Edge ------------
+        ne_te = size(e_te,2)
+        nn_te = size(i_te,2)
+        if (sim_param%debug_level .ge. 3) then
+          write(msg,'(A,I0,A,I0)') ' Trailing edge: elements: ', &
+                                                         ne_te, ' nodes ', nn_te
+          call printout(msg)
+        endif
+        if (.not.allocated(te%e)) then ! it should be enough
+          allocate(te%e    (2,ne_te) ) ; te%e     =     e_te 
+          allocate(te%i    (2,nn_te) ) ; te%i     =     i_te 
+          allocate(te%rr   (3,nn_te) ) ; te%rr    =    rr_te
+          allocate(te%ii   (2,ne_te) ) ; te%ii    =    ii_te 
+          allocate(te%neigh(2,ne_te) ) ; te%neigh = neigh_te
+          allocate(te%o    (2,ne_te) ) ; te%o     =     o_te
+          allocate(te%t    (2,nn_te) ) ; te%t     =     t_te
+          allocate(te%ref  (  nn_te) ) ; te%ref   =   geo%components(i_comp)%ref_id
+        else
+          nn_te_prev = size(te%i,2)
+          ne_te_prev = size(te%e,2)
+          allocate(e_te_tmp(2,size(te%e,2)+ne_te)) 
+          e_te_tmp(:,             1:size(te%e,2)    ) = te%e
+          where( e_te .ne. 0 ) e_te = e_te + elems_offset
+          e_te_tmp(:,size(te%e,2)+1:size(e_te_tmp,2)) = e_te
+          call move_alloc(e_te_tmp,te%e) 
+          allocate(i_te_tmp(2,size(te%i,2)+nn_te)) 
+          i_te_tmp(:,             1:size(te%i,2)    ) = te%i
+          i_te_tmp(:,size(te%i,2)+1:size(i_te_tmp,2)) = i_te + points_offset
+          call move_alloc(i_te_tmp,te%i) 
+          allocate(rr_te_tmp(3,size(te%rr,2)+nn_te)) 
+          rr_te_tmp(:,              1:size(te%rr,2)    ) = te%rr
+          rr_te_tmp(:,size(te%rr,2)+1:size(rr_te_tmp,2)) = rr_te
+          call move_alloc(rr_te_tmp,te%rr) 
+          allocate(ii_te_tmp(2,size(te%ii,2)+ne_te)) 
+          ii_te_tmp(:,              1:size(te%ii,2)    ) = te%ii
+          ii_te_tmp(:,size(te%ii,2)+1:size(ii_te_tmp,2)) = ii_te + nn_te_prev 
+          call move_alloc(ii_te_tmp,te%ii) 
+          allocate(neigh_te_tmp(2,size(te%neigh,2)+ne_te)) 
+          neigh_te_tmp(:,                 1:size(te%neigh,2)    ) = te%neigh
+          where ( neigh_te .ne. 0 ) neigh_te = neigh_te + ne_te_prev
+          neigh_te_tmp(:,size(te%neigh,2)+1:size(neigh_te_tmp,2)) = neigh_te
+          call move_alloc(neigh_te_tmp,te%neigh) 
+          allocate( o_te_tmp(2,size(te%o ,2)+ne_te)) 
+          o_te_tmp(:,              1:size(te%o ,2)    ) = te%o 
+          o_te_tmp(:,size(te%o ,2)+1:size( o_te_tmp,2)) =  o_te 
+          call move_alloc(o_te_tmp,te%o ) 
+          allocate( t_te_tmp(3,size(te%t ,2)+nn_te)) 
+          t_te_tmp(:,              1:size(te%t ,2)    ) = te%t 
+          t_te_tmp(:,size(te%t ,2)+1:size( t_te_tmp,2)) =  t_te 
+          call move_alloc(t_te_tmp,te%t ) 
+          allocate(ref_te_tmp(size(te%ref   )+nn_te)) 
+          ref_te_tmp(                 1:size(te%ref   )   ) =  te%ref 
+          ref_te_tmp(  size(te%ref  )+1:size(ref_te_tmp  )) = &
+                                                    geo%components(i_comp)%ref_id
+
+          call move_alloc(ref_te_tmp,te%ref) 
+        end if 
+
+        !:::::::::::::::::::::::::::::::::::::::::::::::::::
+ 
+        ! Update elems_offset for the next component
+        elems_offset = elems_offset + size(ee,2)
+
+        !cleanup
+        deallocate(ee,rr,neigh)
+        i_comp = i_comp + 1
+
+       case('l')
+        call error(this_sub_name, this_mod_name, 'Feature in development')
+
+       case default
+        call error(this_sub_name, this_mod_name, 'Unknown type of element')
+
+      end select
     enddo !i_mult
 
     call close_hdf5_group(cloc)
@@ -1024,7 +1053,7 @@ end subroutine load_components
 !! in both of the element types, so only one equal subroutine is called, in 
 !! the future the differences can be handled with a select type
 subroutine calc_geo_data(elem,vert)
- class(c_elem), intent(inout) :: elem  
+ class(c_elem_pan), intent(inout) :: elem  
  real(wp), intent(in) :: vert(:,:)
 
  integer :: nsides, is
@@ -1331,7 +1360,7 @@ subroutine merge_nodes( ri , indi , elemsi , tol ,   elems  )
  real(wp)      , intent(in) :: ri(:,:)
  integer       , intent(in) :: indi(:)
  !type(t_elem_p), intent(in) :: elemsi(:)
- class(c_elem), intent(in) :: elemsi(:)
+ class(c_elem_pan), intent(in) :: elemsi(:)
  !type(t_surfpan), intent(in) :: elemsi(:)
  real(wp) :: tol
  type(t_elem_p), allocatable , intent(out) :: elems(:)

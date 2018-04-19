@@ -45,7 +45,7 @@ use mod_param, only: &
 
 implicit none
 
-public :: c_elem, t_elem_p
+public :: c_elem, t_elem_p, c_elem_pan, c_elem_lin
 
 private
 
@@ -55,6 +55,31 @@ private
 !!
 !! It needs to be extended into more specific elements
 type, abstract :: c_elem
+
+  !> Element centre coordinates
+  real(wp), allocatable :: cen(:)
+  !> Body velocity at the centre
+  real(wp), allocatable :: ub(:)
+
+  contains
+! procedure(i_velocity_calc), deferred, pass(this) :: velocity_calc
+! procedure(i_potential_calc), deferred, pass(this) :: potential_calc
+
+! linear system ------
+! new
+  procedure(i_build_row)  , deferred, pass(this)      :: build_row
+  procedure(i_build_row_static), deferred, pass(this) :: build_row_static
+  procedure(i_add_wake), deferred, pass(this)         :: add_wake
+  procedure(i_compute_pot), deferred, pass(this)      :: compute_pot
+  procedure(i_compute_vel), deferred, pass(this)      :: compute_vel
+  procedure(i_compute_psi), deferred, pass(this)      :: compute_psi
+! loads --------------
+  procedure(i_compute_cp ), deferred, pass(this)      :: compute_cp
+  
+
+end type
+
+type, abstract, extends(c_elem) :: c_elem_pan
 
   !> Intensity of the doublets/vortexes
   real(wp), pointer :: idou
@@ -72,8 +97,6 @@ type, abstract :: c_elem
   integer,  allocatable :: i_ver(:)
   !> Element area
   real(wp)              :: area
-  !> Element centre coordinates
-  real(wp), allocatable :: cen(:)
   !> Element normal vector
   real(wp), allocatable :: nor(:)
   !> Element tangential vectors
@@ -83,8 +106,6 @@ type, abstract :: c_elem
   real(wp), allocatable :: edge_vec(:,:)
   real(wp), allocatable :: edge_len(:)
   real(wp), allocatable :: edge_uni(:,:)
-  !> Body velocity at the centre
-  real(wp), allocatable :: ub(:)
   !> Is the element moving during simulation?
   logical :: moving
   !> Element neighbours global index (in the elements vector)
@@ -106,26 +127,17 @@ type, abstract :: c_elem
   !> Fluid velocity at center for boundary condition (U_inf-rel vel)
   real(wp)              :: cp
 
-  contains
-! procedure(i_velocity_calc), deferred, pass(this) :: velocity_calc
-! procedure(i_potential_calc), deferred, pass(this) :: potential_calc
+end type 
 
-! linear system ------
-! new
-  procedure(i_build_row)  , deferred, pass(this)      :: build_row
-  procedure(i_build_row_static), deferred, pass(this) :: build_row_static
-  procedure(i_add_wake), deferred, pass(this)         :: add_wake
-  procedure(i_compute_pot), deferred, pass(this)      :: compute_pot
-  procedure(i_compute_vel), deferred, pass(this)      :: compute_vel
-  procedure(i_compute_psi), deferred, pass(this)      :: compute_psi
-! loads --------------
-  procedure(i_compute_cp ), deferred, pass(this)      :: compute_cp
-  
+
+type, abstract, extends(c_elem) :: c_elem_lin
 
 end type
 
+!WARNING: for the moment the pointer holds only surface elements, consider
+! doing things differently
 type :: t_elem_p
-  class(c_elem), pointer :: p
+  class(c_elem_pan), pointer :: p
 end type
 
 !----------------------------------------------------------------------
