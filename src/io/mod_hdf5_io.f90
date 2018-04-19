@@ -83,6 +83,7 @@ use mod_handling, only: &
 
 
  integer, parameter :: h5loc = HID_T
+ integer, parameter :: h5sz = HSIZE_T
 
 
  !hdf5 types
@@ -145,9 +146,8 @@ contains
 
  subroutine initialize_hdf5()
 
-  integer :: ie, i, edata_index, h5err, ierr
-  logical :: found, equal
-  integer :: mpi_comm, mpi_info
+  integer :: h5err
+  logical :: equal
   character(len=*), parameter :: &
     this_sub_name = 'initialize_hdf5'
 
@@ -330,7 +330,7 @@ subroutine write_string_hdf5(outdata, outname, file_id)
  character(len=*), intent(in)         :: outname
  integer(HID_T), intent(in)           :: file_id
 
- integer(HID_T) :: dspace_id, memspace_id
+ integer(HID_T) :: dspace_id!, memspace_id
  integer(HID_T) :: dset_id
  integer(HID_T) :: filetype_id, memtype_id
  integer(HSIZE_T) :: out_size(1)
@@ -376,7 +376,7 @@ subroutine read_string_hdf5(input, inputname, loc_id)
  character(len=*), intent(in)         :: inputname
  integer(HID_T), intent(in)           :: loc_id
 
- integer(HID_T) :: dspace_id, memspace_id
+ !integer(HID_T) :: dspace_id, memspace_id
  integer(HID_T) :: dset_id
  integer(HID_T) :: filetype_id, memtype_id
  integer(HSIZE_T) :: in_size(1)
@@ -429,7 +429,7 @@ subroutine write_1d_string_hdf5(outdata, outname, file_id)
  character(len=*), intent(in)  :: outname
  integer(HID_T), intent(in)    :: file_id
 
- integer(HID_T) :: dspace_id, memspace_id
+ integer(HID_T) :: dspace_id!, memspace_id
  integer(HID_T) :: dset_id
  integer(HID_T) :: filetype_id, memtype_id
  integer, parameter :: rank=1
@@ -440,7 +440,7 @@ subroutine write_1d_string_hdf5(outdata, outname, file_id)
  integer ::strlen
 
   strlen = len(outdata)
-  out_size(1) = size(outdata, 1)
+  out_size(1) = int(size(outdata, 1),h5sz)
 
   !write only if the array is not empty
   ! (empty arrays of strings create problems while loading)
@@ -483,9 +483,9 @@ subroutine write_real_hdf5(outdata, outname, file_id)
  character(len=*), intent(in)  :: outname
  integer(HID_T), intent(in)    :: file_id
 
- integer(HID_T) :: dspace_id, memspace_id
+ integer(HID_T) :: dspace_id!, memspace_id
  integer(HID_T) :: dset_id
- integer(HID_T) :: filetype_id, memtype_id
+ !integer(HID_T) :: filetype_id, memtype_id
  integer, parameter :: rank=1
  integer(HSIZE_T) :: out_size(1)
  character(len=*), parameter :: &
@@ -519,9 +519,9 @@ subroutine write_1d_real_hdf5(outdata, outname, file_id)
  character(len=*), intent(in)  :: outname
  integer(HID_T), intent(in)    :: file_id
 
- integer(HID_T) :: dspace_id, memspace_id
+ integer(HID_T) :: dspace_id!, memspace_id
  integer(HID_T) :: dset_id
- integer(HID_T) :: filetype_id, memtype_id
+ !integer(HID_T) :: filetype_id, memtype_id
  integer, parameter :: rank=1
  integer(HSIZE_T) :: out_size(1)
  character(len=*), parameter :: &
@@ -529,7 +529,7 @@ subroutine write_1d_real_hdf5(outdata, outname, file_id)
  integer :: h5err
 
   !create a 1D dataspace
-  out_size(1) = size(outdata,1)
+  out_size(1) = int(size(outdata,1),h5sz)
   call h5Screate_simple_f(rank, out_size, dspace_id, h5err)
 
   !create the dataset on the file
@@ -554,9 +554,9 @@ subroutine write_2d_real_hdf5(outdata, outname, file_id)
  character(len=*), intent(in)  :: outname
  integer(HID_T), intent(in)    :: file_id
 
- integer(HID_T) :: dspace_id, memspace_id
+ integer(HID_T) :: dspace_id!, memspace_id
  integer(HID_T) :: dset_id
- integer(HID_T) :: filetype_id, memtype_id
+ !integer(HID_T) :: filetype_id, memtype_id
  integer, parameter :: rank=2
  integer(HSIZE_T) :: out_size(2)
  character(len=*), parameter :: &
@@ -564,7 +564,8 @@ subroutine write_2d_real_hdf5(outdata, outname, file_id)
  integer :: h5err
 
   !create a 2D dataspace
-  out_size(1) = size(outdata,1); out_size(2) = size(outdata,2)
+  out_size(1) = int(size(outdata,1),h5sz)
+  out_size(2) = int(size(outdata,2),h5sz)
   call h5Screate_simple_f(rank, out_size, dspace_id, h5err)
 
   !create the dataset on the file
@@ -591,9 +592,9 @@ subroutine write_3d_real_hdf5(outdata, outname, file_id)
  character(len=*), intent(in)  :: outname
  integer(HID_T), intent(in)    :: file_id
 
- integer(HID_T) :: dspace_id, memspace_id
+ integer(HID_T) :: dspace_id!, memspace_id
  integer(HID_T) :: dset_id
- integer(HID_T) :: filetype_id, memtype_id
+ !integer(HID_T) :: filetype_id, memtype_id
  integer, parameter :: rank=3
  integer(HSIZE_T) :: out_size(3)
  character(len=*), parameter :: &
@@ -601,8 +602,9 @@ subroutine write_3d_real_hdf5(outdata, outname, file_id)
  integer :: h5err
 
   !create a 3D dataspace
-  out_size(1) = size(outdata,1); out_size(2) = size(outdata,2)
-  out_size(3) = size(outdata,3)
+  out_size(1) = int(size(outdata,1), h5sz) 
+  out_size(2) = int(size(outdata,2), h5sz)
+  out_size(3) = int(size(outdata,3), h5sz)
   call h5Screate_simple_f(rank, out_size, dspace_id, h5err)
 
   !create the dataset on the file
@@ -633,7 +635,7 @@ subroutine append_1d_real_hdf5(outdata, outname, file_id)
 
  integer(HID_T) :: dspace_id, memspace_id
  integer(HID_T) :: dset_id
- integer(HID_T) :: filetype_id, memtype_id
+ !integer(HID_T) :: filetype_id, memtype_id
  integer(HID_T) :: prp_id
  integer, parameter :: rank=2
  integer(HSIZE_T) :: out_size(2), maxsize(2), chunksize(2), totsize(2)
@@ -646,7 +648,7 @@ subroutine append_1d_real_hdf5(outdata, outname, file_id)
 
   !check the presence of the requested dataset (actually checking the
   !link to it)
-  out_size(1) = size(outdata,1); out_size(2) = 1
+  out_size(1) = int(size(outdata,1), h5sz); out_size(2) = 1
   call h5Lexists_f(file_id, outname, l_exists, h5err)
   if (.not. l_exists) then
     !build the dataset
@@ -657,7 +659,7 @@ subroutine append_1d_real_hdf5(outdata, outname, file_id)
     !create chunking properties
     call h5Pcreate_f(H5P_DATASET_CREATE_F, prp_id, h5err)
     !TODO:  set a sensible value for the chunk
-    chunksize = (/2,5/)
+    chunksize = int((/2,5/), h5sz)
     call h5Pset_chunk_f(prp_id, rank, chunksize, h5err)
     !create dataset with beginning dimensions
     call h5Dcreate_f(file_id, trim(outname), h5t_file_float, &
@@ -719,7 +721,7 @@ subroutine read_real_hdf5(input, inputname, loc_id)
  integer(HID_T) :: dset_id
  integer :: h5err
 
-  in_size = (/1/)
+  in_size = int((/1/), h5sz)
   !open the dataset
   call h5Dopen_f(loc_id, inputname, dset_id, h5err)
   if(h5err<0) call error(this_mod_name,this_sub_name, &
@@ -762,7 +764,8 @@ subroutine read_1d_real_hdf5(input, inputname, loc_id)
      //trim(inputname))
   call h5Sget_simple_extent_dims_f(filespace_id, in_size, &
                                    max_size, h5err)
-  if(in_size(1) .ne. size(input,1)) call  error(this_mod_name, this_sub_name, &
+  if(in_size(1) .ne. int(size(input,1), h5sz)) &
+      call  error(this_mod_name, this_sub_name, &
       'Dimension of read file and target array differs, for array '//inputname)
   !read
   call h5Dread_f(dset_id, h5t_mem_float, input, in_size, h5err)
@@ -804,7 +807,8 @@ subroutine read_2d_real_hdf5(input, inputname, loc_id)
      //trim(inputname))
   call h5Sget_simple_extent_dims_f(filespace_id, in_size, &
                                    max_size, h5err)
-  if((in_size(1) .ne. size(input,1)) .or. (in_size(2) .ne. size(input,2))) &
+  if((in_size(1) .ne. int(size(input,1), h5sz)) .or. &
+     (in_size(2) .ne. int(size(input,2), h5sz))) &
        call  error(this_mod_name, this_sub_name, &
       'Dimension of read file and target array differs, for array '//inputname)
   !read
@@ -847,8 +851,9 @@ subroutine read_3d_real_hdf5(input, inputname, loc_id)
      //trim(inputname))
   call h5Sget_simple_extent_dims_f(filespace_id, in_size, &
                                    max_size, h5err)
-  if((in_size(1) .ne. size(input,1)) .or. (in_size(2) .ne. size(input,2)) &
-     .or. (in_size(3) .ne. size(input,3))) &
+  if((in_size(1) .ne. int(size(input,1), h5sz)) .or. &
+     (in_size(2) .ne. int(size(input,2), h5sz)) .or.&
+     (in_size(3) .ne. int(size(input,3), h5sz))) &
        call  error(this_mod_name, this_sub_name, &
       'Dimension of read file and target array differs, for array '//inputname)
   !read
@@ -1001,9 +1006,9 @@ subroutine write_int_hdf5(outdata, outname, file_id)
  character(len=*), intent(in)  :: outname
  integer(HID_T), intent(in)    :: file_id
 
- integer(HID_T) :: dspace_id, memspace_id
+ integer(HID_T) :: dspace_id!, memspace_id
  integer(HID_T) :: dset_id
- integer(HID_T) :: filetype_id, memtype_id
+ !integer(HID_T) :: filetype_id, memtype_id
  integer, parameter :: rank=1
  integer(HSIZE_T) :: out_size(1)
  character(len=*), parameter :: &
@@ -1037,9 +1042,9 @@ subroutine write_1d_int_hdf5(outdata, outname, file_id)
  character(len=*), intent(in)  :: outname
  integer(HID_T), intent(in)    :: file_id
 
- integer(HID_T) :: dspace_id, memspace_id
+ integer(HID_T) :: dspace_id!, memspace_id
  integer(HID_T) :: dset_id
- integer(HID_T) :: filetype_id, memtype_id
+ !integer(HID_T) :: filetype_id, memtype_id
  integer, parameter :: rank=1
  integer(HSIZE_T) :: out_size(1)
  character(len=*), parameter :: &
@@ -1047,7 +1052,7 @@ subroutine write_1d_int_hdf5(outdata, outname, file_id)
  integer :: h5err
 
   !create a 1D dataspace
-  out_size(1) = size(outdata,1)
+  out_size(1) = int(size(outdata,1), h5sz)
   call h5Screate_simple_f(rank, out_size, dspace_id, h5err)
 
   !create the dataset on the file
@@ -1072,9 +1077,9 @@ subroutine write_2d_int_hdf5(outdata, outname, file_id)
  character(len=*), intent(in)  :: outname
  integer(HID_T), intent(in)    :: file_id
 
- integer(HID_T) :: dspace_id, memspace_id
+ integer(HID_T) :: dspace_id!, memspace_id
  integer(HID_T) :: dset_id
- integer(HID_T) :: filetype_id, memtype_id
+ !integer(HID_T) :: filetype_id, memtype_id
  integer, parameter :: rank=2
  integer(HSIZE_T) :: out_size(2)
  character(len=*), parameter :: &
@@ -1082,7 +1087,8 @@ subroutine write_2d_int_hdf5(outdata, outname, file_id)
  integer :: h5err
 
   !create a 1D dataspace
-  out_size(1) = size(outdata,1); out_size(2) = size(outdata,2)
+  out_size(1) = int(size(outdata,1), h5sz)
+  out_size(2) = int(size(outdata,2), h5sz)
   call h5Screate_simple_f(rank, out_size, dspace_id, h5err)
 
   !create the dataset on the file
@@ -1108,9 +1114,9 @@ subroutine write_3d_int_hdf5(outdata, outname, file_id)
  character(len=*), intent(in)  :: outname
  integer(HID_T), intent(in)    :: file_id
 
- integer(HID_T) :: dspace_id, memspace_id
+ integer(HID_T) :: dspace_id!, memspace_id
  integer(HID_T) :: dset_id
- integer(HID_T) :: filetype_id, memtype_id
+ !integer(HID_T) :: filetype_id, memtype_id
  integer, parameter :: rank=3
  integer(HSIZE_T) :: out_size(3)
  character(len=*), parameter :: &
@@ -1118,8 +1124,9 @@ subroutine write_3d_int_hdf5(outdata, outname, file_id)
  integer :: h5err
 
   !create a 1D dataspace
-  out_size(1) = size(outdata,1); out_size(2) = size(outdata,2)
-  out_size(3) = size(outdata,3)
+  out_size(1) = int(size(outdata,1), h5sz)
+  out_size(2) = int(size(outdata,2), h5sz)
+  out_size(3) = int(size(outdata,3), h5sz)
   call h5Screate_simple_f(rank, out_size, dspace_id, h5err)
 
   !create the dataset on the file
@@ -1150,7 +1157,7 @@ subroutine append_1d_int_hdf5(outdata, outname, file_id)
 
  integer(HID_T) :: dspace_id, memspace_id
  integer(HID_T) :: dset_id
- integer(HID_T) :: filetype_id, memtype_id
+ !integer(HID_T) :: filetype_id, memtype_id
  integer(HID_T) :: prp_id
  integer, parameter :: rank=2
  integer(HSIZE_T) :: out_size(2), maxsize(2), chunksize(2), totsize(2)
@@ -1163,7 +1170,8 @@ subroutine append_1d_int_hdf5(outdata, outname, file_id)
 
   !check the presence of the requested dataset (actually checking the
   !link to it)
-  out_size(1) = size(outdata,1); out_size(2) = 1
+  out_size(1) = int( size(outdata,1), h5sz)
+  out_size(2) = int( 1, h5sz)
   call h5Lexists_f(file_id, outname, l_exists, h5err)
   if (.not. l_exists) then
     !build the dataset
@@ -1174,7 +1182,7 @@ subroutine append_1d_int_hdf5(outdata, outname, file_id)
     !create chunking properties
     call h5Pcreate_f(H5P_DATASET_CREATE_F, prp_id, h5err)
     !TODO:  set a sensible value for the chunk
-    chunksize = (/2,5/)
+    chunksize = int((/2,5/), h5sz)
     call h5Pset_chunk_f(prp_id, rank, chunksize, h5err)
     !create dataset with beginning dimensions
     call h5Dcreate_f(file_id, trim(outname), h5t_file_int, &
@@ -1235,7 +1243,7 @@ subroutine read_int_hdf5(input, inputname, loc_id)
  integer(HID_T) :: dset_id
  integer :: h5err
 
-  in_size = (/1/)
+  in_size = int((/1/), h5sz)
   !open the dataset
   call h5Dopen_f(loc_id, inputname, dset_id, h5err)
   if(h5err<0) call error(this_mod_name,this_sub_name, &
@@ -1278,7 +1286,8 @@ subroutine read_1d_int_hdf5(input, inputname, loc_id)
      //trim(inputname))
   call h5Sget_simple_extent_dims_f(filespace_id, in_size, &
                                    max_size, h5err)
-  if(in_size(1) .ne. size(input,1)) call  error(this_mod_name, this_sub_name, &
+  if(in_size(1) .ne. int(size(input,1), h5sz))  &
+      call  error(this_mod_name, this_sub_name, &
       'Dimension of read file and target array differs, for array '//inputname)
   !read
   call h5Dread_f(dset_id, h5t_mem_int, input, in_size, h5err)
@@ -1320,7 +1329,8 @@ subroutine read_2d_int_hdf5(input, inputname, loc_id)
      //trim(inputname))
   call h5Sget_simple_extent_dims_f(filespace_id, in_size, &
                                    max_size, h5err)
-  if((in_size(1) .ne. size(input,1)) .or. (in_size(2) .ne. size(input,2))) &
+  if((in_size(1) .ne. int(size(input,1), h5sz)) .or. &
+     (in_size(2) .ne. int(size(input,2), h5sz))) &
       call  error(this_mod_name, this_sub_name, &
       'Dimension of read file and target array differs, for array '//inputname)
   !read
@@ -1363,8 +1373,9 @@ subroutine read_3d_int_hdf5(input, inputname, loc_id)
      //trim(inputname))
   call h5Sget_simple_extent_dims_f(filespace_id, in_size, &
                                    max_size, h5err)
-  if((in_size(1) .ne. size(input,1)) .or. (in_size(2) .ne. size(input,2)) &
-      .or. (in_size(3) .ne. size(input,3))) &
+  if((in_size(1) .ne. int(size(input,1), h5sz)) .or. &
+     (in_size(2) .ne. int(size(input,2), h5sz)) .or. &
+     (in_size(3) .ne. int(size(input,3), h5sz))) &
       call  error(this_mod_name, this_sub_name, &
       'Dimension of read file and target array differs, for array '//inputname)
   !read

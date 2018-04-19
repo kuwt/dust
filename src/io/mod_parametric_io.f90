@@ -72,7 +72,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
  
  type(t_parse) :: pmesh_prs
  integer :: ee_size , rr_size
- integer :: io_error
 
  integer :: nelem_chord, nelem_chord_tot ! , nelem_span_tot <--- moved as an output
  integer :: npoint_chord_tot, npoint_span_tot
@@ -92,18 +91,14 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
  real(wp), allocatable :: rrSection1(:,:) , rrSection2(:,:)
  real(wp) :: dx_ref , dy_ref , dz_ref
  integer :: ista , iend
- ! symmetry
- integer , allocatable :: ee_tmp(:,:) 
- real(wp), allocatable :: rr_tmp(:,:)
 
  character :: ElType , symmetry
  real(wp), allocatable :: chord_fraction(:), span_fraction(:)
- character(len=max_char_len) :: type_chord, type_span
+ character(len=max_char_len) :: type_chord
+ integer :: i1  
 
  character(len=*), parameter :: this_sub_name = 'read_mesh_parametric'
 
- integer :: fid 
- integer :: i1  
 
 
   !Prepare all the parameters to be read in the file
@@ -241,8 +236,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   dy_ref = 0.0_wp
   dz_ref = 0.0_wp
 
-  fid = 22
-  open(unit=fid,file='./check/rr_sec.dat')
 
   ista = 1 ; iend = npoint_chord_tot
   ! Loop over regions
@@ -270,9 +263,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       ! Update rr
       rr(:,ista:iend) = rrSection1
 
-      do i1 = 1 , size(rrSection1,2)
-        write(fid,*) rrSection1(:,i1)
-      end do
 
     end if
 
@@ -306,32 +296,14 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     
     end do
 
-    do i1 = 1 , size(rrSection2,2)
-      write(fid,*) rrSection2(:,i1)
-    end do
 
   enddo
 
-  close(fid)
 
   ! optional output ----
   npoints_chord_tot = npoint_chord_tot
   ! optional output ----
 
-! ! check ----
-! fid = 23
-! open(unit=fid,file='./check/ee.dat')
-! do i1 = 1 , size(ee,2)
-!   write(fid,*) ee(:,i1) 
-! end do
-! close(fid)
-! fid = 24
-! open(unit=fid,file='./check/rr.dat')
-! do i1 = 1 , size(rr,2)
-!   write(fid,*) rr(:,i1) 
-! end do
-! close(fid)
-! ! check ----
  
 end subroutine read_mesh_parametric
 
@@ -352,7 +324,7 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   real(wp), allocatable :: points_mean_line(:,:)
   real(wp) :: twist_rad
 
-  character(len=4) :: char_ini4 , char_fin4
+!  character(len=4) :: char_ini4 , char_fin4
 
   integer :: i1
 

@@ -33,8 +33,7 @@
 !!=====================================================================
 
 
-!> Module to generate the geometry from different kinds of inputs, from mesh
-!! files or parametric input
+!> Module to generate the geometry from different 
 
 module mod_build_geo
 
@@ -113,6 +112,11 @@ subroutine build_component(gloc, geo_file, comp_id)
 
  type(t_parse) :: geo_prs
  character(len=max_char_len) :: mesh_file
+ logical :: custom_ref, file_ref
+ integer :: n_components, i_comp
+ real(wp) :: reference_temp(9), origin_temp(3)
+ character(len=max_char_len) :: ref_name, ref_parent
+ integer :: i, i2,i3, n1
  integer, allocatable :: ee(:,:)
  real(wp), allocatable :: rr(:,:)
  character(len=max_char_len) :: comp_el_type
@@ -120,19 +124,22 @@ subroutine build_component(gloc, geo_file, comp_id)
  character(len=max_char_len) :: mesh_file_type
  logical :: mesh_reflection
  real(wp) :: reflection_point(3), reflection_normal(3)
- character(len=max_char_len) :: ref_tag
- character(len=max_char_len) :: comp_name
+ integer :: points_offset, n_vert
+ real(wp), allocatable :: points_tmp(:,:)
+ integer :: ref_tag, ref_id, iref
+ character(len=max_char_len) :: msg, comp_name
  integer(h5loc) :: comp_loc , geo_loc , te_loc
 
- integer :: npoints_chord_tot, nelems_span, nelems_span_tot
+ integer :: npoints_chord_tot , npoints_span_tot , nelems_span , nelems_span_tot
  ! Connectivity and te structures 
  integer , allocatable :: neigh(:,:)
 
  ! trailing edge ------
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
- integer , allocatable :: neigh_te(:,:) , o_te(:,:)
+ integer , allocatable :: neigh_te(:,:) , o_te(:,:) , ref_te(:)
  real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
 
+ integer :: fid , i1
 
  character(len=*), parameter :: this_sub_name = 'build_component'
 
@@ -145,7 +152,7 @@ subroutine build_component(gloc, geo_file, comp_id)
   call geo_prs%CreateStringOption('ElType', &
               'element type (temporary) p panel v vortex ring')
   !reference frame
-  call geo_prs%CreateStringOption('Reference_Tag',&
+  call geo_prs%CreateIntOption('Reference_Tag',&
                                    'reference frame tag of the component','0')
   !reflections
   call geo_prs%CreateLogicalOption('mesh_reflection',&
@@ -164,7 +171,7 @@ subroutine build_component(gloc, geo_file, comp_id)
 
   mesh_file      = getstr(geo_prs,'MeshFile')
   mesh_file_type = getstr(geo_prs,'MeshFileType')
-  ref_tag        = getstr(geo_prs,'Reference_Tag')
+  ref_tag        = getint(geo_prs,'Reference_Tag')
 
   mesh_reflection   = getlogical(geo_prs, 'mesh_reflection')
   reflection_point  = getrealarray(geo_prs, 'reflection_point',3)
@@ -184,8 +191,7 @@ subroutine build_component(gloc, geo_file, comp_id)
    case('cgns')
     call read_mesh_cgns(trim(mesh_file),ee, rr)
    case('parametric')
-    ! TODO : actually it is possible to define the parameters in the GeoFile 
-    !directly, find a good way to do this
+    ! TODO : actually it is possible to define the parameters in the GeoFile directly, find a good way to do this
     call read_mesh_parametric(trim(mesh_file),ee, rr, &
                               npoints_chord_tot, nelems_span )
     ! nelems_span_tot will be overwritten if symmetry is required (around l.222)
@@ -262,9 +268,9 @@ subroutine build_component(gloc, geo_file, comp_id)
 
   ! selectcase('cgns','parametric','basic') ---> build structures
   ! ---- local numbering ----
-  !  -> build_connectivity                     || <-- these routines depend 
-  !  -> build_te                               ||     on the way a component 
-  !  -> create_local_velocity_stencil ( 3dP )  ||     is defined
+  !  -> build_connectivity                     || <-- these routines depend on the way
+  !  -> build_te                               ||     a component is defined
+  !  -> create_local_velocity_stencil ( 3dP )  ||
   !  -> create_strip_connecivity      ( vr )   ||
   selectcase(trim(mesh_file_type))
     case( 'basic' )
@@ -279,12 +285,11 @@ subroutine build_component(gloc, geo_file, comp_id)
         write(*,*) '  be sure to your input files comply with the conventions '
         write(*,*) '  of parameteric component structures.'//nl
         call build_te_parametric( ee , rr , ElType ,  &
-           npoints_chord_tot , nelems_span_tot , &
-           e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
+           npoints_chord_tot , nelems_span_tot , ref_tag , &
+           e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, ref_te ) !te as an output
       else
-        call build_te_general ( ee , rr , neigh , ElType ,  &
-                  e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
-                                                            !te as an output
+        call build_te_general ( ee , rr , neigh , ElType , ref_tag ,  &
+                  e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, ref_te ) !te as an output
       end if
 
 !     call create_local_velocity_stencil_general()
@@ -294,26 +299,68 @@ subroutine build_component(gloc, geo_file, comp_id)
 
       call build_connectivity_general( ee , neigh )
 
-      call build_te_general ( ee , rr , neigh , ElType ,  &
-                e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
-                                                         !te as an output
+      call build_te_general ( ee , rr , neigh , ElType , ref_tag ,  &
+                e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, ref_te ) !te as an output
 
 !     call create_local_velocity_stencil_general()
 !     call create_strip_connectivity_general()
 
     case( 'parametric' )
       call build_connectivity_parametric( trim(mesh_file) , ee ,     &
-                    ElType , npoints_chord_tot , nelems_span_tot , &
-                    mesh_reflection , neigh )
+                    ElType , npoints_chord_tot , nelems_span_tot , mesh_reflection , &
+                    neigh )
       call build_te_parametric( ee , rr , ElType ,  &
-         npoints_chord_tot , nelems_span_tot , &
-         e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
+         npoints_chord_tot , nelems_span_tot , ref_tag , &
+         e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, ref_te ) !te as an output
 
 !     call create_local_velocity_stencil_parametric()
 !     call create_strip_connectivity_parametric()
 
   end select    
 
+! check ----
+  fid = 26
+  open(unit=fid,file='./check//e_te.dat')
+  do i1 = 1 , size(e_te,2)
+    write(fid,*) e_te(:,i1)
+  end do
+  close(fid)
+  open(unit=fid,file='./check//i_te.dat')
+  do i1 = 1 , size(i_te,2)
+    write(fid,*) i_te(:,i1)
+  end do
+  close(fid)
+  open(unit=fid,file='./check//rr_te.dat')
+  do i1 = 1 , size(rr_te,2)
+    write(fid,*) rr_te(:,i1)
+  end do
+  close(fid)
+  open(unit=fid,file='./check//ii_te.dat')
+  do i1 = 1 , size(ii_te,2)
+    write(fid,*) ii_te(:,i1)
+  end do
+  close(fid)
+  open(unit=fid,file='./check//neigh_te.dat')
+  do i1 = 1 , size(neigh_te,2)
+    write(fid,*) neigh_te(:,i1)
+  end do
+  close(fid)
+  open(unit=fid,file='./check//o_te.dat')
+  do i1 = 1 , size(o_te,2)
+    write(fid,*) o_te(:,i1)
+  end do
+  close(fid)
+  open(unit=fid,file='./check//ref_te.dat')
+  do i1 = 1 , size(ref_te)
+    write(fid,*) ref_te(i1)
+  end do
+  close(fid)
+  open(unit=fid,file='./check//t_te.dat')
+  do i1 = 1 , size(t_te,2)
+    write(fid,*) t_te(:,i1)
+  end do
+  close(fid)
+! check ----
  
   call write_hdf5(neigh,'neigh',geo_loc)
   call close_hdf5_group(geo_loc)
@@ -326,6 +373,7 @@ subroutine build_component(gloc, geo_file, comp_id)
   call write_hdf5(neigh_te,'neigh_te',te_loc)
   call write_hdf5(    o_te,    'o_te',te_loc)
   call write_hdf5(    t_te,    't_te',te_loc)
+  call write_hdf5(  ref_te,  'ref_te',te_loc)
   call close_hdf5_group(te_loc)
 
  
@@ -412,14 +460,14 @@ subroutine reflect_mesh_structured( ee, rr, &
  integer :: nelems_chord
  real(wp) :: n(3), d, l
  integer , allocatable :: ee_temp(:,:) , ee_sort(:,:)
- real(wp), allocatable :: rr_temp(:,:)
+ real(wp), allocatable :: rr_temp(:,:) , rr_sort(:,:)
  integer :: ip, np, ne
- integer :: ie, nv
+ integer :: ie, iv, nv
  ! some checks  and warnings -----
  real(wp) :: mabs  , m
  real(wp) :: minmaxPn 
- real(wp), parameter :: eps = 1e-6_wp ! TODO: move it as an input
- integer :: imabs, i1, nsew
+ real(wp), parameter :: eps = 1e-6 ! TODO: move it as an input
+ integer :: imabs , im , i1 , nsew
 
  character(len=*), parameter :: this_sub_name = 'reflect_mesh_structured'
 
@@ -541,6 +589,20 @@ subroutine reflect_mesh_structured( ee, rr, &
   call move_alloc(rr_temp, rr)
   call move_alloc(ee_sort, ee)
 
+! check -----
+  open(unit=25,file='./ee_symm.dat')
+  do i1 = 1 , size(ee,2)
+    write(25,*) ee(:,i1)
+  end do
+  close(25)
+  open(unit=25,file='./rr_symm.dat')
+  do i1 = 1 , size(rr,2)
+    write(25,*) rr(:,i1)
+  end do
+  close(25)
+!
+! stop
+! check ----
 
   if ( allocated(ee_temp) )  deallocate(ee_temp)
 
@@ -676,17 +738,17 @@ if ( allocated(neigh) )   deallocate(neigh)
 allocate(neigh(4,size(ee,2))) ; neigh = 0
 
 nelems_chord = npoints_chord_tot - 1
-!!! if ( .not. symm ) then
-! ! first strip ------
-! do i2 = 1 , nelems_chord
-!   iel = i2
-!   neigh(1,iel) = iel - 1
-!   neigh(2,iel) = 0  ! iel - nelems_chord
-!   neigh(3,iel) = iel + 1
-!   neigh(4,iel) = iel + nelems_chord
-! end do
+! if ( .not. symm ) then
+  ! first strip ------
+  do i2 = 1 , nelems_chord
+    iel = i2
+    neigh(1,iel) = iel - 1
+    neigh(2,iel) = 0  ! iel - nelems_chord
+    neigh(3,iel) = iel + 1
+    neigh(4,iel) = iel + nelems_chord
+  end do
   ! inner strips -----
-  do i1 = 1 , nelems_span
+  do i1 = 2 , nelems_span - 1 
     do i2 = 1 , nelems_chord
       iel = i2+(i1-1) * nelems_chord
       neigh(1,iel) = iel - 1
@@ -695,17 +757,14 @@ nelems_chord = npoints_chord_tot - 1
       neigh(4,iel) = iel + nelems_chord
     end do
   end do
-! ! last strip -------
-! do i2 = 1 , nelems_chord
-!   iel = i2 + ( nelems_span - 1 ) * nelems_chord
-!   neigh(1,iel) = iel - 1
-!   neigh(2,iel) = iel - nelems_chord
-!   neigh(3,iel) = iel + 1
-!   neigh(4,iel) = 0 ! iel + nelems_chord
-! end do
-  ! correct tip   elements
-  neigh(2,(/ (    i1                          , i1 = 1,nelems_chord) /)) = 0
-  neigh(4,(/ (i1+(nelems_span-1)*nelems_chord , i1 = 1,nelems_chord) /)) = 0
+  ! last strip -------
+  do i2 = 1 , nelems_chord
+    iel = i2 + ( nelems_span - 1 ) * nelems_chord
+    neigh(1,iel) = iel - 1
+    neigh(2,iel) = iel - nelems_chord
+    neigh(3,iel) = iel + 1
+    neigh(4,iel) = 0 ! iel + nelems_chord
+  end do
   ! correct le-te elements
   neigh(1,(/ ( 1+(i1-1)*nelems_chord , i1 = 1,nelems_span) /)) = 0
   neigh(3,(/ (   (i1  )*nelems_chord , i1 = 1,nelems_span) /)) = 0
@@ -714,11 +773,11 @@ nelems_chord = npoints_chord_tot - 1
 ! end if
 
 ! check ----
-!open(unit=25,file='./neigh_symm.dat')
-!do i1 = 1 , size(neigh,2)
-!  write(25,*) neigh(:,i1)
-!end do
-!close(25)
+open(unit=25,file='./neigh_symm.dat')
+do i1 = 1 , size(neigh,2)
+  write(25,*) neigh(:,i1)
+end do
+close(25)
 ! check ----
 
 
@@ -726,24 +785,22 @@ end subroutine build_connectivity_parametric
 
 !----------------------------------------------------------------------
 
-subroutine build_te_general ( ee , rr , neigh , ElType ,  &
-                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
-                                                          !te as an output
+subroutine build_te_general ( ee , rr , neigh , ElType , ref_tag ,  &
+                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, ref_te ) !te as an output
 
  integer   , intent(in) :: ee(:,:)
  real(wp)  , intent(in) :: rr(:,:)
  integer   , intent(in) :: neigh(:,:)
  character , intent(in) :: ElType
+ integer   , intent(in) :: ref_tag
 
  ! te structures
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
- integer , allocatable :: neigh_te(:,:) , o_te(:,:)
+ integer , allocatable :: neigh_te(:,:) , o_te(:,:) , ref_te(:)
  real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
 
  ! merge ------
- ! 1e-0 for nasa-crm , 3e-3_wp for naca0012
- real(wp),   parameter :: tol_sewing = 1e-3_wp  
- !real(wp),   parameter :: tol_sewing = 1e-0_wp  
+ real(wp),   parameter :: tol_sewing = 1e-3_wp  ! 1e-0 for nasa-crm , 3e-3_wp for naca0012
  real(wp), allocatable :: rr_m(:,:)
  integer , allocatable :: ee_m(:,:) , i_m(:,:)
  ! 'closed-te' connectivity -----
@@ -768,10 +825,20 @@ subroutine build_te_general ( ee , rr , neigh , ElType ,  &
 
  write(*,*) '   build_connectivity_general ... done.'
 
+ fid = 31
+ open(unit=fid,file='./check/rr.dat')
+ do i1 = 1 , size(rr,2) 
+   write(fid,*) rr(:,i1)
+ end do
+ close(fid)
+ open(unit=fid,file='./check/ee.dat')
+ do i1 = 1 , size(ee,2) 
+   write(fid,*) ee(:,i1)
+ end do
+ close(fid)
 
  call find_te_general ( rr , ee , neigh , ee_m , neigh_m , &  
-                e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
-                                                         !te as an output
+                e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, ref_te ) !te as an output
 
 
 contains
@@ -779,74 +846,74 @@ contains
 ! -------------
 
 subroutine merge_nodes_general ( ri , ei , tol , rr , ee , im )
- real(wp), intent(in) :: ri(:,:)
- integer , intent(in) :: ei(:,:)
- real(wp), intent(in) :: tol
- real(wp), allocatable , intent(out) :: rr(:,:)
- integer , allocatable , intent(out) :: ee(:,:) , im(:,:)
- 
- integer , allocatable :: im_tmp(:,:)
- integer :: nSides1
- integer :: n_nodes , n_elems
- integer :: n_merge
- 
- integer :: i1 , i2 , i_e , i_v 
- 
- character(len=*), parameter :: this_sub_name = 'merge_nodes_general'
+real(wp), intent(in) :: ri(:,:)
+integer , intent(in) :: ei(:,:)
+real(wp), intent(in) :: tol
+real(wp), allocatable , intent(out) :: rr(:,:)
+integer , allocatable , intent(out) :: ee(:,:) , im(:,:)
 
-  n_nodes = size(ri,2)
-  n_elems = size(ei,2)
+integer , allocatable :: im_tmp(:,:)
+integer :: nSides1 , nSides2
+integer :: n_nodes , n_elems
+integer :: n_merge
+
+integer :: i1 , i2 , i_e , i_v 
+
+character(len=*), parameter :: this_sub_name = 'merge_nodes_general'
+
+n_nodes = size(ri,2)
+n_elems = size(ei,2)
+
+allocate(rr(size(ri,1),size(ri,2))) ; rr = ri
+allocate(ee(size(ei,1),size(ei,2))) ; ee = ei
+
+allocate(im_tmp(2,n_nodes)) ; im_tmp = 0
+
+n_merge = 0
+do i1 = 1 , n_nodes
+
+  do i2 = i1 + 1 , n_nodes 
   
-  allocate(rr(size(ri,1),size(ri,2))) ; rr = ri
-  allocate(ee(size(ei,1),size(ei,2))) ; ee = ei
-  
-  allocate(im_tmp(2,n_nodes)) ; im_tmp = 0
-  
-  n_merge = 0
-  do i1 = 1 , n_nodes
-  
-    do i2 = i1 + 1 , n_nodes 
+    if ( norm2(ri(:,i2)-ri(:,i1)) .lt. tol ) then
+
+      n_merge = n_merge + 1
+      rr(:,i1) = 0.5_wp * (ri(:,i1)+ri(:,i2))
+      rr(:,i2) = rr(:,i1)
     
-      if ( norm2(ri(:,i2)-ri(:,i1)) .lt. tol ) then
-  
-        n_merge = n_merge + 1
-        rr(:,i1) = 0.5_wp * (ri(:,i1)+ri(:,i2))
-        rr(:,i2) = rr(:,i1)
+      do i_e = 1 , size(ei,2)
       
-        do i_e = 1 , size(ei,2)
-          
-          ! 0 assumed to be possible only in ei(4,:)
-          nSides1 = count( ei(:,i_e) .ne. 0 ) 
-        
-          do i_v = 1 , nSides1
-            ! avoid merging nodes belonging to the same element
-            if ( ei(i_v,i_e) .eq. i2 ) then
-              if ( all(ee(:,i_e) .ne. i1 ) ) then
-        
-                ee(i_v,i_e) = i1
-  
-                im_tmp(:,n_merge) = (/ i1 , i2 /)
-        
-              end if
+        nSides1 = count( ei(:,i_e) .ne. 0 ) ! 0 assumed to be possible only in ei(4,:)
+      
+        do i_v = 1 , nSides1
+          ! avoid merging nodes belonging to the same element
+          if ( ei(i_v,i_e) .eq. i2 ) then
+            if ( all(ee(:,i_e) .ne. i1 ) ) then
+      
+              ee(i_v,i_e) = i1
+
+              im_tmp(:,n_merge) = (/ i1 , i2 /)
+
+!             write(*,*) ' i1 , i2 , rr : ' , i1 , i2 , rr(:,i1)
+      
             end if
-          end do
+          end if
         end do
-      end if
-    end do
+      end do
+    end if
   end do
-  write(*,*) ' n_merge : ' , n_merge
-  
-  allocate(im(2,n_merge)) ; im = im_tmp(:,1:n_merge)
-  
-  deallocate(im_tmp)
+end do
+write(*,*) ' n_merge : ' , n_merge
+
+allocate(im(2,n_merge)) ; im = im_tmp(:,1:n_merge)
+
+deallocate(im_tmp)
 
 end subroutine merge_nodes_general
 
 ! -------------
 
 subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &  
-                e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
-                                                         !te as an output
+                e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, ref_te ) !te as an output
 
  real(wp), intent(in) :: rr(:,:)
  integer , intent(in) :: ee(:,:) , neigh(:,:) , ee_m(:,:) , neigh_m(:,:)
@@ -855,10 +922,13 @@ subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &
  integer , allocatable , intent(out) :: e_te(:,:) , i_te(:,:) , ii_te(:,:) 
  integer , allocatable , intent(out) :: neigh_te(:,:) , o_te(:,:)
  real(wp), allocatable , intent(out) :: rr_te(:,:) , t_te(:,:) 
+ integer , allocatable , intent(out) :: ref_te(:)
  
  ! tmp arrays --------
  integer , allocatable               :: e_te_tmp(:,:) , i_te_tmp(:,:) , ii_te_tmp(:,:) 
- real(wp), allocatable               ::rr_te_tmp(:,:)
+ integer , allocatable               :: neigh_te_tmp(:,:) , o_te_tmp(:,:)
+ real(wp), allocatable               ::rr_te_tmp(:,:) , t_te_tmp(:,:)
+ integer , allocatable               :: ref_te_tmp(:)
  integer , allocatable               :: i_el_nodes_tmp(:,:)
 
  real(wp), allocatable :: nor(:,:) , cen(:,:) , area(:)
@@ -870,17 +940,15 @@ subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &
  integer  :: ind1 , ind2 , i_node1 , i_node2 , i_node1_max , i_node2_max
  real(wp) ::  mi1 ,  mi2
 
- real(wp), parameter :: inner_prod_thresh = - 0.5d0
+ real(wp) , parameter :: inner_prod_thresh = - 0.5d0
 
- real(wp), dimension(3) , parameter :: u_rel = (/ 1.0_wp , 0.0_wp , 0.0_wp /) 
-                                                ! hard-coded parameter ... 
- real(wp), dimension(3) :: v_rel = u_rel / norm2(u_rel)
- real(wp), dimension(3) , parameter :: side_dir = (/ 0.0_wp , 1.0_wp , 0.0_wp /) 
-                                                 ! hard-coded parameter ... 
+ real(wp) , dimension(3) , parameter :: u_rel = (/ 1.0_wp , 0.0_wp , 0.0_wp /) ! hard-coded parameter ... 
+ real(wp) , dimension(3) :: v_rel = u_rel / norm2(u_rel)
+ real(wp) , dimension(3) , parameter :: side_dir = (/ 0.0_wp , 1.0_wp , 0.0_wp /) ! hard-coded parameter ... 
  ! TODO: read as an input of the component
- real(wp) , dimension(3) :: vec1
+ real(wp) , dimension(3) :: vec1 , vec2 , vec3
 
- integer :: i1 , i2 
+ integer :: fid , i1 , i2 
  character(len=*), parameter :: this_sub_name = 'find_te_general'
 
  n_el = size(ee,2)
@@ -926,8 +994,7 @@ subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &
      
        ! Check normals ----
        ! 1. 
-       if ( sum( nor(:,i_e) * nor(:,neigh_m(i_b,i_e)) ) .le. &
-                                                       inner_prod_thresh ) then
+       if ( sum( nor(:,i_e) * nor(:,neigh_m(i_b,i_e)) ) .le. inner_prod_thresh ) then
 
          ne_te = ne_te + 1
          
@@ -941,38 +1008,27 @@ subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &
          i_el_nodes_tmp(1,ne_te) = ee( i_b , i_e )
          i_el_nodes_tmp(2,ne_te) = ee( mod(i_b,nSides) + 1 , i_e ) 
 
-         ! Find the corresponding node on the other side 
-         ! of the traling edge (for open te)
-         ind1 = 1 ; mi1 = norm2( rr(:,i_el_nodes_tmp(1,ne_te)) -  &
-                                                 rr(:,ee(1,neigh_m(i_b,i_e))) )
-         ind2 = 1 ; mi2 = norm2( rr(:,i_el_nodes_tmp(2,ne_te)) - &
-                                                 rr(:,ee(1,neigh_m(i_b,i_e))) )
+         ! Find the corresponding node on the other side of the traling edge (for open te)
+         ind1 = 1 ; mi1 = norm2( rr(:,i_el_nodes_tmp(1,ne_te)) - rr(:,ee(1,neigh_m(i_b,i_e))) )
+         ind2 = 1 ; mi2 = norm2( rr(:,i_el_nodes_tmp(2,ne_te)) - rr(:,ee(1,neigh_m(i_b,i_e))) )
 
          nSides_b = count( ee(:,neigh_m(i_b,i_e)) .ne. 0 )
 
          do i1 = 2 , nSides_b
-           if (     norm2( rr(:,i_el_nodes_tmp(1,ne_te)) - &
-                               rr(:,ee(i1,neigh_m(i_b,i_e)) ) ) .lt. mi1 ) then
+           if (     norm2( rr(:,i_el_nodes_tmp(1,ne_te)) - rr(:,ee(i1,neigh_m(i_b,i_e)) ) ) .lt. mi1 ) then
              ind1 = i1
-             mi1  = norm2( rr(:,i_el_nodes_tmp(1,ne_te)) - &
-                                               rr(:,ee(i1,neigh_m(i_b,i_e)) ) )
+             mi1  = norm2( rr(:,i_el_nodes_tmp(1,ne_te)) - rr(:,ee(i1,neigh_m(i_b,i_e)) ) )
            end if
-           if (     norm2( rr(:,i_el_nodes_tmp(2,ne_te)) - &
-                               rr(:,ee(i1,neigh_m(i_b,i_e)) ) ) .lt. mi2 ) then
+           if (     norm2( rr(:,i_el_nodes_tmp(2,ne_te)) - rr(:,ee(i1,neigh_m(i_b,i_e)) ) ) .lt. mi2 ) then
              ind2 = i1
-             mi2  = norm2( rr(:,i_el_nodes_tmp(2,ne_te)) - &
-                                               rr(:,ee(i1,neigh_m(i_b,i_e)) ) )
+             mi2  = norm2( rr(:,i_el_nodes_tmp(2,ne_te)) - rr(:,ee(i1,neigh_m(i_b,i_e)) ) )
            end if
          end do
-         
-          ! elems(neigh_ib_ie)%p%i_ver(ind1) )
-          ! elems(neigh_ib_ie)%p%i_ver(ind2) )
-          ! elems(neigh_ib_ie)%p%i_ver(ind1) )
-          ! elems(neigh_ib_ie)%p%i_ver(ind2) )
-         i_node1     = min(i_el_nodes_tmp(1,ne_te), ee(ind1,neigh_m(i_b,i_e)) )  
-         i_node2     = min(i_el_nodes_tmp(2,ne_te), ee(ind2,neigh_m(i_b,i_e)) )  
-         i_node1_max = max(i_el_nodes_tmp(1,ne_te), ee(ind1,neigh_m(i_b,i_e)) )  
-         i_node2_max = max(i_el_nodes_tmp(2,ne_te), ee(ind2,neigh_m(i_b,i_e)) )  
+
+         i_node1     = min(i_el_nodes_tmp(1,ne_te), ee(ind1,neigh_m(i_b,i_e)) )  ! elems(neigh_ib_ie)%p%i_ver(ind1) )
+         i_node2     = min(i_el_nodes_tmp(2,ne_te), ee(ind2,neigh_m(i_b,i_e)) )  ! elems(neigh_ib_ie)%p%i_ver(ind2) )
+         i_node1_max = max(i_el_nodes_tmp(1,ne_te), ee(ind1,neigh_m(i_b,i_e)) )  ! elems(neigh_ib_ie)%p%i_ver(ind1) )
+         i_node2_max = max(i_el_nodes_tmp(2,ne_te), ee(ind2,neigh_m(i_b,i_e)) )  ! elems(neigh_ib_ie)%p%i_ver(ind2) )
 
          if ( all( i_te_tmp(1,1:nn_te) .ne. i_node2 ) ) then
            nn_te = nn_te + 1
@@ -1063,6 +1119,7 @@ subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &
  ! Compute unit vector at the te nodes ----------------
  !  for the first implicit wake panel  ----------------
  allocate(t_te  (3,nn_te)) ; t_te = 0.0_wp  
+ allocate(ref_te(  nn_te)) ; ref_te = ref_tag
  do i_n = 1 , nn_te
    vec1 = 0.0_wp
    do i_e = 1 , ne_te 
@@ -1173,21 +1230,22 @@ end subroutine build_te_general
 !----------------------------------------------------------------------
 
 subroutine build_te_parametric ( ee , rr , ElType , &
-                npoints_chord_tot , nelems_span , &
-                e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
+                npoints_chord_tot , nelems_span , ref_tag , &
+                e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te, ref_te ) !te as an output
  
  integer , intent(in) :: ee(:,:)
  real(wp), intent(in) :: rr(:,:)
  character,intent(in) :: ElType
  integer , intent(in) :: npoints_chord_tot , nelems_span
+ integer , intent(in) :: ref_tag
  
  ! te structures
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
- integer , allocatable :: neigh_te(:,:) , o_te(:,:)
+ integer , allocatable :: neigh_te(:,:) , o_te(:,:) , ref_te(:)
  real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
  
  integer :: nelems_chord
- integer :: i1
+ integer :: i1 , fid
 
  
  nelems_chord = npoints_chord_tot - 1
@@ -1195,13 +1253,8 @@ subroutine build_te_parametric ( ee , rr , ElType , &
  ! e_te ----------
  allocate(e_te(2,nelems_span)) ; e_te = 0
  if ( ElType .eq. 'p' ) then
-! <<<<<<<<<
-!  e_te(1,:) = (/ ( 1+(i1-1)*nelems_chord , i1=1,nelems_span) /)   
-!  e_te(2,:) = (/ (   (i1  )*nelems_chord , i1=1,nelems_span) /)
-! >>>>>>>>>
-   e_te(1,:) = (/ (   (i1  )*nelems_chord , i1=1,nelems_span) /)
-   e_te(2,:) = (/ ( 1+(i1-1)*nelems_chord , i1=1,nelems_span) /)   
-! >>>>>>>>>
+   e_te(1,:) = (/ ( 1+(i1-1)*nelems_chord , i1=1,nelems_span) /)
+   e_te(2,:) = (/ (   (i1  )*nelems_chord , i1=1,nelems_span) /)
  else
    e_te(1,:) = (/ (   (i1  )*nelems_chord , i1=1,nelems_span) /)
  ! e_te(2,:) = 0 
@@ -1211,16 +1264,12 @@ subroutine build_te_parametric ( ee , rr , ElType , &
  allocate(i_te(2,nelems_span+1)) ; i_te = 0
  if ( ElType .eq. 'p' ) then
    i_te(:,1) = (/ ee(2,1) , ee(3,nelems_chord)/)
-   i_te(1,2:nelems_span+1) = (/ ( ee(1,1+(i1-1)*nelems_chord) ,  &
-                                                           i1=1,nelems_span) /)
-   i_te(2,2:nelems_span+1) = (/ ( ee(4,  (i1  )*nelems_chord) , &
-                                                           i1=1,nelems_span) /)
+   i_te(1,2:nelems_span+1) = (/ ( ee(1,1+(i1-1)*nelems_chord) , i1=1,nelems_span) /)
+   i_te(2,2:nelems_span+1) = (/ ( ee(4,  (i1  )*nelems_chord) , i1=1,nelems_span) /)
  else
    i_te(:,1) = (/ ee(3,nelems_chord) , ee(3,nelems_chord)/)
-   i_te(1,2:nelems_span+1) = (/ ( ee(4,  (i1  )*nelems_chord) , &
-                                                           i1=1,nelems_span) /)
-   i_te(2,2:nelems_span+1) = (/ ( ee(4,  (i1  )*nelems_chord) , &
-                                                           i1=1,nelems_span) /)
+   i_te(1,2:nelems_span+1) = (/ ( ee(4,  (i1  )*nelems_chord) , i1=1,nelems_span) /)
+   i_te(2,2:nelems_span+1) = (/ ( ee(4,  (i1  )*nelems_chord) , i1=1,nelems_span) /)
  end if
  
  ! rr_te ---------
@@ -1230,13 +1279,8 @@ subroutine build_te_parametric ( ee , rr , ElType , &
  ! ii_te ---------
  allocate(ii_te(2,nelems_span)) ; ii_te = 0
  if ( ElType .eq. 'p' ) then 
-! <<<<<<<<<
-!  ii_te(1,:) = (/ ( i1 , i1 = 1,nelems_span   ) /)
-!  ii_te(2,:) = (/ ( i1 , i1 = 2,nelems_span+1 ) /)
-! >>>>>>>>>
-   ii_te(1,:) = (/ ( i1 , i1 = 2,nelems_span+1 ) /)
-   ii_te(2,:) = (/ ( i1 , i1 = 1,nelems_span   ) /)
-! >>>>>>>>>
+   ii_te(1,:) = (/ ( i1 , i1 = 1,nelems_span   ) /)
+   ii_te(2,:) = (/ ( i1 , i1 = 2,nelems_span+1 ) /)
  elseif ( ElType .eq. 'v' ) then 
    ii_te(1,:) = (/ ( i1 , i1 = 2,nelems_span+1 ) /)
    ii_te(2,:) = (/ ( i1 , i1 = 1,nelems_span   ) /)
@@ -1254,25 +1298,18 @@ subroutine build_te_parametric ( ee , rr , ElType , &
  o_te(2,1) = 0
  o_te(1,nelems_span) = 0
  
+ ! ref_te --------
+ allocate(ref_te(nelems_span+1)) ; ref_te = ref_tag
  
  ! t_te ----------
  allocate(t_te(3,nelems_span+1)) ; t_te = 0.0_wp
  if ( ElType .eq. 'p' ) then
-! <<<<<<<<<
-!  t_te(:,1) = 0.5 * ( rr(:,ee(2,e_te(1,1))) - rr(:,ee(3,e_te(1,1))) + & 
-!                      rr(:,ee(3,e_te(2,1))) - rr(:,ee(2,e_te(2,1)))     )
-! >>>>>>>>>
-   t_te(:,1) = 0.5 * ( rr(:,ee(3,e_te(1,1))) - rr(:,ee(2,e_te(1,1))) + & 
-                       rr(:,ee(2,e_te(2,1))) - rr(:,ee(3,e_te(2,1)))     )
+   t_te(:,1) = 0.5 * ( rr(:,ee(2,e_te(1,1))) - rr(:,ee(3,e_te(1,1))) + & 
+                       rr(:,ee(3,e_te(2,1))) - rr(:,ee(2,e_te(2,1)))     )
    t_te(:,1) = t_te(:,1) / norm2(t_te(:,1))
-! >>>>>>>>>
    do i1 = 1 , nelems_span 
-! <<<<<<<<<
-!    t_te(:,i1+1) = 0.5 * ( rr(:,ee(1,e_te(1,i1))) - rr(:,ee(4,e_te(1,i1))) + & 
-!                           rr(:,ee(4,e_te(2,i1))) - rr(:,ee(1,e_te(2,i1)))   )
-! >>>>>>>>>
-     t_te(:,i1+1) = 0.5 * ( rr(:,ee(4,e_te(1,i1))) - rr(:,ee(1,e_te(1,i1))) + & 
-                            rr(:,ee(1,e_te(2,i1))) - rr(:,ee(4,e_te(2,i1)))  )
+     t_te(:,i1+1) = 0.5 * ( rr(:,ee(1,e_te(1,i1))) - rr(:,ee(4,e_te(1,i1))) + & 
+                            rr(:,ee(4,e_te(2,i1))) - rr(:,ee(1,e_te(2,i1)))     )
      t_te(:,i1+1) = t_te(:,i1+1) / norm2(t_te(:,i1+1))
    end do
  else
@@ -1325,15 +1362,6 @@ subroutine build_te_parametric ( ee , rr , ElType , &
 ! check ----
 
 end subroutine build_te_parametric
-
-!----------------------------------------------------------------------
-! subroutines :
-!   create_local_velocity_stencil_...      ... = general, parametric
-!   create_strip_connectivity_...
-
-
-
-
 
 !----------------------------------------------------------------------
 

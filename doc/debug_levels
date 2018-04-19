@@ -7,10 +7,17 @@ All the levels are CUMULATIVE (i.e. a certain level produced also ALL the lower
 levels effects)
 
 level    effect
-1        standard detailed info output
+1        standard detailed info output with timing
 
-15       print out files with geometry details
+3        Extended info output
 
-20       print out the array of linear system results
+15       print out files with debug geometry details at the beginning of the 
+         simulation
+
+16       print out files with debug geometry at each timestep
+
+17       print out debug wake data
+
+20       print out the array of debug linear system results
 
 50       dump the whole linear system

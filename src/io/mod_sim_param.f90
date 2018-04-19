@@ -33,63 +33,36 @@
 !!=====================================================================
 
 
-!> Module containing parameters for the code execution
+!> Module to define the structrues containing the simulation parameters
+!! 
+module mod_sim_param
 
-module mod_param
-
-!----------------------------------------------------------------------
+use mod_param, only: &
+  wp
 
 implicit none
 
-!----------------------------------------------------------------------
-
-public :: wp, & 
-          max_char_len , &
-          extended_char_len, &
-          nl, &
-          pi , &
-          eps, &
-          prev_tri , next_tri , &
-          prev_qua , next_qua
+public :: t_sim_param
 
 private
 
-!----------------------------------------------------------------------
-
-!----------------------------------------------------------------------
-! Select here the working precision wp
-!
-! single precision
-!integer, parameter :: wp = selected_real_kind(6,35)
-!
-! double precision
-integer, parameter :: wp = selected_real_kind(12,307)
-!
-! quadruple precision
-!integer, parameter :: wp = selected_real_kind(30,307)
-!----------------------------------------------------------------------
-
-integer, parameter :: max_char_len = 255
-
-integer, parameter :: extended_char_len = 1000
-
-character, parameter :: nl = new_line('a')
-
-!----------------------------------------------------------------------
-! mathematical parameters and usefull constants & arrays
-
-real(wp), parameter :: pi = 4.0_wp * atan(1.0_wp)
-
-integer, parameter :: prev_tri(3) = (/ 3 , 1 , 2 /)
-integer, parameter :: next_tri(3) = (/ 2 , 3 , 1 /)
-integer, parameter :: prev_qua(4) = (/ 4 , 1 , 2 , 3 /)
-integer, parameter :: next_qua(4) = (/ 2 , 3 , 4 , 1 /)
-
-
-real(wp), parameter :: eps = 1.0e-10_wp
-
-!----------------------------------------------------------------------
+type t_sim_param
+  !> Start time
+  real(wp) :: t0 
+  !> Time step
+  real(wp) :: dt
+  !> Final time
+  real(wp) :: tfin
+  !> Number of timesteps
+  integer  :: n_timesteps
+  !> Vector of time instants
+  real(wp) , allocatable :: time_vec(:)
+  !> Free stream velocity
+  real(wp) , allocatable :: u_inf(:)
+  !> Debug level
+  integer :: debug_level
+end type t_sim_param
 
 
 
-end module mod_param
+end module mod_sim_param

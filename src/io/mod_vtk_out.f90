@@ -71,7 +71,7 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
  real(wp), intent(in) :: w_vort(:)
  character(len=*), intent(in) :: out_filename 
 
- integer :: fu, ierr, i, j, i_shift, ivar
+ integer :: fu, ierr, i, i_shift
  integer :: npoints, ncells, ne
  integer :: offset, nbytes
  character(len=200) :: buffer

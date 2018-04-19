@@ -456,9 +456,10 @@ end subroutine compute_psi_surfpan
 !! WARNING: the velocity calculated, to be consistent with the formulation of 
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the 
 !! result of the present subroutine MUST be DIVIDED by 4*pi
-subroutine compute_vel_surfpan(this, pos , vel )
+subroutine compute_vel_surfpan(this, pos , uinf, vel )
   class(t_surfpan), intent(inout) :: this
   real(wp), intent(in) :: pos(:)
+  real(wp), intent(in) :: uinf(3)
   real(wp), intent(out) :: vel(3)
 
   real(wp) :: vdou(3) , vsou(3)
@@ -479,7 +480,8 @@ subroutine compute_vel_surfpan(this, pos , vel )
   ! vel =  vdou * idou - vsou * isou, where isou = psi = this%nor * ( this%b - U_infy )
   !                                   with  this%b the velocity of the collocation point
   ! TODO: pass this%psi and uinf ( up to now uinf = (/-1,0,0/) )
-  vel = vdou*this%idou - vsou*( sum(this%nor*(this%ub+(/-1.0_wp, 0.0_wp, 0.0_wp/))) )
+  !vel = vdou*this%idou - vsou*( sum(this%nor*(this%ub+(/-1.0_wp, 0.0_wp, 0.0_wp/))) )
+  vel = vdou*this%idou - vsou*( sum(this%nor*(this%ub-uinf)) )
 
 end subroutine compute_vel_surfpan
 
@@ -519,10 +521,9 @@ subroutine compute_cp_surfpan(this, elems, uinf) !, uinf)
              uinf
 
   ! pressure coefficient, cp ---------------------------------
-  ! steady problems  : cp = 1 - (V/V_inf)^2
-  this%cp  = 1.0_wp - ( norm2(this%vel) / norm2(uinf) )**2.0_wp
-  ! unsteady problems: cp = cp_steady - dphi/dt * 2/(V_inf^2)
-! this%cp  = 1.0_wp - ( norm2(this%vel) / norm2(uinf) )**2.0_wp - ...
+  ! steady problems  : cp = 1 - (V/V_inf)^2 - dphi/dt * 2/(V_inf^2)
+  this%cp  = 1.0_wp - ( norm2(this%vel) / norm2(uinf) )**2.0_wp  &
+           + 2.0_wp * this%didou_dt / norm2(uinf)**2.0_wp
  
 
 end subroutine compute_cp_surfpan
