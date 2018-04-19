@@ -66,21 +66,20 @@ contains
 subroutine potential_calc_doublet(this, dou, pos)
  class(c_elem), intent(inout) :: this
  real(wp), intent(out) :: dou
- real(wp), intent(in) :: pos(:)
+ real(wp), contiguous, intent(in) :: pos(:)
 
- real(wp), dimension(3) :: p1 , p2 , p3 , p4 , v1 , v2 , e1 , e2 , e3
-!real(wp), dimension(3) :: p1p, p2p, p3p, p4p
- real(wp), dimension(3,4) :: ver_p ! Projected vertices on the mean plane
+ real(wp), dimension(3) :: e3
+ !real(wp), dimension(3,4) :: ver_p ! Projected vertices on the mean plane
 
  real(wp) :: zQ
- real(wp), dimension(3) ::  Qp , PcQp
+ real(wp), dimension(3) ::Qp
 
  real(wp), dimension(3) :: ei , ap1 , am1
  real(wp) :: ap1n , am1n , sinB , cosB , beta
 
  integer :: indm1 , indp1
 
- real(wp), parameter :: eps_dou  = 1e-6
+ real(wp), parameter :: eps_dou  = 1e-6_wp
  real(wp), parameter :: ff_ratio = 10.0_wp
  real(wp) :: radius
 
@@ -170,8 +169,8 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
  real(wp) :: radius_v(3)
  real(wp) :: radius , rati
 
- real(wp), parameter :: r_Rankine = 0.05_wp
- real(wp), parameter :: r_cutoff  = 0.01_wp
+ real(wp), parameter :: r_Rankine = 0.0000005_wp
+ real(wp), parameter :: r_cutoff  = 0.0000001_wp
  real(wp) :: r_Ran
 
  integer :: i1

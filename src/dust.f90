@@ -40,6 +40,9 @@ program dust
 use mod_param, only: &
   wp, nl, max_char_len, extended_char_len
 
+use mod_sim_param, only: &
+  t_sim_param
+
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
 
@@ -65,7 +68,7 @@ use mod_basic_io, only: &
 
 use mod_parse, only: &
   t_parse, &
-  getstr, getlogical, getreal, getint, &
+  getstr, getlogical, getreal, getint, getrealarray, &
   ignoredParameters, finalizeParameters
 
 use mod_wake, only: &
@@ -86,6 +89,9 @@ implicit none
 character(len=*), parameter :: input_file_name_def = 'dust.in'
 character(len=max_char_len) :: input_file_name
 character(len=extended_char_len) :: message
+
+!Simulation parameters
+type(t_sim_param) :: sim_param
 
 !Time parameters
 real(wp) :: tstart, tend, dt, time
@@ -110,17 +116,15 @@ integer :: debug_level
 ! Asymptotic conditions
 real(wp) :: uinf(3)
 real(wp), parameter :: rho = 1.0_wp
-real(wp), allocatable :: F_aero(:,:)
 
-!!debug output
-real(wp), allocatable ::  vel(:,:),   cp(:,:)
 
 character(len=max_char_len) :: frmt
 character(len=max_char_len) :: basename
 character(len=max_char_len) :: basename_debug
 
-integer :: i_el
+real(wp) , allocatable :: res_old(:)
 
+integer :: i_el , i
 
 
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
@@ -145,6 +149,8 @@ call prms%CreateRealOption( 'dt',     "time step")
 call prms%CreateRealOption( 'dt_out', "output time interval")
 call prms%CreateRealOption( 'dt_debug_out', "debug output time interval")
 call prms%CreateLogicalOption( 'output_start', "output values at starting iteration", 'F')
+call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
+'(/1.0, 0.0, 0.0/)')
 call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output','0')
 call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
 call prms%CreateStringOption('basename','oputput basename','./')
@@ -161,25 +167,52 @@ dt     = getreal(prms, 'dt')
 dt_out = getreal(prms,'dt_out')
 dt_debug_out = getreal(prms, 'dt_debug_out')
 output_start = getlogical(prms, 'output_start')
+
+uinf = getrealarray(prms, 'u_inf', 3)
+
 debug_level = getint(prms, 'debug_level')
 n_wake_panels = getint(prms, 'n_wake_panels')
 basename = getstr(prms,'basename')
 basename_debug = getstr(prms,'basename_debug')
 
+
 if (debug_level .ge. 3) then
   write(message,*) 'Initial time tstart: ', tstart; call printout(message)
   write(message,*) 'Final time tend:     ', tend; call printout(message)
   write(message,*) 'Time step dt:        ', dt; call printout(message)
+  write(message,*) 'Output interval:     ', dt_out; call printout(message)
+  write(message,*) 'Debug output interval:', dt_out; call printout(message)
+  write(message,*) 'Output first step:   ', output_start; call printout(message)
+  write(message,*) 'Debug level:', debug_level; call printout(message)
+  write(message,*) 'Free stream velocity:', uinf; call printout(message)
+  write(message,*) 'Maximum wake panels:', n_wake_panels; call printout(message)
+  write(message,*) 'Results basename: ', trim(basename); call printout(message)
+  write(message,*) 'Debug basename: ', trim(basename); call printout(message)
 endif
 
-!for the moment hard-coded
-uinf = (/1.0_wp, 0.0_wp, 0.0_wp/)
+
+!---- Simulation parameters ----
+nstep = ceiling((tend-tstart)/dt) + 1 !(for the zero time step)
+sim_param%t0          = tstart
+sim_param%tfin        = tend
+sim_param%dt          = dt
+sim_param%n_timesteps = nstep
+allocate(sim_param%time_vec(sim_param%n_timesteps))
+sim_param%time_vec = (/ ( sim_param%t0 + &
+         dble(i-1)*sim_param%dt, i=1,sim_param%n_timesteps ) /)
+allocate(sim_param%u_inf(3)) 
+sim_param%u_inf = uinf
+sim_param%debug_level = debug_level
 
 !------ Geometry creation ------
-
-
 call printout(nl//'====== Geometry Creation ======')
-call create_geometry(prms, input_file_name, geo, te, elems, tstart)
+t0 = dust_time()
+call create_geometry(prms, input_file_name, geo, te, elems, sim_param)
+t1 = dust_time()
+if(debug_level .ge. 1) then
+  write(message,'(A,F9.3,A)') 'Created geometry in: ' , t1 - t0,' s.'
+  call printout(message)
+endif
 
 if(debug_level .ge. 15) &
             call debug_printout_geometry_minimal(elems, geo, basename_debug, 0)
@@ -191,7 +224,7 @@ call finalizeParameters(prms)
 !------ Initialization ------
 call printout(nl//'====== Initializing Wake ======')
 call initialize_wake_panels(wake_panels, geo, te, n_wake_panels)
-call prepare_wake_panels(wake_panels, elems, geo, dt, uinf)
+call prepare_wake_panels(wake_panels,  geo, dt, uinf)
 
 call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
@@ -203,19 +236,19 @@ if(debug_level .ge. 1) then
 endif
 
 t22 = dust_time()
-write(message,'(A,F9.3,A)') '------ Completed all preliminary operations &
+write(message,'(A,F9.3,A)') nl//'------ Completed all preliminary operations &
                              &in: ' , t22 - t00,' s.'
 call printout(message)
 
 !====== Time Cycle ======
-nstep = ceiling((tend-tstart)/dt) + 1 !(for the zero time step)
 time = tstart
 t_last_out = time; t_last_debug_out = time
 
+allocate(res_old(size(elems))) ; res_old = 0.0_wp
 t11 = dust_time()
 do it = 1,nstep
 
-  if(debug_level .ge. 3) then
+  if(debug_level .ge. 1) then
     write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
                                                          nstep, ' time: ', time
     call printout(message)
@@ -233,7 +266,7 @@ do it = 1,nstep
 
 
   !------ Assemble the system ------
-  call prepare_wake_panels(wake_panels, elems, geo, dt, uinf)
+  call prepare_wake_panels(wake_panels, geo, dt, uinf)
   t0 = dust_time()
   call assemble_linsys(linsys, elems, wake_panels, uinf)
   t1 = dust_time()
@@ -249,13 +282,24 @@ do it = 1,nstep
                              trim(basename_debug)//'b_'//trim(frmt)//'.dat' )
   endif
 
-
   !------ Solve the system ------
   t0 = dust_time()
   call solve_linsys(linsys)
   t1 = dust_time()
 
-  if(debug_level .ge. 3) then
+  ! compute time derivative of the result ( = i_vortex = -i_doublet ) ----------
+  write(*,*) ' dt = ' , sim_param%dt
+  do i_el = 1 , size(elems)
+    elems(i_el)%p%didou_dt = ( linsys%res(i_el) - res_old(i_el) ) / sim_param%dt 
+!   if ( it .eq. 2 ) then
+!     write(*,*) ' d , d_old , dd_dt ' ,  linsys%res(i_el) , res_old(i_el) , elems(i_el)%p%didou_dt 
+!   end if
+  end do
+! if ( it .eq. 2 ) stop
+  ! update res_old for next time step -------
+  res_old = linsys%res
+
+  if(debug_level .ge. 1) then
     write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
     call printout(message)
   endif
@@ -272,20 +316,24 @@ do it = 1,nstep
     call debug_printout_loads(elems, basename_debug, it)
   endif
 
-
-  !------ Treat the wake ------
-  call update_wake_panels(wake_panels, elems, geo, dt, uinf)
-
-
+  !------ Output the results  ------
   !Printout the wake
   if((debug_level .ge. 17).and.time_2_debug_out)  &
                       call debug_printout_wake(wake_panels, basename_debug, it)
 
   !Print the results
-  if(time_2_out) call output_status(elems, geo, wake_panels, basename, it)
+  if(time_2_out)  call output_status(elems, geo, wake_panels, basename, it)
+
+  !------ Treat the wake ------
+  ! (this needs to be done after output, in practice the update is for the
+  !  next iteration)
+  call update_wake_panels(wake_panels, elems, dt, uinf)
 
   time = min(tend, time+dt)
+
 enddo
+
+deallocate( res_old )
 !===== End Time Cycle ======
 
 
@@ -471,9 +519,9 @@ end subroutine debug_printout_geometry_minimal
 
 !----------------------------------------------------------------------
 
-subroutine debug_printout_loads(elems, basename, it)
+subroutine debug_printout_loads(elems, basename_debug, it)
  type(t_elem_p),   intent(in) :: elems(:)
- character(len=*), intent(in) :: basename
+ character(len=*), intent(in) :: basename_debug
  integer,          intent(in) :: it
 
  real(wp), allocatable :: vel(:,:), cp(:,:), F_aero(:,:)

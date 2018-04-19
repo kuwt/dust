@@ -199,7 +199,7 @@ type, extends(option) :: RealOption
 end type RealOption
 
 !> Real Array Option
-type,public,extends(option) :: RealArrayOption
+type, extends(option) :: RealArrayOption
   real(wp),allocatable    :: value(:)
   !< number of digits, the value has in parameter file
   !! - negative: -number of digits in exponential representation

@@ -55,7 +55,7 @@ use mod_parse, only: &
   t_parse, &
   getstr, getlogical, getreal, getint, &
   ignoredParameters, finalizeParameters, &
-  countoption, getsuboption
+  countoption, getsuboption, t_link, check_opt_consistency
 
 use mod_build_geo, only: &
   build_geometry
@@ -72,21 +72,26 @@ character(len=max_char_len) :: output_file_name
 character(len=max_char_len) :: output_file_name_read
 logical :: cmd_set_filename
 character(len=max_char_len), allocatable :: geo_files(:)
-character(len=extended_char_len) :: message
+!character(len=extended_char_len) :: message
 
 !Time parameters
-real(wp) :: tstart, tend, dt, time
+!real(wp) :: tstart, tend, dt, time
 
 !Geometry parameters
-type(t_elem_p), allocatable :: elems(:)
+!type(t_elem_p), allocatable :: elems(:)
 type(t_parse) :: prms
-type(t_parse), pointer :: sbprms, ssbprms
-integer :: aa, bb, cc, dd, ee, ff
-type(t_geo) :: geo
-type(t_tedge) :: te
+type(t_parse), pointer :: sbprms!, ssbprms
+!integer :: aa, bb, cc, dd, ee, ff
+!type(t_geo) :: geo
 
 
 integer :: n_geo, i
+
+!debug
+integer :: n_refs,n,nmov, i_ref, intparam
+character(len=max_char_len) :: Ref, mov_type
+logical :: moving
+type(t_link), pointer :: o_link
 
 !write(*,*) 'DUST beginning'
 call printout(nl//'>>>>>> DUST PREPROCESSOR beginning >>>>>>'//nl)
@@ -114,39 +119,53 @@ endif
 call prms%CreateStringOption('GeoFile','Geometry definition files', multiple=.true.)
 call prms%CreateStringOption('FileName','Preprocessor output file')
 
-!call prms%CreateSubOption('sottopzioni','some suboptions',sbprms)
-!call sbprms%CreateIntOption('aaa','aa aa aa')
-!call sbprms%CreateIntOption('bbb','aa aa aa')
-!call sbprms%CreateIntOption('ccc','aa aa aa')
-!call sbprms%CreateSubOption('sottosotto','some more suboptions',ssbprms &
-!     ,multiple=.true.)
-!call ssbprms%CreateIntOption('ddd','aa aa aa')
-!call ssbprms%CreateIntOption('eee','aa aa aa')
-!call ssbprms%CreateIntOption('fff','aa aa aa')
+call prms%CreateStringOption('Ref','  ',multiple=.true.)
+call prms%CreateLogicalOption('Moving','  ',multiple=.true.)
+
+call prms%CreateSubOption('Movement',' ',sbprms,multiple=.true.)
+call sbprms%CreateStringOption('Movement_Type','  ')
+call sbprms%CreateIntOption('first_option','   ')
+call sbprms%CreateIntOption('second_option','   ')
 
 sbprms => null()
-ssbprms => null()
 
 call prms%read_options(input_file_name, printout_val=.false.)
 
 n_geo = countoption(prms,'GeoFile')
+n_refs = countoption(prms,'Ref')
 
-!sbprms =  getsuboption(prms,'sottopzioni')
-!call getsuboption(prms,'sottopzioni',sbprms)
-!aa = getint(sbprms,'aaa')
-!bb = getint(sbprms,'bbb')
-!cc = getint(sbprms,'ccc')
-!write(*,*) 'first suboptions ',aa, bb, cc
-!call getsuboption(sbprms,'sottosotto',ssbprms)
-!dd = getint(ssbprms,'ddd')
-!ee = getint(ssbprms,'eee')
-!ff = getint(ssbprms,'fff')
-!write(*,*) 'more suboptions ',dd,ee,ff
-!call getsuboption(sbprms,'sottosotto',ssbprms)
-!dd = getint(ssbprms,'ddd')
-!ee = getint(ssbprms,'eee')
-!ff = getint(ssbprms,'fff')
-!write(*,*) 'multiple suboptions ',dd,ee,ff
+n = countoption(prms,'Moving')
+if (n .ne. n_refs) call error('','','Wrong number of Moving inserted')
+nmov = 0
+
+
+do i_ref = 1,n_refs
+  Ref = getstr(prms,'Ref')
+    write(*,*) 'Reference: ',trim(Ref)
+  moving = getlogical(prms,'Moving',olink=o_link)
+    write(*,*) 'Is it moving: ',moving
+  if(moving) then
+    nmov = nmov + 1
+    call check_opt_consistency(o_link, next=.true., next_opt='Movement')
+    call getsuboption(prms,'Movement',sbprms) 
+
+    mov_type =getstr(sbprms,'Movement_Type')
+    select case(trim(mov_type))
+    case('first')
+      intparam = getint(sbprms,'first_option')
+    case('second')
+      intparam = getint(sbprms,'second_option')
+    case default
+      call error('','','Wrong kinda movement')
+    end select
+    write(*,*) 'Movement: ',trim(mov_type)
+    write(*,*) 'Parameter: ',intparam
+  endif
+enddo
+
+n = countoption(prms,'Movement')
+
+if(n .ne. nmov) call error('','','Wrong number of movement with respect to Moving = T')
 
 output_file_name_read = getstr(prms, 'FileName')
 
@@ -155,6 +174,13 @@ do i=1,n_geo
   geo_files(i) = getstr(prms,'GeoFile')
 enddo
 
+
+n = 3
+do i = 1,n
+
+  n = n+1
+  write(*,*) 'i',i
+enddo 
 if (.not. cmd_set_filename) output_file_name = output_file_name_read
 
 call build_geometry(geo_files,trim(output_file_name))

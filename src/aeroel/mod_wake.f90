@@ -197,15 +197,14 @@ end subroutine
 
 !> Prepare the first row of panels to be inserted inside the linear system
 !!
-subroutine prepare_wake_panels(wake, elems, geo, dt, uinf)
+subroutine prepare_wake_panels(wake, geo, dt, uinf)
  type(t_wake_panels), intent(inout) :: wake
- type(t_elem_p), intent(in) :: elems(:)
  type(t_geo), intent(in) :: geo
  real(wp), intent(in) :: dt
  real(wp), intent(in) :: uinf(3)
  
  integer :: p1, p2
- integer :: ip, iw
+ integer :: ip, iw, ipan
  real(wp) :: dist(3)
 
   !Update the first row of panels: set points positions
@@ -221,14 +220,18 @@ subroutine prepare_wake_panels(wake, elems, geo, dt, uinf)
     wake%w_points(:,ip,2) = wake%w_points(:,ip,1) + dist*0.3_wp*norm2(uinf)*dt
   enddo
 
-  !Calculate geometrical quantities
-  do iw = 1,wake%n_wake_stripes
-    p1 = wake%i_start_points(1,iw)
-    p2 = wake%i_start_points(2,iw)
-    call calc_geo_data(wake%wake_panels(iw,1), &
-         reshape((/wake%w_points(:,p1,1),   wake%w_points(:,p2,1), &
-                   wake%w_points(:,p2,1+1), wake%w_points(:,p1,1+1)/),&
-                                                                   (/3,4/)))
+  ! Update the panels geometrical quantities of all the panels, the 
+  ! first two row of points have just been updated, the other rows of points
+  ! were updated at the end of the last iteration
+  do ipan = 1,wake%wake_len
+    do iw = 1,wake%n_wake_stripes
+      p1 = wake%i_start_points(1,iw)
+      p2 = wake%i_start_points(2,iw)
+      call calc_geo_data(wake%wake_panels(iw,ipan), &
+           reshape((/wake%w_points(:,p1,ipan),   wake%w_points(:,p2,ipan), &
+                     wake%w_points(:,p2,ipan+1), wake%w_points(:,p1,ipan+1)/),&
+                                                                     (/3,4/)))
+    enddo
   enddo
 
 end subroutine prepare_wake_panels
@@ -238,15 +241,13 @@ end subroutine prepare_wake_panels
 !> Update the position and the intensities of the wake panels
 !!
 !!
-subroutine update_wake_panels(wake, elems, geo, dt, uinf)
+subroutine update_wake_panels(wake, elems, dt, uinf)
  type(t_wake_panels), intent(inout), target :: wake
  type(t_elem_p), intent(in) :: elems(:)
- type(t_geo), intent(in) :: geo
  real(wp), intent(in) :: dt
  real(wp), intent(in) :: uinf(3)
 
  integer :: iw, ipan, ie, ip, np
- integer :: p1, p2
  real(wp) :: pos_p(3), vel_p(3), v(3)
  type(t_elem_p), allocatable :: pan_p_temp(:)
  real(wp), allocatable :: point_old(:,:,:)
@@ -278,7 +279,8 @@ subroutine update_wake_panels(wake, elems, geo, dt, uinf)
   !trailing edge, the second is extrapolated from the trailing edge)
   np = wake%wake_len+1
   if(wake%wake_len .lt. wake%npan) np = np + 1
-
+  
+!$omp parallel do collapse(2) private(pos_p, vel_p, ie, ipan, iw, v)
   do ipan = 3,np
     do iw = 1,wake%n_wake_points
       pos_p = point_old(:,iw,ipan-1) 
@@ -287,14 +289,14 @@ subroutine update_wake_panels(wake, elems, geo, dt, uinf)
       !calculate the influence of the solid bodies 
       do ie=1,size(elems)
         v = 0.0_wp
-        call elems(ie)%p%compute_vel(pos_p, v)
+        call elems(ie)%p%compute_vel(pos_p, uinf, v)
         vel_p = vel_p + v/(4*pi)
       enddo
 
       ! calculate the influence of the wake
       do ie=1,size(wake%pan_p)
         v = 0.0_wp
-        call wake%pan_p(ie)%p%compute_vel(pos_p,v)
+        call wake%pan_p(ie)%p%compute_vel(pos_p, uinf, v)
         vel_p = vel_p + v/(4*pi)
       enddo
 
@@ -306,7 +308,6 @@ subroutine update_wake_panels(wake, elems, geo, dt, uinf)
 !     vel_p(1) = vel_p(1)+uinf(1)
       vel_p    = vel_p   +uinf   
 
-
       !update the position in time
       wake%w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + vel_p*dt
 ! Check ----
@@ -316,6 +317,7 @@ subroutine update_wake_panels(wake, elems, geo, dt, uinf)
       
     enddo
   enddo
+!$omp end parallel do
 
   deallocate(point_old)
 
@@ -351,27 +353,16 @@ subroutine update_wake_panels(wake, elems, geo, dt, uinf)
 
   endif
 
-  !==> 4) Update the panels geometrical quantities:
-  do ipan = 2,wake%wake_len
-    do iw = 1,wake%n_wake_stripes
-      p1 = wake%i_start_points(1,iw)
-      p2 = wake%i_start_points(2,iw)
-      call calc_geo_data(wake%wake_panels(iw,ipan), &
-           reshape((/wake%w_points(:,p1,ipan),   wake%w_points(:,p2,ipan), &
-                     wake%w_points(:,p2,ipan+1), wake%w_points(:,p1,ipan+1)/),&
-                                                                     (/3,4/)))
-    enddo
-  enddo
-
-
-
-  !==> 5) Update the intensities of the panels
+  !==> 4) Update the intensities of the panels
   !       From the back, all the vortex intensities come from the previous panel
   do ipan = wake%wake_len,2,-1
     do iw = 1,wake%n_wake_stripes
       wake%wake_panels(iw,ipan)%idou = wake%wake_panels(iw,ipan-1)%idou
     enddo
   enddo
+
+  ! The geometrical quantities of the panels will be all updated at the 
+  ! beginning of the next iteration in prepare_wake
 
 
 end subroutine update_wake_panels
