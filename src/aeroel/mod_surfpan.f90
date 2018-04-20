@@ -45,7 +45,7 @@ use mod_param, only: &
   pi
 
 use mod_aero_elements, only: &
-  c_elem, c_elem_pan, t_elem_p
+  c_elem, t_elem_p
 
 use mod_doublet, only: &
   potential_calc_doublet , &
@@ -71,7 +71,7 @@ public :: t_surfpan
 !! This type inherits most of its members from the general \ref c_elem class
 !! however implements its own subroutines to calculate the coefficients of the
 !! linear system and the 
-type, extends(c_elem_pan) :: t_surfpan
+type, extends(c_elem) :: t_surfpan
 
 contains
 

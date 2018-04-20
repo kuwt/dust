@@ -37,7 +37,7 @@
 module mod_vortring
 
 use mod_aero_elements, only: &
-  c_elem, t_elem_p, c_elem_pan
+  c_elem, t_elem_p
 
 use mod_doublet, only: &
   potential_calc_doublet , &
@@ -58,7 +58,7 @@ public :: t_vortring
 
 !----------------------------------------------------------------------
 
-type, extends(c_elem_pan) :: t_vortring
+type, extends(c_elem) :: t_vortring
 
   real, allocatable :: vert(:,:)
   real, allocatable :: bar(:)
