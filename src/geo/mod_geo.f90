@@ -363,7 +363,7 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
   ! calculate the geometric quantities
   ! already update the geometry for the first time to get the right 
   ! starting geometrical condition
-
+  call prepare_geometry(geo)
   call update_geometry(geo, tstart, update_static=.true.)
 
   if(sim_param%debug_level .ge. 3) then
@@ -750,270 +750,59 @@ end subroutine load_components
 
 !----------------------------------------------------------------------
 
-!----------------------------------------------------------------------
+!> Prepare the geometry allocating all the relevant fields for each 
+!! kind of element
+subroutine prepare_geometry(geo)
+ type(t_geo), intent(inout), target :: geo
 
-!> Read geometry from a geometry file
-!!
-!! Given a geometry input file, it reads the parameter therein contained, 
-!! reads the mesh from the specified mesh file and builds the components 
-!! contained in the mesh. 
-!! For the moment it is possible to define the reference frame of the 
-!! components in three ways:
-!! - if custom_reference is set to F for each component, the master reference
-!!  frame is employed
-!! - if file_reference is set to T all the components in the file get one 
-!!   single custom defined reference frame
-!! - if each custom_reference is set to T each component can have a custom
-!!   reference frame
-!subroutine read_geometry(geo, geo_file)
-! type(t_geo), intent(inout) :: geo
-! character(len=*), intent(in) :: geo_file
-!
-! type(t_parse) :: geo_prs
-! character(len=max_char_len) :: mesh_file
-! logical :: custom_ref, file_ref
-! integer :: n_components, i_comp
-! type(t_geo_component), allocatable :: temp(:)
-! real(wp) :: reference_temp(9), origin_temp(3)
-! character(len=max_char_len) :: ref_name, ref_parent
-! integer :: i, i2,i3, n1
-! integer, allocatable :: ee(:,:)
-! real(wp), allocatable :: rr(:,:)
-! character(len=max_char_len) :: comp_el_type
-! character(len=max_char_len) :: mesh_file_type
-! logical :: mesh_reflection
-! real(wp) :: reflection_point(3), reflection_normal(3)
-! integer :: points_offset, n_vert
-! real(wp), allocatable :: points_tmp(:,:)
-! integer :: ref_tag, ref_id, iref
-! character(len=max_char_len) :: msg
-!
-! character(len=*), parameter :: this_sub_name = 'read_geometry'
-!
-!
-!  !Prepare all the parameters to be read in the file
-!  !mesh file
-!  call geo_prs%CreateStringOption('MeshFile','Mesh file definition')
-!  call geo_prs%CreateStringOption('MeshFileType','Mesh file type')
-!  !element types
-!  call geo_prs%CreateStringOption('ElType', &
-!              'element type (temporary) p panel v vortex ring')
-!  !reference frame
-!  call geo_prs%CreateIntOption('Reference_Tag',&
-!                                   'reference frame tag of the component','0')
-!  !reflections
-!  call geo_prs%CreateLogicalOption('mesh_reflection',&
-!               'Has all the file a custom reference frame', 'F')
-!  call geo_prs%CreateRealArrayOption('reflection_point', &
-!               'Center point of reflection plane, (x, y, z)', &
-!               '(/0.0, 0.0, 0.0/)')
-!  call geo_prs%CreateRealArrayOption('reflection_normal', &
-!               'Normal of reflection plane, (xn, yn, zn)', &
-!               '(/0.0, 0.0, 1.0/)')
-!  
-!
-!  
-!  !read the parameters
-!  call geo_prs%read_options(geo_file,printout_val=.true.)
-!
-!  mesh_file      = getstr(geo_prs,'MeshFile')
-!  mesh_file_type = getstr(geo_prs,'MeshFileType')
-!  ref_tag        = getint(geo_prs,'Reference_Tag')
-!
-!  mesh_reflection   = getlogical(geo_prs, 'mesh_reflection')
-!  reflection_point  = getrealarray(geo_prs, 'reflection_point',3)
-!  reflection_normal = getrealarray(geo_prs, 'reflection_normal',3)
-!
-!
-!
-!  !Allocate an additional component 
-!  if(.not.allocated(geo%components)) then
-!    !not yet allocated the component vector, allocate it for the first time
-!    allocate(geo%components(1))
-!    i_comp = 0
-!  else
-!    i_comp = size(geo%components)
-!    allocate(temp(i_comp+1))
-!    temp(1:i_comp) = geo%components(1:i_comp)
-!    call move_alloc(temp, geo%components)
-!  endif
-!  i_comp = i_comp + 1
-!
-!  !Look for the reference frame of the component
-!  ref_id = -1
-!  do iref = 0,ubound(geo%refs,1)
-!    if (geo%refs(iref)%tag .eq. ref_tag) then
-!      !set id
-!      ref_id = iref
-!    endif
-!  enddo
-!  !if not found the reference
-!  if (ref_id .lt. 0) then
-!    write(msg,'(A,I2,A,I2,A)') 'For component ',i_comp, &
-!                 ' a reference with tag ',ref_tag,' was not found'
-!    call error(this_sub_name, this_mod_name, msg)
-!  endif
-!
-!  geo%components(i_comp)%ref_id = ref_id
-!  geo%components(i_comp)%ref_tag = ref_tag
-!  geo%components(i_comp)%moving = geo%refs(ref_id)%moving
-!
-!
-!  !TODO: read the mesh here
-!  !::::::::::::::::::::::::::::::::::::::::::::::::::::
-!  
-!  ! read the files
-!  select case (trim(mesh_file_type))
-!
-!   case('basic')
-!    call read_mesh_basic(trim(mesh_file),ee, rr)
-!   case('cgns')
-!    call read_mesh_cgns(trim(mesh_file),ee, rr)
-!   case('parametric')
-!    ! TODO : actually it is possible to define the parameters in the GeoFile directly, find a good way to do this
-!    call read_mesh_parametric(trim(mesh_file),ee, rr)
-!   case default
-!    call error(this_sub_name, this_mod_name, 'Unknown mesh file type')
-!
-!  end select
-!  comp_el_type = getstr(geo_prs,'ElType')
-!  geo%components(i_comp)%comp_el_type = comp_el_type
-!
-!  ! reflect the mesh (if requested)
-!  if (mesh_reflection) call reflect_mesh(ee, rr, &
-!                                         reflection_point, reflection_normal)
-!  
-!  ! treat the points
-!  if(allocated(geo%points)) then
-!    points_offset = size(geo%points,2) 
-!  else
-!    points_offset = 0
-!  endif
-!  !store the read points into the local points
-!  allocate(geo%components(i_comp)%loc_points(3,size(rr,2)))
-!  geo%components(i_comp)%loc_points = rr
-!  
-!  !Now for the moments the points are stored here without moving them, 
-!  !will be moved later, consider not storing them here at all
-!  allocate(points_tmp(3,size(rr,2)+points_offset))
-!  if (points_offset .gt. 0) points_tmp(:,1:points_offset) = geo%points
-!  points_tmp(:,points_offset+1:points_offset+size(rr,2)) = rr
-!  call move_alloc(points_tmp, geo%points)
-!  allocate(geo%components(i_comp)%i_points(size(rr,2)))
-!  geo%components(i_comp)%i_points = &
-!                     (/((i3),i3=points_offset+1,points_offset+size(rr,2))/)
-!
-!  ! treat the elements
-!  allocate(geo%components(i_comp)%temp_elems(size(ee,2)))
-!  do i2=1,size(ee,2)
-!    n_vert = count(ee(:,i2).ne.0)
-!    allocate(geo%components(i_comp)%temp_elems(i2)%vert(n_vert))
-!    geo%components(i_comp)%temp_elems(i2)%vert(1:n_vert) = &
-!                                          ee(1:n_vert,i2) + points_offset
-!    geo%components(i_comp)%temp_elems(i2)%etype = comp_el_type(1:1)
-!  enddo
-!
-!  geo%components(i_comp)%nSurfPan = 0; geo%components(i_comp)%nVortRin = 0;
-!  if(comp_el_type(1:1) .eq. 'p') geo%components(i_comp)%nSurfPan = size(ee,2)
-!  if(comp_el_type(1:1) .eq. 'v') geo%components(i_comp)%nVortRin = size(ee,2)
-!
-!  !:::::::::::::::::::::::::::::::::::::::::::::::::::
-! 
-!
-!  !cleanup
-!  deallocate(ee,rr)
-!  call finalizeparameters(geo_prs)
-!
-!end subroutine read_geometry
+ integer :: i_comp, ie
+ integer :: nsides
+ class(c_elem), pointer :: elem
+ character(len=*), parameter :: this_sub_name = 'prepare_geometry'
 
-!----------------------------------------------------------------------
+ do i_comp = 1,size(geo%components)
+   do ie = 1,size(geo%components(i_comp)%el)
+     !associate(elem => geo%compnents(i_comp)%el(ie))
+     elem => geo%components(i_comp)%el(ie)
 
-!> Final preparation of the geometry
-!!
-!! The geometry is finally prepared. For each component and each element
-!! the element is created, stored in the correct array (surface panel or 
-!! vortex ring) and then all the geometrical quantities of each element are
-!! calculated
-!subroutine prepare_geometry(geo)
-! type(t_geo), intent(inout), target :: geo
-!
-! integer :: ic, ie
-! integer :: iSurfPan, iVortRin
-! integer :: nsides
-!
-! character(len=*), parameter :: this_sub_name = 'prepare_geometry'
-!  !For each component:
-!  ! -the total arrays of elements(surfpan and vortring) should have been
-!  !  already allocated.
-!  ! -fill in the elements arrays (surfpan and vortring) with the loaded 
-!  !  mesh data
-!  ! -point the data in the correct position 
-!  ! -calculate the geometry data
-!  
-!  geo%nelem = 0; geo%nstatic = 0; geo%nmoving = 0
-!
-!  iSurfPan = 1; iVortRin = 1;
-!  do ic = 1,size(geo%components)
-!    associate(comp=>geo%components(ic))
-!
-!    allocate(comp%e(size(comp%temp_elems)))
-!
-!    do ie = 1,size(comp%temp_elems)
-!
-!      !compatibility with old mesh: if last element is zero is one side
-!      !less in the element
-!      nsides = size(comp%temp_elems(ie)%vert)
-!      if (comp%temp_elems(ie)%vert(nsides) .eq. 0) nsides = nsides-1
-!      
-!      !switch type of element
-!      if (comp%temp_elems(ie)%etype .eq. 'p') then
-!
-!        geo%SurfPan(iSurfPan)%moving = comp%moving
-!
-!        ! set the vertex global index
-!        allocate(geo%SurfPan(iSurfPan)%i_ver(nsides))
-!        geo%SurfPan(iSurfPan)%i_ver = &
-!                              comp%temp_elems(ie)%vert(1:nsides)
-!
-!        comp%e(ie)%p=>geo%SurfPan(iSurfPan)
-!        iSurfPan = iSurfPan + 1
-!
-!      elseif (comp%temp_elems(ie)%etype .eq. 'v') then
-!
-!        geo%VortRin(iVortRin)%moving = comp%moving
-!
-!        ! set the vertex global index
-!        allocate(geo%VortRin(iVortRin)%i_ver(nsides))
-!        geo%VortRin(iVortRin)%i_ver = &
-!                              comp%temp_elems(ie)%vert(1:nsides)
-!
-!        comp%e(ie)%p=>geo%VortRin(iVortRin)
-!        iVortRin = iVortRin + 1
-!
-!      else
-!        call error(this_sub_name, this_mod_name, &
-!             'unknown kind of element')
-!      endif
-!
-!      
-!      allocate(comp%e(ie)%p%vel(3))
-!
-!    enddo
-!    
-!    ! update the counters of the elements
-!    geo%nelem = geo%nelem + size(comp%temp_elems)
-!    if (comp%moving) then
-!      geo%nmoving = geo%nmoving + size(comp%temp_elems)
-!    else
-!      geo%nstatic = geo%nstatic + size(comp%temp_elems)
-!    endif
-!
-!    !deallocate(comp%temp_elems, comp%temp_verts)
-!    deallocate(comp%temp_elems)
-!    end associate 
-!  enddo
-!
-!end subroutine prepare_geometry
+     nsides = size(elem%i_ver)
+
+     !Fields common to each element
+     allocate(elem%ver(3,nsides))
+     allocate(elem%cen(3))
+     allocate(elem%nor(3))
+
+     select type(elem)
+      class is(t_surfpan)
+       allocate(elem%tang(3,2))
+       allocate(elem%verp(3,nsides))
+       allocate(elem%edge_vec(3,nsides))
+       allocate(elem%edge_len(nsides))
+       allocate(elem%edge_uni(3,nsides))
+       allocate(elem%cosTi(nsides))
+       allocate(elem%sinTi(nsides))
+
+      class is(t_vortring)
+       allocate(elem%tang(3,2))
+       allocate(elem%verp(3,nsides))
+       allocate(elem%edge_vec(3,nsides))
+       allocate(elem%edge_len(nsides))
+       allocate(elem%edge_uni(3,nsides))
+       allocate(elem%cosTi(nsides))
+       allocate(elem%sinTi(nsides))
+
+      !type is(t_LiftLin)
+       !Lifting line fields
+
+      class default
+       call error(this_sub_name, this_mod_name, 'Unknown element type')
+     end select
+
+     !end associate
+   enddo
+ enddo
+
+end subroutine prepare_geometry
 
 !----------------------------------------------------------------------
 
@@ -1035,15 +824,12 @@ subroutine calc_geo_data(elem,vert)
   elem%n_ver = nsides
   
   ! vertices
-  if(.not. allocated(elem%ver)) allocate(elem%ver(3,nsides))
   elem%ver = vert
 
   ! center
-  if(.not.allocated(elem%cen)) allocate(elem%cen(3))
   elem%cen =  sum ( vert,2 ) / real(nsides,wp)
 
   ! unit normal and area
-  if(.not.allocated(elem%nor)) allocate(elem%nor(3))
   if ( nsides .eq. 4 ) then
     nor = cross( vert(:,3) - vert(:,1) , &
                  vert(:,4) - vert(:,2)     )
@@ -1056,14 +842,12 @@ subroutine calc_geo_data(elem,vert)
   elem%nor = nor / norm2(nor)
 
   ! local tangent unit vector as in PANAIR
-  if(.not.allocated(elem%tang)) allocate(elem%tang(3,2))
   tanl = 0.5_wp * ( vert(:,nsides) + vert(:,1) ) - elem%cen
-
+  
   elem%tang(:,1) = tanl / norm2(tanl)
   elem%tang(:,2) = cross( elem%nor, elem%tang(:,1)  )
 
   ! projection of the vertices on the mean plane
-  if(.not.allocated(elem%verp)) allocate(elem%verp(3,nsides))
   do is = 1 , nsides
     elem%verp(:,is) = vert(:,is) - elem%nor * &
                       sum( (vert(:,is) - elem%cen ) * elem%nor )
@@ -1071,7 +855,6 @@ subroutine calc_geo_data(elem,vert)
   
   ! vector connecting two consecutive vertices: 
   ! edge_vec(:,1) =  ver(:,2) - ver(:,1)
-  if(.not.allocated(elem%edge_vec)) allocate(elem%edge_vec(3,nsides))
   if ( nsides .eq. 3 ) then
     do is = 1 , nsides
       elem%edge_vec(:,is) = vert(:,next_tri(is)) - vert(:,is)
@@ -1083,20 +866,16 @@ subroutine calc_geo_data(elem,vert)
   end if
 
   ! edge: edge_len(:) 
-  if(.not.allocated(elem%edge_len)) allocate(elem%edge_len(nsides))
   do is = 1 , nsides
     elem%edge_len(is) = norm2(elem%edge_vec(:,is)) 
   end do
 
   ! unit vector 
-  if(.not.allocated(elem%edge_uni)) allocate(elem%edge_uni(3,nsides))
   do is = 1 , nSides
     elem%edge_uni(:,is) = elem%edge_vec(:,is) / elem%edge_len(is)
   end do
 
   ! cosTi , sinTi
-  if(.not.allocated(elem%cosTi)) allocate(elem%cosTi(nsides))
-  if(.not.allocated(elem%sinTi)) allocate(elem%sinTi(nsides))
   do is = 1 , nsides
     elem%cosTi(is) = sum( elem%edge_uni(:,is) * elem%tang(:,1) ) 
     elem%sinTi(is) = sum( elem%edge_uni(:,is) * elem%tang(:,2) ) 

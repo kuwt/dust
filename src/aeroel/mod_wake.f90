@@ -130,7 +130,7 @@ subroutine initialize_wake_panels(wake, geo, te,  npan)
  type(t_tedge), intent(in) :: te
  integer, intent(in) :: npan
 
- integer :: iw, ip
+ integer :: iw, ip, nsides
 
 
   !set and allocate all the relevant variables
@@ -149,10 +149,22 @@ subroutine initialize_wake_panels(wake, geo, te,  npan)
   allocate(wake%ivort(wake%n_wake_stripes,npan))
   !allocate(wake%pan_p(0))
 
-  !Associate for all the panels the relevant intensity
+  !Associate for all the panels the relevant intensity and allocate all the
+  !relevant fields
+  nsides = 4
   do ip = 1,npan
     do iw=1,wake%n_wake_stripes
       wake%wake_panels(iw,ip)%idou => wake%ivort(iw,ip)
+     allocate(wake%wake_panels(iw,ip)%ver(3,nsides))
+     allocate(wake%wake_panels(iw,ip)%cen(3))
+     allocate(wake%wake_panels(iw,ip)%nor(3))
+     allocate(wake%wake_panels(iw,ip)%tang(3,2))
+     allocate(wake%wake_panels(iw,ip)%verp(3,nsides))
+     allocate(wake%wake_panels(iw,ip)%edge_vec(3,nsides))
+     allocate(wake%wake_panels(iw,ip)%edge_len(nsides))
+     allocate(wake%wake_panels(iw,ip)%edge_uni(3,nsides))
+     allocate(wake%wake_panels(iw,ip)%cosTi(nsides))
+     allocate(wake%wake_panels(iw,ip)%sinTi(nsides))
     enddo
   enddo
 
@@ -172,6 +184,7 @@ subroutine initialize_wake_panels(wake, geo, te,  npan)
   
   !Starting length of the wake is 
   wake%wake_len = 1
+
 
   !TODO : initialize first row of wake here
   allocate(wake%pan_p(wake%n_wake_stripes))
