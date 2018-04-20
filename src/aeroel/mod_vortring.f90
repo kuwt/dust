@@ -33,7 +33,8 @@
 !!=====================================================================
 
 
-
+!> Module containing the specific subroutines for the vortex ring
+!! type of aerodynamic elements
 module mod_vortring
 
 use mod_aero_elements, only: &
