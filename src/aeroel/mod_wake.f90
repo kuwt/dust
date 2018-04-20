@@ -230,7 +230,7 @@ subroutine prepare_wake_panels(wake, geo, dt, uinf)
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1,wake%n_wake_points
     dist = matmul(geo%refs(wake%gen_ref(ip))%R_g,wake%gen_dir(:,ip))
-    wake%w_points(:,ip,2) = wake%w_points(:,ip,1) + dist*0.3_wp*norm2(uinf)*dt
+    wake%w_points(:,ip,2) = wake%w_points(:,ip,1) + dist*0.001_wp*norm2(uinf)*dt
   enddo
 
   ! Update the panels geometrical quantities of all the panels, the 

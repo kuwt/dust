@@ -57,6 +57,9 @@ use mod_cgns_io, only: &
 use mod_parametric_io, only: &
   read_mesh_parametric
 
+use mod_ll_io, only: &
+  read_mesh_ll
+
 use mod_hdf5_io, only: &
    h5loc, &
    new_hdf5_file, &
@@ -115,6 +118,7 @@ subroutine build_component(gloc, geo_file, comp_id)
  character(len=max_char_len) :: mesh_file
  integer, allocatable :: ee(:,:)
  real(wp), allocatable :: rr(:,:)
+ real(wp), allocatable :: theta_p(:) , chord_p(:)
  character(len=max_char_len) :: comp_el_type
  character :: ElType
  character(len=max_char_len) :: mesh_file_type
@@ -123,6 +127,9 @@ subroutine build_component(gloc, geo_file, comp_id)
  character(len=max_char_len) :: ref_tag
  character(len=max_char_len) :: comp_name
  integer(h5loc) :: comp_loc , geo_loc , te_loc
+
+ character(len=max_char_len), allocatable :: airfoil_table_p(:,:)
+ real(wp) , allocatable                   :: normalised_coord_p(:)
 
  integer :: npoints_chord_tot, nelems_span, nelems_span_tot
  ! Connectivity and te structures 
@@ -133,6 +140,7 @@ subroutine build_component(gloc, geo_file, comp_id)
  integer , allocatable :: neigh_te(:,:) , o_te(:,:)
  real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
 
+ integer :: i1 , fid
 
  character(len=*), parameter :: this_sub_name = 'build_component'
 
@@ -143,7 +151,7 @@ subroutine build_component(gloc, geo_file, comp_id)
   call geo_prs%CreateStringOption('MeshFileType','Mesh file type')
   !element types
   call geo_prs%CreateStringOption('ElType', &
-              'element type (temporary) p panel v vortex ring')
+              'element type (temporary) p:panel, v:vortex ring, l:lifting line')
   !reference frame
   call geo_prs%CreateStringOption('Reference_Tag',&
                                    'reference frame tag of the component','0')
@@ -170,11 +178,18 @@ subroutine build_component(gloc, geo_file, comp_id)
   reflection_point  = getrealarray(geo_prs, 'reflection_point',3)
   reflection_normal = getrealarray(geo_prs, 'reflection_normal',3)
 
+  comp_el_type = getstr(geo_prs,'ElType')
+  ElType = comp_el_type(1:1)
 
   !Build the group
   write(comp_name,'(A,I3.3)')'Comp',comp_id
   call new_hdf5_group(gloc, trim(comp_name), comp_loc)
   call write_hdf5(ref_tag,'RefTag',comp_loc)
+
+! call new_hdf5_group(file_loc, 'Components', group_loc)
+  call write_hdf5(trim(comp_el_type),'ElType',comp_loc)
+
+  call new_hdf5_group(comp_loc, 'Geometry_and_Solution', geo_loc)
 
   ! read the files
   select case (trim(mesh_file_type))
@@ -184,24 +199,33 @@ subroutine build_component(gloc, geo_file, comp_id)
    case('cgns')
     call read_mesh_cgns(trim(mesh_file),ee, rr)
    case('parametric')
-    ! TODO : actually it is possible to define the parameters in the GeoFile 
-    !directly, find a good way to do this
-    call read_mesh_parametric(trim(mesh_file),ee, rr, &
-                              npoints_chord_tot, nelems_span )
-    ! nelems_span_tot will be overwritten if symmetry is required (around l.222)
-    nelems_span_tot =   nelems_span
+    if ( ElType .ne. 'l' ) then
+      ! TODO : actually it is possible to define the parameters in the GeoFile 
+      !directly, find a good way to do this
+      call read_mesh_parametric(trim(mesh_file),ee, rr, &
+                                npoints_chord_tot, nelems_span )
+      ! nelems_span_tot will be overwritten if symmetry is required (around l.220)
+      nelems_span_tot =   nelems_span
+    else ! LIFTING LINE element
+      call read_mesh_ll(trim(mesh_file),ee,rr, &
+                        airfoil_table_p, normalised_coord_p, &
+                                npoints_chord_tot, nelems_span, &
+                                chord_p,theta_p )
+
+      do i1 = 1 , size(airfoil_table_p,2)
+        write(*,*) trim(airfoil_table_p(1,i1)), ' , ' , trim(airfoil_table_p(2,i1))
+      end do
+
+      call write_hdf5(theta_p,'theta_p',geo_loc)
+      call write_hdf5(chord_p,'chord_p',geo_loc)
+      call write_hdf5(airfoil_table_p,'airfoil_table_p',geo_loc)
+      call write_hdf5(normalised_coord_p,'normalised_coord_p',geo_loc)
+
+    end if
    case default
     call error(this_sub_name, this_mod_name, 'Unknown mesh file type')
 
   end select
-
-  comp_el_type = getstr(geo_prs,'ElType')
-  ElType = comp_el_type(1:1)
-
-! call new_hdf5_group(file_loc, 'Components', group_loc)
-  call write_hdf5(trim(comp_el_type),'ElType',comp_loc)
-
-  call new_hdf5_group(comp_loc, 'Geometry_and_Solution', geo_loc)
 
   ! reflect the mesh (if requested)
   write(*,*) 'mesh_reflection' , mesh_reflection
@@ -210,16 +234,39 @@ subroutine build_component(gloc, geo_file, comp_id)
       case('cgns', 'basic' )  ! TODO: check basic
         call reflect_mesh(ee, rr, reflection_point, reflection_normal)
       case('parametric')
-        call reflect_mesh_structured(ee, rr,  &
-                                     npoints_chord_tot , nelems_span , &
-                                     reflection_point, reflection_normal)
-        nelems_span_tot = 2*nelems_span
+!! !       if ( ElType .ne. 'l' ) then
+          call reflect_mesh_structured(ee, rr,  &
+                                       npoints_chord_tot , nelems_span , &
+                                       reflection_point, reflection_normal)
+          nelems_span_tot = 2*nelems_span
 
+!! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !!
+!! Same routines used for all parametric elements: p,v,l        !!
+!! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !!
+!! !       else ! LIFTING LINE element
+!! !         call reflect_mesh_structured(ee, rr,  &
+!! !                                      npoints_chord_tot , nelems_span , &
+!! !                                      reflection_point, reflection_normal)
+!! !         nelems_span_tot = 2*nelems_span
+!! !       end if
       case default
        call error(this_sub_name, this_mod_name,&
              'Symmetry routines not implemented for this kind of input.')
     end select
   end if
+! DEBUG: delete these lines +++++++++++++++++++++++++++++++++++++++++++
+  fid = 21
+  open(unit=fid,file='./check/ee_ll.dat')
+  do i1 = 1,size(ee,2)
+    write(fid,*) ee(:,i1) 
+  end do
+  close(fid)
+  open(unit=fid,file='./check/rr_ll.dat')
+  do i1 = 1,size(rr,2)
+    write(fid,*) rr(:,i1) 
+  end do
+  close(fid)
+! DEBUG: delete these lines +++++++++++++++++++++++++++++++++++++++++++
   !! treat the points
   !if(allocated(geo%points)) then
   !  points_offset = size(geo%points,2) 
@@ -243,6 +290,8 @@ subroutine build_component(gloc, geo_file, comp_id)
 
   call write_hdf5(rr,'rr',geo_loc)
   call write_hdf5(ee,'ee',geo_loc)
+
+! stop
 
   !! treat the elements
   !allocate(geo%components(i_comp)%temp_elems(size(ee,2)))
@@ -296,25 +345,43 @@ subroutine build_component(gloc, geo_file, comp_id)
 
       call build_te_general ( ee , rr , neigh , ElType ,  &
                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
-                                                         !te as an output
+                                                          !te as an output
 
 !     call create_local_velocity_stencil_general()
 !     call create_strip_connectivity_general()
 
     case( 'parametric' )
-      call build_connectivity_parametric( trim(mesh_file) , ee ,     &
-                    ElType , npoints_chord_tot , nelems_span_tot , &
-                    mesh_reflection , neigh )
-      call build_te_parametric( ee , rr , ElType ,  &
-         npoints_chord_tot , nelems_span_tot , &
-         e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
+!! !     if ( ElType .ne. 'l' ) then
+        call build_connectivity_parametric( trim(mesh_file) , ee ,     &
+                      ElType , npoints_chord_tot , nelems_span_tot , &
+                      mesh_reflection , neigh )
+        call build_te_parametric( ee , rr , ElType ,  &
+           npoints_chord_tot , nelems_span_tot , &
+           e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
 
-!     call create_local_velocity_stencil_parametric()
-!     call create_strip_connectivity_parametric()
+!       call create_local_velocity_stencil_parametric()
+!       call create_strip_connectivity_parametric()
 
+!! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !!
+!! Same routines used for all parametric elements: p,v,l        !!
+!! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !!
+!!       else
+!!         call build_connectivity_parametric( trim(mesh_file) , ee ,     &
+!!                       ElType , npoints_chord_tot , nelems_span_tot , &
+!!                       mesh_reflection , neigh )
+!!         call build_te_parametric( ee , rr , ElType ,  &
+!!            npoints_chord_tot , nelems_span_tot , &
+!!            e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
+!! 
+!! !       call create_local_velocity_stencil_parametric()
+!! !       call create_strip_connectivity_parametric()
+!! 
+!!       end if
+    case default
+       call error(this_sub_name, this_mod_name,&
+             'Unknown option for building connectivity.')
   end select    
 
- 
   call write_hdf5(neigh,'neigh',geo_loc)
   call close_hdf5_group(geo_loc)
 

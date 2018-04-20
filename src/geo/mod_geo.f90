@@ -68,6 +68,9 @@ use mod_surfpan, only: &
 use mod_vortring, only: &
   t_vortring
 
+use mod_liftlin, only: &
+  t_liftlin
+
 !use read_naca00xx, only: &
 !  read_naca_arrays
 
@@ -335,6 +338,20 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
   call load_components(geo, geo_file_name, sim_param, te)
 
 
+write(*,*) ' size(geo%components) : ' , size(geo%components)
+do i = 1 , size(geo%components)
+ if ( geo%components(i)%comp_el_type .eq. 'l' ) then
+
+
+ end if
+end do
+
+write(*,*) 
+write(*,*) ' Stop in dust.f90 for DEBUG around line 347' ; stop
+write(*,*) 
+! DEBUG ---
+stop
+
 
   ! Initialisation
   geo%nelem    = 0
@@ -499,6 +516,9 @@ subroutine load_components(geo, in_file, sim_param, te)
 
  ! Connectivity and te structures 
  integer , allocatable :: neigh(:,:)
+ ! Lifting Line elements
+ real(wp), allocatable :: normalised_coord_p(:)
+ character(max_char_len) , allocatable :: airfoil_table_p(:,:)
 
  ! trailing edge ------
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
@@ -588,11 +608,19 @@ subroutine load_components(geo, in_file, sim_param, te)
       geo%components(i_comp)%ref_tag = trim(ref_tag_m)
       geo%components(i_comp)%moving  = geo%refs(ref_id)%moving
 
+      call read_hdf5(comp_el_type,'ElType',cloc)
+      geo%components(i_comp)%comp_el_type = trim(comp_el_type)
+
       ! Geometry and Solution --------------------------
       call open_hdf5_group(cloc,'Geometry_and_Solution',geo_loc)
       call read_hdf5_al(ee   ,'ee'   ,geo_loc)
       call read_hdf5_al(rr   ,'rr'   ,geo_loc)
       call read_hdf5_al(neigh,'neigh',geo_loc)
+      write(*,*) ' comp_el_type(1:1) : ' , comp_el_type(1:1)
+      if ( comp_el_type(1:1) .eq. 'l' ) then
+        call read_hdf5_al(normalised_coord_p,'normalised_coord_p',geo_loc)
+        call read_hdf5_al(airfoil_table_p   ,'airfoil_table_p'   ,geo_loc)
+      end if
       call close_hdf5_group(geo_loc)
 
       ! Trailing Edge ----------------------------------
@@ -607,8 +635,6 @@ subroutine load_components(geo, in_file, sim_param, te)
       !call read_hdf5_al(  ref_te,  'ref_te',te_loc)
       call close_hdf5_group(te_loc)
  
-      call read_hdf5(comp_el_type,'ElType',cloc)
-      geo%components(i_comp)%comp_el_type = trim(comp_el_type)
       
       ! --- treat the points ---
       if(allocated(geo%points)) then
@@ -640,6 +666,8 @@ subroutine load_components(geo, in_file, sim_param, te)
         allocate(t_surfpan::geo%components(i_comp)%el(size(ee,2)))
        case('v')
         allocate(t_vortring::geo%components(i_comp)%el(size(ee,2)))
+       case('l')
+        allocate(t_liftlin::geo%components(i_comp)%el(size(ee,2)))
        case default
         call error(this_sub_name, this_mod_name, &
                  'Unknown type of element: '//geo%components(i_comp)%comp_el_type)
@@ -671,6 +699,8 @@ subroutine load_components(geo, in_file, sim_param, te)
       geo%components(i_comp)%nSurfPan = 0; geo%components(i_comp)%nVortRin = 0;
       if(comp_el_type(1:1) .eq. 'p') geo%components(i_comp)%nSurfPan = size(ee,2)
       if(comp_el_type(1:1) .eq. 'v') geo%components(i_comp)%nVortRin = size(ee,2)
+! TODO: add nLiiftLin field ???
+!     if(comp_el_type(1:1) .eq. 'l') geo%components(i_comp)%nVortRin = size(ee,2)
 
       ! Trailing Edge ------------
       ne_te = size(e_te,2)

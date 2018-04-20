@@ -123,7 +123,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                '0.0',&
                multiple=.false.);
   ! TODO: do we really need to allow the user to define the parameter above?
-  ! the reference chord fraction is a number in the range [0,1] that define
+  ! the reference chord fraction is a number in the range [0,1] that defines
   ! - where the reference point is located in the root chord
   ! - the line related to the sweep angle
   ! - the point around which the sections are rotated to impose twist
@@ -162,7 +162,12 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
    
   nSections = countoption(pmesh_prs,'chord')
   nRegions  = countoption(pmesh_prs,'span')
-  
+
+  ! Check that nSections = nRegion + 1
+  if ( nSections .ne. nRegions + 1 ) then
+    call error(this_sub_name, this_mod_name, 'Unconsistent input: &
+         &nSections .ne. nRegions. Stop.')
+  end if 
 
   ref_chord_fraction = getreal(pmesh_prs,'reference_chord_fraction')
   ref_point          = getrealarray(pmesh_prs,'starting_point',3)
@@ -277,9 +282,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     if ( abs( dihed_list(iRegion) ) .gt. 60.0d0 ) then
       write(*,*) ' WARNING. abs( sweep_list(iRegion) ) .gt. 60.0d0. '
     end if
-    dx_ref = dx_ref + span_list(iRegion) * tan( sweep_list(iRegion)* pi / 180.0_wp )
-    dy_ref = dy_ref + span_list(iRegion)
-    dz_ref = dz_ref + span_list(iRegion) * tan( dihed_list(iRegion)* pi / 180.0_wp )
+    dx_ref = span_list(iRegion) * tan( sweep_list(iRegion)* pi / 180.0_wp ) + dx_ref 
+    dy_ref = span_list(iRegion)                                             + dy_ref 
+    dz_ref = span_list(iRegion) * tan( dihed_list(iRegion)* pi / 180.0_wp ) + dz_ref 
 
     rrSection2(1,:) = xySection2(1,:) + dx_ref
     rrSection2(2,:) = 0.0_wp          + dy_ref  ! <--- read from region structure
