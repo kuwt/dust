@@ -63,6 +63,7 @@ contains
 !----------------------------------------------------------------------
 
 subroutine read_mesh_ll(mesh_file,ee,rr, &
+                        airfoil_list   , nelem_span_list   , &
                         airfoil_table_p, normalised_coord_p, &
                            npoints_chord_tot,nelem_span_tot, &
                                             chord_p,theta_p)
@@ -70,6 +71,8 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
  character(len=*), intent(in) :: mesh_file
  integer  , allocatable, intent(out) :: ee(:,:) 
  real(wp) , allocatable, intent(out) :: rr(:,:) 
+ character(len=max_char_len), allocatable , intent(out) :: airfoil_list(:)
+ integer  , allocatable, intent(out) :: nelem_span_list(:)
  character(len=max_char_len), allocatable , intent(out) :: airfoil_table_p(:,:)
  real(wp) , allocatable, intent(out) :: normalised_coord_p(:)
  integer  , intent(out), optional    :: npoints_chord_tot, nelem_span_tot
@@ -86,9 +89,9 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
  ! data read from file
  ! sections ---
  real(wp)         , allocatable :: chord_list(:) , twist_list(:) 
- character(len=48), allocatable :: airfoil_list(:)
+!character(len=max_str_len), allocatable , intent(out) :: airfoil_list(:)
  ! regions  ---
- integer , allocatable :: nelem_span_list(:)
+!integer , allocatable , intent(out) :: nelem_span_list(:)
  real(wp), allocatable :: span_list(:) , sweep_list(:) , dihed_list(:)
  character :: ElType , symmetry
  ! Sections 1. 2.
@@ -294,14 +297,15 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   
   end do
 ! DEBUG +++++
-  do ich = 1 , size(airfoil_table_p,2)
-    write(*,*) trim(airfoil_table_p(1,ich)) , ' , ' , trim(airfoil_table_p(2,ich)) 
-  end do
-  write(*,*)
-  do ich = 1 , size(normalised_coord_p)
-    write(*,*) normalised_coord_p(ich)
-  end do
+! do ich = 1 , size(airfoil_table_p,2)
+!   write(*,*) trim(airfoil_table_p(1,ich)) , ' , ' , trim(airfoil_table_p(2,ich)) 
+! end do
+! write(*,*)
+! do ich = 1 , size(normalised_coord_p)
+!   write(*,*) normalised_coord_p(ich)
+! end do
 ! DEBUG +++++
+
 
   ! optional output ----
   npoints_chord_tot = npoint_chord_tot

@@ -71,6 +71,9 @@ use mod_vortring, only: &
 use mod_liftlin, only: &
   t_liftlin
 
+use mod_c81, only: &
+  t_aero_tab , read_c81_table
+
 !use read_naca00xx, only: &
 !  read_naca_arrays
 
@@ -161,6 +164,8 @@ type :: t_geo_component
  integer :: nSurfPan
  !> Number of vortex rings in the component
  integer :: nVortRin
+ !> Number of lifting line elements in the component
+ integer :: nLiftLin
 
  !> Is the component moving?
  logical :: moving
@@ -169,6 +174,15 @@ type :: t_geo_component
 !               on the same strip
 !!> Strip for vortex ring (structured) elements
 !integer , allocatable :: strip_elem(:,:)
+
+ !> Arrays for lifting line components
+ character(len=max_char_len), allocatable :: airfoil_list(:)
+ !> Number of ll elements in each region. Size(nelem_span_list) = nRegions
+ integer, allocatable :: nelem_span_list(:)
+ !> Normalised coordinate of sections in each wing region. Size(...) = nRegions+1
+ real(wp),allocatable :: normalised_coord_p(:)
+ 
+!character(len=max_char_len), allocatable :: airfoil_table_p(:,:)
 
 end type  t_geo_component
 
@@ -209,6 +223,11 @@ type :: t_geo
  !> Vortex rings
  !type(t_vortring), allocatable :: VortRin(:)
 
+ !> Number of lifting line elements
+ integer :: nLiftLin
+ !> Lifting lines
+ !type(t_liftlin), allocatable :: LiftLin(:)
+
  !> Number of statical elements
  integer :: nstatic
  !> Number of moving elements
@@ -229,7 +248,6 @@ type :: t_geo
 end type t_geo
 
 !-----------------------------------
-
 
 !> Trailing edge type
 !!
@@ -316,6 +334,8 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
  character(len=max_char_len) :: msg
  real(t_realtime) :: t0, t1
 
+ ! airfoil data for ll
+ type(t_aero_tab) , allocatable :: airfoil_data(:)
 
   tstart = sim_param%t0
 
@@ -337,21 +357,7 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
   call check_preproc(geo_file_name)
   call load_components(geo, geo_file_name, sim_param, te)
 
-
-write(*,*) ' size(geo%components) : ' , size(geo%components)
-do i = 1 , size(geo%components)
- if ( geo%components(i)%comp_el_type .eq. 'l' ) then
-
-
- end if
-end do
-
-write(*,*) 
-write(*,*) ' Stop in dust.f90 for DEBUG around line 347' ; stop
-write(*,*) 
-! DEBUG ---
-stop
-
+  call import_aero_tab(geo,airfoil_data)
 
   ! Initialisation
   geo%nelem    = 0
@@ -359,6 +365,7 @@ stop
   geo%nmoving  = 0
   geo%nSurfPan = 0
   geo%nVortRin = 0
+  geo%nLiftLin = 0
 
   ! count the elements
   do i_comp = 1,size(geo%components)
@@ -372,10 +379,19 @@ stop
       geo%nSurfPan = geo%nSurfPan + geo%components(i_comp)%nelems
     elseif (geo%components(i_comp)%comp_el_type .eq. 'v') then
       geo%nVortRin = geo%nVortRin + geo%components(i_comp)%nelems
+    elseif (geo%components(i_comp)%comp_el_type .eq. 'l') then
+      geo%nVortRin = geo%nLiftLin + geo%components(i_comp)%nelems
     endif
     
     geo%nelem = geo%nelem + geo%components(i_comp)%nelems
   enddo
+
+write(*,*) 
+write(*,*) ' Stop in dust.f90 for DEBUG around line 347' ; stop
+write(*,*) 
+! DEBUG ---
+stop
+
 
   ! calculate the geometric quantities
   ! already update the geometry for the first time to get the right 
@@ -519,6 +535,8 @@ subroutine load_components(geo, in_file, sim_param, te)
  ! Lifting Line elements
  real(wp), allocatable :: normalised_coord_p(:)
  character(max_char_len) , allocatable :: airfoil_table_p(:,:)
+ character(max_char_len) , allocatable :: airfoil_list(:)
+ integer                 , allocatable :: nelem_span_list(:)
 
  ! trailing edge ------
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
@@ -618,10 +636,20 @@ subroutine load_components(geo, in_file, sim_param, te)
       call read_hdf5_al(neigh,'neigh',geo_loc)
       write(*,*) ' comp_el_type(1:1) : ' , comp_el_type(1:1)
       if ( comp_el_type(1:1) .eq. 'l' ) then
+        call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc)
+        call read_hdf5_al(nelem_span_list   ,'nelem_span_list'   ,geo_loc)
         call read_hdf5_al(normalised_coord_p,'normalised_coord_p',geo_loc)
         call read_hdf5_al(airfoil_table_p   ,'airfoil_table_p'   ,geo_loc)
       end if
       call close_hdf5_group(geo_loc)
+
+      allocate(geo%components(i_comp)%airfoil_list(size(airfoil_list))) 
+      geo%components(i_comp)%airfoil_list = airfoil_list 
+      allocate(geo%components(i_comp)%nelem_span_list(size(nelem_span_list))) 
+      geo%components(i_comp)%nelem_span_list = nelem_span_list 
+      allocate(geo%components(i_comp)%normalised_coord_p(size(normalised_coord_p))) 
+      geo%components(i_comp)%normalised_coord_p = normalised_coord_p
+
 
       ! Trailing Edge ----------------------------------
       call open_hdf5_group(cloc,'Trailing_Edge',te_loc)
@@ -699,8 +727,8 @@ subroutine load_components(geo, in_file, sim_param, te)
       geo%components(i_comp)%nSurfPan = 0; geo%components(i_comp)%nVortRin = 0;
       if(comp_el_type(1:1) .eq. 'p') geo%components(i_comp)%nSurfPan = size(ee,2)
       if(comp_el_type(1:1) .eq. 'v') geo%components(i_comp)%nVortRin = size(ee,2)
-! TODO: add nLiiftLin field ???
-!     if(comp_el_type(1:1) .eq. 'l') geo%components(i_comp)%nVortRin = size(ee,2)
+! TODO: add nLiftLin field ???
+!     if(comp_el_type(1:1) .eq. 'l') geo%components(i_comp)%nLiftLin = size(ee,2)
 
       ! Trailing Edge ------------
       ne_te = size(e_te,2)
@@ -777,6 +805,67 @@ subroutine load_components(geo, in_file, sim_param, te)
   call close_hdf5_file(floc)
 
 end subroutine load_components
+
+!----------------------------------------------------------------------
+
+subroutine import_aero_tab(geo,coeff)
+ type(t_geo), intent(inout), target :: geo
+ type(t_aero_tab) , allocatable , intent(inout) :: coeff(:)
+
+ integer :: n_tmp , n_tmp2
+ character(len=max_char_len) , allocatable :: list_tmp(:) 
+ character(len=max_char_len) , allocatable :: list_tmp_tmp(:) 
+
+ integer :: i_c , n_c , i_a , n_a
+
+ n_tmp = 30 
+ allocate(list_tmp(n_tmp)) 
+
+ ! Count # of different airfoil
+ n_c = size(geo%components) 
+ n_a = 0
+ do i_c = 1 ,  n_c
+
+   if ( geo%components(i_c)%comp_el_type .eq. 'l' ) then
+     do i_a = 1 , size(geo%components(i_c)%airfoil_list)
+       if ( all( geo%components(i_c)%airfoil_list(i_a) .ne. list_tmp(1:n_a) ) ) then
+         n_a = n_a + 1
+        
+         ! if n_a > n_tmp --> movalloc
+         if ( n_a .gt. n_tmp ) then
+           n_tmp2 = n_tmp + n_tmp
+           allocate(list_tmp_tmp(n_tmp2))
+           list_tmp_tmp(1:n_tmp) = list_tmp
+           deallocate(list_tmp)
+           call move_alloc(list_tmp_tmp,list_tmp)
+           n_tmp = n_tmp2
+         end if
+ 
+         list_tmp(n_a) = geo%components(i_c)%airfoil_list(i_a)
+
+       end if
+     end do
+   end if
+
+ end do
+
+ ! Read tables and fill coeff structure
+ allocate(coeff(n_a))
+ write(*,*) ' Number of different airfoils : ' , n_a
+ do i_a = 1 , n_a
+   call read_c81_table( list_tmp(i_a) , coeff(i_a) )
+ end do
+
+
+! DEBUG ----
+ do i_a = 1,n_a 
+   write(*,*) trim(adjustl(list_tmp(i_a)))
+ end do
+
+ stop
+! DEBUG ----
+
+end subroutine import_aero_tab
 
 !----------------------------------------------------------------------
 
