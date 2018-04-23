@@ -74,12 +74,20 @@ type :: t_linsys
  !! finally the contribution of the moving panels is added 
  real(wp), allocatable :: b_static(:,:)
 
+ !> Static part of the lifting line contribution
+ !!
+ !! The contribution of the lifting line is similar to wake contribution,
+ !! however a part could be static on static and can be pre-computed
+ real(wp), allocatable :: L_static(:,:)
+
  !> Result of the linear system solution (intensity of the panels doublets)
  real(wp), allocatable :: res(:)
 
  !> Number of static and moving panels
  integer :: nstatic, nmoving
 
+ !> Number of static and moving lifting lines
+ integer :: nstatic_ll, nmoving_ll
 end type t_linsys
 
 !----------------------------------------------------------------------

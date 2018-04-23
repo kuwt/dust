@@ -257,19 +257,6 @@ subroutine build_component(gloc, geo_file, comp_id)
              'Symmetry routines not implemented for this kind of input.')
     end select
   end if
-! DEBUG: delete these lines +++++++++++++++++++++++++++++++++++++++++++
-  fid = 21
-  open(unit=fid,file='./check/ee_ll.dat')
-  do i1 = 1,size(ee,2)
-    write(fid,*) ee(:,i1) 
-  end do
-  close(fid)
-  open(unit=fid,file='./check/rr_ll.dat')
-  do i1 = 1,size(rr,2)
-    write(fid,*) rr(:,i1) 
-  end do
-  close(fid)
-! DEBUG: delete these lines +++++++++++++++++++++++++++++++++++++++++++
   !! treat the points
   !if(allocated(geo%points)) then
   !  points_offset = size(geo%points,2) 

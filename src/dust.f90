@@ -53,9 +53,6 @@ use mod_geometry, only: &
 use mod_aero_elements, only: &
   c_elem, t_elem_p !, t_vp
 
-! dirty ----
-! dirty ----
-
 use mod_linsys_vars, only: &
   t_linsys
 
@@ -102,7 +99,12 @@ logical  :: output_start
 real(wp) :: dt_out, dt_debug_out
 
 !Main variables
+!> All the implicit elements, sorted first static then moving
 type(t_elem_p), allocatable :: elems(:)
+!> Only the lifting line elements
+type(t_elem_p), allocatable :: elems_ll(:)
+!> All the elements (panels+ll)
+type(t_elem_p), allocatable :: elems_tot(:)
 type(t_geo) :: geo
 type(t_tedge) :: te
 integer :: n_wake_panels
@@ -228,7 +230,7 @@ call prepare_wake_panels(wake_panels,  geo, dt, uinf)
 
 call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
-call initialize_linsys(linsys, geo, elems, wake_panels, uinf)
+call initialize_linsys(linsys, geo, elems, wake_panels, elems_ll,  uinf)
 t1 = dust_time()
 if(debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Initialized linear system in: ' , t1 - t0,' s.'
@@ -268,7 +270,7 @@ do it = 1,nstep
   !------ Assemble the system ------
   call prepare_wake_panels(wake_panels, geo, dt, uinf)
   t0 = dust_time()
-  call assemble_linsys(linsys, elems, wake_panels, uinf)
+  call assemble_linsys(linsys, elems, wake_panels, elems_ll, uinf)
   t1 = dust_time()
 
   if(debug_level .ge. 1) then

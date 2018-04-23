@@ -43,7 +43,7 @@ use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
 
 use mod_geometry, only: &
-  t_geo, t_tedge, calc_geo_data
+  t_geo, t_tedge, calc_geo_data_pan
 
 use mod_aero_elements, only: &
   c_elem, t_elem_p
@@ -230,7 +230,7 @@ subroutine prepare_wake_panels(wake, geo, dt, uinf)
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1,wake%n_wake_points
     dist = matmul(geo%refs(wake%gen_ref(ip))%R_g,wake%gen_dir(:,ip))
-    wake%w_points(:,ip,2) = wake%w_points(:,ip,1) + dist*0.001_wp*norm2(uinf)*dt
+    wake%w_points(:,ip,2) = wake%w_points(:,ip,1) + dist*0.3_wp*norm2(uinf)*dt
   enddo
 
   ! Update the panels geometrical quantities of all the panels, the 
@@ -240,7 +240,7 @@ subroutine prepare_wake_panels(wake, geo, dt, uinf)
     do iw = 1,wake%n_wake_stripes
       p1 = wake%i_start_points(1,iw)
       p2 = wake%i_start_points(2,iw)
-      call calc_geo_data(wake%wake_panels(iw,ipan), &
+      call calc_geo_data_pan(wake%wake_panels(iw,ipan), &
            reshape((/wake%w_points(:,p1,ipan),   wake%w_points(:,p2,ipan), &
                      wake%w_points(:,p2,ipan+1), wake%w_points(:,p1,ipan+1)/),&
                                                                      (/3,4/)))

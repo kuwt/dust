@@ -274,6 +274,7 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
  
   !Components not moving, no body velocity in the boundary condition
   linsys%b(ie) = sum(linsys%b_static(:,ie) * (-uinf))
+ 
 
 
   ! ista and iend will be the end of the unknowns vector, containing
@@ -298,9 +299,10 @@ end subroutine build_row_surfpan
 !! In this subroutine only the static part of the equations is built. It is
 !! called just once at the beginning of the simulation, and saves the AIC 
 !! coefficients for te static part and the static contribution to the rhs
-subroutine build_row_static_surfpan(this, elems, linsys, uinf, ie, ista, iend)
+subroutine build_row_static_surfpan(this, elems, ll_elems, linsys, uinf, ie, ista, iend)
  class(t_surfpan), intent(inout) :: this
  type(t_elem_p), intent(in)      :: elems(:)
+ type(t_elem_p), intent(in)      :: ll_elems(:)
  type(t_linsys), intent(inout)   :: linsys
  real(wp), intent(in)            :: uinf(:)
  integer, intent(in)             :: ie
@@ -322,6 +324,12 @@ subroutine build_row_static_surfpan(this, elems, linsys, uinf, ie, ista, iend)
     linsys%b_static(:,ie) = linsys%b_static(:,ie) + b1
  
   end do
+
+  !Now build the static contribution from the lifting line elements
+  do j1 = 1,linsys%nstatic_ll
+    call ll_elems(j1)%p%compute_pot( linsys%L_static(ie,j1), b1,  &
+                                  this%cen, 1, 2 )
+  enddo
   
   
   !The rest of the dynamic part will be completed during the first 
@@ -381,6 +389,43 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, uinf, &
   end do
 
 end subroutine add_wake_surfpan
+
+!----------------------------------------------------------------------
+
+!> Add the contribution of the lifing lines to one equation for a surface panel
+!!
+!! The rhs of the equation for a surface panel is updated  adding the 
+!! the contribution of potential due to the lifting lines
+subroutine add_liftlin_surfpan(this, ll_elems, linsys, uinf, &
+                            ie,ista, iend)
+ class(t_surfpan), intent(inout) :: this
+ type(t_elem_p), intent(in)      :: ll_elems(:)
+ type(t_linsys), intent(inout)   :: linsys
+ real(wp), intent(in)            :: uinf(:)
+ integer, intent(in)             :: ie
+ integer, intent(in)             :: ista
+ integer, intent(in)             :: iend
+
+ integer :: j1, ind1, ind2
+ real(wp) :: a, b(3)
+ integer :: n_impl
+  
+  !Static part: take what was already computed
+  do  j1 = 1, ista-1
+    linsys%b(ie) = linsys%b(ie) - linsys%L_static(ie,j1)*ll_elems(j1)%p%idou
+  enddo
+
+  !Dynamic part: compute the things now
+  do j1 = ista , iend
+  
+    !todo: find a more elegant solution to avoid i=j
+    call ll_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
+    
+    linsys%b(ie) = linsys%b(ie) - a*ll_elems(j1)%p%idou
+
+  end do
+
+end subroutine add_liftlin_surfpan
 
 !----------------------------------------------------------------------
 
