@@ -72,7 +72,7 @@ use mod_liftlin, only: &
   t_liftlin
 
 use mod_c81, only: &
-  t_aero_tab , read_c81_table
+  t_aero_tab , read_c81_table , interp_aero_coeff
 
 !use read_naca00xx, only: &
 !  read_naca_arrays
@@ -385,13 +385,6 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
     
     geo%nelem = geo%nelem + geo%components(i_comp)%nelems
   enddo
-
-write(*,*) 
-write(*,*) ' Stop in dust.f90 for DEBUG around line 347' ; stop
-write(*,*) 
-! DEBUG ---
-stop
-
 
   ! calculate the geometric quantities
   ! already update the geometry for the first time to get the right 
@@ -818,6 +811,9 @@ subroutine import_aero_tab(geo,coeff)
 
  integer :: i_c , n_c , i_a , n_a
 
+! Test ---
+ real(wp) , allocatable :: c(:)
+
  n_tmp = 30 
  allocate(list_tmp(n_tmp)) 
 
@@ -856,7 +852,12 @@ subroutine import_aero_tab(geo,coeff)
    call read_c81_table( list_tmp(i_a) , coeff(i_a) )
  end do
 
+ ! Test interpolation routine ----
+ call interp_aero_coeff ( coeff , 0.0_wp , (/ 1 , 2 /) , &
+                            (/ 0.0_wp , 0.3_wp , 100000.0_wp /) , c )
 
+ write(*,*) ' aero_coeff : ' , c
+ write(*,*)
 ! DEBUG ----
  do i_a = 1,n_a 
    write(*,*) trim(adjustl(list_tmp(i_a)))
@@ -910,8 +911,19 @@ subroutine prepare_geometry(geo)
        allocate(elem%cosTi(nsides))
        allocate(elem%sinTi(nsides))
 
-      !type is(t_LiftLin)
-       !Lifting line fields
+      class is(t_liftlin)
+       allocate(elem%tang(3,2))
+       allocate(elem%verp(3,nsides))
+       allocate(elem%edge_vec(3,nsides))
+       allocate(elem%edge_len(nsides))
+       allocate(elem%edge_uni(3,nsides))
+       allocate(elem%cosTi(nsides))
+       allocate(elem%sinTi(nsides))
+       ! elem%chord    
+       ! elem%csi_c       !! <- for interpolation of aerodynamic coefficients
+       ! elem%airfoil(2)  !! 
+
+       ! elem%theta   <-- ??? 
 
       class default
        call error(this_sub_name, this_mod_name, 'Unknown element type')
