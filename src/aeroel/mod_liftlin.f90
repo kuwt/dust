@@ -54,12 +54,13 @@ public :: t_liftlin
 !----------------------------------------------------------------------
 
 type, extends(c_elem) :: t_liftlin
-
+  real(wp), allocatable :: norm_coord_p
 contains
 
   procedure, pass(this) :: build_row        => build_row_liftlin
   procedure, pass(this) :: build_row_static => build_row_static_liftlin
   procedure, pass(this) :: add_wake         => add_wake_liftlin
+  procedure, pass(this) :: add_liftlin      => add_liftlin_liftlin
   procedure, pass(this) :: compute_pot      => compute_pot_liftlin
   procedure, pass(this) :: compute_vel      => compute_vel_liftlin
   procedure, pass(this) :: compute_psi      => compute_psi_liftlin
@@ -80,9 +81,10 @@ subroutine build_row_liftlin (this, elems, linsys, uinf, ie, ista, iend)
 end subroutine build_row_liftlin
 
 !----------------------------------------------------------------------
-subroutine build_row_static_liftlin (this, elems, linsys, uinf, ie, ista, iend)
+subroutine build_row_static_liftlin (this, elems, ll_elems, linsys, uinf, ie, ista, iend)
  class(t_liftlin), intent(inout) :: this
  type(t_elem_p), intent(in)       :: elems(:)
+ type(t_elem_p), intent(in)       :: ll_elems(:)
  type(t_linsys), intent(inout)    :: linsys
  real(wp), intent(in)             :: uinf(:)
  integer, intent(in)              :: ie
@@ -103,6 +105,19 @@ subroutine add_wake_liftlin (this, wake_elems, impl_wake_ind, linsys, uinf, &
  integer, intent(in)             :: iend
 
 end subroutine add_wake_liftlin
+
+!----------------------------------------------------------------------
+subroutine add_liftlin_liftlin (this, ll_elems, linsys, uinf, &
+                             ie, ista, iend)
+ class(t_liftlin), intent(inout) :: this
+ type(t_elem_p), intent(in)      :: ll_elems(:)
+ type(t_linsys), intent(inout)   :: linsys
+ real(wp), intent(in)            :: uinf(:)
+ integer, intent(in)             :: ie
+ integer, intent(in)             :: ista
+ integer, intent(in)             :: iend
+
+end subroutine add_liftlin_liftlin
 
 !----------------------------------------------------------------------
 subroutine compute_pot_liftlin (this, A, b, pos,i,j)

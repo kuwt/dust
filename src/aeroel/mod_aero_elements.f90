@@ -198,7 +198,7 @@ end interface
 !! The function operates only on the components from ista to iend, which 
 !! should be the static ones ordered at the beginning of the array
 abstract interface
-  subroutine i_build_row_static(this, elems, linsys, uinf, ie, ista, iend)
+  subroutine i_build_row_static(this, elems, ll_elems, linsys, uinf, ie, ista, iend)
     import :: wp
     import :: c_elem
     import :: t_elem_p
@@ -206,6 +206,7 @@ abstract interface
     implicit none
     class(c_elem), intent(inout)  :: this
     type(t_elem_p), intent(in)    :: elems(:)
+    type(t_elem_p), intent(in)    :: ll_elems(:)
     type(t_linsys), intent(inout) :: linsys
     real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
@@ -226,6 +227,26 @@ abstract interface
     class(c_elem), intent(inout)  :: this
     type(t_elem_p), intent(in)    :: wake_elems(:)
     integer, intent(in)           :: impl_wake_ind(:,:)
+    type(t_linsys), intent(inout) :: linsys
+    real(wp), intent(in)          :: uinf(:)
+    integer, intent(in)           :: ie
+    integer, intent(in)           :: ista
+    integer, intent(in)           :: iend
+  end subroutine
+end interface
+
+!----------------------------------------------------------------------
+
+abstract interface
+  subroutine i_add_liftlin(this, ll_elems, linsys, uinf, &
+                        ie, ista, iend)
+    import :: wp
+    import :: c_elem
+    import :: t_elem_p
+    import :: t_linsys
+    implicit none
+    class(c_elem), intent(inout)  :: this
+    type(t_elem_p), intent(in)    :: ll_elems(:)
     type(t_linsys), intent(inout) :: linsys
     real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie

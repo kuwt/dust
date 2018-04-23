@@ -101,7 +101,8 @@ use mod_hdf5_io, only: &
 implicit none
 
 public :: t_geo, t_tedge, set_parameters_geo, create_geometry, &
-          update_geometry, destroy_geometry, calc_geo_data
+          update_geometry, destroy_geometry, calc_geo_data_pan, &
+          calc_geo_data_ll
 
 private
 
@@ -210,8 +211,11 @@ end type  t_geo_group
 !! also all the solution
 type :: t_geo
 
- !> Total number of elements
+ !> Total number of implicit elements
  integer :: nelem
+
+ !> Number of lifting line elements
+ integer :: nll
 
  !> Number of surface panel elements
  integer :: nSurfPan
@@ -232,6 +236,9 @@ type :: t_geo
  integer :: nstatic
  !> Number of moving elements
  integer :: nmoving
+
+ !> Number of static or moving lifting lines
+ integer :: nstatic_ll, nmoving_ll
 
  !> All the components of the geometry
  type(t_geo_component), allocatable :: components(:)
@@ -360,30 +367,47 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
   call import_aero_tab(geo,airfoil_data)
 
   ! Initialisation
-  geo%nelem    = 0
-  geo%nstatic  = 0
-  geo%nmoving  = 0
-  geo%nSurfPan = 0
-  geo%nVortRin = 0
-  geo%nLiftLin = 0
+  geo%nelem      = 0
+  geo%nll        = 0
+  geo%nstatic    = 0
+  geo%nmoving    = 0
+  geo%nstatic_ll = 0
+  geo%nmoving_ll = 0
+  geo%nSurfPan   = 0
+  geo%nVortRin   = 0
+  geo%nLiftLin   = 0
 
   ! count the elements
   do i_comp = 1,size(geo%components)
-    if(geo%components(i_comp)%moving) then
-      geo%nmoving = geo%nmoving + geo%components(i_comp)%nelems
-    else
-      geo%nstatic = geo%nstatic + geo%components(i_comp)%nelems
-    endif
 
     if (geo%components(i_comp)%comp_el_type .eq. 'p') then
+      if(geo%components(i_comp)%moving) then
+        geo%nmoving = geo%nmoving + geo%components(i_comp)%nelems
+      else
+        geo%nstatic = geo%nstatic + geo%components(i_comp)%nelems
+      endif
       geo%nSurfPan = geo%nSurfPan + geo%components(i_comp)%nelems
+      geo%nelem = geo%nelem + geo%components(i_comp)%nelems
+
     elseif (geo%components(i_comp)%comp_el_type .eq. 'v') then
+      if(geo%components(i_comp)%moving) then
+        geo%nmoving = geo%nmoving + geo%components(i_comp)%nelems
+      else
+        geo%nstatic = geo%nstatic + geo%components(i_comp)%nelems
+      endif
       geo%nVortRin = geo%nVortRin + geo%components(i_comp)%nelems
+      geo%nelem = geo%nelem + geo%components(i_comp)%nelems
+
     elseif (geo%components(i_comp)%comp_el_type .eq. 'l') then
+      if(geo%components(i_comp)%moving) then
+        geo%nmoving_ll = geo%nmoving_ll + geo%components(i_comp)%nelems
+      else
+        geo%nstatic_ll = geo%nstatic_ll + geo%components(i_comp)%nelems
+      endif
       geo%nVortRin = geo%nLiftLin + geo%components(i_comp)%nelems
+      geo%nll = geo%nll + geo%components(i_comp)%nelems
     endif
     
-    geo%nelem = geo%nelem + geo%components(i_comp)%nelems
   enddo
 
   ! calculate the geometric quantities
@@ -559,6 +583,9 @@ subroutine load_components(geo, in_file, sim_param, te)
     
     write(cname,'(A,I3.3)') 'Comp',i_comp_input
     call open_hdf5_group(gloc,trim(cname),cloc)
+    
+
+    ! ====== REFERENCES ======
 
     call read_hdf5(ref_tag,'RefTag',cloc)
 
@@ -618,6 +645,9 @@ subroutine load_components(geo, in_file, sim_param, te)
       geo%components(i_comp)%ref_id  = ref_id
       geo%components(i_comp)%ref_tag = trim(ref_tag_m)
       geo%components(i_comp)%moving  = geo%refs(ref_id)%moving
+ 
+
+      ! ====== READING =====
 
       call read_hdf5(comp_el_type,'ElType',cloc)
       geo%components(i_comp)%comp_el_type = trim(comp_el_type)
@@ -627,21 +657,21 @@ subroutine load_components(geo, in_file, sim_param, te)
       call read_hdf5_al(ee   ,'ee'   ,geo_loc)
       call read_hdf5_al(rr   ,'rr'   ,geo_loc)
       call read_hdf5_al(neigh,'neigh',geo_loc)
-      write(*,*) ' comp_el_type(1:1) : ' , comp_el_type(1:1)
+        ! element-specific reads 
       if ( comp_el_type(1:1) .eq. 'l' ) then
         call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc)
         call read_hdf5_al(nelem_span_list   ,'nelem_span_list'   ,geo_loc)
         call read_hdf5_al(normalised_coord_p,'normalised_coord_p',geo_loc)
         call read_hdf5_al(airfoil_table_p   ,'airfoil_table_p'   ,geo_loc)
+        allocate(geo%components(i_comp)%airfoil_list(size(airfoil_list))) 
+        geo%components(i_comp)%airfoil_list = airfoil_list 
+        allocate(geo%components(i_comp)%nelem_span_list(size(nelem_span_list))) 
+        geo%components(i_comp)%nelem_span_list = nelem_span_list 
+        allocate(geo%components(i_comp)%normalised_coord_p(size(normalised_coord_p))) 
+        geo%components(i_comp)%normalised_coord_p = normalised_coord_p
       end if
       call close_hdf5_group(geo_loc)
 
-      allocate(geo%components(i_comp)%airfoil_list(size(airfoil_list))) 
-      geo%components(i_comp)%airfoil_list = airfoil_list 
-      allocate(geo%components(i_comp)%nelem_span_list(size(nelem_span_list))) 
-      geo%components(i_comp)%nelem_span_list = nelem_span_list 
-      allocate(geo%components(i_comp)%normalised_coord_p(size(normalised_coord_p))) 
-      geo%components(i_comp)%normalised_coord_p = normalised_coord_p
 
 
       ! Trailing Edge ----------------------------------
@@ -656,7 +686,11 @@ subroutine load_components(geo, in_file, sim_param, te)
       !call read_hdf5_al(  ref_te,  'ref_te',te_loc)
       call close_hdf5_group(te_loc)
  
-      
+     
+
+
+      ! ======= CREATING ELEMENTS ======
+
       ! --- treat the points ---
       if(allocated(geo%points)) then
         points_offset = size(geo%points,2) 
@@ -678,10 +712,11 @@ subroutine load_components(geo, in_file, sim_param, te)
       geo%components(i_comp)%i_points = &
                          (/((i3),i3=points_offset+1,points_offset+size(rr,2))/)
 
+
       ! --- treat the elements ---
+
       !allocate the elements of the component of the right kind
       geo%components(i_comp)%nelems = size(ee,2)
-      !allocate(geo%components(i_comp)%e(size(ee,2)))
       select case(trim(geo%components(i_comp)%comp_el_type))
        case('p')
         allocate(t_surfpan::geo%components(i_comp)%el(size(ee,2)))
@@ -693,8 +728,11 @@ subroutine load_components(geo, in_file, sim_param, te)
         call error(this_sub_name, this_mod_name, &
                  'Unknown type of element: '//geo%components(i_comp)%comp_el_type)
       end select
-
+      
+      !fill (some) of the elements fields
       do i2=1,size(ee,2)
+        
+        !vertices
         n_vert = count(ee(:,i2).ne.0)
         allocate(geo%components(i_comp)%el(i2)%i_ver(n_vert))
         allocate(geo%components(i_comp)%el(i2)%i_neigh(n_vert))
@@ -710,12 +748,18 @@ subroutine load_components(geo, in_file, sim_param, te)
                                               neigh(i3,i2)
           end if
         end do
-
+        
+        !motion
         geo%components(i_comp)%el(i2)%moving = geo%components(i_comp)%moving
         allocate(geo%components(i_comp)%el(i2)%vel(3))
-        !TEMPORARY: only for backward compatibility
-        !geo%components(i_comp)%e(i2)%p => geo%components(i_comp)%el(i2)
+
+        !element-specific fields
+        if ( trim(geo%components(i_comp)%comp_el_type) .eq. 'l' ) then
+          call read_hdf5_al(normalised_coord_p,'normalised_coord_p',geo_loc)
+          call read_hdf5_al(airfoil_table_p   ,'airfoil_table_p'   ,geo_loc)
+        end if
       enddo
+      
 
       geo%components(i_comp)%nSurfPan = 0; geo%components(i_comp)%nVortRin = 0;
       if(comp_el_type(1:1) .eq. 'p') geo%components(i_comp)%nSurfPan = size(ee,2)
@@ -856,16 +900,6 @@ subroutine import_aero_tab(geo,coeff)
  call interp_aero_coeff ( coeff , 0.0_wp , (/ 1 , 2 /) , &
                             (/ 0.0_wp , 0.3_wp , 100000.0_wp /) , c )
 
- write(*,*) ' aero_coeff : ' , c
- write(*,*)
-! DEBUG ----
- do i_a = 1,n_a 
-   write(*,*) trim(adjustl(list_tmp(i_a)))
- end do
-
- stop
-! DEBUG ----
-
 end subroutine import_aero_tab
 
 !----------------------------------------------------------------------
@@ -939,11 +973,9 @@ end subroutine prepare_geometry
 
 !> Calculate the geometrical quantities of an element
 !!
-!! The subroutine calculates all the relevant geometrical quantities of an 
-!! element. For the moment the quantities to be calculated are the same 
-!! in both of the element types, so only one equal subroutine is called, in 
-!! the future the differences can be handled with a select type
-subroutine calc_geo_data(elem,vert)
+!! The subroutine calculates all the relevant geometrical quantities of a
+!! panel element (vortex ring or surface panel) 
+subroutine calc_geo_data_pan(elem,vert)
  class(c_elem), intent(inout) :: elem  
  real(wp), intent(in) :: vert(:,:)
 
@@ -1013,7 +1045,85 @@ subroutine calc_geo_data(elem,vert)
   end do
 
 
-end subroutine calc_geo_data
+end subroutine calc_geo_data_pan
+
+!----------------------------------------------------------------------
+
+!> Calculate the geometrical quantities of a lifting line element
+!!
+!! The subroutine calculates all the relevant geometrical quantities of a
+!! lifting line element
+subroutine calc_geo_data_ll(elem,vert)
+ class(c_elem), intent(inout) :: elem  
+ real(wp), intent(in) :: vert(:,:)
+
+ integer :: nsides, is
+ real(wp):: nor(3), tanl(3)
+
+  nsides = size(vert,2)
+
+  elem%n_ver = nsides
+  
+  ! vertices
+  elem%ver = vert
+
+  ! center, for the lifting line is the mid-point 
+  elem%cen =  sum ( vert(:,1:2),2 ) / real(nsides,wp)
+
+  ! unit normal and area
+  if ( nsides .eq. 4 ) then
+    nor = cross( vert(:,3) - vert(:,1) , &
+                 vert(:,4) - vert(:,2)     )
+  else if ( nSides .eq. 3 ) then
+    nor = cross( vert(:,3) - vert(:,2) , &
+                 vert(:,1) - vert(:,2)     )
+  end if
+  
+  elem%area = 0.5_wp * norm2(nor)
+  elem%nor = nor / norm2(nor)
+
+  ! local tangent unit vector as in PANAIR
+  tanl = 0.5_wp * ( vert(:,nsides) + vert(:,1) ) - elem%cen
+  
+  elem%tang(:,1) = tanl / norm2(tanl)
+  elem%tang(:,2) = cross( elem%nor, elem%tang(:,1)  )
+
+  ! projection of the vertices on the mean plane
+  do is = 1 , nsides
+    elem%verp(:,is) = vert(:,is) - elem%nor * &
+                      sum( (vert(:,is) - elem%cen ) * elem%nor )
+  end do
+  
+  ! vector connecting two consecutive vertices: 
+  ! edge_vec(:,1) =  ver(:,2) - ver(:,1)
+  if ( nsides .eq. 3 ) then
+    do is = 1 , nsides
+      elem%edge_vec(:,is) = vert(:,next_tri(is)) - vert(:,is)
+    end do
+  else if ( nsides .eq. 4 ) then
+    do is = 1 , nsides
+      elem%edge_vec(:,is) = vert(:,next_qua(is)) - vert(:,is)
+    end do
+  end if
+
+  ! edge: edge_len(:) 
+  do is = 1 , nsides
+    elem%edge_len(is) = norm2(elem%edge_vec(:,is)) 
+  end do
+
+  ! unit vector 
+  do is = 1 , nSides
+    elem%edge_uni(:,is) = elem%edge_vec(:,is) / elem%edge_len(is)
+  end do
+
+  ! cosTi , sinTi
+  do is = 1 , nsides
+    elem%cosTi(is) = sum( elem%edge_uni(:,is) * elem%tang(:,1) ) 
+    elem%sinTi(is) = sum( elem%edge_uni(:,is) * elem%tang(:,2) ) 
+  end do
+
+
+end subroutine calc_geo_data_ll
 
 !----------------------------------------------------------------------
 
@@ -2179,13 +2289,24 @@ subroutine update_geometry(geo, t, update_static)
       geo%points(:,comp%i_points) = move_points(comp%loc_points, &
                            geo%refs(comp%ref_id)%R_g, &
                            geo%refs(comp%ref_id)%of_g)
-      do ie = 1,size(comp%el)
-        call calc_geo_data(comp%el(ie),geo%points(:,comp%el(ie)%i_ver))
+      select case(trim(comp%comp_el_type))
+       case('p','v')
+        do ie = 1,size(comp%el)
+          call calc_geo_data_pan(comp%el(ie),geo%points(:,comp%el(ie)%i_ver))
 
-        !Calculate the velocity of the centers to impose the boundary condition
-        call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &
-                                geo%refs(comp%ref_id)%f_g)
-      enddo
+          !Calculate the velocity of the centers to impose the boundary condition
+          call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &
+                                  geo%refs(comp%ref_id)%f_g)
+        enddo
+       case('l')
+        do ie = 1,size(comp%el)
+          call calc_geo_data_ll(comp%el(ie),geo%points(:,comp%el(ie)%i_ver))
+
+          !Calculate the velocity of the centers to impose the boundary condition
+          call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &
+                                  geo%refs(comp%ref_id)%f_g)
+        enddo
+      end select
     end if
 
   end associate
