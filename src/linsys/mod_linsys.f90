@@ -101,6 +101,7 @@ subroutine initialize_linsys(linsys, geo, elems, wake_elems, ll_elems, uinf)
   allocate( linsys%b(linsys%rank) )
   allocate( linsys%b_static(3,linsys%rank) )
   allocate( linsys%res(linsys%rank) )
+  allocate( linsys%res_expl(linsys%n_ll,2))
   linsys%b_static = 0.0_wp
 
   !Build the static part of the system, saving also the static part of the 
@@ -124,6 +125,12 @@ subroutine initialize_linsys(linsys, geo, elems, wake_elems, ll_elems, uinf)
     !link the solution into the elements
     elems(ie)%p%idou => linsys%res(ie)
 
+  enddo
+
+
+  !At the end link all the explicit elements to their (latest) results
+  do ie = 1,linsys%n_ll
+    ll_elems(ie)%p%idou => linsys%res_expl(ie,1) 
   enddo
 
 end subroutine initialize_linsys

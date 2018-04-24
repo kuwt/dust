@@ -265,7 +265,9 @@ end subroutine prepare_wake_panels
 
 !> Update the position and the intensities of the wake panels
 !!
-!!
+!! Note: at this subroutine is passed the whole array of elements,
+!! comprising both the implicit panels and the explicit (ll) 
+!! elements
 subroutine update_wake_panels(wake, elems, dt, uinf)
  type(t_wake_panels), intent(inout), target :: wake
  type(t_elem_p), intent(in) :: elems(:)

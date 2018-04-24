@@ -53,6 +53,9 @@ use mod_geometry, only: &
 use mod_aero_elements, only: &
   c_elem, t_elem_p !, t_vp
 
+use mod_liftlin, only: &
+ update_liftlin, solve_liftlin 
+
 use mod_linsys_vars, only: &
   t_linsys
 
@@ -264,6 +267,8 @@ do it = 1,nstep
 
   call update_geometry(geo, time, .false.)
 
+  call update_liftlin(elems_ll)
+
   if((debug_level .ge. 16).and.time_2_debug_out)&
             call debug_printout_geometry(elems, geo, basename_debug, it)
 
@@ -309,6 +314,9 @@ do it = 1,nstep
   if (debug_level .ge. 20.and.time_2_debug_out) &
                          call debug_printout_result(linsys, basename_debug, it)
 
+  !------ Update the explicit part ------
+  call solve_liftlin(elems_ll, elems_tot)
+
   !------ Compute loads -------
   do i_el = 1 , size(elems)
     call elems(i_el)%p%compute_cp(elems,uinf)
@@ -329,7 +337,7 @@ do it = 1,nstep
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
   !  next iteration)
-  call update_wake_panels(wake_panels, elems, dt, uinf)
+  call update_wake_panels(wake_panels, elems_tot, dt, uinf)
 
   time = min(tend, time+dt)
 
