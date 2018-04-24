@@ -87,7 +87,8 @@ type :: t_linsys
  integer :: nstatic, nmoving
 
  !> Number of static and moving lifting lines
- integer :: nstatic_ll, nmoving_ll
+ integer :: nstatic_ll, nmoving_ll, n_ll
+
 end type t_linsys
 
 !----------------------------------------------------------------------

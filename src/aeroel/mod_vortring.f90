@@ -70,6 +70,7 @@ contains
   procedure, pass(this) :: build_row        => build_row_vortring
   procedure, pass(this) :: build_row_static => build_row_static_vortring
   procedure, pass(this) :: add_wake         => add_wake_vortring
+  procedure, pass(this) :: add_liftlin      => add_liftlin_vortring
   procedure, pass(this) :: compute_pot      => compute_pot_vortring
   procedure, pass(this) :: compute_vel      => compute_vel_vortring
   procedure, pass(this) :: compute_psi      => compute_psi_vortring

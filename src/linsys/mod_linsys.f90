@@ -92,6 +92,7 @@ subroutine initialize_linsys(linsys, geo, elems, wake_elems, ll_elems, uinf)
   
   linsys%rank = geo%nelem
   linsys%nstatic = geo%nstatic; linsys%nmoving = geo%nmoving
+  linsys%n_ll = geo%nll
   linsys%nstatic_ll = geo%nstatic_ll; linsys%nmoving_ll = geo%nmoving_ll
   
   !Allocate the vectors of the right size 
@@ -109,7 +110,7 @@ subroutine initialize_linsys(linsys, geo, elems, wake_elems, ll_elems, uinf)
     !build one row
     call elems(ie)%p%build_row_static(elems,ll_elems, linsys,uinf,ie,1,linsys%nstatic)
 
-    call elems(ie)%p%add_wake(wake_elems%pan_p, wake_elems%gen_elems, linsys,uinf,ie,1,linsys%nstatic)
+    call elems(ie)%p%add_wake(wake_elems%pan_p, wake_elems%gen_elems_id, linsys,uinf,ie,1,linsys%nstatic)
 
     !link the solution into the elements
     elems(ie)%p%idou => linsys%res(ie)
@@ -153,7 +154,9 @@ subroutine assemble_linsys(linsys, elems, wake_elems, ll_elems, uinf)
 
     call elems(ie)%p%build_row(elems,linsys,uinf,ie,linsys%nstatic+1,linsys%rank)
 
-    call elems(ie)%p%add_wake(wake_elems%pan_p, wake_elems%gen_elems, linsys,uinf,ie,linsys%nstatic+1,linsys%rank)
+    call elems(ie)%p%add_wake(wake_elems%pan_p, wake_elems%gen_elems_id, linsys,uinf,ie,linsys%nstatic+1,linsys%rank)
+
+    call elems(ie)%p%add_liftlin(ll_elems, linsys,uinf,ie,linsys%nstatic_ll+1,linsys%n_ll)
 
   enddo
 
@@ -162,7 +165,9 @@ subroutine assemble_linsys(linsys, elems, wake_elems, ll_elems, uinf)
 
     call elems(ie)%p%build_row(elems,linsys,uinf,ie,1,linsys%rank)
 
-    call elems(ie)%p%add_wake(wake_elems%pan_p, wake_elems%gen_elems ,linsys,uinf,ie,1,linsys%rank)
+    call elems(ie)%p%add_wake(wake_elems%pan_p, wake_elems%gen_elems_id ,linsys,uinf,ie,1,linsys%rank)
+
+    call elems(ie)%p%add_liftlin(ll_elems, linsys,uinf,ie,1,linsys%n_ll)
 
   enddo
 

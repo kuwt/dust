@@ -78,6 +78,7 @@ contains
   procedure, pass(this) :: build_row        => build_row_surfpan
   procedure, pass(this) :: build_row_static => build_row_static_surfpan
   procedure, pass(this) :: add_wake         => add_wake_surfpan
+  procedure, pass(this) :: add_liftlin      => add_liftlin_surfpan
   procedure, pass(this) :: compute_pot      => compute_pot_surfpan
   procedure, pass(this) :: compute_vel      => compute_vel_surfpan
   procedure, pass(this) :: compute_psi      => compute_psi_surfpan
