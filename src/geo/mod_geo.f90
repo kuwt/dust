@@ -159,7 +159,7 @@ type :: t_geo_component
  real(wp), allocatable :: loc_points(:,:)
 
  !> Temporary to build the component
- type(t_e), allocatable :: temp_elems(:)
+ !type(t_e), allocatable :: temp_elems(:)
  
  !> Number of surface panels in the component
  integer :: nSurfPan
@@ -263,7 +263,8 @@ end type t_geo
 type t_tedge
 
  !> Global id of the elements at the TE
- integer , allocatable :: e(:,:)
+ !integer , allocatable :: e(:,:)
+ type(t_elem_p), allocatable :: e(:,:)
 
  !> Global id of the nodes on the TE
  integer , allocatable :: i(:,:)
@@ -321,11 +322,14 @@ end subroutine set_parameters_geo
 !! -# The element pointer array used to build/solve the linear system is
 !!    created, pointed at each element and then re-ordered with the static
 !!    elements first, and the dynamic elements at the end
-subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
+subroutine create_geometry(prms, in_file_name,  geo, te, &
+                           elems, elems_ll, elems_tot, sim_param)
  type(t_parse), intent(inout) :: prms
  character(len=*), intent(in) :: in_file_name
  type(t_geo), intent(out), target :: geo
  type(t_elem_p), allocatable, intent(out) :: elems(:)
+ type(t_elem_p), allocatable, intent(out) :: elems_ll(:)
+ type(t_elem_p), allocatable, intent(out) :: elems_tot(:)
  type(t_tedge), intent(out) :: te
  type(t_sim_param) , intent(inout) :: sim_param
  real(wp)                     :: tstart
@@ -333,7 +337,7 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
  character(len=max_char_len) :: reference_file
  character(len=max_char_len) :: geo_file_name
 
- integer :: i, j, is, im,  i_comp
+ integer :: i, j, is, im,  i_comp, i_ll, i_tot
  type(t_elem_p), allocatable :: temp_static(:), temp_moving(:)
 
  integer , allocatable :: el_id_old(:), el_id_old_static(:), el_id_old_moving(:)
@@ -380,7 +384,7 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
   ! count the elements
   do i_comp = 1,size(geo%components)
 
-    if (geo%components(i_comp)%comp_el_type .eq. 'p') then
+    if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p') then
       if(geo%components(i_comp)%moving) then
         geo%nmoving = geo%nmoving + geo%components(i_comp)%nelems
       else
@@ -389,7 +393,7 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
       geo%nSurfPan = geo%nSurfPan + geo%components(i_comp)%nelems
       geo%nelem = geo%nelem + geo%components(i_comp)%nelems
 
-    elseif (geo%components(i_comp)%comp_el_type .eq. 'v') then
+    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'v') then
       if(geo%components(i_comp)%moving) then
         geo%nmoving = geo%nmoving + geo%components(i_comp)%nelems
       else
@@ -398,13 +402,13 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
       geo%nVortRin = geo%nVortRin + geo%components(i_comp)%nelems
       geo%nelem = geo%nelem + geo%components(i_comp)%nelems
 
-    elseif (geo%components(i_comp)%comp_el_type .eq. 'l') then
+    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'l') then
       if(geo%components(i_comp)%moving) then
         geo%nmoving_ll = geo%nmoving_ll + geo%components(i_comp)%nelems
       else
         geo%nstatic_ll = geo%nstatic_ll + geo%components(i_comp)%nelems
       endif
-      geo%nVortRin = geo%nLiftLin + geo%components(i_comp)%nelems
+      geo%nLiftLin = geo%nLiftLin + geo%components(i_comp)%nelems
       geo%nll = geo%nll + geo%components(i_comp)%nelems
     endif
     
@@ -431,15 +435,30 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
   endif
 
   !Create the vector of pointers to all the elements
-  allocate(elems(geo%nelem)) 
-  i=0
+  allocate(elems(geo%nelem), elems_ll(geo%nll), elems_tot(geo%nelem+geo%nll)) 
+  i=0; i_ll=0; i_tot=0
   do i_comp = 1,size(geo%components)
-    do j = 1,size(geo%components(i_comp)%el)
-      
-      i = i+1
-      elems(i)%p => geo%components(i_comp)%el(j)
+    
+    if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p' .or. &
+        trim(geo%components(i_comp)%comp_el_type) .eq. 'v') then
 
-    enddo
+      do j = 1,size(geo%components(i_comp)%el)
+        i = i+1
+        i_tot = i_tot+1
+        elems(i)%p => geo%components(i_comp)%el(j)
+  !      elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
+      enddo
+
+    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'l') then
+
+      do j = 1,size(geo%components(i_comp)%el)
+        i_ll = i_ll+1
+        i_tot = i_tot+1
+        elems_ll(i_ll)%p => geo%components(i_comp)%el(j)
+  !      elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
+      enddo
+
+    endif
   enddo
 
   ! Sort elements: first static, then moving ------- 
@@ -472,7 +491,8 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
   do i = 1,geo%nelem
     elems(i)%p%id = i
   end do
-  !Update elem-elem connectivity after re-ordering
+  !Update elem-elem connectivity after re-ordering, for the moment only for
+  !implicit panel elements
   do i = 1,geo%nelem
     do j = 1,elems(i)%p%n_ver
       if ( elems(i)%p%i_neigh(j) .ne. 0 ) then
@@ -483,43 +503,48 @@ subroutine create_geometry(prms, in_file_name,  geo, te, elems, sim_param)
     end do 
   end do 
   !Update te structure
-  do i = 1,size(te%e,2)
-    do j = 1,2
-      if ( te%e(j,i) .ne. 0 ) then
-        te%e(j,i) = el_id_old( te%e(j,i) )
-      else
-        te%e(j,i) = 0 
-      end if     
-    end do 
-  end do
+  !do i = 1,size(te%e,2)
+  !  do j = 1,2
+  !    if ( te%e(j,i) .ne. 0 ) then
+  !      te%e(j,i) = el_id_old( te%e(j,i) )
+  !    else
+  !      te%e(j,i) = 0 
+  !    end if     
+  !  end do 
+  !end do
+
+  !Now re-order the lifting line elements
+  deallocate(temp_static, temp_moving)
+  allocate(temp_static(geo%nstatic), temp_moving(geo%nmoving))
+  is = 0; im = 0;
+  do i = 1,geo%nll
+    if(elems_ll(i)%p%moving) then
+      im = im+1
+      temp_moving(im) = elems_ll(i)
+      el_id_old_moving(im) = i
+    else
+      is = is+1
+      temp_static(is) = elems_ll(i)
+      el_id_old_static(is) = i
+    endif
+  enddo
+  if(geo%nll .gt. 0) then
+    elems_ll(1:geo%nstatic_ll) = temp_static
+    elems_ll(geo%nstatic_ll+1:geo%nll) = temp_moving
+  endif
 
   !Update te%neigh NOT NEEDED, because in te numbering
 
   deallocate(temp_static, temp_moving)
   deallocate(el_id_old, el_id_old_static, el_id_old_moving)
 
-! check rr , ee , neigh
+  !Patch together everything in elems_tot
+  elems_tot(1:geo%nelem) = elems
+  elems_tot(geo%nelem+1:geo%nelem+geo%nll) =elems_ll
 
-
-
-! old: now load neigh and te in load component +++++++++++
-! ! neighboring elements ---------------
-! call build_connectivity(elems)
- 
-! ! trailing edge ----------------------
-! call build_te(geo,elems,te)
-
-  ! connectivity needed for computing velocity and cp
-  ! ----
   call create_local_velocity_stencil(geo,elems)    ! for surfpan only (3dP)
 
-  ! ----
   call create_strip_connectivity(geo)
-
-!  t1 = dust_time()
-!  write(msg,'(A,F9.3,A)') 'Geometry generation completed in ', t1-t0, ' s.'
-!  call printout(msg)
-
 
 end subroutine create_geometry
 
@@ -533,7 +558,7 @@ subroutine load_components(geo, in_file, sim_param, te)
 
 
  type(t_geo_component), allocatable :: comp_temp(:)
- integer :: i2, i3
+ integer :: i1, i2, i3
  integer, allocatable :: ee(:,:)
  real(wp), allocatable :: rr(:,:)
  character(len=max_char_len) :: comp_el_type
@@ -561,7 +586,8 @@ subroutine load_components(geo, in_file, sim_param, te)
  real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
  integer :: ne_te , nn_te
  ! tmp arrays --------
- integer , allocatable :: e_te_tmp(:,:) , i_te_tmp(:,:) , ii_te_tmp(:,:) 
+ type(t_elem_p) , allocatable :: e_te_tmp(:,:)
+ integer, allocatable  ::i_te_tmp(:,:) , ii_te_tmp(:,:) 
  integer , allocatable :: neigh_te_tmp(:,:) , o_te_tmp(:,:)
  real(wp), allocatable ::rr_te_tmp(:,:) , t_te_tmp(:,:)
  integer , allocatable :: ref_te_tmp(:)
@@ -776,7 +802,14 @@ subroutine load_components(geo, in_file, sim_param, te)
         call printout(msg)
       endif
       if (.not.allocated(te%e)) then ! it should be enough
-        allocate(te%e    (2,ne_te) ) ; te%e     =     e_te 
+        allocate(te%e    (2,ne_te) )
+        do i1 = 1,ne_te
+          te%e(1,i1)%p => null()
+          te%e(2,i1)%p => null()
+          te%e(1,i1)%p  => geo%components(i_comp)%el(e_te(1,i1)) 
+          if(e_te(2,i1) .gt. 0) &
+            te%e(2,i1)%p  => geo%components(i_comp)%el(e_te(2,i1)) 
+        enddo 
         allocate(te%i    (2,nn_te) ) ; te%i     =     i_te 
         allocate(te%rr   (3,nn_te) ) ; te%rr    =    rr_te
         allocate(te%ii   (2,ne_te) ) ; te%ii    =    ii_te 
@@ -789,8 +822,13 @@ subroutine load_components(geo, in_file, sim_param, te)
         ne_te_prev = size(te%e,2)
         allocate(e_te_tmp(2,size(te%e,2)+ne_te)) 
         e_te_tmp(:,             1:size(te%e,2)    ) = te%e
-        where( e_te .ne. 0 ) e_te = e_te + elems_offset
-        e_te_tmp(:,size(te%e,2)+1:size(e_te_tmp,2)) = e_te
+        do i1 = 1,ne_te
+          e_te_tmp(1,size(te%e,2)+i1)%p => null()
+          e_te_tmp(2,size(te%e,2)+i1)%p => null()
+          e_te_tmp(1,size(te%e,2)+i1)%p  => geo%components(i_comp)%el(e_te(1,i1)) 
+          if(e_te(2,i1) .gt. 0) &
+            e_te_tmp(2,size(te%e,2)+i1)%p  => geo%components(i_comp)%el(e_te(2,i1)) 
+        enddo 
         call move_alloc(e_te_tmp,te%e) 
         allocate(i_te_tmp(2,size(te%i,2)+nn_te)) 
         i_te_tmp(:,             1:size(te%i,2)    ) = te%i
@@ -895,10 +933,6 @@ subroutine import_aero_tab(geo,coeff)
  do i_a = 1 , n_a
    call read_c81_table( list_tmp(i_a) , coeff(i_a) )
  end do
-
- ! Test interpolation routine ----
- call interp_aero_coeff ( coeff , 0.0_wp , (/ 1 , 2 /) , &
-                            (/ 0.0_wp , 0.3_wp , 100000.0_wp /) , c )
 
 end subroutine import_aero_tab
 
@@ -1267,753 +1301,753 @@ end subroutine build_connectivity
 
 !----------------------------------------------------------------------
 
-! TODO : 
-! - add a reference velocity to identify the trailing edge.
-!  Up to now, the relative velocity is assumed to be "mainly oriented" as
-!  the x-axis in the local reference frame. 
-! - identify the trailing edge for vortex ring elements
-! TODO: REMOVE THE SUBROUTINE it is not used anymore
-subroutine build_te(geo,elems,te)
- type(t_geo)   , intent(in), target :: geo
- type(t_elem_p), intent(in)  :: elems(:)
- type(t_tedge) , intent(out) :: te
- 
- real(wp) , parameter :: tol_sewing = 3e-3_wp   ! 3e-6_wp  ! 1e-0 for nasa-crm , 3e-3_wp for naca0012
-
- type(t_elem_p) , allocatable :: elems_m(:)
-
- integer :: i_comp , i_e
-
- write(*,*) nl//' Start TE connectivity '//nl  
-
- 
-
-
- do i_comp = 1,size(geo%components) 
-!  associate(comp => geo%components(i_comp))
-
-   select type(elements => geo%components(i_comp)%el)
-    type is(t_surfpan)
-   !if ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'p' ) then
-
-
-     ! Merge nodes to obtain "closed-TE" connectivity ----- 
-     ! merge_nodes(rri,eei,tol, rr_m,ee_m,i_m)
-    
-     !call merge_nodes( geo%points , geo%components(i_comp)%i_points ,  &
-     !                  geo%components(i_comp)%el ,                      &
-     !                  tol_sewing , elems_m  )
-
-     call merge_nodes( geo%points , geo%components(i_comp)%i_points ,  &
-                       elements ,                      &
-                       tol_sewing , elems_m  )
-
-     ! Find "closed-TE" connectivity ---------------------- 
-     call build_connectivity( elems_m )
-
- 
-     ! Find TE -------------------------------------------- 
-     call find_te( geo , geo%components(i_comp) , elems , elems_m , te )
-
-     ! WARNING: deallocate elems_m !
-     do i_e = 1,size(elems_m)
-       deallocate(elems_m(i_e)%p) 
-     end do
-     deallocate(elems_m)
-
-    type is(t_vortring)
-   !elseif ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'v' ) then
-  
-
-     ! Find TE -------------------------------------------- 
-     call find_te_v( geo , geo%components(i_comp) , elems , te ) ! No "closed-TE" connectivity is required
-
-    class default
-   !else
-     write(*,*) ' In build_te(). Component ', i_comp 
-     write(*,*) '  Wrong type. Stop '  ! 
-   
-   end select
-   !end if  
- 
-!  end associate
- end do
-
- write(*,*) nl//' End of TE connectivity '//nl  
-
-
-! -------------
-contains
-
-! 01. Inside build_te : merge_nodes ------
-subroutine merge_nodes( ri , indi , elemsi , tol ,   elems  )
-!type(t_geo)   , intent(in), target :: geo
- real(wp)      , intent(in) :: ri(:,:)
- integer       , intent(in) :: indi(:)
- !type(t_elem_p), intent(in) :: elemsi(:)
- class(c_elem), intent(in) :: elemsi(:)
- !type(t_surfpan), intent(in) :: elemsi(:)
- real(wp) :: tol
- type(t_elem_p), allocatable , intent(out) :: elems(:)
-! type(t_surfpan),allocatable , target      :: c_elems(:)
- integer       , allocatable  :: im(:,:)
- real(wp)      , allocatable  :: rr(:,:)
- integer  , allocatable :: im_tmp(:,:)
-
- integer :: n_nodes , n_merge
-
- integer :: in1 , in2
- integer :: i1 , i2 , i_e , i_v
-
- n_nodes = size(indi,1)
-
-
- allocate(elems(size(elemsi))) 
- do i1 = 1 , size(elemsi)
-   allocate(t_surfpan::elems(i1)%p)
-   allocate(elems(i1)%p%i_ver(elemsi(i1)%n_ver))
-   elems(i1)%p%id    = elemsi(i1)%id
-   elems(i1)%p%n_ver = elemsi(i1)%n_ver
-   elems(i1)%p%i_ver = elemsi(i1)%i_ver
-
- end do
-
-
- allocate(im_tmp(2,n_nodes) ) ; im_tmp = 0
- allocate(    rr(3,n_nodes) ) ; rr = ri(:,indi)
-
- n_merge = 0
- do i1 = 1 , n_nodes
-
-  in1 = indi(i1)
-
-  do i2 = i1 + 1 , n_nodes
-
-   in2 = indi(i2)
- 
-   if ( norm2(ri(:,in1)-ri(:,in2)) .lt. tol ) then
-    
-    n_merge = n_merge + 1 
- 
-    rr(:,i1) = 0.5_wp * (ri(:,in1) + ri(:,in2))
-    rr(:,i2) = rr(:,i1) !   0.5_wp * (ri(:,i1) + ri(:,i2))
-
-
-    do i_e = 1 , size(elems) 
-     do i_v = 1 , size(elemsi(i_e)%i_ver)
-
-      if ( elems(i_e)%p%i_ver(i_v) .eq. in2 ) then
-
-        if ( all(elems(i_e)%p%i_ver .ne. in1 ) ) then
-
-          elems(i_e)%p%i_ver(i_v) = in1 
-  
-        end if
-      end if 
-     end do
-    end do
- 
-    im_tmp(1,n_merge) = in1
-    im_tmp(2,n_merge) = in2
- 
-   end if
- 
-  end do
-
- end do
- write(*,*) ' n_merge : ' , n_merge
-
- allocate(im(2,n_merge)) ; im = im_tmp(:,1:n_merge)
-
- deallocate(im_tmp)
- deallocate(rr)
-
-end subroutine merge_nodes
-
-! 02. Inside build_te : merge_nodes ------
-
-! 03. Inside build_te : find_te ----------
-! WARNING !!!! subroutine not completed
-! Look for TODO ++++
-subroutine find_te( geo , comp , elems , elems_m , te )
- type(t_geo)   , intent(in), target :: geo
- type(t_geo_component), intent(in) :: comp
- type(t_elem_p)       , intent(in) :: elems(:)
- type(t_elem_p)       , intent(in) :: elems_m(:) ! read "actual" neighbors
- type(t_tedge)        , intent(inout) :: te
-
- ! tmp arrays --------
- integer , allocatable               :: e_te_tmp(:,:) , i_te_tmp(:,:) , ii_te_tmp(:,:) 
- integer , allocatable               :: neigh_te_tmp(:,:) , o_te_tmp(:,:)
- real(wp), allocatable               ::rr_te_tmp(:,:) , t_te_tmp(:,:)
- integer , allocatable               :: ref_te_tmp(:)
- integer , allocatable               :: i_el_nodes_tmp(:,:)
- ! actual arrays -----
- integer , allocatable               :: e_te(:,:) , i_te(:,:) , ii_te(:,:) 
- integer , allocatable               :: neigh_te(:,:) , o_te(:,:)
- real(wp), allocatable               :: rr_te(:,:) , t_te(:,:) 
- integer , allocatable               :: ref_te(:)
-
- integer :: n_el
- integer :: ne_te , nn_te           ! # n. elements and nodes at TE (for the actual comp)
- integer :: ne_te_prev , nn_te_prev ! # n. elements and nodes at TE ( of the prev. comps) 
-
- integer :: neigh_ib_ie , ie_ind
- integer  :: ind1 , ind2 , i_node1 , i_node2 , i_node1_max , i_node2_max
- real(wp) ::  mi1 , mi2 
-
- real(wp) , parameter :: inner_prod_thresh = - 0.5d0
-
- integer :: i_e , i_b , i_n
-
- integer :: nSides1 , nSides2
- integer :: i1 , i2 , e1 , e2
-
- real(wp) , dimension(3) :: vec1
-
- real(wp) , dimension(3) , parameter  :: u_rel = (/ 1.0_wp , 0.0_wp , 0.0_wp /) ! hard-coded parameter ... 
- real(wp) , dimension(3) :: v_rel = u_rel / norm2(u_rel)
- real(wp) , dimension(3) , parameter :: side_dir = (/ 0.0_wp , 1.0_wp , 0.0_wp /) ! hard-coded parameter ... 
- ! TODO: - read as an input of the component
- !       - Projection of the tangent unit vector with no side slip
-
- n_el = size(comp%el)
-
- ! allocate tmp structures --
- allocate( e_te_tmp(2,(n_el+1)/2) )                ;  e_te_tmp = 0 
- allocate( i_el_nodes_tmp(2,size(comp%i_points)) ) ;  i_el_nodes_tmp = 0
- allocate( i_te_tmp      (2,size(comp%i_points)) ) ;  i_te_tmp = 0
- allocate(ii_te_tmp      (2,n_el               ) ) ; ii_te_tmp = 0
- allocate(rr_te_tmp      (3,size(comp%i_points)) ) ; rr_te_tmp = 0.0d0
-
-
- ! initialise counters ------
- ne_te = 0 ; nn_te = 0
-
- do i_e = 1 , n_el
-
-
-   do i_b = 1 , comp%el(i_e)%n_ver
-
-    if ( ( elems_m(i_e)%p%i_neigh(i_b) .ne. 0 ) .and. &
-         ( all(e_te_tmp(1,1:ne_te) .ne. elems_m(i_e)%p%i_neigh(i_b)) ) ) then ! should be enough 
-
-     ! Check normals ----
-     ! 1.
-     if ( sum( comp%el(i_e)%nor * elems( elems_m(i_e)%p%i_neigh(i_b) )%p%nor ) &
-           < inner_prod_thresh ) then
-       ne_te = ne_te + 1
-
-       ! 2. ... other criteria to find te elements --------
-     
-       ! surface elements at the trailing edge ------------
-       neigh_ib_ie = elems_m(i_e)%p%i_neigh(i_b)
-       ie_ind      = elems_m(i_e)%p%id
-       e_te_tmp(1,ne_te) = ie_ind
-       e_te_tmp(2,ne_te) = neigh_ib_ie 
-
-!      ! nodes on the trailing edge ----
-!      i_el_nodes_tmp(1,nete) = ee( ib,ie )
-!      i_el_nodes_tmp(2,nete) = ee( mod(ib,size(neigh,1)) + 1 , ie ) ! <--- size(neigh) ****
-       i_el_nodes_tmp(1,ne_te) = elems(ie_ind)%p%i_ver(i_b)  
-       i_el_nodes_tmp(2,ne_te) = elems(ie_ind)%p%i_ver( mod(i_b,elems(ie_ind)%p%n_ver)+1 )   
-  
-!      ! Find the corresponding node on the other side of the traling edge (for open te)
-!      ind1 = 1 ; mi1 = norm2( rr(:,i_el_nodes_tmp(1,nete)) - rr(:,ee(1,neigh(ib,ie))) )
-!      ind2 = 1 ; mi2 = norm2( rr(:,i_el_nodes_tmp(2,nete)) - rr(:,ee(1,neigh(ib,ie))) )
-       ind1 = 1 ; mi1 = norm2( geo%points(:,i_el_nodes_tmp(1,ne_te)) - &
-                               geo%points(:, elems(neigh_ib_ie)%p%i_ver(1) ) ) 
-       ind2 = 1 ; mi2 = norm2( geo%points(:,i_el_nodes_tmp(2,ne_te)) - & 
-                               geo%points(:, elems(neigh_ib_ie)%p%i_ver(1) ) ) 
-
-!      do i1 = 2 , elems(ie_ind)%p%n_ver       ! <--- WRONG
-       do i1 = 2 , elems(neigh_ib_ie)%p%n_ver  ! <--- mod 2018-03-38 
-!        write(*,*) ' mi1        ' , mi1
-!        write(*,*) ' norm2(...) ' , norm2( rr(:,i_el_nodes_tmp(1,nete)) - rr(:,ee(i1,neigh(ib,ie) )))
-!        write(*,*) ' mi2        ' , mi1
-!        write(*,*) ' norm2(...) ' , norm2( rr(:,i_el_nodes_tmp(2,nete)) - rr(:,ee(i1,neigh(ib,ie) )))
-         if (     norm2( geo%points(:,i_el_nodes_tmp(1,ne_te)) - &  
-                         geo%points(:, elems(neigh_ib_ie)%p%i_ver(i1) ) ) .lt. mi1 ) then
-           ind1 = i1
-           mi1  = norm2( geo%points(:,i_el_nodes_tmp(1,ne_te)) - &  
-                         geo%points(:, elems(neigh_ib_ie)%p%i_ver(i1) ) )
-         end if
-         if (     norm2( geo%points(:,i_el_nodes_tmp(2,ne_te)) - &
-                         geo%points(:, elems(neigh_ib_ie)%p%i_ver(i1) ) ) .lt. mi2 ) then
-           ind2 = i1
-           mi2  = norm2( geo%points(:,i_el_nodes_tmp(2,ne_te)) - &
-                         geo%points(:, elems(neigh_ib_ie)%p%i_ver(i1) ) )  
-         end if
-       end do
- 
-       ! Select the minimum value of the corresponding nodes at the te, to avoid double nodes ...
-!      i_node1 = min(i_el_nodes_tmp(1,ne_te),ee(ind1,neigh(ib,ie)) )
-!      i_node2 = min(i_el_nodes_tmp(2,ne_te),ee(ind2,neigh(ib,ie)) )
-       i_node1     = min(i_el_nodes_tmp(1,ne_te), elems(neigh_ib_ie)%p%i_ver(ind1) )
-       i_node2     = min(i_el_nodes_tmp(2,ne_te), elems(neigh_ib_ie)%p%i_ver(ind2) )
-       i_node1_max = max(i_el_nodes_tmp(1,ne_te), elems(neigh_ib_ie)%p%i_ver(ind1) )
-       i_node2_max = max(i_el_nodes_tmp(2,ne_te), elems(neigh_ib_ie)%p%i_ver(ind2) )
-       if ( all( i_te_tmp(1,1:nn_te) .ne. i_node2 ) ) then
-         nn_te = nn_te + 1
-         i_te_tmp(1,nn_te) = i_node2
-         i_te_tmp(2,nn_te) = i_node2_max
-!        rr_te_tmp(:,nn_te) = 0.5d0 * ( & 
-!                      geo%points(:,i_el_nodes_tmp(2,ne_te)) +     &
-!                      geo%points(:,elems(neigh_ib_ie)%p%i_ver(ind2))     )
-         rr_te_tmp(:,nn_te) = 0.5d0 * ( & 
-                       geo%points(:,i_node2) + geo%points(:,i_node2_max) )
-         ii_te_tmp(1,ne_te) = nn_te
-       else 
-         do i1 = 1 , nn_te   ! find ...
-           if ( i_te_tmp(1,i1) .eq. i_node2 ) then 
-             ii_te_tmp(1,ne_te) = i1 ; exit
-           end if
-         end do
-       end if 
-       if ( all( i_te_tmp(1,1:nn_te) .ne. i_node1 ) ) then
-         nn_te = nn_te + 1
-         i_te_tmp(1,nn_te) = i_node1
-         i_te_tmp(2,nn_te) = i_node1_max
-!        rr_te_tmp(:,nn_te) = 0.5d0 * ( & 
-!                      geo%points(:,i_el_nodes_tmp(1,ne_te)) +     &
-!                      geo%points(:,elems(neigh_ib_ie)%p%i_ver(ind1))     )
-         rr_te_tmp(:,nn_te) = 0.5d0 * ( & 
-                       geo%points(:,i_node1) + geo%points(:,i_node1_max) )
-         ii_te_tmp(2,ne_te) = nn_te
-       else
-         do i1 = 1 , nn_te   ! find ...
-           if ( i_te_tmp(1,i1) .eq. i_node1 ) then 
-             ii_te_tmp(2,ne_te) = i1 ; exit
-           end if
-         end do
-       end if 
-      
-     end if
-    
-   end if
-     
-  end do
-
- end do
-
- ! From tmp to actual e_te array --------------------
- if (allocated(e_te)) deallocate(e_te)
- allocate(e_te(2,ne_te)) ; e_te = e_te_tmp(:,1:ne_te)
- 
- ! From tmp to actual e_te array --------------------
- if (allocated(i_te)) deallocate(i_te)
- allocate(i_te(2,nn_te)) ; i_te = i_te_tmp(:,1:nn_te)
- 
- ! From tmp to actual r_te array --------------------
- if (allocated(rr_te))  deallocate(rr_te)
- allocate(rr_te(3,nn_te)) ; rr_te = rr_te_tmp(:,1:nn_te)
- 
- ! From tmp to actual r_te array --------------------
- if (allocated(ii_te))  deallocate(ii_te)
- allocate(ii_te(2,ne_te)) ; ii_te = ii_te_tmp(:,1:ne_te)
-
- 
- write(*,*) ' n.edges at the te : ' , ne_te
- write(*,*) ' n.nodes at the te : ' , nn_te
-
- deallocate( e_te_tmp, i_te_tmp, rr_te_tmp, ii_te_tmp )
-
- ! Trailing edge elements connectivity --------------
- 
- allocate(neigh_te(2,ne_te) ) ; neigh_te = 0
- allocate(    o_te(2,ne_te) ) ;     o_te = 0
- 
- do e1 = 1 , ne_te
-  nSides1 = 2
-  do i1 = 1 , nSides1
-   do e2 = e1+1 , ne_te
-    nSides2 = 2
-    do i2 = 1 , nSides2
-     if ( ii_te(i1,e1) .eq. ii_te(i2,e2) ) then
-      neigh_te(i1,e1) = e2
-      neigh_te(i2,e2) = e1
-      if ( i1 .ne. i2 ) then
-       o_te(i1,e1) = 1
-       o_te(i2,e2) = 1
-      else
-       o_te(i1,e1) = -1
-       o_te(i2,e2) = -1
-      end if 
-     end if
-    end do    
-   end do
-  end do
- end do
-
- ! Compute unit vector at the te nodes ----------------
- !  for the first implicit wake panel  ----------------
- allocate(t_te  (3,nn_te)) ; t_te = 0.0_wp  
- allocate(ref_te(  nn_te)) ; ref_te = comp%ref_id 
- do i_n = 1 , nn_te
-   vec1 = 0.0_wp
-   do i_e = 1 , ne_te 
-     if ( any( i_n .eq. ii_te(:,i_e)) ) then
-       t_te(:,i_n) =  t_te(:,i_n) + elems(e_te(1,i_e))%p%nor &
-                                  + elems(e_te(2,i_e))%p%nor
-
-       ! TODO: refine the definition of the vec1
-!      vec1 = cross(nor(:,e_te(1,i_e)) , nor(:,e_te(2,i_e)) )
-       vec1 = vec1 + cross(elems(e_te(1,i_e))%p%nor , elems(e_te(2,i_e))%p%nor)
-
-     end if
-   end do
-
-   vec1 = vec1 - sum(vec1*v_rel) * v_rel
-   vec1 = vec1 / norm2(vec1)
-
-   ! projection ****
-!  write(*,*) ' vec1 ' , vec1
-   t_te(:,i_n) = t_te(:,i_n) - sum(t_te(:,i_n)*vec1) * vec1
-
-   ! normalisation
-   t_te(:,i_n) = t_te(:,i_n) / norm2(t_te(:,i_n))
-
-!  transpose transformation to obtain the "transformed" unit vecotr at the te
-   t_te(:,i_n) = matmul(transpose(geo%refs(comp%ref_id)%R_g),t_te(:,i_n))
-
- end do
-
-
- ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- ! Update overall structure --------
- if (.not.allocated(te%e)) then ! it should be enough
-   allocate(te%e    (2,ne_te) ) ; te%e     =     e_te
-   allocate(te%i    (2,nn_te) ) ; te%i     =     i_te
-   allocate(te%rr   (3,nn_te) ) ; te%rr    =    rr_te
-   allocate(te%ii   (2,ne_te) ) ; te%ii    =    ii_te
-   allocate(te%neigh(2,ne_te) ) ; te%neigh = neigh_te
-   allocate(te%o    (2,ne_te) ) ; te%o     =     o_te
-   allocate(te%t    (2,nn_te) ) ; te%t     =     t_te
-   allocate(te%ref  (  nn_te) ) ; te%ref   =   ref_te
- else
-   nn_te_prev = size(te%i,2)
-   ne_te_prev = size(te%e,2)
-   allocate(e_te_tmp(2,size(te%e,2)+ne_te)) 
-   e_te_tmp(:,             1:size(te%e,2)    ) = te%e
-   e_te_tmp(:,size(te%e,2)+1:size(e_te_tmp,2)) = e_te
-   call move_alloc(e_te_tmp,te%e) 
-   allocate(i_te_tmp(2,size(te%i,2)+nn_te)) 
-   i_te_tmp(:,             1:size(te%i,2)    ) = te%i
-   i_te_tmp(:,size(te%i,2)+1:size(i_te_tmp,2)) = i_te
-   call move_alloc(i_te_tmp,te%i) 
-   allocate(rr_te_tmp(3,size(te%rr,2)+nn_te)) 
-   rr_te_tmp(:,              1:size(te%rr,2)    ) = te%rr
-   rr_te_tmp(:,size(te%rr,2)+1:size(rr_te_tmp,2)) = rr_te
-   call move_alloc(rr_te_tmp,te%rr) 
-   allocate(ii_te_tmp(2,size(te%ii,2)+ne_te)) 
-   ii_te_tmp(:,              1:size(te%ii,2)    ) = te%ii
-   ii_te_tmp(:,size(te%ii,2)+1:size(ii_te_tmp,2)) = ii_te + nn_te_prev 
-   call move_alloc(ii_te_tmp,te%ii) 
-   allocate(neigh_te_tmp(2,size(te%neigh,2)+ne_te)) 
-   neigh_te_tmp(:,                 1:size(te%neigh,2)    ) = te%neigh
-   where ( neigh_te .ne. 0 ) neigh_te = neigh_te + ne_te_prev
-   neigh_te_tmp(:,size(te%neigh,2)+1:size(neigh_te_tmp,2)) = neigh_te
-   call move_alloc(neigh_te_tmp,te%neigh) 
-   allocate( o_te_tmp(2,size(te%o ,2)+ne_te)) 
-   o_te_tmp(:,              1:size(te%o ,2)    ) = te%o 
-   o_te_tmp(:,size(te%o ,2)+1:size( o_te_tmp,2)) =  o_te 
-   call move_alloc(o_te_tmp,te%o ) 
-   allocate( t_te_tmp(3,size(te%t ,2)+nn_te)) 
-   t_te_tmp(:,              1:size(te%t ,2)    ) = te%t 
-   t_te_tmp(:,size(te%t ,2)+1:size( t_te_tmp,2)) =  t_te 
-   call move_alloc(t_te_tmp,te%t ) 
-   allocate(ref_te_tmp(size(te%ref   )+nn_te)) 
-   ref_te_tmp(                 1:size(te%ref   )   ) =  te%ref 
-   ref_te_tmp(  size(te%ref  )+1:size(ref_te_tmp  )) = ref_te 
-   call move_alloc(ref_te_tmp,te%ref) 
- end if
-
-
-end subroutine find_te
-
-! 04. Inside build_te : find_te_v --------
-! It is assumed that nodes and elements are sorted as follows
+!! TODO : 
+!! - add a reference velocity to identify the trailing edge.
+!!  Up to now, the relative velocity is assumed to be "mainly oriented" as
+!!  the x-axis in the local reference frame. 
+!! - identify the trailing edge for vortex ring elements
+!! TODO: REMOVE THE SUBROUTINE it is not used anymore
+!subroutine build_te(geo,elems,te)
+! type(t_geo)   , intent(in), target :: geo
+! type(t_elem_p), intent(in)  :: elems(:)
+! type(t_tedge) , intent(out) :: te
+! 
+! real(wp) , parameter :: tol_sewing = 3e-3_wp   ! 3e-6_wp  ! 1e-0 for nasa-crm , 3e-3_wp for naca0012
 !
-!  1-----5-----9-----13----17----21   <--- LE
-!  |  1  |  4  |  7  |  10 |  13 |
-!  2-----6-----10----14----18----22
-!  |  2  |  5  |  8  |  11 |  14 |
-!  3-----7-----11----15----19----23
-!  |  3  |  6  |  9  |  12 |  15 |
-!  4-----8-----12----16----20----24   <--- TE
-
-subroutine find_te_v( geo , comp , elems , te )
- type(t_geo)   , intent(in), target :: geo
- type(t_geo_component), intent(in) :: comp
- type(t_elem_p)       , intent(in) :: elems(:)
-!type(t_elem_p)       , intent(in) :: elems_m(:) ! read "actual" neighbors
- type(t_tedge)        , intent(inout) :: te
-
- ! tmp arrays --------
- integer , allocatable               :: e_te_tmp(:,:) , i_te_tmp(:,:) , ii_te_tmp(:,:) 
- integer , allocatable               :: neigh_te_tmp(:,:) , o_te_tmp(:,:)
- real(wp), allocatable               ::rr_te_tmp(:,:) , t_te_tmp(:,:)
- integer , allocatable               :: ref_te_tmp(:)
- integer , allocatable               :: i_el_nodes_tmp(:,:)
- ! actual arrays -----
- integer , allocatable               :: e_te(:,:) , i_te(:,:) , ii_te(:,:) 
- integer , allocatable               :: neigh_te(:,:) , o_te(:,:)
- real(wp), allocatable               ::rr_te(:,:) , t_te(:,:)
- integer , allocatable               :: ref_te(:)
-
- integer :: n_el
- integer :: ne_te , nn_te           ! # n. elements and nodes at TE (for the actual comp)
- integer :: ne_te_prev , nn_te_prev ! # n. elements and nodes at TE ( of the prev. comps) 
-
- integer :: io_te , io_tip
- integer :: i_el , n_free , n_free_le_te , i_v , ie_ind
- integer :: i_node1 , i_node2 , ind_te 
- integer :: nSides1 , nSides2 
- integer :: i_node3 , i_node4
-
- integer :: i1, i2, e1, e2
-
-
- n_el = size(comp%el)
-
- ! allocate tmp structures --
- allocate( e_te_tmp(2,(n_el+1)/2) )                ;  e_te_tmp = 0 
- allocate( i_el_nodes_tmp(2,size(comp%i_points)) ) ;  i_el_nodes_tmp = 0
- allocate( i_te_tmp      (2,size(comp%i_points)) ) ;  i_te_tmp = 0
- allocate(ii_te_tmp      (2,n_el               ) ) ; ii_te_tmp = 0
- allocate(rr_te_tmp      (3,size(comp%i_points)) ) ; rr_te_tmp = 0.0d0
- allocate( t_te_tmp      (3,size(comp%i_points)) ) ; rr_te_tmp = 0.0d0
-
-
- ! initialise counters ------
- ne_te = 0 ; nn_te = 0
-
- ! Find elements on the TE --------
- ! "logical" to know if you are on a tip element an on the TE/LE elements
- io_tip = 1  ;  io_te  = 0 ! initialisation 
- do i_el = 1 , n_el
-
-   ie_ind = comp%el(i_el)%id
-
-   n_free = 0 
-   do i_v = 1 , comp%el(i_el)%n_ver
-     if ( comp%el(i_el)%i_neigh(i_v) .eq. 0 ) n_free = n_free + 1
-   end do
-
-   ! Back on the tip ----
-   if ( n_free .eq. 2 ) then
-      n_free_le_te = 2 ! on the tip
-      if ( io_tip .eq. 0 ) io_tip = 1
-   end if
-   ! n. free edges on the te,le: tip -> 2 ; inner elements -> 1
-   if ( io_tip .eq. 1 ) then
-     n_free_le_te = 2
-   elseif ( io_tip .eq. 0 ) then
-     n_free_le_te = 1
-   end if 
-
-   if ( ( n_free .eq. n_free_le_te ) .and. ( io_te .eq. 1 ) ) then ! Element at TE
-
-     ! element number: first component only of e_te ----------   
-     ne_te = ne_te + 1
-     e_te_tmp(1,ne_te) = ie_ind 
-
-     ! find i_node1 , i_node2 --------------------------------
-     if     ( n_free .eq. 2 ) then     ! on wing tips --------
-       ! two sides have no neighbors: TE must be identified
-  
-       do i1 = 1 , comp%el(i_el)%n_ver
-         if ( ( comp%el(i_el)%i_neigh(i1)   .eq. 0 ) .and. &
-              ( comp%el(i_el-1)%i_neigh(i1) .ne. 0 ) ) then
-             ind_te = i1 ; exit 
-         end if
-       end do
-
-!      i_node1 = elems(ie_ind)%p%i_ver(ind_te)  
-!      i_node2 = elems(ie_ind)%p%i_ver( mod(ind_te,elems(ie_ind)%p%n_ver)+1 )   
-
-     elseif ( n_free .eq. 1 ) then     ! inner elems ---------
-
-       do i1 = 1 , comp%el(i_el)%n_ver
-         if ( comp%el(i_el)%i_neigh(i1) .eq. 0 ) then 
-           ind_te = i1 ; exit 
-         end if
-       end do
-
-     end if
-
-     i_node1 = elems(ie_ind)%p%i_ver(ind_te)  
-     i_node2 = elems(ie_ind)%p%i_ver( mod(ind_te  ,elems(ie_ind)%p%n_ver)+1 )   
-     i_node3 = elems(ie_ind)%p%i_ver( mod(ind_te+1,elems(ie_ind)%p%n_ver)+1 )   
-     i_node4 = elems(ie_ind)%p%i_ver( mod(ind_te+2,elems(ie_ind)%p%n_ver)+1 )   
-
-     ! build i_te , ii_te , rr_te ----------------------------
-     if ( all ( i_te_tmp(:,1:nn_te) .ne. i_node2 ) ) then ! new node
-       nn_te = nn_te + 1
-       i_te_tmp(:,nn_te) = i_node2
-       rr_te_tmp(:,nn_te) = geo%points(:,i_node2)
-       ii_te_tmp(1,ne_te) = nn_te
-       t_te_tmp(:,nn_te)  = geo%points(:,i_node2) - geo%points(:,i_node3)
-       t_te_tmp(:,nn_te)  = t_te_tmp(:,nn_te) / norm2(t_te_tmp(:,nn_te))
-
-!      transpose transformation to obtain the "transformed" unit vecotr at the te
-       t_te_tmp(:,nn_te) = matmul(transpose(geo%refs(comp%ref_id)%R_g), &
-                                                         t_te_tmp(:,nn_te))
-
-     else ! this node has been already found
-       do i1 = 1 , nn_te   ! find ...
-         if ( i_te_tmp(1,i1) .eq. i_node2 ) then 
-           ii_te_tmp(1,ne_te) = i1 ; exit
-         end if
-       end do
-     end if
-
-     if ( all ( i_te_tmp(:,1:nn_te) .ne. i_node1 ) ) then ! new node
-       nn_te = nn_te + 1
-       i_te_tmp(:,nn_te) = i_node1
-       rr_te_tmp(:,nn_te) = geo%points(:,i_node1)
-       ii_te_tmp(2,ne_te) = nn_te
-       t_te_tmp(:,nn_te)  = geo%points(:,i_node1) - geo%points(:,i_node4)
-       t_te_tmp(:,nn_te)  = t_te_tmp(:,nn_te) / norm2(t_te_tmp(:,nn_te))
-
-!      transpose transformation to obtain the "transformed" unit vecotr at the te
-       t_te_tmp(:,nn_te) = matmul(transpose(geo%refs(comp%ref_id)%R_g), &
-                                                         t_te_tmp(:,nn_te))
-
-     else ! this node has been already found
-       do i1 = 1 , nn_te   ! find ...
-         if ( i_te_tmp(1,i1) .eq. i_node1 ) then 
-           ii_te_tmp(2,ne_te) = i1 ; exit
-         end if
-       end do
-     end if
-
-
-   end if
-
-   ! Next element ----
-   if     ( ( n_free .eq. n_free_le_te ) .and. ( io_te .eq. 0 ) ) then
-      io_te = 1 
-   elseif ( ( n_free .eq. n_free_le_te ) .and. ( io_te .eq. 1 ) ) then
-      io_te = 0 ; io_tip = 0
-   end if
-
- end do
-
-  
- ! From tmp to actual e_te array --------------------
- if (allocated(e_te)) deallocate(e_te)
- allocate(e_te(2,ne_te)) ; e_te = e_te_tmp(:,1:ne_te)
- 
- ! From tmp to actual i_te array --------------------
- if (allocated(i_te)) deallocate(i_te)
- allocate(i_te(2,nn_te)) ; i_te = i_te_tmp(:,1:nn_te)
- 
- ! From tmp to actual rr_te array -------------------
- if (allocated(rr_te))  deallocate(rr_te)
- allocate(rr_te(3,nn_te)) ; rr_te = rr_te_tmp(:,1:nn_te)
- 
- ! From tmp to actual ii_te array -------------------
- if (allocated(ii_te))  deallocate(ii_te)
- allocate(ii_te(2,ne_te)) ; ii_te = ii_te_tmp(:,1:ne_te)
-
- ! From tmp to actual rr_te array -------------------
- if (allocated( t_te))  deallocate( t_te)
- allocate( t_te(3,nn_te)) ;  t_te =  t_te_tmp(:,1:nn_te)
-
- 
- write(*,*) ' n.edges at the te : ' , ne_te
- write(*,*) ' n.nodes at the te : ' , nn_te
-
- deallocate( e_te_tmp, i_te_tmp, rr_te_tmp, ii_te_tmp , t_te_tmp )
-
-
- ! Trailing edge elements connectivity --------------
- 
- allocate(neigh_te(2,ne_te) ) ; neigh_te = 0
- allocate(    o_te(2,ne_te) ) ;     o_te = 0
- 
- do e1 = 1 , ne_te
-  nSides1 = 2
-  do i1 = 1 , nSides1
-   do e2 = e1+1 , ne_te
-    nSides2 = 2
-    do i2 = 1 , nSides2
-     if ( ii_te(i1,e1) .eq. ii_te(i2,e2) ) then
-      neigh_te(i1,e1) = e2
-      neigh_te(i2,e2) = e1
-      if ( i1 .ne. i2 ) then
-       o_te(i1,e1) = 1
-       o_te(i2,e2) = 1
-      else
-       o_te(i1,e1) = -1
-       o_te(i2,e2) = -1
-      end if 
-     end if
-    end do    
-   end do
-  end do
- end do
-
- ! Compute unit vector at the te nodes ----------------
- !  for the first implicit wake panel  ----------------
- allocate(ref_te(  nn_te)) ; ref_te = comp%ref_id 
- 
-
- ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- ! Update overall structures and TE connectivity as in find_te()
- if (.not.allocated(te%e)) then ! it should be enough
-   allocate(te%e    (2,ne_te) ) ; te%e     =     e_te
-   allocate(te%i    (2,nn_te) ) ; te%i     =     i_te
-   allocate(te%rr   (3,nn_te) ) ; te%rr    =    rr_te
-   allocate(te%ii   (2,ne_te) ) ; te%ii    =    ii_te
-   allocate(te%neigh(2,ne_te) ) ; te%neigh = neigh_te
-   allocate(te%o    (2,ne_te) ) ; te%o     =     o_te
-   allocate(te%t    (2,nn_te) ) ; te%t     =     t_te
-   allocate(te%ref  (  nn_te) ) ; te%ref   =   ref_te
- else
-   nn_te_prev = size(te%i,2)
-   ne_te_prev = size(te%e,2)
-   allocate(e_te_tmp(2,size(te%e,2)+ne_te)) 
-   e_te_tmp(:,             1:size(te%e,2)    ) = te%e
-   e_te_tmp(:,size(te%e,2)+1:size(e_te_tmp,2)) = e_te
-   call move_alloc(e_te_tmp,te%e) 
-   allocate(i_te_tmp(2,size(te%i,2)+nn_te)) 
-   i_te_tmp(:,             1:size(te%i,2)    ) = te%i
-   i_te_tmp(:,size(te%i,2)+1:size(i_te_tmp,2)) = i_te
-   call move_alloc(i_te_tmp,te%i) 
-   allocate(rr_te_tmp(3,size(te%rr,2)+nn_te)) 
-   rr_te_tmp(:,              1:size(te%rr,2)    ) = te%rr
-   rr_te_tmp(:,size(te%rr,2)+1:size(rr_te_tmp,2)) = rr_te
-   call move_alloc(rr_te_tmp,te%rr) 
-   allocate(ii_te_tmp(2,size(te%ii,2)+ne_te)) 
-   ii_te_tmp(:,              1:size(te%ii,2)    ) = te%ii
-   ii_te_tmp(:,size(te%ii,2)+1:size(ii_te_tmp,2)) = ii_te + nn_te_prev 
-   call move_alloc(ii_te_tmp,te%ii) 
-   allocate(neigh_te_tmp(2,size(te%neigh,2)+ne_te)) 
-   neigh_te_tmp(:,                 1:size(te%neigh,2)    ) = te%neigh
-   where ( neigh_te .ne. 0 ) neigh_te = neigh_te + ne_te_prev
-   neigh_te_tmp(:,size(te%neigh,2)+1:size(neigh_te_tmp,2)) = neigh_te
-   call move_alloc(neigh_te_tmp,te%neigh) 
-   allocate( o_te_tmp(2,size(te%o ,2)+ne_te)) 
-   o_te_tmp(:,              1:size(te%o ,2)    ) = te%o 
-   o_te_tmp(:,size(te%o ,2)+1:size( o_te_tmp,2)) =  o_te 
-   call move_alloc(o_te_tmp,te%o ) 
-   allocate( t_te_tmp(3,size(te%t ,2)+nn_te)) 
-   t_te_tmp(:,              1:size(te%t ,2)    ) = te%t 
-   t_te_tmp(:,size(te%t ,2)+1:size( t_te_tmp,2)) =  t_te 
-   call move_alloc(t_te_tmp,te%t ) 
-   allocate(ref_te_tmp(size(te%ref   )+nn_te)) 
-   ref_te_tmp(                 1:size(te%ref   )   ) =  te%ref 
-   ref_te_tmp(  size(te%ref  )+1:size(ref_te_tmp  )) = ref_te 
-   call move_alloc(ref_te_tmp,te%ref) 
- end if
-
-
-end subroutine find_te_v
-
-
-end subroutine build_te
+! type(t_elem_p) , allocatable :: elems_m(:)
+!
+! integer :: i_comp , i_e
+!
+! write(*,*) nl//' Start TE connectivity '//nl  
+!
+! 
+!
+!
+! do i_comp = 1,size(geo%components) 
+!!  associate(comp => geo%components(i_comp))
+!
+!   select type(elements => geo%components(i_comp)%el)
+!    type is(t_surfpan)
+!   !if ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'p' ) then
+!
+!
+!     ! Merge nodes to obtain "closed-TE" connectivity ----- 
+!     ! merge_nodes(rri,eei,tol, rr_m,ee_m,i_m)
+!    
+!     !call merge_nodes( geo%points , geo%components(i_comp)%i_points ,  &
+!     !                  geo%components(i_comp)%el ,                      &
+!     !                  tol_sewing , elems_m  )
+!
+!     call merge_nodes( geo%points , geo%components(i_comp)%i_points ,  &
+!                       elements ,                      &
+!                       tol_sewing , elems_m  )
+!
+!     ! Find "closed-TE" connectivity ---------------------- 
+!     call build_connectivity( elems_m )
+!
+! 
+!     ! Find TE -------------------------------------------- 
+!     call find_te( geo , geo%components(i_comp) , elems , elems_m , te )
+!
+!     ! WARNING: deallocate elems_m !
+!     do i_e = 1,size(elems_m)
+!       deallocate(elems_m(i_e)%p) 
+!     end do
+!     deallocate(elems_m)
+!
+!    type is(t_vortring)
+!   !elseif ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'v' ) then
+!  
+!
+!     ! Find TE -------------------------------------------- 
+!     call find_te_v( geo , geo%components(i_comp) , elems , te ) ! No "closed-TE" connectivity is required
+!
+!    class default
+!   !else
+!     write(*,*) ' In build_te(). Component ', i_comp 
+!     write(*,*) '  Wrong type. Stop '  ! 
+!   
+!   end select
+!   !end if  
+! 
+!!  end associate
+! end do
+!
+! write(*,*) nl//' End of TE connectivity '//nl  
+!
+!
+!! -------------
+!contains
+!
+!! 01. Inside build_te : merge_nodes ------
+!subroutine merge_nodes( ri , indi , elemsi , tol ,   elems  )
+!!type(t_geo)   , intent(in), target :: geo
+! real(wp)      , intent(in) :: ri(:,:)
+! integer       , intent(in) :: indi(:)
+! !type(t_elem_p), intent(in) :: elemsi(:)
+! class(c_elem), intent(in) :: elemsi(:)
+! !type(t_surfpan), intent(in) :: elemsi(:)
+! real(wp) :: tol
+! type(t_elem_p), allocatable , intent(out) :: elems(:)
+!! type(t_surfpan),allocatable , target      :: c_elems(:)
+! integer       , allocatable  :: im(:,:)
+! real(wp)      , allocatable  :: rr(:,:)
+! integer  , allocatable :: im_tmp(:,:)
+!
+! integer :: n_nodes , n_merge
+!
+! integer :: in1 , in2
+! integer :: i1 , i2 , i_e , i_v
+!
+! n_nodes = size(indi,1)
+!
+!
+! allocate(elems(size(elemsi))) 
+! do i1 = 1 , size(elemsi)
+!   allocate(t_surfpan::elems(i1)%p)
+!   allocate(elems(i1)%p%i_ver(elemsi(i1)%n_ver))
+!   elems(i1)%p%id    = elemsi(i1)%id
+!   elems(i1)%p%n_ver = elemsi(i1)%n_ver
+!   elems(i1)%p%i_ver = elemsi(i1)%i_ver
+!
+! end do
+!
+!
+! allocate(im_tmp(2,n_nodes) ) ; im_tmp = 0
+! allocate(    rr(3,n_nodes) ) ; rr = ri(:,indi)
+!
+! n_merge = 0
+! do i1 = 1 , n_nodes
+!
+!  in1 = indi(i1)
+!
+!  do i2 = i1 + 1 , n_nodes
+!
+!   in2 = indi(i2)
+! 
+!   if ( norm2(ri(:,in1)-ri(:,in2)) .lt. tol ) then
+!    
+!    n_merge = n_merge + 1 
+! 
+!    rr(:,i1) = 0.5_wp * (ri(:,in1) + ri(:,in2))
+!    rr(:,i2) = rr(:,i1) !   0.5_wp * (ri(:,i1) + ri(:,i2))
+!
+!
+!    do i_e = 1 , size(elems) 
+!     do i_v = 1 , size(elemsi(i_e)%i_ver)
+!
+!      if ( elems(i_e)%p%i_ver(i_v) .eq. in2 ) then
+!
+!        if ( all(elems(i_e)%p%i_ver .ne. in1 ) ) then
+!
+!          elems(i_e)%p%i_ver(i_v) = in1 
+!  
+!        end if
+!      end if 
+!     end do
+!    end do
+! 
+!    im_tmp(1,n_merge) = in1
+!    im_tmp(2,n_merge) = in2
+! 
+!   end if
+! 
+!  end do
+!
+! end do
+! write(*,*) ' n_merge : ' , n_merge
+!
+! allocate(im(2,n_merge)) ; im = im_tmp(:,1:n_merge)
+!
+! deallocate(im_tmp)
+! deallocate(rr)
+!
+!end subroutine merge_nodes
+!
+!! 02. Inside build_te : merge_nodes ------
+!
+!! 03. Inside build_te : find_te ----------
+!! WARNING !!!! subroutine not completed
+!! Look for TODO ++++
+!subroutine find_te( geo , comp , elems , elems_m , te )
+! type(t_geo)   , intent(in), target :: geo
+! type(t_geo_component), intent(in) :: comp
+! type(t_elem_p)       , intent(in) :: elems(:)
+! type(t_elem_p)       , intent(in) :: elems_m(:) ! read "actual" neighbors
+! type(t_tedge)        , intent(inout) :: te
+!
+! ! tmp arrays --------
+! integer , allocatable               :: e_te_tmp(:,:) , i_te_tmp(:,:) , ii_te_tmp(:,:) 
+! integer , allocatable               :: neigh_te_tmp(:,:) , o_te_tmp(:,:)
+! real(wp), allocatable               ::rr_te_tmp(:,:) , t_te_tmp(:,:)
+! integer , allocatable               :: ref_te_tmp(:)
+! integer , allocatable               :: i_el_nodes_tmp(:,:)
+! ! actual arrays -----
+! integer , allocatable               :: e_te(:,:) , i_te(:,:) , ii_te(:,:) 
+! integer , allocatable               :: neigh_te(:,:) , o_te(:,:)
+! real(wp), allocatable               :: rr_te(:,:) , t_te(:,:) 
+! integer , allocatable               :: ref_te(:)
+!
+! integer :: n_el
+! integer :: ne_te , nn_te           ! # n. elements and nodes at TE (for the actual comp)
+! integer :: ne_te_prev , nn_te_prev ! # n. elements and nodes at TE ( of the prev. comps) 
+!
+! integer :: neigh_ib_ie , ie_ind
+! integer  :: ind1 , ind2 , i_node1 , i_node2 , i_node1_max , i_node2_max
+! real(wp) ::  mi1 , mi2 
+!
+! real(wp) , parameter :: inner_prod_thresh = - 0.5d0
+!
+! integer :: i_e , i_b , i_n
+!
+! integer :: nSides1 , nSides2
+! integer :: i1 , i2 , e1 , e2
+!
+! real(wp) , dimension(3) :: vec1
+!
+! real(wp) , dimension(3) , parameter  :: u_rel = (/ 1.0_wp , 0.0_wp , 0.0_wp /) ! hard-coded parameter ... 
+! real(wp) , dimension(3) :: v_rel = u_rel / norm2(u_rel)
+! real(wp) , dimension(3) , parameter :: side_dir = (/ 0.0_wp , 1.0_wp , 0.0_wp /) ! hard-coded parameter ... 
+! ! TODO: - read as an input of the component
+! !       - Projection of the tangent unit vector with no side slip
+!
+! n_el = size(comp%el)
+!
+! ! allocate tmp structures --
+! allocate( e_te_tmp(2,(n_el+1)/2) )                ;  e_te_tmp = 0 
+! allocate( i_el_nodes_tmp(2,size(comp%i_points)) ) ;  i_el_nodes_tmp = 0
+! allocate( i_te_tmp      (2,size(comp%i_points)) ) ;  i_te_tmp = 0
+! allocate(ii_te_tmp      (2,n_el               ) ) ; ii_te_tmp = 0
+! allocate(rr_te_tmp      (3,size(comp%i_points)) ) ; rr_te_tmp = 0.0d0
+!
+!
+! ! initialise counters ------
+! ne_te = 0 ; nn_te = 0
+!
+! do i_e = 1 , n_el
+!
+!
+!   do i_b = 1 , comp%el(i_e)%n_ver
+!
+!    if ( ( elems_m(i_e)%p%i_neigh(i_b) .ne. 0 ) .and. &
+!         ( all(e_te_tmp(1,1:ne_te) .ne. elems_m(i_e)%p%i_neigh(i_b)) ) ) then ! should be enough 
+!
+!     ! Check normals ----
+!     ! 1.
+!     if ( sum( comp%el(i_e)%nor * elems( elems_m(i_e)%p%i_neigh(i_b) )%p%nor ) &
+!           < inner_prod_thresh ) then
+!       ne_te = ne_te + 1
+!
+!       ! 2. ... other criteria to find te elements --------
+!     
+!       ! surface elements at the trailing edge ------------
+!       neigh_ib_ie = elems_m(i_e)%p%i_neigh(i_b)
+!       ie_ind      = elems_m(i_e)%p%id
+!       e_te_tmp(1,ne_te) = ie_ind
+!       e_te_tmp(2,ne_te) = neigh_ib_ie 
+!
+!!      ! nodes on the trailing edge ----
+!!      i_el_nodes_tmp(1,nete) = ee( ib,ie )
+!!      i_el_nodes_tmp(2,nete) = ee( mod(ib,size(neigh,1)) + 1 , ie ) ! <--- size(neigh) ****
+!       i_el_nodes_tmp(1,ne_te) = elems(ie_ind)%p%i_ver(i_b)  
+!       i_el_nodes_tmp(2,ne_te) = elems(ie_ind)%p%i_ver( mod(i_b,elems(ie_ind)%p%n_ver)+1 )   
+!  
+!!      ! Find the corresponding node on the other side of the traling edge (for open te)
+!!      ind1 = 1 ; mi1 = norm2( rr(:,i_el_nodes_tmp(1,nete)) - rr(:,ee(1,neigh(ib,ie))) )
+!!      ind2 = 1 ; mi2 = norm2( rr(:,i_el_nodes_tmp(2,nete)) - rr(:,ee(1,neigh(ib,ie))) )
+!       ind1 = 1 ; mi1 = norm2( geo%points(:,i_el_nodes_tmp(1,ne_te)) - &
+!                               geo%points(:, elems(neigh_ib_ie)%p%i_ver(1) ) ) 
+!       ind2 = 1 ; mi2 = norm2( geo%points(:,i_el_nodes_tmp(2,ne_te)) - & 
+!                               geo%points(:, elems(neigh_ib_ie)%p%i_ver(1) ) ) 
+!
+!!      do i1 = 2 , elems(ie_ind)%p%n_ver       ! <--- WRONG
+!       do i1 = 2 , elems(neigh_ib_ie)%p%n_ver  ! <--- mod 2018-03-38 
+!!        write(*,*) ' mi1        ' , mi1
+!!        write(*,*) ' norm2(...) ' , norm2( rr(:,i_el_nodes_tmp(1,nete)) - rr(:,ee(i1,neigh(ib,ie) )))
+!!        write(*,*) ' mi2        ' , mi1
+!!        write(*,*) ' norm2(...) ' , norm2( rr(:,i_el_nodes_tmp(2,nete)) - rr(:,ee(i1,neigh(ib,ie) )))
+!         if (     norm2( geo%points(:,i_el_nodes_tmp(1,ne_te)) - &  
+!                         geo%points(:, elems(neigh_ib_ie)%p%i_ver(i1) ) ) .lt. mi1 ) then
+!           ind1 = i1
+!           mi1  = norm2( geo%points(:,i_el_nodes_tmp(1,ne_te)) - &  
+!                         geo%points(:, elems(neigh_ib_ie)%p%i_ver(i1) ) )
+!         end if
+!         if (     norm2( geo%points(:,i_el_nodes_tmp(2,ne_te)) - &
+!                         geo%points(:, elems(neigh_ib_ie)%p%i_ver(i1) ) ) .lt. mi2 ) then
+!           ind2 = i1
+!           mi2  = norm2( geo%points(:,i_el_nodes_tmp(2,ne_te)) - &
+!                         geo%points(:, elems(neigh_ib_ie)%p%i_ver(i1) ) )  
+!         end if
+!       end do
+! 
+!       ! Select the minimum value of the corresponding nodes at the te, to avoid double nodes ...
+!!      i_node1 = min(i_el_nodes_tmp(1,ne_te),ee(ind1,neigh(ib,ie)) )
+!!      i_node2 = min(i_el_nodes_tmp(2,ne_te),ee(ind2,neigh(ib,ie)) )
+!       i_node1     = min(i_el_nodes_tmp(1,ne_te), elems(neigh_ib_ie)%p%i_ver(ind1) )
+!       i_node2     = min(i_el_nodes_tmp(2,ne_te), elems(neigh_ib_ie)%p%i_ver(ind2) )
+!       i_node1_max = max(i_el_nodes_tmp(1,ne_te), elems(neigh_ib_ie)%p%i_ver(ind1) )
+!       i_node2_max = max(i_el_nodes_tmp(2,ne_te), elems(neigh_ib_ie)%p%i_ver(ind2) )
+!       if ( all( i_te_tmp(1,1:nn_te) .ne. i_node2 ) ) then
+!         nn_te = nn_te + 1
+!         i_te_tmp(1,nn_te) = i_node2
+!         i_te_tmp(2,nn_te) = i_node2_max
+!!        rr_te_tmp(:,nn_te) = 0.5d0 * ( & 
+!!                      geo%points(:,i_el_nodes_tmp(2,ne_te)) +     &
+!!                      geo%points(:,elems(neigh_ib_ie)%p%i_ver(ind2))     )
+!         rr_te_tmp(:,nn_te) = 0.5d0 * ( & 
+!                       geo%points(:,i_node2) + geo%points(:,i_node2_max) )
+!         ii_te_tmp(1,ne_te) = nn_te
+!       else 
+!         do i1 = 1 , nn_te   ! find ...
+!           if ( i_te_tmp(1,i1) .eq. i_node2 ) then 
+!             ii_te_tmp(1,ne_te) = i1 ; exit
+!           end if
+!         end do
+!       end if 
+!       if ( all( i_te_tmp(1,1:nn_te) .ne. i_node1 ) ) then
+!         nn_te = nn_te + 1
+!         i_te_tmp(1,nn_te) = i_node1
+!         i_te_tmp(2,nn_te) = i_node1_max
+!!        rr_te_tmp(:,nn_te) = 0.5d0 * ( & 
+!!                      geo%points(:,i_el_nodes_tmp(1,ne_te)) +     &
+!!                      geo%points(:,elems(neigh_ib_ie)%p%i_ver(ind1))     )
+!         rr_te_tmp(:,nn_te) = 0.5d0 * ( & 
+!                       geo%points(:,i_node1) + geo%points(:,i_node1_max) )
+!         ii_te_tmp(2,ne_te) = nn_te
+!       else
+!         do i1 = 1 , nn_te   ! find ...
+!           if ( i_te_tmp(1,i1) .eq. i_node1 ) then 
+!             ii_te_tmp(2,ne_te) = i1 ; exit
+!           end if
+!         end do
+!       end if 
+!      
+!     end if
+!    
+!   end if
+!     
+!  end do
+!
+! end do
+!
+! ! From tmp to actual e_te array --------------------
+! if (allocated(e_te)) deallocate(e_te)
+! allocate(e_te(2,ne_te)) ; e_te = e_te_tmp(:,1:ne_te)
+! 
+! ! From tmp to actual e_te array --------------------
+! if (allocated(i_te)) deallocate(i_te)
+! allocate(i_te(2,nn_te)) ; i_te = i_te_tmp(:,1:nn_te)
+! 
+! ! From tmp to actual r_te array --------------------
+! if (allocated(rr_te))  deallocate(rr_te)
+! allocate(rr_te(3,nn_te)) ; rr_te = rr_te_tmp(:,1:nn_te)
+! 
+! ! From tmp to actual r_te array --------------------
+! if (allocated(ii_te))  deallocate(ii_te)
+! allocate(ii_te(2,ne_te)) ; ii_te = ii_te_tmp(:,1:ne_te)
+!
+! 
+! write(*,*) ' n.edges at the te : ' , ne_te
+! write(*,*) ' n.nodes at the te : ' , nn_te
+!
+! deallocate( e_te_tmp, i_te_tmp, rr_te_tmp, ii_te_tmp )
+!
+! ! Trailing edge elements connectivity --------------
+! 
+! allocate(neigh_te(2,ne_te) ) ; neigh_te = 0
+! allocate(    o_te(2,ne_te) ) ;     o_te = 0
+! 
+! do e1 = 1 , ne_te
+!  nSides1 = 2
+!  do i1 = 1 , nSides1
+!   do e2 = e1+1 , ne_te
+!    nSides2 = 2
+!    do i2 = 1 , nSides2
+!     if ( ii_te(i1,e1) .eq. ii_te(i2,e2) ) then
+!      neigh_te(i1,e1) = e2
+!      neigh_te(i2,e2) = e1
+!      if ( i1 .ne. i2 ) then
+!       o_te(i1,e1) = 1
+!       o_te(i2,e2) = 1
+!      else
+!       o_te(i1,e1) = -1
+!       o_te(i2,e2) = -1
+!      end if 
+!     end if
+!    end do    
+!   end do
+!  end do
+! end do
+!
+! ! Compute unit vector at the te nodes ----------------
+! !  for the first implicit wake panel  ----------------
+! allocate(t_te  (3,nn_te)) ; t_te = 0.0_wp  
+! allocate(ref_te(  nn_te)) ; ref_te = comp%ref_id 
+! do i_n = 1 , nn_te
+!   vec1 = 0.0_wp
+!   do i_e = 1 , ne_te 
+!     if ( any( i_n .eq. ii_te(:,i_e)) ) then
+!       t_te(:,i_n) =  t_te(:,i_n) + elems(e_te(1,i_e))%p%nor &
+!                                  + elems(e_te(2,i_e))%p%nor
+!
+!       ! TODO: refine the definition of the vec1
+!!      vec1 = cross(nor(:,e_te(1,i_e)) , nor(:,e_te(2,i_e)) )
+!       vec1 = vec1 + cross(elems(e_te(1,i_e))%p%nor , elems(e_te(2,i_e))%p%nor)
+!
+!     end if
+!   end do
+!
+!   vec1 = vec1 - sum(vec1*v_rel) * v_rel
+!   vec1 = vec1 / norm2(vec1)
+!
+!   ! projection ****
+!!  write(*,*) ' vec1 ' , vec1
+!   t_te(:,i_n) = t_te(:,i_n) - sum(t_te(:,i_n)*vec1) * vec1
+!
+!   ! normalisation
+!   t_te(:,i_n) = t_te(:,i_n) / norm2(t_te(:,i_n))
+!
+!!  transpose transformation to obtain the "transformed" unit vecotr at the te
+!   t_te(:,i_n) = matmul(transpose(geo%refs(comp%ref_id)%R_g),t_te(:,i_n))
+!
+! end do
+!
+!
+! ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+! ! Update overall structure --------
+! if (.not.allocated(te%e)) then ! it should be enough
+!   allocate(te%e    (2,ne_te) ) ; te%e     =     e_te
+!   allocate(te%i    (2,nn_te) ) ; te%i     =     i_te
+!   allocate(te%rr   (3,nn_te) ) ; te%rr    =    rr_te
+!   allocate(te%ii   (2,ne_te) ) ; te%ii    =    ii_te
+!   allocate(te%neigh(2,ne_te) ) ; te%neigh = neigh_te
+!   allocate(te%o    (2,ne_te) ) ; te%o     =     o_te
+!   allocate(te%t    (2,nn_te) ) ; te%t     =     t_te
+!   allocate(te%ref  (  nn_te) ) ; te%ref   =   ref_te
+! else
+!   nn_te_prev = size(te%i,2)
+!   ne_te_prev = size(te%e,2)
+!   allocate(e_te_tmp(2,size(te%e,2)+ne_te)) 
+!   e_te_tmp(:,             1:size(te%e,2)    ) = te%e
+!   e_te_tmp(:,size(te%e,2)+1:size(e_te_tmp,2)) = e_te
+!   call move_alloc(e_te_tmp,te%e) 
+!   allocate(i_te_tmp(2,size(te%i,2)+nn_te)) 
+!   i_te_tmp(:,             1:size(te%i,2)    ) = te%i
+!   i_te_tmp(:,size(te%i,2)+1:size(i_te_tmp,2)) = i_te
+!   call move_alloc(i_te_tmp,te%i) 
+!   allocate(rr_te_tmp(3,size(te%rr,2)+nn_te)) 
+!   rr_te_tmp(:,              1:size(te%rr,2)    ) = te%rr
+!   rr_te_tmp(:,size(te%rr,2)+1:size(rr_te_tmp,2)) = rr_te
+!   call move_alloc(rr_te_tmp,te%rr) 
+!   allocate(ii_te_tmp(2,size(te%ii,2)+ne_te)) 
+!   ii_te_tmp(:,              1:size(te%ii,2)    ) = te%ii
+!   ii_te_tmp(:,size(te%ii,2)+1:size(ii_te_tmp,2)) = ii_te + nn_te_prev 
+!   call move_alloc(ii_te_tmp,te%ii) 
+!   allocate(neigh_te_tmp(2,size(te%neigh,2)+ne_te)) 
+!   neigh_te_tmp(:,                 1:size(te%neigh,2)    ) = te%neigh
+!   where ( neigh_te .ne. 0 ) neigh_te = neigh_te + ne_te_prev
+!   neigh_te_tmp(:,size(te%neigh,2)+1:size(neigh_te_tmp,2)) = neigh_te
+!   call move_alloc(neigh_te_tmp,te%neigh) 
+!   allocate( o_te_tmp(2,size(te%o ,2)+ne_te)) 
+!   o_te_tmp(:,              1:size(te%o ,2)    ) = te%o 
+!   o_te_tmp(:,size(te%o ,2)+1:size( o_te_tmp,2)) =  o_te 
+!   call move_alloc(o_te_tmp,te%o ) 
+!   allocate( t_te_tmp(3,size(te%t ,2)+nn_te)) 
+!   t_te_tmp(:,              1:size(te%t ,2)    ) = te%t 
+!   t_te_tmp(:,size(te%t ,2)+1:size( t_te_tmp,2)) =  t_te 
+!   call move_alloc(t_te_tmp,te%t ) 
+!   allocate(ref_te_tmp(size(te%ref   )+nn_te)) 
+!   ref_te_tmp(                 1:size(te%ref   )   ) =  te%ref 
+!   ref_te_tmp(  size(te%ref  )+1:size(ref_te_tmp  )) = ref_te 
+!   call move_alloc(ref_te_tmp,te%ref) 
+! end if
+!
+!
+!end subroutine find_te
+!
+!! 04. Inside build_te : find_te_v --------
+!! It is assumed that nodes and elements are sorted as follows
+!!
+!!  1-----5-----9-----13----17----21   <--- LE
+!!  |  1  |  4  |  7  |  10 |  13 |
+!!  2-----6-----10----14----18----22
+!!  |  2  |  5  |  8  |  11 |  14 |
+!!  3-----7-----11----15----19----23
+!!  |  3  |  6  |  9  |  12 |  15 |
+!!  4-----8-----12----16----20----24   <--- TE
+!
+!subroutine find_te_v( geo , comp , elems , te )
+! type(t_geo)   , intent(in), target :: geo
+! type(t_geo_component), intent(in) :: comp
+! type(t_elem_p)       , intent(in) :: elems(:)
+!!type(t_elem_p)       , intent(in) :: elems_m(:) ! read "actual" neighbors
+! type(t_tedge)        , intent(inout) :: te
+!
+! ! tmp arrays --------
+! integer , allocatable               :: e_te_tmp(:,:) , i_te_tmp(:,:) , ii_te_tmp(:,:) 
+! integer , allocatable               :: neigh_te_tmp(:,:) , o_te_tmp(:,:)
+! real(wp), allocatable               ::rr_te_tmp(:,:) , t_te_tmp(:,:)
+! integer , allocatable               :: ref_te_tmp(:)
+! integer , allocatable               :: i_el_nodes_tmp(:,:)
+! ! actual arrays -----
+! integer , allocatable               :: e_te(:,:) , i_te(:,:) , ii_te(:,:) 
+! integer , allocatable               :: neigh_te(:,:) , o_te(:,:)
+! real(wp), allocatable               ::rr_te(:,:) , t_te(:,:)
+! integer , allocatable               :: ref_te(:)
+!
+! integer :: n_el
+! integer :: ne_te , nn_te           ! # n. elements and nodes at TE (for the actual comp)
+! integer :: ne_te_prev , nn_te_prev ! # n. elements and nodes at TE ( of the prev. comps) 
+!
+! integer :: io_te , io_tip
+! integer :: i_el , n_free , n_free_le_te , i_v , ie_ind
+! integer :: i_node1 , i_node2 , ind_te 
+! integer :: nSides1 , nSides2 
+! integer :: i_node3 , i_node4
+!
+! integer :: i1, i2, e1, e2
+!
+!
+! n_el = size(comp%el)
+!
+! ! allocate tmp structures --
+! allocate( e_te_tmp(2,(n_el+1)/2) )                ;  e_te_tmp = 0 
+! allocate( i_el_nodes_tmp(2,size(comp%i_points)) ) ;  i_el_nodes_tmp = 0
+! allocate( i_te_tmp      (2,size(comp%i_points)) ) ;  i_te_tmp = 0
+! allocate(ii_te_tmp      (2,n_el               ) ) ; ii_te_tmp = 0
+! allocate(rr_te_tmp      (3,size(comp%i_points)) ) ; rr_te_tmp = 0.0d0
+! allocate( t_te_tmp      (3,size(comp%i_points)) ) ; rr_te_tmp = 0.0d0
+!
+!
+! ! initialise counters ------
+! ne_te = 0 ; nn_te = 0
+!
+! ! Find elements on the TE --------
+! ! "logical" to know if you are on a tip element an on the TE/LE elements
+! io_tip = 1  ;  io_te  = 0 ! initialisation 
+! do i_el = 1 , n_el
+!
+!   ie_ind = comp%el(i_el)%id
+!
+!   n_free = 0 
+!   do i_v = 1 , comp%el(i_el)%n_ver
+!     if ( comp%el(i_el)%i_neigh(i_v) .eq. 0 ) n_free = n_free + 1
+!   end do
+!
+!   ! Back on the tip ----
+!   if ( n_free .eq. 2 ) then
+!      n_free_le_te = 2 ! on the tip
+!      if ( io_tip .eq. 0 ) io_tip = 1
+!   end if
+!   ! n. free edges on the te,le: tip -> 2 ; inner elements -> 1
+!   if ( io_tip .eq. 1 ) then
+!     n_free_le_te = 2
+!   elseif ( io_tip .eq. 0 ) then
+!     n_free_le_te = 1
+!   end if 
+!
+!   if ( ( n_free .eq. n_free_le_te ) .and. ( io_te .eq. 1 ) ) then ! Element at TE
+!
+!     ! element number: first component only of e_te ----------   
+!     ne_te = ne_te + 1
+!     e_te_tmp(1,ne_te) = ie_ind 
+!
+!     ! find i_node1 , i_node2 --------------------------------
+!     if     ( n_free .eq. 2 ) then     ! on wing tips --------
+!       ! two sides have no neighbors: TE must be identified
+!  
+!       do i1 = 1 , comp%el(i_el)%n_ver
+!         if ( ( comp%el(i_el)%i_neigh(i1)   .eq. 0 ) .and. &
+!              ( comp%el(i_el-1)%i_neigh(i1) .ne. 0 ) ) then
+!             ind_te = i1 ; exit 
+!         end if
+!       end do
+!
+!!      i_node1 = elems(ie_ind)%p%i_ver(ind_te)  
+!!      i_node2 = elems(ie_ind)%p%i_ver( mod(ind_te,elems(ie_ind)%p%n_ver)+1 )   
+!
+!     elseif ( n_free .eq. 1 ) then     ! inner elems ---------
+!
+!       do i1 = 1 , comp%el(i_el)%n_ver
+!         if ( comp%el(i_el)%i_neigh(i1) .eq. 0 ) then 
+!           ind_te = i1 ; exit 
+!         end if
+!       end do
+!
+!     end if
+!
+!     i_node1 = elems(ie_ind)%p%i_ver(ind_te)  
+!     i_node2 = elems(ie_ind)%p%i_ver( mod(ind_te  ,elems(ie_ind)%p%n_ver)+1 )   
+!     i_node3 = elems(ie_ind)%p%i_ver( mod(ind_te+1,elems(ie_ind)%p%n_ver)+1 )   
+!     i_node4 = elems(ie_ind)%p%i_ver( mod(ind_te+2,elems(ie_ind)%p%n_ver)+1 )   
+!
+!     ! build i_te , ii_te , rr_te ----------------------------
+!     if ( all ( i_te_tmp(:,1:nn_te) .ne. i_node2 ) ) then ! new node
+!       nn_te = nn_te + 1
+!       i_te_tmp(:,nn_te) = i_node2
+!       rr_te_tmp(:,nn_te) = geo%points(:,i_node2)
+!       ii_te_tmp(1,ne_te) = nn_te
+!       t_te_tmp(:,nn_te)  = geo%points(:,i_node2) - geo%points(:,i_node3)
+!       t_te_tmp(:,nn_te)  = t_te_tmp(:,nn_te) / norm2(t_te_tmp(:,nn_te))
+!
+!!      transpose transformation to obtain the "transformed" unit vecotr at the te
+!       t_te_tmp(:,nn_te) = matmul(transpose(geo%refs(comp%ref_id)%R_g), &
+!                                                         t_te_tmp(:,nn_te))
+!
+!     else ! this node has been already found
+!       do i1 = 1 , nn_te   ! find ...
+!         if ( i_te_tmp(1,i1) .eq. i_node2 ) then 
+!           ii_te_tmp(1,ne_te) = i1 ; exit
+!         end if
+!       end do
+!     end if
+!
+!     if ( all ( i_te_tmp(:,1:nn_te) .ne. i_node1 ) ) then ! new node
+!       nn_te = nn_te + 1
+!       i_te_tmp(:,nn_te) = i_node1
+!       rr_te_tmp(:,nn_te) = geo%points(:,i_node1)
+!       ii_te_tmp(2,ne_te) = nn_te
+!       t_te_tmp(:,nn_te)  = geo%points(:,i_node1) - geo%points(:,i_node4)
+!       t_te_tmp(:,nn_te)  = t_te_tmp(:,nn_te) / norm2(t_te_tmp(:,nn_te))
+!
+!!      transpose transformation to obtain the "transformed" unit vecotr at the te
+!       t_te_tmp(:,nn_te) = matmul(transpose(geo%refs(comp%ref_id)%R_g), &
+!                                                         t_te_tmp(:,nn_te))
+!
+!     else ! this node has been already found
+!       do i1 = 1 , nn_te   ! find ...
+!         if ( i_te_tmp(1,i1) .eq. i_node1 ) then 
+!           ii_te_tmp(2,ne_te) = i1 ; exit
+!         end if
+!       end do
+!     end if
+!
+!
+!   end if
+!
+!   ! Next element ----
+!   if     ( ( n_free .eq. n_free_le_te ) .and. ( io_te .eq. 0 ) ) then
+!      io_te = 1 
+!   elseif ( ( n_free .eq. n_free_le_te ) .and. ( io_te .eq. 1 ) ) then
+!      io_te = 0 ; io_tip = 0
+!   end if
+!
+! end do
+!
+!  
+! ! From tmp to actual e_te array --------------------
+! if (allocated(e_te)) deallocate(e_te)
+! allocate(e_te(2,ne_te)) ; e_te = e_te_tmp(:,1:ne_te)
+! 
+! ! From tmp to actual i_te array --------------------
+! if (allocated(i_te)) deallocate(i_te)
+! allocate(i_te(2,nn_te)) ; i_te = i_te_tmp(:,1:nn_te)
+! 
+! ! From tmp to actual rr_te array -------------------
+! if (allocated(rr_te))  deallocate(rr_te)
+! allocate(rr_te(3,nn_te)) ; rr_te = rr_te_tmp(:,1:nn_te)
+! 
+! ! From tmp to actual ii_te array -------------------
+! if (allocated(ii_te))  deallocate(ii_te)
+! allocate(ii_te(2,ne_te)) ; ii_te = ii_te_tmp(:,1:ne_te)
+!
+! ! From tmp to actual rr_te array -------------------
+! if (allocated( t_te))  deallocate( t_te)
+! allocate( t_te(3,nn_te)) ;  t_te =  t_te_tmp(:,1:nn_te)
+!
+! 
+! write(*,*) ' n.edges at the te : ' , ne_te
+! write(*,*) ' n.nodes at the te : ' , nn_te
+!
+! deallocate( e_te_tmp, i_te_tmp, rr_te_tmp, ii_te_tmp , t_te_tmp )
+!
+!
+! ! Trailing edge elements connectivity --------------
+! 
+! allocate(neigh_te(2,ne_te) ) ; neigh_te = 0
+! allocate(    o_te(2,ne_te) ) ;     o_te = 0
+! 
+! do e1 = 1 , ne_te
+!  nSides1 = 2
+!  do i1 = 1 , nSides1
+!   do e2 = e1+1 , ne_te
+!    nSides2 = 2
+!    do i2 = 1 , nSides2
+!     if ( ii_te(i1,e1) .eq. ii_te(i2,e2) ) then
+!      neigh_te(i1,e1) = e2
+!      neigh_te(i2,e2) = e1
+!      if ( i1 .ne. i2 ) then
+!       o_te(i1,e1) = 1
+!       o_te(i2,e2) = 1
+!      else
+!       o_te(i1,e1) = -1
+!       o_te(i2,e2) = -1
+!      end if 
+!     end if
+!    end do    
+!   end do
+!  end do
+! end do
+!
+! ! Compute unit vector at the te nodes ----------------
+! !  for the first implicit wake panel  ----------------
+! allocate(ref_te(  nn_te)) ; ref_te = comp%ref_id 
+! 
+!
+! ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+! ! Update overall structures and TE connectivity as in find_te()
+! if (.not.allocated(te%e)) then ! it should be enough
+!   allocate(te%e    (2,ne_te) ) ; te%e     =     e_te
+!   allocate(te%i    (2,nn_te) ) ; te%i     =     i_te
+!   allocate(te%rr   (3,nn_te) ) ; te%rr    =    rr_te
+!   allocate(te%ii   (2,ne_te) ) ; te%ii    =    ii_te
+!   allocate(te%neigh(2,ne_te) ) ; te%neigh = neigh_te
+!   allocate(te%o    (2,ne_te) ) ; te%o     =     o_te
+!   allocate(te%t    (2,nn_te) ) ; te%t     =     t_te
+!   allocate(te%ref  (  nn_te) ) ; te%ref   =   ref_te
+! else
+!   nn_te_prev = size(te%i,2)
+!   ne_te_prev = size(te%e,2)
+!   allocate(e_te_tmp(2,size(te%e,2)+ne_te)) 
+!   e_te_tmp(:,             1:size(te%e,2)    ) = te%e
+!   e_te_tmp(:,size(te%e,2)+1:size(e_te_tmp,2)) = e_te
+!   call move_alloc(e_te_tmp,te%e) 
+!   allocate(i_te_tmp(2,size(te%i,2)+nn_te)) 
+!   i_te_tmp(:,             1:size(te%i,2)    ) = te%i
+!   i_te_tmp(:,size(te%i,2)+1:size(i_te_tmp,2)) = i_te
+!   call move_alloc(i_te_tmp,te%i) 
+!   allocate(rr_te_tmp(3,size(te%rr,2)+nn_te)) 
+!   rr_te_tmp(:,              1:size(te%rr,2)    ) = te%rr
+!   rr_te_tmp(:,size(te%rr,2)+1:size(rr_te_tmp,2)) = rr_te
+!   call move_alloc(rr_te_tmp,te%rr) 
+!   allocate(ii_te_tmp(2,size(te%ii,2)+ne_te)) 
+!   ii_te_tmp(:,              1:size(te%ii,2)    ) = te%ii
+!   ii_te_tmp(:,size(te%ii,2)+1:size(ii_te_tmp,2)) = ii_te + nn_te_prev 
+!   call move_alloc(ii_te_tmp,te%ii) 
+!   allocate(neigh_te_tmp(2,size(te%neigh,2)+ne_te)) 
+!   neigh_te_tmp(:,                 1:size(te%neigh,2)    ) = te%neigh
+!   where ( neigh_te .ne. 0 ) neigh_te = neigh_te + ne_te_prev
+!   neigh_te_tmp(:,size(te%neigh,2)+1:size(neigh_te_tmp,2)) = neigh_te
+!   call move_alloc(neigh_te_tmp,te%neigh) 
+!   allocate( o_te_tmp(2,size(te%o ,2)+ne_te)) 
+!   o_te_tmp(:,              1:size(te%o ,2)    ) = te%o 
+!   o_te_tmp(:,size(te%o ,2)+1:size( o_te_tmp,2)) =  o_te 
+!   call move_alloc(o_te_tmp,te%o ) 
+!   allocate( t_te_tmp(3,size(te%t ,2)+nn_te)) 
+!   t_te_tmp(:,              1:size(te%t ,2)    ) = te%t 
+!   t_te_tmp(:,size(te%t ,2)+1:size( t_te_tmp,2)) =  t_te 
+!   call move_alloc(t_te_tmp,te%t ) 
+!   allocate(ref_te_tmp(size(te%ref   )+nn_te)) 
+!   ref_te_tmp(                 1:size(te%ref   )   ) =  te%ref 
+!   ref_te_tmp(  size(te%ref  )+1:size(ref_te_tmp  )) = ref_te 
+!   call move_alloc(ref_te_tmp,te%ref) 
+! end if
+!
+!
+!end subroutine find_te_v
+!
+!
+!end subroutine build_te
 
 !----------------------------------------------------------------------
 

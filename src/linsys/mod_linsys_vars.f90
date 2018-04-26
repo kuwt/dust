@@ -83,11 +83,16 @@ type :: t_linsys
  !> Result of the linear system solution (intensity of the panels doublets)
  real(wp), allocatable :: res(:)
 
+ !> Results of the explicit part of the elements, has more than one column
+ !! since holds previous records for extrapolation
+ real(wp), allocatable :: res_expl(:,:)
+
  !> Number of static and moving panels
  integer :: nstatic, nmoving
 
  !> Number of static and moving lifting lines
- integer :: nstatic_ll, nmoving_ll
+ integer :: nstatic_ll, nmoving_ll, n_ll
+
 end type t_linsys
 
 !----------------------------------------------------------------------

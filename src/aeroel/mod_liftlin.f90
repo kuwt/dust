@@ -39,6 +39,13 @@ module mod_liftlin
 use mod_param, only: &
   wp, pi
 
+use mod_handling, only: &
+  error
+
+use mod_doublet, only: &
+  potential_calc_doublet , &
+  velocity_calc_doublet
+
 use mod_linsys_vars, only: &
   t_linsys
 
@@ -48,7 +55,7 @@ use mod_aero_elements, only: &
 
 implicit none
 
-public :: t_liftlin
+public :: t_liftlin, update_liftlin, solve_liftlin
 
 
 !----------------------------------------------------------------------
@@ -67,9 +74,12 @@ contains
   procedure, pass(this) :: compute_cp       => compute_cp_liftlin
 end type
 
+character(len=*), parameter :: this_mod_name='mod_vortring'
+
 !----------------------------------------------------------------------
 contains
 !----------------------------------------------------------------------
+
 subroutine build_row_liftlin (this, elems, linsys, uinf, ie, ista, iend)
  class(t_liftlin), intent(inout) :: this
  type(t_elem_p), intent(in)       :: elems(:)
@@ -77,10 +87,15 @@ subroutine build_row_liftlin (this, elems, linsys, uinf, ie, ista, iend)
  real(wp), intent(in)             :: uinf(:)
  integer, intent(in)              :: ie
  integer, intent(in)              :: ista, iend
-
+ character(len=*), parameter      :: this_sub_name='build_row_liftlin'
+ 
+  call error(this_sub_name, this_mod_name, 'This was not supposed to &
+  &happen, a team of professionals is underway to remove the evidence')
+ 
 end subroutine build_row_liftlin
 
 !----------------------------------------------------------------------
+
 subroutine build_row_static_liftlin (this, elems, ll_elems, linsys, uinf, ie, ista, iend)
  class(t_liftlin), intent(inout) :: this
  type(t_elem_p), intent(in)       :: elems(:)
@@ -89,10 +104,15 @@ subroutine build_row_static_liftlin (this, elems, ll_elems, linsys, uinf, ie, is
  real(wp), intent(in)             :: uinf(:)
  integer, intent(in)              :: ie
  integer, intent(in)              :: ista, iend
+ character(len=*), parameter      :: this_sub_name='build_row_static_liftlin'
+ 
+  call error(this_sub_name, this_mod_name, 'This was not supposed to &
+  &happen, a team of professionals is underway to remove the evidence')
 
 end subroutine build_row_static_liftlin
 
 !----------------------------------------------------------------------
+
 subroutine add_wake_liftlin (this, wake_elems, impl_wake_ind, linsys, uinf, &
                              ie, ista, iend)
  class(t_liftlin), intent(inout) :: this
@@ -103,10 +123,15 @@ subroutine add_wake_liftlin (this, wake_elems, impl_wake_ind, linsys, uinf, &
  integer, intent(in)             :: ie
  integer, intent(in)             :: ista
  integer, intent(in)             :: iend
+ character(len=*), parameter      :: this_sub_name='add_wake_liftlin'
+ 
+  call error(this_sub_name, this_mod_name, 'This was not supposed to &
+  &happen, a team of professionals is underway to remove the evidence')
 
 end subroutine add_wake_liftlin
 
 !----------------------------------------------------------------------
+
 subroutine add_liftlin_liftlin (this, ll_elems, linsys, uinf, &
                              ie, ista, iend)
  class(t_liftlin), intent(inout) :: this
@@ -116,46 +141,117 @@ subroutine add_liftlin_liftlin (this, ll_elems, linsys, uinf, &
  integer, intent(in)             :: ie
  integer, intent(in)             :: ista
  integer, intent(in)             :: iend
+ character(len=*), parameter      :: this_sub_name='add_liftlin_liftlin'
+ 
+  call error(this_sub_name, this_mod_name, 'This was not supposed to &
+  &happen, a team of professionals is underway to remove the evidence')
 
 end subroutine add_liftlin_liftlin
 
 !----------------------------------------------------------------------
+
 subroutine compute_pot_liftlin (this, A, b, pos,i,j)
-  class(t_liftlin), intent(inout) :: this
-  real(wp), intent(out) :: A
-  real(wp), intent(out) :: b(3)
-  real(wp), intent(in) :: pos(:)
-  integer , intent(in) :: i,j
+ class(t_liftlin), intent(inout) :: this
+ real(wp), intent(out) :: A
+ real(wp), intent(out) :: b(3)
+ real(wp), intent(in) :: pos(:)
+ integer , intent(in) :: i,j
+
+ real(wp) :: dou
+
+  if ( i .ne. j ) then
+    call potential_calc_doublet(this, dou, pos)
+  else
+!   AIC (doublets) = 0.0   -> dou = 0
+    dou = -2.0_wp*pi
+  end if
+
+  A = -dou
+
+  b=0.0_wp
 
 end subroutine compute_pot_liftlin
 
 !----------------------------------------------------------------------
+
 subroutine compute_psi_liftlin (this, A, b, pos, nor, i, j )
-  class(t_liftlin), intent(inout) :: this
-  real(wp), intent(out) :: A
-  real(wp), intent(out) :: b(3)
-  real(wp), intent(in) :: pos(:)
-  real(wp), intent(in) :: nor(:)
-  integer , intent(in) :: i , j
+ class(t_liftlin), intent(inout) :: this
+ real(wp), intent(out) :: A
+ real(wp), intent(out) :: b(3)
+ real(wp), intent(in) :: pos(:)
+ real(wp), intent(in) :: nor(:)
+ integer , intent(in) :: i , j
+
+ real(wp) :: vdou(3) 
+
+  call velocity_calc_doublet(this, vdou, pos)
+
+  A = sum(vdou * nor)
+
+
+  !  b = ... (from boundary conditions)
+  !TODO: consider moving this outside
+  if ( i .eq. j ) then
+    b =  4.0_wp*pi*this%nor
+  else
+    b = 0.0_wp
+  end if
 
 end subroutine compute_psi_liftlin
 
 !----------------------------------------------------------------------
 subroutine compute_vel_liftlin (this, pos, uinf, vel)
-  class(t_liftlin), intent(inout) :: this
-  real(wp), intent(in) :: pos(:)
-  real(wp), intent(in) :: uinf(3)
-  real(wp), intent(out) :: vel(3)
+ class(t_liftlin), intent(inout) :: this
+ real(wp), intent(in) :: pos(:)
+ real(wp), intent(in) :: uinf(3)
+ real(wp), intent(out) :: vel(3)
+
+ real(wp) :: vdou(3)
+
+
+  ! doublet ---
+  call velocity_calc_doublet(this, vdou, pos)
+
+  vel = vdou*this%idou
 
 end subroutine compute_vel_liftlin
 
 !----------------------------------------------------------------------
 subroutine compute_cp_liftlin (this, elems, uinf)
-  class(t_liftlin), intent(inout) :: this
-  type(t_elem_p), intent(in) :: elems(:)
-  real(wp), intent(in) :: uinf(:)
+ class(t_liftlin), intent(inout) :: this
+ type(t_elem_p), intent(in) :: elems(:)
+ real(wp), intent(in) :: uinf(:)
+
+ character(len=*), parameter      :: this_sub_name='add_liftlin_liftlin'
+ 
+  call error(this_sub_name, this_mod_name, 'This was not supposed to &
+  &happen, a team of professionals is underway to remove the evidence')
 
 end subroutine compute_cp_liftlin 
+
+!----------------------------------------------------------------------
+
+subroutine update_liftlin(elems_ll)
+ type(t_elem_p), intent(in) :: elems_ll(:)
+
+ !HERE extrapolate the solution before the linear system
+
+end subroutine update_liftlin
+
+!----------------------------------------------------------------------
+
+subroutine solve_liftlin(elems_ll, elems_tot)
+ type(t_elem_p), intent(in) :: elems_ll(:)
+ type(t_elem_p), intent(in) :: elems_tot(:)
+
+ !Calculate the induced velocity on the airfoil
+
+ !Get the angle of attack, as well as the other parameters
+
+ !Get into the tables to obtain the loads
+
+ !Get the vorticity of the element
+end subroutine solve_liftlin
 
 !----------------------------------------------------------------------
 

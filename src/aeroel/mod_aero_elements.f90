@@ -114,7 +114,8 @@ type, abstract :: c_elem
 ! new
   procedure(i_build_row)  , deferred, pass(this)      :: build_row
   procedure(i_build_row_static), deferred, pass(this) :: build_row_static
-  procedure(i_add_wake), deferred, pass(this)         :: add_wake
+  procedure(i_add_wake),    deferred, pass(this)      :: add_wake
+  procedure(i_add_liftlin), deferred, pass(this)      :: add_liftlin
   procedure(i_compute_pot), deferred, pass(this)      :: compute_pot
   procedure(i_compute_vel), deferred, pass(this)      :: compute_vel
   procedure(i_compute_psi), deferred, pass(this)      :: compute_psi

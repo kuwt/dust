@@ -53,6 +53,9 @@ use mod_geometry, only: &
 use mod_aero_elements, only: &
   c_elem, t_elem_p !, t_vp
 
+use mod_liftlin, only: &
+ update_liftlin, solve_liftlin 
+
 use mod_linsys_vars, only: &
   t_linsys
 
@@ -209,7 +212,8 @@ sim_param%debug_level = debug_level
 !------ Geometry creation ------
 call printout(nl//'====== Geometry Creation ======')
 t0 = dust_time()
-call create_geometry(prms, input_file_name, geo, te, elems, sim_param)
+call create_geometry(prms, input_file_name, geo, te, elems, elems_ll, &
+                     elems_tot, sim_param)
 t1 = dust_time()
 if(debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Created geometry in: ' , t1 - t0,' s.'
@@ -263,6 +267,8 @@ do it = 1,nstep
 
   call update_geometry(geo, time, .false.)
 
+  call update_liftlin(elems_ll)
+
   if((debug_level .ge. 16).and.time_2_debug_out)&
             call debug_printout_geometry(elems, geo, basename_debug, it)
 
@@ -290,7 +296,6 @@ do it = 1,nstep
   t1 = dust_time()
 
   ! compute time derivative of the result ( = i_vortex = -i_doublet ) ----------
-  write(*,*) ' dt = ' , sim_param%dt
   do i_el = 1 , size(elems)
     elems(i_el)%p%didou_dt = ( linsys%res(i_el) - res_old(i_el) ) / sim_param%dt 
 !   if ( it .eq. 2 ) then
@@ -308,6 +313,9 @@ do it = 1,nstep
 
   if (debug_level .ge. 20.and.time_2_debug_out) &
                          call debug_printout_result(linsys, basename_debug, it)
+
+  !------ Update the explicit part ------
+  call solve_liftlin(elems_ll, elems_tot)
 
   !------ Compute loads -------
   do i_el = 1 , size(elems)
@@ -329,7 +337,7 @@ do it = 1,nstep
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
   !  next iteration)
-  call update_wake_panels(wake_panels, elems, dt, uinf)
+  call update_wake_panels(wake_panels, elems_tot, dt, uinf)
 
   time = min(tend, time+dt)
 

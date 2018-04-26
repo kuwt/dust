@@ -79,7 +79,9 @@ type :: t_wake_panels
 
  !> Index of the 2 generating elements of the wake
  !! (2 x n_wake_stripes)
- integer, allocatable :: gen_elems(:,:)
+ !integer, allocatable :: gen_elems(:,:)
+ type(t_elem_p), allocatable :: gen_elems(:,:)
+ integer, allocatable :: gen_elems_id(:,:)
 
  !> Index of the 2 generating points of each wake point
  !! (2 x n_wake_points)
@@ -138,6 +140,7 @@ subroutine initialize_wake_panels(wake, geo, te,  npan)
   wake%n_wake_stripes = size(te%e,2)
   wake%n_wake_points  = size(te%i,2)
   allocate(wake%gen_elems(2,wake%n_wake_stripes))
+  allocate(wake%gen_elems_id(2,wake%n_wake_stripes))
   allocate(wake%gen_points(2,wake%n_wake_points))
   allocate(wake%gen_dir(3,wake%n_wake_points))
   allocate(wake%gen_ref(wake%n_wake_points))
@@ -174,6 +177,15 @@ subroutine initialize_wake_panels(wake, geo, te,  npan)
   wake%gen_dir = te%t
   wake%gen_ref = te%ref
   wake%i_start_points = te%ii
+
+  do iw=1,wake%n_wake_stripes
+    wake%gen_elems_id(1,iw) = wake%gen_elems(1,iw)%p%id
+    if(associated(wake%gen_elems(2,iw)%p)) then
+      wake%gen_elems_id(2,iw) = wake%gen_elems(2,iw)%p%id
+    else
+      wake%gen_elems_id(2,iw) = 0
+    endif
+  enddo
 
   wake%ivort = 0.0_wp
 
@@ -253,7 +265,9 @@ end subroutine prepare_wake_panels
 
 !> Update the position and the intensities of the wake panels
 !!
-!!
+!! Note: at this subroutine is passed the whole array of elements,
+!! comprising both the implicit panels and the explicit (ll) 
+!! elements
 subroutine update_wake_panels(wake, elems, dt, uinf)
  type(t_wake_panels), intent(inout), target :: wake
  type(t_elem_p), intent(in) :: elems(:)
@@ -271,11 +285,14 @@ subroutine update_wake_panels(wake, elems, dt, uinf)
   !      it was already calculated (implicitly) in the linear system
   do iw = 1,wake%n_wake_stripes
     ! 
-    if      ( wake%gen_elems(2,iw) .ne. 0 ) then
-      wake%wake_panels(iw,1)%idou  = elems(wake%gen_elems(1,iw))%p%idou - &
-                                     elems(wake%gen_elems(2,iw))%p%idou
-    else if ( wake%gen_elems(2,iw) .eq. 0 ) then
-      wake%wake_panels(iw,1)%idou  = elems(wake%gen_elems(1,iw))%p%idou
+    if      ( associated(wake%gen_elems(2,iw)%p) ) then
+      !wake%wake_panels(iw,1)%idou  = elems(wake%gen_elems(1,iw))%p%idou - &
+      !                               elems(wake%gen_elems(2,iw))%p%idou
+      wake%wake_panels(iw,1)%idou  = wake%gen_elems(1,iw)%p%idou - &
+                                     wake%gen_elems(2,iw)%p%idou
+    else if ( .not. associated(wake%gen_elems(2,iw)%p) ) then
+      !wake%wake_panels(iw,1)%idou  = elems(wake%gen_elems(1,iw))%p%idou
+      wake%wake_panels(iw,1)%idou  = wake%gen_elems(1,iw)%p%idou
     end if
   enddo
 
