@@ -181,7 +181,9 @@ type :: t_geo_component
  !> Number of ll elements in each region. Size(nelem_span_list) = nRegions
  integer, allocatable :: nelem_span_list(:)
  !> Normalised coordinate of sections in each wing region. Size(...) = nRegions+1
- real(wp),allocatable :: normalised_coord_p(:)
+ real(wp),allocatable :: normalised_coord_e(:,:)
+ !> Id of the airfoil elements (index in airfoil_list char array)
+ integer ,allocatable :: i_airfoil_e(:,:)
  
 !character(len=max_char_len), allocatable :: airfoil_table_p(:,:)
 
@@ -369,6 +371,8 @@ subroutine create_geometry(prms, in_file_name,  geo, te, &
   call load_components(geo, geo_file_name, sim_param, te)
 
   call import_aero_tab(geo,airfoil_data)
+write(*,*) ' bye from l.374 in mod_geo.f90.' 
+stop
 
   ! Initialisation
   geo%nelem      = 0
@@ -575,8 +579,8 @@ subroutine load_components(geo, in_file, sim_param, te)
  ! Connectivity and te structures 
  integer , allocatable :: neigh(:,:)
  ! Lifting Line elements
- real(wp), allocatable :: normalised_coord_p(:)
- character(max_char_len) , allocatable :: airfoil_table_p(:,:)
+ real(wp), allocatable :: normalised_coord_e(:,:)
+ integer                 , allocatable :: i_airfoil_e(:,:)
  character(max_char_len) , allocatable :: airfoil_list(:)
  integer                 , allocatable :: nelem_span_list(:)
 
@@ -683,18 +687,22 @@ subroutine load_components(geo, in_file, sim_param, te)
       call read_hdf5_al(ee   ,'ee'   ,geo_loc)
       call read_hdf5_al(rr   ,'rr'   ,geo_loc)
       call read_hdf5_al(neigh,'neigh',geo_loc)
-        ! element-specific reads 
+      ! element-specific reads 
       if ( comp_el_type(1:1) .eq. 'l' ) then
-        call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc)
-        call read_hdf5_al(nelem_span_list   ,'nelem_span_list'   ,geo_loc)
-        call read_hdf5_al(normalised_coord_p,'normalised_coord_p',geo_loc)
-        call read_hdf5_al(airfoil_table_p   ,'airfoil_table_p'   ,geo_loc)
+        call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc) ! (:)
+        call read_hdf5_al(nelem_span_list   ,'nelem_span_list'   ,geo_loc) ! (:)
+        call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc) ! (:,:)
+        call read_hdf5_al(normalised_coord_e,'normalised_coord_e',geo_loc) ! (:,:)
         allocate(geo%components(i_comp)%airfoil_list(size(airfoil_list))) 
         geo%components(i_comp)%airfoil_list = airfoil_list 
         allocate(geo%components(i_comp)%nelem_span_list(size(nelem_span_list))) 
         geo%components(i_comp)%nelem_span_list = nelem_span_list 
-        allocate(geo%components(i_comp)%normalised_coord_p(size(normalised_coord_p))) 
-        geo%components(i_comp)%normalised_coord_p = normalised_coord_p
+        allocate(geo%components(i_comp)%i_airfoil_e( &
+              size(i_airfoil_e,1),size(i_airfoil_e,2)) ) 
+        geo%components(i_comp)%i_airfoil_e = i_airfoil_e 
+        allocate(geo%components(i_comp)%normalised_coord_e( &
+              size(normalised_coord_e,1),size(normalised_coord_e,2))) 
+        geo%components(i_comp)%normalised_coord_e = normalised_coord_e
       end if
       call close_hdf5_group(geo_loc)
 
@@ -885,8 +893,9 @@ subroutine import_aero_tab(geo,coeff)
  integer :: n_tmp , n_tmp2
  character(len=max_char_len) , allocatable :: list_tmp(:) 
  character(len=max_char_len) , allocatable :: list_tmp_tmp(:) 
+ integer , allocatable :: i_airfoil_e_tmp (:,:)
 
- integer :: i_c , n_c , i_a , n_a
+ integer :: i_c , n_c , i_a , n_a , i_ , i_l
 
 ! Test ---
  real(wp) , allocatable :: c(:)
@@ -900,9 +909,18 @@ subroutine import_aero_tab(geo,coeff)
  do i_c = 1 ,  n_c
 
    if ( geo%components(i_c)%comp_el_type .eq. 'l' ) then
+    
+     allocate( i_airfoil_e_tmp( &
+          size(geo%components(i_c)%i_airfoil_e,1), size(geo%components(i_c)%i_airfoil_e,2) ) ) 
+     i_airfoil_e_tmp = 0
+
      do i_a = 1 , size(geo%components(i_c)%airfoil_list)
+
        if ( all( geo%components(i_c)%airfoil_list(i_a) .ne. list_tmp(1:n_a) ) ) then
+         ! new airfoil ----
          n_a = n_a + 1
+
+         where ( geo%components(i_c)%i_airfoil_e .eq. i_a ) i_airfoil_e_tmp = n_a 
         
          ! if n_a > n_tmp --> movalloc
          if ( n_a .gt. n_tmp ) then
@@ -916,8 +934,32 @@ subroutine import_aero_tab(geo,coeff)
  
          list_tmp(n_a) = geo%components(i_c)%airfoil_list(i_a)
 
+       else
+         ! airfoil already used: find the element and replace the global index
+         do i_l = 1 , n_a
+           if ( geo%components(i_c)%airfoil_list(i_a) .eq. list_tmp(i_l) ) exit
+         end do
+
+         where ( geo%components(i_c)%i_airfoil_e .eq. i_a ) i_airfoil_e_tmp = i_l 
+
        end if
+
+
      end do
+
+   geo%components(i_c)%i_airfoil_e = i_airfoil_e_tmp
+
+   deallocate(i_airfoil_e_tmp)
+     
+   ! check ----
+   write(*,*) ' mod_geo.f89/import_aero_tab().  Component: ' , i_c
+   write(*,*) ' size(geo%components(',i_c,')%i_airfoil_e : ' , shape(geo%components(i_c)%i_airfoil_e)
+   do i_l = 1 , size(geo%components(i_c)%i_airfoil_e,2)
+     write(*,*) geo%components(i_c)%i_airfoil_e(:,i_l)
+   end do
+   write(*,*)
+   ! check ----
+
    end if
 
  end do

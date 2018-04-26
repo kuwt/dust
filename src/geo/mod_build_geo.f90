@@ -130,8 +130,8 @@ subroutine build_component(gloc, geo_file, comp_id)
 
  character(len=max_char_len), allocatable :: airfoil_list(:)
  integer , allocatable                    :: nelem_span_list(:)
- character(len=max_char_len), allocatable :: airfoil_table_p(:,:)
- real(wp) , allocatable                   :: normalised_coord_p(:)
+ integer , allocatable                    :: i_airfoil_e(:,:)
+ real(wp) , allocatable                   :: normalised_coord_e(:,:)
 
  integer :: npoints_chord_tot, nelems_span, nelems_span_tot
  ! Connectivity and te structures 
@@ -211,7 +211,7 @@ subroutine build_component(gloc, geo_file, comp_id)
     else ! LIFTING LINE element
       call read_mesh_ll(trim(mesh_file),ee,rr, &
                         airfoil_list   , nelem_span_list   , &
-                        airfoil_table_p, normalised_coord_p, &
+                        i_airfoil_e    , normalised_coord_e, &
                                 npoints_chord_tot, nelems_span, &
                                 chord_p,theta_p )
       ! nelems_span_tot will be overwritten if symmetry is required (around l.220)
@@ -221,8 +221,8 @@ subroutine build_component(gloc, geo_file, comp_id)
       call write_hdf5(nelem_span_list,'nelem_span_list',geo_loc)
       call write_hdf5(theta_p,'theta_p',geo_loc)
       call write_hdf5(chord_p,'chord_p',geo_loc)
-      call write_hdf5(airfoil_table_p,'airfoil_table_p',geo_loc)
-      call write_hdf5(normalised_coord_p,'normalised_coord_p',geo_loc)
+      call write_hdf5(i_airfoil_e,'i_airfoil_e',geo_loc)
+      call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
 
     end if
    case default

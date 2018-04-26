@@ -267,7 +267,7 @@ do it = 1,nstep
 
   call update_geometry(geo, time, .false.)
 
-  call update_liftlin(elems_ll)
+  call update_liftlin(elems_ll,linsys)
 
   if((debug_level .ge. 16).and.time_2_debug_out)&
             call debug_printout_geometry(elems, geo, basename_debug, it)

@@ -64,7 +64,7 @@ contains
 
 subroutine read_mesh_ll(mesh_file,ee,rr, &
                         airfoil_list   , nelem_span_list   , &
-                        airfoil_table_p, normalised_coord_p, &
+                        i_airfoil_e    , normalised_coord_e, &
                            npoints_chord_tot,nelem_span_tot, &
                                             chord_p,theta_p)
 
@@ -73,8 +73,8 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
  real(wp) , allocatable, intent(out) :: rr(:,:) 
  character(len=max_char_len), allocatable , intent(out) :: airfoil_list(:)
  integer  , allocatable, intent(out) :: nelem_span_list(:)
- character(len=max_char_len), allocatable , intent(out) :: airfoil_table_p(:,:)
- real(wp) , allocatable, intent(out) :: normalised_coord_p(:)
+ integer  , allocatable, intent(out) :: i_airfoil_e(:,:)
+ real(wp) , allocatable, intent(out) :: normalised_coord_e(:,:)
  integer  , intent(out), optional    :: npoints_chord_tot, nelem_span_tot
  real(wp) , allocatable, intent(out), optional :: chord_p(:),theta_p(:)
 
@@ -100,8 +100,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
  real(wp) :: dx_ref , dy_ref , dz_ref
  integer :: ista , iend , ich
  
- real(wp), allocatable :: span_fraction(:)
-
  integer :: fid
 
  character(len=*), parameter :: this_sub_name = 'read_mesh_parametric'
@@ -226,11 +224,13 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   allocate(rr   (3,rr_size)) ; rr      = 0.0_wp
   allocate(chord_p(npoint_span_tot)) ; chord_p = 0.0_wp
   allocate(theta_p(npoint_span_tot)) ; theta_p = 0.0_wp
-  allocate(airfoil_table_p (2,npoint_span_tot)) ;
-  allocate(normalised_coord_p(npoint_span_tot)) ; normalised_coord_p = 0.0_wp
+  allocate(i_airfoil_e       (2,nelem_span_tot)) ; i_airfoil_e        = 0
+  allocate(normalised_coord_e(2,nelem_span_tot)) ; normalised_coord_e = 0.0_wp
+! old
+! allocate(airfoil_table_p (2,npoint_span_tot)) ;
+! allocate(normalised_coord_p(npoint_span_tot)) ; normalised_coord_p = 0.0_wp
 
   ! Initialize the span division to the maximum dimension
-  allocate(span_fraction(maxval(nelem_span_list))) ; span_fraction = 0.0_wp
   allocate(rrSection1(3,npoint_chord_tot)) ; rrSection1 = 0.0_wp
   allocate(rrSection2(3,npoint_chord_tot)) ; rrSection2 = 0.0_wp
 
@@ -260,8 +260,8 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
       chord_p(ich) = chord_list(1)
       theta_p(ich) = twist_list(1)
 
-      airfoil_table_p( 1,ich) = airfoil_list(iRegion) 
-      airfoil_table_p( 2,ich) = airfoil_list(iRegion+1)
+      i_airfoil_e(1,ich) = iRegion 
+      i_airfoil_e(2,ich) = iRegion+1
 
       ! Update rr
       rr(:,ista:iend) = rrSection1
@@ -275,7 +275,9 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     rrSection2(:,1) = rrSection1(:,1) + (/ dx_ref , dy_ref , dz_ref /)
     rrSection2(:,2) = rrSection2(:,1) + chord_list(iRegion+1) * &
               (/ cos(twist_list(iRegion+1)) , 0.0_wp , -sin(twist_list(iRegion+1)) /)
-  
+ 
+    
+ 
     ! Interpolation of the nodes of the region i (between sections i and i+1)
     do iSpan = 1 , nelem_span_list(iRegion)
       ista = iend + 1 
@@ -289,10 +291,14 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
       theta_p(ich) = twist_list(iRegion) + dble(iSpan) / dble(nelem_span_list(iRegion)) * &
                  ( twist_list(iRegion+1) - twist_list(iRegion) )
       ! airfoil file and non-dimensional coordinate between two sections
-      airfoil_table_p( 1,ich) = airfoil_list(iRegion) 
-      airfoil_table_p( 2,ich) = airfoil_list(iRegion+1)
-      normalised_coord_p(ich) = ( rr(2,ista) - rrSection1(2,iRegion) ) / &
-                     ( rrSection2(2,iRegion) - rrSection1(2,iRegion) )
+      i_airfoil_e( 1,ich-1) = iRegion 
+      i_airfoil_e( 2,ich-1) = iRegion+1
+      normalised_coord_e(2,ich-1) = ( rr(2,ista) - rrSection1(2,iRegion) ) / &
+                         ( rrSection2(2,iRegion) - rrSection1(2,iRegion) )
+      if ( iSpan .ne. 1 ) then ! else = 0.0_wp
+        normalised_coord_e(1,ich-1) = normalised_coord_e(2,ich-2)
+      end if
+
     end do
   
   end do
