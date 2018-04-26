@@ -779,11 +779,6 @@ subroutine load_components(geo, in_file, sim_param, te)
         geo%components(i_comp)%el(i2)%moving = geo%components(i_comp)%moving
         allocate(geo%components(i_comp)%el(i2)%vel(3))
 
-        !element-specific fields
-        if ( trim(geo%components(i_comp)%comp_el_type) .eq. 'l' ) then
-          call read_hdf5_al(normalised_coord_p,'normalised_coord_p',geo_loc)
-          call read_hdf5_al(airfoil_table_p   ,'airfoil_table_p'   ,geo_loc)
-        end if
       enddo
       
 
@@ -981,6 +976,8 @@ subroutine prepare_geometry(geo)
 
       class is(t_liftlin)
        allocate(elem%tang(3,2))
+       allocate(elem%tang_cen(3))
+       allocate(elem%bnorm_cen(3))
        allocate(elem%verp(3,nsides))
        allocate(elem%edge_vec(3,nsides))
        allocate(elem%edge_len(nsides))
@@ -1149,6 +1146,13 @@ subroutine calc_geo_data_ll(elem,vert)
   do is = 1 , nSides
     elem%edge_uni(:,is) = elem%edge_vec(:,is) / elem%edge_len(is)
   end do
+
+  ! single tangent at the center
+  elem%tang_cen = elem%edge_uni(:,2) - elem%edge_uni(:,4)
+  elem%tang_cen = elem%tang_cen / norm2(elem%tang_cen)
+
+  elem%bnorm_cen = cross(elem%tang_cen, elem%norm)
+  elem%bnorm_cen = elem%bnorm_cen / norm2(elem%bnorm_cen)
 
   ! cosTi , sinTi
   do is = 1 , nsides

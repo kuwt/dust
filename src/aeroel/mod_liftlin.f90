@@ -61,7 +61,11 @@ public :: t_liftlin, update_liftlin, solve_liftlin
 !----------------------------------------------------------------------
 
 type, extends(c_elem) :: t_liftlin
-  real(wp), allocatable :: norm_coord_p
+  real(wp)              :: norm_coord_p
+  real(wp), allocatable :: tang_cen(:)
+  real(wp), allocatable :: bnorm_cen(:)
+  real(wp)              :: csi
+  integer               :: i_airfoil(2)
 contains
 
   procedure, pass(this) :: build_row        => build_row_liftlin
@@ -231,20 +235,52 @@ end subroutine compute_cp_liftlin
 
 !----------------------------------------------------------------------
 
-subroutine update_liftlin(elems_ll)
- type(t_elem_p), intent(in) :: elems_ll(:)
+subroutine update_liftlin(elems_ll, linsys)
+ type(t_elem_p), intent(inout) :: elems_ll(:)
+ type(t_linsys), intent(inout) :: linsys
 
- !HERE extrapolate the solution before the linear system
+ real(wp), allocatable :: res_temp(:)
+
+  !HERE extrapolate the solution before the linear system
+  allocate(res_temp(size(linsys%res_expl,1)))
+  res_temp = linsys%res_expl(:,1)
+  linsys%res_expl(:,1) = 2.0_wp*res_temp - linsys%res_expl(:,2)
+  linsys%res_expl(:,2) = res_temp
+  deallocate(res_temp)
 
 end subroutine update_liftlin
 
 !----------------------------------------------------------------------
 
-subroutine solve_liftlin(elems_ll, elems_tot)
- type(t_elem_p), intent(in) :: elems_ll(:)
- type(t_elem_p), intent(in) :: elems_tot(:)
+subroutine solve_liftlin(elems_ll, elems_tot, uinf)
+ type(t_elem_p), intent(inout) :: elems_ll(:)
+ type(t_elem_p), intent(in)    :: elems_tot(:)
+ real(wp), intent(in)          :: uinf(3)
+
+ integer :: i_l, j
+ real(wp) :: vel(3), v(3), up(3)
+ real(wp) :: unorm, alpha, mach, re
+ real(wp) :: aero_coeff(3)
 
  !Calculate the induced velocity on the airfoil
+ do i_l = 1,size(elems_ll)
+   vel = 0.0_wp
+   do j = 1,size(elems_tot)
+     call compute_vel(elems_ll(i_l)%p%cen,uinf,vel)
+     vel = vel + v
+   enddo
+     vel = vel/(4.0_wp*pi) + uinf - elems_ll(i_l)%p%ub
+     up = vel-elems_ll(i_l)%p%bnorm_cen*sum(elems_ll(i_l)%p%bnorm_cen*vel)
+     unorm = norm2(up)
+     alpha = atan2(sum(up*elem_ll(i_l)%p%norm), sum(up*elem_ll(i_l)%p%tang_cen))
+     alpha = alpha * 180.0_wp/pi
+     !TODO: fix these parameters which are still hard-coded
+     mach = 0.0_wp
+     re = 1000000.0_wp
+     call interp_aero_coeff ( airfoil_data ,  &
+                    csi , airfoil_id , (/alpha, mach, re/) , aero_coeff )
+ enddo
+
 
  !Get the angle of attack, as well as the other parameters
 

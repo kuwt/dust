@@ -315,7 +315,7 @@ do it = 1,nstep
                          call debug_printout_result(linsys, basename_debug, it)
 
   !------ Update the explicit part ------
-  call solve_liftlin(elems_ll, elems_tot)
+  call solve_liftlin(elems_ll, elems_tot, uinf)
 
   !------ Compute loads -------
   do i_el = 1 , size(elems)

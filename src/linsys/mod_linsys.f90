@@ -103,6 +103,7 @@ subroutine initialize_linsys(linsys, geo, elems, wake_elems, ll_elems, uinf)
   allocate( linsys%res(linsys%rank) )
   allocate( linsys%res_expl(linsys%n_ll,2))
   linsys%b_static = 0.0_wp
+  linsys%res_expl = 0.0_wp
 
   !Build the static part of the system, saving also the static part of the 
   ! rhs
