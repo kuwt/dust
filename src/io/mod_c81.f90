@@ -143,7 +143,6 @@ subroutine read_c81_table ( filen , coeff )
     write(*,*) ' table_dim = ' , cp2(1) , cp1(1) , &
                                  cp2(2) , cp1(2) , &
                                  cp2(3) , cp1(3)
-    
 
     ! Reynolds number
     coeff%aero_coeff(iRe)%Re = Re
@@ -160,15 +159,11 @@ subroutine read_c81_table ( filen , coeff )
       do i1 = 1 , cp1(i_c)
         read(fid,*) coeff%aero_coeff(iRe)%coeff(i_c)%par1(i1) , & 
                     coeff%aero_coeff(iRe)%coeff(i_c)%cf(i1,:)
-!       write(*,*)  coeff%aero_coeff(iRe)%coeff(i_c)%cf(i1,:)
       end do
     end do
 
   end do
 
-! write(*,*) line(iblnk:) 
-! write(*,*) table_dim  
-  
   close(fid)
 
 
@@ -195,9 +190,10 @@ subroutine interp_aero_coeff ( airfoil_data ,  &
   real(wp) :: cf1(3) , cf2(3)
   real(wp) , allocatable :: coeff1(:) , coeff2(:)
   real(wp) , allocatable :: coeff_airfoil(:,:) 
-  integer :: nRe , i_a , id_a
+  integer :: nRe , i_a , id_a , i1
 
-  real(wp) :: reyn1 , reyn2 , irey
+  real(wp) :: reyn1 , reyn2
+  integer  :: irey
 
   al   = aero_par(1)
   mach = aero_par(2)
@@ -217,7 +213,16 @@ subroutine interp_aero_coeff ( airfoil_data ,  &
    if ( nRe .eq. 1 ) then
     write(*,*) ' WARNING: aerodynamic coeffs defined for one value of Re only.'
     write(*,*) '          It is assumed that aero coeffs do not depend on Re. '
-    write(*,*) ' nRe .eq. 1 .For now, STOP.' ; stop
+
+    call interp2d_aero_coeff ( airfoil_data(i_a)%aero_coeff(1)%coeff , &
+                                                 aero_par(1:2) , coeff1 )
+!   write(*,'(A,3F10.5)') ' coeff. 1 : ' , coeff1
+
+    if ( .not. allocated(coeff_airfoil) ) then
+      allocate(coeff_airfoil(2,size(coeff1)))
+    end if
+
+    coeff_airfoil(i_a,:) = coeff1
 
    else  
    ! Some checks ----
@@ -241,7 +246,8 @@ subroutine interp_aero_coeff ( airfoil_data ,  &
 
      irey  = 1
      reyn1 = airfoil_data(id_a)%aero_coeff(irey)%Re
-     do while ( reyn .le. reyn1 )
+!    write(*,*) ' irey , nRe , reyn , reyn1 ' , irey , nRe ,  reyn , reyn1
+     do while ( ( reyn .ge. reyn1 ) .and. ( irey .lt. nRe ) )
       irey = irey + 1
       reyn1 = airfoil_data(id_a)%aero_coeff(irey)%Re 
      end do
@@ -251,18 +257,18 @@ subroutine interp_aero_coeff ( airfoil_data ,  &
     end if
     ! Some checks ----
 
+!   ! DEBUG
 !   write(*,*) ' irey          : ' , irey
 !   write(*,*) ' reyn1 , reyn2 : ' , reyn1 , reyn2
 !   write(*,*) ' aero_par(1:2) : ' , aero_par(1:2)
-!   write(*,*) airfoil_data(i_a)%aero_coeff(irey)%Re
-!   write(*,*) airfoil_data(i_a)%aero_coeff(irey)%coeff(1)%par1
-!   write(*,*) airfoil_data(i_a)%aero_coeff(irey)%coeff(1)%par2
-!   write(*,*) airfoil_data(i_a)%aero_coeff(irey)%coeff(1)%cf
+!   ! DEBUG
 
-    call interp2d ( airfoil_data(i_a)%aero_coeff(irey)%coeff , &
-                                      aero_par(1:2) , coeff1 )
-    call interp2d ( airfoil_data(i_a)%aero_coeff(irey+1)%coeff , &
-                                      aero_par(1:2) , coeff2 )
+    call interp2d_aero_coeff ( airfoil_data(i_a)%aero_coeff(irey)%coeff , &
+                                                 aero_par(1:2) , coeff1 )
+    call interp2d_aero_coeff ( airfoil_data(i_a)%aero_coeff(irey+1)%coeff , &
+                                                 aero_par(1:2) , coeff2 )
+!   write(*,'(A,3F10.5)') ' coeff. 1 : ' , coeff1
+!   write(*,'(A,3F10.5)') ' coeff. 2 : ' , coeff2
 
     if ( .not. allocated(coeff_airfoil) ) then
       allocate(coeff_airfoil(2,size(coeff1)))
@@ -271,23 +277,23 @@ subroutine interp_aero_coeff ( airfoil_data ,  &
     coeff_airfoil(i_a,:) = ( coeff1 * ( reyn2 - reyn ) + coeff2 * ( reyn - reyn1 ) ) /  &
                            ( reyn2 - reyn1 ) 
 
-
    end if
 
   end do
 
-
   allocate( aero_coeff(size(coeff_airfoil,2)) )
   aero_coeff = coeff_airfoil(1,:) * ( 1-csi ) + coeff_airfoil(2,:) * csi
-   
 
+
+  ! deallocate
+  deallocate(coeff_airfoil)
 
 
 end subroutine interp_aero_coeff 
 
 !-----------------------------------
 ! 
-subroutine interp2d ( aero_coeff , x , c )
+subroutine interp2d_aero_coeff ( aero_coeff , x , c )
  type(t_aero_2d_par) , intent(in) :: aero_coeff(:)
  real(wp), intent(in)  :: x(:)
  real(wp), allocatable , intent(out) :: c(:)
@@ -300,7 +306,7 @@ subroutine interp2d ( aero_coeff , x , c )
  integer :: ic , i1 , i2
 
  nc = size(aero_coeff)
- write(*,*) ' nc : ' , nc
+!write(*,*) ' nc : ' , nc
 
  allocate(c(nc)) ; c = 0.0_wp
 
@@ -316,6 +322,9 @@ subroutine interp2d ( aero_coeff , x , c )
 
    n1 = size(aero_coeff(ic)%par1)
    n2 = size(aero_coeff(ic)%par2)
+
+!  ! DEBUG
+!  write(*,*) ' n1 , n2 : ' , n1 , n2
 
    if ( size(aero_coeff(ic)%cf,1) .ne. n1 ) then
      write(*,*) ' Error in interp2d. '
@@ -350,11 +359,15 @@ subroutine interp2d ( aero_coeff , x , c )
    do while ( (aero_coeff(ic)%par2(i2) .lt. x(2)) ) 
      i2 = i2 + 1 
    end do
+
+!  ! DEBUG
+!  write(*,*) i1 , i2
+!  ! DEBUG
   
    csi1 = 2.0_wp * ( x(1) - 0.5_wp*(aero_coeff(ic)%par1(i1-1)+aero_coeff(ic)%par1(i1)) ) / &
-         (aero_coeff(ic)%par1(i1)+aero_coeff(ic)%par1(i1-1))
+         (aero_coeff(ic)%par1(i1)-aero_coeff(ic)%par1(i1-1))
    csi2 = 2.0_wp * ( x(2) - 0.5_wp*(aero_coeff(ic)%par2(i2-1)+aero_coeff(ic)%par2(i2)) ) / &
-         (aero_coeff(ic)%par2(i2)+aero_coeff(ic)%par2(i2-1))
+         (aero_coeff(ic)%par2(i2)-aero_coeff(ic)%par2(i2-1))
   
    phi1 =   0.25_wp * ( 1 + csi1 ) * ( 1 + csi2 )
    phi2 =   0.25_wp * ( 1 - csi1 ) * ( 1 + csi2 )
@@ -394,7 +407,7 @@ subroutine interp2d ( aero_coeff , x , c )
 !            phi4 * coeff(ic)%Mat(i1  ,i2-1)
 !  end do
 
-end subroutine interp2d
+end subroutine interp2d_aero_coeff
 
 !-----------------------------------
 
