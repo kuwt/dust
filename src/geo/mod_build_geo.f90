@@ -1294,7 +1294,7 @@ subroutine build_te_parametric ( ee , rr , ElType , &
    ii_te(1,:) = (/ ( i1 , i1 = 2,nelems_span+1 ) /)
    ii_te(2,:) = (/ ( i1 , i1 = 1,nelems_span   ) /)
 ! >>>>>>>>>
- elseif ( ElType .eq. 'v' ) then 
+ elseif ( ElType .eq. 'v' .or. ElType .eq. 'l') then 
    ii_te(1,:) = (/ ( i1 , i1 = 2,nelems_span+1 ) /)
    ii_te(2,:) = (/ ( i1 , i1 = 1,nelems_span   ) /)
  end if

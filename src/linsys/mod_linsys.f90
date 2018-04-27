@@ -200,11 +200,11 @@ subroutine solve_linsys(linsys)
  !integer :: count1 , count_rate1 , count_max1 
  !integer :: count2 , count_rate2 , count_max2 
 
-
   allocate(A_tmp(size(linsys%A,1),size(linsys%A,2)) ) ; A_tmp = linsys%A
   allocate(IPIV(linsys%rank))
  
   linsys%res = linsys%b
+
    
   !call system_clock(count1,count_rate1,count_max1)
   call dgesv(linsys%rank,1,A_tmp,linsys%rank,IPIV, &

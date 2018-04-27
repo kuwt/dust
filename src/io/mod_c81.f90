@@ -227,18 +227,18 @@ subroutine interp_aero_coeff ( airfoil_data ,  &
    else  
    ! Some checks ----
     if ( reyn .lt. airfoil_data(id_a)%aero_coeff(1)%Re ) then
-     write(*,*) ' WARNING: Reynolds number below the minimum Re defined.       '
-     write(*,*) ' Re          : ' , reyn
-     write(*,*) ' min(Re_tab) : ' , airfoil_data(id_a)%aero_coeff(1)%Re 
-     write(*,*) '       -> Extrapolation. '
+     !write(*,*) ' WARNING: Reynolds number below the minimum Re defined.       '
+     !write(*,*) ' Re          : ' , reyn
+     !write(*,*) ' min(Re_tab) : ' , airfoil_data(id_a)%aero_coeff(1)%Re 
+     !write(*,*) '       -> Extrapolation. '
      reyn1 = airfoil_data(id_a)%aero_coeff(1)%Re
      reyn2 = airfoil_data(id_a)%aero_coeff(2)%Re
      irey  = 1
     else if ( reyn .gt. airfoil_data(id_a)%aero_coeff(nRe)%Re ) then
-     write(*,*) ' WARNING: Reynolds number above the maximum Re defined.       '
-     write(*,*) ' Re          : ' , reyn
-     write(*,*) ' max(Re_tab) : ' , airfoil_data(id_a)%aero_coeff(nRe)%Re 
-     write(*,*) '       -> Extrapolation. '
+     !write(*,*) ' WARNING: Reynolds number above the maximum Re defined.       '
+     !write(*,*) ' Re          : ' , reyn
+     !write(*,*) ' max(Re_tab) : ' , airfoil_data(id_a)%aero_coeff(nRe)%Re 
+     !write(*,*) '       -> Extrapolation. '
      reyn1 = airfoil_data(id_a)%aero_coeff(nRe-1)%Re
      reyn2 = airfoil_data(id_a)%aero_coeff(nRe)%Re
      irey  = nRe-1
@@ -352,11 +352,11 @@ subroutine interp2d_aero_coeff ( aero_coeff , x , c )
    ! Check dimensions ---------
 
    i1 = 1 
-   do while ( (aero_coeff(ic)%par1(i1) .lt. x(1)) ) 
+   do while ( (aero_coeff(ic)%par1(i1) .le. x(1)) ) 
      i1 = i1 + 1 
    end do
    i2 = 1 
-   do while ( (aero_coeff(ic)%par2(i2) .lt. x(2)) ) 
+   do while ( (aero_coeff(ic)%par2(i2) .le. x(2)) ) 
      i2 = i2 + 1 
    end do
 
@@ -366,6 +366,7 @@ subroutine interp2d_aero_coeff ( aero_coeff , x , c )
   
    csi1 = 2.0_wp * ( x(1) - 0.5_wp*(aero_coeff(ic)%par1(i1-1)+aero_coeff(ic)%par1(i1)) ) / &
          (aero_coeff(ic)%par1(i1)-aero_coeff(ic)%par1(i1-1))
+
    csi2 = 2.0_wp * ( x(2) - 0.5_wp*(aero_coeff(ic)%par2(i2-1)+aero_coeff(ic)%par2(i2)) ) / &
          (aero_coeff(ic)%par2(i2)-aero_coeff(ic)%par2(i2-1))
   

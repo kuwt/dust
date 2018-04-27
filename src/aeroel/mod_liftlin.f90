@@ -49,6 +49,9 @@ use mod_doublet, only: &
 use mod_linsys_vars, only: &
   t_linsys
 
+use mod_c81, only: &
+  t_aero_tab, interp_aero_coeff
+
 use mod_aero_elements, only: &
   c_elem, t_elem_p
 !----------------------------------------------------------------------
@@ -61,11 +64,11 @@ public :: t_liftlin, update_liftlin, solve_liftlin
 !----------------------------------------------------------------------
 
 type, extends(c_elem) :: t_liftlin
-  real(wp)              :: norm_coord_p
   real(wp), allocatable :: tang_cen(:)
   real(wp), allocatable :: bnorm_cen(:)
-  real(wp)              :: csi
+  real(wp)              :: csi_cen
   integer               :: i_airfoil(2)
+  real(wp)              :: chord
 contains
 
   procedure, pass(this) :: build_row        => build_row_liftlin
@@ -79,6 +82,8 @@ contains
 end type
 
 character(len=*), parameter :: this_mod_name='mod_vortring'
+
+integer :: it=0
 
 !----------------------------------------------------------------------
 contains
@@ -215,8 +220,10 @@ subroutine compute_vel_liftlin (this, pos, uinf, vel)
 
   ! doublet ---
   call velocity_calc_doublet(this, vdou, pos)
+ 
 
   vel = vdou*this%idou
+
 
 end subroutine compute_vel_liftlin
 
@@ -241,46 +248,84 @@ subroutine update_liftlin(elems_ll, linsys)
 
  real(wp), allocatable :: res_temp(:)
 
+  it = it + 1
+  !DEBUG
+  write(*,*) 'iteration ',it
+  
   !HERE extrapolate the solution before the linear system
-  allocate(res_temp(size(linsys%res_expl,1)))
-  res_temp = linsys%res_expl(:,1)
-  linsys%res_expl(:,1) = 2.0_wp*res_temp - linsys%res_expl(:,2)
-  linsys%res_expl(:,2) = res_temp
-  deallocate(res_temp)
+  if (it .gt. 2) then
+    allocate(res_temp(size(linsys%res_expl,1)))
+    res_temp = linsys%res_expl(:,1)
+    linsys%res_expl(:,1) = 2.0_wp*res_temp - linsys%res_expl(:,2)
+    linsys%res_expl(:,2) = res_temp
+    deallocate(res_temp)
+  else
+    linsys%res_expl(:,2) = linsys%res_expl(:,1)
+  endif
 
 end subroutine update_liftlin
 
 !----------------------------------------------------------------------
 
-subroutine solve_liftlin(elems_ll, elems_tot, uinf)
+subroutine solve_liftlin(elems_ll, elems_tot, uinf, airfoil_data)
  type(t_elem_p), intent(inout) :: elems_ll(:)
  type(t_elem_p), intent(in)    :: elems_tot(:)
  real(wp), intent(in)          :: uinf(3)
+ type(t_aero_tab),  intent(in) :: airfoil_data(:)
 
- integer :: i_l, j
+ integer :: i_l, j, ic
  real(wp) :: vel(3), v(3), up(3)
  real(wp) :: unorm, alpha, mach, re
- real(wp) :: aero_coeff(3)
+ real(wp) :: cl
+ real(wp), allocatable :: aero_coeff(:)
+ real(wp), allocatable :: dou_temp(:)
+ real(wp), parameter :: damp=10.0
+ real(wp), parameter :: toll=1e-4_wp
+ real(wp) :: diff
+ 
+ !TODO: is missing the velocity of the wake
+ allocate(dou_temp(size(elems_ll)))
 
+ diff = 0.0_wp
  !Calculate the induced velocity on the airfoil
+ do ic = 1,100
  do i_l = 1,size(elems_ll)
    vel = 0.0_wp
    do j = 1,size(elems_tot)
-     call compute_vel(elems_ll(i_l)%p%cen,uinf,vel)
+     call elems_tot(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
      vel = vel + v
    enddo
-     vel = vel/(4.0_wp*pi) + uinf - elems_ll(i_l)%p%ub
-     up = vel-elems_ll(i_l)%p%bnorm_cen*sum(elems_ll(i_l)%p%bnorm_cen*vel)
+   select type(el => elems_ll(i_l)%p)
+   type is(t_liftlin)
+     vel = vel/(4.0_wp*pi) + uinf - el%ub
+     !vel = uinf - el%ub
+     up = vel-el%bnorm_cen*sum(el%bnorm_cen*vel)
      unorm = norm2(up)
-     alpha = atan2(sum(up*elem_ll(i_l)%p%norm), sum(up*elem_ll(i_l)%p%tang_cen))
+     alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
      alpha = alpha * 180.0_wp/pi
      !TODO: fix these parameters which are still hard-coded
      mach = 0.0_wp
      re = 1000000.0_wp
      call interp_aero_coeff ( airfoil_data ,  &
-                    csi , airfoil_id , (/alpha, mach, re/) , aero_coeff )
+                    el%csi_cen, el%i_airfoil  , (/alpha, mach, re/) , aero_coeff )
+     cl = aero_coeff(1)
+     dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
+   end select
  enddo
 
+ do i_l = 1,size(elems_ll)
+   diff = max(diff,abs(elems_ll(i_l)%p%idou-dou_temp(i_l))) 
+   elems_ll(i_l)%p%idou = ( dou_temp(i_l)+ damp*elems_ll(i_l)%p%idou )/(1.0_wp+damp)
+ enddo 
+ 
+ if(diff .le. toll) exit
+
+ enddo
+
+ !DEBUG:
+ write(*,*) 'iterations: ',ic
+ write(*,*) 'diff',diff
+ deallocate(dou_temp)
 
  !Get the angle of attack, as well as the other parameters
 

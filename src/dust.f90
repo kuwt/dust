@@ -56,6 +56,9 @@ use mod_aero_elements, only: &
 use mod_liftlin, only: &
  update_liftlin, solve_liftlin 
 
+use mod_c81, only: &
+  t_aero_tab 
+
 use mod_linsys_vars, only: &
   t_linsys
 
@@ -110,6 +113,7 @@ type(t_elem_p), allocatable :: elems_ll(:)
 type(t_elem_p), allocatable :: elems_tot(:)
 type(t_geo) :: geo
 type(t_tedge) :: te
+type(t_aero_tab), allocatable :: airfoil_data(:)
 integer :: n_wake_panels
 type(t_linsys) :: linsys
 type(t_parse) :: prms
@@ -213,7 +217,7 @@ sim_param%debug_level = debug_level
 call printout(nl//'====== Geometry Creation ======')
 t0 = dust_time()
 call create_geometry(prms, input_file_name, geo, te, elems, elems_ll, &
-                     elems_tot, sim_param)
+                     elems_tot, airfoil_data, sim_param)
 t1 = dust_time()
 if(debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Created geometry in: ' , t1 - t0,' s.'
@@ -292,7 +296,9 @@ do it = 1,nstep
 
   !------ Solve the system ------
   t0 = dust_time()
-  call solve_linsys(linsys)
+  if (linsys%rank .gt. 0) then 
+    call solve_linsys(linsys)
+  endif
   t1 = dust_time()
 
   ! compute time derivative of the result ( = i_vortex = -i_doublet ) ----------
@@ -315,7 +321,7 @@ do it = 1,nstep
                          call debug_printout_result(linsys, basename_debug, it)
 
   !------ Update the explicit part ------
-  call solve_liftlin(elems_ll, elems_tot, uinf)
+  call solve_liftlin(elems_ll, elems_tot, uinf, airfoil_data)
 
   !------ Compute loads -------
   do i_el = 1 , size(elems)
@@ -332,7 +338,7 @@ do it = 1,nstep
                       call debug_printout_wake(wake_panels, basename_debug, it)
 
   !Print the results
-  if(time_2_out)  call output_status(elems, geo, wake_panels, basename, it)
+  if(time_2_out)  call output_status(elems_tot, geo, wake_panels, basename, it)
 
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
@@ -393,8 +399,8 @@ end subroutine init_timestep
 
 !------------------------------------------------------------------------------
 
-subroutine output_status(elems, geo, wake_panels, basename, it)
- type(t_elem_p),   intent(in) :: elems(:)
+subroutine output_status(elems_tot, geo, wake_panels, basename, it)
+ type(t_elem_p),   intent(in) :: elems_tot(:)
  type(t_geo),      intent(in) :: geo
  type(t_wake_panels), intent(in) :: wake_panels
  character(len=*), intent(in) :: basename
@@ -406,14 +412,14 @@ subroutine output_status(elems, geo, wake_panels, basename, it)
  integer(h5loc) :: floc
  character(len=max_char_len) :: sit
 
-  allocate(el(4,size(elems))); el = 0
+  allocate(el(4,size(elems_tot))); el = 0
   allocate(w_el(4,size(wake_panels%pan_p))); w_el = 0
   allocate(w_points(3,(wake_panels%n_wake_points)*(wake_panels%wake_len+1)))
   allocate(w_res(size(wake_panels%pan_p)))
 
   !=== VTK output ===
-  do ie=1,size(elems)
-    el(1:elems(ie)%p%n_ver,ie) = elems(ie)%p%i_ver
+  do ie=1,size(elems_tot)
+    el(1:elems_tot(ie)%p%n_ver,ie) = elems_tot(ie)%p%i_ver
   enddo
   do ie=1,size(wake_panels%pan_p)
     p1 = wake_panels%i_start_points(1,mod(ie-1,wake_panels%n_wake_stripes)+1)
@@ -427,7 +433,7 @@ subroutine output_status(elems, geo, wake_panels, basename, it)
   w_points = reshape(wake_panels%w_points(:,:,1:wake_panels%wake_len+1),&
     (/3,(wake_panels%n_wake_points)*(wake_panels%wake_len+1)/))
   write(sit,'(I4.4)') it
-  call vtk_out_bin (geo%points, el, linsys%res,  &
+  call vtk_out_bin (geo%points, el, (/linsys%res,linsys%res_expl(:,1)/),  &
                     w_points, w_el, w_res,  &
                     trim(basename)//'res_'//trim(sit)//'.vtu')
 

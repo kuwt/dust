@@ -325,7 +325,7 @@ end subroutine set_parameters_geo
 !!    created, pointed at each element and then re-ordered with the static
 !!    elements first, and the dynamic elements at the end
 subroutine create_geometry(prms, in_file_name,  geo, te, &
-                           elems, elems_ll, elems_tot, sim_param)
+                           elems, elems_ll, elems_tot, airfoil_data, sim_param)
  type(t_parse), intent(inout) :: prms
  character(len=*), intent(in) :: in_file_name
  type(t_geo), intent(out), target :: geo
@@ -333,6 +333,7 @@ subroutine create_geometry(prms, in_file_name,  geo, te, &
  type(t_elem_p), allocatable, intent(out) :: elems_ll(:)
  type(t_elem_p), allocatable, intent(out) :: elems_tot(:)
  type(t_tedge), intent(out) :: te
+ type(t_aero_tab) , allocatable, intent(out) :: airfoil_data(:)
  type(t_sim_param) , intent(inout) :: sim_param
  real(wp)                     :: tstart
 
@@ -348,7 +349,6 @@ subroutine create_geometry(prms, in_file_name,  geo, te, &
  real(t_realtime) :: t0, t1
 
  ! airfoil data for ll
- type(t_aero_tab) , allocatable :: airfoil_data(:)
 
   tstart = sim_param%t0
 
@@ -371,8 +371,6 @@ subroutine create_geometry(prms, in_file_name,  geo, te, &
   call load_components(geo, geo_file_name, sim_param, te)
 
   call import_aero_tab(geo,airfoil_data)
-write(*,*) ' bye from l.374 in mod_geo.f90.' 
-stop
 
   ! Initialisation
   geo%nelem      = 0
@@ -519,17 +517,15 @@ stop
 
   !Now re-order the lifting line elements
   deallocate(temp_static, temp_moving)
-  allocate(temp_static(geo%nstatic), temp_moving(geo%nmoving))
+  allocate(temp_static(geo%nstatic_ll), temp_moving(geo%nmoving_ll))
   is = 0; im = 0;
   do i = 1,geo%nll
     if(elems_ll(i)%p%moving) then
       im = im+1
       temp_moving(im) = elems_ll(i)
-      el_id_old_moving(im) = i
     else
       is = is+1
       temp_static(is) = elems_ll(i)
-      el_id_old_static(is) = i
     endif
   enddo
   if(geo%nll .gt. 0) then
@@ -1026,6 +1022,11 @@ subroutine prepare_geometry(geo)
        allocate(elem%edge_uni(3,nsides))
        allocate(elem%cosTi(nsides))
        allocate(elem%sinTi(nsides))
+       
+       elem%csi_cen = 0.5_wp * sum(geo%components(i_comp)%normalised_coord_e(:,ie))
+       elem%i_airfoil =  geo%components(i_comp)%i_airfoil_e(:,ie)
+       
+       
        ! elem%chord    
        ! elem%csi_c       !! <- for interpolation of aerodynamic coefficients
        ! elem%airfoil(2)  !! 
@@ -1132,7 +1133,7 @@ subroutine calc_geo_data_ll(elem,vert)
 
  integer :: nsides, is
  real(wp):: nor(3), tanl(3)
-
+  
   nsides = size(vert,2)
 
   elem%n_ver = nsides
@@ -1141,7 +1142,7 @@ subroutine calc_geo_data_ll(elem,vert)
   elem%ver = vert
 
   ! center, for the lifting line is the mid-point 
-  elem%cen =  sum ( vert(:,1:2),2 ) / real(nsides,wp)
+  elem%cen =  sum ( vert(:,1:2),2 ) / 2.0_wp
 
   ! unit normal and area
   if ( nsides .eq. 4 ) then
@@ -1188,13 +1189,17 @@ subroutine calc_geo_data_ll(elem,vert)
   do is = 1 , nSides
     elem%edge_uni(:,is) = elem%edge_vec(:,is) / elem%edge_len(is)
   end do
-
-  ! single tangent at the center
+  
+  ! ll-specific fields
+  select type(elem)
+  type is(t_liftlin)
   elem%tang_cen = elem%edge_uni(:,2) - elem%edge_uni(:,4)
   elem%tang_cen = elem%tang_cen / norm2(elem%tang_cen)
 
-  elem%bnorm_cen = cross(elem%tang_cen, elem%norm)
+  elem%bnorm_cen = cross(elem%tang_cen, elem%nor)
   elem%bnorm_cen = elem%bnorm_cen / norm2(elem%bnorm_cen)
+  elem%chord = sum(elem%edge_len((/2,4/)))*0.5_wp
+  end select
 
   ! cosTi , sinTi
   do is = 1 , nsides
