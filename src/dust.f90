@@ -321,7 +321,7 @@ do it = 1,nstep
                          call debug_printout_result(linsys, basename_debug, it)
 
   !------ Update the explicit part ------
-  call solve_liftlin(elems_ll, elems_tot, uinf, airfoil_data)
+  call solve_liftlin(elems_ll, elems_tot, wake_panels%pan_p, uinf, airfoil_data)
 
   !------ Compute loads -------
   do i_el = 1 , size(elems)
@@ -459,8 +459,9 @@ subroutine debug_printout_result(linsys, basename, it)
  real(wp), allocatable :: res(:,:)
  character(len=max_char_len) :: sit
 
-  allocate(res(1,linsys%rank))
-  res(1,:) = linsys%res
+  allocate(res(1,linsys%rank+linsys%n_ll))
+  !!res(1,:) = linsys%res
+  res(1,:) = (/linsys%res,linsys%res_expl(:,1)/)
   write(sit,'(I4.4)') it
   call write_basic(res,trim(basename)//'result_'//trim(sit)//'.dat')
   deallocate(res)

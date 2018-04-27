@@ -267,28 +267,42 @@ end subroutine update_liftlin
 
 !----------------------------------------------------------------------
 
-subroutine solve_liftlin(elems_ll, elems_tot, uinf, airfoil_data)
+subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
  type(t_elem_p), intent(inout) :: elems_ll(:)
  type(t_elem_p), intent(in)    :: elems_tot(:)
+ type(t_elem_p), intent(in)    :: elems_wake(:)
  real(wp), intent(in)          :: uinf(3)
  type(t_aero_tab),  intent(in) :: airfoil_data(:)
 
  integer :: i_l, j, ic
  real(wp) :: vel(3), v(3), up(3)
+ real(wp), allocatable :: vel_w(:,:)
  real(wp) :: unorm, alpha, mach, re
  real(wp) :: cl
  real(wp), allocatable :: aero_coeff(:)
  real(wp), allocatable :: dou_temp(:)
- real(wp), parameter :: damp=10.0
+ real(wp) :: damp=2.0_wp
  real(wp), parameter :: toll=1e-4_wp
  real(wp) :: diff
  
  !TODO: is missing the velocity of the wake
  allocate(dou_temp(size(elems_ll)))
+ allocate(vel_w(3,size(elems_ll)))
+ 
+ do i_l = 1,size(elems_ll)
+   vel_w(:,i_l) = 0.0_wp
+   do j = 1,size(elems_wake)
+     call elems_wake(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
+     vel_w(:,i_l) = vel_w(:,i_l) + v
+   enddo
+ enddo
+ 
+ vel_w = vel_w/(4.0_wp*pi)
+
 
  diff = 0.0_wp
  !Calculate the induced velocity on the airfoil
- do ic = 1,100
+ do ic = 1,1000
  do i_l = 1,size(elems_ll)
    vel = 0.0_wp
    do j = 1,size(elems_tot)
@@ -297,10 +311,12 @@ subroutine solve_liftlin(elems_ll, elems_tot, uinf, airfoil_data)
    enddo
    select type(el => elems_ll(i_l)%p)
    type is(t_liftlin)
-     vel = vel/(4.0_wp*pi) + uinf - el%ub
+     vel = vel/(4.0_wp*pi) + uinf - el%ub +vel_w(:,i_l)
      !vel = uinf - el%ub
      up = vel-el%bnorm_cen*sum(el%bnorm_cen*vel)
-     unorm = norm2(up)
+     !Employing the free stream velocity to get into tables
+     unorm = norm2((uinf-el%ub) - el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
+     !unorm = norm2(up)
      alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
      alpha = alpha * 180.0_wp/pi
      !TODO: fix these parameters which are still hard-coded
@@ -310,11 +326,12 @@ subroutine solve_liftlin(elems_ll, elems_tot, uinf, airfoil_data)
                     el%csi_cen, el%i_airfoil  , (/alpha, mach, re/) , aero_coeff )
      cl = aero_coeff(1)
      dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
+     diff = max(diff,abs(elems_ll(i_l)%p%idou-dou_temp(i_l))) 
    end select
  enddo
+ damp = 5.0_wp
 
  do i_l = 1,size(elems_ll)
-   diff = max(diff,abs(elems_ll(i_l)%p%idou-dou_temp(i_l))) 
    elems_ll(i_l)%p%idou = ( dou_temp(i_l)+ damp*elems_ll(i_l)%p%idou )/(1.0_wp+damp)
  enddo 
  
@@ -325,7 +342,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, uinf, airfoil_data)
  !DEBUG:
  write(*,*) 'iterations: ',ic
  write(*,*) 'diff',diff
- deallocate(dou_temp)
+ deallocate(dou_temp, vel_w)
 
  !Get the angle of attack, as well as the other parameters
 

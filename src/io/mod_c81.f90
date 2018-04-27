@@ -137,6 +137,9 @@ subroutine read_c81_table ( filen , coeff )
     read(fid,'(A)') line
       iblnk = index(line,' ') 
       string = trim(adjustl(line(iblnk:)))
+      !DEBUG
+      write(*,*) 'iblnk:', iblnk
+      write(*,*) 'string:', trim(string)
       read(string,'(6I2)') cl2 , cl1 , cd2 , cd1 , cm2 , cm1
     cp1 = (/ cl1 , cd1 , cm1 /)
     cp2 = (/ cl2 , cd2 , cm2 /)
@@ -204,6 +207,7 @@ subroutine interp_aero_coeff ( airfoil_data ,  &
 
   ! Find the aerodynamic profiles to be interpolated in order to obtain
   ! the aerodynamic characteristics of the wing section
+  !DEBUG
   do i_a = 1 , 2
 
    id_a = airfoil_id(i_a)
@@ -214,7 +218,7 @@ subroutine interp_aero_coeff ( airfoil_data ,  &
     write(*,*) ' WARNING: aerodynamic coeffs defined for one value of Re only.'
     write(*,*) '          It is assumed that aero coeffs do not depend on Re. '
 
-    call interp2d_aero_coeff ( airfoil_data(i_a)%aero_coeff(1)%coeff , &
+    call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(1)%coeff , &
                                                  aero_par(1:2) , coeff1 )
 !   write(*,'(A,3F10.5)') ' coeff. 1 : ' , coeff1
 
@@ -262,10 +266,10 @@ subroutine interp_aero_coeff ( airfoil_data ,  &
 !   write(*,*) ' reyn1 , reyn2 : ' , reyn1 , reyn2
 !   write(*,*) ' aero_par(1:2) : ' , aero_par(1:2)
 !   ! DEBUG
-
-    call interp2d_aero_coeff ( airfoil_data(i_a)%aero_coeff(irey)%coeff , &
+    
+    call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(irey)%coeff , &
                                                  aero_par(1:2) , coeff1 )
-    call interp2d_aero_coeff ( airfoil_data(i_a)%aero_coeff(irey+1)%coeff , &
+    call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(irey+1)%coeff , &
                                                  aero_par(1:2) , coeff2 )
 !   write(*,'(A,3F10.5)') ' coeff. 1 : ' , coeff1
 !   write(*,'(A,3F10.5)') ' coeff. 2 : ' , coeff2
