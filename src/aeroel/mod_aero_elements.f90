@@ -51,6 +51,10 @@ private
 
 !----------------------------------------------------------------------
 
+type :: t_elem_p
+  class(c_elem), pointer :: p
+end type
+
 !> Abstract type defining a generic aerodynamic element
 !!
 !! It needs to be extended into more specific elements
@@ -88,7 +92,8 @@ type, abstract :: c_elem
   !> Is the element moving during simulation?
   logical :: moving
   !> Element neighbours global index (in the elements vector)
-  integer, allocatable :: i_neigh(:)
+  !integer, allocatable :: i_neigh(:)
+  type(t_elem_p), allocatable :: neigh(:)
 
   !> Coefficients to compute local velocity from the velocity potential
   !! on a stencil of neighboring elements (for surfpan only)
@@ -97,9 +102,11 @@ type, abstract :: c_elem
   !> Panel width (= strip width) (for vortring only)
   real(wp)              :: dy
   !> Previous element in a stripe (for vortring only)
-  integer               :: stripe_1
+  !integer               :: stripe_1
+  type(t_elem_p)        :: stripe_1
   !> Element indices in the component%strip_elem array (for vortring only)
-  integer, allocatable  :: stripe_elem(:)
+  !integer, allocatable  :: stripe_elem(:)
+  type(t_elem_p), allocatable :: stripe_elem(:)
 
   !> Fluid velocity at center for boundary condition (U_inf-rel vel)
   real(wp), allocatable :: vel(:)
@@ -125,9 +132,6 @@ type, abstract :: c_elem
 
 end type
 
-type :: t_elem_p
-  class(c_elem), pointer :: p
-end type
 
 !----------------------------------------------------------------------
 

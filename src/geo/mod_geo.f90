@@ -495,15 +495,15 @@ subroutine create_geometry(prms, in_file_name,  geo, te, &
   end do
   !Update elem-elem connectivity after re-ordering, for the moment only for
   !implicit panel elements
-  do i = 1,geo%nelem
-    do j = 1,elems(i)%p%n_ver
-      if ( elems(i)%p%i_neigh(j) .ne. 0 ) then
-        elems(i)%p%i_neigh(j) = el_id_old( elems(i)%p%i_neigh(j) )
-      else
-        elems(i)%p%i_neigh(j) = 0 
-      end if     
-    end do 
-  end do 
+  !do i = 1,geo%nelem
+  !  do j = 1,elems(i)%p%n_ver
+  !    if ( elems(i)%p%i_neigh(j) .ne. 0 ) then
+  !      elems(i)%p%i_neigh(j) = el_id_old( elems(i)%p%i_neigh(j) )
+  !    else
+  !      elems(i)%p%i_neigh(j) = 0 
+  !    end if     
+  !  end do 
+  !end do 
   !Update te structure
   !do i = 1,size(te%e,2)
   !  do j = 1,2
@@ -765,17 +765,19 @@ subroutine load_components(geo, in_file, sim_param, te)
         !vertices
         n_vert = count(ee(:,i2).ne.0)
         allocate(geo%components(i_comp)%el(i2)%i_ver(n_vert))
-        allocate(geo%components(i_comp)%el(i2)%i_neigh(n_vert))
+        allocate(geo%components(i_comp)%el(i2)%neigh(n_vert))
         geo%components(i_comp)%el(i2)%n_ver = n_vert
         geo%components(i_comp)%el(i2)%i_ver(1:n_vert) = &
                                               ee(1:n_vert,i2) + points_offset
         do i3=1,n_vert
           if ( neigh(i3,i2) .ne. 0 ) then
-            geo%components(i_comp)%el(i2)%i_neigh(i3) = &
-                                              neigh(i3,i2) + elems_offset
+            geo%components(i_comp)%el(i2)%neigh(i3)%p => &
+                                    geo%components(i_comp)%el(neigh(i3,i2))
           else
-            geo%components(i_comp)%el(i2)%i_neigh(i3) = &
-                                              neigh(i3,i2)
+            ! do nothing, keep the neighbour pointer not associated
+            geo%components(i_comp)%el(i2)%neigh(i3)%p => null()
+            !geo%components(i_comp)%el(i2)%i_neigh(i3) = &
+            !                        neigh(i3,i2)
           end if
         end do
         
@@ -1283,72 +1285,72 @@ end subroutine calc_geo_vel
 
 !----------------------------------------------------------------------
 
-subroutine build_connectivity(elems)
- type(t_elem_p), intent(inout) :: elems(:)
-
- integer :: nelem, nvert
- integer :: ie1, iv1, ie2, iv2
- integer :: vert1, vert2
-
- character(len=max_char_len) :: msg
- real(t_realtime) :: t0, t1
-
- character(len=*), parameter :: this_sub_name = 'build_connectivity'
-
-  t0 = dust_time()
-
-  nelem = size(elems)
- 
-  do ie1 = 1,nelem
-    nvert = elems(ie1)%p%n_ver
-    allocate(elems(ie1)%p%i_neigh(nvert))
-    elems(ie1)%p%i_neigh = 0
-  enddo
-
-  do ie1 = 1,nelem
-    nvert = elems(ie1)%p%n_ver
-    do iv1 = 1,nvert
-      if(elems(ie1)%p%i_neigh(iv1) .ne. 0) cycle
-      vert1 = elems(ie1)%p%i_ver(iv1)
-      vert2 = elems(ie1)%p%i_ver(mod(iv1,nvert)+1)
-      do ie2 = ie1+1,nelem
-        if (any(elems(ie2)%p%i_ver .eq. vert1) .and. &
-                              any(elems(ie2)%p%i_ver .eq. vert2)) then
-          !assign first element neighbour
-          elems(ie1)%p%i_neigh(iv1) = elems(ie2)%p%id
-          ! assign the second in the correct position
-          ! the element HAS to have the nodes in the correct position,
-          ! with vert1 after vert2, indicating that the neighbouring 
-          ! element has the same normal orientation
-          do iv2 = 1,elems(ie2)%p%n_ver
-            if (elems(ie2)%p%i_ver(iv2) .eq. vert2) then
-              if (elems(ie2)%p%i_ver(mod(iv2, elems(ie2)%p%n_ver)+1) & 
-                                                            .eq.vert1) then
-                elems(ie2)%p%i_neigh(iv2) = elems(ie1)%p%id
-              else
-                ! debug ----
-                write(*,*) ' elements ie1 , ie2 , elems(ie1)%p%id , elems(ie2)%p%id : ' 
-                write(*,*)            ie1 , ie2 , elems(ie1)%p%id , elems(ie2)%p%id
-                write(*,*) ' elems. i1 ' , elems(ie1)%p%i_ver
-                write(*,*) ' elems. i2 ' , elems(ie2)%p%i_ver
-                write(*,*) ' vertices el.i1 ' , vert1 , vert2
-                write(*,*) ' vertices el.i2 ' , elems(ie2)%p%i_ver(iv1) , elems(ie2)%p%i_ver(iv2)
-                ! debug ----
-                call error(this_sub_name, this_mod_name, &
-                  'Neighbouring elements with opposed normal orientation,&
-                  &this is not allowed. Stop')
-              endif
-            endif
-          enddo
-        endif
-      enddo
-    enddo
-  enddo
-  t1 = dust_time()
-  !write(msg,'(A,F9.3,A)') 'Connectivity built in ', t1-t0, ' s.'
-  call printout(msg)
-
-end subroutine build_connectivity
+!subroutine build_connectivity(elems)
+! type(t_elem_p), intent(inout) :: elems(:)
+!
+! integer :: nelem, nvert
+! integer :: ie1, iv1, ie2, iv2
+! integer :: vert1, vert2
+!
+! character(len=max_char_len) :: msg
+! real(t_realtime) :: t0, t1
+!
+! character(len=*), parameter :: this_sub_name = 'build_connectivity'
+!
+!  t0 = dust_time()
+!
+!  nelem = size(elems)
+! 
+!  do ie1 = 1,nelem
+!    nvert = elems(ie1)%p%n_ver
+!    allocate(elems(ie1)%p%i_neigh(nvert))
+!    elems(ie1)%p%i_neigh = 0
+!  enddo
+!
+!  do ie1 = 1,nelem
+!    nvert = elems(ie1)%p%n_ver
+!    do iv1 = 1,nvert
+!      if(elems(ie1)%p%i_neigh(iv1) .ne. 0) cycle
+!      vert1 = elems(ie1)%p%i_ver(iv1)
+!      vert2 = elems(ie1)%p%i_ver(mod(iv1,nvert)+1)
+!      do ie2 = ie1+1,nelem
+!        if (any(elems(ie2)%p%i_ver .eq. vert1) .and. &
+!                              any(elems(ie2)%p%i_ver .eq. vert2)) then
+!          !assign first element neighbour
+!          elems(ie1)%p%i_neigh(iv1) = elems(ie2)%p%id
+!          ! assign the second in the correct position
+!          ! the element HAS to have the nodes in the correct position,
+!          ! with vert1 after vert2, indicating that the neighbouring 
+!          ! element has the same normal orientation
+!          do iv2 = 1,elems(ie2)%p%n_ver
+!            if (elems(ie2)%p%i_ver(iv2) .eq. vert2) then
+!              if (elems(ie2)%p%i_ver(mod(iv2, elems(ie2)%p%n_ver)+1) & 
+!                                                            .eq.vert1) then
+!                elems(ie2)%p%i_neigh(iv2) = elems(ie1)%p%id
+!              else
+!                ! debug ----
+!                write(*,*) ' elements ie1 , ie2 , elems(ie1)%p%id , elems(ie2)%p%id : ' 
+!                write(*,*)            ie1 , ie2 , elems(ie1)%p%id , elems(ie2)%p%id
+!                write(*,*) ' elems. i1 ' , elems(ie1)%p%i_ver
+!                write(*,*) ' elems. i2 ' , elems(ie2)%p%i_ver
+!                write(*,*) ' vertices el.i1 ' , vert1 , vert2
+!                write(*,*) ' vertices el.i2 ' , elems(ie2)%p%i_ver(iv1) , elems(ie2)%p%i_ver(iv2)
+!                ! debug ----
+!                call error(this_sub_name, this_mod_name, &
+!                  'Neighbouring elements with opposed normal orientation,&
+!                  &this is not allowed. Stop')
+!              endif
+!            endif
+!          enddo
+!        endif
+!      enddo
+!    enddo
+!  enddo
+!  t1 = dust_time()
+!  !write(msg,'(A,F9.3,A)') 'Connectivity built in ', t1-t0, ' s.'
+!  call printout(msg)
+!
+!end subroutine build_connectivity
 
 !----------------------------------------------------------------------
 
@@ -2187,7 +2189,7 @@ end subroutine create_local_velocity_stencil
 !                                , ...
 !                              23,19,20,24 
 subroutine create_strip_connectivity(geo)
- type(t_geo),  intent(inout) :: geo
+ type(t_geo),  target, intent(inout) :: geo
 
  real(wp) :: h2
 
@@ -2207,10 +2209,10 @@ subroutine create_strip_connectivity(geo)
     n_el = size(comp%el)
 
     ! Some checks added: the first element must be at the LE, the last at the TE
-    if ( comp%el(  1 )%i_neigh(1) .ne. 0 ) then
+    if ( associated(comp%el(  1 )%neigh(1)%p)) then
       call error(this_sub_name, this_mod_name, 'First element must be at the LE')
     end if
-    if ( comp%el(n_el)%i_neigh(3) .ne. 0 ) then
+    if ( associated(comp%el(n_el)%neigh(3)%p) ) then
       call error(this_sub_name, this_mod_name, 'Last element must be at the TE')
     end if
 
@@ -2220,11 +2222,11 @@ subroutine create_strip_connectivity(geo)
     
      ie_ind = comp%el(i_el)%id
     
-     if ( comp%el(i_el)%i_neigh(1) .eq. 0 ) then
-       comp%el(i_el)%stripe_1 = 0
+     if ( .not. associated(comp%el(i_el)%neigh(1)%p) ) then
+       comp%el(i_el)%stripe_1%p => null()
        n_s = n_s + 1 
      else 
-       comp%el(i_el)%stripe_1 = comp%el(i_el)%i_neigh(1)
+       comp%el(i_el)%stripe_1%p => comp%el(i_el)%neigh(1)%p
      end if
     
      comp%el(i_el)%dy = sum( cross( comp%el(i_el)%edge_uni(:,2) ,    &
@@ -2253,8 +2255,8 @@ subroutine create_strip_connectivity(geo)
 !       write(*,*) ' comp%el(',i_c+(i_s-1)*n_c,')%stripe_elem : '
         allocate( comp%el(i_c+(i_s-1)*n_c)%stripe_elem(i_c) )
         do i_c2 = 1 , i_c
-          comp%el(i_c+(i_s-1)*n_c)%stripe_elem(i_c2) = &
-                                        comp%el(i_c2+(i_s-1)*n_c)%id
+          comp%el(i_c+(i_s-1)*n_c)%stripe_elem(i_c2)%p => &
+                                        comp%el(i_c2+(i_s-1)*n_c)
 !         write(*,*) comp%el(i_c+(i_s-1)*n_c)%stripe_elem(i_c2)
         end do
       end do

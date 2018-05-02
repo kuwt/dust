@@ -547,9 +547,9 @@ subroutine compute_cp_surfpan(this, elems, uinf) !, uinf)
   ! contained in pot_vel_stencil
   vel_phi = 0.0_wp
   do i_e = 1 , this%n_ver
-    if ( this%i_neigh(i_e) .ne. 0 ) then
+    if ( associated(this%neigh(i_e)%p) ) then
       vel_phi = vel_phi + &
-        this%pot_vel_stencil(:,i_e) * (elems(this%i_neigh(i_e))%p%idou - this%idou)
+        this%pot_vel_stencil(:,i_e) * (this%neigh(i_e)%p%idou - this%idou)
     ! else
     end if
   end do

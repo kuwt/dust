@@ -478,7 +478,7 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
  real(wp), allocatable :: norm(:,:), cent(:,:), velb(:,:)
  integer, allocatable  :: el(:,:), conn(:,:)
  character(len=max_char_len) :: sit
- integer :: ie
+ integer :: ie, iv
 
   allocate(norm(3,size(elems)), cent(3,size(elems)), velb(3,size(elems)))
   allocate(el(4,size(elems))); el = 0
@@ -488,7 +488,13 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
     cent(:,ie) = elems(ie)%p%cen
     velb(:,ie) = elems(ie)%p%ub
     el(1:elems(ie)%p%n_ver,ie) = elems(ie)%p%i_ver
-    conn(1:elems(ie)%p%n_ver, ie) = elems(ie)%p%i_neigh
+    do iv=1,elems(ie)%p%n_ver
+      if(associated(elems(ie)%p%neigh(iv)%p)) then
+        conn(iv, ie) = elems(ie)%p%neigh(iv)%p%id
+      else
+        conn(iv, ie) = 0
+      endif
+    enddo
   enddo
   write(sit,'(I4.4)') it
   call write_basic(geo%points, trim(basename)//'mesh_points_'//trim(sit)//'.dat')

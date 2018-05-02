@@ -371,7 +371,7 @@ subroutine compute_cp_vortring(this, elems, uinf)
   if ( i_stripe .gt. 1 ) then
     this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &
           ( norm2(uinf - this%ub) * this%dy / this%area * &
-               ( elems(this%id)%p%idou - elems(this%stripe_elem(i_stripe-1))%p%idou ) + &
+               ( elems(this%id)%p%idou - this%stripe_elem(i_stripe-1)%p%idou ) + &
                dG_dt )
   else
     this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &
