@@ -81,6 +81,9 @@ use mod_wake, only: &
 use mod_vtk_out, only: &
   vtk_out_bin
 
+use mod_tecplot_out, only: &
+  tec_out_sol_bin
+
 use mod_hdf5_io, only: &
   h5loc, initialize_hdf5, destroy_hdf5, new_hdf5_file, open_hdf5_file, &
   close_hdf5_file, new_hdf5_group, open_hdf5_group, close_hdf5_group, &
@@ -338,7 +341,8 @@ do it = 1,nstep
                       call debug_printout_wake(wake_panels, basename_debug, it)
 
   !Print the results
-  if(time_2_out)  call output_status(elems_tot, geo, wake_panels, basename, it)
+  if(time_2_out)  call output_status(elems_tot, geo, wake_panels, basename, &
+                                     it, time)
 
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
@@ -399,12 +403,13 @@ end subroutine init_timestep
 
 !------------------------------------------------------------------------------
 
-subroutine output_status(elems_tot, geo, wake_panels, basename, it)
+subroutine output_status(elems_tot, geo, wake_panels, basename, it, t)
  type(t_elem_p),   intent(in) :: elems_tot(:)
  type(t_geo),      intent(in) :: geo
  type(t_wake_panels), intent(in) :: wake_panels
  character(len=*), intent(in) :: basename
  integer,          intent(in) :: it
+ real(wp), intent(in)         :: t
 
  integer, allocatable :: el(:,:), w_el(:,:)
  real(wp), allocatable :: w_points(:,:), w_res(:)
@@ -436,6 +441,9 @@ subroutine output_status(elems_tot, geo, wake_panels, basename, it)
   call vtk_out_bin (geo%points, el, (/linsys%res,linsys%res_expl(:,1)/),  &
                     w_points, w_el, w_res,  &
                     trim(basename)//'res_'//trim(sit)//'.vtu')
+  call tec_out_sol_bin(geo%points, el, (/linsys%res,linsys%res_expl(:,1)/),  &
+                    w_points, w_el, w_res, t,  &
+                    trim(basename)//'res_'//trim(sit)//'.plt')
 
 
   !=== Hdf5 output ===
