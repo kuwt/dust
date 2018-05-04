@@ -172,7 +172,6 @@ subroutine build_component(gloc, geo_file, comp_id)
   !read the parameters
   call geo_prs%read_options(geo_file,printout_val=.false.)
 
-  mesh_file      = getstr(geo_prs,'MeshFile')
   mesh_file_type = getstr(geo_prs,'MeshFileType')
   ref_tag        = getstr(geo_prs,'Reference_Tag')
 
@@ -197,10 +196,13 @@ subroutine build_component(gloc, geo_file, comp_id)
   select case (trim(mesh_file_type))
 
    case('basic')
+    mesh_file = getstr(geo_prs,'MeshFile')
     call read_mesh_basic(trim(mesh_file),ee, rr)
    case('cgns')
+    mesh_file = getstr(geo_prs,'MeshFile')
     call read_mesh_cgns(trim(mesh_file),ee, rr)
    case('parametric')
+    mesh_file = geo_file
     if ( ElType .ne. 'l' ) then
       ! TODO : actually it is possible to define the parameters in the GeoFile 
       !directly, find a good way to do this
