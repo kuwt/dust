@@ -303,52 +303,60 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
  diff = 0.0_wp
  !Calculate the induced velocity on the airfoil
  do ic = 1,1000
- do i_l = 1,size(elems_ll)
-   vel = 0.0_wp
-   do j = 1,size(elems_tot)
-     call elems_tot(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
-     vel = vel + v
+   do i_l = 1,size(elems_ll)
+     vel = 0.0_wp
+     do j = 1,size(elems_tot)
+       call elems_tot(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
+       vel = vel + v
+     enddo
+     select type(el => elems_ll(i_l)%p)
+     type is(t_liftlin)
+       vel = vel/(4.0_wp*pi) + uinf - el%ub +vel_w(:,i_l)
+       !vel = uinf - el%ub
+       up = vel-el%bnorm_cen*sum(el%bnorm_cen*vel)
+       !Employing the free stream velocity to get into tables
+       unorm = norm2((uinf-el%ub) - el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
+       !unorm = norm2(up)
+       alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
+       alpha = alpha * 180.0_wp/pi
+       !TODO: fix these parameters which are still hard-coded
+       mach = 0.0_wp
+       re = 1000000.0_wp
+       call interp_aero_coeff ( airfoil_data ,  &
+                      el%csi_cen, el%i_airfoil , (/alpha, mach, re/) , aero_coeff )
+       cl = aero_coeff(1)
+       dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
+       diff = max(diff,abs(elems_ll(i_l)%p%idou-dou_temp(i_l))) 
+     end select
    enddo
-   select type(el => elems_ll(i_l)%p)
-   type is(t_liftlin)
-     vel = vel/(4.0_wp*pi) + uinf - el%ub +vel_w(:,i_l)
-     !vel = uinf - el%ub
-     up = vel-el%bnorm_cen*sum(el%bnorm_cen*vel)
-     !Employing the free stream velocity to get into tables
-     unorm = norm2((uinf-el%ub) - el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
-     !unorm = norm2(up)
-     alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
-     alpha = alpha * 180.0_wp/pi
-     !TODO: fix these parameters which are still hard-coded
-     mach = 0.0_wp
-     re = 1000000.0_wp
-     call interp_aero_coeff ( airfoil_data ,  &
-                    el%csi_cen, el%i_airfoil  , (/alpha, mach, re/) , aero_coeff )
-     cl = aero_coeff(1)
-     dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
-     diff = max(diff,abs(elems_ll(i_l)%p%idou-dou_temp(i_l))) 
-   end select
- enddo
- damp = 5.0_wp
+   damp = 5.0_wp
+  
+   do i_l = 1,size(elems_ll)
+     elems_ll(i_l)%p%idou = ( dou_temp(i_l)+ damp*elems_ll(i_l)%p%idou )/(1.0_wp+damp)
+   enddo 
+   
+   if(diff .le. toll) exit
 
+ enddo
+
+ !Rough cp compuation ! Only steady ...
  do i_l = 1,size(elems_ll)
-   elems_ll(i_l)%p%idou = ( dou_temp(i_l)+ damp*elems_ll(i_l)%p%idou )/(1.0_wp+damp)
- enddo 
- 
- if(diff .le. toll) exit
-
- enddo
+   elems_ll(i_l)%p%cp =  2.0_wp / norm2(uinf)**2.0_wp * &
+            ( norm2(uinf - elems_ll(i_l)%p%ub) ) * elems_ll(i_l)%p%idou 
+ end do
 
  !DEBUG:
  write(*,*) 'iterations: ',ic
  write(*,*) 'diff',diff
  deallocate(dou_temp, vel_w)
 
+
  !Get the angle of attack, as well as the other parameters
 
  !Get into the tables to obtain the loads
 
  !Get the vorticity of the element
+
 end subroutine solve_liftlin
 
 !----------------------------------------------------------------------
