@@ -71,27 +71,18 @@ character(len=max_char_len) :: input_file_name
 character(len=max_char_len) :: output_file_name
 character(len=max_char_len) :: output_file_name_read
 logical :: cmd_set_filename
+character(len=max_char_len), allocatable :: comp_names(:)
 character(len=max_char_len), allocatable :: geo_files(:)
+character(len=max_char_len), allocatable :: ref_tags(:)
 !character(len=extended_char_len) :: message
 
-!Time parameters
-!real(wp) :: tstart, tend, dt, time
-
 !Geometry parameters
-!type(t_elem_p), allocatable :: elems(:)
 type(t_parse) :: prms
-type(t_parse), pointer :: sbprms!, ssbprms
-!integer :: aa, bb, cc, dd, ee, ff
-!type(t_geo) :: geo
+ type(t_link), pointer :: lnk
 
 
-integer :: n_geo, i
+integer :: n_geo, n_tag, n_name, i
 
-!debug
-integer :: n_refs,n,nmov, i_ref, intparam
-character(len=max_char_len) :: Ref, mov_type
-logical :: moving
-type(t_link), pointer :: o_link
 
 !write(*,*) 'DUST beginning'
 call printout(nl//'>>>>>> DUST PREPROCESSOR beginning >>>>>>'//nl)
@@ -116,89 +107,40 @@ endif
 
 !call prms%CreateRealOption( 'tstart', "Starting time", '0.0')
 
+call prms%CreateStringOption('CompName','Component Name', multiple=.true.)
 call prms%CreateStringOption('GeoFile','Geometry definition files', multiple=.true.)
+call prms%CreateStringOption('RefTag','Reference Tag of the component', multiple=.true.)
 call prms%CreateStringOption('FileName','Preprocessor output file')
 
-call prms%CreateStringOption('Ref','  ',multiple=.true.)
-call prms%CreateLogicalOption('Moving','  ',multiple=.true.)
-
-call prms%CreateSubOption('Movement',' ',sbprms,multiple=.true.)
-call sbprms%CreateStringOption('Movement_Type','  ')
-call sbprms%CreateIntOption('first_option','   ')
-call sbprms%CreateIntOption('second_option','   ')
-
-sbprms => null()
 
 call prms%read_options(input_file_name, printout_val=.false.)
 
-n_geo = countoption(prms,'GeoFile')
-n_refs = countoption(prms,'Ref')
+n_name = countoption(prms,'CompName')
+n_geo  = countoption(prms,'GeoFile')
+n_tag  = countoption(prms,'RefTag')
 
-n = countoption(prms,'Moving')
-if (n .ne. n_refs) call error('','','Wrong number of Moving inserted')
-nmov = 0
-
-
-do i_ref = 1,n_refs
-  Ref = getstr(prms,'Ref')
-    write(*,*) 'Reference: ',trim(Ref)
-  moving = getlogical(prms,'Moving',olink=o_link)
-    write(*,*) 'Is it moving: ',moving
-  if(moving) then
-    nmov = nmov + 1
-    call check_opt_consistency(o_link, next=.true., next_opt='Movement')
-    call getsuboption(prms,'Movement',sbprms) 
-
-    mov_type =getstr(sbprms,'Movement_Type')
-    select case(trim(mov_type))
-    case('first')
-      intparam = getint(sbprms,'first_option')
-    case('second')
-      intparam = getint(sbprms,'second_option')
-    case default
-      call error('','','Wrong kinda movement')
-    end select
-    write(*,*) 'Movement: ',trim(mov_type)
-    write(*,*) 'Parameter: ',intparam
-  endif
-enddo
-
-n = countoption(prms,'Movement')
-
-if(n .ne. nmov) call error('','','Wrong number of movement with respect to Moving = T')
+if(n_geo .ne. n_name)  call error('dust_pre','','Different number of components &
+  & and components names in input file "'//trim(input_file_name)//'"')
+if(n_geo .ne. n_tag)  call error('dust_pre','','Different number of components &
+  & and references tags in input file "'//trim(input_file_name)//'"')
 
 output_file_name_read = getstr(prms, 'FileName')
 
-allocate(geo_files(n_geo))
+allocate(comp_names(n_geo), geo_files(n_geo), ref_tags(n_geo))
 do i=1,n_geo
-  geo_files(i) = getstr(prms,'GeoFile')
+  comp_names(i) = getstr(prms, 'CompName')
+  geo_files(i) = getstr(prms,'GeoFile',olink=lnk)
+  call check_opt_consistency(lnk,prev=.true.,prev_opt='CompName')
+  call check_opt_consistency(lnk,next=.true.,next_opt='RefTag')
+  ref_tags(i)  = getstr(prms,'RefTag')
 enddo
 
-
-n = 3
-do i = 1,n
-
-  n = n+1
-  write(*,*) 'i',i
-enddo 
 if (.not. cmd_set_filename) output_file_name = output_file_name_read
 
-call build_geometry(geo_files,trim(output_file_name))
-
-! Read the file list from the main file
-!call set_parameters_geo(prms)
+call build_geometry(geo_files,ref_tags,comp_names,trim(output_file_name))
 
 
-
-! get the parameters and print them out
-!call printout(new_line('a')//'====== Input parameters: ======')
-
-
-!call printout(nl//'====== Geometry Creation ======')
-!call create_geometry(prms, input_file_name, geo, te, elems, tstart)
-
-
-
+deallocate(comp_names, geo_files, ref_tags)
 call destroy_hdf5()
 call printout(nl//'<<<<<< DUST PREPROCESSOR end       <<<<<<'//nl)
 

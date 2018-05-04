@@ -66,6 +66,10 @@ type, abstract :: c_elem
  
   !> Element id
   integer :: id
+
+  !> id of the component to which it belongs
+  integer :: comp_id
+
   !> Number of vertexes
   integer :: n_ver  
   !> Vertexes coordinates

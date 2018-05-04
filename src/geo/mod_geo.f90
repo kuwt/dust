@@ -137,6 +137,9 @@ type :: t_geo_component
  !> Element type
  character(len=max_char_len) :: comp_el_type
 
+ !> Name of the element
+ character(len=max_char_len) :: comp_name
+
  !> Number of elements of the component
  integer :: nelems
 
@@ -346,14 +349,8 @@ subroutine create_geometry(prms, in_file_name,  geo, te, &
  integer , allocatable :: el_id_old(:), el_id_old_static(:), el_id_old_moving(:)
 
  character(len=max_char_len) :: msg
- real(t_realtime) :: t0, t1
-
- ! airfoil data for ll
 
   tstart = sim_param%t0
-
-!  t0 = dust_time()
-
  
   !build the reference frames
   !read which is the reference frame file, if default the main input file is 
@@ -561,7 +558,7 @@ subroutine load_components(geo, in_file, sim_param, te)
  integer :: i1, i2, i3
  integer, allocatable :: ee(:,:)
  real(wp), allocatable :: rr(:,:)
- character(len=max_char_len) :: comp_el_type
+ character(len=max_char_len) :: comp_el_type, comp_name
  integer :: points_offset, n_vert , elems_offset
  real(wp), allocatable :: points_tmp(:,:)
  character(len=max_char_len) :: ref_tag, ref_tag_m
@@ -678,6 +675,9 @@ subroutine load_components(geo, in_file, sim_param, te)
       call read_hdf5(comp_el_type,'ElType',cloc)
       geo%components(i_comp)%comp_el_type = trim(comp_el_type)
 
+      call read_hdf5(comp_name,'CompName',cloc)
+      geo%components(i_comp)%comp_name = trim(comp_name)
+
       ! Geometry and Solution --------------------------
       call open_hdf5_group(cloc,'Geometry_and_Solution',geo_loc)
       call read_hdf5_al(ee   ,'ee'   ,geo_loc)
@@ -761,6 +761,9 @@ subroutine load_components(geo, in_file, sim_param, te)
       
       !fill (some) of the elements fields
       do i2=1,size(ee,2)
+        
+        !Component id
+        geo%components(i_comp)%el(i2)%comp_id = i_comp
         
         !vertices
         n_vert = count(ee(:,i2).ne.0)
@@ -893,10 +896,7 @@ subroutine import_aero_tab(geo,coeff)
  character(len=max_char_len) , allocatable :: list_tmp_tmp(:) 
  integer , allocatable :: i_airfoil_e_tmp (:,:)
 
- integer :: i_c , n_c , i_a , n_a , i_ , i_l
-
-! Test ---
- real(wp) , allocatable :: c(:)
+ integer :: i_c, n_c, i_a, n_a, i_l
 
  n_tmp = 30 
  allocate(list_tmp(n_tmp)) 
@@ -2115,12 +2115,7 @@ subroutine create_local_velocity_stencil (geo, elems)
  type(t_elem_p), intent(in)  :: elems(:)
 
  real(wp) :: surf_bubble
-
  integer  :: i_comp , i_el , i_v
-
- real(wp) :: t0 , t1
-
- call cpu_time(t0)
 
  do i_comp = 1 , size(geo%components)
 
@@ -2165,8 +2160,6 @@ subroutine create_local_velocity_stencil (geo, elems)
 
  end do
  
- !call cpu_time(t1)
- !write(*,*) ' create_local_velocity_stencil. Elapsed time: ' , t1-t0
 
 end subroutine create_local_velocity_stencil
 
