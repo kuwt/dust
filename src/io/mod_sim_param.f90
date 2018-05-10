@@ -38,7 +38,7 @@
 module mod_sim_param
 
 use mod_param, only: &
-  wp
+  wp, max_char_len
 
 implicit none
 
@@ -61,6 +61,8 @@ type t_sim_param
   real(wp) , allocatable :: u_inf(:)
   !> Debug level
   integer :: debug_level
+  !> Basename
+  character(len=max_char_len) :: basename
 end type t_sim_param
 
 

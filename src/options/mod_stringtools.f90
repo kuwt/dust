@@ -119,6 +119,7 @@ public :: inttostr
 public :: isint
 public :: set_formatting
 public :: clear_formatting
+public :: IsInList
 
 logical :: use_escape_codes = .true.  !< If set to .false., output will consist only of standard text, allowing the 
                                       !< escape characters to be switched off in environments which don't support them.
@@ -140,7 +141,7 @@ character(len=*),intent(inout) :: Str1  !< Input/output string
 ! local variables 
 integer                    :: iLen,nLen,Upper
 character(len=*),parameter :: lc='abcdefghijklmnopqrstuvwxyz'
-character(len=*),parameter :: uc='abcdefghijklmnopqrstuvwxyz'
+character(len=*),parameter :: uc='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 logical                    :: HasEq
 !==================================================================================================================================
 HasEq=.false.
@@ -169,7 +170,7 @@ character(len=*),intent(out) :: Str2  !< Output string, lower case letters only
 ! local variables 
 integer                    :: iLen,nLen,Upper
 character(len=*),parameter :: lc='abcdefghijklmnopqrstuvwxyz'
-character(len=*),parameter :: uc='abcdefghijklmnopqrstuvwxyz'
+character(len=*),parameter :: uc='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 logical                    :: HasEq
 !==================================================================================================================================
 HasEq=.false.
@@ -202,6 +203,25 @@ call LowCase(a, alow)
 call LowCase(b, blow)
 stricmp = (trim(alow).eq.trim(blow))
 end function stricmp
+
+function IsInList(str, str_list) result(isin)
+ character(len=*), intent(in) :: str
+ character(len=*), allocatable, intent(in) :: str_list(:)
+ logical :: isin
+
+ integer :: i
+
+  isin = .false.
+  if(allocated(str_list)) then
+   do i = lbound(str_list,1), ubound(str_list,1)
+     if(stricmp(trim(str),trim(str_list(i)))) then
+       isin = .true.
+       return
+     endif
+   enddo
+  endif
+
+end function
 
 !==================================================================================================================================
 !> Removes all whitespace from a string

@@ -100,9 +100,9 @@ use mod_hdf5_io, only: &
 
 implicit none
 
-public :: t_geo, t_tedge, set_parameters_geo, create_geometry, &
-          update_geometry, destroy_geometry, calc_geo_data_pan, &
-          calc_geo_data_ll
+public :: t_geo, t_geo_component, t_tedge, set_parameters_geo, &
+          create_geometry, update_geometry, destroy_geometry, &
+          calc_geo_data_pan, calc_geo_data_ll
 
 private
 
@@ -137,8 +137,11 @@ type :: t_geo_component
  !> Element type
  character(len=max_char_len) :: comp_el_type
 
- !> Name of the element
+ !> Name of the component
  character(len=max_char_len) :: comp_name
+
+ !> Id of the component (warning: not always defined)
+ integer :: comp_id
 
  !> Number of elements of the component
  integer :: nelems
@@ -327,9 +330,11 @@ end subroutine set_parameters_geo
 !! -# The element pointer array used to build/solve the linear system is
 !!    created, pointed at each element and then re-ordered with the static
 !!    elements first, and the dynamic elements at the end
-subroutine create_geometry(prms, in_file_name,  geo, te, &
-                           elems, elems_ll, elems_tot, airfoil_data, sim_param)
- type(t_parse), intent(inout) :: prms
+subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
+                           te, elems, elems_ll, elems_tot, airfoil_data, &
+                           sim_param)
+ character(len=*), intent(in) :: geo_file_name
+ character(len=*), intent(inout) :: ref_file_name
  character(len=*), intent(in) :: in_file_name
  type(t_geo), intent(out), target :: geo
  type(t_elem_p), allocatable, intent(out) :: elems(:)
@@ -340,8 +345,8 @@ subroutine create_geometry(prms, in_file_name,  geo, te, &
  type(t_sim_param) , intent(inout) :: sim_param
  real(wp)                     :: tstart
 
- character(len=max_char_len) :: reference_file
- character(len=max_char_len) :: geo_file_name
+ !character(len=max_char_len) :: reference_file
+ !character(len=max_char_len) :: geo_file_name
 
  integer :: i, j, is, im,  i_comp, i_ll, i_tot
  type(t_elem_p), allocatable :: temp_static(:), temp_moving(:)
@@ -355,17 +360,17 @@ subroutine create_geometry(prms, in_file_name,  geo, te, &
   !build the reference frames
   !read which is the reference frame file, if default the main input file is 
   !employed
-  reference_file = getstr(prms, 'ReferenceFile')
-  if (trim(reference_file) .eq. 'no_set') then
-    reference_file = trim(in_file_name)
+  !reference_file = getstr(prms, 'ReferenceFile')
+  if (trim(ref_file_name) .eq. 'no_set') then
+    ref_file_name = trim(in_file_name)
   endif
 
-  call build_references(geo%refs, reference_file, sim_param)
+  call build_references(geo%refs, trim(ref_file_name), sim_param)
 
   !Load the components from the file created by the preprocessor
-  geo_file_name = getstr(prms, 'GeometryFile')
+  !geo_file_name = getstr(prms, 'GeometryFile')
   call check_preproc(geo_file_name)
-  call load_components(geo, geo_file_name, sim_param, te)
+  call load_components(geo, trim(geo_file_name), sim_param, te)
 
   call import_aero_tab(geo,airfoil_data)
 
@@ -668,6 +673,12 @@ subroutine load_components(geo, in_file, sim_param, te)
       geo%components(i_comp)%ref_id  = ref_id
       geo%components(i_comp)%ref_tag = trim(ref_tag_m)
       geo%components(i_comp)%moving  = geo%refs(ref_id)%moving
+
+      !Re-write the reference tag to the component
+      call write_hdf5(ref_id,'RefId',cloc)
+        !TODO: fix this WARNING: it is not multiple references safe
+
+    
  
 
       ! ====== READING =====
@@ -679,7 +690,7 @@ subroutine load_components(geo, in_file, sim_param, te)
       geo%components(i_comp)%comp_name = trim(comp_name)
 
       ! Geometry and Solution --------------------------
-      call open_hdf5_group(cloc,'Geometry_and_Solution',geo_loc)
+      call open_hdf5_group(cloc,'Geometry',geo_loc)
       call read_hdf5_al(ee   ,'ee'   ,geo_loc)
       call read_hdf5_al(rr   ,'rr'   ,geo_loc)
       call read_hdf5_al(neigh,'neigh',geo_loc)

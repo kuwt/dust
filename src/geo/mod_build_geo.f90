@@ -195,7 +195,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
 ! call new_hdf5_group(file_loc, 'Components', group_loc)
   call write_hdf5(trim(comp_el_type),'ElType',comp_loc)
 
-  call new_hdf5_group(comp_loc, 'Geometry_and_Solution', geo_loc)
+  call new_hdf5_group(comp_loc, 'Geometry', geo_loc)
 
   ! read the files
   select case (trim(mesh_file_type))

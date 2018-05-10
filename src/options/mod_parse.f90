@@ -129,8 +129,9 @@ implicit none
 !-----------------------------------------------------------------------
 
 public :: t_parse, ignoredParameters, finalizeparameters, &
-          getstr, getlogical, getreal, getrealarray, getint, getintarray, countoption, &
-          t_link, check_opt_consistency, getsuboption
+          getstr, getlogical, getreal, getrealarray, getint, getintarray, &
+          countoption, t_link, check_opt_consistency, getsuboption, &
+          print_parse_debug
 
 private
 
@@ -302,6 +303,7 @@ subroutine CreateOption(this, opt, name, description, value, multiple)
   end if
 
   opt%multiple   = .false.
+  opt%additional = .false.
   if (present(multiple)) opt%multiple = multiple
   if (opt%multiple.and.opt%hasDefault) then
     call error(this_sub_name, this_mod_name, &
@@ -523,7 +525,7 @@ function CountOption_(this, name) result(count)
  class(t_parse),intent(inout) :: this    !< class(t_parse)
  character(len=*),intent(in)     :: name  !< Search for this keyword in ini file
  integer                         :: count !< number of found occurences of keyword
-
+ 
  class(t_link),pointer :: current
   count = 0
   ! iterate over all options and compare names
@@ -579,25 +581,27 @@ recursive subroutine copy_parser(source_p, target_p)
   current_target => target_p%firstLink
 
   do while (associated(current_source))
-    allocate(newopt, source=current_source%opt)
+    if (.not.current_source%opt%additional) then
+      allocate(newopt, source=current_source%opt)
 
-    newopt%isSet =.false.
+      newopt%isSet =.false.
 
-    if (.not. associated(target_p%firstLink)) then
-      target_p%firstLink => constructor_Link(newopt, target_p%firstLink)
-      target_p%lastLink => target_p%firstLink
-    else
-      newLink => constructor_Link(newopt, target_p%lastLink%next)
-      target_p%lastLink%next => newLink
-      target_p%lastLink => newLink
-    end if
-    current_target => target_p%lastLink
+      if (.not. associated(target_p%firstLink)) then
+        target_p%firstLink => constructor_Link(newopt, target_p%firstLink)
+        target_p%lastLink => target_p%firstLink
+      else
+        newLink => constructor_Link(newopt, target_p%lastLink%next)
+        target_p%lastLink%next => newLink
+        target_p%lastLink => newLink
+      end if
+      current_target => target_p%lastLink
 
 
-    if(associated(current_source%sub_list)) then
-      call copy_parser(current_source%sub_list, current_target%sub_list)
-      !call copy_parser(current_source%sub_list, newParser)
-      !current_target%sub_list => newParser
+      if(associated(current_source%sub_list)) then
+        call copy_parser(current_source%sub_list, current_target%sub_list)
+        !call copy_parser(current_source%sub_list, newParser)
+        !current_target%sub_list => newParser
+      endif
     endif
 
     newopt => null()
@@ -783,6 +787,7 @@ function read_option(this, line, sub_option, prev_read) result(found)
           allocate(newopt, source=current%opt)
           call newopt%parse(rest)
           newopt%isSet = .true.
+          newopt%additional = .true.
           ! insert option
           call insertOption(current, newopt)
           !if it is a sub-option it is necessary to re-build all the chain
@@ -903,6 +908,26 @@ subroutine check_opt_consistency(olink, prev, prev_opt, next, next_opt)
 
 
 end subroutine check_opt_consistency
+
+subroutine print_parse_debug(prms)
+ class(t_parse),intent(in) :: prms  !< class(t_parse)
+
+ class(t_link),pointer :: current
+
+  write(*,*) 'List of option: '
+  current => prms%firstLink
+  do while (associated(current))
+    write(*,*) 'Option name: ',trim(current%opt%name)
+    write(*,'(A)',advance='no') '       value: '
+    call current%opt%printValue(20)
+    write(*,*)
+    write(*,*) '       is set? ',current%opt%isSet
+    write(*,*) '       is removed? ',current%opt%isRemoved
+    current => current%next
+  end do
+
+
+end subroutine print_parse_debug
 
 !-----------------------------------------------------------------------
 
@@ -1168,8 +1193,6 @@ use MOD_Options
       !class is (SubOption)
       !  select type(value)
       !  type is (t_parse)
-      !    !DEBUG
-      !    write(*,*) 'is sub list associated?',associated(current%sub_list)
       !    value => current%sub_list
       !  end select
       class is (IntOption)

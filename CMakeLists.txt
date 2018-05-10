@@ -102,3 +102,7 @@ target_link_libraries(dust ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} ${HDF5_LIBRARIE
 add_executable(dust_pre  ${PROJECT_SOURCE_DIR}/src/dust_pre.f90)
 add_dependencies(dust_pre dustlib)
 target_link_libraries(dust_pre ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} ${HDF5_LIBRARIES} cgns dustlib)
+
+add_executable(dust_post  ${PROJECT_SOURCE_DIR}/src/dust_post.f90)
+add_dependencies(dust_post dustlib)
+target_link_libraries(dust_post ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} ${HDF5_LIBRARIES} cgns dustlib)
