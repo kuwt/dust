@@ -83,6 +83,9 @@ use mod_geo_postpro, only: &
 use mod_tecplot_out, only: &
   tec_out_viz
 
+use mod_vtk_out, only: &
+  vtk_out_viz
+
 implicit none
 
 !Input
@@ -105,6 +108,7 @@ integer :: n_var, i_var
 character(len=max_char_len), allocatable :: var_names(:)
 character(len=max_char_len) :: lowstr
 character(len=max_char_len) :: filename
+character(len=max_char_len) :: out_frmt
 logical :: all_comp
 logical :: out_vort, out_vel, out_cp, out_press
 logical :: out_wake
@@ -157,6 +161,7 @@ call sbprms%CreateIntOption('EndRes', 'Final result of the analysis')
 call sbprms%CreateIntOption('StepRes', 'Result stride of the analysis')
 call sbprms%CreateLogicalOption('Wake', 'Output also the wake for &
                                 &visualization','T')
+call sbprms%CreateStringOption('Format','Output format')
 call sbprms%CreateStringOption('Component','Component to analyse', &
                                multiple=.true.)
 call sbprms%CreateStringOption('Var','Variable to analise', &
@@ -178,6 +183,8 @@ do ia = 1,n_analyses
   an_type  = getstr(sbprms,'Type')
   call LowCase(an_type)
   an_name  = getstr(sbprms,'Name')
+  out_frmt = getstr(sbprms,'Format')
+  call LowCase(out_frmt)
   an_start = getint(sbprms,'StartRes')
   an_end   = getint(sbprms,'EndRes')
   an_step  = getint(sbprms,'StepRes')
@@ -229,20 +236,19 @@ do ia = 1,n_analyses
 
     !time history
     do it =an_start, an_end, an_step
+
       ! Open the file:
       write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
       call open_hdf5_file(trim(filename),floc)
-      
+
       !Load the references
       call load_refs(floc,refs_R,refs_off)
-
       !Move the points
       call update_points_postpro(comps, points, refs_R, refs_off)
-
       !Load the results
       call load_res(floc, comps, vort, cp, t)
 
-      !Prepare the variable output
+      !Prepare the variable for output
       nprint = 0
       if(out_vort) nprint = nprint+1
       if(out_cp)   nprint = nprint+1
@@ -259,11 +265,15 @@ do ia = 1,n_analyses
         print_var_names(ivar) = 'Cp'
         ivar = ivar +1
       endif
-      write(filename,'(A,I4.4,A)') trim(basename)//'_'//trim(an_name)//'_',it,'.plt'
+
+      write(filename,'(A,I4.4)') trim(basename)//'_'//trim(an_name)//&
+                                                            '_',it
       
       if (out_wake) then
+
         !Load the wake
         call load_wake(floc, wpoints, wstart, wvort)
+        !Prepare the wake variables for output
         nstripes = size(wvort,1); nstripes_p = size(wpoints,2)
         nrows = size(wvort,2); nelem_w = nstripes*nrows
         allocate(wpoints_s(3,nstripes_p*(nrows+1)))
@@ -290,16 +300,45 @@ do ia = 1,n_analyses
           print_var_names_w(ivar) = 'Vorticity'
           ivar = ivar +1
         endif
-        call  tec_out_viz(filename, t, &
+
+        !Output the results (with wake)
+        select case (trim(out_frmt))
+         case ('tecplot')
+          filename = trim(filename)//'.plt'
+          call  tec_out_viz(filename, t, &
                        points, elems, print_vars, print_var_names, &
                        w_rr=wpoints_s, w_ee=welems, w_vars=print_vars_w, &
                        w_var_names = print_var_names_w)
+         case ('vtk')
+          filename = trim(filename)//'.vtu'
+          call  vtk_out_viz(filename, &
+                       points, elems, print_vars, print_var_names, &
+                       w_rr=wpoints_s, w_ee=welems, w_vars=print_vars_w, &
+                       w_var_names = print_var_names_w)
+         case default
+           call error('dust_post','','Unknown format '//trim(out_frmt)//&
+                      ' for visualization output')
+         end select
       
         deallocate(wpoints, wpoints_s, welems, wstart, wvort)
         deallocate(print_var_names_w, print_vars_w)
+
       else
-        call  tec_out_viz(filename, t, &
+        
+        !Output the results (without wake)
+        select case (trim(out_frmt))
+         case ('tecplot')
+          filename = trim(filename)//'.plt'
+          call  tec_out_viz(filename, t, &
                        points, elems, print_vars, print_var_names)
+         case ('vtk')
+          filename = trim(filename)//'.vtu'
+          call  vtk_out_viz(filename, &
+                       points, elems, print_vars, print_var_names)
+         case default
+           call error('dust_post','','Unknown format '//trim(out_frmt)//&
+                      ' for visualization output')
+         end select
 
       endif
 
