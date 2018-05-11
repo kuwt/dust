@@ -632,4 +632,19 @@ end subroutine define_division
 
 !-------------------------------------------------------------------------------
 
+subroutine read_actuatordisk_parametric(mesh_file,ee,rr)
+ character(len=*), intent(in) :: mesh_file
+ integer  , allocatable, intent(out) :: ee(:,:) 
+ real(wp) , allocatable, intent(out) :: rr(:,:) 
+  call pmesh_prs%CreateStringOption('ElType', &
+                'element type (temporary) p panel v vortex ring &
+                & l lifting line a actuator disk')
+  call pmesh_prs%CreateRealOption('Radius', 'Radius of the actuator disk')
+  call pmesh_prs%CreateIntOption('nelem','Number of subdivisions')
+
+
+end subroutine read_actuatordisk_parametric
+
+!-------------------------------------------------------------------------------
+
 end module mod_parametric_io

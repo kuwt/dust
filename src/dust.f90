@@ -109,6 +109,8 @@ real(wp) :: dt_out, dt_debug_out
 type(t_elem_p), allocatable :: elems(:)
 !> Only the lifting line elements
 type(t_elem_p), allocatable :: elems_ll(:)
+!> Only the actuator disk elements
+type(t_elem_p), allocatable :: elems_ad(:)
 !> All the elements (panels+ll)
 type(t_elem_p), allocatable :: elems_tot(:)
 type(t_geo) :: geo
@@ -217,7 +219,7 @@ sim_param%debug_level = debug_level
 call printout(nl//'====== Geometry Creation ======')
 t0 = dust_time()
 call create_geometry(prms, input_file_name, geo, te, elems, elems_ll, &
-                     elems_tot, airfoil_data, sim_param)
+                     elems_ad, elems_tot, airfoil_data, sim_param)
 t1 = dust_time()
 if(debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Created geometry in: ' , t1 - t0,' s.'

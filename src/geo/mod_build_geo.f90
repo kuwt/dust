@@ -201,14 +201,15 @@ subroutine build_component(gloc, geo_file, comp_id)
    case('cgns')
     call read_mesh_cgns(trim(mesh_file),ee, rr)
    case('parametric')
-    if ( ElType .ne. 'l' ) then
+    if ( (ElType .eq. 'v') .or. (ElType .eq. 'p')  ) then
       ! TODO : actually it is possible to define the parameters in the GeoFile 
       !directly, find a good way to do this
       call read_mesh_parametric(trim(mesh_file),ee, rr, &
                                 npoints_chord_tot, nelems_span )
       ! nelems_span_tot will be overwritten if symmetry is required (around l.220)
       nelems_span_tot =   nelems_span
-    else ! LIFTING LINE element
+
+    elseif(ElType .eq. 'l') then ! LIFTING LINE element
       call read_mesh_ll(trim(mesh_file),ee,rr, &
                         airfoil_list   , nelem_span_list   , &
                         i_airfoil_e    , normalised_coord_e, &
@@ -223,6 +224,8 @@ subroutine build_component(gloc, geo_file, comp_id)
       call write_hdf5(chord_p,'chord_p',geo_loc)
       call write_hdf5(i_airfoil_e,'i_airfoil_e',geo_loc)
       call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
+
+    elseif(ElType .eq. 'a') then ! ACTUATOR DISK
 
     end if
    case default
