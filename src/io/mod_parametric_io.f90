@@ -636,6 +636,8 @@ subroutine read_actuatordisk_parametric(mesh_file,ee,rr)
  character(len=*), intent(in) :: mesh_file
  integer  , allocatable, intent(out) :: ee(:,:) 
  real(wp) , allocatable, intent(out) :: rr(:,:) 
+ type(t_parse) :: pmesh_prs
+
   call pmesh_prs%CreateStringOption('ElType', &
                 'element type (temporary) p panel v vortex ring &
                 & l lifting line a actuator disk')

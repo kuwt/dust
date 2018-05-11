@@ -101,7 +101,7 @@ type :: t_ref
   character(len=max_char_len) :: tag
 
   !> Reference Name
-  character(len=max_char_len) :: name
+  !character(len=max_char_len) :: name
 
   !> Parent reference id, used to index the references array
   integer :: parent_id

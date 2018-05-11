@@ -65,6 +65,7 @@ use mod_handling, only: &
    open_hdf5_group, &
    close_hdf5_group, &
    write_hdf5, &
+   write_hdf5_attr, &
    read_hdf5, &
    read_hdf5_al, &
    append_hdf5, &
@@ -104,6 +105,10 @@ use mod_handling, only: &
                    write_1d_real_hdf5, &
                    write_2d_real_hdf5, &
                    write_3d_real_hdf5
+ end interface
+
+ interface write_hdf5_attr
+  module procedure write_1d_int_hdf5_attr
  end interface
 
  interface append_hdf5
@@ -1844,5 +1849,43 @@ end subroutine read_3d_int_hdf5_al
 
 !-----------------------------------------------------------------------
 
+!-----------------------------------------------------------------------
+! ==== Read and allocate Integers ====
+!-----------------------------------------------------------------------
+
+!> Write a rank 1 array of integers to an attribute
+!!
+subroutine write_1d_int_hdf5_attr(outdata, outname, loc_id)
+ integer, intent(in)           :: outdata(:)
+ character(len=*), intent(in)  :: outname
+ integer(HID_T), intent(in)    :: loc_id
+
+ integer(HID_T) :: dspace_id!, memspace_id
+ integer(HID_T) :: attr_id
+ !integer(HID_T) :: filetype_id, memtype_id
+ integer, parameter :: rank=1
+ integer(HSIZE_T) :: out_size(1)
+ character(len=*), parameter :: &
+    this_sub_name = 'write_1d_int_hdf5'
+ integer :: h5err
+
+  !create a 1D dataspace
+  out_size(1) = int(size(outdata,1), h5sz)
+  call h5Screate_simple_f(rank, out_size, dspace_id, h5err)
+
+  !create the dataset on the file
+  call h5Acreate_f(loc_id, trim(outname), h5t_file_int, dspace_id, &
+                   attr_id, h5err)
+  !write
+  call h5Awrite_f(attr_id, h5t_mem_int, outdata, out_size, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                           'Problems writing attribute '//outname)
+
+  !release resources
+  call h5Aclose_f(attr_id, h5err)
+  call h5Sclose_f(dspace_id, h5err)
+end subroutine write_1d_int_hdf5_attr
+
+!-----------------------------------------------------------------------
 
 end module mod_hdf5_io

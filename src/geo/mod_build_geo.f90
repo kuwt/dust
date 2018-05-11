@@ -86,8 +86,10 @@ character(len=*), parameter :: this_mod_name = 'mod_build_geo'
 
 contains 
 
-subroutine build_geometry(geo_files, output_file)
+subroutine build_geometry(geo_files, ref_tags, comp_names, output_file)
  character(len=*), intent(in) :: geo_files(:)
+ character(len=*), intent(in) :: ref_tags(:)
+ character(len=*), intent(in) :: comp_names(:)
  character(len=*), intent(in) :: output_file
 
  integer :: n_geo, i_geo
@@ -99,7 +101,8 @@ subroutine build_geometry(geo_files, output_file)
   call new_hdf5_group(file_loc, 'Components', group_loc)
   call write_hdf5(n_geo,'NComponents',group_loc)
   do i_geo = 1,n_geo
-    call build_component(group_loc, trim(geo_files(i_geo)), i_geo)
+    call build_component(group_loc, trim(geo_files(i_geo)), &
+                         trim(ref_tags(i_geo)), trim(comp_names(i_geo)), i_geo)
   enddo
 
   call close_hdf5_group(group_loc)
@@ -109,9 +112,11 @@ end subroutine build_geometry
 
 !-----------------------------------------------------------------------
 
-subroutine build_component(gloc, geo_file, comp_id)
+subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
  integer(h5loc), intent(in)   :: gloc
  character(len=*), intent(in) :: geo_file
+ character(len=*), intent(in) :: ref_tag
+ character(len=*), intent(in) :: comp_tag
  integer, intent(in)          :: comp_id
 
  type(t_parse) :: geo_prs
@@ -124,7 +129,6 @@ subroutine build_component(gloc, geo_file, comp_id)
  character(len=max_char_len) :: mesh_file_type
  logical :: mesh_reflection
  real(wp) :: reflection_point(3), reflection_normal(3)
- character(len=max_char_len) :: ref_tag
  character(len=max_char_len) :: comp_name
  integer(h5loc) :: comp_loc , geo_loc , te_loc
 
@@ -155,8 +159,8 @@ subroutine build_component(gloc, geo_file, comp_id)
   call geo_prs%CreateStringOption('ElType', &
               'element type (temporary) p:panel, v:vortex ring, l:lifting line')
   !reference frame
-  call geo_prs%CreateStringOption('Reference_Tag',&
-                                   'reference frame tag of the component','0')
+  !call geo_prs%CreateStringOption('Reference_Tag',&
+  !                                 'reference frame tag of the component','0')
   !reflections
   call geo_prs%CreateLogicalOption('mesh_reflection',&
                'Has all the file a custom reference frame', 'F')
@@ -172,9 +176,8 @@ subroutine build_component(gloc, geo_file, comp_id)
   !read the parameters
   call geo_prs%read_options(geo_file,printout_val=.false.)
 
-  mesh_file      = getstr(geo_prs,'MeshFile')
   mesh_file_type = getstr(geo_prs,'MeshFileType')
-  ref_tag        = getstr(geo_prs,'Reference_Tag')
+  !ref_tag        = getstr(geo_prs,'Reference_Tag')
 
   mesh_reflection   = getlogical(geo_prs, 'mesh_reflection')
   reflection_point  = getrealarray(geo_prs, 'reflection_point',3)
@@ -186,21 +189,25 @@ subroutine build_component(gloc, geo_file, comp_id)
   !Build the group
   write(comp_name,'(A,I3.3)')'Comp',comp_id
   call new_hdf5_group(gloc, trim(comp_name), comp_loc)
+  call write_hdf5(comp_tag,'CompName',comp_loc)
   call write_hdf5(ref_tag,'RefTag',comp_loc)
 
 ! call new_hdf5_group(file_loc, 'Components', group_loc)
   call write_hdf5(trim(comp_el_type),'ElType',comp_loc)
 
-  call new_hdf5_group(comp_loc, 'Geometry_and_Solution', geo_loc)
+  call new_hdf5_group(comp_loc, 'Geometry', geo_loc)
 
   ! read the files
   select case (trim(mesh_file_type))
 
    case('basic')
+    mesh_file = getstr(geo_prs,'MeshFile')
     call read_mesh_basic(trim(mesh_file),ee, rr)
    case('cgns')
+    mesh_file = getstr(geo_prs,'MeshFile')
     call read_mesh_cgns(trim(mesh_file),ee, rr)
    case('parametric')
+    mesh_file = geo_file
     if ( (ElType .eq. 'v') .or. (ElType .eq. 'p')  ) then
       ! TODO : actually it is possible to define the parameters in the GeoFile 
       !directly, find a good way to do this

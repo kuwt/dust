@@ -1,0 +1,865 @@
+!!=====================================================================
+!!
+!! Copyright (C) 2018 Politecnico di Milano
+!!
+!! This file is part of DUST, an aerodynamic solver for complex
+!! configurations.
+!! 
+!! Permission is hereby granted, free of charge, to any person
+!! obtaining a copy of this software and associated documentation
+!! files (the "Software"), to deal in the Software without
+!! restriction, including without limitation the rights to use,
+!! copy, modify, merge, publish, distribute, sublicense, and/or sell
+!! copies of the Software, and to permit persons to whom the
+!! Software is furnished to do so, subject to the following
+!! conditions:
+!! 
+!! The above copyright notice and this permission notice shall be
+!! included in all copies or substantial portions of the Software.
+!! 
+!! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+!! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+!! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+!! NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+!! HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+!! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+!! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+!! OTHER DEALINGS IN THE SOFTWARE.
+!! 
+!! Authors: 
+!!          Federico Fonte             <federico.fonte@polimi.it>
+!!          Davide Montagnani       <davide.montagnani@polimi.it>
+!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
+!!=====================================================================
+
+
+!> This is a module dedicated to the handling of the geometry during the 
+!! postprocessing
+!!
+!! It uses the same data structures of the postprocessing as well as
+!! performing similar tasks, but much less cumbersome 
+
+module mod_geo_postpro
+
+use mod_param, only: &
+  wp, max_char_len, nl, prev_tri, next_tri, prev_qua, next_qua
+
+use mod_sim_param, only: &
+  t_sim_param
+
+use mod_parse, only: &
+  t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption &
+  , finalizeparameters
+
+use mod_handling, only: &
+  error, warning, info, printout, dust_time, t_realtime, check_preproc
+
+use mod_basic_io, only: &
+  read_mesh_basic, write_basic
+
+use mod_cgns_io, only: &
+  read_mesh_cgns
+
+use mod_parametric_io, only: &
+  read_mesh_parametric
+
+use mod_aero_elements, only: &
+  c_elem, t_elem_p
+
+use mod_surfpan, only: &
+  t_surfpan
+
+use mod_vortring, only: &
+  t_vortring
+
+use mod_liftlin, only: &
+  t_liftlin
+
+use mod_c81, only: &
+  t_aero_tab , read_c81_table , interp_aero_coeff
+
+!use read_naca00xx, only: &
+!  read_naca_arrays
+
+use mod_math, only: &
+  cross
+
+use mod_reference, only: &
+  t_ref, build_references, update_all_references, destroy_references
+  
+use mod_hdf5_io, only: &
+   h5loc, &
+   new_hdf5_file, &
+   open_hdf5_file, &
+   close_hdf5_file, &
+   new_hdf5_group, &
+   open_hdf5_group, &
+   close_hdf5_group, &
+   write_hdf5, &
+   read_hdf5, &
+   read_hdf5_al, &
+   check_dset_hdf5
+
+use mod_geometry, only: &
+  t_geo, t_geo_component
+
+use mod_stringtools, only: &
+  LowCase, IsInList
+
+!----------------------------------------------------------------------
+
+implicit none
+
+public :: load_components_postpro, update_points_postpro
+
+private
+
+!----------------------------------------------------------------------
+
+character(len=*), parameter :: this_mod_name = 'mod_geo_postpro'
+
+!----------------------------------------------------------------------
+
+contains
+
+!----------------------------------------------------------------------
+
+!----------------------------------------------------------------------
+
+!!!> Create all the goemetry
+!!!! 
+!!!! The geometry creation proceeds in this way:
+!!!! -# The main geometry file is read, and the components therein contained are
+!!!!    created (reading the mesh)
+!!!! -# If some additional geometry files are present, each one is read and all
+!!!!    its component are created
+!!!! -# The main geometry arrays, SurfPan and VortRin are allocated and filled
+!!!!    in the prepare_geometry routine
+!!!! -# The element pointer array used to build/solve the linear system is
+!!!!    created, pointed at each element and then re-ordered with the static
+!!!!    elements first, and the dynamic elements at the end
+!!subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
+!!                           te, elems, elems_ll, elems_tot, airfoil_data, &
+!!                           sim_param)
+!! character(len=*), intent(in) :: geo_file_name
+!! character(len=*), intent(inout) :: ref_file_name
+!! character(len=*), intent(in) :: in_file_name
+!! type(t_geo), intent(out), target :: geo
+!! type(t_elem_p), allocatable, intent(out) :: elems(:)
+!! type(t_elem_p), allocatable, intent(out) :: elems_ll(:)
+!! type(t_elem_p), allocatable, intent(out) :: elems_tot(:)
+!! type(t_tedge), intent(out) :: te
+!! type(t_aero_tab) , allocatable, intent(out) :: airfoil_data(:)
+!! type(t_sim_param) , intent(inout) :: sim_param
+!! real(wp)                     :: tstart
+!!
+!! !character(len=max_char_len) :: reference_file
+!! !character(len=max_char_len) :: geo_file_name
+!!
+!! integer :: i, j, is, im,  i_comp, i_ll, i_tot
+!! type(t_elem_p), allocatable :: temp_static(:), temp_moving(:)
+!!
+!! integer , allocatable :: el_id_old(:), el_id_old_static(:), el_id_old_moving(:)
+!!
+!! character(len=max_char_len) :: msg
+!!
+!!  tstart = sim_param%t0
+!! 
+!!  !build the reference frames
+!!  !read which is the reference frame file, if default the main input file is 
+!!  !employed
+!!  !reference_file = getstr(prms, 'ReferenceFile')
+!!  if (trim(ref_file_name) .eq. 'no_set') then
+!!    ref_file_name = trim(in_file_name)
+!!  endif
+!!
+!!  call build_references(geo%refs, trim(ref_file_name), sim_param)
+!!
+!!  !Load the components from the file created by the preprocessor
+!!  !geo_file_name = getstr(prms, 'GeometryFile')
+!!  call check_preproc(geo_file_name)
+!!  call load_components(geo, trim(geo_file_name), sim_param, te)
+!!
+!!  call import_aero_tab(geo,airfoil_data)
+!!
+!!  ! Initialisation
+!!  geo%nelem      = 0
+!!  geo%nll        = 0
+!!  geo%nstatic    = 0
+!!  geo%nmoving    = 0
+!!  geo%nstatic_ll = 0
+!!  geo%nmoving_ll = 0
+!!  geo%nSurfPan   = 0
+!!  geo%nVortRin   = 0
+!!  geo%nLiftLin   = 0
+!!
+!!  ! count the elements
+!!  do i_comp = 1,size(geo%components)
+!!
+!!    if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p') then
+!!      if(geo%components(i_comp)%moving) then
+!!        geo%nmoving = geo%nmoving + geo%components(i_comp)%nelems
+!!      else
+!!        geo%nstatic = geo%nstatic + geo%components(i_comp)%nelems
+!!      endif
+!!      geo%nSurfPan = geo%nSurfPan + geo%components(i_comp)%nelems
+!!      geo%nelem = geo%nelem + geo%components(i_comp)%nelems
+!!
+!!    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'v') then
+!!      if(geo%components(i_comp)%moving) then
+!!        geo%nmoving = geo%nmoving + geo%components(i_comp)%nelems
+!!      else
+!!        geo%nstatic = geo%nstatic + geo%components(i_comp)%nelems
+!!      endif
+!!      geo%nVortRin = geo%nVortRin + geo%components(i_comp)%nelems
+!!      geo%nelem = geo%nelem + geo%components(i_comp)%nelems
+!!
+!!    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'l') then
+!!      if(geo%components(i_comp)%moving) then
+!!        geo%nmoving_ll = geo%nmoving_ll + geo%components(i_comp)%nelems
+!!      else
+!!        geo%nstatic_ll = geo%nstatic_ll + geo%components(i_comp)%nelems
+!!      endif
+!!      geo%nLiftLin = geo%nLiftLin + geo%components(i_comp)%nelems
+!!      geo%nll = geo%nll + geo%components(i_comp)%nelems
+!!    endif
+!!    
+!!  enddo
+!!
+!!  ! calculate the geometric quantities
+!!  ! already update the geometry for the first time to get the right 
+!!  ! starting geometrical condition
+!!  call prepare_geometry(geo)
+!!  call update_geometry(geo, tstart, update_static=.true.)
+!!
+!!  if(sim_param%debug_level .ge. 3) then
+!!    call printout(nl//' Geometry details:' ) 
+!!    write(msg,'(A,I9)') '  number of elements:        ' ,geo%nelem
+!!    call printout(msg)
+!!    write(msg,'(A,I9)') '  number of static elements: ' ,geo%nstatic
+!!    call printout(msg)
+!!    write(msg,'(A,I9)') '  number of moving elements: ' ,geo%nmoving
+!!    call printout(msg)
+!!    write(msg,'(A,I9)') '  number of surface panels:  ' ,geo%nsurfpan
+!!    call printout(msg)
+!!    write(msg,'(A,I9)') '  number of vortex rings:    ' ,geo%nvortrin
+!!    call printout(msg)
+!!  endif
+!!
+!!  !Create the vector of pointers to all the elements
+!!  allocate(elems(geo%nelem), elems_ll(geo%nll), elems_tot(geo%nelem+geo%nll)) 
+!!  i=0; i_ll=0; i_tot=0
+!!  do i_comp = 1,size(geo%components)
+!!    
+!!    if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p' .or. &
+!!        trim(geo%components(i_comp)%comp_el_type) .eq. 'v') then
+!!
+!!      do j = 1,size(geo%components(i_comp)%el)
+!!        i = i+1
+!!        i_tot = i_tot+1
+!!        elems(i)%p => geo%components(i_comp)%el(j)
+!!  !      elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
+!!      enddo
+!!
+!!    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'l') then
+!!
+!!      do j = 1,size(geo%components(i_comp)%el)
+!!        i_ll = i_ll+1
+!!        i_tot = i_tot+1
+!!        elems_ll(i_ll)%p => geo%components(i_comp)%el(j)
+!!  !      elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
+!!      enddo
+!!
+!!    endif
+!!  enddo
+!!
+!!  ! Sort elements: first static, then moving ------- 
+!!  !fill in the two temporaries
+!!  allocate(temp_static(geo%nstatic), temp_moving(geo%nmoving))
+!!  allocate(el_id_old(geo%nelem))          ; el_id_old = 0
+!!  allocate(el_id_old_static(geo%nstatic)) ; el_id_old_static = 0
+!!  allocate(el_id_old_moving(geo%nmoving)) ; el_id_old_moving = 0
+!!  is = 0; im = 0;
+!!  do i = 1,geo%nelem
+!!    if(elems(i)%p%moving) then
+!!      im = im+1
+!!      temp_moving(im) = elems(i)
+!!      el_id_old_moving(im) = i
+!!    else
+!!      is = is+1
+!!      temp_static(is) = elems(i)
+!!      el_id_old_static(is) = i
+!!    endif
+!!  enddo
+!!
+!!  !Now might be more bombproof to deallocate and allocate, but for the moment..
+!!  elems(1:geo%nstatic) = temp_static
+!!  elems(geo%nstatic+1:geo%nelem) = temp_moving
+!!
+!!  el_id_old(1:geo%nstatic) = el_id_old_static
+!!  el_id_old(geo%nstatic+1:geo%nelem) = el_id_old_moving
+!! 
+!!  !Update the indexing since we re-ordered the vector
+!!  do i = 1,geo%nelem
+!!    elems(i)%p%id = i
+!!  end do
+!!  !Update elem-elem connectivity after re-ordering, for the moment only for
+!!  !implicit panel elements
+!!  !do i = 1,geo%nelem
+!!  !  do j = 1,elems(i)%p%n_ver
+!!  !    if ( elems(i)%p%i_neigh(j) .ne. 0 ) then
+!!  !      elems(i)%p%i_neigh(j) = el_id_old( elems(i)%p%i_neigh(j) )
+!!  !    else
+!!  !      elems(i)%p%i_neigh(j) = 0 
+!!  !    end if     
+!!  !  end do 
+!!  !end do 
+!!  !Update te structure
+!!  !do i = 1,size(te%e,2)
+!!  !  do j = 1,2
+!!  !    if ( te%e(j,i) .ne. 0 ) then
+!!  !      te%e(j,i) = el_id_old( te%e(j,i) )
+!!  !    else
+!!  !      te%e(j,i) = 0 
+!!  !    end if     
+!!  !  end do 
+!!  !end do
+!!
+!!  !Now re-order the lifting line elements
+!!  deallocate(temp_static, temp_moving)
+!!  allocate(temp_static(geo%nstatic_ll), temp_moving(geo%nmoving_ll))
+!!  is = 0; im = 0;
+!!  do i = 1,geo%nll
+!!    if(elems_ll(i)%p%moving) then
+!!      im = im+1
+!!      temp_moving(im) = elems_ll(i)
+!!    else
+!!      is = is+1
+!!      temp_static(is) = elems_ll(i)
+!!    endif
+!!  enddo
+!!  if(geo%nll .gt. 0) then
+!!    elems_ll(1:geo%nstatic_ll) = temp_static
+!!    elems_ll(geo%nstatic_ll+1:geo%nll) = temp_moving
+!!  endif
+!!
+!!  !Update te%neigh NOT NEEDED, because in te numbering
+!!
+!!  deallocate(temp_static, temp_moving)
+!!  deallocate(el_id_old, el_id_old_static, el_id_old_moving)
+!!
+!!  !Patch together everything in elems_tot
+!!  elems_tot(1:geo%nelem) = elems
+!!  elems_tot(geo%nelem+1:geo%nelem+geo%nll) =elems_ll
+!!
+!!  call create_local_velocity_stencil(geo,elems)    ! for surfpan only (3dP)
+!!
+!!  call create_strip_connectivity(geo)
+!!
+!!end subroutine create_geometry
+
+!----------------------------------------------------------------------
+
+subroutine load_components_postpro(comps, points, nelem, ep_conn, floc, &
+             components_names, all_comp)
+ type(t_geo_component), allocatable, intent(inout) :: comps(:)
+ real(wp), allocatable, intent(out) :: points(:,:)
+ integer, intent(out)               :: nelem
+ integer, allocatable, intent(out)  :: ep_conn(:,:)
+ !character(len=*), intent(in) :: in_file
+ integer(h5loc), intent(in) :: floc
+ character(len=*), allocatable, intent(in) :: components_names(:)
+ logical, intent(in) :: all_comp
+
+ type(t_geo_component), allocatable :: comp_temp(:)
+ integer :: i2, i3
+ integer, allocatable :: ee(:,:)
+ real(wp), allocatable :: rr(:,:)
+ character(len=max_char_len) :: comp_el_type, comp_name
+ integer :: points_offset, n_vert , elems_offset
+ real(wp), allocatable :: points_tmp(:,:)
+ character(len=max_char_len) :: ref_tag, ref_tag_m
+ integer :: ref_id
+ character(len=max_char_len) :: msg, cname
+ integer(h5loc) :: gloc, cloc , geo_loc
+ integer :: n_comp, i_comp, n_comp_tot, i_comp_tot
+ integer :: ie, ie_t
+ !integer :: n_mult, i_mult
+ !logical :: mult
+
+ ! Connectivity and te structures 
+ !integer , allocatable :: neigh(:,:)
+ ! Lifting Line elements
+ !real(wp), allocatable :: normalised_coord_e(:,:)
+ !integer                 , allocatable :: i_airfoil_e(:,:)
+ !character(max_char_len) , allocatable :: airfoil_list(:)
+ !integer                 , allocatable :: nelem_span_list(:)
+
+ ! trailing edge ------
+ !integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
+ !integer , allocatable :: neigh_te(:,:) , o_te(:,:)
+ !real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
+ !integer :: ne_te , nn_te
+ ! tmp arrays --------
+ !type(t_elem_p) , allocatable :: e_te_tmp(:,:)
+ !integer, allocatable  ::i_te_tmp(:,:) , ii_te_tmp(:,:) 
+ !integer , allocatable :: neigh_te_tmp(:,:) , o_te_tmp(:,:)
+ !real(wp), allocatable ::rr_te_tmp(:,:) , t_te_tmp(:,:)
+ !integer , allocatable :: ref_te_tmp(:)
+ !integer :: ne_te_prev , nn_te_prev ! # n. elements and nodes at TE ( of the prev. comps) 
+
+ character(len=*), parameter :: this_sub_name = 'load_components_postpro'
+
+  call open_hdf5_group(floc,'Components',gloc)
+  call read_hdf5(n_comp_tot,'NComponents',gloc)
+
+!  allocate(comps(n_comp))
+  nelem = 0
+  i_comp = 0; n_comp = 0 
+  do i_comp_tot = 1,n_comp_tot
+    
+    write(cname,'(A,I3.3)') 'Comp',i_comp_tot
+    call open_hdf5_group(gloc,trim(cname),cloc)
+    
+    call read_hdf5(comp_name,'CompName',cloc)
+    
+    !TODO: add modifications to treat also multiple components
+    if(IsInList(comp_name, components_names) .or. all_comp) then
+
+      i_comp = i_comp+1; n_comp = n_comp+1
+      allocate(comp_temp(n_comp))
+      if(allocated(comps)) comp_temp(1:n_comp-1) = comps 
+      call move_alloc(comp_temp, comps)
+
+      comps(i_comp)%comp_id = i_comp_tot
+      call read_hdf5(ref_id,'RefId',cloc)
+      call read_hdf5(ref_tag,'RefTag',cloc)
+
+      comps(i_comp)%ref_id  = ref_id
+      comps(i_comp)%ref_tag = trim(ref_tag_m)
+      !geo%components(i_comp)%moving  = geo%refs(ref_id)%moving
+
+      ! ====== READING =====
+      call read_hdf5(comp_el_type,'ElType',cloc)
+      comps(i_comp)%comp_el_type = trim(comp_el_type)
+
+      comps(i_comp)%comp_name = trim(comp_name)
+
+      ! Geometry --------------------------
+      call open_hdf5_group(cloc,'Geometry',geo_loc)
+      call read_hdf5_al(ee   ,'ee'   ,geo_loc)
+      call read_hdf5_al(rr   ,'rr'   ,geo_loc)
+      !!call read_hdf5_al(neigh,'neigh',geo_loc)
+      !! !element-specific reads 
+      !!if ( comp_el_type(1:1) .eq. 'l' ) then
+      !!  call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc) ! (:)
+      !!  call read_hdf5_al(nelem_span_list   ,'nelem_span_list'   ,geo_loc) ! (:)
+      !!  call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc) ! (:,:)
+      !!  call read_hdf5_al(normalised_coord_e,'normalised_coord_e',geo_loc) ! (:,:)
+      !!  allocate(geo%components(i_comp)%airfoil_list(size(airfoil_list))) 
+      !!  geo%components(i_comp)%airfoil_list = airfoil_list 
+      !!  allocate(geo%components(i_comp)%nelem_span_list(size(nelem_span_list))) 
+      !!  geo%components(i_comp)%nelem_span_list = nelem_span_list 
+      !!  allocate(geo%components(i_comp)%i_airfoil_e( &
+      !!        size(i_airfoil_e,1),size(i_airfoil_e,2)) ) 
+      !!  geo%components(i_comp)%i_airfoil_e = i_airfoil_e 
+      !!  allocate(geo%components(i_comp)%normalised_coord_e( &
+      !!        size(normalised_coord_e,1),size(normalised_coord_e,2))) 
+      !!  geo%components(i_comp)%normalised_coord_e = normalised_coord_e
+      !!end if
+      call close_hdf5_group(geo_loc)
+
+      ! ======= CREATING ELEMENTS ======
+
+      ! --- treat the points ---
+      if(allocated(points)) then
+        points_offset = size(points,2) 
+      else
+        points_offset = 0
+      endif
+
+      !store the read points into the local points
+      allocate(comps(i_comp)%loc_points(3,size(rr,2)))
+      comps(i_comp)%loc_points = rr
+      
+      !Now for the moments the points are stored here without moving them, 
+      !will be moved later, consider not storing them here at all
+      allocate(points_tmp(3,size(rr,2)+points_offset))
+      if (points_offset .gt. 0) points_tmp(:,1:points_offset) = points
+      points_tmp(:,points_offset+1:points_offset+size(rr,2)) = rr
+      call move_alloc(points_tmp, points)
+      allocate(comps(i_comp)%i_points(size(rr,2)))
+      comps(i_comp)%i_points = &
+                         (/((i3),i3=points_offset+1,points_offset+size(rr,2))/)
+
+
+      ! --- treat the elements ---
+
+      !allocate the elements of the component of the right kind
+      comps(i_comp)%nelems = size(ee,2)
+      nelem = nelem + comps(i_comp)%nelems
+      select case(trim(comps(i_comp)%comp_el_type))
+       case('p')
+        allocate(t_surfpan::comps(i_comp)%el(size(ee,2)))
+       case('v')
+        allocate(t_vortring::comps(i_comp)%el(size(ee,2)))
+       case('l')
+        allocate(t_liftlin::comps(i_comp)%el(size(ee,2)))
+       case default
+        call error(this_sub_name, this_mod_name, &
+                 'Unknown type of element: '//comps(i_comp)%comp_el_type)
+      end select
+        
+      !fill (some) of the elements fields
+      do i2=1,size(ee,2)
+        
+        !Component id
+        comps(i_comp)%el(i2)%comp_id = i_comp
+        
+        !vertices
+        n_vert = count(ee(:,i2).ne.0)
+        allocate(comps(i_comp)%el(i2)%i_ver(n_vert))
+        !allocate(geo%components(i_comp)%el(i2)%neigh(n_vert))
+        comps(i_comp)%el(i2)%n_ver = n_vert
+        comps(i_comp)%el(i2)%i_ver(1:n_vert) = &
+                                              ee(1:n_vert,i2) + points_offset
+        !do i3=1,n_vert
+        !  if ( neigh(i3,i2) .ne. 0 ) then
+        !    geo%components(i_comp)%el(i2)%neigh(i3)%p => &
+        !                            geo%components(i_comp)%el(neigh(i3,i2))
+        !  else
+        !    ! do nothing, keep the neighbour pointer not associated
+        !    geo%components(i_comp)%el(i2)%neigh(i3)%p => null()
+        !  end if
+        !end do
+        
+        !motion
+        !geo%components(i_comp)%el(i2)%moving = geo%components(i_comp)%moving
+        allocate(comps(i_comp)%el(i2)%vel(3))
+
+      enddo
+ 
+      ! Update elems_offset for the next component
+      elems_offset = elems_offset + size(ee,2)
+
+      !cleanup
+      deallocate(ee,rr)
+
+    endif !load the element because in list
+
+    call close_hdf5_group(cloc)
+
+  enddo !i_comp
+  call close_hdf5_group(gloc)
+
+  !generate the "global" connectivity
+  allocate(ep_conn(4,nelem))
+  ep_conn = 0
+  ie_t = 0
+  do i_comp = 1,n_comp
+    do ie = 1,comps(i_comp)%nelems
+    ie_t = ie_t + 1
+    ep_conn(1:comps(i_comp)%el(ie)%n_ver,ie_t) = comps(i_comp)%el(ie)%i_ver
+
+    enddo
+  enddo
+
+
+
+end subroutine load_components_postpro
+
+!----------------------------------------------------------------------
+
+!!subroutine import_aero_tab(geo,coeff)
+!! type(t_geo), intent(inout), target :: geo
+!! type(t_aero_tab) , allocatable , intent(inout) :: coeff(:)
+!!
+!! integer :: n_tmp , n_tmp2
+!! character(len=max_char_len) , allocatable :: list_tmp(:) 
+!! character(len=max_char_len) , allocatable :: list_tmp_tmp(:) 
+!! integer , allocatable :: i_airfoil_e_tmp (:,:)
+!!
+!! integer :: i_c, n_c, i_a, n_a, i_l
+!!
+!! n_tmp = 30 
+!! allocate(list_tmp(n_tmp)) 
+!!
+!! ! Count # of different airfoil
+!! n_c = size(geo%components) 
+!! n_a = 0
+!! do i_c = 1 ,  n_c
+!!
+!!   if ( geo%components(i_c)%comp_el_type .eq. 'l' ) then
+!!    
+!!     allocate( i_airfoil_e_tmp( &
+!!          size(geo%components(i_c)%i_airfoil_e,1), size(geo%components(i_c)%i_airfoil_e,2) ) ) 
+!!     i_airfoil_e_tmp = 0
+!!
+!!     do i_a = 1 , size(geo%components(i_c)%airfoil_list)
+!!
+!!       if ( all( geo%components(i_c)%airfoil_list(i_a) .ne. list_tmp(1:n_a) ) ) then
+!!         ! new airfoil ----
+!!         n_a = n_a + 1
+!!
+!!         where ( geo%components(i_c)%i_airfoil_e .eq. i_a ) i_airfoil_e_tmp = n_a 
+!!        
+!!         ! if n_a > n_tmp --> movalloc
+!!         if ( n_a .gt. n_tmp ) then
+!!           n_tmp2 = n_tmp + n_tmp
+!!           allocate(list_tmp_tmp(n_tmp2))
+!!           list_tmp_tmp(1:n_tmp) = list_tmp
+!!           deallocate(list_tmp)
+!!           call move_alloc(list_tmp_tmp,list_tmp)
+!!           n_tmp = n_tmp2
+!!         end if
+!! 
+!!         list_tmp(n_a) = geo%components(i_c)%airfoil_list(i_a)
+!!
+!!       else
+!!         ! airfoil already used: find the element and replace the global index
+!!         do i_l = 1 , n_a
+!!           if ( geo%components(i_c)%airfoil_list(i_a) .eq. list_tmp(i_l) ) exit
+!!         end do
+!!
+!!         where ( geo%components(i_c)%i_airfoil_e .eq. i_a ) i_airfoil_e_tmp = i_l 
+!!
+!!       end if
+!!
+!!
+!!     end do
+!!
+!!   geo%components(i_c)%i_airfoil_e = i_airfoil_e_tmp
+!!
+!!   deallocate(i_airfoil_e_tmp)
+!!     
+!!   ! check ----
+!!   write(*,*) ' mod_geo.f89/import_aero_tab().  Component: ' , i_c
+!!   write(*,*) ' size(geo%components(',i_c,')%i_airfoil_e : ' , shape(geo%components(i_c)%i_airfoil_e)
+!!   do i_l = 1 , size(geo%components(i_c)%i_airfoil_e,2)
+!!     write(*,*) geo%components(i_c)%i_airfoil_e(:,i_l)
+!!   end do
+!!   write(*,*)
+!!   ! check ----
+!!
+!!   end if
+!!
+!! end do
+!!
+!! ! Read tables and fill coeff structure
+!! allocate(coeff(n_a))
+!! write(*,*) ' Number of different airfoils : ' , n_a
+!! do i_a = 1 , n_a
+!!   call read_c81_table( list_tmp(i_a) , coeff(i_a) )
+!! end do
+!!
+!!end subroutine import_aero_tab
+
+!----------------------------------------------------------------------
+
+!> Prepare the geometry allocating all the relevant fields for each 
+!! kind of element
+subroutine prepare_geometry_postpro(comps)
+ type(t_geo_component), intent(inout), target :: comps(:)
+
+ integer :: i_comp, ie
+ integer :: nsides
+ class(c_elem), pointer :: elem
+ character(len=*), parameter :: this_sub_name = 'prepare_geometry_postpro'
+
+ do i_comp = 1,size(comps)
+   do ie = 1,size(comps(i_comp)%el)
+     elem => comps(i_comp)%el(ie)
+
+     nsides = size(elem%i_ver)
+
+     !Fields common to each element
+     allocate(elem%ver(3,nsides))
+     allocate(elem%cen(3))
+     allocate(elem%nor(3))
+
+     !!select type(elem)
+     !! class is(t_surfpan)
+     !!  allocate(elem%tang(3,2))
+     !!  allocate(elem%verp(3,nsides))
+     !!  allocate(elem%edge_vec(3,nsides))
+     !!  allocate(elem%edge_len(nsides))
+     !!  allocate(elem%edge_uni(3,nsides))
+     !!  allocate(elem%cosTi(nsides))
+     !!  allocate(elem%sinTi(nsides))
+
+     !! class is(t_vortring)
+     !!  allocate(elem%tang(3,2))
+     !!  allocate(elem%verp(3,nsides))
+     !!  allocate(elem%edge_vec(3,nsides))
+     !!  allocate(elem%edge_len(nsides))
+     !!  allocate(elem%edge_uni(3,nsides))
+     !!  allocate(elem%cosTi(nsides))
+     !!  allocate(elem%sinTi(nsides))
+
+     !! class is(t_liftlin)
+     !!  allocate(elem%tang(3,2))
+     !!  allocate(elem%tang_cen(3))
+     !!  allocate(elem%bnorm_cen(3))
+     !!  allocate(elem%verp(3,nsides))
+     !!  allocate(elem%edge_vec(3,nsides))
+     !!  allocate(elem%edge_len(nsides))
+     !!  allocate(elem%edge_uni(3,nsides))
+     !!  allocate(elem%cosTi(nsides))
+     !!  allocate(elem%sinTi(nsides))
+     !!  
+     !!  elem%csi_cen = 0.5_wp * sum(geo%components(i_comp)%normalised_coord_e(:,ie))
+     !!  elem%i_airfoil =  geo%components(i_comp)%i_airfoil_e(:,ie)
+     !!  
+     !!  
+     !!  ! elem%chord    
+     !!  ! elem%csi_c       !! <- for interpolation of aerodynamic coefficients
+     !!  ! elem%airfoil(2)  !! 
+
+     !!  ! elem%theta   <-- ??? 
+
+     !! class default
+     !!  call error(this_sub_name, this_mod_name, 'Unknown element type')
+     !!end select
+
+     !end associate
+   enddo
+ enddo
+
+end subroutine prepare_geometry_postpro
+
+!----------------------------------------------------------------------
+
+!> Calculate the geometrical quantities of an element
+!!
+!! The subroutine calculates all the relevant geometrical quantities of a
+!! panel element (vortex ring or surface panel) 
+subroutine calc_geo_data_postpro(elem,vert)
+ class(c_elem), intent(inout) :: elem  
+ real(wp), intent(in) :: vert(:,:)
+
+ integer :: nsides, is
+ real(wp):: nor(3), tanl(3)
+
+  nsides = size(vert,2)
+
+  elem%n_ver = nsides
+  
+  ! vertices
+  elem%ver = vert
+
+  ! center
+  elem%cen =  sum ( vert,2 ) / real(nsides,wp)
+
+  ! unit normal and area
+  if ( nsides .eq. 4 ) then
+    nor = cross( vert(:,3) - vert(:,1) , &
+                 vert(:,4) - vert(:,2)     )
+  else if ( nSides .eq. 3 ) then
+    nor = cross( vert(:,3) - vert(:,2) , &
+                 vert(:,1) - vert(:,2)     )
+  end if
+  
+  elem%area = 0.5_wp * norm2(nor)
+  elem%nor = nor / norm2(nor)
+
+  ! local tangent unit vector as in PANAIR
+  !!tanl = 0.5_wp * ( vert(:,nsides) + vert(:,1) ) - elem%cen
+  
+  !!elem%tang(:,1) = tanl / norm2(tanl)
+  !!elem%tang(:,2) = cross( elem%nor, elem%tang(:,1)  )
+
+  ! projection of the vertices on the mean plane
+  !!do is = 1 , nsides
+  !!  elem%verp(:,is) = vert(:,is) - elem%nor * &
+  !!                    sum( (vert(:,is) - elem%cen ) * elem%nor )
+  !!end do
+  
+  ! vector connecting two consecutive vertices: 
+  ! edge_vec(:,1) =  ver(:,2) - ver(:,1)
+  !!if ( nsides .eq. 3 ) then
+  !!  do is = 1 , nsides
+  !!    elem%edge_vec(:,is) = vert(:,next_tri(is)) - vert(:,is)
+  !!  end do
+  !!else if ( nsides .eq. 4 ) then
+  !!  do is = 1 , nsides
+  !!    elem%edge_vec(:,is) = vert(:,next_qua(is)) - vert(:,is)
+  !!  end do
+  !!end if
+
+  ! edge: edge_len(:) 
+  !!do is = 1 , nsides
+  !!  elem%edge_len(is) = norm2(elem%edge_vec(:,is)) 
+  !!end do
+
+  ! unit vector 
+  !!do is = 1 , nSides
+  !!  elem%edge_uni(:,is) = elem%edge_vec(:,is) / elem%edge_len(is)
+  !!end do
+
+  ! cosTi , sinTi
+  !!do is = 1 , nsides
+  !!  elem%cosTi(is) = sum( elem%edge_uni(:,is) * elem%tang(:,1) ) 
+  !!  elem%sinTi(is) = sum( elem%edge_uni(:,is) * elem%tang(:,2) ) 
+  !!end do
+
+
+end subroutine calc_geo_data_postpro
+
+!----------------------------------------------------------------------
+
+!> Calculate the local velocity on the panels to then enforce the 
+!! boundary condition
+!!
+subroutine calc_geo_vel(elem, G, f)
+ class(c_elem), intent(inout) :: elem  
+ real(wp), intent(in) :: f(3), G(3,3)
+
+  if(.not.allocated(elem%ub)) allocate(elem%ub(3))
+  elem%ub = f + matmul(G,elem%cen)
+
+end subroutine calc_geo_vel
+
+!----------------------------------------------------------------------
+
+function move_points(pp, R, of)  result(rot_pp)
+ real(wp), intent(in) :: pp(:,:)
+ real(wp), intent(in)    :: R(:,:)
+ real(wp), intent(in)    :: of(:)
+ real(wp) :: rot_pp(size(pp,1),size(pp,2))
+
+  rot_pp = matmul(R,pp)
+  rot_pp(1,:) =rot_pp(1,:) + of(1)
+  rot_pp(2,:) =rot_pp(2,:) + of(2)
+  rot_pp(3,:) =rot_pp(3,:) + of(3)
+
+end function move_points
+
+!----------------------------------------------------------------------
+
+subroutine update_points_postpro(comps, points, refs_R, refs_off)
+ type(t_geo_component), intent(inout) :: comps(:)
+ real(wp), intent(inout) :: points(:,:)
+ real(wp), intent(in)    :: refs_R(:,:,0:)
+ real(wp), intent(in)    :: refs_off(:,0:)
+
+ integer :: i_comp, ie
+
+ do i_comp = 1,size(comps)
+  associate(comp => comps(i_comp))
+  points(:,comp%i_points) = move_points(comp%loc_points, &
+                           refs_R(:,:,comp%ref_id), &
+                           refs_off(:,comp%ref_id))
+  do ie = 1,size(comp%el)
+    call calc_geo_data_postpro(comp%el(ie),points(:,comp%el(ie)%i_ver))
+
+  enddo
+
+  end associate
+ enddo
+
+
+end subroutine update_points_postpro
+
+!----------------------------------------------------------------------
+
+end module mod_geo_postpro

@@ -81,16 +81,27 @@ use mod_wake, only: &
 use mod_vtk_out, only: &
   vtk_out_bin
 
+use mod_tecplot_out, only: &
+  tec_out_sol_bin
+
 use mod_hdf5_io, only: &
   h5loc, initialize_hdf5, destroy_hdf5, new_hdf5_file, open_hdf5_file, &
   close_hdf5_file, new_hdf5_group, open_hdf5_group, close_hdf5_group, &
-  write_hdf5, read_hdf5, read_hdf5_al, append_hdf5
+  write_hdf5, write_hdf5_attr, read_hdf5, read_hdf5_al, append_hdf5
+
+use mod_dust_io, only: &
+  save_status
 
 implicit none
+
+!run-id
+integer :: run_id(10)
 
 !Input
 character(len=*), parameter :: input_file_name_def = 'dust.in'
 character(len=max_char_len) :: input_file_name
+character(len=max_char_len) :: geo_file_name
+character(len=max_char_len) :: ref_file_name
 character(len=extended_char_len) :: message
 
 !Simulation parameters
@@ -141,6 +152,9 @@ integer :: i_el , i
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
 t00 = dust_time()
 
+call get_run_id(run_id)
+write(*,*) 'run_id: ', run_id
+
 !------ Modules initialization ------
 call initialize_hdf5()
 
@@ -166,7 +180,9 @@ call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output','0')
 call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
 call prms%CreateStringOption('basename','oputput basename','./')
 call prms%CreateStringOption('basename_debug','oputput basename for debug','./')
-call set_parameters_geo(prms)
+call prms%CreateStringOption('GeometryFile','Main geometry definition file')
+call prms%CreateStringOption('ReferenceFile','Reference frames file','no_set')
+!call set_parameters_geo(prms)
 
 
 ! get the parameters and print them out
@@ -185,6 +201,8 @@ debug_level = getint(prms, 'debug_level')
 n_wake_panels = getint(prms, 'n_wake_panels')
 basename = getstr(prms,'basename')
 basename_debug = getstr(prms,'basename_debug')
+geo_file_name = getstr(prms,'GeometryFile')
+ref_file_name = getstr(prms,'ReferenceFile')
 
 
 if (debug_level .ge. 3) then
@@ -214,12 +232,15 @@ sim_param%time_vec = (/ ( sim_param%t0 + &
 allocate(sim_param%u_inf(3)) 
 sim_param%u_inf = uinf
 sim_param%debug_level = debug_level
+sim_param%basename = basename
 
 !------ Geometry creation ------
 call printout(nl//'====== Geometry Creation ======')
 t0 = dust_time()
-call create_geometry(prms, input_file_name, geo, te, elems, elems_ll, &
-                     elems_ad, elems_tot, airfoil_data, sim_param)
+call copy_geo(sim_param, geo_file_name, run_id)
+call create_geometry(geo_file_name, ref_file_name, input_file_name, geo, &
+                     te, elems, elems_ll, elems_ad, &
+                     elems_tot, airfoil_data, sim_param)
 t1 = dust_time()
 if(debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Created geometry in: ' , t1 - t0,' s.'
@@ -340,7 +361,11 @@ do it = 1,nstep
                       call debug_printout_wake(wake_panels, basename_debug, it)
 
   !Print the results
-  if(time_2_out)  call output_status(elems_tot, geo, wake_panels, basename, it)
+  if(time_2_out)  then
+    call output_status(elems_tot, geo, wake_panels, basename, &
+                                     it, time)
+    call save_status(geo, wake_panels, sim_param, it, time, run_id)
+  endif
 
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
@@ -373,6 +398,62 @@ call printout(nl//'<<<<<< DUST end <<<<<<'//nl)
 contains
 !------------------------------------------------------------------------------
 
+subroutine get_run_id (run_id)
+ integer, intent(out) :: run_id(10)
+
+ real(wp) :: randr
+ integer  :: maxi, randi
+
+  !First 8 values are the date and time
+  call date_and_time(VALUES=run_id(1:8))
+
+  !Last 3 values are 2 random integers
+  maxi = huge(maxi)
+  call random_number(randr)
+  randi = int(randr*real(maxi,wp))
+  run_id(9) = randi
+
+  call random_number(randr)
+  randi = int(randr*real(maxi,wp))
+  run_id(10) = randi
+
+end subroutine
+
+!------------------------------------------------------------------------------
+subroutine copy_geo(sim_param, geo_file, run_id)
+ type(t_sim_param), intent(inout) :: sim_param
+ character(len=*), intent(inout)     :: geo_file
+ integer, intent(in)              :: run_id(10)
+
+ character(len=max_char_len) :: target_file
+ integer :: estat, cstat
+ integer(h5loc) :: floc
+  
+  !target file name: same as run basename with appendix
+  target_file = trim(sim_param%basename)//'_geo.h5'
+ 
+  !Copy the geometry file
+  call execute_command_line('cp '//trim(geo_file)//' '//trim(target_file), &
+                                           exitstat=estat,cmdstat=cstat)
+  if((cstat .ne. 0) .or. (estat .ne. 0)) &
+    call error('dust','','System errors while trying to copy the geometry &
+    &to the output path')
+
+
+  !Attach the run_id to the file as an attribute
+  call open_hdf5_file(trim(target_file), floc)
+  call write_hdf5_attr(run_id, 'run_id', floc)
+  call close_hdf5_file(floc)
+
+
+  !Overwrite the geo file name, so that the copy is going to be
+  !opened
+  geo_file = trim(target_file)
+
+end subroutine copy_geo
+
+!------------------------------------------------------------------------------
+
 subroutine init_timestep(t)
  real(wp), intent(in) :: t
 
@@ -401,12 +482,13 @@ end subroutine init_timestep
 
 !------------------------------------------------------------------------------
 
-subroutine output_status(elems_tot, geo, wake_panels, basename, it)
+subroutine output_status(elems_tot, geo, wake_panels, basename, it, t)
  type(t_elem_p),   intent(in) :: elems_tot(:)
  type(t_geo),      intent(in) :: geo
  type(t_wake_panels), intent(in) :: wake_panels
  character(len=*), intent(in) :: basename
  integer,          intent(in) :: it
+ real(wp), intent(in)         :: t
 
  integer, allocatable :: el(:,:), w_el(:,:)
  real(wp), allocatable :: w_points(:,:), w_res(:)
@@ -437,16 +519,19 @@ subroutine output_status(elems_tot, geo, wake_panels, basename, it)
   write(sit,'(I4.4)') it
   call vtk_out_bin (geo%points, el, (/linsys%res,linsys%res_expl(:,1)/),  &
                     w_points, w_el, w_res,  &
-                    trim(basename)//'res_'//trim(sit)//'.vtu')
+                    trim(basename)//'_res_'//trim(sit)//'.vtu')
+  call tec_out_sol_bin(geo%points, el, (/linsys%res,linsys%res_expl(:,1)/),  &
+                    w_points, w_el, w_res, t,  &
+                    trim(basename)//'_res_'//trim(sit)//'.plt')
 
 
   !=== Hdf5 output ===
-  call new_hdf5_file(trim(basename)//'res_'//trim(sit)//'.h5',floc)
-  call write_hdf5(time,'time',floc)
-  call write_hdf5(geo%points,'points',floc)
-  call write_hdf5(el,'elements',floc)
+  !call new_hdf5_file(trim(basename)//'res_'//trim(sit)//'.h5',floc)
+  !call write_hdf5(time,'time',floc)
+  !call write_hdf5(geo%points,'points',floc)
+  !call write_hdf5(el,'elements',floc)
 
-  call close_hdf5_file(floc)
+  !call close_hdf5_file(floc)
   deallocate(el,w_el,w_points,w_res)
 
 end subroutine output_status
@@ -465,7 +550,7 @@ subroutine debug_printout_result(linsys, basename, it)
   !!res(1,:) = linsys%res
   res(1,:) = (/linsys%res,linsys%res_expl(:,1)/)
   write(sit,'(I4.4)') it
-  call write_basic(res,trim(basename)//'result_'//trim(sit)//'.dat')
+  call write_basic(res,trim(basename)//'_result_'//trim(sit)//'.dat')
   deallocate(res)
 
 end subroutine debug_printout_result
@@ -499,12 +584,12 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
     enddo
   enddo
   write(sit,'(I4.4)') it
-  call write_basic(geo%points, trim(basename)//'mesh_points_'//trim(sit)//'.dat')
-  call write_basic(norm,       trim(basename)//'mesh_norm_'  //trim(sit)//'.dat')
-  call write_basic(velb,       trim(basename)//'mesh_velb_'  //trim(sit)//'.dat')
-  call write_basic(cent,       trim(basename)//'mesh_cent_'  //trim(sit)//'.dat')
-  call write_basic(el,         trim(basename)//'mesh_elems_'  //trim(sit)//'.dat')
-  call write_basic(conn,       trim(basename)//'mesh_conn_'   //trim(sit)//'.dat')
+  call write_basic(geo%points, trim(basename)//'_mesh_points_'//trim(sit)//'.dat')
+  call write_basic(norm,       trim(basename)//'_mesh_norm_'  //trim(sit)//'.dat')
+  call write_basic(velb,       trim(basename)//'_mesh_velb_'  //trim(sit)//'.dat')
+  call write_basic(cent,       trim(basename)//'_mesh_cent_'  //trim(sit)//'.dat')
+  call write_basic(el,         trim(basename)//'_mesh_elems_'  //trim(sit)//'.dat')
+  call write_basic(conn,       trim(basename)//'_mesh_conn_'   //trim(sit)//'.dat')
   deallocate(norm, cent, el, conn, velb)
 end subroutine debug_printout_geometry
 
@@ -530,12 +615,12 @@ subroutine debug_printout_geometry_minimal(elems,geo,basename, it)
     el(1:elems(ie)%p%n_ver,ie) = elems(ie)%p%i_ver
   enddo
   write(sit,'(I4.4)') it
-  call write_basic(geo%points, trim(basename)//'mesh_points_'//trim(sit)//'.dat')
-  call write_basic(norm,       trim(basename)//'mesh_norm_'  //trim(sit)//'.dat')
-  call write_basic(cent,       trim(basename)//'mesh_cent_'  //trim(sit)//'.dat')
-  call write_basic(el,         trim(basename)//'mesh_elems_'  //trim(sit)//'.dat')
+  call write_basic(geo%points, trim(basename)//'_mesh_points_'//trim(sit)//'.dat')
+  call write_basic(norm,       trim(basename)//'_mesh_norm_'  //trim(sit)//'.dat')
+  call write_basic(cent,       trim(basename)//'_mesh_cent_'  //trim(sit)//'.dat')
+  call write_basic(el,         trim(basename)//'_mesh_elems_'  //trim(sit)//'.dat')
 
-  call new_hdf5_file(trim(basename)//'geo_'  //trim(sit)//'.h5',h5fid)
+  call new_hdf5_file(trim(basename)//'_geo_'  //trim(sit)//'.h5',h5fid)
   call write_hdf5(geo%points,'points',h5fid)
   call close_hdf5_file(h5fid)
 
@@ -563,9 +648,9 @@ subroutine debug_printout_loads(elems, basename_debug, it)
                      elems(i_el)%p%area * elems(i_el)%p%nor
   end do
   write(frmt,'(I4.4)') it
-  call write_basic(vel,trim(basename_debug)//'velocity_'//trim(frmt)//'.dat')
-  call write_basic(cp ,trim(basename_debug)//'cp_'//trim(frmt)//'.dat')
-  call write_basic(F_aero ,trim(basename_debug)//'Faero_'//trim(frmt)//'.dat')
+  call write_basic(vel,trim(basename_debug)//'_velocity_'//trim(frmt)//'.dat')
+  call write_basic(cp ,trim(basename_debug)//'_cp_'//trim(frmt)//'.dat')
+  call write_basic(F_aero ,trim(basename_debug)//'_Faero_'//trim(frmt)//'.dat')
   deallocate(vel,cp,F_aero)
 
 end subroutine debug_printout_loads
@@ -599,15 +684,15 @@ subroutine debug_printout_wake(wake_panels, basename, it)
   call write_basic( &
     reshape(wake_panels%w_points(:,:,1:wake_panels%wake_len+1),&
     (/3,(wake_panels%n_wake_points)*(wake_panels%wake_len+1)/)), &
-    trim(basename)//'wake_points_'//trim(sit)//'.dat')
+    trim(basename)//'_wake_points_'//trim(sit)//'.dat')
   call write_basic( &
     reshape(wake_panels%w_vel(:,:,1:wake_panels%wake_len+1),&
     (/3,(wake_panels%n_wake_points)*(wake_panels%wake_len+1)/)), &
-    trim(basename)//'wake_vels_'//trim(sit)//'.dat')
-  call write_basic(norm, trim(basename)//'wake_norm_'//trim(sit)//'.dat')
-  call write_basic(cent, trim(basename)//'wake_cent_'//trim(sit)//'.dat')
-  call write_basic(el,   trim(basename)//'wake_elems_'//trim(sit)//'.dat')
-  call write_basic(res,  trim(basename)//'wake_result_'//trim(sit)//'.dat')
+    trim(basename)//'_wake_vels_'//trim(sit)//'.dat')
+  call write_basic(norm, trim(basename)//'_wake_norm_'//trim(sit)//'.dat')
+  call write_basic(cent, trim(basename)//'_wake_cent_'//trim(sit)//'.dat')
+  call write_basic(el,   trim(basename)//'_wake_elems_'//trim(sit)//'.dat')
+  call write_basic(res,  trim(basename)//'_wake_result_'//trim(sit)//'.dat')
   deallocate(norm, cent, el, res)
 end subroutine debug_printout_wake
 
