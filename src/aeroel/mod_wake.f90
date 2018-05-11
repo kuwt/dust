@@ -309,7 +309,8 @@ subroutine update_wake_panels(wake, elems, dt, uinf)
   !trailing edge, the second is extrapolated from the trailing edge)
   np = wake%wake_len+1
   if(wake%wake_len .lt. wake%npan) np = np + 1
-
+  
+!$omp parallel do collapse(2) private(pos_p, vel_p, ie, ipan, iw, v)
   do ipan = 3,np
     do iw = 1,wake%n_wake_points
       pos_p = point_old(:,iw,ipan-1) 
@@ -346,6 +347,7 @@ subroutine update_wake_panels(wake, elems, dt, uinf)
       
     enddo
   enddo
+!$omp end parallel do
 
   deallocate(point_old)
 

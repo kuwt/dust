@@ -155,29 +155,38 @@ subroutine assemble_linsys(linsys, elems, wake_elems, ll_elems, uinf)
  type(t_elem_p), intent(in) :: ll_elems(:)
  real(wp), intent(in) :: uinf(:)
 
- integer :: ie
+ integer :: ie, nst, ntot
+
+ nst = linsys%nstatic
+ ntot = linsys%rank
 
   !First all the static ones (passing as start and end only the dynamic part)
-  do ie = 1,linsys%nstatic
+!$omp parallel private(ie) firstprivate(nst, ntot)
+!$omp do
+  do ie = 1,nst
 
-    call elems(ie)%p%build_row(elems,linsys,uinf,ie,linsys%nstatic+1,linsys%rank)
+    call elems(ie)%p%build_row(elems,linsys,uinf,ie,nst+1,ntot)
 
-    call elems(ie)%p%add_wake(wake_elems%pan_p, wake_elems%gen_elems_id, linsys,uinf,ie,linsys%nstatic+1,linsys%rank)
+    call elems(ie)%p%add_wake(wake_elems%pan_p, wake_elems%gen_elems_id, linsys,uinf,ie,nst+1,ntot)
 
     call elems(ie)%p%add_liftlin(ll_elems, linsys,uinf,ie,linsys%nstatic_ll+1,linsys%n_ll)
 
   enddo
+!$omp end do nowait
 
   !Then all the dynamic ones (passing as start and end the whole system)
-  do ie = linsys%nstatic+1,linsys%rank
+!$omp do
+  do ie = nst+1,ntot
 
-    call elems(ie)%p%build_row(elems,linsys,uinf,ie,1,linsys%rank)
+    call elems(ie)%p%build_row(elems,linsys,uinf,ie,1,ntot)
 
-    call elems(ie)%p%add_wake(wake_elems%pan_p, wake_elems%gen_elems_id ,linsys,uinf,ie,1,linsys%rank)
+    call elems(ie)%p%add_wake(wake_elems%pan_p, wake_elems%gen_elems_id, linsys,uinf,ie,1,ntot)
 
     call elems(ie)%p%add_liftlin(ll_elems, linsys,uinf,ie,1,linsys%n_ll)
 
   enddo
+!$omp end do
+!$omp end parallel
 
 end subroutine assemble_linsys
 

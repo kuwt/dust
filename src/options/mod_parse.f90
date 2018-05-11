@@ -138,17 +138,17 @@ private
 !> Link for linked List
 type :: t_link
   class(option), pointer :: opt => null()
-  class(t_link), pointer   :: next => null()
-  class(t_link), pointer   :: prev_read => null()
-  class(t_link), pointer   :: next_read => null()
-  class(t_parse), pointer   :: sub_list => null()
+  type(t_link), pointer   :: next => null()
+  type(t_link), pointer   :: prev_read => null()
+  type(t_link), pointer   :: next_read => null()
+  type(t_parse), pointer   :: sub_list => null()
 end type t_link
 
 !> Class to store all options.
 !! This is basically a linked list of options.
 type :: t_parse
-  class(t_link), pointer :: firstLink => null() !< first option in the list
-  class(t_link), pointer :: lastLink  => null() !< last option in the list
+  type(t_link), pointer :: firstLink => null() !< first option in the list
+  type(t_link), pointer :: lastLink  => null() !< last option in the list
   integer              :: maxNameLen          !< maximal string length of the name of an option in the list
   integer              :: maxValueLen         !< maximal string length of the value of an option in the list
   character(len=max_char_len)   :: actualSection = ""  !< actual section, to set section of an option, when inserted into list
@@ -566,9 +566,9 @@ recursive subroutine copy_parser(source_p, target_p)
  type(t_parse), pointer, intent(out)  :: target_p
  !type(t_parse), allocatable, intent(out)  :: target_p
 
- class(t_link), pointer :: newLink
+ type(t_link), pointer :: newLink
  class(option), pointer  :: newopt
- class(t_link), pointer :: current_source, current_target
+ type(t_link), pointer :: current_source, current_target
  
   !allocate(newParser)
   !target_p => newParser
@@ -1100,9 +1100,9 @@ end subroutine
 !> Creates a new link to a option-object,
 !! 'next' is the following link in the linked list
 function constructor_Link(opt, next)
- class(t_link),pointer            :: constructor_Link  !< new link
+ type(t_link),pointer            :: constructor_Link  !< new link
  class(option),intent(in)       :: opt               !< option to be linked
- class(t_link),intent(in),pointer :: next              !< next link
+ type(t_link),intent(in),pointer :: next              !< next link
 
   allocate(constructor_Link)
   constructor_Link%next => next

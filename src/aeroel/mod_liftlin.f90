@@ -282,7 +282,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
  real(wp), allocatable :: aero_coeff(:)
  real(wp), allocatable :: dou_temp(:)
  real(wp) :: damp=2.0_wp
- real(wp), parameter :: toll=1e-4_wp
+ real(wp), parameter :: toll=1e-6_wp
  real(wp) :: diff
  
  !TODO: is missing the velocity of the wake
@@ -295,14 +295,21 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
      call elems_wake(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
      vel_w(:,i_l) = vel_w(:,i_l) + v
    enddo
+   !DEBUG:
+   !write(*,*) 'i_l', i_l, 'vel w', vel_w(:,i_l)
  enddo
  
  vel_w = vel_w/(4.0_wp*pi)
 
+ !Crack the starting guess
+ !do i_l = 1,size(elems_ll)
+ !  elems_ll(i_l)%p%idou = -1
+ !enddo
 
- diff = 0.0_wp
+
  !Calculate the induced velocity on the airfoil
- do ic = 1,1000
+ do ic = 1,100
+   diff = 0.0_wp
    do i_l = 1,size(elems_ll)
      vel = 0.0_wp
      do j = 1,size(elems_tot)
@@ -319,12 +326,18 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
        !unorm = norm2(up)
        alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
        alpha = alpha * 180.0_wp/pi
+       !DEBUG:
+       !write(*,*) 'element ',i_l,'alpha',alpha
        !TODO: fix these parameters which are still hard-coded
        mach = 0.0_wp
        re = 1000000.0_wp
+       !if (ic .le. 1) then
+       !  cl = 2*pi*alpha*pi/180.0_wp
+       !else
        call interp_aero_coeff ( airfoil_data ,  &
                       el%csi_cen, el%i_airfoil , (/alpha, mach, re/) , aero_coeff )
        cl = aero_coeff(1)
+       !endif
        dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
        diff = max(diff,abs(elems_ll(i_l)%p%idou-dou_temp(i_l))) 
      end select
@@ -333,8 +346,12 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
   
    do i_l = 1,size(elems_ll)
      elems_ll(i_l)%p%idou = ( dou_temp(i_l)+ damp*elems_ll(i_l)%p%idou )/(1.0_wp+damp)
+     !elems_ll(i_l)%p%idou = ( (damp)*dou_temp(i_l) + (1.0_wp-damp)*elems_ll(i_l)%p%idou )
+     !elems_ll(i_l)%p%idou = dou_temp(i_l)
    enddo 
    
+   !DEBUG:
+   write(*,*) 'diff', diff
    if(diff .le. toll) exit
 
  enddo

@@ -66,7 +66,7 @@ contains
 subroutine potential_calc_doublet(this, dou, pos)
  class(c_elem), intent(inout) :: this
  real(wp), intent(out) :: dou
- real(wp), intent(in) :: pos(:)
+ real(wp), contiguous, intent(in) :: pos(:)
 
  real(wp), dimension(3) :: e3
  !real(wp), dimension(3,4) :: ver_p ! Projected vertices on the mean plane
