@@ -35,7 +35,7 @@
 program dust_post
 
 use mod_param, only: &
-  wp, nl, max_char_len, extended_char_len
+  wp, nl, max_char_len, extended_char_len , pi
 
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
@@ -53,6 +53,7 @@ use mod_aero_elements, only: &
 use mod_parse, only: &
   t_parse, &
   getstr, getlogical, getreal, getint, &
+  getrealarray, getintarray , &
   ignoredParameters, finalizeParameters, &
   countoption, getsuboption, t_link, check_opt_consistency, &
   print_parse_debug
@@ -75,16 +76,23 @@ use mod_hdf5_io, only: &
    check_dset_hdf5
 
 use mod_stringtools, only: &
-  LowCase, IsInList
+  LowCase, isInList
 
 use mod_geo_postpro, only: &
-  load_components_postpro, update_points_postpro
+  load_components_postpro, update_points_postpro , prepare_geometry_postpro, &
+  prepare_wake_postpro
+
+use mod_wake, only: &
+  t_wake_panels
 
 use mod_tecplot_out, only: &
   tec_out_viz
 
 use mod_vtk_out, only: &
   vtk_out_viz
+
+use mod_dat_out, only: & 
+  dat_out_probes_header , dat_out_probes 
 
 implicit none
 
@@ -135,7 +143,34 @@ integer :: nprint, ivar
 
 integer, allocatable :: print_elems(:,:)
 
-integer :: it
+! wake ------------
+type(t_wake_panels) :: wake
+
+! probe output ----
+character(len=max_char_len) :: in_type , str_a , filename_in , var_name
+integer :: n_probes , n_vars , n_vars_int
+real(wp), allocatable :: rr_probes(:,:)
+logical :: probe_vel , probe_p , probe_vort
+character(len=max_char_len) :: vars_str
+! real(wp) , allocatable :: u_inf(:)
+real(wp) :: u_inf(3)
+real(wp) :: vel_probe(3) = 0.0_wp , vort_probe(3) = 0.0_wp 
+real(wp) :: v(3) = 0.0_wp , w(3) = 0.0_wp
+real(wp), allocatable , target :: sol(:) 
+real(wp) :: pres_probe
+integer :: fid_out , ip , ie, ic
+! flow field ------
+integer :: nxyz(3)
+real(wp):: minxyz(3) , maxxyz(3)
+real(wp), allocatable :: xbox(:) , ybox(:) , zbox(:)
+real(wp) :: dxbox , dybox , dzbox
+real(wp), allocatable :: box_vel(:,:) , box_p(:) , box_vort(:,:)
+integer :: ix , iy , iz
+!TODO: 
+! add wake contribution to the velocity field for probe and flow_field analysis
+
+integer :: it , i1
+
 
 !write(*,*) 'DUST beginning'
 call printout(nl//'>>>>>> DUST POSTPROCESSOR beginning >>>>>>'//nl)
@@ -167,6 +202,24 @@ call sbprms%CreateStringOption('Component','Component to analyse', &
 call sbprms%CreateStringOption('Var','Variable to analise', &
                                multiple=.true.)
 
+! probe output -------------
+call sbprms%CreateStringOption('InputType','How to specify probe coordinates',&
+                              multiple=.true.)
+call sbprms%CreateRealArrayOption('Point','Point coordinates in dust_post.in',&
+                              multiple=.true.)
+call sbprms%CreateStringOption('File','File containing the coordinates of the probes',&
+                              multiple=.true.)
+call sbprms%CreateStringOption('Variable','Variables to be saved: velocity, pressure or&
+                              & vorticity', multiple=.true.)
+! flow field output --------
+call sbprms%CreateIntArrayOption( 'Nxyz','number of points per coordinate',&
+                              multiple=.true.)
+call sbprms%CreateRealArrayOption('Minxyz','lower bounds of the box',&
+                              multiple=.true.)
+call sbprms%CreateRealArrayOption('Maxxyz','upper bounds of the box',&
+                              multiple=.true.)
+
+
 sbprms=>null()
 
 call prms%read_options(input_file_name, printout_val=.false.)
@@ -177,7 +230,9 @@ n_analyses = countoption(prms,'Analysis')
 
 !Cycle on all the analyses
 do ia = 1,n_analyses
-  
+ 
+  write(*,*) nl//' Analysis n. ' , ia
+ 
   !Get some of the options
   call getsuboption(prms,'Analysis',sbprms)
   an_type  = getstr(sbprms,'Type')
@@ -188,8 +243,6 @@ do ia = 1,n_analyses
   an_start = getint(sbprms,'StartRes')
   an_end   = getint(sbprms,'EndRes')
   an_step  = getint(sbprms,'StepRes')
-
-
   
   !Check if we are analysing all the components or just some
   all_comp = .false.
@@ -233,6 +286,8 @@ do ia = 1,n_analyses
     call close_hdf5_file(floc)
     out_wake = getlogical(sbprms,'Wake')
 
+    ! Prepare_geometry_postpro
+    call prepare_geometry_postpro(comps)
 
     !time history
     do it =an_start, an_end, an_step
@@ -241,11 +296,15 @@ do ia = 1,n_analyses
       write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
       call open_hdf5_file(trim(filename),floc)
 
-      !Load the references
+      ! Load u_inf
+      call read_hdf5(u_inf,'u_inf',floc)
+
+      ! Load the references
       call load_refs(floc,refs_R,refs_off)
-      !Move the points
+
+      ! Move the points
       call update_points_postpro(comps, points, refs_R, refs_off)
-      !Load the results
+      ! Load the results
       call load_res(floc, comps, vort, cp, t)
 
       !Prepare the variable for output
@@ -349,6 +408,333 @@ do ia = 1,n_analyses
     enddo !Time history
 
     deallocate(comps, points)
+
+
+   !//////////////////Domain probes \\\\\\\\\\\\\\\\\
+   case('probes')
+
+    ! Read probe coordinates: point_list or from_file
+    in_type =  getstr(sbprms,'InputType')
+    select case ( trim(in_type) )
+     case('point_list')
+      n_probes = countoption(sbprms,'Point')
+      allocate(rr_probes(3,n_probes))
+      do ip = 1 , n_probes
+        rr_probes(:,ip) = getrealarray(sbprms,'Point',3)
+      end do
+     case('from_file')
+      filename_in = getstr(sbprms,'File')   ! N probes and then their coordinates
+      fid_out = 21
+      open(unit=fid_out,file=trim(filename_in))
+      read(fid_out,*) n_probes
+      allocate(rr_probes(3,n_probes))
+      do ip = 1 , n_probes
+        read(fid_out,*) rr_probes(:,ip)
+      end do
+      close(fid_out)
+     case default
+      write(str_a,*) ia 
+      call error('dust_post','','Unknown InputType: '//trim(in_type)//&
+                 ' for analysis n.'//trim(str_a)//'.'//nl//&
+                  'It must either "point_list" or "from_file".')
+    end select
+
+    ! Read variables to save : velocity | pressure | vorticity
+    probe_vel = .false. ; probe_p = .false. ; probe_vort = .false.
+    n_vars = countoption(sbprms,'Variable')
+
+    if ( n_vars .eq. 0 ) then ! default: velocity | pressure | vorticity
+      probe_vel = .true. ; probe_p = .true. ; probe_vort = .true.
+    else
+     do it = 1 , n_vars
+      var_name = getstr(sbprms,'Variable')
+      select case(trim(var_name))
+       case ( 'velocity' ) ; probe_vel = .true.
+       case ( 'pressure' ) ; probe_p   = .true.
+       case ( 'vorticity') ; probe_vort= .true.
+       case ( 'all') ; probe_vel = .true. ; probe_p   = .true. ; probe_vort= .true.
+       case default
+       call error('dust_post','','Unknown Variable: '//trim(var_name)//&
+                  ' for analysis n.'//trim(str_a)//'.'//nl//&
+                   'Choose "velocity", "pressure", "vorticity".')
+      end select
+     end do
+    end if
+    vars_str = ''
+    ! Double loop to avoid double call to the same variable
+    !  n_vars_int = 0
+    if ( probe_vel ) vars_str = trim(vars_str)//'     u     v     w' ! ; n_vars_int = n_vars_int + 3  
+    if ( probe_p   ) vars_str = trim(vars_str)//'     p'             ! ; n_vars_int = n_vars_int + 1  
+    if ( probe_vort) vars_str = trim(vars_str)//'   omx   omy   omz' ! ; n_vars_int = n_vars_int + 3  
+     
+    ! load the geo components just once just once
+    call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
+    !TODO: here get the run id
+    call load_components_postpro(comps, points, nelem, elems, floc, & 
+                                 components_names,  all_comp)
+
+    call close_hdf5_file(floc)
+
+    ! Prepare_geometry_postpro
+    call prepare_geometry_postpro(comps)
+
+    ! Allocate and point to sol
+    allocate(sol(nelem)) ; sol = 0.0_wp
+    ip = 0
+    do ic = 1 , size(comps)
+     do ie = 1 , size(comps(ic)%el)
+      ip = ip + 1
+      comps(ic)%el(ie)%idou => sol(ip) 
+     end do
+    end do
+
+    ! Open output .dat file
+    fid_out = 21
+    open(unit=fid_out,file='./test_probe.dat') 
+      
+    call dat_out_probes_header( fid_out , rr_probes , vars_str )
+
+    !time history
+    do it =an_start, an_end, an_step
+
+     ! Open the result file ----------------------
+     write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
+     call open_hdf5_file(trim(filename),floc)
+
+     ! Load u_inf --------------------------------
+     call read_hdf5(u_inf,'u_inf',floc)
+
+     ! Load the references and move the points ---
+     call load_refs(floc,refs_R,refs_off)
+     call update_points_postpro(comps, points, refs_R, refs_off)
+     ! Load the results --------------------------
+     call load_res(floc, comps, vort, cp, t)
+     sol = vort
+
+     ! Load the wake -----------------------------
+     call load_wake(floc, wpoints, wstart, wvort)
+   
+     call close_hdf5_file(floc)
+     
+     call prepare_wake_postpro( wpoints , wstart , wvort , wake )
+
+     write(fid_out,'(F12.6)',advance='no') t 
+
+     ! Compute velocity --------------------------
+     do ip = 1 , n_probes ! probes
+
+      vel_probe = 0.0_wp ; pres_probe = 0.0_wp ; vort_probe = 0.0_wp
+      if ( probe_vel .or. probe_p ) then 
+        ! compute velocity
+        do ic = 1,size(comps)
+         do ie = 1 , size( comps(ic)%el )
+
+          call comps(ic)%el(ie)%compute_vel( rr_probes(:,ip) , u_inf , v )
+          vel_probe = vel_probe + v/(4*pi) 
+         
+         end do
+        end do
+        ! wake contribution
+        do ic = 1 , size(wake%wake_panels,1)
+         do ie = 1 , size(wake%wake_panels,2)
+               
+          call wake%wake_panels(ic,ie)%compute_vel( rr_probes(:,ip) , u_inf , v )
+          vel_probe = vel_probe + v/(4*pi) 
+         
+         end do
+        end do
+
+        ! + u_inf
+        vel_probe = vel_probe + u_inf
+        write(fid_out,'(3F12.6)',advance='no') vel_probe
+      end if
+
+      ! compute pressure
+      if ( probe_p ) then
+        pres_probe = 1.0_wp
+        write(fid_out,'(F12.6)',advance='no') pres_probe
+      end if
+      
+      ! compute vorticity
+      if ( probe_vort ) then
+        vort_probe = 2.0_wp
+        write(fid_out,'(3F12.6)',advance='no') vort_probe
+      end if
+
+     end do  ! probes
+
+     write(fid_out,*) ' '
+
+    end do ! Time history
+
+    close(fid_out)
+
+    deallocate(comps)
+    deallocate(rr_probes,sol)
+
+
+   case('flow_field')
+
+    ! Read variables to save : velocity | pressure | vorticity
+    probe_vel = .false. ; probe_p = .false. ; probe_vort = .false.
+    n_vars = countoption(sbprms,'Variable')
+
+    if ( n_vars .eq. 0 ) then ! default: velocity | pressure | vorticity
+      probe_vel = .true. ; probe_p = .true. ; probe_vort = .true.
+    else
+     do it = 1 , n_vars
+      var_name = getstr(sbprms,'Variable')
+      select case(trim(var_name))
+       case ( 'velocity' ) ; probe_vel = .true.
+       case ( 'pressure' ) ; probe_p   = .true.
+       case ( 'vorticity') ; probe_vort= .true.
+       case ( 'all') ; probe_vel = .true. ; probe_p   = .true. ; probe_vort= .true.
+       case default
+       call error('dust_post','','Unknown Variable: '//trim(var_name)//&
+                  ' for analysis n.'//trim(str_a)//'.'//nl//&
+                   'Choose "velocity", "pressure", "vorticity".')
+      end select
+     end do
+    end if
+
+    ! load the geo components just once just once
+    call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
+    !TODO: here get the run id
+    call load_components_postpro(comps, points, nelem, elems, floc, & 
+                                 components_names,  all_comp)
+
+    call close_hdf5_file(floc)
+
+    ! Prepare_geometry_postpro
+    call prepare_geometry_postpro(comps)
+
+    ! Allocate and point to sol
+    allocate(sol(nelem)) ; sol = 0.0_wp
+    ip = 0
+    do ic = 1 , size(comps)
+     do ie = 1 , size(comps(ic)%el)
+      ip = ip + 1
+      comps(ic)%el(ie)%idou => sol(ip) 
+     end do
+    end do
+
+    ! Read box dimensions
+    nxyz   = getintarray( sbprms,'Nxyz'  ,3)
+    minxyz = getrealarray(sbprms,'Minxyz',3)
+    maxxyz = getrealarray(sbprms,'Maxxyz',3)
+
+!   allocate( xbox(nxyz(1)), ybox(nxyz(2)) , zbox(nxyz(3)) ) 
+    if ( nxyz(1) .gt. 1 ) then
+      allocate( xbox(nxyz(1)) )
+      dxbox = ( maxxyz(1) - minxyz(1) ) / dble( nxyz(1) - 1 ) 
+      xbox = (/ ( minxyz(1) + dble(i1-1) * dxbox , i1 = 1 , nxyz(1) )/) 
+    else
+      allocate( xbox(1) )
+      xbox(1) = minxyz(1)
+    end if
+    if ( nxyz(2) .gt. 1 ) then
+      allocate( ybox(nxyz(2)) )
+      dybox = ( maxxyz(2) - minxyz(2) ) / dble( nxyz(2) - 1 ) 
+      ybox = (/ ( minxyz(2) + dble(i1-1) * dybox , i1 = 1 , nxyz(2) )/) 
+    else
+      allocate( ybox(1) )
+      ybox(1) = minxyz(2)
+    end if
+    if ( nxyz(3) .gt. 1 ) then
+      allocate( zbox(nxyz(3)) )
+      dzbox = ( maxxyz(3) - minxyz(3) ) / dble( nxyz(3) - 1 ) 
+      zbox = (/ ( minxyz(3) + dble(i1-1) * dzbox , i1 = 1 , nxyz(3) )/) 
+    else
+      allocate( zbox(1) )
+      zbox(1) = minxyz(3)
+    end if
+
+    if ( probe_vel ) allocate(box_vel (product(nxyz),3))
+    if ( probe_p   ) allocate(box_p   (product(nxyz)  ))
+    if ( probe_vort) allocate(box_vort(product(nxyz),3))
+
+    do it = an_start, an_end, an_step ! Time history
+
+     ! Open the result file ----------------------
+     write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
+     call open_hdf5_file(trim(filename),floc)
+
+     ! Load u_inf --------------------------------
+     call read_hdf5(u_inf,'u_inf',floc)
+
+     ! Load the references and move the points ---
+     call load_refs(floc,refs_R,refs_off)
+     call update_points_postpro(comps, points, refs_R, refs_off)
+     ! Load the results --------------------------
+     call load_res(floc, comps, vort, cp, t)
+     sol = vort
+
+     ! Load the wake -----------------------------
+     call load_wake(floc, wpoints, wstart, wvort)
+   
+     call close_hdf5_file(floc)
+     
+     call prepare_wake_postpro( wpoints , wstart , wvort , wake )
+
+     ! Compute velocity --------------------------
+     !CHECK
+     write(filename,'(A,I4.4)') trim(basename)//'_'//trim(an_name)//&
+                                                            '_',it
+     fid_out = 21
+     open(unit=fid_out,file=trim(filename)//'_box.dat')
+     ip = 0
+     ! Loop over the nodes of the box
+     do iz = 1 , size(zbox)
+      do iy = 1 , size(ybox)
+       do ix = 1 , size(xbox)
+        ip = ip + 1
+
+        if ( probe_vel .or. probe_p ) then 
+          ! compute velocity
+          vel_probe = 0.0_wp ; pres_probe = 0.0_wp ; vort_probe = 0.0_wp
+          do ic = 1,size(comps)
+           do ie = 1 , size( comps(ic)%el )
+
+!           call comps(ic)%el(ie)%compute_vel( rr_probes(:,ip) , u_inf , v )
+            call comps(ic)%el(ie)%compute_vel( (/ xbox(ix) , ybox(iy) , zbox(iz) /) , & 
+                                                u_inf , v )
+            vel_probe = vel_probe + v/(4*pi) 
+           
+           end do
+          end do
+          ! wake contribution
+          do ic = 1 , size(wake%wake_panels,1)
+           do ie = 1 , size(wake%wake_panels,2)
+                 
+            call wake%wake_panels(ic,ie)%compute_vel( (/ xbox(ix) , ybox(iy) , zbox(iz) /) , u_inf , v )
+            vel_probe = vel_probe + v/(4*pi) 
+           
+           end do
+          end do
+  
+          ! + u_inf
+          vel_probe = vel_probe + u_inf
+!         write(*,*) (/ xbox(ix) , ybox(iy) , zbox(iz) /) , vel_probe
+!         write(fid_out,'(3F12.6)',advance='no') vel_probe
+        end if
+
+        !CHECK
+        write(fid_out,'(6F12.6)') xbox(ix) , ybox(iy) , zbox(iz) , vel_probe
+
+       end do
+      end do
+     end do
+
+     close(fid_out)
+
+    end do ! Time history
+
+    if (allocated(box_vel )) deallocate(box_vel )
+    if (allocated(box_p   )) deallocate(box_p   )
+    if (allocated(box_vort)) deallocate(box_vort)
+    deallocate(xbox,ybox,zbox)
+    deallocate(comps,sol)
+
    case default
     call error('dust_post','','Unknown type of analysis: '//trim(an_type))
 

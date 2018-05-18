@@ -157,7 +157,7 @@ subroutine initialize_wake_panels(wake, geo, te,  npan)
   nsides = 4
   do ip = 1,npan
     do iw=1,wake%n_wake_stripes
-      wake%wake_panels(iw,ip)%idou => wake%ivort(iw,ip)
+     wake%wake_panels(iw,ip)%idou => wake%ivort(iw,ip)
      allocate(wake%wake_panels(iw,ip)%ver(3,nsides))
      allocate(wake%wake_panels(iw,ip)%cen(3))
      allocate(wake%wake_panels(iw,ip)%nor(3))

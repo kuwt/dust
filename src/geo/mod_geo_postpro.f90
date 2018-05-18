@@ -101,7 +101,10 @@ use mod_hdf5_io, only: &
    check_dset_hdf5
 
 use mod_geometry, only: &
-  t_geo, t_geo_component
+  t_geo, t_geo_component , calc_geo_data_pan
+
+use mod_wake, only: &
+  t_wake_panels
 
 use mod_stringtools, only: &
   LowCase, IsInList
@@ -110,7 +113,8 @@ use mod_stringtools, only: &
 
 implicit none
 
-public :: load_components_postpro, update_points_postpro
+public :: load_components_postpro, update_points_postpro , prepare_geometry_postpro, &
+          prepare_wake_postpro
 
 private
 
@@ -677,33 +681,33 @@ subroutine prepare_geometry_postpro(comps)
      allocate(elem%cen(3))
      allocate(elem%nor(3))
 
-     !!select type(elem)
-     !! class is(t_surfpan)
-     !!  allocate(elem%tang(3,2))
+     select type(elem)
+      class is(t_surfpan)
+       allocate(elem%tang(3,2))
      !!  allocate(elem%verp(3,nsides))
-     !!  allocate(elem%edge_vec(3,nsides))
-     !!  allocate(elem%edge_len(nsides))
-     !!  allocate(elem%edge_uni(3,nsides))
+       allocate(elem%edge_vec(3,nsides))
+       allocate(elem%edge_len(nsides))
+       allocate(elem%edge_uni(3,nsides))
      !!  allocate(elem%cosTi(nsides))
      !!  allocate(elem%sinTi(nsides))
 
-     !! class is(t_vortring)
-     !!  allocate(elem%tang(3,2))
+      class is(t_vortring)
+       allocate(elem%tang(3,2))
      !!  allocate(elem%verp(3,nsides))
-     !!  allocate(elem%edge_vec(3,nsides))
-     !!  allocate(elem%edge_len(nsides))
-     !!  allocate(elem%edge_uni(3,nsides))
+       allocate(elem%edge_vec(3,nsides))
+       allocate(elem%edge_len(nsides))
+       allocate(elem%edge_uni(3,nsides))
      !!  allocate(elem%cosTi(nsides))
      !!  allocate(elem%sinTi(nsides))
 
-     !! class is(t_liftlin)
-     !!  allocate(elem%tang(3,2))
+      class is(t_liftlin)
+       allocate(elem%tang(3,2))
      !!  allocate(elem%tang_cen(3))
      !!  allocate(elem%bnorm_cen(3))
      !!  allocate(elem%verp(3,nsides))
-     !!  allocate(elem%edge_vec(3,nsides))
-     !!  allocate(elem%edge_len(nsides))
-     !!  allocate(elem%edge_uni(3,nsides))
+       allocate(elem%edge_vec(3,nsides))
+       allocate(elem%edge_len(nsides))
+       allocate(elem%edge_uni(3,nsides))
      !!  allocate(elem%cosTi(nsides))
      !!  allocate(elem%sinTi(nsides))
      !!  
@@ -717,15 +721,105 @@ subroutine prepare_geometry_postpro(comps)
 
      !!  ! elem%theta   <-- ??? 
 
-     !! class default
-     !!  call error(this_sub_name, this_mod_name, 'Unknown element type')
-     !!end select
+      class default
+       call error(this_sub_name, this_mod_name, 'Unknown element type')
+     end select
 
      !end associate
    enddo
  enddo
 
 end subroutine prepare_geometry_postpro
+
+!----------------------------------------------------------------------
+
+subroutine prepare_wake_postpro( wpoints , wstart , wvort , wake )
+ real(wp), allocatable, intent(in) :: wpoints(:,:,:)
+ integer , allocatable, intent(in) :: wstart(:,:)
+ real(wp), allocatable, intent(in) :: wvort(:,:)
+ type(t_wake_panels), target, intent(out) :: wake
+
+ integer :: n_wake_stripes , npan
+ integer :: nsides
+ integer :: p1 , p2 
+ integer :: ip , iw
+
+!!DEBUG
+!write(*,*) ' shape(wpoints) : ' , shape(wpoints)
+!write(*,*) ' shape(wstart ) : ' , shape(wstart )
+!write(*,*) ' shape(wvort  ) : ' , shape(wvort  )
+
+ n_wake_stripes = size(wstart ,2)
+ npan           = size(wvort  ,2) 
+
+ !TODO: check if the following dimensions are right
+ wake%npan = npan
+ wake%n_wake_stripes = n_wake_stripes
+ wake%wake_len = npan
+!wake%n_wake_points = ...
+ allocate(wake%i_start_points(2,wake%n_wake_stripes))
+ allocate(wake%w_points(3,wake%n_wake_points,npan+1))
+ allocate(wake%wake_panels(wake%n_wake_stripes,npan))
+ allocate(wake%ivort(wake%n_wake_stripes,npan))
+
+ wake%i_start_points = wstart
+ wake%w_points       = wpoints
+
+ nsides = 4 
+ do ip = 1,npan
+   do iw=1,wake%n_wake_stripes
+    wake%wake_panels(iw,ip)%idou => wake%ivort(iw,ip)
+    allocate(wake%wake_panels(iw,ip)%ver(3,nsides))
+    allocate(wake%wake_panels(iw,ip)%cen(3))
+    allocate(wake%wake_panels(iw,ip)%nor(3))
+    allocate(wake%wake_panels(iw,ip)%tang(3,2))
+!   allocate(wake%wake_panels(iw,ip)%verp(3,nsides))
+    allocate(wake%wake_panels(iw,ip)%edge_vec(3,nsides))
+    allocate(wake%wake_panels(iw,ip)%edge_len(nsides))
+    allocate(wake%wake_panels(iw,ip)%edge_uni(3,nsides))
+!   allocate(wake%wake_panels(iw,ip)%cosTi(nsides))
+!   allocate(wake%wake_panels(iw,ip)%sinTi(nsides))
+   enddo
+ enddo
+
+ ! Build wake structure:
+ ! + use wstart and wpoints to:
+ !   - build connectivity
+ !   - allocate and compute geometric quantities
+ ! +  assign the vortex intenisty
+
+!!DEBUG
+!write(*,*) ' wake%n_wake_stripes : ' , wake%n_wake_stripes
+
+ do ip = 1,wake%wake_len
+  do iw = 1,wake%n_wake_stripes
+      p1 = wake%i_start_points(1,iw)
+      p2 = wake%i_start_points(2,iw)
+      call calc_geo_data_postpro(wake%wake_panels(iw,ip), &
+           reshape((/wake%w_points(:,p1,ip),   wake%w_points(:,p2,ip), &
+                     wake%w_points(:,p2,ip+1), wake%w_points(:,p1,ip+1)/),&
+                                                                  (/3,4/)))
+      wake%wake_panels(iw,ip)%idou = wvort(iw,ip) 
+  end do
+ end do
+
+! Add the influence of the wake in the velocity computation 
+!allocate(wake%pan_p(wake%n_wake_stripes))
+!do iw = 1,wake%n_wake_stripes
+!  wake%pan_p(iw)%p => wake%wake_panels(iw,1)
+!enddo
+
+
+!allocate(wake%elem
+
+end subroutine prepare_wake_postpro
+
+!----------------------------------------------------------------------
+
+
+
+
+
 
 !----------------------------------------------------------------------
 
@@ -763,10 +857,10 @@ subroutine calc_geo_data_postpro(elem,vert)
   elem%nor = nor / norm2(nor)
 
   ! local tangent unit vector as in PANAIR
-  !!tanl = 0.5_wp * ( vert(:,nsides) + vert(:,1) ) - elem%cen
-  
-  !!elem%tang(:,1) = tanl / norm2(tanl)
-  !!elem%tang(:,2) = cross( elem%nor, elem%tang(:,1)  )
+  tanl = 0.5_wp * ( vert(:,nsides) + vert(:,1) ) - elem%cen
+ 
+  elem%tang(:,1) = tanl / norm2(tanl)
+  elem%tang(:,2) = cross( elem%nor, elem%tang(:,1)  )
 
   ! projection of the vertices on the mean plane
   !!do is = 1 , nsides
@@ -776,25 +870,25 @@ subroutine calc_geo_data_postpro(elem,vert)
   
   ! vector connecting two consecutive vertices: 
   ! edge_vec(:,1) =  ver(:,2) - ver(:,1)
-  !!if ( nsides .eq. 3 ) then
-  !!  do is = 1 , nsides
-  !!    elem%edge_vec(:,is) = vert(:,next_tri(is)) - vert(:,is)
-  !!  end do
-  !!else if ( nsides .eq. 4 ) then
-  !!  do is = 1 , nsides
-  !!    elem%edge_vec(:,is) = vert(:,next_qua(is)) - vert(:,is)
-  !!  end do
-  !!end if
+  if ( nsides .eq. 3 ) then
+    do is = 1 , nsides
+      elem%edge_vec(:,is) = vert(:,next_tri(is)) - vert(:,is)
+    end do
+  else if ( nsides .eq. 4 ) then
+    do is = 1 , nsides
+      elem%edge_vec(:,is) = vert(:,next_qua(is)) - vert(:,is)
+    end do
+  end if
 
   ! edge: edge_len(:) 
-  !!do is = 1 , nsides
-  !!  elem%edge_len(is) = norm2(elem%edge_vec(:,is)) 
-  !!end do
+  do is = 1 , nsides
+    elem%edge_len(is) = norm2(elem%edge_vec(:,is)) 
+  end do
 
   ! unit vector 
-  !!do is = 1 , nSides
-  !!  elem%edge_uni(:,is) = elem%edge_vec(:,is) / elem%edge_len(is)
-  !!end do
+  do is = 1 , nSides
+    elem%edge_uni(:,is) = elem%edge_vec(:,is) / elem%edge_len(is)
+  end do
 
   ! cosTi , sinTi
   !!do is = 1 , nsides
