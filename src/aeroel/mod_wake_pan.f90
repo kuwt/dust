@@ -34,7 +34,7 @@
 
 
 !> Module to treat the vortex panel wake
-module mod_wake
+module mod_wake_pan
 
 use mod_param, only: &
   wp, nl, pi
@@ -51,8 +51,6 @@ use mod_aero_elements, only: &
 use mod_vortring, only: &
   t_vortring
 
-use mod_doublet, only: &
-  velocity_calc_doublet
 !----------------------------------------------------------------------
 
 implicit none
@@ -120,6 +118,7 @@ type :: t_wake_panels
  type(t_elem_p), allocatable :: pan_p(:)
  
 end type 
+
 
 !----------------------------------------------------------------------
 contains
@@ -268,9 +267,10 @@ end subroutine prepare_wake_panels
 !! Note: at this subroutine is passed the whole array of elements,
 !! comprising both the implicit panels and the explicit (ll) 
 !! elements
-subroutine update_wake_panels(wake, elems, dt, uinf)
+subroutine update_wake_panels(wake, elems, wake_rings_p, dt, uinf)
  type(t_wake_panels), intent(inout), target :: wake
  type(t_elem_p), intent(in) :: elems(:)
+ type(t_elem_p), intent(in) :: wake_rings_p(:)
  real(wp), intent(in) :: dt
  real(wp), intent(in) :: uinf(3)
 
@@ -323,13 +323,19 @@ subroutine update_wake_panels(wake, elems, dt, uinf)
         vel_p = vel_p + v/(4*pi)
       enddo
 
-      ! calculate the influence of the wake
+      ! calculate the influence of the wake panels
       do ie=1,size(wake%pan_p)
         v = 0.0_wp
         call wake%pan_p(ie)%p%compute_vel(pos_p, uinf, v)
         vel_p = vel_p + v/(4*pi)
       enddo
 
+      ! calculate the influence of the wake rings
+      do ie=1,size(wake_rings_p)
+        v = 0.0_wp
+        call wake_rings_p(ie)%p%compute_vel(pos_p, uinf, v)
+        vel_p = vel_p + v/(4*pi)
+      enddo
       !calculate the influence of particles
 
       ! for OUTPUT only -----
@@ -399,4 +405,4 @@ end subroutine update_wake_panels
 
 !----------------------------------------------------------------------
 
-end module mod_wake
+end module mod_wake_pan

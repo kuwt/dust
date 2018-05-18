@@ -56,6 +56,9 @@ use mod_aero_elements, only: &
 use mod_liftlin, only: &
  update_liftlin, solve_liftlin 
 
+use mod_actuatordisk, only: &
+ update_actdisk
+
 use mod_c81, only: &
   t_aero_tab 
 
@@ -74,9 +77,12 @@ use mod_parse, only: &
   getstr, getlogical, getreal, getint, getrealarray, &
   ignoredParameters, finalizeParameters
 
-use mod_wake, only: &
+use mod_wake_pan, only: &
   t_wake_panels, initialize_wake_panels, update_wake_panels, &
   prepare_wake_panels, destroy_wake_panels
+
+use mod_wake_ring, only: &
+  t_wake_rings, initialize_wake_rings, update_wake_rings, destroy_wake_rings
 
 use mod_vtk_out, only: &
   vtk_out_bin
@@ -131,6 +137,7 @@ integer :: n_wake_panels
 type(t_linsys) :: linsys
 type(t_parse) :: prms
 type(t_wake_panels) :: wake_panels
+type(t_wake_rings) :: wake_rings
 
 real(t_realtime) :: t1 , t0, t00, t11, t22
 integer :: debug_level
@@ -257,11 +264,15 @@ call finalizeParameters(prms)
 !------ Initialization ------
 call printout(nl//'====== Initializing Wake ======')
 call initialize_wake_panels(wake_panels, geo, te, n_wake_panels)
+!Probably could be eliminated
 call prepare_wake_panels(wake_panels,  geo, dt, uinf)
+
+call initialize_wake_rings(wake_rings, geo, n_wake_panels)
 
 call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
-call initialize_linsys(linsys, geo, elems, wake_panels, elems_ll,  uinf)
+call initialize_linsys(linsys, geo, elems, elems_ll, elems_ad, &
+                       wake_panels, wake_rings,  uinf)
 t1 = dust_time()
 if(debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Initialized linear system in: ' , t1 - t0,' s.'
@@ -294,22 +305,30 @@ do it = 1,nstep
 
   call update_geometry(geo, time, .false.)
 
+
   call update_liftlin(elems_ll,linsys)
+  call update_actdisk(elems_ad,linsys)
+
 
   if((debug_level .ge. 16).and.time_2_debug_out)&
             call debug_printout_geometry(elems, geo, basename_debug, it)
 
 
+  !DEBUG: 
+  write(*,*) 'Before assembling system'
   !------ Assemble the system ------
   call prepare_wake_panels(wake_panels, geo, dt, uinf)
   t0 = dust_time()
-  call assemble_linsys(linsys, elems, wake_panels, elems_ll, uinf)
+  call assemble_linsys(linsys, elems, elems_ll, elems_ad,  &
+                       wake_panels, wake_rings, uinf)
   t1 = dust_time()
 
   if(debug_level .ge. 1) then
     write(message,'(A,F9.3,A)') 'Assembled linear system in: ' , t1 - t0,' s.'
     call printout(message)
   endif
+  !DEBUG: 
+  write(*,*) 'After assembling system'
 
   if ((debug_level .ge. 50).and.time_2_debug_out) then
     write(frmt,'(I4.4)') it
@@ -327,12 +346,7 @@ do it = 1,nstep
   ! compute time derivative of the result ( = i_vortex = -i_doublet ) ----------
   do i_el = 1 , size(elems)
     elems(i_el)%p%didou_dt = ( linsys%res(i_el) - res_old(i_el) ) / sim_param%dt 
-!   if ( it .eq. 2 ) then
-!     write(*,*) ' d , d_old , dd_dt ' ,  linsys%res(i_el) , res_old(i_el) , elems(i_el)%p%didou_dt 
-!   end if
   end do
-! if ( it .eq. 2 ) stop
-  ! update res_old for next time step -------
   res_old = linsys%res
 
   if(debug_level .ge. 1) then
@@ -344,7 +358,8 @@ do it = 1,nstep
                          call debug_printout_result(linsys, basename_debug, it)
 
   !------ Update the explicit part ------
-  call solve_liftlin(elems_ll, elems_tot, wake_panels%pan_p, uinf, airfoil_data)
+  call solve_liftlin(elems_ll, elems_tot, &
+                 (/ wake_panels%pan_p, wake_rings%pan_p/), uinf, airfoil_data)
 
   !------ Compute loads -------
   do i_el = 1 , size(elems)
@@ -362,15 +377,16 @@ do it = 1,nstep
 
   !Print the results
   if(time_2_out)  then
-    call output_status(elems_tot, geo, wake_panels, basename, &
-                                     it, time)
-    call save_status(geo, wake_panels, sim_param, it, time, run_id)
+    !call output_status(elems_tot, geo, wake_panels, basename, &
+    !                                 it, time)
+    call save_status(geo, wake_panels, wake_rings, sim_param, it, time, run_id)
   endif
 
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
   !  next iteration)
-  call update_wake_panels(wake_panels, elems_tot, dt, uinf)
+  call update_wake_panels(wake_panels, elems_tot, wake_rings%pan_p, dt, uinf)
+  call update_wake_rings(wake_rings, elems_tot, wake_panels%pan_p, dt, uinf)
 
   time = min(tend, time+dt)
 

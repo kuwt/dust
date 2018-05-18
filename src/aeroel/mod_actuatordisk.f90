@@ -58,7 +58,7 @@ use mod_aero_elements, only: &
 
 implicit none
 
-public :: t_actdisk
+public :: t_actdisk, update_actdisk
 
 
 !----------------------------------------------------------------------
@@ -71,6 +71,7 @@ contains
   procedure, pass(this) :: build_row_static => build_row_static_actdisk
   procedure, pass(this) :: add_wake         => add_wake_actdisk
   procedure, pass(this) :: add_liftlin      => add_liftlin_actdisk
+  procedure, pass(this) :: add_actdisk      => add_actdisk_actdisk
   procedure, pass(this) :: compute_pot      => compute_pot_actdisk
   procedure, pass(this) :: compute_vel      => compute_vel_actdisk
   procedure, pass(this) :: compute_psi      => compute_psi_actdisk
@@ -101,10 +102,11 @@ end subroutine build_row_actdisk
 
 !----------------------------------------------------------------------
 
-subroutine build_row_static_actdisk (this, elems, ll_elems, linsys, uinf, ie, ista, iend)
+subroutine build_row_static_actdisk (this, elems, ll_elems, ad_elems, linsys, uinf, ie, ista, iend)
  class(t_actdisk), intent(inout) :: this
  type(t_elem_p), intent(in)       :: elems(:)
  type(t_elem_p), intent(in)       :: ll_elems(:)
+ type(t_elem_p), intent(in)       :: ad_elems(:)
  type(t_linsys), intent(inout)    :: linsys
  real(wp), intent(in)             :: uinf(:)
  integer, intent(in)              :: ie
@@ -152,6 +154,25 @@ subroutine add_liftlin_actdisk (this, ll_elems, linsys, uinf, &
   &happen, a team of professionals is underway to remove the evidence')
 
 end subroutine add_liftlin_actdisk
+
+
+!----------------------------------------------------------------------
+
+subroutine add_actdisk_actdisk (this, ad_elems, linsys, uinf, &
+                             ie, ista, iend)
+ class(t_actdisk), intent(inout) :: this
+ type(t_elem_p), intent(in)      :: ad_elems(:)
+ type(t_linsys), intent(inout)   :: linsys
+ real(wp), intent(in)            :: uinf(:)
+ integer, intent(in)             :: ie
+ integer, intent(in)             :: ista
+ integer, intent(in)             :: iend
+ character(len=*), parameter      :: this_sub_name='add_actdisk_actdisk'
+ 
+  call error(this_sub_name, this_mod_name, 'This was not supposed to &
+  &happen, a team of professionals is underway to remove the evidence')
+
+end subroutine add_actdisk_actdisk
 
 !----------------------------------------------------------------------
 
@@ -239,11 +260,23 @@ end subroutine compute_cp_actdisk
 
 !----------------------------------------------------------------------
 
-subroutine update_actdisk(elems_ll, linsys)
- type(t_elem_p), intent(inout) :: elems_ll(:)
+subroutine update_actdisk(elems_ad, linsys)
+ type(t_elem_p), intent(inout) :: elems_ad(:)
  type(t_linsys), intent(inout) :: linsys
 
  real(wp), allocatable :: res_temp(:)
+
+ integer :: ie
+
+ do ie=1,size(elems_ad)
+   select type(el => elems_ad(ie)%p)
+   type is(t_actdisk)
+
+   !TODO: here put a REAL formula
+     el%idou = el%traction
+
+   end select
+ enddo
 
 
 end subroutine update_actdisk

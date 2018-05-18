@@ -286,7 +286,7 @@ type t_tedge
  integer , allocatable :: i(:,:)
 
  !> Coordinates of the nodes of the TE
- real(wp), allocatable :: rr(:,:)
+ !real(wp), allocatable :: rr(:,:)
 
  !> TE id of the nodes of the TE elements
  integer , allocatable :: ii(:,:)
@@ -294,7 +294,7 @@ type t_tedge
  !> TE id of neighboring TE elements
  integer , allocatable :: neigh(:,:)
 
- !> Relavative orientation of the neighboring TE elements
+ !> Relative orientation of the neighboring TE elements
  integer , allocatable :: o(:,:)
 
  !> Unit vector at TE nodes
@@ -643,6 +643,7 @@ subroutine load_components(geo, in_file, sim_param, te)
  real(wp), allocatable ::rr_te_tmp(:,:) , t_te_tmp(:,:)
  integer , allocatable :: ref_te_tmp(:)
  integer :: ne_te_prev , nn_te_prev ! # n. elements and nodes at TE ( of the prev. comps) 
+ real(wp) :: trac
 
  character(len=*), parameter :: this_sub_name = 'load_components'
 
@@ -738,7 +739,8 @@ subroutine load_components(geo, in_file, sim_param, te)
       call read_hdf5(comp_name,'CompName',cloc)
       geo%components(i_comp)%comp_name = trim(comp_name)
 
-      ! Geometry and Solution --------------------------
+
+      ! Geometry --------------------------
       call open_hdf5_group(cloc,'Geometry',geo_loc)
       call read_hdf5_al(ee   ,'ee'   ,geo_loc)
       call read_hdf5_al(rr   ,'rr'   ,geo_loc)
@@ -764,17 +766,21 @@ subroutine load_components(geo, in_file, sim_param, te)
 
 
 
-      ! Trailing Edge ----------------------------------
-      call open_hdf5_group(cloc,'Trailing_Edge',te_loc)
-      call read_hdf5_al(    e_te,    'e_te',te_loc)
-      call read_hdf5_al(    i_te,    'i_te',te_loc)
-      call read_hdf5_al(   rr_te,   'rr_te',te_loc)
-      call read_hdf5_al(   ii_te,   'ii_te',te_loc)
-      call read_hdf5_al(neigh_te,'neigh_te',te_loc)
-      call read_hdf5_al(    o_te,    'o_te',te_loc)
-      call read_hdf5_al(    t_te,    't_te',te_loc)
-      !call read_hdf5_al(  ref_te,  'ref_te',te_loc)
-      call close_hdf5_group(te_loc)
+      ! Trailing Edge (not all elements build the trailing edge)
+      if( comp_el_type(1:1) .eq. 'p' .or. &
+          comp_el_type(1:1) .eq. 'v' .or. &
+          comp_el_type(1:1) .eq. 'l') then
+        call open_hdf5_group(cloc,'Trailing_Edge',te_loc)
+        call read_hdf5_al(    e_te,    'e_te',te_loc)
+        call read_hdf5_al(    i_te,    'i_te',te_loc)
+        !call read_hdf5_al(   rr_te,   'rr_te',te_loc)
+        call read_hdf5_al(   ii_te,   'ii_te',te_loc)
+        call read_hdf5_al(neigh_te,'neigh_te',te_loc)
+        call read_hdf5_al(    o_te,    'o_te',te_loc)
+        call read_hdf5_al(    t_te,    't_te',te_loc)
+        !call read_hdf5_al(  ref_te,  'ref_te',te_loc)
+        call close_hdf5_group(te_loc)
+      endif
  
      
 
@@ -859,15 +865,29 @@ subroutine load_components(geo, in_file, sim_param, te)
 ! TODO: add nLiftLin field ???
 !     if(comp_el_type(1:1) .eq. 'l') geo%components(i_comp)%nLiftLin = size(ee,2)
 
+      !If it is an actuator disk read the traction
+      if(geo%components(i_comp)%comp_el_type(1:1) .eq. 'a') then
+        call read_hdf5(trac,'Traction',cloc)
+        select type (el=>geo%components(i_comp)%el)
+        type is(t_actdisk)
+          do i2 = 1,size(el)
+            el(i2)%traction = trac
+          enddo
+        end select
+      endif
+
+
+
       ! Trailing Edge ------------
-      ne_te = size(e_te,2)
-      nn_te = size(i_te,2)
+      ne_te = 0; nn_te=0
+      if(allocated(e_te)) ne_te = size(e_te,2)
+      if(allocated(i_te)) nn_te = size(i_te,2)
       if (sim_param%debug_level .ge. 3) then
         write(msg,'(A,I0,A,I0)') ' Trailing edge: elements: ', &
                                                        ne_te, ' nodes ', nn_te
         call printout(msg)
       endif
-      if (.not.allocated(te%e)) then ! it should be enough
+      if (.not.allocated(te%e) .and. ne_te .gt. 0) then ! it should be enough
         allocate(te%e    (2,ne_te) )
         do i1 = 1,ne_te
           te%e(1,i1)%p => null()
@@ -877,13 +897,15 @@ subroutine load_components(geo, in_file, sim_param, te)
             te%e(2,i1)%p  => geo%components(i_comp)%el(e_te(2,i1)) 
         enddo 
         allocate(te%i    (2,nn_te) ) ; te%i     =     i_te 
-        allocate(te%rr   (3,nn_te) ) ; te%rr    =    rr_te
+        !allocate(te%rr   (3,nn_te) ) ; te%rr    =    rr_te
         allocate(te%ii   (2,ne_te) ) ; te%ii    =    ii_te 
         allocate(te%neigh(2,ne_te) ) ; te%neigh = neigh_te
         allocate(te%o    (2,ne_te) ) ; te%o     =     o_te
         allocate(te%t    (2,nn_te) ) ; te%t     =     t_te
         allocate(te%ref  (  nn_te) ) ; te%ref   =   geo%components(i_comp)%ref_id
-      else
+        deallocate(e_te, i_te, ii_te, neigh_te, o_te, t_te)
+
+      elseif (ne_te .gt. 0) then
         nn_te_prev = size(te%i,2)
         ne_te_prev = size(te%e,2)
         allocate(e_te_tmp(2,size(te%e,2)+ne_te)) 
@@ -900,10 +922,10 @@ subroutine load_components(geo, in_file, sim_param, te)
         i_te_tmp(:,             1:size(te%i,2)    ) = te%i
         i_te_tmp(:,size(te%i,2)+1:size(i_te_tmp,2)) = i_te + points_offset
         call move_alloc(i_te_tmp,te%i) 
-        allocate(rr_te_tmp(3,size(te%rr,2)+nn_te)) 
-        rr_te_tmp(:,              1:size(te%rr,2)    ) = te%rr
-        rr_te_tmp(:,size(te%rr,2)+1:size(rr_te_tmp,2)) = rr_te
-        call move_alloc(rr_te_tmp,te%rr) 
+        !allocate(rr_te_tmp(3,size(te%rr,2)+nn_te)) 
+        !rr_te_tmp(:,              1:size(te%rr,2)    ) = te%rr
+        !rr_te_tmp(:,size(te%rr,2)+1:size(rr_te_tmp,2)) = rr_te
+        !call move_alloc(rr_te_tmp,te%rr) 
         allocate(ii_te_tmp(2,size(te%ii,2)+ne_te)) 
         ii_te_tmp(:,              1:size(te%ii,2)    ) = te%ii
         ii_te_tmp(:,size(te%ii,2)+1:size(ii_te_tmp,2)) = ii_te + nn_te_prev 
@@ -927,6 +949,7 @@ subroutine load_components(geo, in_file, sim_param, te)
                                                   geo%components(i_comp)%ref_id
 
         call move_alloc(ref_te_tmp,te%ref) 
+        deallocate(e_te, i_te, ii_te, neigh_te, o_te, t_te)
       end if 
 
       !:::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -1100,6 +1123,7 @@ subroutine prepare_geometry(geo)
        ! elem%theta   <-- ??? 
 
       class is(t_actdisk)
+       allocate(elem%tang(3,2))
        allocate(elem%verp(3,nsides))
        allocate(elem%edge_vec(3,nsides))
        allocate(elem%edge_len(nsides))

@@ -50,7 +50,7 @@ use mod_parse, only: &
 
 implicit none
 
-public :: read_mesh_parametric
+public :: read_mesh_parametric, read_actuatordisk_parametric
 
 private
 
@@ -636,14 +636,56 @@ subroutine read_actuatordisk_parametric(mesh_file,ee,rr)
  character(len=*), intent(in) :: mesh_file
  integer  , allocatable, intent(out) :: ee(:,:) 
  real(wp) , allocatable, intent(out) :: rr(:,:) 
+
+ real(wp), allocatable :: x(:), y(:)
  type(t_parse) :: pmesh_prs
+ character :: ElType
+ integer :: nstep, ax, ip
+ real(wp) :: r, theta
+ integer :: ind1, ind2
+ character(len=*), parameter ::  this_sub_name = 'read_actuatordisk_parametric'
 
   call pmesh_prs%CreateStringOption('ElType', &
                 'element type (temporary) p panel v vortex ring &
                 & l lifting line a actuator disk')
   call pmesh_prs%CreateRealOption('Radius', 'Radius of the actuator disk')
-  call pmesh_prs%CreateIntOption('nelem','Number of subdivisions')
+  call pmesh_prs%CreateIntOption('nstep','Number of subdivisions')
+  call pmesh_prs%CreateIntOption('Axis','Which axis to align the disk')
 
+  !read the parameters
+  call pmesh_prs%read_options(trim(mesh_file),printout_val=.true.)
+  
+  ElType = getstr(pmesh_prs,'ElType')
+
+  if(trim(ElType) .ne. 'a') call error(this_sub_name, this_mod_name, &
+    'This should have not happened, a team of professionals is under way to &
+    &remove the evidence')
+
+  r = getreal(pmesh_prs,'Radius')
+  nstep = getint(pmesh_prs,'nstep')
+  ax = getint(pmesh_prs,'Axis')
+
+  
+  allocate(x(nstep), y(nstep))
+
+  do ip = 1, nstep
+    theta = real(ip-1,wp) * 2.0_wp*pi/real(nstep,wp)
+    x(ip) = cos(theta)*r
+    y(ip) = sin(theta)*r
+  enddo
+
+  ind1 = 1+mod(ax,3)
+  ind2 = 1+mod(ind1,3)
+  allocate(rr   (3,nstep)) ; rr = 0.0_wp
+  rr(ind1,:) = x
+  rr(ind2,:) = y
+
+  allocate(ee(nstep,1)) ; ee = 0
+  do ip = 1,nstep
+    ee(ip,1) = ip
+  enddo
+
+  deallocate(x,y)
 
 end subroutine read_actuatordisk_parametric
 

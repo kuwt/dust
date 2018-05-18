@@ -75,6 +75,7 @@ contains
   procedure, pass(this) :: build_row_static => build_row_static_liftlin
   procedure, pass(this) :: add_wake         => add_wake_liftlin
   procedure, pass(this) :: add_liftlin      => add_liftlin_liftlin
+  procedure, pass(this) :: add_actdisk      => add_actdisk_liftlin
   procedure, pass(this) :: compute_pot      => compute_pot_liftlin
   procedure, pass(this) :: compute_vel      => compute_vel_liftlin
   procedure, pass(this) :: compute_psi      => compute_psi_liftlin
@@ -105,10 +106,11 @@ end subroutine build_row_liftlin
 
 !----------------------------------------------------------------------
 
-subroutine build_row_static_liftlin (this, elems, ll_elems, linsys, uinf, ie, ista, iend)
+subroutine build_row_static_liftlin (this, elems, ll_elems, ad_elems, linsys, uinf, ie, ista, iend)
  class(t_liftlin), intent(inout) :: this
  type(t_elem_p), intent(in)       :: elems(:)
  type(t_elem_p), intent(in)       :: ll_elems(:)
+ type(t_elem_p), intent(in)       :: ad_elems(:)
  type(t_linsys), intent(inout)    :: linsys
  real(wp), intent(in)             :: uinf(:)
  integer, intent(in)              :: ie
@@ -156,6 +158,24 @@ subroutine add_liftlin_liftlin (this, ll_elems, linsys, uinf, &
   &happen, a team of professionals is underway to remove the evidence')
 
 end subroutine add_liftlin_liftlin
+
+!----------------------------------------------------------------------
+
+subroutine add_actdisk_liftlin (this, ad_elems, linsys, uinf, &
+                             ie, ista, iend)
+ class(t_liftlin), intent(inout) :: this
+ type(t_elem_p), intent(in)      :: ad_elems(:)
+ type(t_linsys), intent(inout)   :: linsys
+ real(wp), intent(in)            :: uinf(:)
+ integer, intent(in)             :: ie
+ integer, intent(in)             :: ista
+ integer, intent(in)             :: iend
+ character(len=*), parameter      :: this_sub_name='add_actdisk_liftlin'
+ 
+  call error(this_sub_name, this_mod_name, 'This was not supposed to &
+  &happen, a team of professionals is underway to remove the evidence')
+
+end subroutine add_actdisk_liftlin
 
 !----------------------------------------------------------------------
 
@@ -295,8 +315,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
      call elems_wake(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
      vel_w(:,i_l) = vel_w(:,i_l) + v
    enddo
-   !DEBUG:
-   !write(*,*) 'i_l', i_l, 'vel w', vel_w(:,i_l)
  enddo
  
  vel_w = vel_w/(4.0_wp*pi)
@@ -326,8 +344,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
        !unorm = norm2(up)
        alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
        alpha = alpha * 180.0_wp/pi
-       !DEBUG:
-       !write(*,*) 'element ',i_l,'alpha',alpha
        !TODO: fix these parameters which are still hard-coded
        mach = 0.0_wp
        re = 1000000.0_wp

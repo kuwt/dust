@@ -127,6 +127,7 @@ type, abstract :: c_elem
   procedure(i_build_row_static), deferred, pass(this) :: build_row_static
   procedure(i_add_wake),    deferred, pass(this)      :: add_wake
   procedure(i_add_liftlin), deferred, pass(this)      :: add_liftlin
+  procedure(i_add_actdisk), deferred, pass(this)      :: add_actdisk
   procedure(i_compute_pot), deferred, pass(this)      :: compute_pot
   procedure(i_compute_vel), deferred, pass(this)      :: compute_vel
   procedure(i_compute_psi), deferred, pass(this)      :: compute_psi
@@ -207,7 +208,7 @@ end interface
 !! The function operates only on the components from ista to iend, which 
 !! should be the static ones ordered at the beginning of the array
 abstract interface
-  subroutine i_build_row_static(this, elems, ll_elems, linsys, uinf, ie, ista, iend)
+  subroutine i_build_row_static(this, elems, ll_elems, ad_elems, linsys, uinf, ie, ista, iend)
     import :: wp
     import :: c_elem
     import :: t_elem_p
@@ -216,6 +217,7 @@ abstract interface
     class(c_elem), intent(inout)  :: this
     type(t_elem_p), intent(in)    :: elems(:)
     type(t_elem_p), intent(in)    :: ll_elems(:)
+    type(t_elem_p), intent(in)    :: ad_elems(:)
     type(t_linsys), intent(inout) :: linsys
     real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
@@ -256,6 +258,26 @@ abstract interface
     implicit none
     class(c_elem), intent(inout)  :: this
     type(t_elem_p), intent(in)    :: ll_elems(:)
+    type(t_linsys), intent(inout) :: linsys
+    real(wp), intent(in)          :: uinf(:)
+    integer, intent(in)           :: ie
+    integer, intent(in)           :: ista
+    integer, intent(in)           :: iend
+  end subroutine
+end interface
+
+!----------------------------------------------------------------------
+
+abstract interface
+  subroutine i_add_actdisk(this, ad_elems, linsys, uinf, &
+                        ie, ista, iend)
+    import :: wp
+    import :: c_elem
+    import :: t_elem_p
+    import :: t_linsys
+    implicit none
+    class(c_elem), intent(inout)  :: this
+    type(t_elem_p), intent(in)    :: ad_elems(:)
     type(t_linsys), intent(inout) :: linsys
     real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie

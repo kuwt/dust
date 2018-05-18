@@ -122,7 +122,7 @@ integer :: nelem
 
 real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
 real(wp), allocatable :: vort(:), cp(:)
-real(wp), allocatable :: wpoints(:,:,:),wvort(:,:), wpoints_s(:,:)
+real(wp), allocatable :: wpoints(:,:,:),wvort(:), wpoints_s(:,:)
 integer,  allocatable :: wstart(:,:), welems(:,:)
 integer :: nstripes, nstripes_p, nrows, is, ir, iew, nelem_w
 real(wp) :: t
@@ -271,24 +271,26 @@ do ia = 1,n_analyses
       
       if (out_wake) then
 
-        !Load the wake
-        call load_wake(floc, wpoints, wstart, wvort)
-        !Prepare the wake variables for output
-        nstripes = size(wvort,1); nstripes_p = size(wpoints,2)
-        nrows = size(wvort,2); nelem_w = nstripes*nrows
-        allocate(wpoints_s(3,nstripes_p*(nrows+1)))
-        allocate(welems(4,nelem_w))
-        wpoints_s = reshape(wpoints, (/3,nstripes_p*(nrows+1)/))
-        iew = 0
-        do ir = 1,nrows
-          do is = 1,nstripes
-            iew = iew+1
-            welems(:,iew) = (/wstart(1,is)+nstripes_p*(ir-1), &
-                              wstart(2,is)+nstripes_p*(ir-1), &
-                              wstart(2,is)+nstripes_p*(ir), &
-                              wstart(1,is)+nstripes_p*(ir)/)
-          enddo
-        enddo
+        !!Load the wake
+        !call load_wake_pan(floc, wpoints, wstart, wvort)
+        !!Prepare the wake variables for output
+        !nstripes = size(wvort,1); nstripes_p = size(wpoints,2)
+        !nrows = size(wvort,2); nelem_w = nstripes*nrows
+        !allocate(wpoints_s(3,nstripes_p*(nrows+1)))
+        !allocate(welems(4,nelem_w))
+        !wpoints_s = reshape(wpoints, (/3,nstripes_p*(nrows+1)/))
+        !iew = 0
+        !do ir = 1,nrows
+        !  do is = 1,nstripes
+        !    iew = iew+1
+        !    welems(:,iew) = (/wstart(1,is)+nstripes_p*(ir-1), &
+        !                      wstart(2,is)+nstripes_p*(ir-1), &
+        !                      wstart(2,is)+nstripes_p*(ir), &
+        !                      wstart(1,is)+nstripes_p*(ir)/)
+        !  enddo
+        !enddo
+
+        call load_wake_viz(floc, wpoints_s, welems, wvort)
 
         nprint = 0
         if(out_vort) nprint = nprint+1
@@ -296,7 +298,8 @@ do ia = 1,n_analyses
         
         ivar = 1
         if(out_vort) then
-          print_vars_w(:,ivar) = reshape(wvort,(/nelem_w/))
+          !print_vars_w(:,ivar) = reshape(wvort,(/nelem_w/))
+          print_vars_w(:,ivar) = wvort
           print_var_names_w(ivar) = 'Vorticity'
           ivar = ivar +1
         endif
@@ -508,7 +511,7 @@ end subroutine load_res
 
 !----------------------------------------------------------------------
 
-subroutine load_wake(floc, wpoints, wstart, wvort)
+subroutine load_wake_pan(floc, wpoints, wstart, wvort)
  integer(h5loc), intent(in) :: floc 
  real(wp), allocatable, intent(out) :: wpoints(:,:,:)
  integer, allocatable, intent(out) :: wstart(:,:)
@@ -524,7 +527,161 @@ subroutine load_wake(floc, wpoints, wstart, wvort)
 
   call close_hdf5_group(gloc)
 
-end subroutine load_wake
+end subroutine load_wake_pan
+
+!----------------------------------------------------------------------
+
+subroutine load_wake_ring(floc, wpoints, wconn, wcen, wvort)
+ integer(h5loc), intent(in) :: floc 
+ real(wp), allocatable, intent(out) :: wpoints(:,:,:)
+ integer, allocatable, intent(out) :: wconn(:)
+ real(wp), allocatable, intent(out) :: wcen(:,:,:)
+ real(wp), allocatable, intent(out) :: wvort(:,:)
+
+ integer(h5loc) :: gloc
+  
+  call open_hdf5_group(floc,'RingWake',gloc)
+  
+  call read_hdf5_al(wpoints,'WakePoints',gloc)
+  call read_hdf5_al(wconn,'Conn_pe',gloc)
+  call read_hdf5_al(wcen,'WakeCenters',gloc)
+  call read_hdf5_al(wvort,'WakeVort',gloc)
+
+  call close_hdf5_group(gloc)
+
+end subroutine load_wake_ring
+
+!----------------------------------------------------------------------
+
+subroutine load_wake_viz(floc, wpoints, welems, wvort)
+ integer(h5loc), intent(in) :: floc 
+ real(wp), allocatable, intent(out) :: wpoints(:,:)
+ integer, allocatable, intent(out)  :: welems(:,:)
+ real(wp), allocatable, intent(out) :: wvort(:)
+
+ integer(h5loc) :: gloc
+ logical :: got_dset 
+ real(wp), allocatable :: wpoints_read(:,:,:)
+ real(wp), allocatable :: wpoints_pan(:,:), wpoints_rin(:,:)
+ integer, allocatable  :: wstart(:,:), wconn(:)
+ real(wp), allocatable :: wcen(:,:)
+ real(wp), allocatable :: wvort_read(:,:)
+ real(wp), allocatable :: wvort_pan(:), wvort_rin(:)
+ integer, allocatable  :: welems_pan(:,:), welems_rin(:,:)
+ integer :: nstripes, npoints_row, nrows, ndisks, nelem_w
+ integer :: iew, ir, is, ip
+ integer :: first_elem, act_disk, next_elem
+
+
+ !get the panel wake
+ got_dset = check_dset_hdf5('PanelWake',floc)
+ if(got_dset) then
+
+  call open_hdf5_group(floc,'PanelWake',gloc)
+  call read_hdf5_al(wpoints_read,'WakePoints',gloc)
+  call read_hdf5_al(wstart,'StartPoints',gloc)
+  call read_hdf5_al(wvort_read,'WakeVort',gloc)
+
+  nstripes = size(wvort_read,1); nrows = size(wvort_read,2);
+  npoints_row = size(wpoints_read,2)
+  nelem_w = nstripes*nrows
+
+  allocate(wpoints_pan(3,npoints_row*(nrows+1)))
+  allocate(welems_pan(4,nelem_w))
+  allocate(wvort_pan(nelem_w))
+
+  wpoints_pan = reshape(wpoints_read, (/3,npoints_row*(nrows+1)/))
+  wvort_pan = reshape(wvort_read, (/nelem_w/))
+  iew = 0
+  do ir = 1,nrows
+    do is = 1,nstripes
+      iew = iew+1
+      welems_pan(:,iew) = (/wstart(1,is)+npoints_row*(ir-1), &
+                            wstart(2,is)+npoints_row*(ir-1), &
+                            wstart(2,is)+npoints_row*(ir), &
+                            wstart(1,is)+npoints_row*(ir)/)
+    enddo
+  enddo
+ 
+  deallocate(wpoints_read, wstart, wvort_read)
+  call close_hdf5_group(gloc)
+ else
+   !panel wake not present, allocate stuff at zero size
+   allocate(wvort_pan(0), wpoints_pan(3,0), welems_pan(4,0))
+ endif
+
+ !get the ring wake
+ got_dset = check_dset_hdf5('RingWake',floc)
+ if(got_dset) then
+
+  call open_hdf5_group(floc,'RingWake',gloc)
+  call read_hdf5_al(wpoints_read,'WakePoints',gloc)
+  call read_hdf5_al(wconn,'Conn_pe',gloc)
+  call read_hdf5_al(wcen,'WakeCenters',gloc)
+  call read_hdf5_al(wvort_read,'WakeVort',gloc)
+  
+  ndisks = size(wvort_read,1); nrows = size(wvort_read,2)
+  npoints_row = size(wpoints_read,2)
+  nelem_w = ndisks*nrows
+
+  allocate(wpoints_rin(3,npoints_row*nrows+nelem_w))
+  allocate(welems_rin(4,npoints_row*nrows))
+  allocate(wvort_rin(npoints_row*nrows))
+
+  wpoints_rin(:,1:npoints_row*nrows) = reshape(wpoints_read, &
+                                          (/3,npoints_row*nrows/))
+  wpoints_rin(:,npoints_row*nrows+1:size(wpoints_rin,2)) = &
+         reshape(wcen, (/3,nelem_w/))
+
+  iew = 0; act_disk = 0
+  do ir = 1,nrows
+    do ip = 1, npoints_row
+      iew = iew+1
+
+      if(ip .eq. 1) then
+        first_elem = iew
+      else
+        if(wconn(ip-1) .ne. wconn(ip)) first_elem = iew
+      endif
+
+      if(ip.lt.npoints_row) then
+        if(wconn(ip+1) .ne. wconn(ip)) next_elem = first_elem
+      else
+        next_elem = first_elem
+      endif
+
+      welems_rin(1,iew) = iew
+      welems_rin(2,iew) = next_elem
+      welems_rin(3,iew) = npoints_row*nrows+(ir-1)*nelem_w+wconn(ip)
+      welems_rin(4,iew) = welems_rin(3,iew)
+
+      wvort_rin(iew) = wvort_read(wconn(ip),ir)
+    enddo
+  enddo
+
+  call close_hdf5_group(gloc)
+  deallocate(wpoints_read, wconn, wcen, wvort_read) 
+ else
+   allocate(wvort_rin(0), wpoints_rin(3,0), welems_rin(4,0))
+ endif
+
+ !Stitch together the two wakes
+ allocate(wpoints(3,size(wpoints_pan,2)+size(wpoints_rin,2)))
+ wpoints(:,1:size(wpoints_pan,2)) = wpoints_pan
+ wpoints(:,size(wpoints_pan,2)+1:size(wpoints,2)) = wpoints_rin
+ deallocate(wpoints_pan, wpoints_rin)
+
+ allocate(welems(4,size(welems_pan,2)+size(welems_rin,2)))
+ welems(:,1:size(welems_pan,2)) = welems_pan
+ welems(:,size(welems_pan,2)+1:size(welems,2)) = welems_rin
+ deallocate(welems_pan, welems_rin)
+
+
+ allocate(wvort(size(wvort_pan)+size(wvort_rin)))
+ wvort(1:size(wvort_pan)) = wvort_pan
+ wvort(size(wvort_pan)+1:size(wvort)) = wvort_rin
+ deallocate(wvort_pan, wvort_rin)
+end subroutine load_wake_viz
 
 !----------------------------------------------------------------------
 
