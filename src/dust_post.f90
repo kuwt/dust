@@ -500,7 +500,8 @@ do ia = 1,n_analyses
 
     ! Open output .dat file
     fid_out = 21
-    open(unit=fid_out,file='./test_probe.dat') 
+    write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.dat'
+    open(unit=fid_out,file=trim(filename)) 
       
     call dat_out_probes_header( fid_out , rr_probes , vars_str )
 

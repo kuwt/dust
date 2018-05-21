@@ -60,6 +60,7 @@ subroutine dat_out_probes_header ( fid , rr_probes , vars_str )
  real(wp), intent(in) :: rr_probes(:,:)
  character(len=*), intent(in) :: vars_str
 
+ character(len=max_char_len) :: istr
  integer :: n_probes , ic
 
  n_probes = size(rr_probes,2)
@@ -74,8 +75,9 @@ subroutine dat_out_probes_header ( fid , rr_probes , vars_str )
  do ic = 1 , 3
    write(fid,*) rr_probes(ic,:) 
  end do
- 
- write(fid,*) '#    '//trim(vars_str)
+
+ write(istr,'(I0)') n_probes 
+ write(fid,*) '#    t     '//istr//'( '//trim(vars_str)//')'
 
 end subroutine dat_out_probes_header
 
