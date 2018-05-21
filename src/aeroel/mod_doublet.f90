@@ -169,8 +169,8 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
  real(wp) :: radius_v(3)
  real(wp) :: radius , rati
 
- real(wp), parameter :: r_Rankine = 0.0000005_wp
- real(wp), parameter :: r_cutoff  = 0.0000001_wp
+ real(wp), parameter :: r_Rankine = 0.005_wp ! 0.0000005_wp
+ real(wp), parameter :: r_cutoff  = 0.00001_wp ! 0.0000001_wp
  !real(wp), parameter :: r_Rankine = 0.005_wp
  !real(wp), parameter :: r_cutoff  = 0.001_wp
  real(wp) :: r_Ran

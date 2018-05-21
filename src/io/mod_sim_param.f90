@@ -57,6 +57,10 @@ type t_sim_param
   integer  :: n_timesteps
   !> Vector of time instants
   real(wp) , allocatable :: time_vec(:)
+  !> Free stream pressure
+  real(wp) :: P_inf
+  !> Free stream density 
+  real(wp) :: rho_inf
   !> Free stream velocity
   real(wp) , allocatable :: u_inf(:)
   !> Debug level

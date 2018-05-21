@@ -89,7 +89,7 @@ use mod_tecplot_out, only: &
   tec_out_viz
 
 use mod_vtk_out, only: &
-  vtk_out_viz
+  vtk_out_viz , vtr_write
 
 use mod_dat_out, only: & 
   dat_out_probes_header , dat_out_probes 
@@ -121,7 +121,7 @@ logical :: all_comp
 logical :: out_vort, out_vel, out_cp, out_press
 logical :: out_wake
 
-integer(h5loc) :: floc, geo_floc, gloc1, gloc2
+integer(h5loc) :: floc, geo_floc, gloc1, gloc2 , ploc
 
 real(wp), allocatable :: points(:,:)
 integer, allocatable :: elems(:,:)
@@ -154,6 +154,7 @@ logical :: probe_vel , probe_p , probe_vort
 character(len=max_char_len) :: vars_str
 ! real(wp) , allocatable :: u_inf(:)
 real(wp) :: u_inf(3)
+real(wp) :: P_inf , rho
 real(wp) :: vel_probe(3) = 0.0_wp , vort_probe(3) = 0.0_wp 
 real(wp) :: v(3) = 0.0_wp , w(3) = 0.0_wp
 real(wp), allocatable , target :: sol(:) 
@@ -166,8 +167,10 @@ real(wp), allocatable :: xbox(:) , ybox(:) , zbox(:)
 real(wp) :: dxbox , dybox , dzbox
 real(wp), allocatable :: box_vel(:,:) , box_p(:) , box_vort(:,:)
 integer :: ix , iy , iz
-!TODO: 
-! add wake contribution to the velocity field for probe and flow_field analysis
+integer , allocatable :: vars_n(:)
+character(len=max_char_len) , allocatable :: vars_name(:)
+real(wp), allocatable :: vars(:,:) 
+integer :: i_vars , i_var_v , i_var_p , i_var_w
 
 integer :: it , i1
 
@@ -243,7 +246,7 @@ do ia = 1,n_analyses
   an_start = getint(sbprms,'StartRes')
   an_end   = getint(sbprms,'EndRes')
   an_step  = getint(sbprms,'StepRes')
-  
+ 
   !Check if we are analysing all the components or just some
   all_comp = .false.
   n_comp = countoption(sbprms, 'Component')
@@ -297,7 +300,12 @@ do ia = 1,n_analyses
       call open_hdf5_file(trim(filename),floc)
 
       ! Load u_inf
-      call read_hdf5(u_inf,'u_inf',floc)
+      call open_hdf5_group(floc,'Parameters',ploc)
+      call read_hdf5(u_inf,'u_inf',ploc)
+      call read_hdf5(P_inf,'P_inf',ploc)
+      call read_hdf5(rho,'rho_inf',ploc)
+      call close_hdf5_group(ploc)
+
 
       ! Load the references
       call load_refs(floc,refs_R,refs_off)
@@ -361,6 +369,8 @@ do ia = 1,n_analyses
         endif
 
         !Output the results (with wake)
+        !DEBUG
+        write(*,*) ' trim(out_frmt) : ' , trim(out_frmt)
         select case (trim(out_frmt))
          case ('tecplot')
           filename = trim(filename)//'.plt'
@@ -502,7 +512,11 @@ do ia = 1,n_analyses
      call open_hdf5_file(trim(filename),floc)
 
      ! Load u_inf --------------------------------
-     call read_hdf5(u_inf,'u_inf',floc)
+     call open_hdf5_group(floc,'Parameters',ploc)
+     call read_hdf5(u_inf,'u_inf',ploc)
+     call read_hdf5(P_inf,'P_inf',ploc)
+     call read_hdf5(rho,'rho_inf',ploc)
+     call close_hdf5_group(ploc)
 
      ! Load the references and move the points ---
      call load_refs(floc,refs_R,refs_off)
@@ -551,7 +565,11 @@ do ia = 1,n_analyses
 
       ! compute pressure
       if ( probe_p ) then
-        pres_probe = 1.0_wp
+        ! Bernoulli equation
+        ! rho * dphi/dt + P + 0.5*rho*V^2 = P_infty + 0.5*rho*V_infty^2
+        !TODO: add:
+        ! - add the unsteady term: -rho*dphi/dt
+        pres_probe = P_inf + 0.5_wp*rho*norm2(u_inf)**2 - 0.5_wp*rho*norm2(vel_probe)**2
         write(fid_out,'(F12.6)',advance='no') pres_probe
       end if
       
@@ -574,6 +592,9 @@ do ia = 1,n_analyses
 
 
    case('flow_field')
+
+    allocate(vars_name(3)) ; vars_name = ' '
+    allocate(vars_n   (3)) ; vars_n = 0
 
     ! Read variables to save : velocity | pressure | vorticity
     probe_vel = .false. ; probe_p = .false. ; probe_vort = .false.
@@ -599,7 +620,7 @@ do ia = 1,n_analyses
 
     ! load the geo components just once just once
     call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
-    !TODO: here get the run id
+    !TODO: here get the run id    !todo????
     call load_components_postpro(comps, points, nelem, elems, floc, & 
                                  components_names,  all_comp)
 
@@ -649,9 +670,30 @@ do ia = 1,n_analyses
       zbox(1) = minxyz(3)
     end if
 
-    if ( probe_vel ) allocate(box_vel (product(nxyz),3))
-    if ( probe_p   ) allocate(box_p   (product(nxyz)  ))
-    if ( probe_vort) allocate(box_vort(product(nxyz),3))
+    i_var = 0
+    i_var_v = 0 ; i_var_p = 0 ; i_var_w = 0
+    if ( probe_vel ) then
+      allocate(box_vel (product(nxyz),3))
+      i_var = i_var + 1
+      vars_name(i_var) = 'velocity'
+      vars_n(i_var) = 3
+      i_var_v = 3
+    end if
+    if ( probe_p   ) then
+      allocate(box_p   (product(nxyz)  ))
+      i_var = i_var + 1
+      vars_name(i_var) = 'pressure'
+      vars_n(i_var) = 1
+      i_var_p = i_var_v + 1
+    end if 
+    if ( probe_vort) then
+      allocate(box_vort(product(nxyz),3))
+      i_var = i_var + 1
+      vars_name(i_var) = 'vorticity'
+      vars_n(i_var) = 3
+      i_var_w = i_var_p + 3
+    end if
+    allocate(vars(sum(vars_n),product(nxyz))) ; vars = 1.0_wp 
 
     do it = an_start, an_end, an_step ! Time history
 
@@ -660,7 +702,11 @@ do ia = 1,n_analyses
      call open_hdf5_file(trim(filename),floc)
 
      ! Load u_inf --------------------------------
-     call read_hdf5(u_inf,'u_inf',floc)
+     call open_hdf5_group(floc,'Parameters',ploc)
+     call read_hdf5(u_inf,'u_inf',ploc)
+     call read_hdf5(P_inf,'P_inf',ploc)
+     call read_hdf5(rho,'rho_inf',ploc)
+     call close_hdf5_group(ploc)
 
      ! Load the references and move the points ---
      call load_refs(floc,refs_R,refs_off)
@@ -677,11 +723,11 @@ do ia = 1,n_analyses
      call prepare_wake_postpro( wpoints , wstart , wvort , wake )
 
      ! Compute velocity --------------------------
-     !CHECK
-     write(filename,'(A,I4.4)') trim(basename)//'_'//trim(an_name)//&
-                                                            '_',it
-     fid_out = 21
-     open(unit=fid_out,file=trim(filename)//'_box.dat')
+     write(filename,'(A,I4.4,A)') trim(basename)//'_'//trim(an_name)//&
+                                                            '_',it,'.vtr'
+!    !CHECK
+!    fid_out = 21
+!    open(unit=fid_out,file=trim(filename)//'_box.dat')
      ip = 0
      ! Loop over the nodes of the box
      do iz = 1 , size(zbox)
@@ -706,7 +752,8 @@ do ia = 1,n_analyses
           do ic = 1 , size(wake%wake_panels,1)
            do ie = 1 , size(wake%wake_panels,2)
                  
-            call wake%wake_panels(ic,ie)%compute_vel( (/ xbox(ix) , ybox(iy) , zbox(iz) /) , u_inf , v )
+            call wake%wake_panels(ic,ie)%compute_vel( &
+                 (/ xbox(ix) , ybox(iy) , zbox(iz) /) , u_inf , v )
             vel_probe = vel_probe + v/(4*pi) 
            
            end do
@@ -714,18 +761,36 @@ do ia = 1,n_analyses
   
           ! + u_inf
           vel_probe = vel_probe + u_inf
-!         write(*,*) (/ xbox(ix) , ybox(iy) , zbox(iz) /) , vel_probe
-!         write(fid_out,'(3F12.6)',advance='no') vel_probe
+          
+        end if
+        if ( probe_vel ) then
+!         vars(1:3,ix+(iy-1)*size(xbox)+(iz-1)*size(xbox)*size(ybox)) = vel_probe
+          vars(1:3,ip) = vel_probe
         end if
 
-        !CHECK
-        write(fid_out,'(6F12.6)') xbox(ix) , ybox(iy) , zbox(iz) , vel_probe
+        if ( probe_p ) then
+          ! Bernoulli equation
+          ! rho * dphi/dt + P + 0.5*rho*V^2 = P_infty + 0.5*rho*V_infty^2
+          !TODO: add:
+          ! - add the unsteady term: -rho*dphi/dt
+          pres_probe = P_inf + 0.5_wp*rho*norm2(u_inf)**2 - 0.5_wp*rho*norm2(vel_probe)**2
+          vars(i_var_v+1,ip) = pres_probe 
+   !       
+        end if
+
+        if ( probe_vort ) then
+
+        end if
 
        end do
       end do
      end do
 
-     close(fid_out)
+     call vtr_write ( filename , xbox , ybox , zbox , &
+                      vars_n(1:i_var) , vars_name(1:i_var) , vars ) 
+
+!    !CHECK
+!    close(fid_out)
 
     end do ! Time history
 
@@ -734,6 +799,8 @@ do ia = 1,n_analyses
     if (allocated(box_vort)) deallocate(box_vort)
     deallocate(xbox,ybox,zbox)
     deallocate(comps,sol)
+
+    deallocate(vars_name,vars_n,vars)
 
    case default
     call error('dust_post','','Unknown type of analysis: '//trim(an_type))

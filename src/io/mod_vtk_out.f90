@@ -44,7 +44,7 @@ use mod_handling, only: &
 !---------------------------------------------------------------------
 implicit none
 
-public :: vtk_out_bin, vtk_out_viz
+public :: vtk_out_bin, vtk_out_viz , vtr_write
 
 private
 
@@ -55,6 +55,143 @@ character(len=*), parameter :: &
 !---------------------------------------------------------------------
 
 contains
+
+! subroutine vtr_write      <--- for RectuangularGrid files
+! subroutine vtk_out_bin
+! subroutine vtk_out_viz
+
+!> RectilinearGrid: binary xml .vtr file 
+!!
+!!
+subroutine vtr_write ( filen , x , y , z , vars_n , vars_name , vars ) 
+ character(len=*), intent(in) :: filen
+ real(wp), intent(in) :: x(:) , y(:) , z(:)
+ integer , intent(in) :: vars_n(:)
+ character(len=*), intent(in) :: vars_name(:)
+ real(wp), intent(in) :: vars(:,:)
+
+ integer :: nx , ny , nz , n_points
+ integer :: n_vars
+ character(len=200) :: buffer
+ character(len=20)  :: str1 , ostr , istr
+ character(len=1)   :: lf
+ integer :: offset , nbytes
+ integer :: fid , ierr , i1 , i2 , irow
+
+ character(len=*), parameter :: this_sub_name = 'wtr_write'
+
+
+ lf = char(10) !line feed char
+
+ nx = size(x) ; ny = size(y) ; nz = size(z)
+ n_points = nx * ny * nz
+ n_vars = size(vars_n)
+
+ call new_file_unit(fid,ierr)
+ 
+ open(fid,file=trim(filen), &
+       status='replace',access='stream',iostat=ierr)
+
+ ! Header
+ buffer = '<?xml version="1.0"?>'//lf ; write(fid) trim(buffer)
+ buffer = '<VTKFile type="RectilinearGrid" version="0.1"&
+          & byte_order="LittleEndian">'//lf ; write(fid) trim(buffer)
+ write(str1,'(I0,a,I0,a,I0,a,I0,a,I0,a,I0)') &
+            0,' ',size(x)-1,' ',0,' ',size(y)-1, ' ',0,' ',size(z)-1
+!           0,' ',1,' ',0,' ',-1, ' ',0,' ',size(z)
+ buffer = ' <RectilinearGrid WholeExtent="'//trim(str1)//'">'//lf ; write(fid) trim(buffer)
+ buffer = '  <Piece Extent="'//trim(str1)//'">'//lf ; write(fid) trim(buffer)
+ ! Coordinates
+ buffer = '   <Coordinates>'//lf ; write(fid) trim(buffer)
+ offset = 0
+ write(ostr,'(I0)') offset
+ buffer = '    <DataArray type="Float32" Name="x" format="appended"&
+          & offset="'//trim(ostr)//'"/>'//lf ; write(fid) trim(buffer)
+ offset = offset + vtk_isize + vtk_fsize*size(x)
+ write(ostr,'(I0)') offset
+ buffer = '    <DataArray type="Float32" Name="y" format="appended"&
+          & offset="'//trim(ostr)//'"/>'//lf ; write(fid) trim(buffer)
+ offset = offset + vtk_isize + vtk_fsize*size(y)
+ write(ostr,'(I0)') offset
+ buffer = '    <DataArray type="Float32" Name="z" format="appended"&
+          & offset="'//trim(ostr)//'"/>'//lf ; write(fid) trim(buffer)
+ offset = offset + vtk_isize + vtk_fsize*size(z)
+ buffer = '   </Coordinates>'//lf ; write(fid) trim(buffer)
+ write(ostr,'(I0)') offset
+ ! Data
+ buffer = '   <PointData>'//lf ; write(fid) trim(buffer)
+ do i1 = 1 , n_vars 
+  if ( vars_n(i1) .eq. 1 ) then ! Scalar variable
+ 
+   buffer = '    <DataArray type="Float32" Name="'//trim(vars_name(i1))//'"&
+            & format="appended" offset="'//trim(ostr)//'"/>'//lf ; write(fid) trim(buffer)
+   offset = offset + vtk_isize + vtk_fsize*size(x)*size(y)*size(z)
+   write(ostr,'(I0)') offset
+ 
+  elseif ( vars_n(i1) .eq. 3 ) then ! Vector variable
+ 
+   buffer = '    <DataArray type="Float32" Name="'//trim(vars_name(i1))//'"&
+            & NumberOfComponents="3" format="appended" offset="'//trim(ostr)//'"/>'//lf
+   write(fid) trim(buffer)
+   offset = offset + vtk_isize + 3*vtk_fsize*size(x)*size(y)*size(z)
+   write(ostr,'(I0)') offset
+  
+ !elseif ( vars_n(i1) .eq. 9 ) then ! Tensor Variable
+ 
+  else
+   write(istr,'(I0)') i1
+   call error(this_sub_name, this_mod_name, 'Wrong dimension of the variable n.'//istr)
+  end if
+ 
+ end do
+ buffer = '   </PointData>'//lf ; write(fid) trim(buffer)
+ buffer = '  </Piece>'//lf ; write(fid) trim(buffer)
+ buffer = ' </RectilinearGrid>'//lf; write(fid) trim(buffer)
+ ! Appended data
+ buffer = ' <AppendedData encoding="raw">'//lf ; write(fid) trim(buffer)
+ buffer = '_'; write(fid) trim(buffer) !mark the beginning of the data
+ ! Coordinates 
+ nbytes = vtk_fsize * nx 
+ write(fid) nbytes
+ write(fid) real(x,vtk_fsize)
+ nbytes = vtk_fsize * ny
+ write(fid) nbytes
+ write(fid) real(y,vtk_fsize)
+ nbytes = vtk_fsize * nz
+ write(fid) nbytes
+ write(fid) real(z,vtk_fsize)
+ ! Data
+ irow = 1
+ do i1 = 1 , n_vars
+  if ( vars_n(i1) .eq. 1 ) then
+   nbytes = vtk_fsize * n_points 
+   write(fid) nbytes
+   write(fid) real( vars(irow,:) , vtk_fsize )
+   irow = irow + 1
+  elseif ( vars_n(i1) .eq. 3 ) then
+   nbytes = vtk_fsize * 3 * n_points
+   write(fid) nbytes
+   do i2 = 1 , n_points
+    write(fid) real( vars(irow:irow+2,i2) , vtk_fsize )
+   end do
+   irow = irow + 3
+  
+ !elseif ( vars_n(i1) .eq. 9 ) then ! Tensor Variable
+ 
+   else
+    write(istr,'(I0)') i1
+    call error(this_sub_name, this_mod_name, 'Wrong dimension of the variable n.'//istr)
+ 
+  end if
+ end do
+ buffer = ' </AppendedData>'//lf ; write(fid) trim(buffer)
+ buffer = '</VTKFile>' ; write(fid) trim(buffer)
+
+ close(fid)
+
+end subroutine vtr_write
+
+!---------------------------------------------------------------------
 
 !> Output the processed data into a binary xml  .vtu file
 !!

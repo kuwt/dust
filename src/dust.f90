@@ -135,7 +135,7 @@ integer :: debug_level
 
 ! Asymptotic conditions
 real(wp) :: uinf(3)
-real(wp), parameter :: rho = 1.0_wp
+real(wp) :: rho , Pinf
 
 
 character(len=max_char_len) :: frmt
@@ -174,6 +174,10 @@ call prms%CreateRealOption( 'dt_debug_out', "debug output time interval")
 call prms%CreateLogicalOption( 'output_start', "output values at starting iteration", 'F')
 call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
 '(/1.0, 0.0, 0.0/)')
+call prms%CreateRealOption( 'P_inf', "free stream pressure", &
+'1.0')
+call prms%CreateRealOption( 'rho_inf', "free stream density", &
+'1.0')
 call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output','0')
 call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
 call prms%CreateStringOption('basename','oputput basename','./')
@@ -193,6 +197,8 @@ dt_out = getreal(prms,'dt_out')
 dt_debug_out = getreal(prms, 'dt_debug_out')
 output_start = getlogical(prms, 'output_start')
 
+Pinf = getreal(prms,'P_inf')
+rho  = getreal(prms,'rho_inf')
 uinf = getrealarray(prms, 'u_inf', 3)
 
 debug_level = getint(prms, 'debug_level')
@@ -229,6 +235,8 @@ sim_param%time_vec = (/ ( sim_param%t0 + &
          dble(i-1)*sim_param%dt, i=1,sim_param%n_timesteps ) /)
 allocate(sim_param%u_inf(3)) 
 sim_param%u_inf = uinf
+sim_param%P_inf = Pinf
+sim_param%rho_inf = rho
 sim_param%debug_level = debug_level
 sim_param%basename = basename
 

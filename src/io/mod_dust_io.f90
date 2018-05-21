@@ -105,7 +105,7 @@ subroutine save_status(geo, wake, sim_params, it, time, run_id)
  real(wp), intent(in)            :: time
  integer, intent(in)             :: run_id(10)
 
- integer(h5loc) :: floc, gloc1, gloc2, gloc3
+ integer(h5loc) :: floc, gloc1, gloc2, gloc3, ploc
  character(len=max_char_len) :: comp_name, sit
  integer :: icomp, ncomp
  integer :: iref, nref
@@ -119,7 +119,13 @@ subroutine save_status(geo, wake, sim_params, it, time, run_id)
                      floc)
   call write_hdf5_attr(run_id, 'run_id', floc)
   call write_hdf5(time,'time',floc)
-  call write_hdf5(sim_params%u_inf,'u_inf', floc)
+
+  call new_hdf5_group(floc, 'Parameters', ploc)
+  call write_hdf5(sim_params%u_inf,'u_inf', ploc)
+  call write_hdf5(sim_params%P_inf,'P_inf', ploc)
+  call write_hdf5(sim_params%rho_inf,'rho_inf', ploc)
+  call close_hdf5_group(ploc)
+  
 
   ! 1) %%%%% Component solution: 
   ! mimic the structure of the components inside the geometry input file
