@@ -43,7 +43,7 @@ use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
 
 use mod_geometry, only: &
-  t_geo, t_tedge, calc_geo_data_pan
+  t_geo, t_tedge, calc_geo_data_ad
 
 use mod_aero_elements, only: &
   c_elem, t_elem_p
@@ -150,6 +150,7 @@ subroutine initialize_wake_rings(wake, geo, nrings)
     do ir = 1,wake%nrings
       wake%wake_rings(id,ir)%idou => wake%ivort(id,ir)
       nsides = wake%gen_elems(id)%p%n_ver
+      wake%wake_rings(id,ir)%n_ver = nsides
       allocate(wake%wake_rings(id,ir)%ver(3,nsides))
       allocate(wake%wake_rings(id,ir)%cen(3))
       allocate(wake%wake_rings(id,ir)%nor(3))
@@ -253,7 +254,7 @@ subroutine update_wake_rings(wake, elems, wake_pan_p, dt, uinf)
  real(wp), intent(in) :: dt
  real(wp), intent(in) :: uinf(3)
 
- integer :: ip,id,ir, nrows, ie, np
+ integer :: ip,id,ir, ie, np
  real(wp) :: pos_p(3), vel_p(3), v(3)
  type(t_elem_p), allocatable :: pan_p_temp(:)
  real(wp), allocatable :: points(:,:,:)
@@ -280,8 +281,8 @@ subroutine update_wake_rings(wake, elems, wake_pan_p, dt, uinf)
 
   !Then store the old points of the rest of the wake (the shift forward
   ! of the points in the array is happening here)
-  ip=1
   do ir = 1,wake%wake_len-1
+    ip=1
     do id = 1,wake%ndisks
       np = wake%wake_rings(id,ir)%n_ver
       points(:,ip:ip+np-1,ir+1) = wake%wake_rings(id,ir)%ver(:,:)
@@ -377,8 +378,14 @@ subroutine update_wake_rings(wake, elems, wake_pan_p, dt, uinf)
     wake%wake_rings(id,1)%idou  = wake%gen_elems(id)%p%idou
   enddo
 
-  ! The geometrical quantities of the panels will be all updated at the 
-  ! beginning of the next iteration in prepare_wake
+  !Update the geometrical quantities
+  do ir = 1,wake%wake_len
+    do id = 1,wake%ndisks
+      call calc_geo_data_ad(wake%wake_rings(id,ir), &
+                    wake%wake_rings(id,ir)%ver)
+    enddo
+  enddo
+
 
 
 end subroutine update_wake_rings

@@ -314,8 +314,6 @@ do it = 1,nstep
             call debug_printout_geometry(elems, geo, basename_debug, it)
 
 
-  !DEBUG: 
-  write(*,*) 'Before assembling system'
   !------ Assemble the system ------
   call prepare_wake_panels(wake_panels, geo, dt, uinf)
   t0 = dust_time()
@@ -327,8 +325,6 @@ do it = 1,nstep
     write(message,'(A,F9.3,A)') 'Assembled linear system in: ' , t1 - t0,' s.'
     call printout(message)
   endif
-  !DEBUG: 
-  write(*,*) 'After assembling system'
 
   if ((debug_level .ge. 50).and.time_2_debug_out) then
     write(frmt,'(I4.4)') it
@@ -509,7 +505,6 @@ subroutine output_status(elems_tot, geo, wake_panels, basename, it, t)
  integer, allocatable :: el(:,:), w_el(:,:)
  real(wp), allocatable :: w_points(:,:), w_res(:)
  integer :: ie, of, p1, p2
- integer(h5loc) :: floc
  character(len=max_char_len) :: sit
 
   allocate(el(4,size(elems_tot))); el = 0

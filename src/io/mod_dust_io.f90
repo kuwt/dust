@@ -190,7 +190,7 @@ subroutine save_status(geo, wake_pan, wake_rin, sim_params, it, time, run_id)
   call close_hdf5_group(gloc1)
   deallocate(points_w, conn_pe, cent)
 
-  ! 3) %%%% Referenced
+  ! 3) %%%% References
   ! save the whole list of references
   call new_hdf5_group(floc, 'References', gloc1)
   nref = size(geo%refs)

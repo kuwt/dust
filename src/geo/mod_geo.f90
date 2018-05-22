@@ -105,7 +105,7 @@ implicit none
 
 public :: t_geo, t_geo_component, t_tedge, set_parameters_geo, &
           create_geometry, update_geometry, destroy_geometry, &
-          calc_geo_data_pan, calc_geo_data_ll
+          calc_geo_data_pan, calc_geo_data_ll, calc_geo_data_ad
 
 private
 
@@ -634,13 +634,13 @@ subroutine load_components(geo, in_file, sim_param, te)
  ! trailing edge ------
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
  integer , allocatable :: neigh_te(:,:) , o_te(:,:)
- real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
+ real(wp), allocatable :: t_te(:,:)
  integer :: ne_te , nn_te
  ! tmp arrays --------
  type(t_elem_p) , allocatable :: e_te_tmp(:,:)
- integer, allocatable  ::i_te_tmp(:,:) , ii_te_tmp(:,:) 
+ integer, allocatable  :: i_te_tmp(:,:) , ii_te_tmp(:,:) 
  integer , allocatable :: neigh_te_tmp(:,:) , o_te_tmp(:,:)
- real(wp), allocatable ::rr_te_tmp(:,:) , t_te_tmp(:,:)
+ real(wp), allocatable :: t_te_tmp(:,:)
  integer , allocatable :: ref_te_tmp(:)
  integer :: ne_te_prev , nn_te_prev ! # n. elements and nodes at TE ( of the prev. comps) 
  real(wp) :: trac

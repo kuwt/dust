@@ -75,6 +75,9 @@ use mod_vortring, only: &
 use mod_liftlin, only: &
   t_liftlin
 
+use mod_actuatordisk, only: &
+  t_actdisk
+
 use mod_c81, only: &
   t_aero_tab , read_c81_table , interp_aero_coeff
 
@@ -110,7 +113,8 @@ use mod_stringtools, only: &
 
 implicit none
 
-public :: load_components_postpro, update_points_postpro
+public :: load_components_postpro, update_points_postpro, &
+          expand_actdisk_postpro
 
 private
 
@@ -360,12 +364,12 @@ contains
 
 !----------------------------------------------------------------------
 
-subroutine load_components_postpro(comps, points, nelem, ep_conn, floc, &
+subroutine load_components_postpro(comps, points, nelem, floc, &
              components_names, all_comp)
  type(t_geo_component), allocatable, intent(inout) :: comps(:)
  real(wp), allocatable, intent(out) :: points(:,:)
  integer, intent(out)               :: nelem
- integer, allocatable, intent(out)  :: ep_conn(:,:)
+ !integer, allocatable, intent(out)  :: ep_conn(:,:)
  !character(len=*), intent(in) :: in_file
  integer(h5loc), intent(in) :: floc
  character(len=*), allocatable, intent(in) :: components_names(:)
@@ -376,14 +380,14 @@ subroutine load_components_postpro(comps, points, nelem, ep_conn, floc, &
  integer, allocatable :: ee(:,:)
  real(wp), allocatable :: rr(:,:)
  character(len=max_char_len) :: comp_el_type, comp_name
- integer :: points_offset, n_vert , elems_offset
+ integer :: points_offset, n_vert! , elems_offset
  real(wp), allocatable :: points_tmp(:,:)
  character(len=max_char_len) :: ref_tag, ref_tag_m
  integer :: ref_id
- character(len=max_char_len) :: msg, cname
+ character(len=max_char_len) :: cname !, msg
  integer(h5loc) :: gloc, cloc , geo_loc
  integer :: n_comp, i_comp, n_comp_tot, i_comp_tot
- integer :: ie, ie_t
+ !integer :: ie_t, ie
  !integer :: n_mult, i_mult
  !logical :: mult
 
@@ -505,6 +509,8 @@ subroutine load_components_postpro(comps, points, nelem, ep_conn, floc, &
         allocate(t_vortring::comps(i_comp)%el(size(ee,2)))
        case('l')
         allocate(t_liftlin::comps(i_comp)%el(size(ee,2)))
+       case('a')
+        allocate(t_actdisk::comps(i_comp)%el(size(ee,2)))
        case default
         call error(this_sub_name, this_mod_name, &
                  'Unknown type of element: '//comps(i_comp)%comp_el_type)
@@ -540,7 +546,7 @@ subroutine load_components_postpro(comps, points, nelem, ep_conn, floc, &
       enddo
  
       ! Update elems_offset for the next component
-      elems_offset = elems_offset + size(ee,2)
+      !elems_offset = elems_offset + size(ee,2)
 
       !cleanup
       deallocate(ee,rr)
@@ -553,16 +559,16 @@ subroutine load_components_postpro(comps, points, nelem, ep_conn, floc, &
   call close_hdf5_group(gloc)
 
   !generate the "global" connectivity
-  allocate(ep_conn(4,nelem))
-  ep_conn = 0
-  ie_t = 0
-  do i_comp = 1,n_comp
-    do ie = 1,comps(i_comp)%nelems
-    ie_t = ie_t + 1
-    ep_conn(1:comps(i_comp)%el(ie)%n_ver,ie_t) = comps(i_comp)%el(ie)%i_ver
+  !allocate(ep_conn(4,nelem))
+  !ep_conn = 0
+  !ie_t = 0
+  !do i_comp = 1,n_comp
+  !  do ie = 1,comps(i_comp)%nelems
+  !  ie_t = ie_t + 1
+  !  ep_conn(1:comps(i_comp)%el(ie)%n_ver,ie_t) = comps(i_comp)%el(ie)%i_ver
 
-    enddo
-  enddo
+  !  enddo
+  !enddo
 
 
 
@@ -737,8 +743,8 @@ subroutine calc_geo_data_postpro(elem,vert)
  class(c_elem), intent(inout) :: elem  
  real(wp), intent(in) :: vert(:,:)
 
- integer :: nsides, is
- real(wp):: nor(3), tanl(3)
+ integer :: nsides!, is
+ real(wp):: nor(3)!, tanl(3)
 
   nsides = size(vert,2)
 
@@ -860,6 +866,81 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off)
 
 end subroutine update_points_postpro
 
+!----------------------------------------------------------------------
+
+subroutine expand_actdisk_postpro(comps, points, points_exp, elems)
+ type(t_geo_component), intent(in) :: comps(:)
+ real(wp), intent(in) :: points(:,:)
+ real(wp), allocatable, intent(out) :: points_exp(:,:)
+ integer, allocatable, intent(out)  :: elems(:,:)
+
+
+ real(wp), allocatable :: pt_tmp(:,:)
+ integer, allocatable  :: ee_tmp(:,:)
+ integer :: i_comp, ie, extra_offset, iv, ipt, ipt1!, ie_t, next
+ integer :: start_pts, start_cen
+
+  extra_offset = 0
+  allocate(points_exp(3,0), elems(4,0))
+  do i_comp = 1,size(comps)
+    associate(cmp=>comps(i_comp))
+    select type(el => cmp%el)
+     type is(t_actdisk) 
+      !make space also for the centers
+      allocate(pt_tmp(3,size(points_exp,2) + &
+               size(cmp%loc_points,2) + cmp%nelems))
+      pt_tmp(:,1:size(points_exp,2)) = points_exp
+      start_pts = size(points_exp,2)
+      start_cen = size(points_exp,2) + size(cmp%i_points)
+      pt_tmp(:,start_pts+1 : start_cen) = points(:,cmp%i_points)
+      do ie = 1,cmp%nelems
+        pt_tmp(:,start_cen+ie) = el(ie)%cen
+      enddo
+      call move_alloc(pt_tmp, points_exp)
+      extra_offset = extra_offset + cmp%nelems
+
+      allocate(ee_tmp(4,size(elems,2)+size(cmp%i_points)))
+      ee_tmp(:,1:size(elems,2)) = elems
+      ee_tmp(:,size(elems,2)+1:size(ee_tmp,2)) = 0
+
+      ipt = 1
+      do ie = 1,cmp%nelems
+        ipt1 = ipt
+        do iv = 1,el(ie)%n_ver-1
+          ee_tmp(1,size(elems,2)+ipt) = start_pts+ipt
+          ee_tmp(2,size(elems,2)+ipt) = start_pts+ipt+1
+          ee_tmp(3,size(elems,2)+ipt) = start_cen+ie
+          ipt = ipt+1
+        enddo
+        !last element
+          ee_tmp(1,size(elems,2)+ipt) = start_pts+ipt
+          ee_tmp(2,size(elems,2)+ipt) = start_pts+ipt1
+          ee_tmp(3,size(elems,2)+ipt) = start_cen+ie
+          ipt = ipt+1
+      enddo
+      call move_alloc(ee_tmp, elems)
+
+     class default
+      allocate(pt_tmp(3,size(points_exp,2)+size(cmp%loc_points,2)))
+      pt_tmp(:,1:size(points_exp,2)) = points_exp
+      pt_tmp(:,size(points_exp,2)+1:size(pt_tmp,2)) = points(:,cmp%i_points)
+      call move_alloc(pt_tmp, points_exp)
+
+      allocate(ee_tmp(4,size(elems,2)+cmp%nelems))
+      ee_tmp(:,1:size(elems,2)) = elems
+      ee_tmp(:,size(elems,2)+1:size(ee_tmp,2)) = 0
+      do ie = 1,cmp%nelems
+        ee_tmp(1:el(ie)%n_ver,size(elems,2)+ie) =  &
+                                                el(ie)%i_ver+extra_offset 
+      enddo
+      call move_alloc(ee_tmp, elems)
+      
+
+
+    end select
+    end associate
+  enddo
+end subroutine
 !----------------------------------------------------------------------
 
 end module mod_geo_postpro
