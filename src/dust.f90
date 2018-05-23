@@ -144,7 +144,7 @@ integer :: debug_level
 
 ! Asymptotic conditions
 real(wp) :: uinf(3)
-real(wp), parameter :: rho = 1.0_wp
+real(wp) :: rho 
 
 
 character(len=max_char_len) :: frmt
@@ -183,6 +183,7 @@ call prms%CreateRealOption( 'dt_debug_out', "debug output time interval")
 call prms%CreateLogicalOption( 'output_start', "output values at starting iteration", 'F')
 call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
 '(/1.0, 0.0, 0.0/)')
+call prms%CreateRealOption( 'rho', "density", '1.0')
 call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output','0')
 call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
 call prms%CreateStringOption('basename','oputput basename','./')
@@ -203,6 +204,7 @@ dt_debug_out = getreal(prms, 'dt_debug_out')
 output_start = getlogical(prms, 'output_start')
 
 uinf = getrealarray(prms, 'u_inf', 3)
+rho = getreal(prms, 'rho')
 
 debug_level = getint(prms, 'debug_level')
 n_wake_panels = getint(prms, 'n_wake_panels')
@@ -238,6 +240,7 @@ sim_param%time_vec = (/ ( sim_param%t0 + &
          dble(i-1)*sim_param%dt, i=1,sim_param%n_timesteps ) /)
 allocate(sim_param%u_inf(3)) 
 sim_param%u_inf = uinf
+sim_param%rho = rho
 sim_param%debug_level = debug_level
 sim_param%basename = basename
 
@@ -307,7 +310,7 @@ do it = 1,nstep
 
 
   call update_liftlin(elems_ll,linsys)
-  call update_actdisk(elems_ad,linsys)
+  call update_actdisk(elems_ad,linsys,sim_param)
 
 
   if((debug_level .ge. 16).and.time_2_debug_out)&

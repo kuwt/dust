@@ -42,6 +42,9 @@ use mod_param, only: &
 use mod_handling, only: &
   error
 
+use mod_sim_param, only: &
+  t_sim_param
+
 use mod_doublet, only: &
   potential_calc_doublet , &
   velocity_calc_doublet
@@ -65,6 +68,7 @@ public :: t_actdisk, update_actdisk
 
 type, extends(c_elem) :: t_actdisk
   real(wp), allocatable :: traction
+  real(wp), allocatable :: radius
 contains
 
   procedure, pass(this) :: build_row        => build_row_actdisk
@@ -260,9 +264,10 @@ end subroutine compute_cp_actdisk
 
 !----------------------------------------------------------------------
 
-subroutine update_actdisk(elems_ad, linsys)
+subroutine update_actdisk(elems_ad, linsys, sim_param)
  type(t_elem_p), intent(inout) :: elems_ad(:)
  type(t_linsys), intent(inout) :: linsys
+ type(t_sim_param), intent(in) :: sim_param
 
  real(wp), allocatable :: res_temp(:)
 
@@ -273,7 +278,7 @@ subroutine update_actdisk(elems_ad, linsys)
    type is(t_actdisk)
 
    !TODO: here put a REAL formula
-     el%idou = el%traction
+     el%idou = -el%traction*sim_param%dt/(sim_param%rho*pi*el%radius**2)
 
    end select
  enddo

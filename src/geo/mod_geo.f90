@@ -643,7 +643,7 @@ subroutine load_components(geo, in_file, sim_param, te)
  real(wp), allocatable :: t_te_tmp(:,:)
  integer , allocatable :: ref_te_tmp(:)
  integer :: ne_te_prev , nn_te_prev ! # n. elements and nodes at TE ( of the prev. comps) 
- real(wp) :: trac
+ real(wp) :: trac, rad
 
  character(len=*), parameter :: this_sub_name = 'load_components'
 
@@ -780,6 +780,9 @@ subroutine load_components(geo, in_file, sim_param, te)
         call read_hdf5_al(    t_te,    't_te',te_loc)
         !call read_hdf5_al(  ref_te,  'ref_te',te_loc)
         call close_hdf5_group(te_loc)
+      else
+        allocate(e_te(0,0), i_te(0,0), ii_te(0,0), neigh_te(0,0), o_te(0,0),&
+                 t_te(0,0))
       endif
  
      
@@ -824,7 +827,7 @@ subroutine load_components(geo, in_file, sim_param, te)
         allocate(t_actdisk::geo%components(i_comp)%el(size(ee,2)))
        case default
         call error(this_sub_name, this_mod_name, &
-                 'Unknown type of element: '//geo%components(i_comp)%comp_el_type)
+          'Unknown type of element: '//geo%components(i_comp)%comp_el_type)
       end select
       
       !fill (some) of the elements fields
@@ -868,10 +871,12 @@ subroutine load_components(geo, in_file, sim_param, te)
       !If it is an actuator disk read the traction
       if(geo%components(i_comp)%comp_el_type(1:1) .eq. 'a') then
         call read_hdf5(trac,'Traction',cloc)
+        call read_hdf5(rad,'Radius',cloc)
         select type (el=>geo%components(i_comp)%el)
         type is(t_actdisk)
           do i2 = 1,size(el)
             el(i2)%traction = trac
+            el(i2)%radius = rad
           enddo
         end select
       endif
@@ -887,7 +892,7 @@ subroutine load_components(geo, in_file, sim_param, te)
                                                        ne_te, ' nodes ', nn_te
         call printout(msg)
       endif
-      if (.not.allocated(te%e) .and. ne_te .gt. 0) then ! it should be enough
+      if (.not.allocated(te%e) ) then ! it should be enough
         allocate(te%e    (2,ne_te) )
         do i1 = 1,ne_te
           te%e(1,i1)%p => null()

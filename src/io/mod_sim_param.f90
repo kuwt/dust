@@ -59,6 +59,8 @@ type t_sim_param
   real(wp) , allocatable :: time_vec(:)
   !> Free stream velocity
   real(wp) , allocatable :: u_inf(:)
+  !> Density
+  real(wp) :: rho
   !> Debug level
   integer :: debug_level
   !> Basename

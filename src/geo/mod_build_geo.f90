@@ -136,7 +136,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
  integer , allocatable                    :: nelem_span_list(:)
  integer , allocatable                    :: i_airfoil_e(:,:)
  real(wp) , allocatable                   :: normalised_coord_e(:,:)
- real(wp) :: trac
+ real(wp) :: trac, radius
 
  integer :: npoints_chord_tot, nelems_span, nelems_span_tot
  ! Connectivity and te structures 
@@ -174,6 +174,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
   
   call geo_prs%CreateRealOption('traction', &
                'Traction of the rotor')
+  call geo_prs%CreateRealOption('Radius', &
+               'Radius of the rotor')
 
   
   !read the parameters
@@ -239,6 +241,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
       call read_actuatordisk_parametric(trim(mesh_file),ee,rr)
       trac = getreal(geo_prs,'traction')
       call write_hdf5(trac,'Traction',comp_loc)
+      radius = getreal(geo_prs,'Radius')
+      call write_hdf5(radius,'Radius', comp_loc)
 
     end if
    case default
