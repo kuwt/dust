@@ -302,15 +302,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     end do
   
   end do
-! DEBUG +++++
-! do ich = 1 , size(airfoil_table_p,2)
-!   write(*,*) trim(airfoil_table_p(1,ich)) , ' , ' , trim(airfoil_table_p(2,ich)) 
-! end do
-! write(*,*)
-! do ich = 1 , size(normalised_coord_p)
-!   write(*,*) normalised_coord_p(ich)
-! end do
-! DEBUG +++++
 
 
   ! optional output ----
