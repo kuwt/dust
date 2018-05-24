@@ -85,6 +85,9 @@ use mod_geo_postpro, only: &
 use mod_wake_pan, only: &
   t_wake_panels
 
+use mod_wake_ring, only: &
+  t_wake_rings
+
 use mod_tecplot_out, only: &
   tec_out_viz
 
@@ -132,7 +135,11 @@ integer :: nelem, nelem_out
 
 real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
 real(wp), allocatable :: vort(:), cp(:)
-real(wp), allocatable :: wvort(:), wvort_pan(:,:), wpoints(:,:), wpoints_pan(:,:,:)
+real(wp), allocatable :: wvort(:), wvort_pan(:,:), wvort_rin(:,:)
+real(wp), allocatable :: wpoints(:,:), wpoints_pan(:,:,:), wpoints_rin(:,:,:)
+!real(wp), allocatable :: wcen(:,:,:)
+integer,  allocatable :: wconn(:)
+
 integer,  allocatable :: welems(:,:)
 integer, allocatable  :: wstart(:,:)
 integer :: nelem_w
@@ -147,7 +154,9 @@ integer :: nprint, ivar
 integer, allocatable :: print_elems(:,:)
 
 ! wake ------------
-type(t_wake_panels) :: wake
+type(t_wake_panels) :: wake_pan
+type(t_wake_rings)  :: wake_rin
+type(t_elem_p), allocatable :: wake_elems(:)
 
 ! probe output ----
 character(len=max_char_len) :: in_type , str_a , filename_in , var_name
@@ -178,7 +187,6 @@ integer :: i_vars , i_var_v , i_var_p , i_var_w
 integer :: it , i1
 
 
-!write(*,*) 'DUST beginning'
 call printout(nl//'>>>>>> DUST POSTPROCESSOR beginning >>>>>>'//nl)
 call initialize_hdf5()
 
@@ -281,6 +289,8 @@ do ia = 1,n_analyses
 
    !//////////////////Visualizations\\\\\\\\\\\\\\\\\
    case('viz') 
+    !DEBUG
+    write(*,*) 'calculating a viz'
 
     ! load the geo components just once just once
     call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
@@ -379,8 +389,6 @@ do ia = 1,n_analyses
         endif
 
         !Output the results (with wake)
-        !DEBUG
-        write(*,*) ' trim(out_frmt) : ' , trim(out_frmt)
         select case (trim(out_frmt))
          case ('tecplot')
           filename = trim(filename)//'.plt'
@@ -432,6 +440,8 @@ do ia = 1,n_analyses
 
    !//////////////////Domain probes \\\\\\\\\\\\\\\\\
    case('probes')
+    !DEBUG
+    write(*,*) 'calculating probes'
 
     ! Read probe coordinates: point_list or from_file
     in_type =  getstr(sbprms,'InputType')
@@ -534,14 +544,16 @@ do ia = 1,n_analyses
      call update_points_postpro(comps, points, refs_R, refs_off)
      ! Load the results --------------------------
      call load_res(floc, comps, vort, cp, t)
-     sol = vort
+     !sol = vort
 
      ! Load the wake -----------------------------
      call load_wake_pan(floc, wpoints_pan, wstart, wvort_pan)
+     call load_wake_ring(floc, wpoints_rin, wconn, wvort_rin)
    
      call close_hdf5_file(floc)
      
-     call prepare_wake_postpro( wpoints_pan , wstart , wvort_pan , wake )
+     call prepare_wake_postpro( wpoints_pan, wpoints_rin, wstart, wconn, &
+                 wvort_pan,  wvort_rin, wake_pan, wake_rin, wake_elems )
 
      write(fid_out,'(F12.6)',advance='no') t 
 
@@ -560,14 +572,19 @@ do ia = 1,n_analyses
          end do
         end do
         ! wake contribution
-        do ic = 1 , size(wake%wake_panels,1)
-         do ie = 1 , size(wake%wake_panels,2)
-               
-          call wake%wake_panels(ic,ie)%compute_vel( rr_probes(:,ip) , u_inf , v )
+        !do ic = 1 , size(wake%wake_panels,1)
+        ! do ie = 1 , size(wake%wake_panels,2)
+        !       
+        !  call wake%wake_panels(ic,ie)%compute_vel( rr_probes(:,ip) , u_inf , v )
+        !  vel_probe = vel_probe + v/(4*pi) 
+        ! 
+        ! end do
+        !end do
+        do ie = 1, size(wake_elems)
+          call wake_elems(ie)%p%compute_vel( rr_probes(:,ip) , u_inf , v )
           vel_probe = vel_probe + v/(4*pi) 
-         
-         end do
-        end do
+        enddo
+        
 
         ! + u_inf
         vel_probe = vel_probe + u_inf
@@ -602,7 +619,10 @@ do ia = 1,n_analyses
     deallocate(rr_probes,sol)
 
 
+   !//////////////////Flow Field \\\\\\\\\\\\\\\\\
    case('flow_field')
+    !DEBUG
+    write(*,*) 'calculating a flowfield'
 
     allocate(vars_name(3)) ; vars_name = ' '
     allocate(vars_n   (3)) ; vars_n = 0
@@ -724,21 +744,20 @@ do ia = 1,n_analyses
      call update_points_postpro(comps, points, refs_R, refs_off)
      ! Load the results --------------------------
      call load_res(floc, comps, vort, cp, t)
-     sol = vort
+     !sol = vort
 
      ! Load the wake -----------------------------
      call load_wake_pan(floc, wpoints_pan, wstart, wvort_pan)
+     call load_wake_ring(floc, wpoints_rin, wconn, wvort_rin)
    
      call close_hdf5_file(floc)
      
-     call prepare_wake_postpro( wpoints_pan , wstart , wvort_pan , wake )
+     call prepare_wake_postpro( wpoints_pan, wpoints_rin, wstart, wconn, &
+                 wvort_pan,  wvort_rin, wake_pan, wake_rin, wake_elems )
 
      ! Compute velocity --------------------------
      write(filename,'(A,I4.4,A)') trim(basename)//'_'//trim(an_name)//&
                                                             '_',it,'.vtr'
-!    !CHECK
-!    fid_out = 21
-!    open(unit=fid_out,file=trim(filename)//'_box.dat')
      ip = 0
      ! Loop over the nodes of the box
      do iz = 1 , size(zbox)
@@ -760,16 +779,22 @@ do ia = 1,n_analyses
            end do
           end do
           ! wake contribution
-          do ic = 1 , size(wake%wake_panels,1)
-           do ie = 1 , size(wake%wake_panels,2)
-                 
-            call wake%wake_panels(ic,ie)%compute_vel( &
-                 (/ xbox(ix) , ybox(iy) , zbox(iz) /) , u_inf , v )
-            vel_probe = vel_probe + v/(4*pi) 
-           
-           end do
-          end do
+          !do ic = 1 , size(wake%wake_panels,1)
+          ! do ie = 1 , size(wake%wake_panels,2)
+          !       
+          !  call wake%wake_panels(ic,ie)%compute_vel( &
+          !       (/ xbox(ix) , ybox(iy) , zbox(iz) /) , u_inf , v )
+          !  vel_probe = vel_probe + v/(4*pi) 
+          ! 
+          ! end do
+          !end do
   
+          do ie = 1, size(wake_elems)
+            call wake_elems(ie)%p%compute_vel( &
+                     (/ xbox(ix) , ybox(iy) , zbox(iz) /) , u_inf , v )
+            vel_probe = vel_probe + v/(4*pi) 
+          enddo
+         
           ! + u_inf
           vel_probe = vel_probe + u_inf
           
@@ -833,68 +858,6 @@ call printout(nl//'<<<<<< DUST POSTPROCESSOR end       <<<<<<'//nl)
 !----------------------------------------------------------------------
 contains
 !----------------------------------------------------------------------
-!----------------------------------------------------------------------
-
-!subroutine load_comp(floc, components_names, elems, points)
-! integer(h5loc), intent(in) :: floc 
-! character(len=*), allocatable, intent(in) :: components_names(:)
-! integer, allocatable, intent(out) :: elems(:,:)
-! real(wp), allocatable, intent(out) :: points(:,:)
-!
-! integer :: nelem, npoints
-! integer(h5loc) :: gloc1, gloc2
-! integer :: i_comp, n_comp
-! character(len=max_char_len) :: cname, cname2
-!
-! real(wp), allocatable :: points_tmp(:,:), points_read(:,:)
-! integer, allocatable ::  elems_tmp(:,:), elems_read(:,:)
-!
-!  call open_hdf5_group(floc,'Components',gloc1)
-!  call read_hdf5(n_comp,'NComponents',gloc1)
-!  
-!  nelem = 0; npoints = 0;
-!
-!  do i_comp = 1, n_comp
-!    write(cname,'(A,I3.3)') 'Comp',i_comp
-!    call open_hdf5_group(gloc1,trim(cname),gloc2)
-!
-!    call read_hdf5(cname2, 'CompName', gloc2)
-!    !read the components contents only if it is in the list
-!    if(IsInList(cname2, components_names) .or. all_comp) then
-!
-!      call read_hdf5_al(elems_read, 'ee', gloc2)
-!      call read_hdf5_al(points_read,'rr', gloc2)
-!      !increase the connectivity indexes
-!      where(elems_read .gt. 0)
-!        elems_read = elems_read + npoints
-!      end where
-!
-!
-!      allocate(elems_tmp(4,nelem+size(elems_read,2))) 
-!      allocate(points_tmp(3,npoints+size(points_read,2)))
-!
-!      if (allocated(elems)) elems_tmp(:,1:nelem) = elems
-!      if (allocated(points)) points_tmp(:,1:npoints) = points
-!
-!      elems_tmp(:,nelem+1:ubound(elems_tmp,2)) = elems_read
-!      points_tmp(:,npoints+1:ubound(points_tmp,2)) = points_read
-!
-!      call move_alloc(elems_tmp, elems)
-!      call move_alloc(points_tmp, points)
-!      deallocate(elems_read, points_read)
-!
-!
-!
-!      nelem = nelem + size(elems_read,2)
-!      npoints = npoints + size(points_read,2)
-!
-!    endif
-!    
-!    call close_hdf5_group(gloc2)
-!  enddo
-!
-!end subroutine
-
 !----------------------------------------------------------------------
 
 subroutine load_refs(floc, refs_R, refs_off)
@@ -975,11 +938,18 @@ subroutine load_res(floc, comps, vort, cp, t)
       vort(offset+1:offset+nelems_comp) = vort_read
       cp(offset+1:offset+nelems_comp) = cp_read
       offset = offset + nelems_comp
+      do ie = 1,nelems_comp
+        if(associated(comps(icomp)%el(ie)%idou)) &
+                        comps(icomp)%el(ie)%idou = vort_read(ie)
+      enddo
      type is(t_actdisk)
       do ie = 1,nelems_comp
         vort(offset+1:offset+el(ie)%n_ver) = vort_read(ie)
         cp(offset+1:offset+el(ie)%n_ver) = cp_read(ie)
         offset = offset + el(ie)%n_ver
+        if(associated(comps(icomp)%el(ie)%idou)) then
+                        comps(icomp)%el(ie)%idou = vort_read(ie)
+        endif
       enddo
     end select
 
@@ -1013,11 +983,11 @@ end subroutine load_wake_pan
 
 !----------------------------------------------------------------------
 
-subroutine load_wake_ring(floc, wpoints, wconn, wcen, wvort)
+subroutine load_wake_ring(floc, wpoints, wconn, wvort)
  integer(h5loc), intent(in) :: floc 
  real(wp), allocatable, intent(out) :: wpoints(:,:,:)
  integer, allocatable, intent(out) :: wconn(:)
- real(wp), allocatable, intent(out) :: wcen(:,:,:)
+ !real(wp), allocatable, intent(out) :: wcen(:,:,:)
  real(wp), allocatable, intent(out) :: wvort(:,:)
 
  integer(h5loc) :: gloc
@@ -1026,7 +996,7 @@ subroutine load_wake_ring(floc, wpoints, wconn, wcen, wvort)
   
   call read_hdf5_al(wpoints,'WakePoints',gloc)
   call read_hdf5_al(wconn,'Conn_pe',gloc)
-  call read_hdf5_al(wcen,'WakeCenters',gloc)
+!  call read_hdf5_al(wcen,'WakeCenters',gloc)
   call read_hdf5_al(wvort,'WakeVort',gloc)
 
   call close_hdf5_group(gloc)

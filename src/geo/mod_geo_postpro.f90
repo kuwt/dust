@@ -109,6 +109,9 @@ use mod_geometry, only: &
 use mod_wake_pan, only: &
   t_wake_panels
 
+use mod_wake_ring, only: &
+  t_wake_rings
+
 use mod_stringtools, only: &
   LowCase, IsInList
 
@@ -743,84 +746,125 @@ end subroutine prepare_geometry_postpro
 
 !----------------------------------------------------------------------
 
-subroutine prepare_wake_postpro( wpoints , wstart , wvort , wake )
- real(wp), allocatable, intent(in) :: wpoints(:,:,:)
- integer , allocatable, intent(in) :: wstart(:,:)
- real(wp), allocatable, intent(in) :: wvort(:,:)
- type(t_wake_panels), target, intent(out) :: wake
+subroutine prepare_wake_postpro( wpoints_pan, wpoints_rin, wstart, wconn, &
+                  wvort_pan, wvort_rin,  wake_pan, wake_rin, wake_elems )
+ real(wp), intent(in) :: wpoints_pan(:,:,:)
+ real(wp), intent(in) :: wpoints_rin(:,:,:)
+ integer , intent(in) :: wstart(:,:)
+ integer , intent(in) :: wconn(:)
+ real(wp), intent(in) :: wvort_pan(:,:)
+ real(wp), intent(in) :: wvort_rin(:,:)
+ type(t_wake_panels), target, intent(out) :: wake_pan
+ type(t_wake_rings), target,  intent(out) :: wake_rin
+ type(t_elem_p), allocatable, intent(out) :: wake_elems(:)
 
- integer :: n_wake_stripes , npan
+
+ integer :: n_wake_stripes , npan, ndisks, nrows
  integer :: nsides
  integer :: p1 , p2 
- integer :: ip , iw
+ integer :: ip , iw, id, ir, iconn, ie
+ integer :: npt_disk
+ integer, allocatable :: disk_pts(:)
 
-!!DEBUG
-!write(*,*) ' shape(wpoints) : ' , shape(wpoints)
-!write(*,*) ' shape(wstart ) : ' , shape(wstart )
-!write(*,*) ' shape(wvort  ) : ' , shape(wvort  )
+  !First get all the panel wake
+  n_wake_stripes = size(wstart ,2)
+  npan           = size(wvort_pan  ,2) 
 
- n_wake_stripes = size(wstart ,2)
- npan           = size(wvort  ,2) 
+  !TODO: check if the following dimensions are right
+  wake_pan%npan = npan
+  wake_pan%n_wake_stripes = n_wake_stripes
+  wake_pan%wake_len = npan
+! wake%n_wake_points = ...
+  allocate(wake_pan%i_start_points(2,wake_pan%n_wake_stripes))
+  allocate(wake_pan%w_points(3,wake_pan%n_wake_points,npan+1))
+  allocate(wake_pan%wake_panels(wake_pan%n_wake_stripes,npan))
+  allocate(wake_pan%ivort(wake_pan%n_wake_stripes,npan))
 
- !TODO: check if the following dimensions are right
- wake%npan = npan
- wake%n_wake_stripes = n_wake_stripes
- wake%wake_len = npan
-!wake%n_wake_points = ...
- allocate(wake%i_start_points(2,wake%n_wake_stripes))
- allocate(wake%w_points(3,wake%n_wake_points,npan+1))
- allocate(wake%wake_panels(wake%n_wake_stripes,npan))
- allocate(wake%ivort(wake%n_wake_stripes,npan))
+  wake_pan%i_start_points = wstart
+  wake_pan%w_points       = wpoints_pan
 
- wake%i_start_points = wstart
- wake%w_points       = wpoints
+  nsides = 4 
+  do ip = 1,npan
+    do iw=1,wake_pan%n_wake_stripes
+     wake_pan%wake_panels(iw,ip)%idou => wake_pan%ivort(iw,ip)
+     allocate(wake_pan%wake_panels(iw,ip)%ver(3,nsides))
+     allocate(wake_pan%wake_panels(iw,ip)%cen(3))
+     allocate(wake_pan%wake_panels(iw,ip)%nor(3))
+     allocate(wake_pan%wake_panels(iw,ip)%tang(3,2))
+     allocate(wake_pan%wake_panels(iw,ip)%edge_vec(3,nsides))
+     allocate(wake_pan%wake_panels(iw,ip)%edge_len(nsides))
+     allocate(wake_pan%wake_panels(iw,ip)%edge_uni(3,nsides))
+    enddo
+  enddo
 
- nsides = 4 
- do ip = 1,npan
-   do iw=1,wake%n_wake_stripes
-    wake%wake_panels(iw,ip)%idou => wake%ivort(iw,ip)
-    allocate(wake%wake_panels(iw,ip)%ver(3,nsides))
-    allocate(wake%wake_panels(iw,ip)%cen(3))
-    allocate(wake%wake_panels(iw,ip)%nor(3))
-    allocate(wake%wake_panels(iw,ip)%tang(3,2))
-!   allocate(wake%wake_panels(iw,ip)%verp(3,nsides))
-    allocate(wake%wake_panels(iw,ip)%edge_vec(3,nsides))
-    allocate(wake%wake_panels(iw,ip)%edge_len(nsides))
-    allocate(wake%wake_panels(iw,ip)%edge_uni(3,nsides))
-!   allocate(wake%wake_panels(iw,ip)%cosTi(nsides))
-!   allocate(wake%wake_panels(iw,ip)%sinTi(nsides))
-   enddo
- enddo
-
- ! Build wake structure:
- ! + use wstart and wpoints to:
- !   - build connectivity
- !   - allocate and compute geometric quantities
- ! +  assign the vortex intenisty
-
-!!DEBUG
-!write(*,*) ' wake%n_wake_stripes : ' , wake%n_wake_stripes
-
- do ip = 1,wake%wake_len
-  do iw = 1,wake%n_wake_stripes
-      p1 = wake%i_start_points(1,iw)
-      p2 = wake%i_start_points(2,iw)
-      call calc_geo_data_postpro(wake%wake_panels(iw,ip), &
-           reshape((/wake%w_points(:,p1,ip),   wake%w_points(:,p2,ip), &
-                     wake%w_points(:,p2,ip+1), wake%w_points(:,p1,ip+1)/),&
-                                                                  (/3,4/)))
-      wake%wake_panels(iw,ip)%idou = wvort(iw,ip) 
+  do ip = 1,wake_pan%wake_len
+   do iw = 1,wake_pan%n_wake_stripes
+       p1 = wake_pan%i_start_points(1,iw)
+       p2 = wake_pan%i_start_points(2,iw)
+       call calc_geo_data_postpro(wake_pan%wake_panels(iw,ip), &
+       reshape((/wake_pan%w_points(:,p1,ip),   wake_pan%w_points(:,p2,ip), &
+                 wake_pan%w_points(:,p2,ip+1), wake_pan%w_points(:,p1,ip+1)/),&
+                                                                   (/3,4/)))
+       wake_pan%wake_panels(iw,ip)%idou = wvort_pan(iw,ip) 
+   end do
   end do
- end do
 
-! Add the influence of the wake in the velocity computation 
-!allocate(wake%pan_p(wake%n_wake_stripes))
-!do iw = 1,wake%n_wake_stripes
-!  wake%pan_p(iw)%p => wake%wake_panels(iw,1)
-!enddo
+  !Then get all the ring wake
+  ndisks = size(wvort_rin,1)
+  nrows = size(wvort_rin,2)
+  wake_rin%ndisks = ndisks; wake_rin%wake_len = nrows
+  allocate(wake_rin%wake_rings(wake_rin%ndisks,wake_rin%wake_len))
+  allocate(wake_rin%ivort(wake_rin%ndisks,wake_rin%wake_len))
 
+  do id = 1,wake_rin%ndisks
+    !reverse the connectivity, from pts2disk to disk2pts
+    npt_disk = count(wconn .eq. id)
+    allocate(disk_pts(npt_disk))
+    iconn = 1
+    do ip = 1,size(wconn)
+      if(wconn(ip) .eq. id) then
+        disk_pts(iconn) = ip
+        iconn = iconn+1
+      endif
+    enddo
 
-!allocate(wake%elem
+    nsides = npt_disk
+    do ir = 1,wake_rin%wake_len
+      wake_rin%wake_rings(id,ir)%idou => wake_rin%ivort(id,ir)
+      wake_rin%wake_rings(id,ir)%n_ver = nsides
+      allocate(wake_rin%wake_rings(id,ir)%ver(3,nsides))
+      allocate(wake_rin%wake_rings(id,ir)%cen(3))
+      allocate(wake_rin%wake_rings(id,ir)%nor(3))
+      allocate(wake_rin%wake_rings(id,ir)%tang(3,2))
+      allocate(wake_rin%wake_rings(id,ir)%edge_vec(3,nsides))
+      allocate(wake_rin%wake_rings(id,ir)%edge_len(nsides))
+      allocate(wake_rin%wake_rings(id,ir)%edge_uni(3,nsides))
+      call calc_geo_data_postpro(wake_rin%wake_rings(id,ir), &
+                  wpoints_rin(:,disk_pts,ir))
+      wake_rin%wake_rings(id,ir)%idou = wvort_rin(id,ir)
+      
+    enddo
+    deallocate(disk_pts)
+  enddo
+
+  !Stitch together everything
+  allocate(wake_elems(wake_pan%n_wake_stripes*wake_pan%wake_len + &
+                      wake_rin%ndisks*wake_rin%wake_len))
+  ie = 1
+  do ip = 1,wake_pan%wake_len
+   do iw = 1,wake_pan%n_wake_stripes
+     wake_elems(ie)%p => wake_pan%wake_panels(iw,ip)
+     ie = ie + 1
+   end do
+  end do
+
+  do ir = 1,wake_rin%wake_len
+    do id = 1,wake_rin%ndisks
+      wake_elems(ie)%p => wake_rin%wake_rings(id,ir)
+      ie = ie+1
+    enddo
+  enddo
+
 
 end subroutine prepare_wake_postpro
 

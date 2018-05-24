@@ -61,7 +61,7 @@ end type
 type, abstract :: c_elem
 
   !> Intensity of the doublets/vortexes
-  real(wp), pointer :: idou
+  real(wp), pointer :: idou => null()
   real(wp)          :: didou_dt
  
   !> Element id
