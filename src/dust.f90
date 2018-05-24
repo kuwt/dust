@@ -362,12 +362,14 @@ do it = 1,nstep
 
   !------ Update the explicit part ------
   call solve_liftlin(elems_ll, elems_tot, &
-                 (/ wake_panels%pan_p, wake_rings%pan_p/), uinf, airfoil_data)
+                 (/ wake_panels%pan_p, wake_rings%pan_p/), sim_param, airfoil_data)
 
   !------ Compute loads -------
+  ! vortex rings and 3d-panels
   do i_el = 1 , size(elems)
     call elems(i_el)%p%compute_cp(elems,uinf)
   end do
+  ! lifting line in solve_liftlin
 
   if ((debug_level .ge. 10).and.time_2_debug_out) then
     call debug_printout_loads(elems, basename_debug, it)

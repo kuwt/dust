@@ -114,7 +114,8 @@ subroutine save_status(geo, wake_pan, wake_rin, sim_params, it, time, run_id)
  integer :: iref, nref
  character(len=max_char_len) :: ref_name
  integer :: ie, ne
- real(wp), allocatable :: vort(:), cp(:)
+ real(wp), allocatable :: vort(:), cp(:) , pres(:)
+ real(wp), allocatable :: dforce(:,:) 
  real(wp), allocatable :: points_w(:,:,:), cent(:,:,:)
  integer, allocatable :: conn_pe(:)
  integer :: ir, id, ip, np
@@ -151,14 +152,18 @@ subroutine save_status(geo, wake_pan, wake_rin, sim_params, it, time, run_id)
     call new_hdf5_group(gloc2, 'Solution', gloc3)
 
     ne = size(geo%components(icomp)%el)
-    allocate(vort(ne), cp(ne))
+    allocate(vort(ne), cp(ne) , pres(ne) , dforce(ne,3) )
     do ie = 1,ne
      vort(ie) = geo%components(icomp)%el(ie)%idou
      cp(ie) = geo%components(icomp)%el(ie)%cp
+     pres(ie) = geo%components(icomp)%el(ie)%pres
+     dforce(ie,:) = geo%components(icomp)%el(ie)%dforce
     enddo
     call write_hdf5(vort,'Vort',gloc3)
     call write_hdf5(cp,'Cp',gloc3)
-    deallocate(vort, cp)
+    call write_hdf5(pres,'Pres',gloc3)
+    call write_hdf5(dforce,'dF',gloc3)
+    deallocate(vort, cp, pres, dforce)
 
     call close_hdf5_group(gloc3)
     call close_hdf5_group(gloc2)

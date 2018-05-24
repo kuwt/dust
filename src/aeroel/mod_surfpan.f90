@@ -54,6 +54,9 @@ use mod_doublet, only: &
 use mod_linsys_vars, only: &
   t_linsys
 
+use mod_sim_param, only: &
+  t_sim_param
+
 use mod_math, only: &
   cross
 
@@ -84,6 +87,8 @@ contains
   procedure, pass(this) :: compute_vel      => compute_vel_surfpan
   procedure, pass(this) :: compute_psi      => compute_psi_surfpan
   procedure, pass(this) :: compute_cp       => compute_cp_surfpan
+  procedure, pass(this) :: compute_pres     => compute_pres_surfpan
+  procedure, pass(this) :: compute_dforce   => compute_dforce_surfpan
 
 end type
 
@@ -620,6 +625,69 @@ subroutine compute_cp_surfpan(this, elems, uinf) !, uinf)
  
 
 end subroutine compute_cp_surfpan
+
+!----------------------------------------------------------------------
+
+!> Compute an approximate value of the mean pressure on the actual element
+!!
+subroutine compute_pres_surfpan(this, elems, sim_param)
+  class(t_surfpan), intent(inout) :: this
+  type(t_elem_p), intent(in) :: elems(:)
+  type(t_sim_param), intent(in) :: sim_param
+
+  real(wp) :: vel_phi(3)
+
+  integer :: i_e
+
+  ! perturbation velocity, u ---------------------------------
+  ! Compute velocity from the potential (mu = -phi), exploiting the stencil
+  ! contained in pot_vel_stencil
+  vel_phi = 0.0_wp
+  do i_e = 1 , this%n_ver
+    if ( associated(this%neigh(i_e)%p) ) then
+      vel_phi = vel_phi + &
+        this%pot_vel_stencil(:,i_e) * (this%neigh(i_e)%p%idou - this%idou)
+    ! else
+    end if
+  end do
+
+  if (.not. allocated(this%vel)) then !
+    allocate(this%vel(3)) ; this%vel = 0.0_wp
+    write(*,*) 'allocating this%vel'
+  end if
+
+  vel_phi  = - vel_phi    ! mu = - phi
+
+  ! velocity, U = u_t \hat{t} + u_n \hat{n} + U_inf ----------
+  this%vel = vel_phi - sum(vel_phi*this%nor)*this%nor    +  &
+             this%nor * sum(this%nor * (-sim_param%u_inf+this%ub) ) +  &
+             sim_param%u_inf
+
+  ! pressure -------------------------------------------------
+  ! steady problems  : P = P_inf - 0.5*rho_inf*V^2 - rho_inf*dphi/dt 
+  this%pres  = sim_param%P_inf &
+    - 0.5_wp * sim_param%rho_inf * norm2(this%vel)**2.0_wp  &
+             + sim_param%rho_inf * this%didou_dt
+ 
+
+end subroutine compute_pres_surfpan
+
+!----------------------------------------------------------------------
+
+! Compute the elementary force on the on the actual element
+!!
+subroutine compute_dforce_surfpan(this, elems, sim_param)
+  class(t_surfpan), intent(inout) :: this
+  type(t_elem_p), intent(in) :: elems(:)
+  type(t_sim_param), intent(in) :: sim_param
+
+  ! first rough approximation
+  ! vec{F} = - this%pres * vec{n}
+
+  this%dforce = - this%pres * this%nor
+
+
+end subroutine compute_dforce_surfpan 
 
 !----------------------------------------------------------------------
 

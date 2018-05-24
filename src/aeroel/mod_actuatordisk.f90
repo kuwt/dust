@@ -80,6 +80,8 @@ contains
   procedure, pass(this) :: compute_vel      => compute_vel_actdisk
   procedure, pass(this) :: compute_psi      => compute_psi_actdisk
   procedure, pass(this) :: compute_cp       => compute_cp_actdisk
+  procedure, pass(this) :: compute_pres     => compute_pres_actdisk
+  procedure, pass(this) :: compute_dforce   => compute_dforce_actdisk
 end type
 
 character(len=*), parameter :: this_mod_name='mod_actuatordisk'
@@ -262,6 +264,44 @@ subroutine compute_cp_actdisk (this, elems, uinf)
 
 end subroutine compute_cp_actdisk 
 
+!----------------------------------------------------------------------
+
+subroutine compute_pres_actdisk (this, elems, sim_param)
+ class(t_actdisk), intent(inout) :: this
+ type(t_elem_p), intent(in) :: elems(:)
+ type(t_sim_param), intent(in) :: sim_param
+
+ character(len=*), parameter      :: this_sub_name='compute_pres_actdisk'
+ 
+  call error(this_sub_name, this_mod_name, 'This was not supposed to &
+  &happen, a team of professionals is underway to remove the evidence')
+  
+!! only steady loads: steady data from table: L -> gam -> p_equiv
+!this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &
+!        norm2(uinf - this%ub) * this%dy / this%area * &
+!             elems(this%id)%p%idou  
+
+end subroutine compute_pres_actdisk 
+
+!----------------------------------------------------------------------
+
+subroutine compute_dforce_actdisk (this, elems, sim_param)
+ class(t_actdisk), intent(inout) :: this
+ type(t_elem_p), intent(in) :: elems(:)
+ type(t_sim_param), intent(in) :: sim_param
+
+ character(len=*), parameter      :: this_sub_name='compute_dforce_actdisk'
+ 
+  call error(this_sub_name, this_mod_name, 'This was not supposed to &
+  &happen, a team of professionals is underway to remove the evidence')
+  
+!! only steady loads: steady data from table: L -> gam -> p_equiv
+!this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &
+!        norm2(uinf - this%ub) * this%dy / this%area * &
+!             elems(this%id)%p%idou  
+
+end subroutine compute_dforce_actdisk
+ 
 !----------------------------------------------------------------------
 
 subroutine update_actdisk(elems_ad, linsys, sim_param)

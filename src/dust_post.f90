@@ -296,7 +296,7 @@ do ia = 1,n_analyses
   out_press = isInList('press',var_names)
   out_cp = isInList('cp',var_names)
 
-  !DEBUG
+  !write to terminal
   write(*,*) ' trim(an_type) : ' , trim(an_type)
 
   !Fork the different kind of analyses
@@ -307,8 +307,7 @@ do ia = 1,n_analyses
 
     ! load the geo components just once just once
     call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
-    !TODO: here get the run id
-    call load_components_postpro(comps, points, nelem, elems, floc, & 
+    call load_components_postpro(comps, points, nelem, floc, & 
                                  components_names,  all_comp)
 
     call close_hdf5_file(floc)
@@ -327,38 +326,24 @@ do ia = 1,n_analyses
       comps_meas(ic) = getstr(sbprms,'CompName') 
     end do
     !TODO:loads 
-    ! from string to id.s ic
+    ! from string to id.s of the ic
     allocate( i_comps_meas(n_comps_meas) ) ; i_comps_meas = 0
     do ic = 1 , n_comps_meas 
       ! loop over the ref.sys 
       do ic2 = 1 , size(comps)
-!       !DEBUG
-!       write(*,*) ' trim(comps_meas(',ic,') : ', trim(comps_meas(ic)) 
-!       write(*,*) ' trim(comps(',ic,')%ref_tag : ', trim(comps(ic)%comp_name) 
         if ( trim(comps_meas(ic)) .eq. trim(comps(ic2)%comp_name) ) then
-          i_comps_meas(ic) = ic2 ! comps(ic2)%ref_id
-!         !DEBUG
-!         write(*,*) ' i_comps_meas(',ic,') = ', ic2
+          i_comps_meas(ic) = ic2 
           exit
         end if
       end do
     end do
 
-!   ! Allocate and point to sol
-!   !   part of sol_p will remain equal to 0.0, if only some
-!   !   components are considered for the loads
+!   ! Allocate sol_p: ...%cp is not a pointer
+!     comps(ic)%el(ie)%cp = sol_p(ip) in the loop
     allocate(sol_p(nelem)) ; sol_p = 0.0_wp
-!   ip = 0
-!   do ic = 1 , size(comps)
-!    do ie = 1 , size(comps(ic)%el)
-!     ip = ip + 1
-!     comps(ic)%el(ie)%cp => sol_p(ip) 
-!    end do
-!   end do
 
     ref_tag = getstr(sbprms,'Reference_Tag')
 
-!   call dat_out_probes_header( fid_out , rr_probes , vars_str )
     call dat_out_loads_header( fid_out , comps_meas , ref_tag )
 
     ! Find the id of the reference where the loads must be projected
@@ -369,13 +354,6 @@ do ia = 1,n_analyses
     do it = lbound(refs_tag,1) , ubound(refs_tag,1)
       if ( trim(refs_tag(it)) .eq. ref_tag ) ref_id = it
     end do
-!   !DEBUG
-!   do ic = 1 , n_comps_meas
-!     write(*,*) ' comps_meas , i_comps_meas : ' , trim(comps_meas(ic)) , i_comps_meas(ic) 
-!   end do
-!   write(*,*) ' ref_tag , ref_id : ' , trim(ref_tag) , ref_id
-
-
 
     do it=an_start, an_end, an_step
 
@@ -405,10 +383,6 @@ do ia = 1,n_analyses
         comps(ic)%el(ie)%cp = sol_p(ip) 
        end do
       end do
-      
-!     !DEBUG
-!     write(*,*) ' sol_p ' 
-!     write(*,*)   sol_p
 
       call close_hdf5_file(floc)
 
@@ -423,27 +397,17 @@ do ia = 1,n_analyses
       
         ! Loads from the ic-th component in the base ref.frame
         do ie = 1 , size(comps( i_comps_meas(ic) )%el )
-          F_bas1 = - comps( i_comps_meas(ic) )%el(ie)%cp   * &
-                     comps( i_comps_meas(ic) )%el(ie)%area * &   ! update
-                     comps( i_comps_meas(ic) )%el(ie)%nor        ! update
-          F_bas = F_bas + F_bas1   ! comps( i_comps_meas(ic) )%el(ie)%cp   * &
-                                   ! comps( i_comps_meas(ic) )%el(ie)%area * &   ! update
-                                   ! comps( i_comps_meas(ic) )%el(ie)%nor        ! update
-!         !CHECK
-!         write(*,*) ' ie , cp , area , norm ' , ie , &
-!                         comps( i_comps_meas(ic) )%el(ie)%cp   , &   ! update
-!                         comps( i_comps_meas(ic) )%el(ie)%area , &   ! update
-!                         comps( i_comps_meas(ic) )%el(ie)%nor        ! update
+!         F_bas1 = - comps( i_comps_meas(ic) )%el(ie)%cp   * &
+!                    comps( i_comps_meas(ic) )%el(ie)%area * &   ! update
+!                    comps( i_comps_meas(ic) )%el(ie)%nor        ! update
+          F_bas1 = comps( i_comps_meas(ic) )%el(ie)%dforce
 
-          M_bas = cross( comps( i_comps_meas(ic) )%el(ie)%cen &
-                        -refs_off(:,ref_id) , F_bas1 )
+          F_bas = F_bas + F_bas1
+
+          M_bas = M_bas + cross( comps( i_comps_meas(ic) )%el(ie)%cen &
+                         -refs_off(:,ref_id) , F_bas1 )
 
         end do
-
-!       !CHECK
-!       write(*,*) ' F_bas = ' , F_bas
-
-        write(*,'(A,I0,A,3F12.3)') ' ic : ' , ic , ' F_bas : ' , F_bas
 
         ! From the base ref.sys to the chosen ref.sys (offset and rotation)
         F_ref = F_ref + matmul( &
@@ -453,15 +417,7 @@ do ia = 1,n_analyses
 
       end do
 
-      !DEBUG
-      write(*,'(A,I0)')     ' ref_id : ' , ref_id
-      write(*,'(A,3F12.3)') ' F_ref  : ' , F_ref
-     
-      write(*,*)
-
-!     !CHECK
-!     write(*,*) ' F_ref = ' , F_ref
-
+      ! Update output file
       write(fid_out,'(F12.6)'  ,advance='no') t 
       write(fid_out,'(3F16.6)' ,advance='no') F_ref
       write(fid_out,'(3F16.6)' ,advance='no') M_ref
@@ -1132,7 +1088,7 @@ end subroutine load_refs
 
 subroutine load_res(floc, comps, vort, cp, t)
  integer(h5loc), intent(in) :: floc 
- type(t_geo_component), intent(in) :: comps(:)
+ type(t_geo_component), intent(inout) :: comps(:)
  real(wp), allocatable, intent(out) :: vort(:)
  real(wp), allocatable, intent(out) :: cp(:)
  real(wp), intent(out) :: t
@@ -1142,6 +1098,7 @@ subroutine load_res(floc, comps, vort, cp, t)
  integer(h5loc) :: gloc1, gloc2, gloc3
  character(len=max_char_len) :: cname
  real(wp), allocatable :: vort_read(:), cp_read(:)
+ real(wp), allocatable :: pres_read(:), dforce_read(:,:)
 
   ncomps = size(comps)
   nelems = 0
@@ -1170,6 +1127,18 @@ subroutine load_res(floc, comps, vort, cp, t)
     !call read_hdf5(cp(offset+1:offset+nelems_comp),'Cp',gloc3)
     call read_hdf5_al(vort_read,'Vort',gloc3)
     call read_hdf5_al(cp_read,'Cp',gloc3)
+    call read_hdf5_al(pres_read,'Pres',gloc3)
+    call read_hdf5_al(dforce_read,'dF',gloc3)
+
+!   TODO: check if it is general enough *******
+!   TODO: check if something is broken after changing intent(in to inout) for comps
+    do ie = 1 , nelems_comp
+      comps(icomp)%el(ie)%pres = pres_read(ie) 
+      if( .not. allocated(comps(icomp)%el(ie)%dforce) ) then
+        allocate(comps(icomp)%el(ie)%dforce(3))
+      end if
+      comps(icomp)%el(ie)%dforce = dforce_read(ie,:) 
+    end do
 
     call close_hdf5_group(gloc3)
     call close_hdf5_group(gloc2)

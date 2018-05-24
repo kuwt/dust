@@ -47,6 +47,9 @@ use mod_doublet, only: &
 use mod_linsys_vars, only: &
   t_linsys
 
+use mod_sim_param, only: &
+  t_sim_param
+
 use mod_param, only: &
   wp, pi
 
@@ -76,6 +79,8 @@ contains
   procedure, pass(this) :: compute_vel      => compute_vel_vortring
   procedure, pass(this) :: compute_psi      => compute_psi_vortring
   procedure, pass(this) :: compute_cp       => compute_cp_vortring
+  procedure, pass(this) :: compute_pres     => compute_pres_vortring
+  procedure, pass(this) :: compute_dforce   => compute_dforce_vortring
 end type
 
 
@@ -439,6 +444,60 @@ subroutine compute_cp_vortring(this, elems, uinf)
 ! end if
 
 end subroutine compute_cp_vortring
+
+!----------------------------------------------------------------------
+
+!> Compute an approximate value of the mean DELTA pressure on the actual element
+!!
+!! pres = " DELTA pressure = ( pressure lower - pressure upper ) "
+!!  s.t. vec{dforce} = pres * vec{n}  ( since vec{n} = vec{n_upper} )
+!!
+!! see compute_dforce_vortring
+subroutine compute_pres_vortring(this, elems, sim_param)
+  class(t_vortring), intent(inout) :: this
+  type(t_elem_p), intent(in) :: elems(:)
+  type(t_sim_param), intent(in) :: sim_param
+
+  integer  :: i_stripe , i_c
+  real(wp) :: dG_dt
+
+  this%pres = 0.0_wp
+
+  i_stripe = size(this%stripe_elem)
+
+  dG_dt = this%didou_dt
+
+  if ( i_stripe .gt. 1 ) then
+    this%pres =  sim_param%rho_inf * & 
+          ( norm2(sim_param%u_inf - this%ub) * this%dy / this%area * &
+               ( elems(this%id)%p%idou - this%stripe_elem(i_stripe-1)%p%idou ) + &
+               dG_dt )
+  else
+    this%pres =  sim_param%rho_inf * &
+          ( norm2(sim_param%u_inf - this%ub) * this%dy / this%area * &
+                 elems(this%id)%p%idou + &
+               dG_dt )
+  end if
+
+
+end subroutine compute_pres_vortring
+
+!----------------------------------------------------------------------
+
+! Compute the elementary force on the on the actual element
+!!
+subroutine compute_dforce_vortring(this, elems, sim_param)
+  class(t_vortring), intent(inout) :: this
+  type(t_elem_p), intent(in) :: elems(:)
+  type(t_sim_param), intent(in) :: sim_param
+
+  ! first rough approximation
+  ! vec{F} = this%pres * vec{n}
+
+  this%dforce = this%pres * this%nor
+
+
+end subroutine compute_dforce_vortring
 
 !----------------------------------------------------------------------
 

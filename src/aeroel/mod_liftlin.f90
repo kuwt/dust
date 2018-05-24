@@ -49,11 +49,15 @@ use mod_doublet, only: &
 use mod_linsys_vars, only: &
   t_linsys
 
+use mod_sim_param, only: &
+  t_sim_param
+
 use mod_c81, only: &
   t_aero_tab, interp_aero_coeff
 
 use mod_aero_elements, only: &
   c_elem, t_elem_p
+
 !----------------------------------------------------------------------
 
 implicit none
@@ -80,6 +84,8 @@ contains
   procedure, pass(this) :: compute_vel      => compute_vel_liftlin
   procedure, pass(this) :: compute_psi      => compute_psi_liftlin
   procedure, pass(this) :: compute_cp       => compute_cp_liftlin
+  procedure, pass(this) :: compute_pres     => compute_pres_liftlin
+  procedure, pass(this) :: compute_dforce   => compute_dforce_liftlin
 end type
 
 character(len=*), parameter :: this_mod_name='mod_vortring'
@@ -247,12 +253,13 @@ subroutine compute_vel_liftlin (this, pos, uinf, vel)
 end subroutine compute_vel_liftlin
 
 !----------------------------------------------------------------------
+
 subroutine compute_cp_liftlin (this, elems, uinf)
  class(t_liftlin), intent(inout) :: this
  type(t_elem_p), intent(in) :: elems(:)
  real(wp), intent(in) :: uinf(:)
 
- character(len=*), parameter      :: this_sub_name='add_liftlin_liftlin'
+ character(len=*), parameter      :: this_sub_name='compute_cp_liftlin'
  
   call error(this_sub_name, this_mod_name, 'This was not supposed to &
   &happen, a team of professionals is underway to remove the evidence')
@@ -264,6 +271,44 @@ subroutine compute_cp_liftlin (this, elems, uinf)
 
 end subroutine compute_cp_liftlin 
 
+!----------------------------------------------------------------------
+
+subroutine compute_pres_liftlin (this, elems, sim_param)
+ class(t_liftlin), intent(inout) :: this
+ type(t_elem_p), intent(in) :: elems(:)
+ type(t_sim_param), intent(in) :: sim_param
+
+ character(len=*), parameter      :: this_sub_name='compute_pres_liftlin'
+ 
+  call error(this_sub_name, this_mod_name, 'This was not supposed to &
+  &happen, a team of professionals is underway to remove the evidence')
+  
+!! only steady loads: steady data from table: L -> gam -> p_equiv
+!this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &
+!        norm2(uinf - this%ub) * this%dy / this%area * &
+!             elems(this%id)%p%idou  
+
+end subroutine compute_pres_liftlin 
+
+!----------------------------------------------------------------------
+
+subroutine compute_dforce_liftlin (this, elems, sim_param)
+ class(t_liftlin), intent(inout) :: this
+ type(t_elem_p), intent(in) :: elems(:)
+ type(t_sim_param), intent(in) :: sim_param
+
+ character(len=*), parameter      :: this_sub_name='compute_dforce_liftlin'
+ 
+  call error(this_sub_name, this_mod_name, 'This was not supposed to &
+  &happen, a team of professionals is underway to remove the evidence')
+  
+!! only steady loads: steady data from table: L -> gam -> p_equiv
+!this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &
+!        norm2(uinf - this%ub) * this%dy / this%area * &
+!             elems(this%id)%p%idou  
+
+end subroutine compute_dforce_liftlin
+ 
 !----------------------------------------------------------------------
 
 subroutine update_liftlin(elems_ll, linsys)
@@ -291,14 +336,16 @@ end subroutine update_liftlin
 
 !----------------------------------------------------------------------
 
-subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
+! subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
+subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  sim_param, airfoil_data)
  type(t_elem_p), intent(inout) :: elems_ll(:)
  type(t_elem_p), intent(in)    :: elems_tot(:)
  type(t_elem_p), intent(in)    :: elems_wake(:)
- real(wp), intent(in)          :: uinf(3)
+ type(t_sim_param), intent(in) :: sim_param
  type(t_aero_tab),  intent(in) :: airfoil_data(:)
 
- integer :: i_l, j, ic
+ real(wp) :: uinf(3)
+ integer  :: i_l, j, ic
  real(wp) :: vel(3), v(3), up(3)
  real(wp), allocatable :: vel_w(:,:)
  real(wp) :: unorm, alpha, mach, re
@@ -308,6 +355,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
  real(wp) :: damp=2.0_wp
  real(wp), parameter :: toll=1e-6_wp
  real(wp) :: diff
+
+ uinf = sim_param%u_inf
  
  !TODO: is missing the velocity of the wake
  allocate(dou_temp(size(elems_ll)))
@@ -370,24 +419,31 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
      !elems_ll(i_l)%p%idou = dou_temp(i_l)
    enddo 
    
-   !DEBUG:
-   write(*,*) 'diff', diff
+!  !DEBUG:
+!  write(*,*) 'diff', diff
    if(diff .le. toll) exit
 
  enddo
 
- !Rough cp compuation ! Only steady ...
- do i_l = 1,size(elems_ll)
-   elems_ll(i_l)%p%cp =  2.0_wp / norm2(uinf)**2.0_wp * &
-            ( norm2(uinf - elems_ll(i_l)%p%ub) ) * elems_ll(i_l)%p%idou 
- end do
+!!Rough cp compuation ! Only steady ...
+!do i_l = 1,size(elems_ll)
+!  elems_ll(i_l)%p%cp =  2.0_wp / norm2(uinf)**2.0_wp * &
+!           ( norm2(uinf - elems_ll(i_l)%p%ub) ) * elems_ll(i_l)%p%idou 
+!end do
 
+ ! Rough approximation (w/o using tabulated data) of the loads
  do i_l = 1,size(elems_ll)
    elems_ll(i_l)%p%cp = & 
      2.0_wp / norm2(uinf)**2.0_wp * &
             ( norm2(uinf - elems_ll(i_l)%p%ub) * &
               elems_ll(i_l)%p%dy / elems_ll(i_l)%p%area * &
                    elems_ll(i_l)%p%idou )
+   elems_ll(i_l)%p%pres = & 
+            - sim_param%rho_inf * &
+            ( norm2(sim_param%u_inf - elems_ll(i_l)%p%ub) * &
+              elems_ll(i_l)%p%dy / elems_ll(i_l)%p%area * &
+                   elems_ll(i_l)%p%idou )
+   elems_ll(i_l)%p%dforce = elems_ll(i_l)%p%pres * elems_ll(i_l)%p%nor
  end do
 
  !DEBUG:
@@ -400,6 +456,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
  !Get into the tables to obtain the loads
 
  !Get the vorticity of the element
+
 end subroutine solve_liftlin
 
 !----------------------------------------------------------------------

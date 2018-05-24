@@ -40,6 +40,9 @@ module mod_aero_elements
 
 use mod_linsys_vars, only: t_linsys
 
+use mod_sim_param, only: &
+  t_sim_param
+
 use mod_param, only: &
   wp
 
@@ -114,8 +117,12 @@ type, abstract :: c_elem
 
   !> Fluid velocity at center for boundary condition (U_inf-rel vel)
   real(wp), allocatable :: vel(:)
-  !> Fluid velocity at center for boundary condition (U_inf-rel vel)
+  !> Average pressure coefficient on the element
   real(wp)              :: cp
+  !> Average pressure on the element
+  real(wp)              :: pres
+  !> Elementary force acting on the element (components in the base ref.sys.) 
+  real(wp), allocatable :: dforce(:)
 
   contains
 ! procedure(i_velocity_calc), deferred, pass(this) :: velocity_calc
@@ -132,7 +139,9 @@ type, abstract :: c_elem
   procedure(i_compute_vel), deferred, pass(this)      :: compute_vel
   procedure(i_compute_psi), deferred, pass(this)      :: compute_psi
 ! loads --------------
-  procedure(i_compute_cp ), deferred, pass(this)      :: compute_cp
+  procedure(i_compute_cp     ), deferred, pass(this)      :: compute_cp
+  procedure(i_compute_pres   ), deferred, pass(this)      :: compute_pres
+  procedure(i_compute_dforce ), deferred, pass(this)      :: compute_dforce
   
 
 end type
@@ -337,6 +346,30 @@ abstract interface
     class(c_elem), intent(inout) :: this
     type(t_elem_p), intent(in)   :: elems(:)
     real(wp), intent(in)         :: uinf(:)
+  end subroutine
+end interface
+
+!----------------------------------------------------------------------
+
+abstract interface
+  subroutine i_compute_pres (this, elems, sim_param)
+    import :: c_elem , t_elem_p , wp ,t_sim_param 
+    implicit none
+    class(c_elem), intent(inout) :: this
+    type(t_elem_p), intent(in)   :: elems(:)
+    type(t_sim_param), intent(in):: sim_param
+  end subroutine
+end interface
+
+!----------------------------------------------------------------------
+
+abstract interface
+  subroutine i_compute_dforce (this, elems, sim_param)
+    import :: c_elem , t_elem_p , wp , t_sim_param 
+    implicit none
+    class(c_elem), intent(inout) :: this
+    type(t_elem_p), intent(in)   :: elems(:)
+    type(t_sim_param), intent(in):: sim_param
   end subroutine
 end interface
 

@@ -1248,6 +1248,9 @@ subroutine calc_geo_data_pan(elem,vert)
     elem%sinTi(is) = sum( elem%edge_uni(:,is) * elem%tang(:,2) ) 
   end do
 
+  ! allocate %dforce
+  if(.not.allocated(elem%dforce)) allocate(elem%dforce(3)) ; elem%dforce = 0.0_wp
+
 
 end subroutine calc_geo_data_pan
 
@@ -1337,6 +1340,9 @@ subroutine calc_geo_data_ll(elem,vert)
     elem%sinTi(is) = sum( elem%edge_uni(:,is) * elem%tang(:,2) ) 
   end do
 
+  ! allocate %dforce
+  if(.not.allocated(elem%dforce)) allocate(elem%dforce(3)) ; elem%dforce = 0.0_wp
+
 
 end subroutine calc_geo_data_ll
 
@@ -1409,6 +1415,8 @@ subroutine calc_geo_data_ad(elem,vert)
     elem%sinTi(is) = sum( elem%edge_uni(:,is) * elem%tang(:,2) ) 
   end do
 
+  ! allocate %dforce
+  if(.not.allocated(elem%dforce)) allocate(elem%dforce(3)) ; elem%dforce = 0.0_wp
 
 end subroutine calc_geo_data_ad
 
