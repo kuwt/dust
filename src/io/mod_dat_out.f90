@@ -43,7 +43,7 @@ use mod_handling, only: &
 !---------------------------------------------------------------------
 implicit none
 
-public :: dat_out_probes_header , dat_out_probes 
+public :: dat_out_probes_header , dat_out_loads_header
 
 private
 
@@ -52,6 +52,29 @@ character(len=*), parameter :: &
 !---------------------------------------------------------------------
 
 contains
+
+!---------------------------------------------------------------------
+
+subroutine dat_out_loads_header ( fid , comps_meas , ref_sys )
+ integer , intent(in) :: fid
+ character(len=*), intent(in) :: comps_meas(:)
+ character(len=*), intent(in) :: ref_sys 
+
+ character(len=max_char_len) :: istr
+ integer :: n_comps , ic
+
+ n_comps = size(comps_meas)
+
+ write(istr,'(I0)') n_comps 
+ write(fid,*) '# comments ... n.components: ' , istr
+ ! three-dimensional space
+ do ic = 1 , n_comps - 1
+   write(fid,'(A)',advance='no') trim(comps_meas(ic))//' , '
+ end do
+ write(fid,'(A)') trim(comps_meas(n_comps))
+ write(fid,*) '#  t  Fx  Fy  Fz  Mx  My  Mz  ' 
+
+end subroutine dat_out_loads_header
 
 !---------------------------------------------------------------------
 
@@ -77,7 +100,7 @@ subroutine dat_out_probes_header ( fid , rr_probes , vars_str )
  end do
 
  write(istr,'(I0)') n_probes 
- write(fid,*) '#    t     '//istr//'( '//trim(vars_str)//')'
+ write(fid,*) '#    t     '//trim(istr)//'( '//trim(vars_str)//' )'
 
 end subroutine dat_out_probes_header
 

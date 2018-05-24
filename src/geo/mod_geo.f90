@@ -345,17 +345,20 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
  type(t_sim_param) , intent(inout) :: sim_param
  real(wp)                     :: tstart
 
- !character(len=max_char_len) :: reference_file
- !character(len=max_char_len) :: geo_file_name
-
  integer :: i, j, is, im,  i_comp, i_ll, i_tot
  type(t_elem_p), allocatable :: temp_static(:), temp_moving(:)
 
  integer , allocatable :: el_id_old(:), el_id_old_static(:), el_id_old_moving(:)
 
  character(len=max_char_len) :: msg
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
 
   tstart = sim_param%t0
+
+ ! *** 20180523 ***
+ ! *** 20180523 ***
  
   !build the reference frames
   !read which is the reference frame file, if default the main input file is 
@@ -704,6 +707,8 @@ subroutine load_components(geo, in_file, sim_param, te)
         geo%components(i_comp)%airfoil_list = airfoil_list 
         allocate(geo%components(i_comp)%nelem_span_list(size(nelem_span_list))) 
         geo%components(i_comp)%nelem_span_list = nelem_span_list 
+ ! *** 20180523 ***
+ ! *** 20180523 ***
         allocate(geo%components(i_comp)%i_airfoil_e( &
               size(i_airfoil_e,1),size(i_airfoil_e,2)) ) 
         geo%components(i_comp)%i_airfoil_e = i_airfoil_e 
@@ -982,6 +987,28 @@ subroutine import_aero_tab(geo,coeff)
 
 end subroutine import_aero_tab
 
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
+ ! *** 20180523 ***
 !----------------------------------------------------------------------
 
 !> Prepare the geometry allocating all the relevant fields for each 
@@ -2208,7 +2235,8 @@ subroutine create_strip_connectivity(geo)
   associate(comp => geo%components(i_comp))
 
   ! connectivity built for lifting surface only
-  if ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'v' ) then
+  if ( ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'v' .or. &
+         geo%components(i_comp)%comp_el_type(1:1) .eq. 'l' )  ) then
 
     n_el = size(comp%el)
 

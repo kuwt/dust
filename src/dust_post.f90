@@ -92,7 +92,11 @@ use mod_vtk_out, only: &
   vtk_out_viz , vtr_write
 
 use mod_dat_out, only: & 
-  dat_out_probes_header , dat_out_probes 
+  dat_out_probes_header, & 
+  dat_out_loads_header
+
+use mod_math, only: &
+  cross
 
 implicit none
 
@@ -128,6 +132,7 @@ integer, allocatable :: elems(:,:)
 type(t_geo_component), allocatable :: comps(:)
 integer :: nelem
 
+character(len=max_char_len) , allocatable :: refs_tag(:)
 real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
 real(wp), allocatable :: vort(:), cp(:)
 real(wp), allocatable :: wpoints(:,:,:),wvort(:,:), wpoints_s(:,:)
@@ -152,7 +157,6 @@ integer :: n_probes , n_vars , n_vars_int
 real(wp), allocatable :: rr_probes(:,:)
 logical :: probe_vel , probe_p , probe_vort
 character(len=max_char_len) :: vars_str
-! real(wp) , allocatable :: u_inf(:)
 real(wp) :: u_inf(3)
 real(wp) :: P_inf , rho
 real(wp) :: vel_probe(3) = 0.0_wp , vort_probe(3) = 0.0_wp 
@@ -171,6 +175,16 @@ integer , allocatable :: vars_n(:)
 character(len=max_char_len) , allocatable :: vars_name(:)
 real(wp), allocatable :: vars(:,:) 
 integer :: i_vars , i_var_v , i_var_p , i_var_w
+! loads -----------
+integer :: n_comps_meas
+integer ,allocatable :: i_comps_meas(:)
+character(len=max_char_len), allocatable :: comps_meas(:)
+character(len=max_char_len) :: ref_tag
+integer                     :: ref_id
+real(wp) :: F_loc(3) , F_ref(3) , F_bas(3) , F_bas1(3)
+real(wp) :: M_loc(3) , M_ref(3) , M_bas(3)
+integer :: ic2
+real(wp), allocatable , target :: sol_p(:) 
 
 integer :: it , i1
 
@@ -222,6 +236,12 @@ call sbprms%CreateRealArrayOption('Minxyz','lower bounds of the box',&
 call sbprms%CreateRealArrayOption('Maxxyz','upper bounds of the box',&
                               multiple=.true.)
 
+! loads --------------------
+call sbprms%CreateStringOption('CompName','Components where loads are computed',&
+                              multiple=.true.)
+call sbprms%CreateStringOption('Reference_Tag','Reference frame where loads&
+                            & are computed',multiple=.true.)
+
 
 sbprms=>null()
 
@@ -257,7 +277,7 @@ do ia = 1,n_analyses
     do i_comp = 1, n_comp
       components_names(i_comp) = getstr(sbprms, 'Component')
     enddo
-    call LowCase(components_names(1),lowstr)
+    call LowCase(components_names(1),lowstr)    ! char 
     if(trim(lowstr) .eq. 'all') then
       all_comp = .true.
     endif
@@ -275,12 +295,192 @@ do ia = 1,n_analyses
   out_press = isInList('press',var_names)
   out_cp = isInList('cp',var_names)
 
+  !DEBUG
+  write(*,*) ' trim(an_type) : ' , trim(an_type)
+
   !Fork the different kind of analyses
   select case(trim(an_type))
+
+   !//////////////////    Loads     \\\\\\\\\\\\\\\\\
+   case('integral_loads')
+
+    ! load the geo components just once just once
+    call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
+    !TODO: here get the run id
+    call load_components_postpro(comps, points, nelem, elems, floc, & 
+                                 components_names,  all_comp)
+
+    call close_hdf5_file(floc)
+
+    ! Prepare_geometry_postpro
+    call prepare_geometry_postpro(comps)
+
+    ! Open output .dat file
+    fid_out = 21
+    write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.dat'
+    open(unit=fid_out,file=trim(filename))
+
+    n_comps_meas = countoption(sbprms,'CompName')
+    allocate( comps_meas(n_comps_meas) )
+    do ic = 1 , n_comps_meas 
+      comps_meas(ic) = getstr(sbprms,'CompName') 
+    end do
+    !TODO:loads 
+    ! from string to id.s ic
+    allocate( i_comps_meas(n_comps_meas) ) ; i_comps_meas = 0
+    do ic = 1 , n_comps_meas 
+      ! loop over the ref.sys 
+      do ic2 = 1 , size(comps)
+!       !DEBUG
+!       write(*,*) ' trim(comps_meas(',ic,') : ', trim(comps_meas(ic)) 
+!       write(*,*) ' trim(comps(',ic,')%ref_tag : ', trim(comps(ic)%comp_name) 
+        if ( trim(comps_meas(ic)) .eq. trim(comps(ic2)%comp_name) ) then
+          i_comps_meas(ic) = ic2 ! comps(ic2)%ref_id
+!         !DEBUG
+!         write(*,*) ' i_comps_meas(',ic,') = ', ic2
+          exit
+        end if
+      end do
+    end do
+
+!   ! Allocate and point to sol
+!   !   part of sol_p will remain equal to 0.0, if only some
+!   !   components are considered for the loads
+    allocate(sol_p(nelem)) ; sol_p = 0.0_wp
+!   ip = 0
+!   do ic = 1 , size(comps)
+!    do ie = 1 , size(comps(ic)%el)
+!     ip = ip + 1
+!     comps(ic)%el(ie)%cp => sol_p(ip) 
+!    end do
+!   end do
+
+    ref_tag = getstr(sbprms,'Reference_Tag')
+
+!   call dat_out_probes_header( fid_out , rr_probes , vars_str )
+    call dat_out_loads_header( fid_out , comps_meas , ref_tag )
+
+    ! Find the id of the reference where the loads must be projected
+    write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',an_start,'.h5'
+    call open_hdf5_file(trim(filename),floc)
+    call load_refs(floc,refs_R,refs_off,refs_tag)
+    call close_hdf5_file(floc)    
+    do it = lbound(refs_tag,1) , ubound(refs_tag,1)
+      if ( trim(refs_tag(it)) .eq. ref_tag ) ref_id = it
+    end do
+!   !DEBUG
+!   do ic = 1 , n_comps_meas
+!     write(*,*) ' comps_meas , i_comps_meas : ' , trim(comps_meas(ic)) , i_comps_meas(ic) 
+!   end do
+!   write(*,*) ' ref_tag , ref_id : ' , trim(ref_tag) , ref_id
+
+
+
+    do it=an_start, an_end, an_step
+
+      ! Open the file:
+      write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
+      call open_hdf5_file(trim(filename),floc)
+
+      ! Load u_inf --------------------------------
+      call open_hdf5_group(floc,'Parameters',ploc)
+      call read_hdf5(u_inf,'u_inf',ploc)
+      call read_hdf5(P_inf,'P_inf',ploc)
+      call read_hdf5(rho,'rho_inf',ploc)
+      call close_hdf5_group(ploc)
+
+      ! Load the references and move the points ---
+      call load_refs(floc,refs_R,refs_off)
+      ! Move the points ---------------------------
+      call update_points_postpro(comps, points, refs_R, refs_off)
+      ! Load the results --------------------------
+      call load_res(floc, comps, vort, cp, t)
+      sol_p = cp
+      !
+      ip = 0
+      do ic = 1 , size(comps)
+       do ie = 1 , size(comps(ic)%el)
+        ip = ip + 1
+        comps(ic)%el(ie)%cp = sol_p(ip) 
+       end do
+      end do
+      
+!     !DEBUG
+!     write(*,*) ' sol_p ' 
+!     write(*,*)   sol_p
+
+      call close_hdf5_file(floc)
+
+      ! Initialise integral loads in the desired ref.frame
+      F_ref = 0.0_wp ; M_ref = 0.0_wp 
+
+      ! Update the overall load with the comtribution from all the components
+      do ic = 1 , n_comps_meas
+
+        ! Initialise integral loads in the local ref.frame
+        F_bas = 0.0_wp ; M_bas = 0.0_wp 
+      
+        ! Loads from the ic-th component in the base ref.frame
+        do ie = 1 , size(comps( i_comps_meas(ic) )%el )
+          F_bas1 = - comps( i_comps_meas(ic) )%el(ie)%cp   * &
+                     comps( i_comps_meas(ic) )%el(ie)%area * &   ! update
+                     comps( i_comps_meas(ic) )%el(ie)%nor        ! update
+          F_bas = F_bas + F_bas1   ! comps( i_comps_meas(ic) )%el(ie)%cp   * &
+                                   ! comps( i_comps_meas(ic) )%el(ie)%area * &   ! update
+                                   ! comps( i_comps_meas(ic) )%el(ie)%nor        ! update
+!         !CHECK
+!         write(*,*) ' ie , cp , area , norm ' , ie , &
+!                         comps( i_comps_meas(ic) )%el(ie)%cp   , &   ! update
+!                         comps( i_comps_meas(ic) )%el(ie)%area , &   ! update
+!                         comps( i_comps_meas(ic) )%el(ie)%nor        ! update
+
+          M_bas = cross( comps( i_comps_meas(ic) )%el(ie)%cen &
+                        -refs_off(:,ref_id) , F_bas1 )
+
+        end do
+
+!       !CHECK
+!       write(*,*) ' F_bas = ' , F_bas
+
+        write(*,'(A,I0,A,3F12.3)') ' ic : ' , ic , ' F_bas : ' , F_bas
+
+        ! From the base ref.sys to the chosen ref.sys (offset and rotation)
+        F_ref = F_ref + matmul( &
+             transpose( refs_R(:,:, ref_id) ) , F_bas )
+        M_ref = M_ref + matmul( &
+             transpose( refs_R(:,:, ref_id) ) , M_bas )
+
+      end do
+
+      !DEBUG
+      write(*,'(A,I0)')     ' ref_id : ' , ref_id
+      write(*,'(A,3F12.3)') ' F_ref  : ' , F_ref
+     
+      write(*,*)
+
+!     !CHECK
+!     write(*,*) ' F_ref = ' , F_ref
+
+      write(fid_out,'(F12.6)'  ,advance='no') t 
+      write(fid_out,'(3F16.6)' ,advance='no') F_ref
+      write(fid_out,'(3F16.6)' ,advance='no') M_ref
+      write(fid_out,'(9F16.10)',advance='no') refs_R(:,:, ref_id)
+      write(fid_out,'(3F16.10)',advance='no') refs_off(:, ref_id)
+      write(fid_out,*) ' '
+
+
+    end do
+
+    close(fid_out)
+
+    deallocate(comps,comps_meas,i_comps_meas)
+    deallocate(sol_p)
 
    !//////////////////Visualizations\\\\\\\\\\\\\\\\\
    case('viz') 
 
+    !DEBUG
+    write(*,*) ' viz '
     ! load the geo components just once just once
     call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
     !TODO: here get the run id
@@ -305,7 +505,6 @@ do ia = 1,n_analyses
       call read_hdf5(P_inf,'P_inf',ploc)
       call read_hdf5(rho,'rho_inf',ploc)
       call close_hdf5_group(ploc)
-
 
       ! Load the references
       call load_refs(floc,refs_R,refs_off)
@@ -711,6 +910,7 @@ do ia = 1,n_analyses
 
      ! Load the references and move the points ---
      call load_refs(floc,refs_R,refs_off)
+
      call update_points_postpro(comps, points, refs_R, refs_off)
      ! Load the results --------------------------
      call load_res(floc, comps, vort, cp, t)
@@ -786,6 +986,7 @@ do ia = 1,n_analyses
        end do
       end do
      end do
+
 
      call vtr_write ( filename , xbox , ybox , zbox , &
                       vars_n(1:i_var) , vars_name(1:i_var) , vars ) 
@@ -887,10 +1088,11 @@ contains
 
 !----------------------------------------------------------------------
 
-subroutine load_refs(floc, refs_R, refs_off)
+subroutine load_refs(floc, refs_R, refs_off, refs_tag)
  integer(h5loc), intent(in) :: floc 
  real(wp), allocatable, intent(out) :: refs_R(:,:,:)
  real(wp), allocatable, intent(out) :: refs_off(:,:)
+ character(len=max_char_len) , allocatable , intent(out) , optional :: refs_tag(:)
 
  integer(h5loc) :: gloc1, gloc2
  integer :: nrefs, iref
@@ -900,12 +1102,14 @@ subroutine load_refs(floc, refs_R, refs_off)
   call read_hdf5(nrefs,'NReferences',gloc1)
 
   allocate(refs_R(3,3,0:nrefs-1), refs_off(3,0:nrefs-1))
+  if (present(refs_tag)) allocate(refs_tag(0:nrefs-1))
   do iref = 0,nrefs-1
     write(rname,'(A,I3.3)') 'Ref',iref
     call open_hdf5_group(gloc1,trim(rname),gloc2)
    
     call read_hdf5(refs_R(:,:,iref),'R',gloc2)
     call read_hdf5(refs_off(:,iref),'Offset',gloc2)
+    if (present(refs_tag)) call read_hdf5(refs_tag(  iref),'Tag',gloc2)
 
     call close_hdf5_group(gloc2)
   enddo
