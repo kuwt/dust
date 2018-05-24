@@ -446,7 +446,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       call read_hdf5(ref_tag,'RefTag',cloc)
 
       comps(i_comp)%ref_id  = ref_id
-      comps(i_comp)%ref_tag = trim(ref_tag_m)
+      comps(i_comp)%ref_tag = trim(ref_tag)
       !geo%components(i_comp)%moving  = geo%refs(ref_id)%moving
 
       ! ====== READING =====

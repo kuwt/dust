@@ -240,7 +240,6 @@ subroutine compute_vel_liftlin (this, pos, uinf, vel)
 
   ! doublet ---
   call velocity_calc_doublet(this, vdou, pos)
- 
 
   vel = vdou*this%idou
 
@@ -257,6 +256,11 @@ subroutine compute_cp_liftlin (this, elems, uinf)
  
   call error(this_sub_name, this_mod_name, 'This was not supposed to &
   &happen, a team of professionals is underway to remove the evidence')
+  
+!! only steady loads: steady data from table: L -> gam -> p_equiv
+!this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &
+!        norm2(uinf - this%ub) * this%dy / this%area * &
+!             elems(this%id)%p%idou  
 
 end subroutine compute_cp_liftlin 
 
@@ -376,6 +380,14 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
  do i_l = 1,size(elems_ll)
    elems_ll(i_l)%p%cp =  2.0_wp / norm2(uinf)**2.0_wp * &
             ( norm2(uinf - elems_ll(i_l)%p%ub) ) * elems_ll(i_l)%p%idou 
+ end do
+
+ do i_l = 1,size(elems_ll)
+   elems_ll(i_l)%p%cp = & 
+     2.0_wp / norm2(uinf)**2.0_wp * &
+            ( norm2(uinf - elems_ll(i_l)%p%ub) * &
+              elems_ll(i_l)%p%dy / elems_ll(i_l)%p%area * &
+                   elems_ll(i_l)%p%idou )
  end do
 
  !DEBUG:
