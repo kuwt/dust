@@ -535,7 +535,7 @@ subroutine vtk_out_viz (out_filename, &
  character(len=20) :: ostr, str1, str2
  character(len=1)  :: lf
 
- integer :: ie, nquad, ntria, etype
+ integer :: ie, nquad, ntria, nquad_w, ntria_w, etype
  integer :: npoints_w, nw
  integer :: nvars, nvars_w, i_v
  logical :: got_wake
@@ -564,6 +564,16 @@ subroutine vtk_out_viz (out_filename, &
     endif
   enddo
 
+  if(got_wake) then
+    nquad_w = 0; ntria_w = 0
+    do ie = 1,nw
+      if(w_ee(4,ie) .eq. 0) then
+        ntria_w = ntria_w+1
+      else
+        nquad_w = nquad_w+1
+      endif
+    enddo
+  endif
 
 
   call new_file_unit(fu,ierr)
@@ -678,7 +688,7 @@ subroutine vtk_out_viz (out_filename, &
     buffer = '    <DataArray type="Int32" Name="connectivity" &
              &Format="appended" offset="'//trim(ostr)//'"/>'//lf; 
     write(fu) trim(buffer)
-    offset = offset + vtk_isize  + vtk_isize*4*nw
+    offset = offset + vtk_isize  + vtk_isize*4*nquad_w + vtk_isize*3*ntria_w
 
     write(ostr,'(I0)') offset
     buffer =  '    <DataArray type="Int32" Name="offsets" &
@@ -784,21 +794,33 @@ subroutine vtk_out_viz (out_filename, &
     !Connectivity
     nbytes = vtk_isize*4*nw; write(fu) nbytes
     do i=1,size(w_ee,2)
-      write(fu) w_ee(1:4,i)-1
+      if (w_ee(4,i) .eq. 0) then
+        write(fu) w_ee(1:3,i)-1
+      else
+        write(fu) w_ee(1:4,i)-1
+      endif
     enddo
 
     !Offset
     nbytes =  vtk_isize*nw; write(fu) nbytes
     i_shift = 0
     do i=1,size(w_ee,2)
-      i_shift = i_shift + 4
+      if (w_ee(4,i) .eq. 0) then
+        i_shift = i_shift + 3
+      else
+        i_shift = i_shift + 4
+      endif
       write(fu) i_shift
     enddo
 
     !Cell types
     nbytes = vtk_isize*nw; write(fu) nbytes
     do i=1,size(w_ee,2)
-      etype = 9
+      if (w_ee(4,i) .eq. 0) then
+        etype = 5
+      else
+        etype = 9
+      endif
       write(fu) etype
     enddo
 

@@ -80,9 +80,9 @@ use mod_stringtools, only: &
 
 use mod_geo_postpro, only: &
   load_components_postpro, update_points_postpro , prepare_geometry_postpro, &
-  prepare_wake_postpro
+  expand_actdisk_postpro, prepare_wake_postpro
 
-use mod_wake, only: &
+use mod_wake_pan, only: &
   t_wake_panels
 
 use mod_tecplot_out, only: &
@@ -98,6 +98,9 @@ use mod_dat_out, only: &
 use mod_math, only: &
   cross
 
+use mod_actuatordisk, only: &
+  t_actdisk
+
 implicit none
 
 !Input
@@ -107,7 +110,6 @@ character(len=max_char_len) :: input_file_name
 !Geometry parameters
 type(t_parse) :: prms
 type(t_parse), pointer :: sbprms
-type(t_link), pointer :: lnk
 
 integer :: n_analyses, ia
 
@@ -127,17 +129,18 @@ logical :: out_wake
 
 integer(h5loc) :: floc, geo_floc, gloc1, gloc2 , ploc
 
-real(wp), allocatable :: points(:,:)
+real(wp), allocatable :: points(:,:), points_exp(:,:)
 integer, allocatable :: elems(:,:)
 type(t_geo_component), allocatable :: comps(:)
-integer :: nelem
+integer :: nelem, nelem_out
 
 character(len=max_char_len) , allocatable :: refs_tag(:)
 real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
 real(wp), allocatable :: vort(:), cp(:)
-real(wp), allocatable :: wpoints(:,:,:),wvort(:,:), wpoints_s(:,:)
-integer,  allocatable :: wstart(:,:), welems(:,:)
-integer :: nstripes, nstripes_p, nrows, is, ir, iew, nelem_w
+real(wp), allocatable :: wvort(:), wvort_pan(:,:), wpoints(:,:), wpoints_pan(:,:,:)
+integer,  allocatable :: welems(:,:)
+integer, allocatable  :: wstart(:,:)
+integer :: nelem_w
 real(wp) :: t
 
 real(wp), allocatable :: print_vars(:,:)
@@ -253,9 +256,7 @@ n_analyses = countoption(prms,'Analysis')
 
 !Cycle on all the analyses
 do ia = 1,n_analyses
- 
-  write(*,*) nl//' Analysis n. ' , ia
- 
+  
   !Get some of the options
   call getsuboption(prms,'Analysis',sbprms)
   an_type  = getstr(sbprms,'Type')
@@ -484,13 +485,14 @@ do ia = 1,n_analyses
     ! load the geo components just once just once
     call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
     !TODO: here get the run id
-    call load_components_postpro(comps, points, nelem, elems, floc, & 
+    call load_components_postpro(comps, points, nelem, floc, & 
                                  components_names,  all_comp)
     call close_hdf5_file(floc)
     out_wake = getlogical(sbprms,'Wake')
 
     ! Prepare_geometry_postpro
     call prepare_geometry_postpro(comps)
+
 
     !time history
     do it =an_start, an_end, an_step
@@ -511,14 +513,18 @@ do ia = 1,n_analyses
 
       ! Move the points
       call update_points_postpro(comps, points, refs_R, refs_off)
-      ! Load the results
+      !expand the actuator disks
+      call expand_actdisk_postpro(comps, points, points_exp, elems)
+
+      !Load the results
       call load_res(floc, comps, vort, cp, t)
 
       !Prepare the variable for output
+      nelem_out = size(vort)
       nprint = 0
       if(out_vort) nprint = nprint+1
       if(out_cp)   nprint = nprint+1
-      allocate(print_var_names(nprint), print_vars(nelem, nprint))
+      allocate(print_var_names(nprint), print_vars(nelem_out, nprint))
       
       ivar = 1
       if(out_vort) then
@@ -537,24 +543,27 @@ do ia = 1,n_analyses
       
       if (out_wake) then
 
-        !Load the wake
-        call load_wake(floc, wpoints, wstart, wvort)
-        !Prepare the wake variables for output
-        nstripes = size(wvort,1); nstripes_p = size(wpoints,2)
-        nrows = size(wvort,2); nelem_w = nstripes*nrows
-        allocate(wpoints_s(3,nstripes_p*(nrows+1)))
-        allocate(welems(4,nelem_w))
-        wpoints_s = reshape(wpoints, (/3,nstripes_p*(nrows+1)/))
-        iew = 0
-        do ir = 1,nrows
-          do is = 1,nstripes
-            iew = iew+1
-            welems(:,iew) = (/wstart(1,is)+nstripes_p*(ir-1), &
-                              wstart(2,is)+nstripes_p*(ir-1), &
-                              wstart(2,is)+nstripes_p*(ir), &
-                              wstart(1,is)+nstripes_p*(ir)/)
-          enddo
-        enddo
+        !!Load the wake
+        !call load_wake_pan(floc, wpoints, wstart, wvort)
+        !!Prepare the wake variables for output
+        !nstripes = size(wvort,1); nstripes_p = size(wpoints,2)
+        !nrows = size(wvort,2); nelem_w = nstripes*nrows
+        !allocate(wpoints_s(3,nstripes_p*(nrows+1)))
+        !allocate(welems(4,nelem_w))
+        !wpoints_s = reshape(wpoints, (/3,nstripes_p*(nrows+1)/))
+        !iew = 0
+        !do ir = 1,nrows
+        !  do is = 1,nstripes
+        !    iew = iew+1
+        !    welems(:,iew) = (/wstart(1,is)+nstripes_p*(ir-1), &
+        !                      wstart(2,is)+nstripes_p*(ir-1), &
+        !                      wstart(2,is)+nstripes_p*(ir), &
+        !                      wstart(1,is)+nstripes_p*(ir)/)
+        !  enddo
+        !enddo
+        
+        call load_wake_viz(floc, wpoints, welems, wvort)
+        nelem_w = size(welems,2)
 
         nprint = 0
         if(out_vort) nprint = nprint+1
@@ -562,7 +571,8 @@ do ia = 1,n_analyses
         
         ivar = 1
         if(out_vort) then
-          print_vars_w(:,ivar) = reshape(wvort,(/nelem_w/))
+          !print_vars_w(:,ivar) = reshape(wvort,(/nelem_w/))
+          print_vars_w(:,ivar) = wvort
           print_var_names_w(ivar) = 'Vorticity'
           ivar = ivar +1
         endif
@@ -574,21 +584,21 @@ do ia = 1,n_analyses
          case ('tecplot')
           filename = trim(filename)//'.plt'
           call  tec_out_viz(filename, t, &
-                       points, elems, print_vars, print_var_names, &
-                       w_rr=wpoints_s, w_ee=welems, w_vars=print_vars_w, &
+                       points_exp, elems, print_vars, print_var_names, &
+                       w_rr=wpoints, w_ee=welems, w_vars=print_vars_w, &
                        w_var_names = print_var_names_w)
          case ('vtk')
           filename = trim(filename)//'.vtu'
           call  vtk_out_viz(filename, &
-                       points, elems, print_vars, print_var_names, &
-                       w_rr=wpoints_s, w_ee=welems, w_vars=print_vars_w, &
+                       points_exp, elems, print_vars, print_var_names, &
+                       w_rr=wpoints, w_ee=welems, w_vars=print_vars_w, &
                        w_var_names = print_var_names_w)
          case default
            call error('dust_post','','Unknown format '//trim(out_frmt)//&
                       ' for visualization output')
          end select
       
-        deallocate(wpoints, wpoints_s, welems, wstart, wvort)
+        deallocate (wpoints, welems,  wvort)
         deallocate(print_var_names_w, print_vars_w)
 
       else
@@ -598,11 +608,11 @@ do ia = 1,n_analyses
          case ('tecplot')
           filename = trim(filename)//'.plt'
           call  tec_out_viz(filename, t, &
-                       points, elems, print_vars, print_var_names)
+                       points_exp, elems, print_vars, print_var_names)
          case ('vtk')
           filename = trim(filename)//'.vtu'
           call  vtk_out_viz(filename, &
-                       points, elems, print_vars, print_var_names)
+                       points_exp, elems, print_vars, print_var_names)
          case default
            call error('dust_post','','Unknown format '//trim(out_frmt)//&
                       ' for visualization output')
@@ -679,7 +689,7 @@ do ia = 1,n_analyses
     ! load the geo components just once just once
     call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
     !TODO: here get the run id
-    call load_components_postpro(comps, points, nelem, elems, floc, & 
+    call load_components_postpro(comps, points, nelem,  floc, & 
                                  components_names,  all_comp)
 
     call close_hdf5_file(floc)
@@ -726,11 +736,11 @@ do ia = 1,n_analyses
      sol = vort
 
      ! Load the wake -----------------------------
-     call load_wake(floc, wpoints, wstart, wvort)
+     call load_wake_pan(floc, wpoints_pan, wstart, wvort_pan)
    
      call close_hdf5_file(floc)
      
-     call prepare_wake_postpro( wpoints , wstart , wvort , wake )
+     call prepare_wake_postpro( wpoints_pan , wstart , wvort_pan , wake )
 
      write(fid_out,'(F12.6)',advance='no') t 
 
@@ -821,7 +831,7 @@ do ia = 1,n_analyses
     ! load the geo components just once just once
     call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
     !TODO: here get the run id    !todo????
-    call load_components_postpro(comps, points, nelem, elems, floc, & 
+    call load_components_postpro(comps, points, nelem, floc, & 
                                  components_names,  all_comp)
 
     call close_hdf5_file(floc)
@@ -917,11 +927,11 @@ do ia = 1,n_analyses
      sol = vort
 
      ! Load the wake -----------------------------
-     call load_wake(floc, wpoints, wstart, wvort)
+     call load_wake_pan(floc, wpoints_pan, wstart, wvort_pan)
    
      call close_hdf5_file(floc)
      
-     call prepare_wake_postpro( wpoints , wstart , wvort , wake )
+     call prepare_wake_postpro( wpoints_pan , wstart , wvort_pan , wake )
 
      ! Compute velocity --------------------------
      write(filename,'(A,I4.4,A)') trim(basename)//'_'//trim(an_name)//&
@@ -1127,15 +1137,21 @@ subroutine load_res(floc, comps, vort, cp, t)
  real(wp), allocatable, intent(out) :: cp(:)
  real(wp), intent(out) :: t
 
- integer :: ncomps, icomp
+ integer :: ncomps, icomp, ie
  integer :: nelems, offset, nelems_comp
  integer(h5loc) :: gloc1, gloc2, gloc3
  character(len=max_char_len) :: cname
+ real(wp), allocatable :: vort_read(:), cp_read(:)
 
   ncomps = size(comps)
   nelems = 0
   do icomp = 1, ncomps
-    nelems = nelems + comps(icomp)%nelems 
+    select type(el=>comps(icomp)%el)
+     class default
+      nelems = nelems + comps(icomp)%nelems 
+     type is(t_actdisk)
+      nelems = nelems + size(comps(icomp)%loc_points,2)
+    end select
   enddo
   
   call read_hdf5(t,'time',floc)
@@ -1150,13 +1166,28 @@ subroutine load_res(floc, comps, vort, cp, t)
     call open_hdf5_group(gloc1,trim(cname),gloc2)
     call open_hdf5_group(gloc2,'Solution',gloc3)
 
-    call read_hdf5(vort(offset+1:offset+nelems_comp),'Vort',gloc3)
-    call read_hdf5(cp(offset+1:offset+nelems_comp),'Cp',gloc3)
+    !call read_hdf5(vort(offset+1:offset+nelems_comp),'Vort',gloc3)
+    !call read_hdf5(cp(offset+1:offset+nelems_comp),'Cp',gloc3)
+    call read_hdf5_al(vort_read,'Vort',gloc3)
+    call read_hdf5_al(cp_read,'Cp',gloc3)
 
     call close_hdf5_group(gloc3)
     call close_hdf5_group(gloc2)
 
-    offset = offset + nelems_comp
+    select type(el =>comps(icomp)%el)
+     class default
+      vort(offset+1:offset+nelems_comp) = vort_read
+      cp(offset+1:offset+nelems_comp) = cp_read
+      offset = offset + nelems_comp
+     type is(t_actdisk)
+      do ie = 1,nelems_comp
+        vort(offset+1:offset+el(ie)%n_ver) = vort_read(ie)
+        cp(offset+1:offset+el(ie)%n_ver) = cp_read(ie)
+        offset = offset + el(ie)%n_ver
+      enddo
+    end select
+
+    deallocate(vort_read, cp_read)
 
   enddo
 
@@ -1166,7 +1197,7 @@ end subroutine load_res
 
 !----------------------------------------------------------------------
 
-subroutine load_wake(floc, wpoints, wstart, wvort)
+subroutine load_wake_pan(floc, wpoints, wstart, wvort)
  integer(h5loc), intent(in) :: floc 
  real(wp), allocatable, intent(out) :: wpoints(:,:,:)
  integer, allocatable, intent(out) :: wstart(:,:)
@@ -1182,7 +1213,171 @@ subroutine load_wake(floc, wpoints, wstart, wvort)
 
   call close_hdf5_group(gloc)
 
-end subroutine load_wake
+end subroutine load_wake_pan
+
+!----------------------------------------------------------------------
+
+subroutine load_wake_ring(floc, wpoints, wconn, wcen, wvort)
+ integer(h5loc), intent(in) :: floc 
+ real(wp), allocatable, intent(out) :: wpoints(:,:,:)
+ integer, allocatable, intent(out) :: wconn(:)
+ real(wp), allocatable, intent(out) :: wcen(:,:,:)
+ real(wp), allocatable, intent(out) :: wvort(:,:)
+
+ integer(h5loc) :: gloc
+  
+  call open_hdf5_group(floc,'RingWake',gloc)
+  
+  call read_hdf5_al(wpoints,'WakePoints',gloc)
+  call read_hdf5_al(wconn,'Conn_pe',gloc)
+  call read_hdf5_al(wcen,'WakeCenters',gloc)
+  call read_hdf5_al(wvort,'WakeVort',gloc)
+
+  call close_hdf5_group(gloc)
+
+end subroutine load_wake_ring
+
+!----------------------------------------------------------------------
+
+subroutine load_wake_viz(floc, wpoints, welems, wvort)
+ integer(h5loc), intent(in) :: floc 
+ real(wp), allocatable, intent(out) :: wpoints(:,:)
+ integer, allocatable, intent(out)  :: welems(:,:)
+ real(wp), allocatable, intent(out) :: wvort(:)
+
+ integer(h5loc) :: gloc
+ logical :: got_dset 
+ real(wp), allocatable :: wpoints_read(:,:,:)
+ real(wp), allocatable :: wpoints_pan(:,:), wpoints_rin(:,:)
+ integer, allocatable  :: wstart(:,:), wconn(:)
+ real(wp), allocatable :: wcen(:,:,:)
+ real(wp), allocatable :: wvort_read(:,:)
+ real(wp), allocatable :: wvort_pan(:), wvort_rin(:)
+ integer, allocatable  :: welems_pan(:,:), welems_rin(:,:)
+ integer :: nstripes, npoints_row, nrows, ndisks, nelem_w
+ integer :: iew, ir, is, ip
+ integer :: first_elem, act_disk, next_elem
+
+
+ !get the panel wake
+ got_dset = check_dset_hdf5('PanelWake',floc)
+ if(got_dset) then
+
+  call open_hdf5_group(floc,'PanelWake',gloc)
+  call read_hdf5_al(wpoints_read,'WakePoints',gloc)
+  call read_hdf5_al(wstart,'StartPoints',gloc)
+  call read_hdf5_al(wvort_read,'WakeVort',gloc)
+
+
+  nstripes = size(wvort_read,1); nrows = size(wvort_read,2);
+  npoints_row = size(wpoints_read,2)
+  nelem_w = nstripes*nrows
+
+  allocate(wpoints_pan(3,npoints_row*(nrows+1)))
+  allocate(welems_pan(4,nelem_w))
+  allocate(wvort_pan(nelem_w))
+
+  wpoints_pan = reshape(wpoints_read, (/3,npoints_row*(nrows+1)/))
+  wvort_pan = reshape(wvort_read, (/nelem_w/))
+  iew = 0
+  do ir = 1,nrows
+    do is = 1,nstripes
+      iew = iew+1
+      welems_pan(:,iew) = (/wstart(1,is)+npoints_row*(ir-1), &
+                            wstart(2,is)+npoints_row*(ir-1), &
+                            wstart(2,is)+npoints_row*(ir), &
+                            wstart(1,is)+npoints_row*(ir)/)
+    enddo
+  enddo
+ 
+  deallocate(wpoints_read, wstart, wvort_read)
+  call close_hdf5_group(gloc)
+ else
+   !panel wake not present, allocate stuff at zero size
+   allocate(wvort_pan(0), wpoints_pan(3,0), welems_pan(4,0))
+ endif
+
+ !get the ring wake
+ got_dset = check_dset_hdf5('RingWake',floc)
+ if(got_dset) then
+
+  call open_hdf5_group(floc,'RingWake',gloc)
+  call read_hdf5_al(wpoints_read,'WakePoints',gloc)
+  call read_hdf5_al(wconn,'Conn_pe',gloc)
+  call read_hdf5_al(wcen,'WakeCenters',gloc)
+  call read_hdf5_al(wvort_read,'WakeVort',gloc)
+  
+  ndisks = size(wvort_read,1); nrows = size(wvort_read,2)
+  npoints_row = size(wpoints_read,2)
+
+  nelem_w = ndisks*nrows
+
+  allocate(wpoints_rin(3,npoints_row*nrows+nelem_w))
+  allocate(welems_rin(4,npoints_row*nrows))
+  allocate(wvort_rin(npoints_row*nrows))
+
+  wpoints_rin(:,1:npoints_row*nrows) = reshape(wpoints_read, &
+                                          (/3,npoints_row*nrows/))
+  wpoints_rin(:,npoints_row*nrows+1:size(wpoints_rin,2)) = &
+         reshape(wcen, (/3,nelem_w/))
+
+  iew = 0; act_disk = 0
+  do ir = 1,nrows
+    do ip = 1, npoints_row
+      iew = iew+1
+
+      if(ip .eq. 1) then
+        first_elem = iew
+      else
+        if(wconn(ip-1) .ne. wconn(ip)) first_elem = iew
+      endif
+
+      if(ip.lt.npoints_row) then
+        if(wconn(ip+1) .ne. wconn(ip)) then
+          next_elem = first_elem
+        else
+          next_elem = iew + 1
+        endif
+      else
+        next_elem = first_elem
+      endif
+
+      welems_rin(1,iew) = iew
+      welems_rin(2,iew) = next_elem
+      !welems_rin(3,iew) = npoints_row*nrows+(ir-1)*nelem_w+wconn(ip)
+      welems_rin(3,iew) = npoints_row*nrows+(ir-1)*ndisks+wconn(ip)
+      welems_rin(4,iew) = 0
+
+      wvort_rin(iew) = wvort_read(wconn(ip),ir)
+    enddo
+  enddo
+
+  call close_hdf5_group(gloc)
+  deallocate(wpoints_read, wconn, wcen, wvort_read) 
+ else
+   allocate(wvort_rin(0), wpoints_rin(3,0), welems_rin(4,0))
+ endif
+
+ !Stitch together the two wakes
+ allocate(wpoints(3,size(wpoints_pan,2)+size(wpoints_rin,2)))
+ wpoints(:,1:size(wpoints_pan,2)) = wpoints_pan
+ wpoints(:,size(wpoints_pan,2)+1:size(wpoints,2)) = wpoints_rin
+ deallocate(wpoints_pan, wpoints_rin)
+
+ allocate(welems(4,size(welems_pan,2)+size(welems_rin,2)))
+ welems(:,1:size(welems_pan,2)) = welems_pan
+ welems(1:3,size(welems_pan,2)+1:size(welems,2)) = welems_rin(1:3,:) + &
+                                                   size(wpoints_pan,2)
+ welems(4,size(welems_pan,2)+1:size(welems,2)) = 0
+ deallocate(welems_pan, welems_rin)
+
+
+ allocate(wvort(size(wvort_pan)+size(wvort_rin)))
+ wvort(1:size(wvort_pan)) = wvort_pan
+ wvort(size(wvort_pan)+1:size(wvort)) = wvort_rin
+ deallocate(wvort_pan, wvort_rin)
+
+end subroutine load_wake_viz
 
 !----------------------------------------------------------------------
 

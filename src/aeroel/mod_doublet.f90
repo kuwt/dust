@@ -66,7 +66,7 @@ contains
 subroutine potential_calc_doublet(this, dou, pos)
  class(c_elem), intent(inout) :: this
  real(wp), intent(out) :: dou
- real(wp), intent(in) :: pos(:)
+ real(wp), contiguous, intent(in) :: pos(:)
 
  real(wp), dimension(3) :: e3
  !real(wp), dimension(3,4) :: ver_p ! Projected vertices on the mean plane
@@ -106,13 +106,9 @@ subroutine potential_calc_doublet(this, dou, pos)
 
    do i1 = 1 , this%n_ver
       
-     if ( this%n_ver .eq. 3 ) then
-       indm1 = prev_tri(i1)
-       indp1 = next_tri(i1)
-     else if ( this%n_ver .eq. 4 ) then
-       indm1 = prev_qua(i1)
-       indp1 = next_qua(i1)
-     end if
+     !This is ugly but should be general and work...
+     indp1 = 1+mod(i1,this%n_ver)
+     indm1 = this%n_ver - mod(this%n_ver-i1+1, this%n_ver)
    
      ! doublet  -----
      ! it is possible to use ver, instead of ver_p for the doublet
@@ -204,13 +200,17 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
 
    do i1 = 1 , this%n_ver
    
-     if ( this%n_ver .eq. 3 ) then
-       indm1 = prev_tri(i1)
-       indp1 = next_tri(i1)
-     else if ( this%n_ver .eq. 4 ) then
-       indm1 = prev_qua(i1)
-       indp1 = next_qua(i1)
-     end if
+     !if ( this%n_ver .eq. 3 ) then
+     !  indm1 = prev_tri(i1)
+     !  indp1 = next_tri(i1)
+     !else if ( this%n_ver .eq. 4 ) then
+     !  indm1 = prev_qua(i1)
+     !  indp1 = next_qua(i1)
+     !end if
+     !This is ugly but should be general and work...
+     indp1 = 1+mod(i1,this%n_ver)
+     indm1 = this%n_ver - mod(this%n_ver-i1+1, this%n_ver)
+
 
      ! use this%ver instead of its projection this%verp   
      !av = pos-this%verp(:,i1)

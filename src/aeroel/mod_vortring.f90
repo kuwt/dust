@@ -71,6 +71,7 @@ contains
   procedure, pass(this) :: build_row_static => build_row_static_vortring
   procedure, pass(this) :: add_wake         => add_wake_vortring
   procedure, pass(this) :: add_liftlin      => add_liftlin_vortring
+  procedure, pass(this) :: add_actdisk      => add_actdisk_vortring
   procedure, pass(this) :: compute_pot      => compute_pot_vortring
   procedure, pass(this) :: compute_vel      => compute_vel_vortring
   procedure, pass(this) :: compute_psi      => compute_psi_vortring
@@ -129,10 +130,12 @@ end subroutine build_row_vortring
 !! In this subroutine only the static part of the equations is built. It is
 !! called just once at the beginning of the simulation, and saves the AIC 
 !! coefficients for te static part and the static contribution to the rhs
-subroutine build_row_static_vortring(this, elems, ll_elems, linsys, uinf, ie, ista, iend)
+subroutine build_row_static_vortring(this, elems, ll_elems, ad_elems, linsys, &
+                                     uinf, ie, ista, iend)
  class(t_vortring), intent(inout) :: this
  type(t_elem_p), intent(in)       :: elems(:)
  type(t_elem_p), intent(in)       :: ll_elems(:)
+ type(t_elem_p), intent(in)       :: ad_elems(:)
  type(t_linsys), intent(inout)    :: linsys
  real(wp), intent(in)             :: uinf(:)
  integer, intent(in)              :: ie
@@ -161,6 +164,12 @@ subroutine build_row_static_vortring(this, elems, ll_elems, linsys, uinf, ie, is
                                   this%cen, this%nor,  1, 2 )
   enddo
   
+  !Now build the static contribution from the lifting line elements
+  do j1 = 1,linsys%nstatic_ad
+    call ad_elems(j1)%p%compute_psi( linsys%D_static(ie,j1), b1,  &
+                                  this%cen, this%nor,  1, 2 )
+  enddo
+
   !The rest of the dynamic part will be completed during the first 
   ! iteration of the assempling
 
@@ -206,6 +215,44 @@ end subroutine add_liftlin_vortring
 
 !----------------------------------------------------------------------
 
+!> Add the contribution of actuator disks to one equation for a vortex ring
+!!
+!! The rhs of the equation for a vortex ring is updated  adding the 
+!! the contribution of velocity due to the actuator disks
+subroutine add_actdisk_vortring(this, ad_elems, linsys, uinf, &
+                             ie, ista, iend)
+ class(t_vortring), intent(inout) :: this
+ type(t_elem_p), intent(in)       :: ad_elems(:)
+ type(t_linsys), intent(inout)    :: linsys
+ real(wp), intent(in)             :: uinf(:)
+ integer, intent(in)              :: ie
+ integer, intent(in)             :: ista
+ integer, intent(in)             :: iend
+
+ integer :: j1, ind1, ind2
+ real(wp) :: a, b(3)
+ integer :: n_impl
+  
+
+  !Static part: take what was already computed
+  do  j1 = 1, ista-1
+    linsys%b(ie) = linsys%b(ie) - linsys%D_static(ie,j1)*ad_elems(j1)%p%idou
+  enddo
+
+  ! Add the explicit vortex panel wake contribution to the rhs
+  do j1 = ista, iend
+
+    call ad_elems(j1)%p%compute_psi( a, b, this%cen, this%nor, 1, 2 )
+
+
+    linsys%b(ie) = linsys%b(ie) - a*ad_elems(j1)%p%idou
+
+  end do
+
+end subroutine add_actdisk_vortring
+
+!----------------------------------------------------------------------
+
 !> Add the contribution of the wake to one equation for a vortex ring
 !!
 !! The rhs of the equation for a surface panel is updated  adding the 
@@ -229,6 +276,8 @@ subroutine add_wake_vortring(this, wake_elems, impl_wake_ind, linsys, uinf, &
   n_impl = size(impl_wake_ind,2)
 
   !Add the contribution of the implicit wake panels to the linear system
+  !Implicitly we assume that the first set of wake panels are the implicit
+  !ones since are at the beginning of the list
   do j1 = 1 , n_impl
     ind1 = impl_wake_ind(1,j1); ind2 = impl_wake_ind(2,j1)
 !   if ((ind1.ge.ista .and. ind1.le.iend) .and. &

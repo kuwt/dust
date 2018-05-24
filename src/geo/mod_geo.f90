@@ -71,6 +71,9 @@ use mod_vortring, only: &
 use mod_liftlin, only: &
   t_liftlin
 
+use mod_actuatordisk, only: &
+  t_actdisk
+
 use mod_c81, only: &
   t_aero_tab , read_c81_table , interp_aero_coeff
 
@@ -102,7 +105,7 @@ implicit none
 
 public :: t_geo, t_geo_component, t_tedge, set_parameters_geo, &
           create_geometry, update_geometry, destroy_geometry, &
-          calc_geo_data_pan, calc_geo_data_ll
+          calc_geo_data_pan, calc_geo_data_ll, calc_geo_data_ad
 
 private
 
@@ -173,6 +176,8 @@ type :: t_geo_component
  integer :: nVortRin
  !> Number of lifting line elements in the component
  integer :: nLiftLin
+ !> Number of lifting line ele
+ integer :: nActDisk
 
  !> Is the component moving?
  logical :: moving
@@ -225,20 +230,20 @@ type :: t_geo
  !> Number of lifting line elements
  integer :: nll
 
+ !> Number of actuator disk elements
+ integer :: nad
+
  !> Number of surface panel elements
  integer :: nSurfPan
- !> Surface panels 
- !type(t_surfpan), allocatable :: SurfPan(:)
 
  !> Number of vortex ring elements
  integer :: nVortRin
- !> Vortex rings
- !type(t_vortring), allocatable :: VortRin(:)
 
  !> Number of lifting line elements
  integer :: nLiftLin
- !> Lifting lines
- !type(t_liftlin), allocatable :: LiftLin(:)
+
+ !> Number of Actuator disk elements
+ integer :: nActDisk
 
  !> Number of statical elements
  integer :: nstatic
@@ -247,6 +252,9 @@ type :: t_geo
 
  !> Number of static or moving lifting lines
  integer :: nstatic_ll, nmoving_ll
+
+ !> Number of static or moving lifting lines
+ integer :: nstatic_ad, nmoving_ad
 
  !> All the components of the geometry
  type(t_geo_component), allocatable :: components(:)
@@ -278,7 +286,7 @@ type t_tedge
  integer , allocatable :: i(:,:)
 
  !> Coordinates of the nodes of the TE
- real(wp), allocatable :: rr(:,:)
+ !real(wp), allocatable :: rr(:,:)
 
  !> TE id of the nodes of the TE elements
  integer , allocatable :: ii(:,:)
@@ -286,7 +294,7 @@ type t_tedge
  !> TE id of neighboring TE elements
  integer , allocatable :: neigh(:,:)
 
- !> Relavative orientation of the neighboring TE elements
+ !> Relative orientation of the neighboring TE elements
  integer , allocatable :: o(:,:)
 
  !> Unit vector at TE nodes
@@ -331,24 +339,28 @@ end subroutine set_parameters_geo
 !!    created, pointed at each element and then re-ordered with the static
 !!    elements first, and the dynamic elements at the end
 subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
-                           te, elems, elems_ll, elems_tot, airfoil_data, &
-                           sim_param)
+                           te, elems, elems_ll, elems_ad, elems_tot, &
+                           airfoil_data, sim_param)
  character(len=*), intent(in) :: geo_file_name
  character(len=*), intent(inout) :: ref_file_name
  character(len=*), intent(in) :: in_file_name
  type(t_geo), intent(out), target :: geo
  type(t_elem_p), allocatable, intent(out) :: elems(:)
  type(t_elem_p), allocatable, intent(out) :: elems_ll(:)
+ type(t_elem_p), allocatable, intent(out) :: elems_ad(:)
  type(t_elem_p), allocatable, intent(out) :: elems_tot(:)
  type(t_tedge), intent(out) :: te
  type(t_aero_tab) , allocatable, intent(out) :: airfoil_data(:)
  type(t_sim_param) , intent(inout) :: sim_param
  real(wp)                     :: tstart
 
- integer :: i, j, is, im,  i_comp, i_ll, i_tot
+ !character(len=max_char_len) :: reference_file
+ !character(len=max_char_len) :: geo_file_name
+
+ integer :: i, j, is, im,  i_comp, i_ll, i_ad, i_tot
  type(t_elem_p), allocatable :: temp_static(:), temp_moving(:)
 
- integer , allocatable :: el_id_old(:), el_id_old_static(:), el_id_old_moving(:)
+ !integer , allocatable :: el_id_old(:), el_id_old_static(:), el_id_old_moving(:)
 
  character(len=max_char_len) :: msg
  ! *** 20180523 ***
@@ -380,13 +392,17 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   ! Initialisation
   geo%nelem      = 0
   geo%nll        = 0
+  geo%nad        = 0
   geo%nstatic    = 0
   geo%nmoving    = 0
   geo%nstatic_ll = 0
   geo%nmoving_ll = 0
+  geo%nstatic_ad = 0
+  geo%nmoving_ad = 0
   geo%nSurfPan   = 0
   geo%nVortRin   = 0
   geo%nLiftLin   = 0
+  geo%nActDisk   = 0
 
   ! count the elements
   do i_comp = 1,size(geo%components)
@@ -417,6 +433,14 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
       endif
       geo%nLiftLin = geo%nLiftLin + geo%components(i_comp)%nelems
       geo%nll = geo%nll + geo%components(i_comp)%nelems
+    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'a') then
+      if(geo%components(i_comp)%moving) then
+        geo%nmoving_ad = geo%nmoving_ad + geo%components(i_comp)%nelems
+      else
+        geo%nstatic_ad = geo%nstatic_ad + geo%components(i_comp)%nelems
+      endif
+      geo%nActDisk = geo%nActDisk + geo%components(i_comp)%nelems
+      geo%nad = geo%nad + geo%components(i_comp)%nelems
     endif
     
   enddo
@@ -439,11 +463,16 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
     call printout(msg)
     write(msg,'(A,I9)') '  number of vortex rings:    ' ,geo%nvortrin
     call printout(msg)
+    write(msg,'(A,I9)') '  number of lifting lines:   ' ,geo%nvortrin
+    call printout(msg)
+    write(msg,'(A,I9)') '  number of actuator disks:  ' ,geo%nvortrin
+    call printout(msg)
   endif
 
   !Create the vector of pointers to all the elements
-  allocate(elems(geo%nelem), elems_ll(geo%nll), elems_tot(geo%nelem+geo%nll)) 
-  i=0; i_ll=0; i_tot=0
+  allocate(elems(geo%nelem), elems_ll(geo%nll), elems_ad(geo%nad), &
+           elems_tot(geo%nelem+geo%nll+geo%nad)) 
+  i=0; i_ll=0; i_ad=0; i_tot=0
   do i_comp = 1,size(geo%components)
     
     if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p' .or. &
@@ -453,7 +482,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
         i = i+1
         i_tot = i_tot+1
         elems(i)%p => geo%components(i_comp)%el(j)
-  !      elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
       enddo
 
     elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'l') then
@@ -462,7 +490,14 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
         i_ll = i_ll+1
         i_tot = i_tot+1
         elems_ll(i_ll)%p => geo%components(i_comp)%el(j)
-  !      elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
+      enddo
+
+    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'a') then
+
+      do j = 1,size(geo%components(i_comp)%el)
+        i_ad = i_ad+1
+        i_tot = i_tot+1
+        elems_ad(i_ad)%p => geo%components(i_comp)%el(j)
       enddo
 
     endif
@@ -471,19 +506,19 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   ! Sort elements: first static, then moving ------- 
   !fill in the two temporaries
   allocate(temp_static(geo%nstatic), temp_moving(geo%nmoving))
-  allocate(el_id_old(geo%nelem))          ; el_id_old = 0
-  allocate(el_id_old_static(geo%nstatic)) ; el_id_old_static = 0
-  allocate(el_id_old_moving(geo%nmoving)) ; el_id_old_moving = 0
+  !allocate(el_id_old(geo%nelem))          ; el_id_old = 0
+  !allocate(el_id_old_static(geo%nstatic)) ; el_id_old_static = 0
+  !allocate(el_id_old_moving(geo%nmoving)) ; el_id_old_moving = 0
   is = 0; im = 0;
   do i = 1,geo%nelem
     if(elems(i)%p%moving) then
       im = im+1
       temp_moving(im) = elems(i)
-      el_id_old_moving(im) = i
+      !el_id_old_moving(im) = i
     else
       is = is+1
       temp_static(is) = elems(i)
-      el_id_old_static(is) = i
+      !el_id_old_static(is) = i
     endif
   enddo
 
@@ -491,8 +526,8 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   elems(1:geo%nstatic) = temp_static
   elems(geo%nstatic+1:geo%nelem) = temp_moving
 
-  el_id_old(1:geo%nstatic) = el_id_old_static
-  el_id_old(geo%nstatic+1:geo%nelem) = el_id_old_moving
+  !el_id_old(1:geo%nstatic) = el_id_old_static
+  !el_id_old(geo%nstatic+1:geo%nelem) = el_id_old_moving
  
   !Update the indexing since we re-ordered the vector
   do i = 1,geo%nelem
@@ -538,14 +573,31 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
     elems_ll(geo%nstatic_ll+1:geo%nll) = temp_moving
   endif
 
-  !Update te%neigh NOT NEEDED, because in te numbering
+  !Now re-order the actuator disks
+  deallocate(temp_static, temp_moving)
+  allocate(temp_static(geo%nstatic_ad), temp_moving(geo%nmoving_ad))
+  is = 0; im = 0;
+  do i = 1,geo%nad
+    if(elems_ad(i)%p%moving) then
+      im = im+1
+      temp_moving(im) = elems_ad(i)
+    else
+      is = is+1
+      temp_static(is) = elems_ad(i)
+    endif
+  enddo
+  if(geo%nad .gt. 0) then
+    elems_ad(1:geo%nstatic_ad) = temp_static
+    elems_ad(geo%nstatic_ad+1:geo%nad) = temp_moving
+  endif
 
   deallocate(temp_static, temp_moving)
-  deallocate(el_id_old, el_id_old_static, el_id_old_moving)
+  !deallocate(el_id_old, el_id_old_static, el_id_old_moving)
 
   !Patch together everything in elems_tot
   elems_tot(1:geo%nelem) = elems
   elems_tot(geo%nelem+1:geo%nelem+geo%nll) =elems_ll
+  elems_tot(geo%nelem+geo%nll+1:geo%nelem+geo%nll+geo%nad) = elems_ad
 
   call create_local_velocity_stencil(geo,elems)    ! for surfpan only (3dP)
 
@@ -588,15 +640,16 @@ subroutine load_components(geo, in_file, sim_param, te)
  ! trailing edge ------
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
  integer , allocatable :: neigh_te(:,:) , o_te(:,:)
- real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
+ real(wp), allocatable :: t_te(:,:)
  integer :: ne_te , nn_te
  ! tmp arrays --------
  type(t_elem_p) , allocatable :: e_te_tmp(:,:)
- integer, allocatable  ::i_te_tmp(:,:) , ii_te_tmp(:,:) 
+ integer, allocatable  :: i_te_tmp(:,:) , ii_te_tmp(:,:) 
  integer , allocatable :: neigh_te_tmp(:,:) , o_te_tmp(:,:)
- real(wp), allocatable ::rr_te_tmp(:,:) , t_te_tmp(:,:)
+ real(wp), allocatable :: t_te_tmp(:,:)
  integer , allocatable :: ref_te_tmp(:)
  integer :: ne_te_prev , nn_te_prev ! # n. elements and nodes at TE ( of the prev. comps) 
+ real(wp) :: trac, rad
 
  character(len=*), parameter :: this_sub_name = 'load_components'
 
@@ -692,7 +745,7 @@ subroutine load_components(geo, in_file, sim_param, te)
       call read_hdf5(comp_name,'CompName',cloc)
       geo%components(i_comp)%comp_name = trim(comp_name)
 
-      ! Geometry and Solution --------------------------
+      ! Geometry --------------------------
       call open_hdf5_group(cloc,'Geometry',geo_loc)
       call read_hdf5_al(ee   ,'ee'   ,geo_loc)
       call read_hdf5_al(rr   ,'rr'   ,geo_loc)
@@ -720,17 +773,24 @@ subroutine load_components(geo, in_file, sim_param, te)
 
 
 
-      ! Trailing Edge ----------------------------------
-      call open_hdf5_group(cloc,'Trailing_Edge',te_loc)
-      call read_hdf5_al(    e_te,    'e_te',te_loc)
-      call read_hdf5_al(    i_te,    'i_te',te_loc)
-      call read_hdf5_al(   rr_te,   'rr_te',te_loc)
-      call read_hdf5_al(   ii_te,   'ii_te',te_loc)
-      call read_hdf5_al(neigh_te,'neigh_te',te_loc)
-      call read_hdf5_al(    o_te,    'o_te',te_loc)
-      call read_hdf5_al(    t_te,    't_te',te_loc)
-      !call read_hdf5_al(  ref_te,  'ref_te',te_loc)
-      call close_hdf5_group(te_loc)
+      ! Trailing Edge (not all elements build the trailing edge)
+      if( comp_el_type(1:1) .eq. 'p' .or. &
+          comp_el_type(1:1) .eq. 'v' .or. &
+          comp_el_type(1:1) .eq. 'l') then
+        call open_hdf5_group(cloc,'Trailing_Edge',te_loc)
+        call read_hdf5_al(    e_te,    'e_te',te_loc)
+        call read_hdf5_al(    i_te,    'i_te',te_loc)
+        !call read_hdf5_al(   rr_te,   'rr_te',te_loc)
+        call read_hdf5_al(   ii_te,   'ii_te',te_loc)
+        call read_hdf5_al(neigh_te,'neigh_te',te_loc)
+        call read_hdf5_al(    o_te,    'o_te',te_loc)
+        call read_hdf5_al(    t_te,    't_te',te_loc)
+        !call read_hdf5_al(  ref_te,  'ref_te',te_loc)
+        call close_hdf5_group(te_loc)
+      else
+        allocate(e_te(0,0), i_te(2,0), ii_te(2,0), neigh_te(2,0), o_te(2,0),&
+                 t_te(2,0))
+      endif
  
      
 
@@ -770,9 +830,11 @@ subroutine load_components(geo, in_file, sim_param, te)
         allocate(t_vortring::geo%components(i_comp)%el(size(ee,2)))
        case('l')
         allocate(t_liftlin::geo%components(i_comp)%el(size(ee,2)))
+       case('a')
+        allocate(t_actdisk::geo%components(i_comp)%el(size(ee,2)))
        case default
         call error(this_sub_name, this_mod_name, &
-                 'Unknown type of element: '//geo%components(i_comp)%comp_el_type)
+          'Unknown type of element: '//geo%components(i_comp)%comp_el_type)
       end select
       
       !fill (some) of the elements fields
@@ -813,15 +875,31 @@ subroutine load_components(geo, in_file, sim_param, te)
 ! TODO: add nLiftLin field ???
 !     if(comp_el_type(1:1) .eq. 'l') geo%components(i_comp)%nLiftLin = size(ee,2)
 
+      !If it is an actuator disk read the traction
+      if(geo%components(i_comp)%comp_el_type(1:1) .eq. 'a') then
+        call read_hdf5(trac,'Traction',cloc)
+        call read_hdf5(rad,'Radius',cloc)
+        select type (el=>geo%components(i_comp)%el)
+        type is(t_actdisk)
+          do i2 = 1,size(el)
+            el(i2)%traction = trac
+            el(i2)%radius = rad
+          enddo
+        end select
+      endif
+
+
+
       ! Trailing Edge ------------
-      ne_te = size(e_te,2)
-      nn_te = size(i_te,2)
+      ne_te = 0; nn_te=0
+      if(allocated(e_te)) ne_te = size(e_te,2)
+      if(allocated(i_te)) nn_te = size(i_te,2)
       if (sim_param%debug_level .ge. 3) then
         write(msg,'(A,I0,A,I0)') ' Trailing edge: elements: ', &
                                                        ne_te, ' nodes ', nn_te
         call printout(msg)
       endif
-      if (.not.allocated(te%e)) then ! it should be enough
+      if (.not.allocated(te%e) ) then ! it should be enough
         allocate(te%e    (2,ne_te) )
         do i1 = 1,ne_te
           te%e(1,i1)%p => null()
@@ -831,13 +909,15 @@ subroutine load_components(geo, in_file, sim_param, te)
             te%e(2,i1)%p  => geo%components(i_comp)%el(e_te(2,i1)) 
         enddo 
         allocate(te%i    (2,nn_te) ) ; te%i     =     i_te 
-        allocate(te%rr   (3,nn_te) ) ; te%rr    =    rr_te
+        !allocate(te%rr   (3,nn_te) ) ; te%rr    =    rr_te
         allocate(te%ii   (2,ne_te) ) ; te%ii    =    ii_te 
         allocate(te%neigh(2,ne_te) ) ; te%neigh = neigh_te
         allocate(te%o    (2,ne_te) ) ; te%o     =     o_te
         allocate(te%t    (2,nn_te) ) ; te%t     =     t_te
         allocate(te%ref  (  nn_te) ) ; te%ref   =   geo%components(i_comp)%ref_id
-      else
+        deallocate(e_te, i_te, ii_te, neigh_te, o_te, t_te)
+
+      elseif (ne_te .gt. 0) then
         nn_te_prev = size(te%i,2)
         ne_te_prev = size(te%e,2)
         allocate(e_te_tmp(2,size(te%e,2)+ne_te)) 
@@ -854,10 +934,10 @@ subroutine load_components(geo, in_file, sim_param, te)
         i_te_tmp(:,             1:size(te%i,2)    ) = te%i
         i_te_tmp(:,size(te%i,2)+1:size(i_te_tmp,2)) = i_te + points_offset
         call move_alloc(i_te_tmp,te%i) 
-        allocate(rr_te_tmp(3,size(te%rr,2)+nn_te)) 
-        rr_te_tmp(:,              1:size(te%rr,2)    ) = te%rr
-        rr_te_tmp(:,size(te%rr,2)+1:size(rr_te_tmp,2)) = rr_te
-        call move_alloc(rr_te_tmp,te%rr) 
+        !allocate(rr_te_tmp(3,size(te%rr,2)+nn_te)) 
+        !rr_te_tmp(:,              1:size(te%rr,2)    ) = te%rr
+        !rr_te_tmp(:,size(te%rr,2)+1:size(rr_te_tmp,2)) = rr_te
+        !call move_alloc(rr_te_tmp,te%rr) 
         allocate(ii_te_tmp(2,size(te%ii,2)+ne_te)) 
         ii_te_tmp(:,              1:size(te%ii,2)    ) = te%ii
         ii_te_tmp(:,size(te%ii,2)+1:size(ii_te_tmp,2)) = ii_te + nn_te_prev 
@@ -881,6 +961,7 @@ subroutine load_components(geo, in_file, sim_param, te)
                                                   geo%components(i_comp)%ref_id
 
         call move_alloc(ref_te_tmp,te%ref) 
+        deallocate(e_te, i_te, ii_te, neigh_te, o_te, t_te)
       end if 
 
       !:::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -1073,6 +1154,15 @@ subroutine prepare_geometry(geo)
 
        ! elem%theta   <-- ??? 
 
+      class is(t_actdisk)
+       allocate(elem%tang(3,2))
+       allocate(elem%verp(3,nsides))
+       allocate(elem%edge_vec(3,nsides))
+       allocate(elem%edge_len(nsides))
+       allocate(elem%edge_uni(3,nsides))
+       allocate(elem%cosTi(nsides))
+       allocate(elem%sinTi(nsides))
+
       class default
        call error(this_sub_name, this_mod_name, 'Unknown element type')
      end select
@@ -1249,6 +1339,78 @@ subroutine calc_geo_data_ll(elem,vert)
 
 
 end subroutine calc_geo_data_ll
+
+!----------------------------------------------------------------------
+
+!> Calculate the geometrical quantities of an actuator disk
+!!
+!! The subroutine calculates all the relevant geometrical quantities of an
+!! actuator disk
+subroutine calc_geo_data_ad(elem,vert)
+ class(c_elem), intent(inout) :: elem  
+ real(wp), intent(in) :: vert(:,:)
+
+ integer :: nsides, is
+ real(wp):: nor(3), tanl(3)
+ integer :: nxt
+  
+  nsides = size(vert,2)
+
+  elem%n_ver = nsides
+  
+  ! vertices
+  elem%ver = vert
+
+  ! center, for the lifting line is the mid-point 
+  elem%cen =  sum ( vert,2 ) / real(nsides,wp)
+  
+  elem%area = 0.0_wp; elem%nor = 0.0_wp
+  do is = 1, nsides
+    nxt = 1+mod(is,nsides)
+    nor = cross(vert(:,is) - elem%cen,&
+                vert(:,nxt) - elem%cen )
+    elem%area = elem%area + 0.5_wp * norm2(nor)
+    elem%nor = elem%nor + nor/norm2(nor)
+  enddo
+    elem%nor = elem%nor/real(nsides,wp)
+
+  ! local tangent unit vector: aligned with first node, normal to n
+  tanl = (vert(:,1)-elem%cen)-sum((vert(:,1)-elem%cen)*elem%nor)*elem%nor
+  
+  elem%tang(:,1) = tanl / norm2(tanl)
+  elem%tang(:,2) = cross( elem%nor, elem%tang(:,1)  )
+
+  ! projection of the vertices on the mean plane
+  do is = 1 , nsides
+    elem%verp(:,is) = vert(:,is) - elem%nor * &
+                      sum( (vert(:,is) - elem%cen ) * elem%nor )
+  end do
+  
+  ! vector connecting two consecutive vertices: 
+  do is = 1 , nsides
+    nxt = 1+mod(is,nsides)
+    elem%edge_vec(:,is) = vert(:,nxt) - vert(:,is)
+  end do
+
+  ! edge: edge_len(:) 
+  do is = 1 , nsides
+    elem%edge_len(is) = norm2(elem%edge_vec(:,is)) 
+  end do
+
+  ! unit vector 
+  do is = 1 , nsides
+    elem%edge_uni(:,is) = elem%edge_vec(:,is) / elem%edge_len(is)
+  end do
+  
+
+  ! cosTi , sinTi
+  do is = 1 , nsides
+    elem%cosTi(is) = sum( elem%edge_uni(:,is) * elem%tang(:,1) ) 
+    elem%sinTi(is) = sum( elem%edge_uni(:,is) * elem%tang(:,2) ) 
+  end do
+
+
+end subroutine calc_geo_data_ad
 
 !----------------------------------------------------------------------
 
@@ -2420,6 +2582,14 @@ subroutine update_geometry(geo, t, update_static)
        case('l')
         do ie = 1,size(comp%el)
           call calc_geo_data_ll(comp%el(ie),geo%points(:,comp%el(ie)%i_ver))
+
+          !Calculate the velocity of the centers to impose the boundary condition
+          call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &
+                                  geo%refs(comp%ref_id)%f_g)
+        enddo
+       case('a')
+        do ie = 1,size(comp%el)
+          call calc_geo_data_ad(comp%el(ie),geo%points(:,comp%el(ie)%i_ver))
 
           !Calculate the velocity of the centers to impose the boundary condition
           call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &

@@ -78,9 +78,11 @@ use mod_hdf5_io, only: &
 use mod_geometry, only: &
   t_geo
 
-use mod_wake, only: &
+use mod_wake_pan, only: &
   t_wake_panels
 
+use mod_wake_ring, only: &
+  t_wake_rings
 !----------------------------------------------------------------------
 
 implicit none
@@ -97,9 +99,10 @@ character(len=*), parameter :: this_mod_name = 'mod_dust_io'
 contains
 
 !----------------------------------------------------------------------
-subroutine save_status(geo, wake, sim_params, it, time, run_id)
+subroutine save_status(geo, wake_pan, wake_rin, sim_params, it, time, run_id)
  type(t_geo), intent(in)         :: geo
- type(t_wake_panels), intent(in) :: wake
+ type(t_wake_panels), intent(in) :: wake_pan
+ type(t_wake_rings), intent(in) :: wake_rin
  type(t_sim_param), intent(in)  :: sim_params
  integer, intent(in)             :: it
  real(wp), intent(in)            :: time
@@ -112,6 +115,9 @@ subroutine save_status(geo, wake, sim_params, it, time, run_id)
  character(len=max_char_len) :: ref_name
  integer :: ie, ne
  real(wp), allocatable :: vort(:), cp(:)
+ real(wp), allocatable :: points_w(:,:,:), cent(:,:,:)
+ integer, allocatable :: conn_pe(:)
+ integer :: ir, id, ip, np
 
   !create the output file
   write(sit,'(I4.4)') it
@@ -164,13 +170,34 @@ subroutine save_status(geo, wake, sim_params, it, time, run_id)
   ! connectivity to build connectivity after
   call new_hdf5_group(floc, 'PanelWake', gloc1)
 
-  call write_hdf5(wake%w_points(:,:,1:wake%wake_len+1),'WakePoints',gloc1 )
-  call write_hdf5(wake%i_start_points,'StartPoints',gloc1)
-  call write_hdf5(wake%ivort(:,1:wake%wake_len),'WakeVort',gloc1)
+  call write_hdf5(wake_pan%w_points(:,:,1:wake_pan%wake_len+1),'WakePoints',gloc1 )
+  call write_hdf5(wake_pan%i_start_points,'StartPoints',gloc1)
+  call write_hdf5(wake_pan%ivort(:,1:wake_pan%wake_len),'WakeVort',gloc1)
 
   call close_hdf5_group(gloc1)
 
-  ! 3) %%%% Referenced
+  call new_hdf5_group(floc, 'RingWake', gloc1)
+  allocate(points_w(3,wake_rin%np_row,wake_rin%wake_len))
+  allocate(conn_pe(wake_rin%np_row))
+  allocate(cent(3,wake_rin%ndisks,wake_rin%wake_len))
+  ip = 1
+  do id = 1,wake_rin%ndisks
+    np = wake_rin%gen_elems(id)%p%n_ver
+    do ir = 1,wake_rin%wake_len
+      points_w(:,ip:ip+np-1,ir) = wake_rin%wake_rings(id,ir)%ver(:,:)
+      cent(:,id,ir) = wake_rin%wake_rings(id,ir)%cen(:)
+    enddo
+    conn_pe(ip:ip+np-1) = id
+    ip = ip+np
+  enddo
+  call write_hdf5(points_w,'WakePoints',gloc1)
+  call write_hdf5(conn_pe,'Conn_pe',gloc1)
+  call write_hdf5(cent,'WakeCenters',gloc1)
+  call write_hdf5(wake_rin%ivort(:,1:wake_rin%wake_len),'WakeVort',gloc1)
+  call close_hdf5_group(gloc1)
+  deallocate(points_w, conn_pe, cent)
+
+  ! 3) %%%% References
   ! save the whole list of references
   call new_hdf5_group(floc, 'References', gloc1)
   nref = size(geo%refs)
