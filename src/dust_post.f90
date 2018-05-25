@@ -89,7 +89,7 @@ use mod_wake_ring, only: &
   t_wake_rings
 
 use mod_tecplot_out, only: &
-  tec_out_viz, tec_out_probes
+  tec_out_viz, tec_out_probes, tec_out_box
 
 use mod_vtk_out, only: &
   vtk_out_viz , vtr_write
@@ -188,7 +188,6 @@ real(wp) :: dxbox , dybox , dzbox
 real(wp), allocatable :: box_vel(:,:) , box_p(:) , box_vort(:,:)
 integer :: ix , iy , iz
 integer , allocatable :: vars_n(:)
-character(len=max_char_len) , allocatable :: vars_name(:)
 real(wp), allocatable :: vars(:,:) 
 integer :: i_vars , i_var_v , i_var_p , i_var_w
 ! loads -----------
@@ -814,7 +813,7 @@ do ia = 1,n_analyses
    !//////////////////Flow Field \\\\\\\\\\\\\\\\\
    case('flow_field')
 
-    allocate(vars_name(3)) ; vars_name = ' '
+    allocate(var_names(3)) ; var_names = ' '
     allocate(vars_n   (3)) ; vars_n = 0
 
     ! Read variables to save : velocity | pressure | vorticity
@@ -896,21 +895,21 @@ do ia = 1,n_analyses
     if ( probe_vel ) then
       allocate(box_vel (product(nxyz),3))
       i_var = i_var + 1
-      vars_name(i_var) = 'velocity'
+      var_names(i_var) = 'velocity'
       vars_n(i_var) = 3
       i_var_v = 3
     end if
     if ( probe_p   ) then
       allocate(box_p   (product(nxyz)  ))
       i_var = i_var + 1
-      vars_name(i_var) = 'pressure'
+      var_names(i_var) = 'pressure'
       vars_n(i_var) = 1
       i_var_p = i_var_v + 1
     end if 
     if ( probe_vort) then
       allocate(box_vort(product(nxyz),3))
       i_var = i_var + 1
-      vars_name(i_var) = 'vorticity'
+      var_names(i_var) = 'vorticity'
       vars_n(i_var) = 3
       i_var_w = i_var_p + 3
     end if
@@ -947,8 +946,6 @@ do ia = 1,n_analyses
                  wvort_pan,  wvort_rin, wake_pan, wake_rin, wake_elems )
 
      ! Compute velocity --------------------------
-     write(filename,'(A,I4.4,A)') trim(basename)//'_'//trim(an_name)//&
-                                                            '_',it,'.vtr'
      ip = 0
      ! Loop over the nodes of the box
      do iz = 1 , size(zbox)
@@ -1014,8 +1011,44 @@ do ia = 1,n_analyses
      end do
 
 
+    select case (trim(out_frmt))
+
+    case ('vtk')
+     write(filename,'(A,I4.4,A)') trim(basename)//'_'//trim(an_name)//&
+                                                            '_',it,'.vtr'
      call vtr_write ( filename , xbox , ybox , zbox , &
-                      vars_n(1:i_var) , vars_name(1:i_var) , vars ) 
+                      vars_n(1:i_var) , var_names(1:i_var) , vars ) 
+
+    case('tecplot')
+     write(filename,'(A,I4.4,A)') trim(basename)//'_'//trim(an_name)//&
+                                                            '_',it,'.plt'
+
+     i_var = 0
+     deallocate(var_names)
+     allocate(var_names(7))
+     if(probe_vel) then
+       var_names(i_var + 1) = 'ux'
+       var_names(i_var + 2) = 'uy'
+       var_names(i_var + 3) = 'uz'
+       i_var = i_var + 3
+     endif
+     if(probe_p) then
+       var_names(i_var + 1) = 'p'
+       i_var = i_var + 1
+     endif
+     if(probe_vort) then
+       var_names(i_var + 1) = 'omx'
+       var_names(i_var + 2) = 'omy'
+       var_names(i_var + 3) = 'omz'
+       i_var = i_var + 3
+     endif
+
+     call tec_out_box(filename, t, xbox, ybox, zbox, vars, var_names(1:i_var))
+
+    case default
+      call error('dust_post','','Unknown format '//trim(out_frmt)//&
+                 ' for flowfield output')
+    end select
 
 !    !CHECK
 !    close(fid_out)
@@ -1028,7 +1061,7 @@ do ia = 1,n_analyses
     deallocate(xbox,ybox,zbox)
     deallocate(comps,sol)
 
-    deallocate(vars_name,vars_n,vars)
+    deallocate(var_names,vars_n,vars)
 
    case default
     call error('dust_post','','Unknown type of analysis: '//trim(an_type))

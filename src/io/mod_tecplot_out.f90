@@ -43,7 +43,7 @@ use mod_handling, only: &
 !---------------------------------------------------------------------
 implicit none
 
-public :: tec_out_sol_bin, tec_out_viz, tec_out_probes
+public :: tec_out_sol_bin, tec_out_viz, tec_out_probes, tec_out_box
 
 private
 
@@ -687,6 +687,145 @@ subroutine tec_out_viz(out_filename, t, &
 
 end subroutine tec_out_viz
 
+!----------------------------------------------------------------------
+
+subroutine tec_out_box(out_filename, time, xpoints, ypoints, zpoints, vars, var_names)
+ character(len=*), intent(in) :: out_filename 
+ real(wp), intent(in) :: time
+ real(wp), intent(in) :: xpoints(:)
+ real(wp), intent(in) :: ypoints(:)
+ real(wp), intent(in) :: zpoints(:)
+ real(wp), intent(in) :: vars(:,:)
+ character(len=*), intent(in) :: var_names(:)
+ 
+ character, parameter :: zc = char(0)
+ integer :: fu, ierr, i1, i2, i3
+ real(kind=4)  , parameter :: zoneMarker = 299.0
+ real(kind=4)  , parameter :: eohMarker  = 357.0
+ character(len=max_char_len) :: buffer_char
+ integer :: nvars, iv
+
+
+  nvars = size(var_names)
+
+  call new_file_unit(fu,ierr)
+  open(unit=fu,file=trim(out_filename),status='replace',access='stream', &
+       form='unformatted',iostat=ierr)
+
+  !magic number
+  buffer_char = "#!TDV112" ;  write(fu) trim(buffer_char) 
+
+  !integer 1 to set the byte order
+  write(fu) int(1,s_size)
+
+  !integer 0 to mark a full file (1=solution only, 2=grid only)
+  write(fu) int(0,s_size)
+
+  !title
+  call put_tec_string('DUST flowfield',fu)
+
+  !number of variables
+  write(fu) int(3+nvars,s_size) !x y z+vars
+
+  !Variables names
+  call put_tec_string('X',fu)
+  call put_tec_string('Y',fu)
+  call put_tec_string('Z',fu)
+  do iv = 1,nvars
+    call put_tec_string(trim(var_names(iv)),fu)
+  enddo
+  
+  !Zone marker
+  write(fu) zoneMarker
+
+  !Zone name
+  call put_tec_string('flowfield',fu)
+
+  !Parent zone: -1 for no parent (not too clear)
+  write(fu) int(-1,s_size)
+
+  !Strand id: -2 for automatic generation
+  write(fu) int(-2,s_size)
+
+  !Solution time
+  write(fu) real(time,d_size)
+
+  !"not used, set to -1"
+  write(fu) int(-1,s_size) 
+  
+  !Zone type: 0 ordered, 3 unstructured quadrilateral
+  write(fu) int(0,s_size)
+
+  !Toggle variable location specification: no, default on nodes
+  write(fu) int(0,s_size)
+
+  !are local neighbour supplied? No.
+  write(fu) int(0,s_size)
+
+  !Number of miscellaneous somethings
+  write(fu) int(0,s_size)
+
+  !Ordered zone: Imax, Jmax, Kmax
+  write(fu) int(size(xpoints),s_size)
+  write(fu) int(size(ypoints),s_size)
+  write(fu) int(size(zpoints),s_size)
+
+  !"no more auxilliary name/value pairs"
+  write(fu) int(0,s_size)
+
+
+  !DATA
+  write(fu) eohMarker
+
+  !Zone marker
+  write(fu) zoneMarker
+
+  !Size of the variables: 2=double
+  write(fu) int(2,s_size) !x
+  write(fu) int(2,s_size) !y
+  write(fu) int(2,s_size) !z
+  do iv = 1,nvars
+    write(fu) int(2,s_size)
+  enddo
+
+  !Has passive variables?
+  write(fu) int(0,s_size)
+
+  !Has variable sharing?
+  write(fu) int(0,s_size)
+
+  !sharing connectivity? -1 no sharing
+  write(fu) int(-1,s_size)
+
+  !Min e max
+  write(fu) dble(minval( xpoints ))
+  write(fu) dble(maxval( xpoints ))
+  write(fu) dble(minval( ypoints ))
+  write(fu) dble(maxval( ypoints ))
+  write(fu) dble(minval( zpoints ))
+  write(fu) dble(maxval( zpoints ))
+  do iv = 1,nvars
+    write(fu) dble(minval( vars(iv,:) ))
+    write(fu) dble(maxval( vars(iv,:) ))
+  enddo
+
+  !The actual data
+  do i3 = 1,size(zpoints); do i2 = 1,size(ypoints); do i1 = 1, size(xpoints)
+    write(fu) real(xpoints(i1), d_size)
+    write(fu) real(ypoints(i2), d_size)
+    write(fu) real(zpoints(i3), d_size)
+  enddo; enddo; enddo
+
+  do iv = 1,nvars
+    do i1 = 1, size(vars,2)
+      write(fu) real(vars(iv,i1),d_size)
+    enddo
+  enddo
+
+end subroutine
+
+!---------------------------------------------------------------------
+
 !---------------------------------------------------------------------
 
 subroutine tec_out_probes(out_filename, time, vars, var_names, zone_names)
@@ -740,8 +879,6 @@ subroutine tec_out_probes(out_filename, time, vars, var_names, zone_names)
 
     !Zone name
     call put_tec_string(trim(zone_names(ip)),fu)
-    !DEBUG
-    write(*,*) 'zone',ip,trim(zone_names(ip))
 
     !Parent zone: -1 for no parent (not too clear)
     write(fu) int(-1,s_size)
