@@ -43,7 +43,7 @@ use mod_handling, only: &
 !---------------------------------------------------------------------
 implicit none
 
-public :: tec_out_sol_bin, tec_out_viz
+public :: tec_out_sol_bin, tec_out_viz, tec_out_probes
 
 private
 
@@ -70,11 +70,11 @@ subroutine tec_out_sol_bin(rr, ee, vort, w_rr, w_ee, w_vort, t, out_filename)
 
  character, parameter :: zc = char(0)
  integer :: npoints, ncells, ne
- integer :: fu, ierr, i, i1, i2, i_shift
+ integer :: fu, ierr, i1, i2
  real(kind=4)  , parameter :: zoneMarker = 299.0
  real(kind=4)  , parameter :: eohMarker  = 357.0
  character(len=max_char_len) :: buffer_char
- integer :: ie, nquad, ntria, etype
+ integer :: ie, nquad, ntria
  integer npoints_w, nw
 
 
@@ -365,11 +365,11 @@ subroutine tec_out_viz(out_filename, t, &
 
  character, parameter :: zc = char(0)
  integer :: npoints, ncells, ne
- integer :: fu, ierr, i, i1, i2, i_shift
+ integer :: fu, ierr, i1, i2
  real(kind=4)  , parameter :: zoneMarker = 299.0
  real(kind=4)  , parameter :: eohMarker  = 357.0
  character(len=max_char_len) :: buffer_char
- integer :: ie, nquad, ntria, etype
+ integer :: ie, nquad, ntria
  integer npoints_w, nw
  logical :: got_wake
  integer :: nvars, w_nvars, iv
@@ -686,6 +686,148 @@ subroutine tec_out_viz(out_filename, t, &
   
 
 end subroutine tec_out_viz
+
+!---------------------------------------------------------------------
+
+subroutine tec_out_probes(out_filename, time, vars, var_names, zone_names)
+ character(len=*), intent(in) :: out_filename 
+ real(wp), intent(in) :: time(:)
+ real(wp), intent(in) :: vars(:,:,:)
+ character(len=*), intent(in) :: var_names(:)
+ character(len=*), intent(in) :: zone_names(:)
+ 
+ character, parameter :: zc = char(0)
+ integer :: fu, ierr, i1
+ real(kind=4)  , parameter :: zoneMarker = 299.0
+ real(kind=4)  , parameter :: eohMarker  = 357.0
+ character(len=max_char_len) :: buffer_char
+ integer :: nvars, ip, nprobes, varlen, iv
+
+
+  nvars = size(var_names)
+  nprobes = size(zone_names)
+  varlen = size(vars, 2)
+
+  call new_file_unit(fu,ierr)
+  open(unit=fu,file=trim(out_filename),status='replace',access='stream', &
+       form='unformatted',iostat=ierr)
+
+  !magic number
+  buffer_char = "#!TDV112" ;  write(fu) trim(buffer_char) 
+
+  !integer 1 to set the byte order
+  write(fu) int(1,s_size)
+
+  !integer 0 to mark a full file (1=solution only, 2=grid only)
+  write(fu) int(0,s_size)
+
+  !title
+  call put_tec_string('DUST probes',fu)
+
+  !number of variables
+  write(fu) int(1+nvars,s_size) !t+vars
+
+  !Variables names
+  call put_tec_string('t',fu)
+  do iv = 1,nvars
+    call put_tec_string(trim(var_names(iv)),fu)
+  enddo
+  
+  !A single zone for each probe
+  do ip = 1,nprobes
+    !Zone marker
+    write(fu) zoneMarker
+
+    !Zone name
+    call put_tec_string(trim(zone_names(ip)),fu)
+    !DEBUG
+    write(*,*) 'zone',ip,trim(zone_names(ip))
+
+    !Parent zone: -1 for no parent (not too clear)
+    write(fu) int(-1,s_size)
+
+    !Strand id: -2 for automatic generation
+    write(fu) int(-2,s_size)
+
+    !Solution time, useless in this case
+    write(fu) real(0.0,d_size)
+
+    !"not used, set to -1"
+    write(fu) int(-1,s_size) 
+    
+    !Zone type: 0 ordered, 3 unstructured quadrilateral
+    write(fu) int(0,s_size)
+
+    !Toggle variable location specification: no, default on nodes
+    write(fu) int(0,s_size)
+
+    !are local neighbour supplied? No.
+    write(fu) int(0,s_size)
+
+    !Number of miscellaneous somethings
+    write(fu) int(0,s_size)
+
+    !Ordered zone: Imax, Jmax, Kmax
+    write(fu) int(varlen,s_size)
+    write(fu) int(1,s_size)
+    write(fu) int(1,s_size)
+
+    !Number of elemenst
+    !write(fu) int(varlen,s_size)
+
+    ! All zero, three fields, for future use
+    !write(fu) int(0,s_size) , int(0,s_size) , int(0,s_size)
+
+    !"no more auxilliary name/value pairs"
+    write(fu) int(0,s_size)
+
+  enddo
+
+  !DATA
+  write(fu) eohMarker
+
+  do ip=1,nprobes
+
+    !Zone marker
+    write(fu) zoneMarker
+
+    !Size of the variables: 2=double
+    write(fu) int(2,s_size) !time
+    do iv = 1,nvars
+      write(fu) int(2,s_size)
+    enddo
+
+    !Has passive variables?
+    write(fu) int(0,s_size)
+
+    !Has variable sharing?
+    write(fu) int(0,s_size)
+
+    !sharing connectivity? -1 no sharing
+    write(fu) int(-1,s_size)
+
+    !Min e max
+    write(fu) dble(minval( time ))
+    write(fu) dble(maxval( time ))
+    do iv = 1,nvars
+      write(fu) dble(minval( vars(iv,:,ip) ))
+      write(fu) dble(maxval( vars(iv,:,ip) ))
+    enddo
+
+    !The actual data
+    do i1 = 1, varlen
+      write(fu) real(time(i1), d_size)
+    enddo
+    do iv = 1,nvars
+      do i1 = 1, varlen
+        write(fu) real(vars(iv,i1,ip),d_size)
+      enddo
+    enddo
+
+
+  enddo
+
+end subroutine
 
 !---------------------------------------------------------------------
 

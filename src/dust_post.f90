@@ -38,7 +38,7 @@ use mod_param, only: &
   wp, nl, max_char_len, extended_char_len , pi
 
 use mod_handling, only: &
-  error, warning, info, printout, dust_time, t_realtime
+  error, warning, info, printout, dust_time, t_realtime, new_file_unit
 
 use mod_geometry, only: &
   t_geo, t_geo_component
@@ -89,7 +89,7 @@ use mod_wake_ring, only: &
   t_wake_rings
 
 use mod_tecplot_out, only: &
-  tec_out_viz
+  tec_out_viz, tec_out_probes
 
 use mod_vtk_out, only: &
   vtk_out_viz , vtr_write
@@ -118,7 +118,7 @@ integer :: n_analyses, ia
 
 character(len=max_char_len) :: basename, data_basename
 character(len=max_char_len) :: an_name, an_type
-integer :: an_start, an_end, an_step
+integer :: an_start, an_end, an_step, nstep
 integer :: n_comp, i_comp
 character(len=max_char_len), allocatable :: components_names(:)
 integer :: n_var, i_var
@@ -164,6 +164,10 @@ type(t_wake_rings)  :: wake_rin
 type(t_elem_p), allocatable :: wake_elems(:)
 
 ! probe output ----
+real(wp), allocatable :: probe_vars(:,:,:)
+real(wp), allocatable :: time(:)
+character(len=max_char_len), allocatable :: probe_var_names(:)
+character(len=max_char_len), allocatable :: probe_loc_names(:)
 character(len=max_char_len) :: in_type , str_a , filename_in , var_name
 integer :: n_probes , n_vars , n_vars_int
 real(wp), allocatable :: rr_probes(:,:)
@@ -198,7 +202,8 @@ real(wp) :: M_loc(3) , M_ref(3) , M_bas(3)
 integer :: ic2
 real(wp), allocatable , target :: sol_p(:) 
 
-integer :: it , i1
+integer :: it , i1, ires
+integer :: ierr
 
 
 call printout(nl//'>>>>>> DUST POSTPROCESSOR beginning >>>>>>'//nl)
@@ -227,8 +232,8 @@ call sbprms%CreateLogicalOption('Wake', 'Output also the wake for &
 call sbprms%CreateStringOption('Format','Output format')
 call sbprms%CreateStringOption('Component','Component to analyse', &
                                multiple=.true.)
-call sbprms%CreateStringOption('Var','Variable to analise', &
-                               multiple=.true.)
+call sbprms%CreateStringOption('Variable','Variables to be saved: velocity, pressure or&
+                              & vorticity', multiple=.true.)
 
 ! probe output -------------
 call sbprms%CreateStringOption('InputType','How to specify probe coordinates',&
@@ -237,8 +242,6 @@ call sbprms%CreateRealArrayOption('Point','Point coordinates in dust_post.in',&
                               multiple=.true.)
 call sbprms%CreateStringOption('File','File containing the coordinates of the probes',&
                               multiple=.true.)
-call sbprms%CreateStringOption('Variable','Variables to be saved: velocity, pressure or&
-                              & vorticity', multiple=.true.)
 ! flow field output --------
 call sbprms%CreateIntArrayOption( 'Nxyz','number of points per coordinate',&
                               multiple=.true.)
@@ -292,20 +295,6 @@ do ia = 1,n_analyses
     endif
   endif
 
-  !Check which variables to analyse
-  out_vort = .false.; out_vel = .false.; out_press =.false.; out_cp = .false.
-  n_var = countoption(sbprms, 'Var')
-  allocate(var_names(n_var))
-  do i_var = 1, n_var 
-    var_names(i_var) = getstr(sbprms, 'Var')
-  enddo
-  out_vort = isInList('vort',var_names)
-  out_vel = isInList('vel',var_names)
-  out_press = isInList('press',var_names)
-  out_cp = isInList('cp',var_names)
-
-  !write to terminal
-  write(*,*) ' trim(an_type) : ' , trim(an_type)
 
   !Fork the different kind of analyses
   select case(trim(an_type))
@@ -347,8 +336,8 @@ do ia = 1,n_analyses
       end do
     end do
 
-!   ! Allocate sol_p: ...%cp is not a pointer
-!     comps(ic)%el(ie)%cp = sol_p(ip) in the loop
+    ! Allocate sol_p: ...%cp is not a pointer
+    !  comps(ic)%el(ie)%cp = sol_p(ip) in the loop
     allocate(sol_p(nelem)) ; sol_p = 0.0_wp
 
     ref_tag = getstr(sbprms,'Reference_Tag')
@@ -444,11 +433,19 @@ do ia = 1,n_analyses
 
    !//////////////////Visualizations\\\\\\\\\\\\\\\\\
    case('viz') 
-    !DEBUG
-    write(*,*) 'calculating a viz'
 
-    !DEBUG
-    write(*,*) ' viz '
+    !Check which variables to analyse
+    out_vort = .false.; out_vel = .false.; out_press =.false.; out_cp = .false.
+    n_var = countoption(sbprms, 'Variable')
+    allocate(var_names(n_var))
+    do i_var = 1, n_var 
+      var_names(i_var) = getstr(sbprms, 'Variable')
+    enddo
+    out_vort = isInList('vort',var_names)
+    out_vel = isInList('vel',var_names)
+    out_press = isInList('press',var_names)
+    out_cp = isInList('cp',var_names)
+
     ! load the geo components just once just once
     call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
     !TODO: here get the run id
@@ -509,25 +506,6 @@ do ia = 1,n_analyses
                                                             '_',it
       
       if (out_wake) then
-
-        !!Load the wake
-        !call load_wake_pan(floc, wpoints, wstart, wvort)
-        !!Prepare the wake variables for output
-        !nstripes = size(wvort,1); nstripes_p = size(wpoints,2)
-        !nrows = size(wvort,2); nelem_w = nstripes*nrows
-        !allocate(wpoints_s(3,nstripes_p*(nrows+1)))
-        !allocate(welems(4,nelem_w))
-        !wpoints_s = reshape(wpoints, (/3,nstripes_p*(nrows+1)/))
-        !iew = 0
-        !do ir = 1,nrows
-        !  do is = 1,nstripes
-        !    iew = iew+1
-        !    welems(:,iew) = (/wstart(1,is)+nstripes_p*(ir-1), &
-        !                      wstart(2,is)+nstripes_p*(ir-1), &
-        !                      wstart(2,is)+nstripes_p*(ir), &
-        !                      wstart(1,is)+nstripes_p*(ir)/)
-        !  enddo
-        !enddo
         
         call load_wake_viz(floc, wpoints, welems, wvort)
         nelem_w = size(welems,2)
@@ -596,8 +574,6 @@ do ia = 1,n_analyses
 
    !//////////////////Domain probes \\\\\\\\\\\\\\\\\
    case('probes')
-    !DEBUG
-    write(*,*) 'calculating probes'
 
     ! Read probe coordinates: point_list or from_file
     in_type =  getstr(sbprms,'InputType')
@@ -646,14 +622,51 @@ do ia = 1,n_analyses
       end select
      end do
     end if
-    vars_str = ''
-    ! Double loop to avoid double call to the same variable
-    !  n_vars_int = 0
-    if ( probe_vel ) vars_str = trim(vars_str)//'     u     v     w' ! ; n_vars_int = n_vars_int + 3  
-    if ( probe_p   ) vars_str = trim(vars_str)//'     p'             ! ; n_vars_int = n_vars_int + 1  
-    if ( probe_vort) vars_str = trim(vars_str)//'   omx   omy   omz' ! ; n_vars_int = n_vars_int + 3  
      
-    ! load the geo components just once just once
+    nprint = 0
+    if(probe_vel) nprint = nprint+3
+    if(probe_p)   nprint = nprint+1
+    if(probe_vort) nprint = nprint+3
+    allocate(probe_var_names(nprint))
+    allocate(probe_loc_names(n_probes))
+    probe_var_names = ''
+    ivar = 1
+    if(probe_vel) then
+      probe_var_names(ivar) = 'ux'
+      probe_var_names(ivar + 1) = 'uy'
+      probe_var_names(ivar + 2) = 'uz'
+      ivar = ivar + 3
+    endif
+    if(probe_p) then
+      probe_var_names(ivar) = 'p'
+      ivar = ivar +1
+    endif
+    if(probe_vort) then
+      probe_var_names(ivar) = 'omx'
+      probe_var_names(ivar + 1) = 'omy'
+      probe_var_names(ivar + 2) = 'omz'
+      ivar = ivar + 3
+    endif
+    vars_str = ''
+    do ivar = 1,size(probe_var_names)
+      vars_str = trim(vars_str)//'  '//trim(probe_var_names(ivar))
+    enddo
+
+    do ip = 1,n_probes
+      write(probe_loc_names(ip),'(A,F10.5,A,F10.5,A,F10.5)') &
+           'x=',rr_probes(1,ip), &
+           'y=',rr_probes(2,ip), &
+           'z=',rr_probes(3,ip)
+
+    enddo
+
+    !Allocate where the solution will be stored
+    nstep = (an_end-an_start)/an_step + 1
+    allocate(probe_vars(nprint, nstep, n_probes))
+    allocate(time(nstep))
+
+
+    ! load the geo components just once
     call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
     !TODO: here get the run id
     call load_components_postpro(comps, points, nelem,  floc, & 
@@ -674,15 +687,10 @@ do ia = 1,n_analyses
      end do
     end do
 
-    ! Open output .dat file
-    fid_out = 21
-    write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.dat'
-    open(unit=fid_out,file=trim(filename)) 
-      
-    call dat_out_probes_header( fid_out , rr_probes , vars_str )
-
     !time history
+    ires = 0
     do it =an_start, an_end, an_step
+      ires = ires+1
 
      ! Open the result file ----------------------
      write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
@@ -711,13 +719,15 @@ do ia = 1,n_analyses
      call prepare_wake_postpro( wpoints_pan, wpoints_rin, wstart, wconn, &
                  wvort_pan,  wvort_rin, wake_pan, wake_rin, wake_elems )
 
-     write(fid_out,'(F12.6)',advance='no') t 
+     time(ires) = t
 
      ! Compute velocity --------------------------
      do ip = 1 , n_probes ! probes
 
       vel_probe = 0.0_wp ; pres_probe = 0.0_wp ; vort_probe = 0.0_wp
+      ivar = 1
       if ( probe_vel .or. probe_p ) then 
+
         ! compute velocity
         do ic = 1,size(comps)
          do ie = 1 , size( comps(ic)%el )
@@ -727,25 +737,20 @@ do ia = 1,n_analyses
          
          end do
         end do
-        ! wake contribution
-        !do ic = 1 , size(wake%wake_panels,1)
-        ! do ie = 1 , size(wake%wake_panels,2)
-        !       
-        !  call wake%wake_panels(ic,ie)%compute_vel( rr_probes(:,ip) , u_inf , v )
-        !  vel_probe = vel_probe + v/(4*pi) 
-        ! 
-        ! end do
-        !end do
+
         do ie = 1, size(wake_elems)
           call wake_elems(ie)%p%compute_vel( rr_probes(:,ip) , u_inf , v )
           vel_probe = vel_probe + v/(4*pi) 
         enddo
-        
 
         ! + u_inf
         vel_probe = vel_probe + u_inf
-        write(fid_out,'(3F12.6)',advance='no') vel_probe
       end if
+
+      if(probe_vel) then
+        probe_vars(ivar:ivar+2, ires, ip) = vel_probe
+        ivar = ivar+3
+      endif
 
       ! compute pressure
       if ( probe_p ) then
@@ -754,31 +759,60 @@ do ia = 1,n_analyses
         !TODO: add:
         ! - add the unsteady term: -rho*dphi/dt
         pres_probe = P_inf + 0.5_wp*rho*norm2(u_inf)**2 - 0.5_wp*rho*norm2(vel_probe)**2
-        write(fid_out,'(F12.6)',advance='no') pres_probe
+
+        probe_vars(ivar, ires, ip) = pres_probe
+        ivar = ivar+1
       end if
       
       ! compute vorticity
       if ( probe_vort ) then
         vort_probe = 2.0_wp
-        write(fid_out,'(3F12.6)',advance='no') vort_probe
+        !write(fid_out,'(3F12.6)',advance='no') vort_probe
+        probe_vars(ivar:ivar+2, ires, ip) = vort_probe
+        ivar = ivar+3
       end if
 
      end do  ! probes
 
-     write(fid_out,*) ' '
 
     end do ! Time history
 
-    close(fid_out)
+    !Output the results in the correct format
+    select case (trim(out_frmt))
+
+     case ('dat')
+      call new_file_unit(fid_out, ierr)
+      write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.dat'
+      open(unit=fid_out,file=trim(filename)) 
+      call dat_out_probes_header( fid_out , rr_probes , vars_str )
+
+      do ires = 1, size(time)
+        write(fid_out,'(F12.6)',advance='no') time(ires)
+        do ip = 1, n_probes
+          do ivar = 1, size(probe_vars,1)
+            write(fid_out,'(3F12.6)',advance='no') probe_vars(ivar,ires,ip)
+            write(fid_out,'(A)',advance='no') ' '
+          enddo
+        enddo
+        write(fid_out,*) ' '
+      enddo
+      close(fid_out)
+
+     case ('tecplot')
+      write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt'
+      call tec_out_probes(filename, time, probe_vars, probe_var_names, probe_loc_names)
+    case default
+      call error('dust_post','','Unknown format '//trim(out_frmt)//&
+                 ' for probe output')
+    end select
 
     deallocate(comps)
     deallocate(rr_probes,sol)
+    deallocate(probe_vars, probe_var_names, time)
 
 
    !//////////////////Flow Field \\\\\\\\\\\\\\\\\
    case('flow_field')
-    !DEBUG
-    write(*,*) 'calculating a flowfield'
 
     allocate(vars_name(3)) ; vars_name = ' '
     allocate(vars_n   (3)) ; vars_n = 0
