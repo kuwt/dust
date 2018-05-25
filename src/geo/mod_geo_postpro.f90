@@ -104,7 +104,7 @@ use mod_hdf5_io, only: &
    check_dset_hdf5
 
 use mod_geometry, only: &
-  t_geo, t_geo_component , calc_geo_data_pan
+  t_geo, t_geo_component , calc_geo_data_pan , calc_geo_vel
 
 use mod_wake_pan, only: &
   t_wake_panels
@@ -692,12 +692,12 @@ subroutine prepare_geometry_postpro(comps)
      select type(elem)
       class is(t_surfpan)
        allocate(elem%tang(3,2))
-     !!  allocate(elem%verp(3,nsides))
+       allocate(elem%verp(3,nsides))
        allocate(elem%edge_vec(3,nsides))
        allocate(elem%edge_len(nsides))
        allocate(elem%edge_uni(3,nsides))
-     !!  allocate(elem%cosTi(nsides))
-     !!  allocate(elem%sinTi(nsides))
+       allocate(elem%cosTi(nsides))
+       allocate(elem%sinTi(nsides))
 
       class is(t_vortring)
        allocate(elem%tang(3,2))
@@ -870,13 +870,6 @@ end subroutine prepare_wake_postpro
 
 !----------------------------------------------------------------------
 
-
-
-
-
-
-!----------------------------------------------------------------------
-
 !> Calculate the geometrical quantities of an element
 !!
 !! The subroutine calculates all the relevant geometrical quantities of a
@@ -940,12 +933,7 @@ subroutine calc_geo_data_postpro(elem,vert)
     elem%tang(:,2) = cross( elem%nor, elem%tang(:,1)  )
 
   end select
-  ! projection of the vertices on the mean plane
-  !!do is = 1 , nsides
-  !!  elem%verp(:,is) = vert(:,is) - elem%nor * &
-  !!                    sum( (vert(:,is) - elem%cen ) * elem%nor )
-  !!end do
-  
+
   ! vector connecting two consecutive vertices: 
   ! edge_vec(:,1) =  ver(:,2) - ver(:,1)
   do is = 1 , nsides
@@ -963,28 +951,36 @@ subroutine calc_geo_data_postpro(elem,vert)
     elem%edge_uni(:,is) = elem%edge_vec(:,is) / elem%edge_len(is)
   end do
 
-  ! cosTi , sinTi
-  !!do is = 1 , nsides
-  !!  elem%cosTi(is) = sum( elem%edge_uni(:,is) * elem%tang(:,1) ) 
-  !!  elem%sinTi(is) = sum( elem%edge_uni(:,is) * elem%tang(:,2) ) 
-  !!end do
+  ! variables for surfpan elements only
+  select type(elem)
+    class is(t_surfpan)
+      do is = 1 , nsides
+        elem%verp(:,is) = vert(:,is) - elem%nor * &
+                          sum( (vert(:,is) - elem%cen ) * elem%nor )
+        elem%cosTi(is) = sum( elem%edge_uni(:,is) * elem%tang(:,1) ) 
+        elem%sinTi(is) = sum( elem%edge_uni(:,is) * elem%tang(:,2) ) 
+      end do
+
+    class default
+
+  end select
 
 
 end subroutine calc_geo_data_postpro
 
-!----------------------------------------------------------------------
-
-!> Calculate the local velocity on the panels to then enforce the 
-!! boundary condition
-!!
-subroutine calc_geo_vel(elem, G, f)
- class(c_elem), intent(inout) :: elem  
- real(wp), intent(in) :: f(3), G(3,3)
-
-  if(.not.allocated(elem%ub)) allocate(elem%ub(3))
-  elem%ub = f + matmul(G,elem%cen)
-
-end subroutine calc_geo_vel
+! in geo/mod_geo.f90 ---------------------------------------------------
+!
+!!> Calculate the local velocity on the panels to then enforce the 
+!!! boundary condition
+!!!
+!subroutine calc_geo_vel(elem, G, f)
+! class(c_elem), intent(inout) :: elem  
+! real(wp), intent(in) :: f(3), G(3,3)
+!
+!  if(.not.allocated(elem%ub)) allocate(elem%ub(3))
+!  elem%ub = f + matmul(G,elem%cen)
+!
+!end subroutine calc_geo_vel
 
 !----------------------------------------------------------------------
 
@@ -1003,11 +999,13 @@ end function move_points
 
 !----------------------------------------------------------------------
 
-subroutine update_points_postpro(comps, points, refs_R, refs_off)
+subroutine update_points_postpro(comps, points, refs_R, refs_off, refs_G , refs_f)
  type(t_geo_component), intent(inout) :: comps(:)
  real(wp), intent(inout) :: points(:,:)
  real(wp), intent(in)    :: refs_R(:,:,0:)
  real(wp), intent(in)    :: refs_off(:,0:)
+ real(wp), optional , intent(in)    :: refs_G(:,:,0:)
+ real(wp), optional , intent(in)    :: refs_f(:,0:)
 
  integer :: i_comp, ie
 
@@ -1019,10 +1017,18 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off)
   do ie = 1,size(comp%el)
     call calc_geo_data_postpro(comp%el(ie),points(:,comp%el(ie)%i_ver))
 
+    if ( present(refs_G) .and. present(refs_f) ) then
+      !Calculate the velocity of the centers to impose the boundary condition
+      call calc_geo_vel(comp%el(ie), refs_G(:,:,comp%ref_id) , &
+                                       refs_f(:,comp%ref_id) )
+    end if
   enddo
 
   end associate
  enddo
+
+!DEBUG
+!write(*,*) ' ***** '
 
 
 end subroutine update_points_postpro

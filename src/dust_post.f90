@@ -139,6 +139,7 @@ integer :: nelem, nelem_out
 
 character(len=max_char_len) , allocatable :: refs_tag(:)
 real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
+real(wp), allocatable :: refs_G(:,:,:), refs_f(:,:)
 real(wp), allocatable :: vort(:), cp(:)
 real(wp), allocatable :: wvort(:), wvort_pan(:,:), wvort_rin(:,:)
 real(wp), allocatable :: wpoints(:,:), wpoints_pan(:,:,:), wpoints_rin(:,:,:)
@@ -358,7 +359,7 @@ do ia = 1,n_analyses
     ! Find the id of the reference where the loads must be projected
     write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',an_start,'.h5'
     call open_hdf5_file(trim(filename),floc)
-    call load_refs(floc,refs_R,refs_off,refs_tag)
+    call load_refs(floc,refs_R,refs_off,refs_G,refs_f,refs_tag)
     call close_hdf5_file(floc)    
     do it = lbound(refs_tag,1) , ubound(refs_tag,1)
       if ( trim(refs_tag(it)) .eq. ref_tag ) ref_id = it
@@ -896,9 +897,20 @@ do ia = 1,n_analyses
      call close_hdf5_group(ploc)
 
      ! Load the references and move the points ---
-     call load_refs(floc,refs_R,refs_off)
+     call load_refs(floc,refs_R,refs_off,refs_G,refs_f)
 
-     call update_points_postpro(comps, points, refs_R, refs_off)
+!    !DEBUG
+!    write(*,*) refs_G
+!    write(*,*)
+!    write(*,*) refs_f
+
+!    !DEBUG
+!    write(*,*) ' before update_points_postpro '
+!    write(*,*) ' refs_G : ' , refs_G
+     call update_points_postpro(comps, points, refs_R, refs_off, refs_G, refs_f)
+!    write(*,*) '  after update_points_postpro '
+
+
      ! Load the results --------------------------
      call load_res(floc, comps, vort, cp, t)
      !sol = vort
@@ -1018,10 +1030,12 @@ contains
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
 
-subroutine load_refs(floc, refs_R, refs_off, refs_tag)
+subroutine load_refs(floc, refs_R, refs_off, refs_G, refs_f, refs_tag)
  integer(h5loc), intent(in) :: floc 
  real(wp), allocatable, intent(out) :: refs_R(:,:,:)
  real(wp), allocatable, intent(out) :: refs_off(:,:)
+ real(wp), allocatable, intent(out) , optional :: refs_G(:,:,:)
+ real(wp), allocatable, intent(out) , optional :: refs_f(:,:)
  character(len=max_char_len) , allocatable , intent(out) , optional :: refs_tag(:)
 
  integer(h5loc) :: gloc1, gloc2
@@ -1032,6 +1046,8 @@ subroutine load_refs(floc, refs_R, refs_off, refs_tag)
   call read_hdf5(nrefs,'NReferences',gloc1)
 
   allocate(refs_R(3,3,0:nrefs-1), refs_off(3,0:nrefs-1))
+  if (present(refs_G)  ) allocate(refs_G(3,3,0:nrefs-1))
+  if (present(refs_f)  ) allocate(refs_f(3,0:nrefs-1))
   if (present(refs_tag)) allocate(refs_tag(0:nrefs-1))
   do iref = 0,nrefs-1
     write(rname,'(A,I3.3)') 'Ref',iref
@@ -1040,6 +1056,9 @@ subroutine load_refs(floc, refs_R, refs_off, refs_tag)
     call read_hdf5(refs_R(:,:,iref),'R',gloc2)
     call read_hdf5(refs_off(:,iref),'Offset',gloc2)
     if (present(refs_tag)) call read_hdf5(refs_tag(  iref),'Tag',gloc2)
+    if (present(refs_G  )) call read_hdf5(refs_G(:,:,iref),'RotVel',gloc2)
+    if (present(refs_f  )) call read_hdf5(refs_f(:,iref),'Vel',gloc2)
+    call read_hdf5(refs_off(:,iref),'Offset',gloc2)
 
     call close_hdf5_group(gloc2)
   enddo

@@ -105,7 +105,8 @@ implicit none
 
 public :: t_geo, t_geo_component, t_tedge, set_parameters_geo, &
           create_geometry, update_geometry, destroy_geometry, &
-          calc_geo_data_pan, calc_geo_data_ll, calc_geo_data_ad
+          calc_geo_data_pan, calc_geo_data_ll, calc_geo_data_ad,&
+          calc_node_vel , calc_geo_vel
 
 private
 
@@ -1433,6 +1434,20 @@ subroutine calc_geo_vel(elem, G, f)
   elem%ub = f + matmul(G,elem%cen)
 
 end subroutine calc_geo_vel
+
+!----------------------------------------------------------------------
+
+!> Calculate velocity of a point whose coordinate is rr
+!! boundary condition
+!!
+subroutine calc_node_vel( r, G, f, v)
+ real(wp), intent(in) :: r(3)
+ real(wp), intent(in) :: f(3), G(3,3)
+ real(wp), intent(out):: v(3)
+
+ v = f + matmul(G,r)
+
+end subroutine calc_node_vel
 
 !----------------------------------------------------------------------
 

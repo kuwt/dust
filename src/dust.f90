@@ -324,6 +324,11 @@ do it = 1,nstep
   !------ Assemble the system ------
   call prepare_wake_panels(wake_panels, geo, dt, uinf)
   t0 = dust_time()
+
+! !DEBUG
+! write(*,*) ' allocated(elems   ) , size(elems   ) : ' , allocated(elems   ) , size(elems   ) 
+! write(*,*) ' allocated(elems_ll) , size(elems_ll) : ' , allocated(elems_ll) , size(elems_ll) 
+! write(*,*) ' allocated(elems_ad) , size(elems_ad) : ' , allocated(elems_ad) , size(elems_ad) 
   call assemble_linsys(linsys, elems, elems_ll, elems_ad,  &
                        wake_panels, wake_rings, uinf)
   t1 = dust_time()
@@ -367,7 +372,9 @@ do it = 1,nstep
   !------ Compute loads -------
   ! vortex rings and 3d-panels
   do i_el = 1 , size(elems)
-    call elems(i_el)%p%compute_cp(elems,uinf)
+!   call elems(i_el)%p%compute_cp(elems,uinf)       ! <--TODO: must become "old" as soon as possible
+    call elems(i_el)%p%compute_pres(elems,sim_param)
+    call elems(i_el)%p%compute_dforce(elems,sim_param)
   end do
   ! lifting line in solve_liftlin
 
