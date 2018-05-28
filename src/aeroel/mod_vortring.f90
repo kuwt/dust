@@ -468,12 +468,12 @@ subroutine compute_pres_vortring(this, elems, sim_param)
   dG_dt = this%didou_dt
 
   if ( i_stripe .gt. 1 ) then
-    this%pres =  sim_param%rho_inf * & 
+    this%pres = - sim_param%rho_inf * & 
           ( norm2(sim_param%u_inf - this%ub) * this%dy / this%area * &
                ( elems(this%id)%p%idou - this%stripe_elem(i_stripe-1)%p%idou ) + &
                dG_dt )
   else
-    this%pres =  sim_param%rho_inf * &
+    this%pres = - sim_param%rho_inf * &
           ( norm2(sim_param%u_inf - this%ub) * this%dy / this%area * &
                  elems(this%id)%p%idou + &
                dG_dt )
@@ -494,7 +494,7 @@ subroutine compute_dforce_vortring(this, elems, sim_param)
   ! first rough approximation
   ! vec{F} = this%pres * vec{n}
 
-  this%dforce = this%pres * this%nor
+  this%dforce = this%pres * this%area * this%nor
 
 
 end subroutine compute_dforce_vortring

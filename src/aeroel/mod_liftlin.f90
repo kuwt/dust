@@ -432,6 +432,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  sim_param, airfoil_da
 !end do
 
  ! Rough approximation (w/o using tabulated data) of the loads
+!!DEBUG
+!if ( .not. allocated(force) ) allocate(force(3)) ; force = 0.0_wp
  do i_l = 1,size(elems_ll)
    elems_ll(i_l)%p%cp = & 
      2.0_wp / norm2(uinf)**2.0_wp * &
@@ -443,7 +445,9 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  sim_param, airfoil_da
             ( norm2(sim_param%u_inf - elems_ll(i_l)%p%ub) * &
               elems_ll(i_l)%p%dy / elems_ll(i_l)%p%area * &
                    elems_ll(i_l)%p%idou )
-   elems_ll(i_l)%p%dforce = elems_ll(i_l)%p%pres * elems_ll(i_l)%p%nor
+   elems_ll(i_l)%p%dforce = elems_ll(i_l)%p%pres * &
+                            elems_ll(i_l)%p%area * &
+                            elems_ll(i_l)%p%nor
  end do
 
  !DEBUG:

@@ -579,6 +579,14 @@ subroutine compute_vel_surfpan(this, pos , uinf, vel )
   !                                   with  this%b the velocity of the collocation point
   ! TODO: pass this%psi and uinf ( up to now uinf = (/-1,0,0/) )
   !vel = vdou*this%idou - vsou*( sum(this%nor*(this%ub+(/-1.0_wp, 0.0_wp, 0.0_wp/))) )
+! !DEBUG
+! write(*,*) ' vdou      : ' , vdou
+! write(*,*) ' this%idou : ' , this%idou
+! write(*,*) ' vsou      : ' , vsou
+! write(*,*) ' this%nor  : ' , this%nor
+! write(*,*) ' this%ub   : ' , this%ub 
+! write(*,*) ' uinf      : ' , uinf
+! write(*,*)
   vel = vdou*this%idou - vsou*( sum(this%nor*(this%ub-uinf)) )
 
 end subroutine compute_vel_surfpan
@@ -684,7 +692,7 @@ subroutine compute_dforce_surfpan(this, elems, sim_param)
   ! first rough approximation
   ! vec{F} = - this%pres * vec{n}
 
-  this%dforce = - this%pres * this%nor
+  this%dforce = - this%pres * this%area * this%nor
 
 
 end subroutine compute_dforce_surfpan 

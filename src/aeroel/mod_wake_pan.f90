@@ -43,7 +43,7 @@ use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
 
 use mod_geometry, only: &
-  t_geo, t_tedge, calc_geo_data_pan
+  t_geo, t_tedge, calc_geo_data_pan, calc_node_vel
 
 use mod_aero_elements, only: &
   c_elem, t_elem_p
@@ -104,7 +104,14 @@ type :: t_wake_panels
  !> Points of the wake, in a structured way
  !! (3 x n_wake_points x npan+1)
  real(wp), allocatable :: w_points(:,:,:)
+ 
+ !> Relative velocity ( u_inf - ub ) of the nodes at the TE
+ !! (3 x n_wake_points) 
+ !! used to determine the first prescribed panel of the wake
+ real(wp), allocatable :: w_vel_te(:,:)
 
+ !> Velocity at the nodes of the wake. For output only
+ !! (3 x n_wake_points x npan+1)
  real(wp), allocatable :: w_vel(:,:,:)
 
  !> elements of the panels
@@ -230,7 +237,7 @@ subroutine prepare_wake_panels(wake, geo, dt, uinf)
  
  integer :: p1, p2
  integer :: ip, iw, ipan
- real(wp) :: dist(3)
+ real(wp) :: dist(3) , vel_te(3)
 
   !Update the first row of panels: set points positions
 
@@ -242,7 +249,14 @@ subroutine prepare_wake_panels(wake, geo, dt, uinf)
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1,wake%n_wake_points
     dist = matmul(geo%refs(wake%gen_ref(ip))%R_g,wake%gen_dir(:,ip))
-    wake%w_points(:,ip,2) = wake%w_points(:,ip,1) + dist*0.3_wp*norm2(uinf)*dt
+    call calc_node_vel( wake%w_start_points(:,ip), &
+            geo%refs(wake%gen_ref(ip))%G_g, &
+            geo%refs(wake%gen_ref(ip))%f_g, &
+            vel_te )
+!   !DEBUG
+!   write(*,*) 'ip , wake%gen_ref(ip) : ' , ip , wake%gen_ref(ip)
+!   write(*,*) ' vel_te , dt : ' ,vel_te ,dt
+    wake%w_points(:,ip,2) = wake%w_points(:,ip,1) + dist*0.3_wp*norm2(uinf-vel_te)*dt
   enddo
 
   ! Update the panels geometrical quantities of all the panels, the 
