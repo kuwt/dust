@@ -383,6 +383,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
 
   call build_references(geo%refs, trim(ref_file_name), sim_param)
 
+
   !Load the components from the file created by the preprocessor
   !geo_file_name = getstr(prms, 'GeometryFile')
   call check_preproc(geo_file_name)
@@ -624,9 +625,9 @@ subroutine load_components(geo, in_file, sim_param, te)
  real(wp), allocatable :: points_tmp(:,:)
  character(len=max_char_len) :: ref_tag, ref_tag_m
  integer :: ref_id, iref
- character(len=max_char_len) :: msg, cname
- integer(h5loc) :: floc, gloc, cloc , geo_loc , te_loc
- integer :: n_comp, i_comp, n_comp_input, i_comp_input
+ character(len=max_char_len) :: msg, cname, cname_write
+ integer(h5loc) :: floc, gloc, cloc , geo_loc , te_loc, cloc2
+ integer :: n_comp, i_comp, n_comp_input, i_comp_input, n_comp_write
  integer :: n_mult, i_mult
  logical :: mult
 
@@ -663,6 +664,7 @@ subroutine load_components(geo, in_file, sim_param, te)
   elems_offset = 0
   
   n_comp_input = n_comp
+  n_comp_write = n_comp
   i_comp = 1
   do i_comp_input = 1,n_comp_input
     
@@ -730,12 +732,6 @@ subroutine load_components(geo, in_file, sim_param, te)
       geo%components(i_comp)%ref_id  = ref_id
       geo%components(i_comp)%ref_tag = trim(ref_tag_m)
       geo%components(i_comp)%moving  = geo%refs(ref_id)%moving
-
-      !Re-write the reference tag to the component
-      call write_hdf5(ref_id,'RefId',cloc)
-        !TODO: fix this WARNING: it is not multiple references safe
-
-    
  
 
       ! ====== READING =====
@@ -744,7 +740,13 @@ subroutine load_components(geo, in_file, sim_param, te)
       geo%components(i_comp)%comp_el_type = trim(comp_el_type)
 
       call read_hdf5(comp_name,'CompName',cloc)
-      geo%components(i_comp)%comp_name = trim(comp_name)
+      !add the multiplicity appendix if multiple
+      if(mult) then
+        write(geo%components(i_comp)%comp_name,'(A,I2.2)') trim(comp_name)&
+                                                            &//'__',i_mult
+      else
+        geo%components(i_comp)%comp_name = trim(comp_name)
+      endif
 
       ! Geometry --------------------------
       call open_hdf5_group(cloc,'Geometry',geo_loc)
@@ -761,16 +763,18 @@ subroutine load_components(geo, in_file, sim_param, te)
         geo%components(i_comp)%airfoil_list = airfoil_list 
         allocate(geo%components(i_comp)%nelem_span_list(size(nelem_span_list))) 
         geo%components(i_comp)%nelem_span_list = nelem_span_list 
- ! *** 20180523 ***
- ! *** 20180523 ***
         allocate(geo%components(i_comp)%i_airfoil_e( &
               size(i_airfoil_e,1),size(i_airfoil_e,2)) ) 
         geo%components(i_comp)%i_airfoil_e = i_airfoil_e 
         allocate(geo%components(i_comp)%normalised_coord_e( &
               size(normalised_coord_e,1),size(normalised_coord_e,2))) 
         geo%components(i_comp)%normalised_coord_e = normalised_coord_e
+      else if (comp_el_type(1:1) .eq. 'a') then
+        call read_hdf5(trac,'Traction',cloc)
+        call read_hdf5(rad,'Radius',cloc)
       end if
       call close_hdf5_group(geo_loc)
+
 
 
 
@@ -793,7 +797,68 @@ subroutine load_components(geo, in_file, sim_param, te)
                  t_te(2,0))
       endif
  
+      !Treat the multiplicity: if it is multiple we need to re-write the 
+      !components into the geometry file
      
+      if(mult) then
+        if(i_mult .eq. 1) then
+          !first multiple: the component stays the same, added the reference
+          !id and updated the name with the multiple appendix
+          call write_hdf5(trim(geo%components(i_comp)%comp_name),'CompName',cloc)
+          call write_hdf5(ref_id,'RefId',cloc)
+          call write_hdf5(trim(ref_tag_m),'RefTag',cloc)
+
+        else
+          !Following multiples: need to create a new component in the file and
+          !re-write everything
+          n_comp_write = n_comp_write+1
+          write(cname_write,'(A,I3.3)') 'Comp',n_comp_write
+          call new_hdf5_group(gloc,trim(cname_write),cloc2)
+          call write_hdf5(ref_id,'RefId',cloc2)
+          call write_hdf5(trim(ref_tag_m),'RefTag',cloc2)
+          call write_hdf5(trim(comp_el_type),'ElType',cloc2)
+          call write_hdf5(trim(geo%components(i_comp)%comp_name),'CompName',cloc2)
+          call new_hdf5_group(cloc2,'Geometry',geo_loc)
+
+          call write_hdf5(ee   ,'ee'   ,geo_loc)
+          call write_hdf5(rr   ,'rr'   ,geo_loc)
+          call write_hdf5(neigh,'neigh',geo_loc)
+          if ( comp_el_type(1:1) .eq. 'l' ) then
+            call write_hdf5(airfoil_list      ,'airfoil_list'      ,geo_loc) 
+            call write_hdf5(nelem_span_list   ,'nelem_span_list'   ,geo_loc) 
+            call write_hdf5(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc) 
+            call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc) 
+
+          else if (comp_el_type(1:1) .eq. 'a') then
+            call write_hdf5(trac,'Traction',cloc2)
+            call write_hdf5(rad,'Radius',cloc2)
+
+          endif
+          call close_hdf5_group(geo_loc)
+
+          if( comp_el_type(1:1) .eq. 'p' .or. &
+              comp_el_type(1:1) .eq. 'v' .or. &
+              comp_el_type(1:1) .eq. 'l') then
+            call new_hdf5_group(cloc2,'Trailing_Edge',te_loc)
+            call write_hdf5(    e_te,    'e_te',te_loc)
+            call write_hdf5(    i_te,    'i_te',te_loc)
+            call write_hdf5(   ii_te,   'ii_te',te_loc)
+            call write_hdf5(neigh_te,'neigh_te',te_loc)
+            call write_hdf5(    o_te,    'o_te',te_loc)
+            call write_hdf5(    t_te,    't_te',te_loc)
+            call close_hdf5_group(te_loc)
+          endif
+
+
+          call close_hdf5_group(cloc2)
+        endif
+
+      else
+        !Not multiple:
+        !just write the reference id to the component
+        call write_hdf5(ref_id,'RefId',cloc)
+
+      endif
 
 
       ! ======= CREATING ELEMENTS ======
@@ -878,8 +943,6 @@ subroutine load_components(geo, in_file, sim_param, te)
 
       !If it is an actuator disk read the traction
       if(geo%components(i_comp)%comp_el_type(1:1) .eq. 'a') then
-        call read_hdf5(trac,'Traction',cloc)
-        call read_hdf5(rad,'Radius',cloc)
         select type (el=>geo%components(i_comp)%el)
         type is(t_actdisk)
           do i2 = 1,size(el)
@@ -978,6 +1041,8 @@ subroutine load_components(geo, in_file, sim_param, te)
     call close_hdf5_group(cloc)
 
   enddo !i_comp
+  !update the total number of components
+  call write_hdf5(i_comp-1,'NComponents',gloc)
   call close_hdf5_group(gloc)
   call close_hdf5_file(floc)
 

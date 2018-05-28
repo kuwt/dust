@@ -348,6 +348,7 @@ subroutine write_string_hdf5(outdata, outname, file_id)
     this_sub_name = 'write_string_hdf5'
  integer :: h5err
  integer ::strlen
+ logical :: l_exists
 
   strlen = len(outdata)
   out_size(1) = 1
@@ -361,9 +362,19 @@ subroutine write_string_hdf5(outdata, outname, file_id)
   !create a (single) scalar dataspace
   call h5Screate_f(H5S_SCALAR_F, dspace_id, h5err)
 
-  !create the dataset on the file
-  call h5Dcreate_f(file_id, trim(outname), filetype_id, dspace_id, &
-                   dset_id, h5err)
+  !check if the dataset on file exists
+  call h5Lexists_f(file_id, trim(outname), l_exists, h5err)
+
+  if (.not. l_exists) then
+    !create the dataset on the file
+    call h5Dcreate_f(file_id, trim(outname), filetype_id, dspace_id, &
+                     dset_id, h5err)
+  else
+    !open the dataset
+    !TODO: perform a check on the dimensions
+    call h5Dopen_f(file_id, trim(outname), dset_id, h5err)
+
+  endif
 
   !write
   call h5Dwrite_f(dset_id, memtype_id, outdata, out_size, h5err)
@@ -1344,14 +1355,25 @@ subroutine write_int_hdf5(outdata, outname, file_id)
  character(len=*), parameter :: &
     this_sub_name = 'write_int_hdf5'
  integer :: h5err
+ logical :: l_exists
 
   !create a (single) scalar dataspace
   out_size(1) = 1
   call h5Screate_f(H5S_SCALAR_F, dspace_id, h5err)
 
-  !create the dataset on the file
-  call h5Dcreate_f(file_id, trim(outname), h5t_file_int, dspace_id, &
-                   dset_id, h5err)
+  !check if the dataset on file exists
+  call h5Lexists_f(file_id, trim(outname), l_exists, h5err)
+
+  if (.not. l_exists) then
+    !create the dataset on the file
+    call h5Dcreate_f(file_id, trim(outname), h5t_file_int, dspace_id, &
+                     dset_id, h5err)
+  else
+    !open the dataset
+    !TODO: perform a check on the dimensions
+    call h5Dopen_f(file_id, trim(outname), dset_id, h5err)
+
+  endif
 
   !write
   call h5Dwrite_f(dset_id, h5t_mem_int, outdata, out_size, h5err)
