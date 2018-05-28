@@ -812,7 +812,11 @@ subroutine tec_out_box(out_filename, time, xpoints, ypoints, zpoints, vars, var_
   !The actual data
   do i3 = 1,size(zpoints); do i2 = 1,size(ypoints); do i1 = 1, size(xpoints)
     write(fu) real(xpoints(i1), d_size)
+  enddo; enddo; enddo
+  do i3 = 1,size(zpoints); do i2 = 1,size(ypoints); do i1 = 1, size(xpoints)
     write(fu) real(ypoints(i2), d_size)
+  enddo; enddo; enddo
+  do i3 = 1,size(zpoints); do i2 = 1,size(ypoints); do i1 = 1, size(xpoints)
     write(fu) real(zpoints(i3), d_size)
   enddo; enddo; enddo
 
