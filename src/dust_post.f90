@@ -76,7 +76,7 @@ use mod_hdf5_io, only: &
    check_dset_hdf5
 
 use mod_stringtools, only: &
-  LowCase, isInList
+  LowCase, isInList, stricmp
 
 use mod_geo_postpro, only: &
   load_components_postpro, update_points_postpro , prepare_geometry_postpro, &
@@ -89,7 +89,7 @@ use mod_wake_ring, only: &
   t_wake_rings
 
 use mod_tecplot_out, only: &
-  tec_out_viz, tec_out_probes, tec_out_box
+  tec_out_viz, tec_out_probes, tec_out_box, tec_out_loads
 
 use mod_vtk_out, only: &
   vtk_out_viz , vtr_write
@@ -199,6 +199,7 @@ character(len=max_char_len) :: ref_tag
 integer                     :: ref_id
 real(wp) :: F_loc(3) , F_ref(3) , F_bas(3) , F_bas1(3)
 real(wp) :: M_loc(3) , M_ref(3) , M_bas(3)
+real(wp), allocatable :: force(:,:), moment(:,:)
 integer :: ic2
 real(wp), allocatable , target :: sol_p(:) 
 
@@ -313,28 +314,29 @@ do ia = 1,n_analyses
     ! Prepare_geometry_postpro
     call prepare_geometry_postpro(comps)
 
-    ! Open output .dat file
-    fid_out = 21
-    write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.dat'
-    open(unit=fid_out,file=trim(filename))
 
-    n_comps_meas = countoption(sbprms,'CompName')
-    allocate( comps_meas(n_comps_meas) )
-    do ic = 1 , n_comps_meas 
-      comps_meas(ic) = getstr(sbprms,'CompName') 
-    end do
-    !TODO:loads 
-    ! from string to id.s of the ic
-    allocate( i_comps_meas(n_comps_meas) ) ; i_comps_meas = 0
-    do ic = 1 , n_comps_meas 
-      ! loop over the ref.sys 
-      do ic2 = 1 , size(comps)
-        if ( trim(comps_meas(ic)) .eq. trim(comps(ic2)%comp_name) ) then
-          i_comps_meas(ic) = ic2 
-          exit
-        end if
-      end do
-    end do
+    !n_comps_meas = countoption(sbprms,'CompName')
+    !allocate( comps_meas(n_comps_meas) )
+    !do ic = 1 , n_comps_meas 
+    !  comps_meas(ic) = getstr(sbprms,'CompName') 
+    !end do
+    !!TODO:loads 
+    !! from string to id.s of the ic
+    !allocate( i_comps_meas(n_comps_meas) ) ; i_comps_meas = 0
+    !do ic = 1 , n_comps_meas 
+    !  ! loop over the ref.sys 
+    !  do ic2 = 1 , size(comps)
+    !    if ( trim(comps_meas(ic)) .eq. trim(comps(ic2)%comp_name) ) then
+    !      i_comps_meas(ic) = ic2 
+    !      exit
+    !    end if
+    !  end do
+    !end do
+    if(allocated(components_names)) deallocate(components_names) 
+    allocate(components_names(size(comps)))
+    do ic = 1,size(comps)
+      components_names(ic) = trim(comps(ic)%comp_name)
+    enddo
 
     ! Allocate sol_p: ...%cp is not a pointer
     !  comps(ic)%el(ie)%cp = sol_p(ip) in the loop
@@ -342,18 +344,37 @@ do ia = 1,n_analyses
 
     ref_tag = getstr(sbprms,'Reference_Tag')
 
-    call dat_out_loads_header( fid_out , comps_meas , ref_tag )
+    nstep = (an_end-an_start)/an_step + 1
+    select case(trim(out_frmt))
+
+     case('dat')
+      ! Open output .dat file
+      call new_file_unit(fid_out, ierr)
+      write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.dat'
+      open(unit=fid_out,file=trim(filename))
+      call dat_out_loads_header( fid_out , components_names , ref_tag )
+
+     case('tecplot')
+      allocate(force(3,nstep), moment(3,nstep), time(nstep))
+
+     case default
+      call error('dust_post','','Unknown format '//trim(out_frmt)//&
+                 ' for loads output')
+    end select
+    
 
     ! Find the id of the reference where the loads must be projected
     write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',an_start,'.h5'
     call open_hdf5_file(trim(filename),floc)
     call load_refs(floc,refs_R,refs_off,refs_G,refs_f,refs_tag)
-    call close_hdf5_file(floc)    
+    call close_hdf5_file(floc)   
     do it = lbound(refs_tag,1) , ubound(refs_tag,1)
-      if ( trim(refs_tag(it)) .eq. ref_tag ) ref_id = it
+      if ( stricmp(refs_tag(it),  ref_tag) ) ref_id = it
     end do
 
+    ires = 0
     do it=an_start, an_end, an_step
+      ires = ires+1
 
       ! Open the file:
       write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
@@ -388,24 +409,21 @@ do ia = 1,n_analyses
       F_ref = 0.0_wp ; M_ref = 0.0_wp 
 
       ! Update the overall load with the comtribution from all the components
-      do ic = 1 , n_comps_meas
+      do ic = 1 , size(comps)
 
         ! Initialise integral loads in the local ref.frame
         F_bas = 0.0_wp ; M_bas = 0.0_wp 
       
         ! Loads from the ic-th component in the base ref.frame
-        do ie = 1 , size(comps( i_comps_meas(ic) )%el )
-!         F_bas1 = - comps( i_comps_meas(ic) )%el(ie)%cp   * &
-!                    comps( i_comps_meas(ic) )%el(ie)%area * &   ! update
-!                    comps( i_comps_meas(ic) )%el(ie)%nor        ! update
-          F_bas1 = comps( i_comps_meas(ic) )%el(ie)%dforce
+        do ie = 1 , size(comps(ic)%el)
+          F_bas1 = comps(ic)%el(ie)%dforce
 
           F_bas = F_bas + F_bas1
 
-          M_bas = M_bas + cross( comps( i_comps_meas(ic) )%el(ie)%cen &
+          M_bas = M_bas + cross( comps(ic)%el(ie)%cen &
                          -refs_off(:,ref_id) , F_bas1 )
 
-        end do
+        end do !ie
 
         ! From the base ref.sys to the chosen ref.sys (offset and rotation)
         F_ref = F_ref + matmul( &
@@ -413,22 +431,43 @@ do ia = 1,n_analyses
         M_ref = M_ref + matmul( &
              transpose( refs_R(:,:, ref_id) ) , M_bas )
 
-      end do
+      end do !ic
+      
+      select case(trim(out_frmt))
 
-      ! Update output file
-      write(fid_out,'(F12.6)'  ,advance='no') t 
-      write(fid_out,'(3F16.6)' ,advance='no') F_ref
-      write(fid_out,'(3F16.6)' ,advance='no') M_ref
-      write(fid_out,'(9F16.10)',advance='no') refs_R(:,:, ref_id)
-      write(fid_out,'(3F16.10)',advance='no') refs_off(:, ref_id)
-      write(fid_out,*) ' '
+       case ('dat')
+        ! Update output file
+        write(fid_out,'(F12.6)'  ,advance='no') t 
+        write(fid_out,'(3F16.6)' ,advance='no') F_ref
+        write(fid_out,'(3F16.6)' ,advance='no') M_ref
+        write(fid_out,'(9F16.10)',advance='no') refs_R(:,:, ref_id)
+        write(fid_out,'(3F16.10)',advance='no') refs_off(:, ref_id)
+        write(fid_out,*) ' '
+
+       case('tecplot')
+        time(ires) = t
+        force(:,ires) = F_ref
+        moment(:,ires) = M_ref
+
+      end select
 
 
-    end do
+    end do !it
 
-    close(fid_out)
+    
+    select case(trim(out_frmt))
 
-    deallocate(comps,comps_meas,i_comps_meas)
+     case('dat')
+      close(fid_out)
+     
+     case('tecplot')
+      write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt'
+      call tec_out_loads(filename, time, force, moment)
+      deallocate(time, force, moment)
+
+    end select
+
+    deallocate(comps,components_names)
     deallocate(sol_p)
 
    !//////////////////Visualizations\\\\\\\\\\\\\\\\\

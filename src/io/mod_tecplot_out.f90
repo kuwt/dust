@@ -43,7 +43,8 @@ use mod_handling, only: &
 !---------------------------------------------------------------------
 implicit none
 
-public :: tec_out_sol_bin, tec_out_viz, tec_out_probes, tec_out_box
+public :: tec_out_sol_bin, tec_out_viz, tec_out_probes, tec_out_box, &
+          tec_out_loads
 
 private
 
@@ -972,6 +973,142 @@ end subroutine
 
 !---------------------------------------------------------------------
 
+subroutine tec_out_loads(out_filename, time, force, moment)
+ character(len=*), intent(in) :: out_filename 
+ real(wp), intent(in) :: time(:)
+ real(wp), intent(in) :: force(:,:)
+ real(wp), intent(in) :: moment(:,:)
+ 
+ character, parameter :: zc = char(0)
+ integer :: fu, ierr, i1, iv, timelen
+ real(kind=4)  , parameter :: zoneMarker = 299.0
+ real(kind=4)  , parameter :: eohMarker  = 357.0
+ character(len=max_char_len) :: buffer_char
+
+  timelen = size(time)
+
+  call new_file_unit(fu,ierr)
+  open(unit=fu,file=trim(out_filename),status='replace',access='stream', &
+       form='unformatted',iostat=ierr)
+
+  !magic number
+  buffer_char = "#!TDV112" ;  write(fu) trim(buffer_char) 
+
+  !integer 1 to set the byte order
+  write(fu) int(1,s_size)
+
+  !integer 0 to mark a full file (1=solution only, 2=grid only)
+  write(fu) int(0,s_size)
+
+  !title
+  call put_tec_string('DUST loads',fu)
+
+  !number of variables
+  write(fu) int(1+3+3) !t+3force+3moments
+
+  !Variables names
+  call put_tec_string('t',fu)
+  call put_tec_string('F1',fu)
+  call put_tec_string('F2',fu)
+  call put_tec_string('F3',fu)
+  call put_tec_string('M1',fu)
+  call put_tec_string('M2',fu)
+  call put_tec_string('M3',fu)
+  
+  !Zone marker
+  write(fu) zoneMarker
+
+  !Zone name
+  call put_tec_string('loads',fu)
+
+  !Parent zone: -1 for no parent (not too clear)
+  write(fu) int(-1,s_size)
+
+  !Strand id: -2 for automatic generation
+  write(fu) int(-2,s_size)
+
+  !Solution time, useless in this case
+  write(fu) real(0.0,d_size)
+
+  !"not used, set to -1"
+  write(fu) int(-1,s_size) 
+  
+  !Zone type: 0 ordered, 3 unstructured quadrilateral
+  write(fu) int(0,s_size)
+
+  !Toggle variable location specification: no, default on nodes
+  write(fu) int(0,s_size)
+
+  !are local neighbour supplied? No.
+  write(fu) int(0,s_size)
+
+  !Number of miscellaneous somethings
+  write(fu) int(0,s_size)
+
+  !Ordered zone: Imax, Jmax, Kmax
+  write(fu) int(timelen,s_size)
+  write(fu) int(1,s_size)
+  write(fu) int(1,s_size)
+
+  !"no more auxilliary name/value pairs"
+  write(fu) int(0,s_size)
+
+
+  !DATA
+  write(fu) eohMarker
+
+  !Zone marker
+  write(fu) zoneMarker
+
+  !Size of the variables: 2=double
+  write(fu) int(2,s_size) !time
+  write(fu) int(2,s_size) !force
+  write(fu) int(2,s_size) !force
+  write(fu) int(2,s_size) !force
+  write(fu) int(2,s_size) !moment
+  write(fu) int(2,s_size) !moment
+  write(fu) int(2,s_size) !moment
+
+  !Has passive variables?
+  write(fu) int(0,s_size)
+
+  !Has variable sharing?
+  write(fu) int(0,s_size)
+
+  !sharing connectivity? -1 no sharing
+  write(fu) int(-1,s_size)
+
+  !Min e max
+  write(fu) dble(minval( time ))
+  write(fu) dble(maxval( time ))
+  do iv = 1,3
+    write(fu) dble(minval( force(iv,:) ))
+    write(fu) dble(maxval( force(iv,:) ))
+  enddo
+  do iv = 1,3
+    write(fu) dble(minval( moment(iv,:) ))
+    write(fu) dble(maxval( moment(iv,:) ))
+  enddo
+
+  !The actual data
+  do i1 = 1, timelen
+    write(fu) real(time(i1), d_size)
+  enddo
+  do iv = 1,3
+    do i1 = 1, timelen
+      write(fu) real(force(iv,i1),d_size)
+    enddo
+  enddo
+  do iv = 1,3
+    do i1 = 1, timelen
+      write(fu) real(moment(iv,i1),d_size)
+    enddo
+  enddo
+
+
+end subroutine
+
+!---------------------------------------------------------------------
 subroutine put_tec_string(str, fu)
  character(len=*), intent(in) :: str
  integer, intent(in)          :: fu
