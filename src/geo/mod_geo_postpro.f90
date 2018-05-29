@@ -113,7 +113,7 @@ use mod_wake_ring, only: &
   t_wake_rings
 
 use mod_stringtools, only: &
-  LowCase, IsInList
+  LowCase, IsInList, strip_mult_appendix
 
 !----------------------------------------------------------------------
 
@@ -385,7 +385,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
  integer :: i2, i3
  integer, allocatable :: ee(:,:)
  real(wp), allocatable :: rr(:,:)
- character(len=max_char_len) :: comp_el_type, comp_name
+ character(len=max_char_len) :: comp_el_type, comp_name, comp_name_stripped
  integer :: points_offset, n_vert! , elems_offset
  real(wp), allocatable :: points_tmp(:,:)
  character(len=max_char_len) :: ref_tag, ref_tag_m
@@ -432,9 +432,12 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
     call open_hdf5_group(gloc,trim(cname),cloc)
     
     call read_hdf5(comp_name,'CompName',cloc)
+
+    !Strip the appendix of multiple components, to load all the multiple
+    !components at once
+    call strip_mult_appendix(comp_name, comp_name_stripped, '__') 
     
-    !TODO: add modifications to treat also multiple components
-    if(IsInList(comp_name, components_names) .or. all_comp) then
+    if(IsInList(comp_name_stripped, components_names) .or. all_comp) then
 
       i_comp = i_comp+1; n_comp = n_comp+1
       allocate(comp_temp(n_comp))
