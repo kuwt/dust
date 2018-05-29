@@ -125,6 +125,10 @@ type  :: option
   !! Indicates if an option can occur multiple times in parameter file
   logical               :: multiple
 
+  !< Is it an additional option? Default false.
+  !! Additional options are the multiple options after the first one
+  logical               :: additional
+
   !< Has option been recovered in the code? Default false.
   !! Indicates if the option is already used (get... call) and therefore is
   !! no longer available in the list of parameters

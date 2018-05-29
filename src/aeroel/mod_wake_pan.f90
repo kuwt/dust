@@ -34,7 +34,7 @@
 
 
 !> Module to treat the vortex panel wake
-module mod_wake
+module mod_wake_pan
 
 use mod_param, only: &
   wp, nl, pi
@@ -43,7 +43,7 @@ use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
 
 use mod_geometry, only: &
-  t_geo, t_tedge, calc_geo_data
+  t_geo, t_tedge, calc_geo_data_pan, calc_node_vel
 
 use mod_aero_elements, only: &
   c_elem, t_elem_p
@@ -51,8 +51,6 @@ use mod_aero_elements, only: &
 use mod_vortring, only: &
   t_vortring
 
-use mod_doublet, only: &
-  velocity_calc_doublet
 !----------------------------------------------------------------------
 
 implicit none
@@ -79,7 +77,9 @@ type :: t_wake_panels
 
  !> Index of the 2 generating elements of the wake
  !! (2 x n_wake_stripes)
- integer, allocatable :: gen_elems(:,:)
+ !integer, allocatable :: gen_elems(:,:)
+ type(t_elem_p), allocatable :: gen_elems(:,:)
+ integer, allocatable :: gen_elems_id(:,:)
 
  !> Index of the 2 generating points of each wake point
  !! (2 x n_wake_points)
@@ -104,7 +104,14 @@ type :: t_wake_panels
  !> Points of the wake, in a structured way
  !! (3 x n_wake_points x npan+1)
  real(wp), allocatable :: w_points(:,:,:)
+ 
+ !> Relative velocity ( u_inf - ub ) of the nodes at the TE
+ !! (3 x n_wake_points) 
+ !! used to determine the first prescribed panel of the wake
+ real(wp), allocatable :: w_vel_te(:,:)
 
+ !> Velocity at the nodes of the wake. For output only
+ !! (3 x n_wake_points x npan+1)
  real(wp), allocatable :: w_vel(:,:,:)
 
  !> elements of the panels
@@ -119,6 +126,7 @@ type :: t_wake_panels
  
 end type 
 
+
 !----------------------------------------------------------------------
 contains
 !----------------------------------------------------------------------
@@ -130,7 +138,7 @@ subroutine initialize_wake_panels(wake, geo, te,  npan)
  type(t_tedge), intent(in) :: te
  integer, intent(in) :: npan
 
- integer :: iw, ip
+ integer :: iw, ip, nsides
 
 
   !set and allocate all the relevant variables
@@ -138,6 +146,7 @@ subroutine initialize_wake_panels(wake, geo, te,  npan)
   wake%n_wake_stripes = size(te%e,2)
   wake%n_wake_points  = size(te%i,2)
   allocate(wake%gen_elems(2,wake%n_wake_stripes))
+  allocate(wake%gen_elems_id(2,wake%n_wake_stripes))
   allocate(wake%gen_points(2,wake%n_wake_points))
   allocate(wake%gen_dir(3,wake%n_wake_points))
   allocate(wake%gen_ref(wake%n_wake_points))
@@ -149,10 +158,22 @@ subroutine initialize_wake_panels(wake, geo, te,  npan)
   allocate(wake%ivort(wake%n_wake_stripes,npan))
   !allocate(wake%pan_p(0))
 
-  !Associate for all the panels the relevant intensity
+  !Associate for all the panels the relevant intensity and allocate all the
+  !relevant fields
+  nsides = 4
   do ip = 1,npan
     do iw=1,wake%n_wake_stripes
-      wake%wake_panels(iw,ip)%idou => wake%ivort(iw,ip)
+     wake%wake_panels(iw,ip)%idou => wake%ivort(iw,ip)
+     allocate(wake%wake_panels(iw,ip)%ver(3,nsides))
+     allocate(wake%wake_panels(iw,ip)%cen(3))
+     allocate(wake%wake_panels(iw,ip)%nor(3))
+     allocate(wake%wake_panels(iw,ip)%tang(3,2))
+     allocate(wake%wake_panels(iw,ip)%verp(3,nsides))
+     allocate(wake%wake_panels(iw,ip)%edge_vec(3,nsides))
+     allocate(wake%wake_panels(iw,ip)%edge_len(nsides))
+     allocate(wake%wake_panels(iw,ip)%edge_uni(3,nsides))
+     allocate(wake%wake_panels(iw,ip)%cosTi(nsides))
+     allocate(wake%wake_panels(iw,ip)%sinTi(nsides))
     enddo
   enddo
 
@@ -163,7 +184,17 @@ subroutine initialize_wake_panels(wake, geo, te,  npan)
   wake%gen_ref = te%ref
   wake%i_start_points = te%ii
 
+  do iw=1,wake%n_wake_stripes
+    wake%gen_elems_id(1,iw) = wake%gen_elems(1,iw)%p%id
+    if(associated(wake%gen_elems(2,iw)%p)) then
+      wake%gen_elems_id(2,iw) = wake%gen_elems(2,iw)%p%id
+    else
+      wake%gen_elems_id(2,iw) = 0
+    endif
+  enddo
+
   wake%ivort = 0.0_wp
+
 
   !the first line of points is calculated from the mesh points
   wake%w_start_points = 0.5_wp * (geo%points(:,wake%gen_points(1,:)) + &
@@ -172,6 +203,7 @@ subroutine initialize_wake_panels(wake, geo, te,  npan)
   
   !Starting length of the wake is 
   wake%wake_len = 1
+
 
   !TODO : initialize first row of wake here
   allocate(wake%pan_p(wake%n_wake_stripes))
@@ -205,7 +237,7 @@ subroutine prepare_wake_panels(wake, geo, dt, uinf)
  
  integer :: p1, p2
  integer :: ip, iw, ipan
- real(wp) :: dist(3)
+ real(wp) :: dist(3) , vel_te(3)
 
   !Update the first row of panels: set points positions
 
@@ -217,7 +249,14 @@ subroutine prepare_wake_panels(wake, geo, dt, uinf)
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1,wake%n_wake_points
     dist = matmul(geo%refs(wake%gen_ref(ip))%R_g,wake%gen_dir(:,ip))
-    wake%w_points(:,ip,2) = wake%w_points(:,ip,1) + dist*0.3_wp*norm2(uinf)*dt
+    call calc_node_vel( wake%w_start_points(:,ip), &
+            geo%refs(wake%gen_ref(ip))%G_g, &
+            geo%refs(wake%gen_ref(ip))%f_g, &
+            vel_te )
+!   !DEBUG
+!   write(*,*) 'ip , wake%gen_ref(ip) : ' , ip , wake%gen_ref(ip)
+!   write(*,*) ' vel_te , dt : ' ,vel_te ,dt
+    wake%w_points(:,ip,2) = wake%w_points(:,ip,1) + dist*0.3_wp*norm2(uinf-vel_te)*dt
   enddo
 
   ! Update the panels geometrical quantities of all the panels, the 
@@ -227,7 +266,7 @@ subroutine prepare_wake_panels(wake, geo, dt, uinf)
     do iw = 1,wake%n_wake_stripes
       p1 = wake%i_start_points(1,iw)
       p2 = wake%i_start_points(2,iw)
-      call calc_geo_data(wake%wake_panels(iw,ipan), &
+      call calc_geo_data_pan(wake%wake_panels(iw,ipan), &
            reshape((/wake%w_points(:,p1,ipan),   wake%w_points(:,p2,ipan), &
                      wake%w_points(:,p2,ipan+1), wake%w_points(:,p1,ipan+1)/),&
                                                                      (/3,4/)))
@@ -240,10 +279,13 @@ end subroutine prepare_wake_panels
 
 !> Update the position and the intensities of the wake panels
 !!
-!!
-subroutine update_wake_panels(wake, elems, dt, uinf)
+!! Note: at this subroutine is passed the whole array of elements,
+!! comprising both the implicit panels and the explicit (ll) 
+!! elements
+subroutine update_wake_panels(wake, elems, wake_rings_p, dt, uinf)
  type(t_wake_panels), intent(inout), target :: wake
  type(t_elem_p), intent(in) :: elems(:)
+ type(t_elem_p), intent(in) :: wake_rings_p(:)
  real(wp), intent(in) :: dt
  real(wp), intent(in) :: uinf(3)
 
@@ -258,11 +300,14 @@ subroutine update_wake_panels(wake, elems, dt, uinf)
   !      it was already calculated (implicitly) in the linear system
   do iw = 1,wake%n_wake_stripes
     ! 
-    if      ( wake%gen_elems(2,iw) .ne. 0 ) then
-      wake%wake_panels(iw,1)%idou  = elems(wake%gen_elems(1,iw))%p%idou - &
-                                     elems(wake%gen_elems(2,iw))%p%idou
-    else if ( wake%gen_elems(2,iw) .eq. 0 ) then
-      wake%wake_panels(iw,1)%idou  = elems(wake%gen_elems(1,iw))%p%idou
+    if      ( associated(wake%gen_elems(2,iw)%p) ) then
+      !wake%wake_panels(iw,1)%idou  = elems(wake%gen_elems(1,iw))%p%idou - &
+      !                               elems(wake%gen_elems(2,iw))%p%idou
+      wake%wake_panels(iw,1)%idou  = wake%gen_elems(1,iw)%p%idou - &
+                                     wake%gen_elems(2,iw)%p%idou
+    else if ( .not. associated(wake%gen_elems(2,iw)%p) ) then
+      !wake%wake_panels(iw,1)%idou  = elems(wake%gen_elems(1,iw))%p%idou
+      wake%wake_panels(iw,1)%idou  = wake%gen_elems(1,iw)%p%idou
     end if
   enddo
 
@@ -293,13 +338,19 @@ subroutine update_wake_panels(wake, elems, dt, uinf)
         vel_p = vel_p + v/(4*pi)
       enddo
 
-      ! calculate the influence of the wake
+      ! calculate the influence of the wake panels
       do ie=1,size(wake%pan_p)
         v = 0.0_wp
         call wake%pan_p(ie)%p%compute_vel(pos_p, uinf, v)
         vel_p = vel_p + v/(4*pi)
       enddo
 
+      ! calculate the influence of the wake rings
+      do ie=1,size(wake_rings_p)
+        v = 0.0_wp
+        call wake_rings_p(ie)%p%compute_vel(pos_p, uinf, v)
+        vel_p = vel_p + v/(4*pi)
+      enddo
       !calculate the influence of particles
 
       ! for OUTPUT only -----
@@ -369,4 +420,4 @@ end subroutine update_wake_panels
 
 !----------------------------------------------------------------------
 
-end module mod_wake
+end module mod_wake_pan

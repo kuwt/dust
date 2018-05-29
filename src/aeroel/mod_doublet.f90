@@ -106,13 +106,9 @@ subroutine potential_calc_doublet(this, dou, pos)
 
    do i1 = 1 , this%n_ver
       
-     if ( this%n_ver .eq. 3 ) then
-       indm1 = prev_tri(i1)
-       indp1 = next_tri(i1)
-     else if ( this%n_ver .eq. 4 ) then
-       indm1 = prev_qua(i1)
-       indp1 = next_qua(i1)
-     end if
+     !This is ugly but should be general and work...
+     indp1 = 1+mod(i1,this%n_ver)
+     indm1 = this%n_ver - mod(this%n_ver-i1+1, this%n_ver)
    
      ! doublet  -----
      ! it is possible to use ver, instead of ver_p for the doublet
@@ -169,8 +165,10 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
  real(wp) :: radius_v(3)
  real(wp) :: radius , rati
 
- real(wp), parameter :: r_Rankine = 0.0000005_wp
- real(wp), parameter :: r_cutoff  = 0.0000001_wp
+ real(wp), parameter :: r_Rankine = 0.10_wp ! 0.0000005_wp
+ real(wp), parameter :: r_cutoff  = 0.001_wp ! 0.0000001_wp
+ !real(wp), parameter :: r_Rankine = 0.005_wp
+ !real(wp), parameter :: r_cutoff  = 0.001_wp
  real(wp) :: r_Ran
 
  integer :: i1
@@ -202,13 +200,17 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
 
    do i1 = 1 , this%n_ver
    
-     if ( this%n_ver .eq. 3 ) then
-       indm1 = prev_tri(i1)
-       indp1 = next_tri(i1)
-     else if ( this%n_ver .eq. 4 ) then
-       indm1 = prev_qua(i1)
-       indp1 = next_qua(i1)
-     end if
+     !if ( this%n_ver .eq. 3 ) then
+     !  indm1 = prev_tri(i1)
+     !  indp1 = next_tri(i1)
+     !else if ( this%n_ver .eq. 4 ) then
+     !  indm1 = prev_qua(i1)
+     !  indp1 = next_qua(i1)
+     !end if
+     !This is ugly but should be general and work...
+     indp1 = 1+mod(i1,this%n_ver)
+     indm1 = this%n_ver - mod(this%n_ver-i1+1, this%n_ver)
+
 
      ! use this%ver instead of its projection this%verp   
      !av = pos-this%verp(:,i1)
@@ -231,6 +233,7 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
          v_dou = v_dou + ( (this%edge_len(i1)-ai)/R2 + ai/R1 )/(r_Ran**2.0_wp) * &
                           cross(this%edge_uni(:,i1),hv)
 !      else
+        
        end if
      end if
    

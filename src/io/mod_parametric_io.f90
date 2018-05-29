@@ -50,7 +50,7 @@ use mod_parse, only: &
 
 implicit none
 
-public :: read_mesh_parametric
+public :: read_mesh_parametric, read_actuatordisk_parametric
 
 private
 
@@ -123,7 +123,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                '0.0',&
                multiple=.false.);
   ! TODO: do we really need to allow the user to define the parameter above?
-  ! the reference chord fraction is a number in the range [0,1] that define
+  ! the reference chord fraction is a number in the range [0,1] that defines
   ! - where the reference point is located in the root chord
   ! - the line related to the sweep angle
   ! - the point around which the sections are rotated to impose twist
@@ -162,7 +162,12 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
    
   nSections = countoption(pmesh_prs,'chord')
   nRegions  = countoption(pmesh_prs,'span')
-  
+
+  ! Check that nSections = nRegion + 1
+  if ( nSections .ne. nRegions + 1 ) then
+    call error(this_sub_name, this_mod_name, 'Unconsistent input: &
+         &nSections .ne. nRegions. Stop.')
+  end if 
 
   ref_chord_fraction = getreal(pmesh_prs,'reference_chord_fraction')
   ref_point          = getrealarray(pmesh_prs,'starting_point',3)
@@ -277,9 +282,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     if ( abs( dihed_list(iRegion) ) .gt. 60.0d0 ) then
       write(*,*) ' WARNING. abs( sweep_list(iRegion) ) .gt. 60.0d0. '
     end if
-    dx_ref = dx_ref + span_list(iRegion) * tan( sweep_list(iRegion)* pi / 180.0_wp )
-    dy_ref = dy_ref + span_list(iRegion)
-    dz_ref = dz_ref + span_list(iRegion) * tan( dihed_list(iRegion)* pi / 180.0_wp )
+    dx_ref = span_list(iRegion) * tan( sweep_list(iRegion)* pi / 180.0_wp ) + dx_ref 
+    dy_ref = span_list(iRegion)                                             + dy_ref 
+    dz_ref = span_list(iRegion) * tan( dihed_list(iRegion)* pi / 180.0_wp ) + dz_ref 
 
     rrSection2(1,:) = xySection2(1,:) + dx_ref
     rrSection2(2,:) = 0.0_wp          + dy_ref  ! <--- read from region structure
@@ -624,6 +629,65 @@ subroutine define_division(type_mesh, nelem, division)
   end select
 
 end subroutine define_division
+
+!-------------------------------------------------------------------------------
+
+subroutine read_actuatordisk_parametric(mesh_file,ee,rr)
+ character(len=*), intent(in) :: mesh_file
+ integer  , allocatable, intent(out) :: ee(:,:) 
+ real(wp) , allocatable, intent(out) :: rr(:,:) 
+
+ real(wp), allocatable :: x(:), y(:)
+ type(t_parse) :: pmesh_prs
+ character :: ElType
+ integer :: nstep, ax, ip
+ real(wp) :: r, theta
+ integer :: ind1, ind2
+ character(len=*), parameter ::  this_sub_name = 'read_actuatordisk_parametric'
+
+  call pmesh_prs%CreateStringOption('ElType', &
+                'element type (temporary) p panel v vortex ring &
+                & l lifting line a actuator disk')
+  call pmesh_prs%CreateRealOption('Radius', 'Radius of the actuator disk')
+  call pmesh_prs%CreateIntOption('nstep','Number of subdivisions')
+  call pmesh_prs%CreateIntOption('Axis','Which axis to align the disk')
+
+  !read the parameters
+  call pmesh_prs%read_options(trim(mesh_file),printout_val=.true.)
+  
+  ElType = getstr(pmesh_prs,'ElType')
+
+  if(trim(ElType) .ne. 'a') call error(this_sub_name, this_mod_name, &
+    'This should have not happened, a team of professionals is under way to &
+    &remove the evidence')
+
+  r = getreal(pmesh_prs,'Radius')
+  nstep = getint(pmesh_prs,'nstep')
+  ax = getint(pmesh_prs,'Axis')
+
+  
+  allocate(x(nstep), y(nstep))
+
+  do ip = 1, nstep
+    theta = real(ip-1,wp) * 2.0_wp*pi/real(nstep,wp)
+    x(ip) = cos(theta)*r
+    y(ip) = sin(theta)*r
+  enddo
+
+  ind1 = 1+mod(ax,3)
+  ind2 = 1+mod(ind1,3)
+  allocate(rr   (3,nstep)) ; rr = 0.0_wp
+  rr(ind1,:) = x
+  rr(ind2,:) = y
+
+  allocate(ee(nstep,1)) ; ee = 0
+  do ip = 1,nstep
+    ee(ip,1) = ip
+  enddo
+
+  deallocate(x,y)
+
+end subroutine read_actuatordisk_parametric
 
 !-------------------------------------------------------------------------------
 
