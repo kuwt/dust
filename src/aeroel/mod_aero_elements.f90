@@ -40,6 +40,9 @@ module mod_aero_elements
 
 use mod_linsys_vars, only: t_linsys
 
+use mod_sim_param, only: &
+  t_sim_param
+
 use mod_param, only: &
   wp
 
@@ -51,17 +54,25 @@ private
 
 !----------------------------------------------------------------------
 
+type :: t_elem_p
+  class(c_elem), pointer :: p
+end type
+
 !> Abstract type defining a generic aerodynamic element
 !!
 !! It needs to be extended into more specific elements
 type, abstract :: c_elem
 
   !> Intensity of the doublets/vortexes
-  real(wp), pointer :: idou
+  real(wp), pointer :: idou => null()
   real(wp)          :: didou_dt
  
   !> Element id
   integer :: id
+
+  !> id of the component to which it belongs
+  integer :: comp_id
+
   !> Number of vertexes
   integer :: n_ver  
   !> Vertexes coordinates
@@ -88,7 +99,8 @@ type, abstract :: c_elem
   !> Is the element moving during simulation?
   logical :: moving
   !> Element neighbours global index (in the elements vector)
-  integer, allocatable :: i_neigh(:)
+  !integer, allocatable :: i_neigh(:)
+  type(t_elem_p), allocatable :: neigh(:)
 
   !> Coefficients to compute local velocity from the velocity potential
   !! on a stencil of neighboring elements (for surfpan only)
@@ -97,14 +109,20 @@ type, abstract :: c_elem
   !> Panel width (= strip width) (for vortring only)
   real(wp)              :: dy
   !> Previous element in a stripe (for vortring only)
-  integer               :: stripe_1
+  !integer               :: stripe_1
+  type(t_elem_p)        :: stripe_1
   !> Element indices in the component%strip_elem array (for vortring only)
-  integer, allocatable  :: stripe_elem(:)
+  !integer, allocatable  :: stripe_elem(:)
+  type(t_elem_p), allocatable :: stripe_elem(:)
 
   !> Fluid velocity at center for boundary condition (U_inf-rel vel)
   real(wp), allocatable :: vel(:)
-  !> Fluid velocity at center for boundary condition (U_inf-rel vel)
+  !> Average pressure coefficient on the element
   real(wp)              :: cp
+  !> Average pressure on the element
+  real(wp)              :: pres
+  !> Elementary force acting on the element (components in the base ref.sys.) 
+  real(wp), allocatable :: dforce(:)
 
   contains
 ! procedure(i_velocity_calc), deferred, pass(this) :: velocity_calc
@@ -114,19 +132,20 @@ type, abstract :: c_elem
 ! new
   procedure(i_build_row)  , deferred, pass(this)      :: build_row
   procedure(i_build_row_static), deferred, pass(this) :: build_row_static
-  procedure(i_add_wake), deferred, pass(this)         :: add_wake
+  procedure(i_add_wake),    deferred, pass(this)      :: add_wake
+  procedure(i_add_liftlin), deferred, pass(this)      :: add_liftlin
+  procedure(i_add_actdisk), deferred, pass(this)      :: add_actdisk
   procedure(i_compute_pot), deferred, pass(this)      :: compute_pot
   procedure(i_compute_vel), deferred, pass(this)      :: compute_vel
   procedure(i_compute_psi), deferred, pass(this)      :: compute_psi
 ! loads --------------
-  procedure(i_compute_cp ), deferred, pass(this)      :: compute_cp
+  procedure(i_compute_cp     ), deferred, pass(this)      :: compute_cp
+  procedure(i_compute_pres   ), deferred, pass(this)      :: compute_pres
+  procedure(i_compute_dforce ), deferred, pass(this)      :: compute_dforce
   
 
 end type
 
-type :: t_elem_p
-  class(c_elem), pointer :: p
-end type
 
 !----------------------------------------------------------------------
 
@@ -198,7 +217,7 @@ end interface
 !! The function operates only on the components from ista to iend, which 
 !! should be the static ones ordered at the beginning of the array
 abstract interface
-  subroutine i_build_row_static(this, elems, linsys, uinf, ie, ista, iend)
+  subroutine i_build_row_static(this, elems, ll_elems, ad_elems, linsys, uinf, ie, ista, iend)
     import :: wp
     import :: c_elem
     import :: t_elem_p
@@ -206,6 +225,8 @@ abstract interface
     implicit none
     class(c_elem), intent(inout)  :: this
     type(t_elem_p), intent(in)    :: elems(:)
+    type(t_elem_p), intent(in)    :: ll_elems(:)
+    type(t_elem_p), intent(in)    :: ad_elems(:)
     type(t_linsys), intent(inout) :: linsys
     real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
@@ -226,6 +247,46 @@ abstract interface
     class(c_elem), intent(inout)  :: this
     type(t_elem_p), intent(in)    :: wake_elems(:)
     integer, intent(in)           :: impl_wake_ind(:,:)
+    type(t_linsys), intent(inout) :: linsys
+    real(wp), intent(in)          :: uinf(:)
+    integer, intent(in)           :: ie
+    integer, intent(in)           :: ista
+    integer, intent(in)           :: iend
+  end subroutine
+end interface
+
+!----------------------------------------------------------------------
+
+abstract interface
+  subroutine i_add_liftlin(this, ll_elems, linsys, uinf, &
+                        ie, ista, iend)
+    import :: wp
+    import :: c_elem
+    import :: t_elem_p
+    import :: t_linsys
+    implicit none
+    class(c_elem), intent(inout)  :: this
+    type(t_elem_p), intent(in)    :: ll_elems(:)
+    type(t_linsys), intent(inout) :: linsys
+    real(wp), intent(in)          :: uinf(:)
+    integer, intent(in)           :: ie
+    integer, intent(in)           :: ista
+    integer, intent(in)           :: iend
+  end subroutine
+end interface
+
+!----------------------------------------------------------------------
+
+abstract interface
+  subroutine i_add_actdisk(this, ad_elems, linsys, uinf, &
+                        ie, ista, iend)
+    import :: wp
+    import :: c_elem
+    import :: t_elem_p
+    import :: t_linsys
+    implicit none
+    class(c_elem), intent(inout)  :: this
+    type(t_elem_p), intent(in)    :: ad_elems(:)
     type(t_linsys), intent(inout) :: linsys
     real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
@@ -285,6 +346,30 @@ abstract interface
     class(c_elem), intent(inout) :: this
     type(t_elem_p), intent(in)   :: elems(:)
     real(wp), intent(in)         :: uinf(:)
+  end subroutine
+end interface
+
+!----------------------------------------------------------------------
+
+abstract interface
+  subroutine i_compute_pres (this, elems, sim_param)
+    import :: c_elem , t_elem_p , wp ,t_sim_param 
+    implicit none
+    class(c_elem), intent(inout) :: this
+    type(t_elem_p), intent(in)   :: elems(:)
+    type(t_sim_param), intent(in):: sim_param
+  end subroutine
+end interface
+
+!----------------------------------------------------------------------
+
+abstract interface
+  subroutine i_compute_dforce (this, elems, sim_param)
+    import :: c_elem , t_elem_p , wp , t_sim_param 
+    implicit none
+    class(c_elem), intent(inout) :: this
+    type(t_elem_p), intent(in)   :: elems(:)
+    type(t_sim_param), intent(in):: sim_param
   end subroutine
 end interface
 

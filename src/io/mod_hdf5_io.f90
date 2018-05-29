@@ -65,6 +65,7 @@ use mod_handling, only: &
    open_hdf5_group, &
    close_hdf5_group, &
    write_hdf5, &
+   write_hdf5_attr, &
    read_hdf5, &
    read_hdf5_al, &
    append_hdf5, &
@@ -95,6 +96,7 @@ use mod_handling, only: &
  interface write_hdf5
   module procedure write_string_hdf5, &
                    write_1d_string_hdf5, &
+                   write_2d_string_hdf5, &
                    write_int_hdf5, &
                    write_1d_int_hdf5, &
                    write_2d_int_hdf5, &
@@ -103,6 +105,10 @@ use mod_handling, only: &
                    write_1d_real_hdf5, &
                    write_2d_real_hdf5, &
                    write_3d_real_hdf5
+ end interface
+
+ interface write_hdf5_attr
+  module procedure write_1d_int_hdf5_attr
  end interface
 
  interface append_hdf5
@@ -119,7 +125,9 @@ use mod_handling, only: &
                    read_1d_real_hdf5, &
                    read_2d_real_hdf5, &
                    read_3d_real_hdf5, &
-                   read_string_hdf5
+                   read_string_hdf5, &
+                   read_1d_string_hdf5, &
+                   read_2d_string_hdf5
  end interface read_hdf5
 
  interface read_hdf5_al
@@ -128,7 +136,9 @@ use mod_handling, only: &
                    read_3d_real_hdf5_al, &
                    read_1d_int_hdf5_al, &
                    read_2d_int_hdf5_al, &
-                   read_3d_int_hdf5_al
+                   read_3d_int_hdf5_al, &
+                   read_1d_string_hdf5_al, &
+                   read_2d_string_hdf5_al
  end interface read_hdf5_al
 
  interface check_dset_hdf5
@@ -338,6 +348,7 @@ subroutine write_string_hdf5(outdata, outname, file_id)
     this_sub_name = 'write_string_hdf5'
  integer :: h5err
  integer ::strlen
+ logical :: l_exists
 
   strlen = len(outdata)
   out_size(1) = 1
@@ -351,9 +362,19 @@ subroutine write_string_hdf5(outdata, outname, file_id)
   !create a (single) scalar dataspace
   call h5Screate_f(H5S_SCALAR_F, dspace_id, h5err)
 
-  !create the dataset on the file
-  call h5Dcreate_f(file_id, trim(outname), filetype_id, dspace_id, &
-                   dset_id, h5err)
+  !check if the dataset on file exists
+  call h5Lexists_f(file_id, trim(outname), l_exists, h5err)
+
+  if (.not. l_exists) then
+    !create the dataset on the file
+    call h5Dcreate_f(file_id, trim(outname), filetype_id, dspace_id, &
+                     dset_id, h5err)
+  else
+    !open the dataset
+    !TODO: perform a check on the dimensions
+    call h5Dopen_f(file_id, trim(outname), dset_id, h5err)
+
+  endif
 
   !write
   call h5Dwrite_f(dset_id, memtype_id, outdata, out_size, h5err)
@@ -471,6 +492,326 @@ subroutine write_1d_string_hdf5(outdata, outname, file_id)
   endif
 end subroutine write_1d_string_hdf5
 
+!-----------------------------------------------------------------------
+
+!> Read a string array.
+!!
+subroutine read_1d_string_hdf5(input, inputname, loc_id)
+ character(len=*), intent(out)        :: input(:)
+ character(len=*), intent(in)         :: inputname
+ integer(HID_T), intent(in)           :: loc_id
+
+ !integer(HID_T) :: dspace_id, memspace_id
+ integer(HID_T) :: filespace_id
+ integer(HID_T) :: dset_id
+ integer(HID_T) :: filetype_id, memtype_id
+ integer(HSIZE_T) :: in_size(1), max_size(1)
+ integer :: in_rank
+ character(len=*), parameter :: &
+    this_sub_name = 'read_string_hdf5'
+ integer :: h5err
+ integer(HSIZE_T) ::strlen
+  
+  !open the dataset
+  call h5Dopen_f(loc_id, inputname, dset_id, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                               'Problems opening dataset  '//inputname)
+  !get the type
+  call h5Dget_type_f(dset_id, filetype_id, h5err)
+  !get the size
+  call h5Tget_size_f(filetype_id, strlen, h5err)
+
+  !Check the size
+  if (int(strlen) .gt. len(input)) call error(this_mod_name, this_sub_name, &
+     'The string'//trim(inputname)//' about to be read is shorter than the&
+     &data on the file')
+
+  !create the memory datatypes
+  call h5Tcopy_f(h5t_mem_char, memtype_id, h5err)
+  call h5Tset_size_f(memtype_id, strlen,h5err)
+
+  !get its dataspace
+  call h5Dget_space_f(dset_id, filespace_id, h5err)
+  !get dataspace rank and dimensions
+  call h5Sget_simple_extent_ndims_f(filespace_id, in_rank, h5err)
+  if (in_rank .ne. 1) call error(this_mod_name,this_sub_name, &
+     'Dataset rank different from the requested 1 for data ' &
+     //trim(inputname))
+  call h5Sget_simple_extent_dims_f(filespace_id, in_size, &
+                                   max_size, h5err)
+  if(in_size(1) .ne. int(size(input,1), h5sz)) &
+      call  error(this_mod_name, this_sub_name, &
+      'Dimension of read file and target array differs, for array '//inputname)
+
+  !Prepare the local string: it might be filled with random data, and 
+  !since we read only the first part is necessary to clear it to avoid
+  !having garbage at the end of the string
+  input = ''
+  !read
+  call h5Dread_f(dset_id, memtype_id, input, in_size, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                           'Problems reading dataset '//inputname)
+
+  !release resources
+  call h5Sclose_f(filespace_id, h5err)
+  call h5Tclose_f(memtype_id, h5err)
+  call h5Tclose_f(filetype_id, h5err)
+  call h5Dclose_f(dset_id, h5err)
+end subroutine read_1d_string_hdf5
+
+!-----------------------------------------------------------------------
+
+!> Read and allocate string array.
+!!
+subroutine read_1d_string_hdf5_al(input, inputname, loc_id)
+ character(len=*), allocatable, intent(out) :: input(:)
+ character(len=*), intent(in)         :: inputname
+ integer(HID_T), intent(in)           :: loc_id
+
+ !integer(HID_T) :: dspace_id, memspace_id
+ integer(HID_T) :: filespace_id
+ integer(HID_T) :: dset_id
+ integer(HID_T) :: filetype_id, memtype_id
+ integer(HSIZE_T) :: in_size(1), max_size(1)
+ integer :: in_rank
+ character(len=*), parameter :: &
+    this_sub_name = 'read_1d_string_hdf5_al'
+ integer :: h5err
+ integer(HSIZE_T) ::strlen
+  
+  !open the dataset
+  call h5Dopen_f(loc_id, inputname, dset_id, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                               'Problems opening dataset  '//inputname)
+  !get the type
+  call h5Dget_type_f(dset_id, filetype_id, h5err)
+  !get the size
+  call h5Tget_size_f(filetype_id, strlen, h5err)
+
+  !Check the size
+  if (int(strlen) .gt. len(input)) call error(this_mod_name, this_sub_name, &
+     'The string'//trim(inputname)//' about to be read is shorter than the&
+     &data on the file')
+
+  !create the memory datatypes
+  call h5Tcopy_f(h5t_mem_char, memtype_id, h5err)
+  call h5Tset_size_f(memtype_id, strlen,h5err)
+
+  !get its dataspace
+  call h5Dget_space_f(dset_id, filespace_id, h5err)
+  !get dataspace rank and dimensions
+  call h5Sget_simple_extent_ndims_f(filespace_id, in_rank, h5err)
+  if (in_rank .ne. 1) call error(this_mod_name,this_sub_name, &
+     'Dataset rank different from the requested 1 for data ' &
+     //trim(inputname))
+  call h5Sget_simple_extent_dims_f(filespace_id, in_size, &
+                                   max_size, h5err)
+  
+  ! allocate memory data
+  allocate(input(in_size(1)))
+  !Prepare the local string: it might be filled with random data, and 
+  !since we read only the first part is necessary to clear it to avoid
+  !having garbage at the end of the string
+  input = ''
+  !read
+  call h5Dread_f(dset_id, memtype_id, input, in_size, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                           'Problems reading dataset '//inputname)
+
+  !release resources
+  call h5Sclose_f(filespace_id, h5err)
+  call h5Tclose_f(memtype_id, h5err)
+  call h5Tclose_f(filetype_id, h5err)
+  call h5Dclose_f(dset_id, h5err)
+end subroutine read_1d_string_hdf5_al
+
+!-----------------------------------------------------------------------
+
+!> Write a 2D array of strings
+!!
+!! If the array is empty nothing is written (not an empty dataset as in
+!! other cases), due to known issues to load empty character dataset by
+!! hdf5
+subroutine write_2d_string_hdf5(outdata, outname, file_id)
+ character(len=*), intent(in)  :: outdata(:,:)
+ character(len=*), intent(in)  :: outname
+ integer(HID_T), intent(in)    :: file_id
+
+ integer(HID_T) :: dspace_id!, memspace_id
+ integer(HID_T) :: dset_id
+ integer(HID_T) :: filetype_id, memtype_id
+ integer, parameter :: rank=2
+ integer(HSIZE_T) :: out_size(2)
+ character(len=*), parameter :: &
+    this_sub_name = 'write_string_hdf5'
+ integer :: h5err
+ integer ::strlen
+
+  strlen = len(outdata)
+  out_size(1) = int(size(outdata, 1), h5sz)
+  out_size(2) = int(size(outdata, 2), h5sz)
+
+  !write only if the array is not empty
+  ! (empty arrays of strings create problems while loading)
+  if (out_size(1) .gt. 0) then
+    !create the string datatypes
+    call h5Tcopy_f(h5t_mem_char, memtype_id, h5err)
+    call h5Tset_size_f(memtype_id, int(strlen,HSIZE_T),h5err)
+    call h5Tcopy_f(h5t_file_char, filetype_id, h5err)
+    call h5Tset_size_f(filetype_id, int(strlen,HSIZE_T),h5err)
+
+    !create a 1D scalar dataspace
+    call h5Screate_simple_f(rank, out_size, dspace_id, h5err)
+
+    !create the dataset on the file
+    call h5Dcreate_f(file_id, trim(outname), filetype_id, dspace_id, &
+                     dset_id, h5err)
+
+    !write
+    call h5Dwrite_f(dset_id, memtype_id, outdata, out_size, h5err)
+    if(h5err<0) call error(this_mod_name,this_sub_name, &
+                           'Problems writing dataset '//outname)
+
+    !release resources
+    call h5Dclose_f(dset_id, h5err)
+    call h5Sclose_f(dspace_id, h5err)
+    call h5Tclose_f(memtype_id, h5err)
+    call h5Tclose_f(filetype_id, h5err)
+  endif
+end subroutine write_2d_string_hdf5
+
+!-----------------------------------------------------------------------
+
+!> Read a string 2d array.
+!!
+subroutine read_2d_string_hdf5(input, inputname, loc_id)
+ character(len=*), intent(out)        :: input(:,:)
+ character(len=*), intent(in)         :: inputname
+ integer(HID_T), intent(in)           :: loc_id
+
+ !integer(HID_T) :: dspace_id, memspace_id
+ integer(HID_T) :: filespace_id
+ integer(HID_T) :: dset_id
+ integer(HID_T) :: filetype_id, memtype_id
+ integer(HSIZE_T) :: in_size(2), max_size(2)
+ integer :: in_rank
+ character(len=*), parameter :: &
+    this_sub_name = 'read_string_hdf5'
+ integer :: h5err
+ integer(HSIZE_T) ::strlen
+  
+  !open the dataset
+  call h5Dopen_f(loc_id, inputname, dset_id, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                               'Problems opening dataset  '//inputname)
+  !get the type
+  call h5Dget_type_f(dset_id, filetype_id, h5err)
+  !get the size
+  call h5Tget_size_f(filetype_id, strlen, h5err)
+
+  !Check the size
+  if (int(strlen) .gt. len(input)) call error(this_mod_name, this_sub_name, &
+     'The string'//trim(inputname)//' about to be read is shorter than the&
+     &data on the file')
+
+  !create the memory datatypes
+  call h5Tcopy_f(h5t_mem_char, memtype_id, h5err)
+  call h5Tset_size_f(memtype_id, strlen,h5err)
+
+  !get its dataspace
+  call h5Dget_space_f(dset_id, filespace_id, h5err)
+  !get dataspace rank and dimensions
+  call h5Sget_simple_extent_ndims_f(filespace_id, in_rank, h5err)
+  if (in_rank .ne. 2) call error(this_mod_name,this_sub_name, &
+     'Dataset rank different from the requested 2 for data ' &
+     //trim(inputname))
+  call h5Sget_simple_extent_dims_f(filespace_id, in_size, &
+                                   max_size, h5err)
+  if((in_size(1) .ne. int(size(input,1), h5sz)) .or. &
+     (in_size(2) .ne. int(size(input,2), h5sz))) &
+       call  error(this_mod_name, this_sub_name, &
+      'Dimension of read file and target array differs, for array '//inputname)
+
+  !Prepare the local string: it might be filled with random data, and 
+  !since we read only the first part is necessary to clear it to avoid
+  !having garbage at the end of the string
+  input = ''
+  !read
+  call h5Dread_f(dset_id, memtype_id, input, in_size, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                           'Problems reading dataset '//inputname)
+
+  !release resources
+  call h5Sclose_f(filespace_id, h5err)
+  call h5Tclose_f(memtype_id, h5err)
+  call h5Tclose_f(filetype_id, h5err)
+  call h5Dclose_f(dset_id, h5err)
+end subroutine read_2d_string_hdf5
+
+!-----------------------------------------------------------------------
+
+!> Read a string 2d array.
+!!
+subroutine read_2d_string_hdf5_al(input, inputname, loc_id)
+ character(len=*), allocatable, intent(out) :: input(:,:)
+ character(len=*), intent(in)         :: inputname
+ integer(HID_T), intent(in)           :: loc_id
+
+ !integer(HID_T) :: dspace_id, memspace_id
+ integer(HID_T) :: filespace_id
+ integer(HID_T) :: dset_id
+ integer(HID_T) :: filetype_id, memtype_id
+ integer(HSIZE_T) :: in_size(2), max_size(2)
+ integer :: in_rank
+ character(len=*), parameter :: &
+    this_sub_name = 'read_string_hdf5'
+ integer :: h5err
+ integer(HSIZE_T) ::strlen
+  
+  !open the dataset
+  call h5Dopen_f(loc_id, inputname, dset_id, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                               'Problems opening dataset  '//inputname)
+  !get the type
+  call h5Dget_type_f(dset_id, filetype_id, h5err)
+  !get the size
+  call h5Tget_size_f(filetype_id, strlen, h5err)
+
+  !Check the size
+  if (int(strlen) .gt. len(input)) call error(this_mod_name, this_sub_name, &
+     'The string'//trim(inputname)//' about to be read is shorter than the&
+     &data on the file')
+
+  !create the memory datatypes
+  call h5Tcopy_f(h5t_mem_char, memtype_id, h5err)
+  call h5Tset_size_f(memtype_id, strlen,h5err)
+
+  !get its dataspace
+  call h5Dget_space_f(dset_id, filespace_id, h5err)
+  !get dataspace rank and dimensions
+  call h5Sget_simple_extent_ndims_f(filespace_id, in_rank, h5err)
+  if (in_rank .ne. 2) call error(this_mod_name,this_sub_name, &
+     'Dataset rank different from the requested 2 for data ' &
+     //trim(inputname))
+  call h5Sget_simple_extent_dims_f(filespace_id, in_size, &
+                                   max_size, h5err)
+  ! allocate memory data
+  allocate(input(in_size(1),in_size(2)))
+  !Prepare the local string: it might be filled with random data, and 
+  !since we read only the first part is necessary to clear it to avoid
+  !having garbage at the end of the string
+  input = ''
+  !read
+  call h5Dread_f(dset_id, memtype_id, input, in_size, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                           'Problems reading dataset '//inputname)
+
+  !release resources
+  call h5Sclose_f(filespace_id, h5err)
+  call h5Tclose_f(memtype_id, h5err)
+  call h5Tclose_f(filetype_id, h5err)
+  call h5Dclose_f(dset_id, h5err)
+end subroutine read_2d_string_hdf5_al
 
 !-----------------------------------------------------------------------
 ! ==== Write Reals ====
@@ -1014,14 +1355,25 @@ subroutine write_int_hdf5(outdata, outname, file_id)
  character(len=*), parameter :: &
     this_sub_name = 'write_int_hdf5'
  integer :: h5err
+ logical :: l_exists
 
   !create a (single) scalar dataspace
   out_size(1) = 1
   call h5Screate_f(H5S_SCALAR_F, dspace_id, h5err)
 
-  !create the dataset on the file
-  call h5Dcreate_f(file_id, trim(outname), h5t_file_int, dspace_id, &
-                   dset_id, h5err)
+  !check if the dataset on file exists
+  call h5Lexists_f(file_id, trim(outname), l_exists, h5err)
+
+  if (.not. l_exists) then
+    !create the dataset on the file
+    call h5Dcreate_f(file_id, trim(outname), h5t_file_int, dspace_id, &
+                     dset_id, h5err)
+  else
+    !open the dataset
+    !TODO: perform a check on the dimensions
+    call h5Dopen_f(file_id, trim(outname), dset_id, h5err)
+
+  endif
 
   !write
   call h5Dwrite_f(dset_id, h5t_mem_int, outdata, out_size, h5err)
@@ -1519,5 +1871,43 @@ end subroutine read_3d_int_hdf5_al
 
 !-----------------------------------------------------------------------
 
+!-----------------------------------------------------------------------
+! ==== Read and allocate Integers ====
+!-----------------------------------------------------------------------
+
+!> Write a rank 1 array of integers to an attribute
+!!
+subroutine write_1d_int_hdf5_attr(outdata, outname, loc_id)
+ integer, intent(in)           :: outdata(:)
+ character(len=*), intent(in)  :: outname
+ integer(HID_T), intent(in)    :: loc_id
+
+ integer(HID_T) :: dspace_id!, memspace_id
+ integer(HID_T) :: attr_id
+ !integer(HID_T) :: filetype_id, memtype_id
+ integer, parameter :: rank=1
+ integer(HSIZE_T) :: out_size(1)
+ character(len=*), parameter :: &
+    this_sub_name = 'write_1d_int_hdf5'
+ integer :: h5err
+
+  !create a 1D dataspace
+  out_size(1) = int(size(outdata,1), h5sz)
+  call h5Screate_simple_f(rank, out_size, dspace_id, h5err)
+
+  !create the dataset on the file
+  call h5Acreate_f(loc_id, trim(outname), h5t_file_int, dspace_id, &
+                   attr_id, h5err)
+  !write
+  call h5Awrite_f(attr_id, h5t_mem_int, outdata, out_size, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                           'Problems writing attribute '//outname)
+
+  !release resources
+  call h5Aclose_f(attr_id, h5err)
+  call h5Sclose_f(dspace_id, h5err)
+end subroutine write_1d_int_hdf5_attr
+
+!-----------------------------------------------------------------------
 
 end module mod_hdf5_io

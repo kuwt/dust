@@ -101,7 +101,7 @@ type :: t_ref
   character(len=max_char_len) :: tag
 
   !> Reference Name
-  character(len=max_char_len) :: name
+  !character(len=max_char_len) :: name
 
   !> Parent reference id, used to index the references array
   integer :: parent_id
@@ -947,10 +947,12 @@ subroutine build_references(refs, reference_file, sim_param)
 
         !1) allocate a series of extra reference frames and move-alloc everything
         n_refs = n_refs+n_mult_refs
-        allocate(refs_temp(0:n_refs+n_mult_refs))
+        !allocate(refs_temp(0:n_refs+n_mult_refs))
+        allocate(refs_temp(0:n_refs))
         refs_temp(0:iref) = refs(0:iref)
         deallocate(refs)
         call move_alloc(refs_temp, refs)
+
 
         !2) Read the inputs
         allocate( psi_0(n_mult_refs))

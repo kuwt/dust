@@ -38,7 +38,7 @@
 module mod_sim_param
 
 use mod_param, only: &
-  wp
+  wp, max_char_len
 
 implicit none
 
@@ -57,10 +57,16 @@ type t_sim_param
   integer  :: n_timesteps
   !> Vector of time instants
   real(wp) , allocatable :: time_vec(:)
+  !> Free stream pressure
+  real(wp) :: P_inf
+  !> Free stream density 
+  real(wp) :: rho_inf
   !> Free stream velocity
   real(wp) , allocatable :: u_inf(:)
   !> Debug level
   integer :: debug_level
+  !> Basename
+  character(len=max_char_len) :: basename
 end type t_sim_param
 
 

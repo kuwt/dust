@@ -55,7 +55,10 @@ use mod_cgns_io, only: &
   read_mesh_cgns
 
 use mod_parametric_io, only: &
-  read_mesh_parametric
+  read_mesh_parametric, read_actuatordisk_parametric
+
+use mod_ll_io, only: &
+  read_mesh_ll
 
 use mod_hdf5_io, only: &
    h5loc, &
@@ -83,8 +86,10 @@ character(len=*), parameter :: this_mod_name = 'mod_build_geo'
 
 contains 
 
-subroutine build_geometry(geo_files, output_file)
+subroutine build_geometry(geo_files, ref_tags, comp_names, output_file)
  character(len=*), intent(in) :: geo_files(:)
+ character(len=*), intent(in) :: ref_tags(:)
+ character(len=*), intent(in) :: comp_names(:)
  character(len=*), intent(in) :: output_file
 
  integer :: n_geo, i_geo
@@ -96,7 +101,8 @@ subroutine build_geometry(geo_files, output_file)
   call new_hdf5_group(file_loc, 'Components', group_loc)
   call write_hdf5(n_geo,'NComponents',group_loc)
   do i_geo = 1,n_geo
-    call build_component(group_loc, trim(geo_files(i_geo)), i_geo)
+    call build_component(group_loc, trim(geo_files(i_geo)), &
+                         trim(ref_tags(i_geo)), trim(comp_names(i_geo)), i_geo)
   enddo
 
   call close_hdf5_group(group_loc)
@@ -106,23 +112,31 @@ end subroutine build_geometry
 
 !-----------------------------------------------------------------------
 
-subroutine build_component(gloc, geo_file, comp_id)
+subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
  integer(h5loc), intent(in)   :: gloc
  character(len=*), intent(in) :: geo_file
+ character(len=*), intent(in) :: ref_tag
+ character(len=*), intent(in) :: comp_tag
  integer, intent(in)          :: comp_id
 
  type(t_parse) :: geo_prs
  character(len=max_char_len) :: mesh_file
  integer, allocatable :: ee(:,:)
  real(wp), allocatable :: rr(:,:)
+ real(wp), allocatable :: theta_p(:) , chord_p(:)
  character(len=max_char_len) :: comp_el_type
  character :: ElType
  character(len=max_char_len) :: mesh_file_type
  logical :: mesh_reflection
  real(wp) :: reflection_point(3), reflection_normal(3)
- character(len=max_char_len) :: ref_tag
  character(len=max_char_len) :: comp_name
  integer(h5loc) :: comp_loc , geo_loc , te_loc
+
+ character(len=max_char_len), allocatable :: airfoil_list(:)
+ integer , allocatable                    :: nelem_span_list(:)
+ integer , allocatable                    :: i_airfoil_e(:,:)
+ real(wp) , allocatable                   :: normalised_coord_e(:,:)
+ real(wp) :: trac, radius
 
  integer :: npoints_chord_tot, nelems_span, nelems_span_tot
  ! Connectivity and te structures 
@@ -133,6 +147,7 @@ subroutine build_component(gloc, geo_file, comp_id)
  integer , allocatable :: neigh_te(:,:) , o_te(:,:)
  real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
 
+ integer :: i1 , fid
 
  character(len=*), parameter :: this_sub_name = 'build_component'
 
@@ -143,10 +158,10 @@ subroutine build_component(gloc, geo_file, comp_id)
   call geo_prs%CreateStringOption('MeshFileType','Mesh file type')
   !element types
   call geo_prs%CreateStringOption('ElType', &
-              'element type (temporary) p panel v vortex ring')
+              'element type (temporary) p:panel, v:vortex ring, l:lifting line')
   !reference frame
-  call geo_prs%CreateStringOption('Reference_Tag',&
-                                   'reference frame tag of the component','0')
+  !call geo_prs%CreateStringOption('Reference_Tag',&
+  !                                 'reference frame tag of the component','0')
   !reflections
   call geo_prs%CreateLogicalOption('mesh_reflection',&
                'Has all the file a custom reference frame', 'F')
@@ -157,51 +172,83 @@ subroutine build_component(gloc, geo_file, comp_id)
                'Normal of reflection plane, (xn, yn, zn)', &
                '(/0.0, 0.0, 1.0/)')
   
+  call geo_prs%CreateRealOption('traction', &
+               'Traction of the rotor')
+  call geo_prs%CreateRealOption('Radius', &
+               'Radius of the rotor')
 
   
   !read the parameters
   call geo_prs%read_options(geo_file,printout_val=.false.)
 
-  mesh_file      = getstr(geo_prs,'MeshFile')
   mesh_file_type = getstr(geo_prs,'MeshFileType')
-  ref_tag        = getstr(geo_prs,'Reference_Tag')
+  !ref_tag        = getstr(geo_prs,'Reference_Tag')
 
   mesh_reflection   = getlogical(geo_prs, 'mesh_reflection')
   reflection_point  = getrealarray(geo_prs, 'reflection_point',3)
   reflection_normal = getrealarray(geo_prs, 'reflection_normal',3)
 
+  comp_el_type = getstr(geo_prs,'ElType')
+  ElType = comp_el_type(1:1)
 
   !Build the group
   write(comp_name,'(A,I3.3)')'Comp',comp_id
   call new_hdf5_group(gloc, trim(comp_name), comp_loc)
+  call write_hdf5(comp_tag,'CompName',comp_loc)
   call write_hdf5(ref_tag,'RefTag',comp_loc)
+
+! call new_hdf5_group(file_loc, 'Components', group_loc)
+  call write_hdf5(trim(comp_el_type),'ElType',comp_loc)
+
+  call new_hdf5_group(comp_loc, 'Geometry', geo_loc)
 
   ! read the files
   select case (trim(mesh_file_type))
 
    case('basic')
+    mesh_file = getstr(geo_prs,'MeshFile')
     call read_mesh_basic(trim(mesh_file),ee, rr)
    case('cgns')
+    mesh_file = getstr(geo_prs,'MeshFile')
     call read_mesh_cgns(trim(mesh_file),ee, rr)
    case('parametric')
-    ! TODO : actually it is possible to define the parameters in the GeoFile 
-    !directly, find a good way to do this
-    call read_mesh_parametric(trim(mesh_file),ee, rr, &
-                              npoints_chord_tot, nelems_span )
-    ! nelems_span_tot will be overwritten if symmetry is required (around l.222)
-    nelems_span_tot =   nelems_span
+    mesh_file = geo_file
+    if ( (ElType .eq. 'v') .or. (ElType .eq. 'p')  ) then
+      ! TODO : actually it is possible to define the parameters in the GeoFile 
+      !directly, find a good way to do this
+      call read_mesh_parametric(trim(mesh_file),ee, rr, &
+                                npoints_chord_tot, nelems_span )
+      ! nelems_span_tot will be overwritten if symmetry is required (around l.220)
+      nelems_span_tot =   nelems_span
+
+    elseif(ElType .eq. 'l') then ! LIFTING LINE element
+      call read_mesh_ll(trim(mesh_file),ee,rr, &
+                        airfoil_list   , nelem_span_list   , &
+                        i_airfoil_e    , normalised_coord_e, &
+                                npoints_chord_tot, nelems_span, &
+                                chord_p,theta_p )
+      ! nelems_span_tot will be overwritten if symmetry is required (around l.220)
+      nelems_span_tot =   nelems_span
+
+      call write_hdf5(airfoil_list   ,'airfoil_list'   ,geo_loc)
+      call write_hdf5(nelem_span_list,'nelem_span_list',geo_loc)
+      call write_hdf5(theta_p,'theta_p',geo_loc)
+      call write_hdf5(chord_p,'chord_p',geo_loc)
+      call write_hdf5(i_airfoil_e,'i_airfoil_e',geo_loc)
+      call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
+
+    elseif(ElType .eq. 'a') then ! ACTUATOR DISK
+      call read_actuatordisk_parametric(trim(mesh_file),ee,rr)
+      trac = getreal(geo_prs,'traction')
+      call write_hdf5(trac,'Traction',comp_loc)
+      radius = getreal(geo_prs,'Radius')
+      call write_hdf5(radius,'Radius', comp_loc)
+
+    end if
    case default
     call error(this_sub_name, this_mod_name, 'Unknown mesh file type')
 
   end select
-
-  comp_el_type = getstr(geo_prs,'ElType')
-  ElType = comp_el_type(1:1)
-
-! call new_hdf5_group(file_loc, 'Components', group_loc)
-  call write_hdf5(trim(comp_el_type),'ElType',comp_loc)
-
-  call new_hdf5_group(comp_loc, 'Geometry_and_Solution', geo_loc)
 
   ! reflect the mesh (if requested)
   write(*,*) 'mesh_reflection' , mesh_reflection
@@ -210,11 +257,21 @@ subroutine build_component(gloc, geo_file, comp_id)
       case('cgns', 'basic' )  ! TODO: check basic
         call reflect_mesh(ee, rr, reflection_point, reflection_normal)
       case('parametric')
-        call reflect_mesh_structured(ee, rr,  &
-                                     npoints_chord_tot , nelems_span , &
-                                     reflection_point, reflection_normal)
-        nelems_span_tot = 2*nelems_span
+!! !       if ( ElType .ne. 'l' ) then
+          call reflect_mesh_structured(ee, rr,  &
+                                       npoints_chord_tot , nelems_span , &
+                                       reflection_point, reflection_normal)
+          nelems_span_tot = 2*nelems_span
 
+!! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !!
+!! Same routines used for all parametric elements: p,v,l        !!
+!! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !!
+!! !       else ! LIFTING LINE element
+!! !         call reflect_mesh_structured(ee, rr,  &
+!! !                                      npoints_chord_tot , nelems_span , &
+!! !                                      reflection_point, reflection_normal)
+!! !         nelems_span_tot = 2*nelems_span
+!! !       end if
       case default
        call error(this_sub_name, this_mod_name,&
              'Symmetry routines not implemented for this kind of input.')
@@ -243,6 +300,8 @@ subroutine build_component(gloc, geo_file, comp_id)
 
   call write_hdf5(rr,'rr',geo_loc)
   call write_hdf5(ee,'ee',geo_loc)
+
+! stop
 
   !! treat the elements
   !allocate(geo%components(i_comp)%temp_elems(size(ee,2)))
@@ -296,37 +355,61 @@ subroutine build_component(gloc, geo_file, comp_id)
 
       call build_te_general ( ee , rr , neigh , ElType ,  &
                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
-                                                         !te as an output
+                                                          !te as an output
 
 !     call create_local_velocity_stencil_general()
 !     call create_strip_connectivity_general()
 
     case( 'parametric' )
-      call build_connectivity_parametric( trim(mesh_file) , ee ,     &
-                    ElType , npoints_chord_tot , nelems_span_tot , &
-                    mesh_reflection , neigh )
-      call build_te_parametric( ee , rr , ElType ,  &
-         npoints_chord_tot , nelems_span_tot , &
-         e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
+     if ( ElType .eq. 'l' .or. ElType .eq. 'v' .or. ElType .eq. 'p' ) then
+        call build_connectivity_parametric( trim(mesh_file) , ee ,     &
+                      ElType , npoints_chord_tot , nelems_span_tot , &
+                      mesh_reflection , neigh )
+        call build_te_parametric( ee , rr , ElType ,  &
+           npoints_chord_tot , nelems_span_tot , &
+           e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
+     elseif(ElType .eq. 'a') then
+       allocate(neigh(size(ee,1), size(ee,2)))
+       neigh = 0 !All actuator disk are isolated
+     endif
 
-!     call create_local_velocity_stencil_parametric()
-!     call create_strip_connectivity_parametric()
+!       call create_local_velocity_stencil_parametric()
+!       call create_strip_connectivity_parametric()
 
+!! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !!
+!! Same routines used for all parametric elements: p,v,l        !!
+!! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !!
+!!       else
+!!         call build_connectivity_parametric( trim(mesh_file) , ee ,     &
+!!                       ElType , npoints_chord_tot , nelems_span_tot , &
+!!                       mesh_reflection , neigh )
+!!         call build_te_parametric( ee , rr , ElType ,  &
+!!            npoints_chord_tot , nelems_span_tot , &
+!!            e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
+!! 
+!! !       call create_local_velocity_stencil_parametric()
+!! !       call create_strip_connectivity_parametric()
+!! 
+!!       end if
+    case default
+       call error(this_sub_name, this_mod_name,&
+             'Unknown option for building connectivity.')
   end select    
 
- 
   call write_hdf5(neigh,'neigh',geo_loc)
   call close_hdf5_group(geo_loc)
 
-  call new_hdf5_group(comp_loc, 'Trailing_Edge', te_loc)
-  call write_hdf5(    e_te,    'e_te',te_loc)
-  call write_hdf5(    i_te,    'i_te',te_loc)
-  call write_hdf5(   rr_te,   'rr_te',te_loc)
-  call write_hdf5(   ii_te,   'ii_te',te_loc)
-  call write_hdf5(neigh_te,'neigh_te',te_loc)
-  call write_hdf5(    o_te,    'o_te',te_loc)
-  call write_hdf5(    t_te,    't_te',te_loc)
-  call close_hdf5_group(te_loc)
+  if (ElType .ne. 'a') then
+    call new_hdf5_group(comp_loc, 'Trailing_Edge', te_loc)
+    call write_hdf5(    e_te,    'e_te',te_loc)
+    call write_hdf5(    i_te,    'i_te',te_loc)
+    call write_hdf5(   rr_te,   'rr_te',te_loc)
+    call write_hdf5(   ii_te,   'ii_te',te_loc)
+    call write_hdf5(neigh_te,'neigh_te',te_loc)
+    call write_hdf5(    o_te,    'o_te',te_loc)
+    call write_hdf5(    t_te,    't_te',te_loc)
+    call close_hdf5_group(te_loc)
+  endif
 
  
   call close_hdf5_group(comp_loc)
@@ -1237,7 +1320,7 @@ subroutine build_te_parametric ( ee , rr , ElType , &
    ii_te(1,:) = (/ ( i1 , i1 = 2,nelems_span+1 ) /)
    ii_te(2,:) = (/ ( i1 , i1 = 1,nelems_span   ) /)
 ! >>>>>>>>>
- elseif ( ElType .eq. 'v' ) then 
+ elseif ( ElType .eq. 'v' .or. ElType .eq. 'l') then 
    ii_te(1,:) = (/ ( i1 , i1 = 2,nelems_span+1 ) /)
    ii_te(2,:) = (/ ( i1 , i1 = 1,nelems_span   ) /)
  end if

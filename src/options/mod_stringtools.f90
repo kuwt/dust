@@ -79,7 +79,13 @@ module MOD_StringTools
 use mod_handling, only: &
   error, warning, info, unit_stdout, printout
 
+use mod_param, only: &
+  max_char_len
+
 use MOD_ISO_VARYING_STRING
+
+!----------------------------------------------------------------------
+
 implicit none
 private
 
@@ -119,30 +125,31 @@ public :: inttostr
 public :: isint
 public :: set_formatting
 public :: clear_formatting
+public :: IsInList, strip_mult_appendix
 
 logical :: use_escape_codes = .true.  !< If set to .false., output will consist only of standard text, allowing the 
                                       !< escape characters to be switched off in environments which don't support them.
 public :: use_escape_codes                                      
-!==================================================================================================================================
+
+character(len=*), parameter :: this_mod_name = 'mod_stringtools'
+
+!----------------------------------------------------------------------
 
 contains
 
-!==================================================================================================================================
+!----------------------------------------------------------------------
+
 !> Transform upper case letters in "Str1" into lower case letters, result is "Str2" (in place version)
-!==================================================================================================================================
 subroutine LowCase_overwrite(Str1)
 ! modules
 implicit none
-!----------------------------------------------------------------------------------------------------------------------------------
 ! input / output variables
 character(len=*),intent(inout) :: Str1  !< Input/output string
-!----------------------------------------------------------------------------------------------------------------------------------
 ! local variables 
 integer                    :: iLen,nLen,Upper
 character(len=*),parameter :: lc='abcdefghijklmnopqrstuvwxyz'
-character(len=*),parameter :: uc='abcdefghijklmnopqrstuvwxyz'
+character(len=*),parameter :: uc='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 logical                    :: HasEq
-!==================================================================================================================================
 HasEq=.false.
 nLen=LEN_TRIM(Str1)
 do iLen=1,nLen
@@ -155,23 +162,20 @@ do iLen=1,nLen
 end do
 end subroutine LowCase_overwrite
 
-!==================================================================================================================================
+!----------------------------------------------------------------------
+
 !> Transform upper case letters in "Str1" into lower case letters, result is "Str2"
-!==================================================================================================================================
 subroutine LowCase(Str1,Str2)
 ! modules
 implicit none
-!----------------------------------------------------------------------------------------------------------------------------------
 ! input / output variables
 character(len=*),intent(in)  :: Str1  !< Input string
 character(len=*),intent(out) :: Str2  !< Output string, lower case letters only
-!----------------------------------------------------------------------------------------------------------------------------------
 ! local variables 
 integer                    :: iLen,nLen,Upper
 character(len=*),parameter :: lc='abcdefghijklmnopqrstuvwxyz'
-character(len=*),parameter :: uc='abcdefghijklmnopqrstuvwxyz'
+character(len=*),parameter :: uc='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 logical                    :: HasEq
-!==================================================================================================================================
 HasEq=.false.
 Str2=Str1
 nLen=LEN_TRIM(Str1)
@@ -183,39 +187,55 @@ do iLen=1,nLen
 end do
 end subroutine LowCase
 
-!==================================================================================================================================
+!----------------------------------------------------------------------
+
 !> Case insensitive string comparison 
-!==================================================================================================================================
 function stricmp(a, b)
 ! modules
 implicit none
-!----------------------------------------------------------------------------------------------------------------------------------
 ! input/output variables
 character(len=*),intent(in) :: a,b !< strings to compare with each other
-!----------------------------------------------------------------------------------------------------------------------------------
 ! local variables 
 logical            :: stricmp
 character(len=255) :: alow
 character(len=255) :: blow
-!==================================================================================================================================
 call LowCase(a, alow)
 call LowCase(b, blow)
 stricmp = (trim(alow).eq.trim(blow))
 end function stricmp
 
-!==================================================================================================================================
+!----------------------------------------------------------------------
+
+function IsInList(str, str_list) result(isin)
+ character(len=*), intent(in) :: str
+ character(len=*), allocatable, intent(in) :: str_list(:)
+ logical :: isin
+
+ integer :: i
+
+  isin = .false.
+  if(allocated(str_list)) then
+   do i = lbound(str_list,1), ubound(str_list,1)
+     if(stricmp(trim(str),trim(str_list(i)))) then
+       isin = .true.
+       return
+     endif
+   enddo
+  endif
+
+end function
+
+!----------------------------------------------------------------------
+
 !> Removes all whitespace from a string
-!==================================================================================================================================
 subroutine StripSpaces(string)
 ! modules
 implicit none
 ! input / output variables 
 character(len=*),intent(inout) :: string  !< input string
-!----------------------------------------------------------------------------------------------------------------------------------
 ! local variables
 integer :: stringLen 
 integer :: last, actual
-!==================================================================================================================================
 stringLen = len(string)
 last = 1
 actual = 1
@@ -232,34 +252,32 @@ do while (actual < stringLen)
 end do
 end subroutine
 
-!==================================================================================================================================
+!----------------------------------------------------------------------
+
 !> Converts integer to string
-!==================================================================================================================================
 pure function inttostr(value) 
 integer,intent(in)  :: value
 character(len=255)  :: inttostr
 write(inttostr,"(I20)") value
 end function inttostr
 
-!==================================================================================================================================
+!----------------------------------------------------------------------
+
 !> Checks if a string is an integer
-!==================================================================================================================================
 pure function isint(value) 
-character(len=255),intent(in)  :: value
+character(len=*),intent(in)  :: value
 logical                        :: isint
-!----------------------------------------------------------------------------------------------------------------------------------
 ! local variables
 integer                    :: i,stat
-!==================================================================================================================================
 read(value, *, iostat=stat) i
 isint=(stat.eq.0)
 end function isint
 
-!==================================================================================================================================
+!----------------------------------------------------------------------
+
 !> Splits the supplied string along a delimiter.
 !> This function is copied from the fortran output library (foul). For the full version of this library see:
 !>   http://foul.sourceforge.net
-!==================================================================================================================================
 subroutine split_string(string, delimiter, substrings, substring_count)
 ! modules
 implicit none
@@ -268,10 +286,8 @@ character (len = *), intent(in)  :: string          !< Variable-length character
 character,           intent(in)  :: delimiter       !< Character along which to split
 character (len = *), intent(out) :: substrings(*)   !< Array of substrings generated by split operation
 integer,             intent(out) :: substring_count !< Number of substrings generated
-!----------------------------------------------------------------------------------------------------------------------------------
 ! local variables
 integer :: start_position, end_position
-!==================================================================================================================================
 start_position  = 1
 substring_count = 0
 
@@ -289,11 +305,61 @@ do
 end do
 end subroutine split_string
 
-!==================================================================================================================================
+!----------------------------------------------------------------------
+
+subroutine strip_mult_appendix(string, rem, delimiter)
+ character(len=*), intent(in) :: string
+ character(len=*), intent(in) :: delimiter
+ character(len=*), intent(out) :: rem
+
+ character(len=max_char_len) :: substrings(5)
+ integer :: nstr, striplen, nlen
+ character(len=*), parameter :: this_sub_name = 'strip_mult_appendix'
+
+ call split_string(trim(string), trim(delimiter), substrings, nstr)
+
+
+ if (nstr .gt. 3) then
+   call warning(this_sub_name, this_mod_name, 'More than one delimiter &
+   &"'//trim(delimiter)//'" was found in string "'//trim(string)//'". Assuming&
+   & that the delimiters previous to the last were part of an input string.&
+   & This is a dengerous situation and could lead to unexpected behaviours, the&
+   & user is encouraged to avoid the use of the aforementioned delimiter in&
+   & input strings.')
+ endif
+
+ if (.not.isint(trim(substrings(nstr))) .and. nstr .gt. 1) then
+   call warning(this_sub_name, this_mod_name, 'One or more instances of the &
+   &delimiter "'//trim(delimiter)//'" were found in strin "'//trim(string)//'"&
+   & without delimiting a multiple string numeral. &
+   & This is a dengerous situation and could lead to unexpected behaviours, the&
+   & user is encouraged to avoid the use of the aforementioned delimiter in&
+   & input strings.')
+ endif
+ 
+ if (isint(trim(substrings(nstr)))) then
+   striplen = len(trim(substrings(nstr)))
+   striplen = striplen + len(trim(delimiter))
+ else
+   striplen = 0
+ endif
+
+ !DEBUG
+ write(*,*) 'striplen ',striplen
+
+
+ nlen = len(trim(string))-striplen
+ rem = string(1:nlen)
+ !DEBUG
+ write(*,*) 'rem ',trim(rem)
+
+end subroutine strip_mult_appendix
+
+!----------------------------------------------------------------------
+
 !> Generates an ansi escape sequence from the supplied style string.
 !> This function is copied from the fortran output library (foul). For the full version of this library see:
 !>   http://foul.sourceforge.net
-!==================================================================================================================================
 subroutine get_escape_sequence(style_string, escape_sequence)
 ! modules
 implicit none
@@ -301,12 +367,9 @@ implicit none
 character(len=*),intent(in)   :: style_string    !< String describing which styles to set (separated by space)
                                                  !< see source code for supported styles
 character(len=16),intent(out) :: escape_sequence !< escape_sequence: ansi escape sequence generated from the specified styles
-!----------------------------------------------------------------------------------------------------------------------------------
-! local variables
 integer           :: i
 character(len=32) :: style_substrings(16)
 integer           :: style_substring_count
-!==================================================================================================================================
 ! Start sequence with command to clear any previous attributes
 escape_sequence = char(27) // '[0'
 
@@ -367,18 +430,17 @@ end do
 escape_sequence = trim(escape_sequence) // 'm'
 end subroutine get_escape_sequence
 
-!==================================================================================================================================
+!----------------------------------------------------------------------
+
 !> Sets output formatting to the supplied styles.
 !> This function is copied from the fortran output library (foul). For the full version of this library see:
 !>   http://foul.sourceforge.net
-!==================================================================================================================================
 subroutine set_formatting(style_string)
 ! modules
 implicit none
 ! input / output variables 
 character (len = *), intent(in) :: style_string !< String describing which styles to set (separated by space).
                                                 !< See get_escape_sequence for supported styles.
-!----------------------------------------------------------------------------------------------------------------------------------
 ! local variables
 character(len=16) :: escape_sequence
 character         :: escape_sequence_array(16)
@@ -386,7 +448,6 @@ equivalence         (escape_sequence, escape_sequence_array)
 character(len=16) :: format_string
 character(len=16) :: istring
 integer           :: i
-!==================================================================================================================================
 if (use_escape_codes) then
   call get_escape_sequence(trim(style_string), escape_sequence)
 
@@ -397,18 +458,19 @@ if (use_escape_codes) then
 end if
 end subroutine set_formatting
 
-!==================================================================================================================================
+!----------------------------------------------------------------------
+
 !> Resets output formatting to normal.
 !> This function is copied from the fortran output library (foul). For the full version of this library see:
 !>   http://foul.sourceforge.net
-!==================================================================================================================================
 subroutine clear_formatting()
 implicit none
-!==================================================================================================================================
 if (use_escape_codes) then
   ! Clear all previously set styles
   write(UNIT_stdOut, '(3A1)', advance="no") (/ char(27), '[', 'm' /)
 end if
 end subroutine clear_formatting
+
+!----------------------------------------------------------------------
 
 end module MOD_StringTools

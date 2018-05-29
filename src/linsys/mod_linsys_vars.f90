@@ -74,11 +74,36 @@ type :: t_linsys
  !! finally the contribution of the moving panels is added 
  real(wp), allocatable :: b_static(:,:)
 
+ !> Static part of the lifting line contribution
+ !!
+ !! The contribution of the lifting line is similar to wake contribution,
+ !! however a part could be static on static and can be pre-computed
+ real(wp), allocatable :: L_static(:,:)
+
+ !> Static part of the actuator disk contribution
+ !!
+ !! The contribution of the actuator disk is similar to wake contribution,
+ !! however a part could be static on static and can be pre-computed
+ real(wp), allocatable :: D_static(:,:)
+
  !> Result of the linear system solution (intensity of the panels doublets)
  real(wp), allocatable :: res(:)
 
+ !> Results of the explicit part of the elements, has more than one column
+ !! since holds previous records for extrapolation
+ real(wp), allocatable :: res_expl(:,:)
+
  !> Number of static and moving panels
  integer :: nstatic, nmoving
+
+ !> Number of static and moving lifting lines
+ integer :: nstatic_ll, nmoving_ll, n_ll
+
+ !> Number of static and moving actuator disks
+ integer :: nstatic_ad, nmoving_ad, n_ad
+
+ !> Number of explicit elements
+ integer :: n_expl
 
 end type t_linsys
 

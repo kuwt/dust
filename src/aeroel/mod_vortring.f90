@@ -33,7 +33,8 @@
 !!=====================================================================
 
 
-
+!> Module containing the specific subroutines for the vortex ring
+!! type of aerodynamic elements
 module mod_vortring
 
 use mod_aero_elements, only: &
@@ -45,6 +46,9 @@ use mod_doublet, only: &
 
 use mod_linsys_vars, only: &
   t_linsys
+
+use mod_sim_param, only: &
+  t_sim_param
 
 use mod_param, only: &
   wp, pi
@@ -69,12 +73,18 @@ contains
   procedure, pass(this) :: build_row        => build_row_vortring
   procedure, pass(this) :: build_row_static => build_row_static_vortring
   procedure, pass(this) :: add_wake         => add_wake_vortring
+  procedure, pass(this) :: add_liftlin      => add_liftlin_vortring
+  procedure, pass(this) :: add_actdisk      => add_actdisk_vortring
   procedure, pass(this) :: compute_pot      => compute_pot_vortring
   procedure, pass(this) :: compute_vel      => compute_vel_vortring
   procedure, pass(this) :: compute_psi      => compute_psi_vortring
   procedure, pass(this) :: compute_cp       => compute_cp_vortring
+  procedure, pass(this) :: compute_pres     => compute_pres_vortring
+  procedure, pass(this) :: compute_dforce   => compute_dforce_vortring
 end type
 
+
+character(len=*), parameter :: this_mod_name='mod_vortring'
 
 !----------------------------------------------------------------------
 contains
@@ -125,9 +135,12 @@ end subroutine build_row_vortring
 !! In this subroutine only the static part of the equations is built. It is
 !! called just once at the beginning of the simulation, and saves the AIC 
 !! coefficients for te static part and the static contribution to the rhs
-subroutine build_row_static_vortring(this, elems, linsys, uinf, ie, ista, iend)
+subroutine build_row_static_vortring(this, elems, ll_elems, ad_elems, linsys, &
+                                     uinf, ie, ista, iend)
  class(t_vortring), intent(inout) :: this
  type(t_elem_p), intent(in)       :: elems(:)
+ type(t_elem_p), intent(in)       :: ll_elems(:)
+ type(t_elem_p), intent(in)       :: ad_elems(:)
  type(t_linsys), intent(inout)    :: linsys
  real(wp), intent(in)             :: uinf(:)
  integer, intent(in)              :: ie
@@ -149,11 +162,99 @@ subroutine build_row_static_vortring(this, elems, linsys, uinf, ie, ista, iend)
     linsys%b_static(:,ie) = linsys%b_static(:,ie) + b1
  
   end do
+
+  !Now build the static contribution from the lifting line elements
+  do j1 = 1,linsys%nstatic_ll
+    call ll_elems(j1)%p%compute_psi( linsys%L_static(ie,j1), b1,  &
+                                  this%cen, this%nor,  1, 2 )
+  enddo
   
+  !Now build the static contribution from the lifting line elements
+  do j1 = 1,linsys%nstatic_ad
+    call ad_elems(j1)%p%compute_psi( linsys%D_static(ie,j1), b1,  &
+                                  this%cen, this%nor,  1, 2 )
+  enddo
+
   !The rest of the dynamic part will be completed during the first 
   ! iteration of the assempling
 
 end subroutine build_row_static_vortring
+
+!----------------------------------------------------------------------
+
+!> Add the contribution of the lifting lines to one equation for a vortex ring
+!!
+!! The rhs of the equation for a vortex ring is updated  adding the 
+!! the contribution of velocity due to the lifting lines
+subroutine add_liftlin_vortring(this, ll_elems, linsys, uinf, &
+                             ie, ista, iend)
+ class(t_vortring), intent(inout) :: this
+ type(t_elem_p), intent(in)       :: ll_elems(:)
+ type(t_linsys), intent(inout)    :: linsys
+ real(wp), intent(in)             :: uinf(:)
+ integer, intent(in)              :: ie
+ integer, intent(in)             :: ista
+ integer, intent(in)             :: iend
+
+ integer :: j1, ind1, ind2
+ real(wp) :: a, b(3)
+ integer :: n_impl
+  
+
+  !Static part: take what was already computed
+  do  j1 = 1, ista-1
+    linsys%b(ie) = linsys%b(ie) - linsys%L_static(ie,j1)*ll_elems(j1)%p%idou
+  enddo
+
+  ! Add the explicit vortex panel wake contribution to the rhs
+  do j1 = ista, iend
+
+    call ll_elems(j1)%p%compute_psi( a, b, this%cen, this%nor, 1, 2 )
+
+
+    linsys%b(ie) = linsys%b(ie) - a*ll_elems(j1)%p%idou
+
+  end do
+
+end subroutine add_liftlin_vortring
+
+!----------------------------------------------------------------------
+
+!> Add the contribution of actuator disks to one equation for a vortex ring
+!!
+!! The rhs of the equation for a vortex ring is updated  adding the 
+!! the contribution of velocity due to the actuator disks
+subroutine add_actdisk_vortring(this, ad_elems, linsys, uinf, &
+                             ie, ista, iend)
+ class(t_vortring), intent(inout) :: this
+ type(t_elem_p), intent(in)       :: ad_elems(:)
+ type(t_linsys), intent(inout)    :: linsys
+ real(wp), intent(in)             :: uinf(:)
+ integer, intent(in)              :: ie
+ integer, intent(in)             :: ista
+ integer, intent(in)             :: iend
+
+ integer :: j1, ind1, ind2
+ real(wp) :: a, b(3)
+ integer :: n_impl
+  
+
+  !Static part: take what was already computed
+  do  j1 = 1, ista-1
+    linsys%b(ie) = linsys%b(ie) - linsys%D_static(ie,j1)*ad_elems(j1)%p%idou
+  enddo
+
+  ! Add the explicit vortex panel wake contribution to the rhs
+  do j1 = ista, iend
+
+    call ad_elems(j1)%p%compute_psi( a, b, this%cen, this%nor, 1, 2 )
+
+
+    linsys%b(ie) = linsys%b(ie) - a*ad_elems(j1)%p%idou
+
+  end do
+
+end subroutine add_actdisk_vortring
 
 !----------------------------------------------------------------------
 
@@ -180,6 +281,8 @@ subroutine add_wake_vortring(this, wake_elems, impl_wake_ind, linsys, uinf, &
   n_impl = size(impl_wake_ind,2)
 
   !Add the contribution of the implicit wake panels to the linear system
+  !Implicitly we assume that the first set of wake panels are the implicit
+  !ones since are at the beginning of the list
   do j1 = 1 , n_impl
     ind1 = impl_wake_ind(1,j1); ind2 = impl_wake_ind(2,j1)
 !   if ((ind1.ge.ista .and. ind1.le.iend) .and. &
@@ -322,7 +425,7 @@ subroutine compute_cp_vortring(this, elems, uinf)
   if ( i_stripe .gt. 1 ) then
     this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &
           ( norm2(uinf - this%ub) * this%dy / this%area * &
-               ( elems(this%id)%p%idou - elems(this%stripe_elem(i_stripe-1))%p%idou ) + &
+               ( elems(this%id)%p%idou - this%stripe_elem(i_stripe-1)%p%idou ) + &
                dG_dt )
   else
     this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &
@@ -341,6 +444,60 @@ subroutine compute_cp_vortring(this, elems, uinf)
 ! end if
 
 end subroutine compute_cp_vortring
+
+!----------------------------------------------------------------------
+
+!> Compute an approximate value of the mean DELTA pressure on the actual element
+!!
+!! pres = " DELTA pressure = ( pressure lower - pressure upper ) "
+!!  s.t. vec{dforce} = pres * vec{n}  ( since vec{n} = vec{n_upper} )
+!!
+!! see compute_dforce_vortring
+subroutine compute_pres_vortring(this, elems, sim_param)
+  class(t_vortring), intent(inout) :: this
+  type(t_elem_p), intent(in) :: elems(:)
+  type(t_sim_param), intent(in) :: sim_param
+
+  integer  :: i_stripe , i_c
+  real(wp) :: dG_dt
+
+  this%pres = 0.0_wp
+
+  i_stripe = size(this%stripe_elem)
+
+  dG_dt = this%didou_dt
+
+  if ( i_stripe .gt. 1 ) then
+    this%pres = - sim_param%rho_inf * & 
+          ( norm2(sim_param%u_inf - this%ub) * this%dy / this%area * &
+               ( elems(this%id)%p%idou - this%stripe_elem(i_stripe-1)%p%idou ) + &
+               dG_dt )
+  else
+    this%pres = - sim_param%rho_inf * &
+          ( norm2(sim_param%u_inf - this%ub) * this%dy / this%area * &
+                 elems(this%id)%p%idou + &
+               dG_dt )
+  end if
+
+
+end subroutine compute_pres_vortring
+
+!----------------------------------------------------------------------
+
+! Compute the elementary force on the on the actual element
+!!
+subroutine compute_dforce_vortring(this, elems, sim_param)
+  class(t_vortring), intent(inout) :: this
+  type(t_elem_p), intent(in) :: elems(:)
+  type(t_sim_param), intent(in) :: sim_param
+
+  ! first rough approximation
+  ! vec{F} = this%pres * vec{n}
+
+  this%dforce = this%pres * this%area * this%nor
+
+
+end subroutine compute_dforce_vortring
 
 !----------------------------------------------------------------------
 
