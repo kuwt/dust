@@ -235,6 +235,14 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
      R1 = norm2( pos - this%verp(:,i1) )
      R2 = norm2( pos - this%verp(:,indp1) )
      ! si = this%edge_len(i1)
+     if ( abs(R1+R2-this%edge_len(i1)) .lt. 1e-6 ) then
+      write(*,*) ' warning: abs(R1+R2-this%edge_len(i1)) .lt. 1e-6 '
+      write(*,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
+     end if
+     if ( abs(this%edge_len(i1) ) .lt. 1e-6 ) then
+      write(*,*) ' warning: abs(this%edge_len(i1)) .lt. 1e-6 '
+      write(*,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
+     end if
      souLog = log( (R1+R2+this%edge_len(i1)) / (R1+R2-this%edge_len(i1)) )
   
      phix = phix + this%sinTi(i1) * souLog

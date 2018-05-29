@@ -355,6 +355,10 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  sim_param, airfoil_da
  real(wp) :: damp=2.0_wp
  real(wp), parameter :: toll=1e-6_wp
  real(wp) :: diff
+ ! arrays used for force projection
+ real(wp) , allocatable :: a_v(:)   ! size(elems_ll)
+ real(wp) , allocatable :: c_m(:,:) ! size(elems_ll) , 3
+ real(wp) , allocatable :: u_v(:)   ! size(elems_ll)
 
  uinf = sim_param%u_inf
  
@@ -377,6 +381,18 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  sim_param, airfoil_da
  !  elems_ll(i_l)%p%idou = -1
  !enddo
 
+ allocate(a_v(size(elems_ll)  )) ; a_v = 0.0_wp
+ allocate(c_m(size(elems_ll),3)) ; c_m = 0.0_wp
+ allocate(u_v(size(elems_ll)  )) ; u_v = 0.0_wp
+
+ !
+ do i_l=1,size(elems_ll)
+  select type(el => elems_ll(i_l)%p)
+  type is(t_liftlin)
+    u_v(i_l) = norm2((uinf-el%ub) - &
+        el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
+  end select
+ end do
 
  !Calculate the induced velocity on the airfoil
  do ic = 1,100
@@ -393,10 +409,11 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  sim_param, airfoil_da
        !vel = uinf - el%ub
        up = vel-el%bnorm_cen*sum(el%bnorm_cen*vel)
        !Employing the free stream velocity to get into tables
-       unorm = norm2((uinf-el%ub) - el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
+       unorm = u_v(i_l) ! norm2((uinf-el%ub) - el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
        !unorm = norm2(up)
        alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
        alpha = alpha * 180.0_wp/pi
+       
        !TODO: fix these parameters which are still hard-coded
        mach = 0.0_wp
        re = 1000000.0_wp
@@ -410,6 +427,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  sim_param, airfoil_da
        dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
        diff = max(diff,abs(elems_ll(i_l)%p%idou-dou_temp(i_l))) 
      end select
+     c_m(i_l,:) = aero_coeff
+     a_v(i_l)   = alpha * pi/180.0_wp
    enddo
    damp = 5.0_wp
   
@@ -425,35 +444,40 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  sim_param, airfoil_da
 
  enddo
 
-!!Rough cp compuation ! Only steady ...
-!do i_l = 1,size(elems_ll)
-!  elems_ll(i_l)%p%cp =  2.0_wp / norm2(uinf)**2.0_wp * &
-!           ( norm2(uinf - elems_ll(i_l)%p%ub) ) * elems_ll(i_l)%p%idou 
-!end do
-
- ! Rough approximation (w/o using tabulated data) of the loads
-!!DEBUG
-!if ( .not. allocated(force) ) allocate(force(3)) ; force = 0.0_wp
+ ! Loads computation ------------
  do i_l = 1,size(elems_ll)
-   elems_ll(i_l)%p%cp = & 
-     2.0_wp / norm2(uinf)**2.0_wp * &
-            ( norm2(uinf - elems_ll(i_l)%p%ub) * &
-              elems_ll(i_l)%p%dy / elems_ll(i_l)%p%area * &
-                   elems_ll(i_l)%p%idou )
-   elems_ll(i_l)%p%pres = & 
-            - sim_param%rho_inf * &
-            ( norm2(sim_param%u_inf - elems_ll(i_l)%p%ub) * &
-              elems_ll(i_l)%p%dy / elems_ll(i_l)%p%area * &
-                   elems_ll(i_l)%p%idou )
-   elems_ll(i_l)%p%dforce = elems_ll(i_l)%p%pres * &
-                            elems_ll(i_l)%p%area * &
-                            elems_ll(i_l)%p%nor
+!  old and rough approximation
+!  elems_ll(i_l)%p%cp = & 
+!    2.0_wp / norm2(uinf)**2.0_wp * &
+!           ( norm2(uinf - elems_ll(i_l)%p%ub) * &
+!             elems_ll(i_l)%p%dy / elems_ll(i_l)%p%area * &
+!                  elems_ll(i_l)%p%idou )
+!  elems_ll(i_l)%p%pres = & 
+!           - sim_param%rho_inf * &
+!           ( norm2(sim_param%u_inf - elems_ll(i_l)%p%ub) * &
+!             elems_ll(i_l)%p%dy / elems_ll(i_l)%p%area * &
+!                  elems_ll(i_l)%p%idou )
+!  elems_ll(i_l)%p%dforce = elems_ll(i_l)%p%pres * &
+!                           elems_ll(i_l)%p%area * &
+!                           elems_ll(i_l)%p%nor
+  select type(el => elems_ll(i_l)%p)
+  type is(t_liftlin)
+   el%pres   = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
+              ( c_m(i_l,1) * cos(a_v(i_l)) +  c_m(i_l,2) * sin(a_v(i_l)) )  
+   el%dforce = ( el%nor * el%pres + &
+                 el%tang_cen * & 
+                 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * ( &
+                -c_m(i_l,1) * sin(a_v(i_l)) + c_m(i_l,2) * cos(a_v(i_l)) & 
+                ) ) * el%area
+  end select 
  end do
 
  !DEBUG:
  write(*,*) 'iterations: ',ic
  write(*,*) 'diff',diff
+
  deallocate(dou_temp, vel_w)
+ deallocate(a_v,c_m,u_v)
 
  !Get the angle of attack, as well as the other parameters
 
