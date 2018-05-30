@@ -1226,7 +1226,7 @@ subroutine load_res(floc, comps, vort, cp, t)
       if( .not. allocated(comps(icomp)%el(ie)%dforce) ) then
         allocate(comps(icomp)%el(ie)%dforce(3))
       end if
-      comps(icomp)%el(ie)%dforce = dforce_read(ie,:) 
+      comps(icomp)%el(ie)%dforce = dforce_read(:,ie) 
     end do
 
     call close_hdf5_group(gloc3)

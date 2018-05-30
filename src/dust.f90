@@ -79,10 +79,11 @@ use mod_parse, only: &
 
 use mod_wake_pan, only: &
   t_wake_panels, initialize_wake_panels, update_wake_panels, &
-  prepare_wake_panels, destroy_wake_panels
+  prepare_wake_panels, load_wake_panels, destroy_wake_panels
 
 use mod_wake_ring, only: &
-  t_wake_rings, initialize_wake_rings, update_wake_rings, destroy_wake_rings
+  t_wake_rings, initialize_wake_rings, update_wake_rings, &
+  load_wake_rings, destroy_wake_rings
 
 use mod_vtk_out, only: &
   vtk_out_bin
@@ -96,7 +97,7 @@ use mod_hdf5_io, only: &
   write_hdf5, write_hdf5_attr, read_hdf5, read_hdf5_al, append_hdf5
 
 use mod_dust_io, only: &
-  save_status
+  save_status, load_solution, load_time
 
 implicit none
 
@@ -104,6 +105,8 @@ implicit none
 integer :: run_id(10)
 
 !Input
+!> Main parameters parser
+type(t_parse) :: prms
 character(len=*), parameter :: input_file_name_def = 'dust.in'
 character(len=max_char_len) :: input_file_name
 character(len=max_char_len) :: geo_file_name
@@ -112,6 +115,9 @@ character(len=extended_char_len) :: message
 
 !Simulation parameters
 type(t_sim_param) :: sim_param
+! Asymptotic conditions
+real(wp) :: uinf(3)
+real(wp) :: rho , Pinf
 
 !Time parameters
 real(wp) :: tstart, tend, dt, time
@@ -130,23 +136,32 @@ type(t_elem_p), allocatable :: elems_ll(:)
 type(t_elem_p), allocatable :: elems_ad(:)
 !> All the elements (panels+ll)
 type(t_elem_p), allocatable :: elems_tot(:)
+!> Geometry
 type(t_geo) :: geo
+!> Trailing edge
 type(t_tedge) :: te
+!> Airfoil table data
 type(t_aero_tab), allocatable :: airfoil_data(:)
-integer :: n_wake_panels
+!> Linear system
 type(t_linsys) :: linsys
-type(t_parse) :: prms
+!> Wake panels
 type(t_wake_panels) :: wake_panels
+!> Wake rings
 type(t_wake_rings) :: wake_rings
+!> Number of wake panels(/rings)
+integer :: n_wake_panels
 
+!> Timing vars
 real(t_realtime) :: t1 , t0, t00, t11, t22
+!> Level of debug output
 integer :: debug_level
 
-! Asymptotic conditions
-real(wp) :: uinf(3)
-real(wp) :: rho , Pinf
+!Restart
+logical :: restart
+character(len=max_char_len) :: restart_file
 
 
+!> 
 character(len=max_char_len) :: frmt
 character(len=max_char_len) :: basename
 character(len=max_char_len) :: basename_debug
@@ -160,7 +175,6 @@ call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
 t00 = dust_time()
 
 call get_run_id(run_id)
-write(*,*) 'run_id: ', run_id
 
 !------ Modules initialization ------
 call initialize_hdf5()
@@ -174,26 +188,34 @@ else
 endif
 
 ! define the parameters to be read
-call prms%SetSection("Time")
+! time:
 call prms%CreateRealOption( 'tstart', "Starting time")
 call prms%CreateRealOption( 'tend',   "Ending time")
 call prms%CreateRealOption( 'dt',     "time step")
 call prms%CreateRealOption( 'dt_out', "output time interval")
 call prms%CreateRealOption( 'dt_debug_out', "debug output time interval")
-call prms%CreateLogicalOption( 'output_start', "output values at starting iteration", 'F')
-call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
-'(/1.0, 0.0, 0.0/)')
-call prms%CreateRealOption( 'P_inf', "free stream pressure", &
-'1.0')
-call prms%CreateRealOption( 'rho_inf', "free stream density", &
-'1.0')
-call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output','0')
-call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
-call prms%CreateStringOption('basename','oputput basename','./')
-call prms%CreateStringOption('basename_debug','oputput basename for debug','./')
+
+! input:
 call prms%CreateStringOption('GeometryFile','Main geometry definition file')
 call prms%CreateStringOption('ReferenceFile','Reference frames file','no_set')
-!call set_parameters_geo(prms)
+
+! output: 
+call prms%CreateStringOption('basename','oputput basename','./')
+call prms%CreateStringOption('basename_debug','oputput basename for debug','./')
+call prms%CreateLogicalOption( 'output_start', "output values at starting &
+                                                             & iteration", 'F')
+call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output','0')
+
+! restart
+call prms%CreateLogicalOption('restart_from_file','restarting from file?','F')
+call prms%CreatestringOption('restart_file','restart file name')
+
+! parameters:
+call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
+                                                           '(/1.0, 0.0, 0.0/)')
+call prms%CreateRealOption( 'P_inf', "free stream pressure", '1.0')
+call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')
+call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
 
 
 ! get the parameters and print them out
@@ -216,6 +238,13 @@ basename = getstr(prms,'basename')
 basename_debug = getstr(prms,'basename_debug')
 geo_file_name = getstr(prms,'GeometryFile')
 ref_file_name = getstr(prms,'ReferenceFile')
+
+restart = getlogical(prms,'restart_from_file')
+if (restart) then
+  restart_file = getstr(prms,'restart_file')
+  geo_file_name = restart_file(1:len(trim(restart_file))-11)//'geo.h5'
+  call load_time(restart_file, tstart) 
+endif
 
 
 if (debug_level .ge. 3) then
@@ -269,10 +298,11 @@ call ignoredParameters(prms)
 
 call finalizeParameters(prms)
 
+
 !------ Initialization ------
 call printout(nl//'====== Initializing Wake ======')
 call initialize_wake_panels(wake_panels, geo, te, n_wake_panels)
-!Probably could be eliminated
+!Consider moving what is inside here to the initialization
 call prepare_wake_panels(wake_panels,  geo, dt, uinf)
 
 call initialize_wake_rings(wake_rings, geo, n_wake_panels)
@@ -287,10 +317,18 @@ if(debug_level .ge. 1) then
   call printout(message)
 endif
 
+!------ Reloading ------
+if (restart) then
+ call load_solution(restart_file,geo%components)
+ call load_wake_panels(restart_file, wake_panels)
+ call load_wake_rings(restart_file, wake_rings)
+endif
+
 t22 = dust_time()
 write(message,'(A,F9.3,A)') nl//'------ Completed all preliminary operations &
                              &in: ' , t22 - t00,' s.'
 call printout(message)
+
 
 !====== Time Cycle ======
 time = tstart
