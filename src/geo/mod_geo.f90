@@ -655,7 +655,10 @@ subroutine load_components(geo, in_file, sim_param, te)
 
  character(len=*), parameter :: this_sub_name = 'load_components'
 
+  !DEBUG
+  write(*,*) ' trim(in_file) : ' , trim(in_file)
   call open_hdf5_file(trim(in_file),floc)
+  write(*,*) ' trim(in_file) : ' , trim(in_file)
   call open_hdf5_group(floc,'Components',gloc)
   call read_hdf5(n_comp,'NComponents',gloc)
 

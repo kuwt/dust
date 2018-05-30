@@ -344,14 +344,8 @@ subroutine strip_mult_appendix(string, rem, delimiter)
    striplen = 0
  endif
 
- !DEBUG
- write(*,*) 'striplen ',striplen
-
-
  nlen = len(trim(string))-striplen
  rem = string(1:nlen)
- !DEBUG
- write(*,*) 'rem ',trim(rem)
 
 end subroutine strip_mult_appendix
 
