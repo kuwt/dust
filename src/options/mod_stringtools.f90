@@ -345,7 +345,6 @@ subroutine strip_mult_appendix(string, rem, delimiter)
    striplen = 0
  endif
 
-
  nlen = len(trim(string))-striplen
  rem = string(1:nlen)
 
