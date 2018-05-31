@@ -149,6 +149,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
 
  integer :: i1 , fid
 
+ !DEBUG
+ integer :: id1 , id2
+
  character(len=*), parameter :: this_sub_name = 'build_component'
 
 
