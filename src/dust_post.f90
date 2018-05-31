@@ -367,10 +367,22 @@ do ia = 1,n_analyses
     write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',an_start,'.h5'
     call open_hdf5_file(trim(filename),floc)
     call load_refs(floc,refs_R,refs_off,refs_G,refs_f,refs_tag)
-    call close_hdf5_file(floc)   
+    call close_hdf5_file(floc) 
+    !DEBUG
+    ref_id = -333
     do it = lbound(refs_tag,1) , ubound(refs_tag,1)
       if ( stricmp(refs_tag(it),  ref_tag) ) ref_id = it
     end do
+    if ( ref_id .eq. -333 ) then 
+      write(*,*)
+      write(*,*) ' Available references systems: '
+      do it = lbound(refs_tag,1) , ubound(refs_tag,1)
+        write(*,*) ' ref_id : ' , it , ' ref_tag ' , trim(refs_tag(it))
+      end do
+      call error('dust_post','','Unknown ref.sys. defined for loads output.&
+           & Your input in dust_post.in is '//trim(ref_tag)//'. All the&
+           & available ref.sys. are listed above.')
+    end if
 
     ires = 0
     do it=an_start, an_end, an_step
