@@ -118,7 +118,7 @@ subroutine initialize_wake_rings(wake, geo, nrings)
   do ic = 1, size(geo%components)
     if(geo%components(ic)%comp_el_type(1:1) .eq. 'a') then
       nad = nad + geo%components(ic)%nelems
-      do ie = 1, nad
+      do ie = 1, size(geo%components(ic)%el)
         npt = npt + geo%components(ic)%el(ie)%n_ver
       enddo
     endif
@@ -139,7 +139,7 @@ subroutine initialize_wake_rings(wake, geo, nrings)
   id = 1
   do ic = 1, size(geo%components)
     if(geo%components(ic)%comp_el_type(1:1) .eq. 'a') then
-      do ie = 1, nad
+      do ie = 1,size(geo%components(ic)%el)
         wake%gen_elems(id)%p => geo%components(ic)%el(ie)
         id = id+1
       enddo
