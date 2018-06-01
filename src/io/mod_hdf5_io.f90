@@ -1872,7 +1872,7 @@ end subroutine read_3d_int_hdf5_al
 !-----------------------------------------------------------------------
 
 !-----------------------------------------------------------------------
-! ==== Read and allocate Integers ====
+! ==== Attributes ====
 !-----------------------------------------------------------------------
 
 !> Write a rank 1 array of integers to an attribute
@@ -1890,11 +1890,18 @@ subroutine write_1d_int_hdf5_attr(outdata, outname, loc_id)
  character(len=*), parameter :: &
     this_sub_name = 'write_1d_int_hdf5'
  integer :: h5err
+ logical :: l_exists
 
   !create a 1D dataspace
   out_size(1) = int(size(outdata,1), h5sz)
   call h5Screate_simple_f(rank, out_size, dspace_id, h5err)
 
+  !check if the dataset on file exists
+  call h5Aexists_f(loc_id, trim(outname), l_exists, h5err)
+
+  if(l_exists) then
+    call h5Adelete_f(loc_id, trim(outname), h5err) 
+  endif
   !create the dataset on the file
   call h5Acreate_f(loc_id, trim(outname), h5t_file_int, dspace_id, &
                    attr_id, h5err)

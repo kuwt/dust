@@ -57,12 +57,26 @@ use mod_actuatordisk, only: &
 use mod_doublet, only: &
   velocity_calc_doublet
 
+use mod_hdf5_io, only: &
+   h5loc, &
+   new_hdf5_file, &
+   open_hdf5_file, &
+   close_hdf5_file, &
+   new_hdf5_group, &
+   open_hdf5_group, &
+   close_hdf5_group, &
+   write_hdf5, &
+   write_hdf5_attr, &
+   read_hdf5, &
+   read_hdf5_al, &
+   check_dset_hdf5
+
 !----------------------------------------------------------------------
 
 implicit none
 
 public :: t_wake_rings, initialize_wake_rings, update_wake_rings, &
-          destroy_wake_rings
+          load_wake_rings, destroy_wake_rings
 
 private
 
@@ -100,6 +114,7 @@ type t_wake_rings
 
 end type t_wake_rings
 
+character(len=*), parameter :: this_mod_name = 'mod_wake_ring'
 !----------------------------------------------------------------------
 contains
 !----------------------------------------------------------------------
@@ -239,6 +254,71 @@ end subroutine
 !  enddo
 !
 !end subroutine prepare_wake_panels
+
+!----------------------------------------------------------------------
+
+subroutine load_wake_rings(filename, wake)
+ character(len=*), intent(in) :: filename
+ type(t_wake_rings), intent(inout), target :: wake
+
+ integer(h5loc) :: floc, gloc
+ real(wp), allocatable :: wpoints(:,:,:), wvort(:,:)
+ integer, allocatable :: conn_pe(:)
+ integer :: id, ir, ip, np, ipt
+ character(len=*), parameter :: this_sub_name = 'load_rin_wake'
+
+  !Read the past results
+  call open_hdf5_file(filename, floc)
+  call open_hdf5_group(floc, 'RingWake', gloc)
+
+  call read_hdf5_al(wpoints,'WakePoints',gloc)
+  call read_hdf5_al(conn_pe,'Conn_pe',gloc)
+  call read_hdf5_al(wvort,'WakeVort',gloc)
+
+  call close_hdf5_group(gloc)
+  call close_hdf5_file(floc)
+
+  !check the consistency
+  ip = 1
+  do id = 1,wake%ndisks
+    np = wake%gen_elems(id)%p%n_ver
+    if (.not. all(conn_pe(ip:ip+np-1) .eq. id)) call error( &
+    this_sub_name, this_mod_name, 'Different wake diske connectivity&
+    & between the loded and built geometry')
+    ip = ip+np
+  enddo
+
+  !the wake length is the loaded one, or less if imposed so
+  wake%wake_len = min(wake%nrings, size(wvort,2))
+
+  !Load the old results
+  ip = 1
+  do id = 1,wake%ndisks
+    np = wake%gen_elems(id)%p%n_ver
+    do ir = 1,wake%wake_len
+      !DEBUG:
+      write(*,*) 'size ver', shape(wake%wake_rings(id,ir)%ver(:,:))
+      write(*,*) 'size results', shape(wpoints(:,ip:ip+np-1,ir))
+      wake%wake_rings(id,ir)%ver(:,:) = wpoints(:,ip:ip+np-1,ir)
+    enddo
+    ip = ip+np
+  enddo
+  wake%ivort(:,1:wake%wake_len) = wvort(:,1:wake%wake_len)
+
+  deallocate(wake%pan_p); allocate(wake%pan_p(wake%ndisks*wake%wake_len))
+
+  !Update the geometrical quantities
+  ipt = 1
+  do ir = 1,wake%wake_len
+    do id = 1,wake%ndisks
+      call calc_geo_data_ad(wake%wake_rings(id,ir), &
+                    wake%wake_rings(id,ir)%ver)
+      wake%pan_p(ipt)%p => wake%wake_rings(id,ir)
+      ipt = ipt + 1
+    enddo
+  enddo
+
+end subroutine load_wake_rings
 
 !----------------------------------------------------------------------
 

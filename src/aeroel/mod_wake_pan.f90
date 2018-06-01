@@ -51,12 +51,25 @@ use mod_aero_elements, only: &
 use mod_vortring, only: &
   t_vortring
 
+use mod_hdf5_io, only: &
+   h5loc, &
+   new_hdf5_file, &
+   open_hdf5_file, &
+   close_hdf5_file, &
+   new_hdf5_group, &
+   open_hdf5_group, &
+   close_hdf5_group, &
+   write_hdf5, &
+   write_hdf5_attr, &
+   read_hdf5, &
+   read_hdf5_al, &
+   check_dset_hdf5
 !----------------------------------------------------------------------
 
 implicit none
 
 public :: t_wake_panels, initialize_wake_panels, update_wake_panels, &
-          prepare_wake_panels, destroy_wake_panels
+          prepare_wake_panels, load_wake_panels, destroy_wake_panels
 
 private
 
@@ -126,6 +139,7 @@ type :: t_wake_panels
  
 end type 
 
+character(len=*), parameter :: this_mod_name='mod_wake_pan'
 
 !----------------------------------------------------------------------
 contains
@@ -274,6 +288,63 @@ subroutine prepare_wake_panels(wake, geo, dt, uinf)
   enddo
 
 end subroutine prepare_wake_panels
+
+!----------------------------------------------------------------------
+
+subroutine load_wake_panels(filename, wake)
+ character(len=*), intent(in) :: filename
+ type(t_wake_panels), intent(inout), target :: wake
+
+ integer(h5loc) :: floc, gloc
+ real(wp), allocatable :: wpoints(:,:,:), wvort(:,:)
+ integer, allocatable :: start_points(:,:)
+ integer :: ipan, iw, p1, p2, ipt
+ character(len=*), parameter :: this_sub_name = 'load_pan_wake'
+
+  !Read the past results
+  call open_hdf5_file(filename, floc)
+  call open_hdf5_group(floc, 'PanelWake', gloc)
+
+  call read_hdf5_al(wpoints,'WakePoints',gloc)
+  call read_hdf5_al(start_points,'StartPoints',gloc)
+  call read_hdf5_al(wvort,'WakeVort',gloc)
+
+  call close_hdf5_group(gloc)
+  call close_hdf5_file(floc)
+
+  !Perform a few checks to be sure that the correct size solution was loaded
+  if(.not. all(start_points .eq. wake%i_start_points)) call error( &
+    this_sub_name, this_mod_name, 'Different wake trailing edge connectivity&
+    & between the loded and built geometry')
+  
+  !the wake length is the loaded one, or less if imposed so
+  wake%wake_len = min(wake%npan, size(wvort,2))
+
+  !store points position and doublets intensity
+  wake%w_points(:,:,1:wake%wake_len+1) = wpoints(:,:,1:wake%wake_len+1)
+  wake%ivort(:,1:wake%wake_len) = wvort(:,1:wake%wake_len)
+
+  deallocate(wake%pan_p)
+  allocate(wake%pan_p(wake%n_wake_stripes*wake%wake_len))
+  ! Update the panels geometrical quantities of all the panels
+  ipt = 1
+  do ipan = 1,wake%wake_len
+    do iw = 1,wake%n_wake_stripes
+      p1 = wake%i_start_points(1,iw)
+      p2 = wake%i_start_points(2,iw)
+      call calc_geo_data_pan(wake%wake_panels(iw,ipan), &
+           reshape((/wake%w_points(:,p1,ipan),   wake%w_points(:,p2,ipan), &
+                    wake%w_points(:,p2,ipan+1), wake%w_points(:,p1,ipan+1)/),&
+                                                                     (/3,4/)))
+      wake%pan_p(ipt)%p => wake%wake_panels(iw,ipan)
+      ipt = ipt + 1 
+    enddo
+  enddo
+
+
+  deallocate(wpoints, wvort, start_points)
+end subroutine load_wake_panels
+
 
 !----------------------------------------------------------------------
 
