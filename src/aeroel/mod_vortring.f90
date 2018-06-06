@@ -62,14 +62,17 @@ public :: t_vortring
 
 !----------------------------------------------------------------------
 
+!> Planar aerodynamic elements with a surface distribution of doublets
+!!
+!! Aerodynamic elements characterized by a uniform surface distribution
+!! of doublets, employed to model a planar surface.
+!! Thanks to the equivalence of a surface distribution of doublets and a
+!! closed vortex ring it can be also viewed as ring vortex laying on the
+!! edges of the element.
 type, extends(c_elem) :: t_vortring
 
-  real, allocatable :: vert(:,:)
-  real, allocatable :: bar(:)
 contains
 
-! linear system ------
-! new
   procedure, pass(this) :: build_row        => build_row_vortring
   procedure, pass(this) :: build_row_static => build_row_static_vortring
   procedure, pass(this) :: add_wake         => add_wake_vortring
@@ -196,9 +199,8 @@ subroutine add_liftlin_vortring(this, ll_elems, linsys, uinf, &
  integer, intent(in)             :: ista
  integer, intent(in)             :: iend
 
- integer :: j1, ind1, ind2
+ integer :: j1
  real(wp) :: a, b(3)
- integer :: n_impl
   
 
   !Static part: take what was already computed
@@ -234,9 +236,8 @@ subroutine add_actdisk_vortring(this, ad_elems, linsys, uinf, &
  integer, intent(in)             :: ista
  integer, intent(in)             :: iend
 
- integer :: j1, ind1, ind2
+ integer :: j1
  real(wp) :: a, b(3)
- integer :: n_impl
   
 
   !Static part: take what was already computed
@@ -402,12 +403,14 @@ end subroutine compute_vel_vortring
 
 !----------------------------------------------------------------------
 
+!> DISCONTINUED at the moment
+!! will be modified and employed in postprocessing
 subroutine compute_cp_vortring(this, elems, uinf)
   class(t_vortring), intent(inout) :: this
   type(t_elem_p), intent(in) :: elems(:)
   real(wp), intent(in) :: uinf(:)
 
-  integer  :: i_stripe , i_c
+  integer  :: i_stripe
   real(wp) :: dG_dt
 
   this%cp = 0.0_wp
@@ -447,7 +450,8 @@ end subroutine compute_cp_vortring
 
 !----------------------------------------------------------------------
 
-!> Compute an approximate value of the mean DELTA pressure on the actual element
+!> Compute an approximate value of the mean DELTA pressure on the actual 
+!! element
 !!
 !! pres = " DELTA pressure = ( pressure lower - pressure upper ) "
 !!  s.t. vec{dforce} = pres * vec{n}  ( since vec{n} = vec{n_upper} )
@@ -458,7 +462,7 @@ subroutine compute_pres_vortring(this, elems, sim_param)
   type(t_elem_p), intent(in) :: elems(:)
   type(t_sim_param), intent(in) :: sim_param
 
-  integer  :: i_stripe , i_c
+  integer  :: i_stripe
   real(wp) :: dG_dt
 
   this%pres = 0.0_wp
@@ -484,8 +488,7 @@ end subroutine compute_pres_vortring
 
 !----------------------------------------------------------------------
 
-! Compute the elementary force on the on the actual element
-!!
+!>  Compute the elementary force on the on the actual element
 subroutine compute_dforce_vortring(this, elems, sim_param)
   class(t_vortring), intent(inout) :: this
   type(t_elem_p), intent(in) :: elems(:)

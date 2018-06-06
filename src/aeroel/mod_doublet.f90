@@ -112,7 +112,6 @@ subroutine potential_calc_doublet(this, dou, pos)
    
      ! doublet  -----
      ! it is possible to use ver, instead of ver_p for the doublet
-!    ei = - ( pos - this%verp(:,i1) ) ; ei = ei / norm2(ei)
      ei = - ( pos - this%ver (:,i1) ) ; ei = ei / norm2(ei)
      ap1 =   this%edge_vec(:,i1   ) - ei * sum( ei * this%edge_vec(:,i1   ) )
      am1 = - this%edge_vec(:,indm1) + ei * sum( ei * this%edge_vec(:,indm1) )
@@ -213,11 +212,9 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
 
 
      ! use this%ver instead of its projection this%verp   
-     !av = pos-this%verp(:,i1)
      av = pos-this%ver(:,i1)
      ai = sum(av*this%edge_uni(:,i1))
      R1 = norm2(av)
-     !R2 = norm2(pos-this%verp(:,indp1))
      R2 = norm2(pos-this%ver(:,indp1))
      hv = av - ai*this%edge_uni(:,i1)
      hi = norm2(hv)

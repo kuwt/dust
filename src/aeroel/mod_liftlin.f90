@@ -96,6 +96,7 @@ integer :: it=0
 contains
 !----------------------------------------------------------------------
 
+!> Not present for this element
 subroutine build_row_liftlin (this, elems, linsys, uinf, ie, ista, iend)
  class(t_liftlin), intent(inout) :: this
  type(t_elem_p), intent(in)       :: elems(:)
@@ -112,6 +113,7 @@ end subroutine build_row_liftlin
 
 !----------------------------------------------------------------------
 
+!> Not present for this element
 subroutine build_row_static_liftlin (this, elems, ll_elems, ad_elems, linsys, uinf, ie, ista, iend)
  class(t_liftlin), intent(inout) :: this
  type(t_elem_p), intent(in)       :: elems(:)
@@ -130,6 +132,7 @@ end subroutine build_row_static_liftlin
 
 !----------------------------------------------------------------------
 
+!> Not present for this element
 subroutine add_wake_liftlin (this, wake_elems, impl_wake_ind, linsys, uinf, &
                              ie, ista, iend)
  class(t_liftlin), intent(inout) :: this
@@ -149,6 +152,7 @@ end subroutine add_wake_liftlin
 
 !----------------------------------------------------------------------
 
+!> Not present for this element
 subroutine add_liftlin_liftlin (this, ll_elems, linsys, uinf, &
                              ie, ista, iend)
  class(t_liftlin), intent(inout) :: this
@@ -167,6 +171,7 @@ end subroutine add_liftlin_liftlin
 
 !----------------------------------------------------------------------
 
+!> Not present for this element
 subroutine add_actdisk_liftlin (this, ad_elems, linsys, uinf, &
                              ie, ista, iend)
  class(t_liftlin), intent(inout) :: this
@@ -185,6 +190,11 @@ end subroutine add_actdisk_liftlin
 
 !----------------------------------------------------------------------
 
+!> Compute the potential due to a lifting line
+!!
+!! this subroutine employs doublets  to calculate
+!! the AIC of a suface panel on a surface panel, and the contribution
+!! to its rhs
 subroutine compute_pot_liftlin (this, A, b, pos,i,j)
  class(t_liftlin), intent(inout) :: this
  real(wp), intent(out) :: A
@@ -209,6 +219,11 @@ end subroutine compute_pot_liftlin
 
 !----------------------------------------------------------------------
 
+!> Compute the velocity due to a lifting line
+!!
+!! This subroutine employs doublets basic subroutines to calculate
+!! the AIC coefficients of a surface panel to a vortex ring and the
+!! contribution to its rhs
 subroutine compute_psi_liftlin (this, A, b, pos, nor, i, j )
  class(t_liftlin), intent(inout) :: this
  real(wp), intent(out) :: A
@@ -235,6 +250,12 @@ subroutine compute_psi_liftlin (this, A, b, pos, nor, i, j )
 end subroutine compute_psi_liftlin
 
 !----------------------------------------------------------------------
+
+!> Compute the velocity induced by a lifting line in a prescribed position
+!!
+!! WARNING: the velocity calculated, to be consistent with the formulation of
+!! the equations is multiplied by 4*pi, to obtain the actual velocity the
+!! result of the present subroutine MUST be DIVIDED by 4*pi
 subroutine compute_vel_liftlin (this, pos, uinf, vel)
  class(t_liftlin), intent(inout) :: this
  real(wp), intent(in) :: pos(:)
@@ -273,6 +294,8 @@ end subroutine compute_cp_liftlin
 
 !----------------------------------------------------------------------
 
+!> The computation of the pressure in the lifting line is not meant to 
+!! happen, loads are retrieved from the tables
 subroutine compute_pres_liftlin (this, elems, sim_param)
  class(t_liftlin), intent(inout) :: this
  type(t_elem_p), intent(in) :: elems(:)

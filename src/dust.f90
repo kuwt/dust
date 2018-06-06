@@ -4,7 +4,7 @@
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -13,10 +13,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -25,8 +25,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@polimi.it>
 !!          Davide Montagnani       <davide.montagnani@polimi.it>
 !!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
@@ -47,20 +47,21 @@ use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
 
 use mod_geometry, only: &
-  t_geo, set_parameters_geo, create_geometry, update_geometry, &
+  t_geo, &
+  create_geometry, update_geometry, &
   t_tedge,  destroy_geometry
 
 use mod_aero_elements, only: &
   c_elem, t_elem_p !, t_vp
 
 use mod_liftlin, only: &
- update_liftlin, solve_liftlin 
+ update_liftlin, solve_liftlin
 
 use mod_actuatordisk, only: &
  update_actdisk
 
 use mod_c81, only: &
-  t_aero_tab 
+  t_aero_tab
 
 use mod_linsys_vars, only: &
   t_linsys
@@ -161,7 +162,7 @@ logical :: restart
 character(len=max_char_len) :: restart_file
 
 
-!> 
+!>
 character(len=max_char_len) :: frmt
 character(len=max_char_len) :: basename
 character(len=max_char_len) :: basename_debug
@@ -199,7 +200,7 @@ call prms%CreateRealOption( 'dt_debug_out', "debug output time interval")
 call prms%CreateStringOption('GeometryFile','Main geometry definition file')
 call prms%CreateStringOption('ReferenceFile','Reference frames file','no_set')
 
-! output: 
+! output:
 call prms%CreateStringOption('basename','oputput basename','./')
 call prms%CreateStringOption('basename_debug','oputput basename for debug','./')
 call prms%CreateLogicalOption( 'output_start', "output values at starting &
@@ -243,7 +244,7 @@ restart = getlogical(prms,'restart_from_file')
 if (restart) then
   restart_file = getstr(prms,'restart_file')
   geo_file_name = restart_file(1:len(trim(restart_file))-11)//'geo.h5'
-  call load_time(restart_file, tstart) 
+  call load_time(restart_file, tstart)
 endif
 
 
@@ -271,7 +272,7 @@ sim_param%n_timesteps = nstep
 allocate(sim_param%time_vec(sim_param%n_timesteps))
 sim_param%time_vec = (/ ( sim_param%t0 + &
          dble(i-1)*sim_param%dt, i=1,sim_param%n_timesteps ) /)
-allocate(sim_param%u_inf(3)) 
+allocate(sim_param%u_inf(3))
 sim_param%u_inf = uinf
 sim_param%P_inf = Pinf
 sim_param%rho_inf = rho
@@ -301,9 +302,7 @@ call finalizeParameters(prms)
 
 !------ Initialization ------
 call printout(nl//'====== Initializing Wake ======')
-call initialize_wake_panels(wake_panels, geo, te, n_wake_panels)
-!Consider moving what is inside here to the initialization
-call prepare_wake_panels(wake_panels,  geo, dt, uinf)
+call initialize_wake_panels(wake_panels, geo, te, n_wake_panels, sim_param)
 
 call initialize_wake_rings(wake_rings, geo, n_wake_panels)
 
@@ -360,13 +359,9 @@ do it = 1,nstep
 
 
   !------ Assemble the system ------
-  call prepare_wake_panels(wake_panels, geo, dt, uinf)
+  call prepare_wake_panels(wake_panels, geo, sim_param)
   t0 = dust_time()
 
-! !DEBUG
-! write(*,*) ' allocated(elems   ) , size(elems   ) : ' , allocated(elems   ) , size(elems   ) 
-! write(*,*) ' allocated(elems_ll) , size(elems_ll) : ' , allocated(elems_ll) , size(elems_ll) 
-! write(*,*) ' allocated(elems_ad) , size(elems_ad) : ' , allocated(elems_ad) , size(elems_ad) 
   call assemble_linsys(linsys, elems, elems_ll, elems_ad,  &
                        wake_panels, wake_rings, uinf)
   t1 = dust_time()
@@ -384,14 +379,14 @@ do it = 1,nstep
 
   !------ Solve the system ------
   t0 = dust_time()
-  if (linsys%rank .gt. 0) then 
+  if (linsys%rank .gt. 0) then
     call solve_linsys(linsys)
   endif
   t1 = dust_time()
 
   ! compute time derivative of the result ( = i_vortex = -i_doublet ) ----------
   do i_el = 1 , size(elems)
-    elems(i_el)%p%didou_dt = ( linsys%res(i_el) - res_old(i_el) ) / sim_param%dt 
+    elems(i_el)%p%didou_dt = ( linsys%res(i_el) - res_old(i_el) ) / sim_param%dt
   end do
   res_old = linsys%res
 
@@ -411,6 +406,7 @@ do it = 1,nstep
   ! vortex rings and 3d-panels
   do i_el = 1 , size(elems)
 !   call elems(i_el)%p%compute_cp(elems,uinf)       ! <--TODO: must become "old" as soon as possible
+
     call elems(i_el)%p%compute_pres(elems,sim_param)
     call elems(i_el)%p%compute_dforce(elems,sim_param)
   end do
@@ -435,8 +431,8 @@ do it = 1,nstep
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
   !  next iteration)
-  call update_wake_panels(wake_panels, elems_tot, wake_rings%pan_p, dt, uinf)
-  call update_wake_rings(wake_rings, elems_tot, wake_panels%pan_p, dt, uinf)
+  call update_wake_panels(wake_panels, elems_tot, wake_rings%pan_p, sim_param)
+  call update_wake_rings(wake_rings, elems_tot, wake_panels%pan_p, sim_param)
 
   time = min(tend, time+dt)
 
@@ -494,10 +490,10 @@ subroutine copy_geo(sim_param, geo_file, run_id)
  character(len=max_char_len) :: target_file
  integer :: estat, cstat
  integer(h5loc) :: floc
-  
+
   !target file name: same as run basename with appendix
   target_file = trim(sim_param%basename)//'_geo.h5'
- 
+
   !Copy the geometry file
   call execute_command_line('cp '//trim(geo_file)//' '//trim(target_file), &
                                            exitstat=estat,cmdstat=cstat)
@@ -590,13 +586,6 @@ subroutine output_status(elems_tot, geo, wake_panels, basename, it, t)
                     trim(basename)//'_res_'//trim(sit)//'.plt')
 
 
-  !=== Hdf5 output ===
-  !call new_hdf5_file(trim(basename)//'res_'//trim(sit)//'.h5',floc)
-  !call write_hdf5(time,'time',floc)
-  !call write_hdf5(geo%points,'points',floc)
-  !call write_hdf5(el,'elements',floc)
-
-  !call close_hdf5_file(floc)
   deallocate(el,w_el,w_points,w_res)
 
 end subroutine output_status

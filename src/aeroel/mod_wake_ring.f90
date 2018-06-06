@@ -4,7 +4,7 @@
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -13,10 +13,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -25,8 +25,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@polimi.it>
 !!          Davide Montagnani       <davide.montagnani@polimi.it>
 !!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
@@ -38,6 +38,9 @@ module mod_wake_ring
 
 use mod_param, only: &
   wp, nl, pi
+
+use mod_sim_param, only: &
+  t_sim_param
 
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
@@ -149,7 +152,7 @@ subroutine initialize_wake_rings(wake, geo, nrings)
   allocate(wake%wake_rings(wake%ndisks,wake%nrings))
   allocate(wake%ivort(wake%ndisks,wake%nrings))
   !allocate(wake%pan_p(0))
-  
+
   !Associate
   id = 1
   do ic = 1, size(geo%components)
@@ -171,32 +174,22 @@ subroutine initialize_wake_rings(wake, geo, nrings)
       allocate(wake%wake_rings(id,ir)%nor(3))
       allocate(wake%wake_rings(id,ir)%tang(3,2))
       !TODO: check if the following are really used
-      allocate(wake%wake_rings(id,ir)%verp(3,nsides))
       allocate(wake%wake_rings(id,ir)%edge_vec(3,nsides))
       allocate(wake%wake_rings(id,ir)%edge_len(nsides))
       allocate(wake%wake_rings(id,ir)%edge_uni(3,nsides))
-      allocate(wake%wake_rings(id,ir)%cosTi(nsides))
-      allocate(wake%wake_rings(id,ir)%sinTi(nsides))
     enddo
   enddo
 
 
   wake%ivort = 0.0_wp
 
-  !the first line of points is calculated from the mesh points
-  !do id = 1,wake%ndisks
-  !  wake%wake_rings(id,1)%ver = wake%gen_elems(id)%p%ver
-  !enddo
-  
-  !Starting length of the wake is 
+  !Starting length of the wake is
   wake%wake_len = 0
 
 
-  !TODO : initialize first row of wake here
   allocate(wake%pan_p(0))
   do id = 1,wake%ndisks
     wake%wake_rings(id,:)%moving = wake%gen_elems(id)%p%moving
-  !  wake%pan_p(id)%p => wake%wake_panels(id,1)
   enddo
 
 end subroutine initialize_wake_rings
@@ -214,49 +207,7 @@ end subroutine
 
 !----------------------------------------------------------------------
 
-!> Prepare the first row of panels to be inserted inside the linear system
-!!
-!subroutine prepare_wake_panels(wake, geo, dt, uinf)
-! type(t_wake_panels), intent(inout) :: wake
-! type(t_geo), intent(in) :: geo
-! real(wp), intent(in) :: dt
-! real(wp), intent(in) :: uinf(3)
-! 
-! integer :: p1, p2
-! integer :: ip, iw, ipan
-! real(wp) :: dist(3)
-!
-!  !Update the first row of panels: set points positions
-!
-!  !first row  of new points comes from geometry
-!  wake%w_start_points = 0.5_wp * (geo%points(:,wake%gen_points(1,:)) + &
-!                                  geo%points(:,wake%gen_points(2,:)))
-!  wake%w_points(:,:,1) = wake%w_start_points
-!
-!  !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
-!  do ip=1,wake%n_wake_points
-!    dist = matmul(geo%iefs(wake%gen_ref(ip))%R_g,wake%gen_dir(:,ip))
-!    wake%w_points(:,ip,2) = wake%w_points(:,ip,1) + dist*0.3_wp*norm2(uinf)*dt
-!  enddo
-!
-!  ! Update the panels geometrical quantities of all the panels, the 
-!  ! first two row of points have just been updated, the other rows of points
-!  ! were updated at the end of the last iteration
-!  do ipan = 1,wake%wake_len
-!    do iw = 1,wake%n_wake_stripes
-!      p1 = wake%i_start_points(1,iw)
-!      p2 = wake%i_start_points(2,iw)
-!      call calc_geo_data_pan(wake%wake_panels(iw,ipan), &
-!           reshape((/wake%w_points(:,p1,ipan),   wake%w_points(:,p2,ipan), &
-!                     wake%w_points(:,p2,ipan+1), wake%w_points(:,p1,ipan+1)/),&
-!                                                                     (/3,4/)))
-!    enddo
-!  enddo
-!
-!end subroutine prepare_wake_panels
-
-!----------------------------------------------------------------------
-
+!> Load the wake rings solution from a previous result
 subroutine load_wake_rings(filename, wake)
  character(len=*), intent(in) :: filename
  type(t_wake_rings), intent(inout), target :: wake
@@ -325,14 +276,13 @@ end subroutine load_wake_rings
 !> Update the position and the intensities of the wake panels
 !!
 !! Note: at this subroutine is passed the whole array of elements,
-!! comprising both the implicit panels and the explicit (ll) 
+!! comprising both the implicit panels and the explicit (ll)
 !! elements
-subroutine update_wake_rings(wake, elems, wake_pan_p, dt, uinf)
+subroutine update_wake_rings(wake, elems, wake_pan_p, sim_param)
  type(t_wake_rings), intent(inout), target :: wake
  type(t_elem_p), intent(in) :: elems(:)
  type(t_elem_p), intent(in) :: wake_pan_p(:)
- real(wp), intent(in) :: dt
- real(wp), intent(in) :: uinf(3)
+ type(t_sim_param), intent(in) :: sim_param
 
  integer :: ip,id,ir, ie, np
  real(wp) :: pos_p(3), vel_p(3), v(3)
@@ -342,7 +292,7 @@ subroutine update_wake_rings(wake, elems, wake_pan_p, dt, uinf)
  integer :: size_old
 
   !==> 1) Update wake points position ==
-  
+
   !Save the old positions for the integration
   increase_wake = .false.
   if(wake%wake_len .lt. wake%nrings) then
@@ -350,7 +300,7 @@ subroutine update_wake_rings(wake, elems, wake_pan_p, dt, uinf)
     increase_wake = .true.
   endif
   allocate(points(3,wake%np_row,wake%wake_len))
-  
+
   !Store at the beginning the disk points
   ip=1
   do id = 1,wake%ndisks
@@ -372,45 +322,45 @@ subroutine update_wake_rings(wake, elems, wake_pan_p, dt, uinf)
 
 
   !calculate the velocities at the old positions of the points and then
-  !update the positions 
-  
+  !update the positions
+
 !$omp parallel do private(pos_p, vel_p, ip, v)
   do ip = 1,size(points,2)
     do ir = 1,size(points,3)
-      pos_p = points(:,ip,ir) 
+      pos_p = points(:,ip,ir)
       vel_p = 0.0_wp
-      
-      !calculate the influence of the solid bodies 
+
+      !calculate the influence of the solid bodies
       do ie=1,size(elems)
         v = 0.0_wp
-        call elems(ie)%p%compute_vel(pos_p, uinf, v)
+        call elems(ie)%p%compute_vel(pos_p, sim_param%u_inf, v)
         vel_p = vel_p + v/(4*pi)
       enddo
 
       ! calculate the influence of the panel wake
       do ie=1,size(wake_pan_p)
         v = 0.0_wp
-        call wake_pan_p(ie)%p%compute_vel(pos_p, uinf, v)
+        call wake_pan_p(ie)%p%compute_vel(pos_p, sim_param%u_inf, v)
         vel_p = vel_p + v/(4*pi)
       enddo
 
       ! calculate the influence of the ring wake
       do ie=1,size(wake%pan_p)
         v = 0.0_wp
-        call wake%pan_p(ie)%p%compute_vel(pos_p, uinf, v)
+        call wake%pan_p(ie)%p%compute_vel(pos_p, sim_param%u_inf, v)
         vel_p = vel_p + v/(4*pi)
       enddo
 
       !calculate the influence of particles
 
-      vel_p    = vel_p   +uinf   
+      vel_p    = vel_p   +sim_param%u_inf
 
       !update the position in time
-      points(:,ip,ir) = points(:,ip,ir) + vel_p*dt
+      points(:,ip,ir) = points(:,ip,ir) + vel_p*sim_param%dt
     enddo !ir
   enddo !ip
 !$omp end parallel do
- 
+
   !redistribute the points
   do ir = 1,wake%wake_len
     ip = 1
@@ -423,8 +373,8 @@ subroutine update_wake_rings(wake, elems, wake_pan_p, dt, uinf)
 
   deallocate(points)
 
- 
-  !==> 3) Increase the length of the wake, if it is necessary
+
+  !==> 2) Increase the length of the wake, if it is necessary
   if (increase_wake) then
     allocate(pan_p_temp(wake%ndisks*wake%wake_len))
     size_old = 0; if(allocated(wake%pan_p)) size_old = size(wake%pan_p)
@@ -445,10 +395,9 @@ subroutine update_wake_rings(wake, elems, wake_pan_p, dt, uinf)
     deallocate(pan_p_temp)
   endif
 
-  !==> 4) Update the intensities of the panels
-  !       From the back, all the vortex intensities come from the previous panel
-  !==> 1) Update the first row of vortex intensities: 
-  !      it was already calculated (implicitly) in the linear system
+  !==> 3) Update the intensities of the panels
+  !       From the back, all the vortex intensities come from the 
+  !       previous panel
   do ir = wake%wake_len,2,-1
     do id = 1,wake%ndisks
       wake%wake_rings(id,ir)%idou = wake%wake_rings(id,ir-1)%idou
