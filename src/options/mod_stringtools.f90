@@ -206,17 +206,21 @@ end function stricmp
 
 !----------------------------------------------------------------------
 
-function IsInList(str, str_list) result(isin)
+function IsInList(str, str_list, pos) result(isin)
  character(len=*), intent(in) :: str
  character(len=*), allocatable, intent(in) :: str_list(:)
+ integer, optional :: pos
  logical :: isin
 
  integer :: i
+
+  if (present(pos)) pos = 0
 
   isin = .false.
   if(allocated(str_list)) then
    do i = lbound(str_list,1), ubound(str_list,1)
      if(stricmp(trim(str),trim(str_list(i)))) then
+       if (present(pos))  pos = i
        isin = .true.
        return
      endif
