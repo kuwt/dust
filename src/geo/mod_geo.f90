@@ -506,6 +506,11 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   elems_tot(geo%nelem+1:geo%nelem+geo%nll) =elems_ll
   elems_tot(geo%nelem+geo%nll+1:geo%nelem+geo%nll+geo%nad) = elems_ad
 
+  !EXPERIMENTAL
+  do i = 1,size(elems_tot)
+    elems_tot(i)%p%id = i
+  end do
+
   call create_local_velocity_stencil(geo,elems)    ! for surfpan only (3dP)
 
   call create_strip_connectivity(geo)

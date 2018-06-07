@@ -158,12 +158,12 @@ subroutine save_status(geo, wake_pan, wake_rin, sim_params, it, time, run_id)
     allocate(vort(ne), cp(ne) , pres(ne) , dforce(3,ne) )
     do ie = 1,ne
      vort(ie) = geo%components(icomp)%el(ie)%idou
-     cp(ie) = geo%components(icomp)%el(ie)%cp
+     !cp(ie) = geo%components(icomp)%el(ie)%cp
      pres(ie) = geo%components(icomp)%el(ie)%pres
      dforce(:,ie) = geo%components(icomp)%el(ie)%dforce
     enddo
     call write_hdf5(vort,'Vort',gloc3)
-    call write_hdf5(cp,'Cp',gloc3)
+    !call write_hdf5(cp,'Cp',gloc3)
     call write_hdf5(pres,'Pres',gloc3)
     call write_hdf5(dforce,'dF',gloc3)
     deallocate(vort, cp, pres, dforce)

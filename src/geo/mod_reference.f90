@@ -346,13 +346,13 @@ subroutine build_references(refs, reference_file, sim_param)
                                                              &simple_function')
   ! TODO: add %CreateStrinArrayOption(...) to options/mod_parse.f90
   call sbprms_rot%CreateIntOption('Function','fun definition.&
-                                                         0:constant,1:sin,...')
+                                                    &0:constant,1:sin,...')
   call sbprms_rot%CreateStringOption('File','file .dat containing the motion')
   call sbprms_rot%CreateRealArrayOption('Axis','axis of rotation')
   call sbprms_rot%CreateRealOption('Amplitude','Multiplicative factor for &
                                                   &the motion, default 1','1')
   call sbprms_rot%CreateRealOption('Omega','Pulsation of the motion for &
-                                            &each coordinate, default 1','1.0')
+                                          &each coordinate, default 1','1.0')
   call sbprms_rot%CreateRealOption('Phase','Phase of the motion &
                             &each coordinate, default 0','0.0')
   call sbprms_rot%CreateRealOption('Offset','Offset of the motion &
@@ -533,6 +533,8 @@ subroutine build_references(refs, reference_file, sim_param)
               allocate(refs(iref)%pol_tim(  sim_param%n_timesteps)) 
 
               ! Read the integer id for the user defined functions 0:constant,1:sin              
+              allocate(pol_fun_int(3), pol_vec(3), pol_ome(3), &
+                       pol_pha(3), pol_off(3))
               pol_fun_int = getintarray(sbprms_pol,'Function',3)
               pol_amp = getreal(sbprms_pol,'Amplitude')
               pol_vec = getrealarray(sbprms_pol,'Vector',3)
