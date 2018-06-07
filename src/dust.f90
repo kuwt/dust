@@ -54,6 +54,12 @@ use mod_geometry, only: &
 use mod_aero_elements, only: &
   c_elem, t_elem_p !, t_vp
 
+use mod_doublet, only: &
+  initialize_doublet
+
+use mod_surfpan, only: &
+  initialize_surfpan
+
 use mod_liftlin, only: &
  update_liftlin, solve_liftlin
 
@@ -118,7 +124,7 @@ character(len=extended_char_len) :: message
 type(t_sim_param) :: sim_param
 ! Asymptotic conditions
 real(wp) :: uinf(3)
-real(wp) :: rho , Pinf
+real(wp) :: rho , Pinf, Re, Mach
 
 !Time parameters
 real(wp) :: tstart, tend, dt, time
@@ -127,6 +133,12 @@ real(wp) :: t_last_out, t_last_debug_out
 logical  :: time_2_out, time_2_debug_out
 logical  :: output_start
 real(wp) :: dt_out, dt_debug_out
+!Wake parameters
+!> Number of wake panels(/rings)
+integer :: n_wake_panels
+real(wp) :: wake_pan_scaling
+!doublet parameters
+real(wp) :: ff_ratio_dou, ff_ratio_sou, eps_dou, r_Rankine, r_cutoff
 
 !Main variables
 !> All the implicit elements, sorted first static then moving
@@ -149,8 +161,6 @@ type(t_linsys) :: linsys
 type(t_wake_panels) :: wake_panels
 !> Wake rings
 type(t_wake_rings) :: wake_rings
-!> Number of wake panels(/rings)
-integer :: n_wake_panels
 
 !> Timing vars
 real(t_realtime) :: t1 , t0, t00, t11, t22
@@ -216,7 +226,22 @@ call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
                                                            '(/1.0, 0.0, 0.0/)')
 call prms%CreateRealOption( 'P_inf', "free stream pressure", '1.0')
 call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')
+call prms%CreateRealOption( 'Re', "Reynolds number", '1000000.0')
+call prms%CreateRealOption( 'Mach', "Mach number", '0.0')
 call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
+call prms%CreateRealOption( 'ImplicitPanelScale', &
+                    "Scaling of the first implicit wake panel", '0.3')
+
+call prms%CreateRealOption( 'FarFieldRatioDoublet', &
+      "Multiplier for far field threshold computation on doublet", '10.0')
+call prms%CreateRealOption( 'FarFieldRatioSource', &
+      "Multiplier for far field threshold computation on sources", '10.0')
+call prms%CreateRealOption( 'DoubletThreshold', &
+      "Thresold for considering the point in plane in doublets", '1.0e-6')
+call prms%CreateRealOption( 'RankineRad', &
+      "Radius of Rankine correction for vortex induction near core", '0.1')
+call prms%CreateRealOption( 'CutoffRad', &
+      "Radius of complete cutoff  for vortex induction near core", '0.001')
 
 
 ! get the parameters and print them out
@@ -232,13 +257,25 @@ output_start = getlogical(prms, 'output_start')
 Pinf = getreal(prms,'P_inf')
 rho  = getreal(prms,'rho_inf')
 uinf = getrealarray(prms, 'u_inf', 3)
+Re   = getreal(prms,'Re')
+Mach = getreal(prms,'Mach')
 
 debug_level = getint(prms, 'debug_level')
 n_wake_panels = getint(prms, 'n_wake_panels')
+wake_pan_scaling = getreal(prms,'ImplicitPanelScale')
 basename = getstr(prms,'basename')
 basename_debug = getstr(prms,'basename_debug')
 geo_file_name = getstr(prms,'GeometryFile')
 ref_file_name = getstr(prms,'ReferenceFile')
+
+ff_ratio_dou  = getreal(prms, 'FarFieldRatioDoublet')
+ff_ratio_sou  = getreal(prms, 'FarFieldRatioSource')
+eps_dou   = getreal(prms, 'DoubletThreshold')
+r_Rankine = getreal(prms, 'RankineRad')
+r_cutoff  = getreal(prms, 'CutoffRad')
+
+call initialize_doublet(ff_ratio_dou, eps_dou, r_Rankine, r_cutoff);
+call initialize_surfpan(ff_ratio_sou);
 
 restart = getlogical(prms,'restart_from_file')
 if (restart) then
@@ -276,6 +313,9 @@ allocate(sim_param%u_inf(3))
 sim_param%u_inf = uinf
 sim_param%P_inf = Pinf
 sim_param%rho_inf = rho
+sim_param%Re    = Re
+sim_param%Mach  = Mach
+sim_param%first_panel_scaling = wake_pan_scaling
 sim_param%debug_level = debug_level
 sim_param%basename = basename
 

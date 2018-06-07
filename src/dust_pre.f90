@@ -41,7 +41,7 @@ use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
 
 use mod_geometry, only: &
-  t_geo, set_parameters_geo, create_geometry, update_geometry, &
+  t_geo, create_geometry, update_geometry, &
   t_tedge,  destroy_geometry
 
 use mod_basic_io, only: &

@@ -228,7 +228,8 @@ subroutine initialize_wake_panels(wake, geo, te,  npan, sim_param)
             geo%refs(wake%gen_ref(ip))%f_g, &
             vel_te )
     wake%w_points(:,ip,2) = wake%w_points(:,ip,1) +  &
-                      dist*0.3_wp*norm2(sim_param%u_inf-vel_te)*sim_param%dt
+                dist*sim_param%first_panel_scaling* &
+                norm2(sim_param%u_inf-vel_te)*sim_param%dt
   enddo
 
   !Starting length of the wake is 1
@@ -291,7 +292,8 @@ subroutine prepare_wake_panels(wake, geo, sim_param)
             geo%refs(wake%gen_ref(ip))%f_g, &
             vel_te )
     wake%w_points(:,ip,2) = wake%w_points(:,ip,1) + &
-                        dist*0.3_wp*norm2(sim_param%u_inf-vel_te)*sim_param%dt
+                        dist*sim_param%first_panel_scaling* &
+                        norm2(sim_param%u_inf-vel_te)*sim_param%dt
   enddo
 
   ! Update the panels geometrical quantities of all the panels, the
@@ -303,7 +305,7 @@ subroutine prepare_wake_panels(wake, geo, sim_param)
       p2 = wake%i_start_points(2,iw)
       call calc_geo_data_pan(wake%wake_panels(iw,ipan), &
            reshape((/wake%w_points(:,p1,ipan),   wake%w_points(:,p2,ipan), &
-                     wake%w_points(:,p2,ipan+1), wake%w_points(:,p1,ipan+1)/),&
+                    wake%w_points(:,p2,ipan+1), wake%w_points(:,p1,ipan+1)/),&
                                                                      (/3,4/)))
     enddo
   enddo

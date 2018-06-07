@@ -66,7 +66,9 @@ use mod_math, only: &
 
 implicit none
 
-public :: t_surfpan
+public :: t_surfpan, initialize_surfpan
+
+private
 
 !----------------------------------------------------------------------
 
@@ -97,14 +99,24 @@ contains
 
 end type
 
+real(wp) :: ff_ratio
 
 character(len=*), parameter :: this_mod_name = 'mod_surfpan'
 !----------------------------------------------------------------------
 contains
 !----------------------------------------------------------------------
 
+!> Subroutine to populate the module variables from input
+!!
+subroutine initialize_surfpan(ff_ratio_in)
+ real(wp), intent(in) :: ff_ratio_in
+
+  ff_ratio = ff_ratio_in
+
+end subroutine initialize_surfpan
 
 !----------------------------------------------------------------------
+
 !> compute AIC of panel <this>, on the control point <pos>
 !! Compute I_ik : velocity potential in <pos>_i induced by a (-4*pi)
 !!   -intensity surface source  on the panel <this>_k.         ^---------
