@@ -104,7 +104,7 @@ implicit none
 public :: t_geo, t_geo_component, t_tedge, &
           create_geometry, update_geometry, destroy_geometry, &
           calc_geo_data_pan, calc_geo_data_ll, calc_geo_data_ad,&
-          calc_node_vel , calc_geo_vel
+          calc_node_vel , calc_geo_vel, destroy_elements
 
 private
 
@@ -1632,6 +1632,25 @@ subroutine update_geometry(geo, t, update_static)
 
 
 end subroutine update_geometry
+
+!----------------------------------------------------------------------
+
+!> Destroy the pointers array of the components
+!!
+!! This subroutine is needed just for compatibility with gcc 4.8
+!! Newer versions of the compiler and ifort deallocate also the 
+!! vector of pointers alongside the geometry in destroy_geometry,
+!! however gcc 4.8 gives a SIGSEGV and needs and explicit deallocation
+subroutine destroy_elements(geo)
+ type(t_geo), intent(inout) :: geo
+
+ integer :: ic
+
+ do ic=1,size(geo%components)
+   if(allocated(geo%components(ic)%el)) deallocate(geo%components(ic)%el)
+ enddo
+
+end subroutine destroy_elements
 
 !----------------------------------------------------------------------
 

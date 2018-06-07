@@ -49,7 +49,7 @@ use mod_handling, only: &
 use mod_geometry, only: &
   t_geo, &
   create_geometry, update_geometry, &
-  t_tedge,  destroy_geometry
+  t_tedge,  destroy_geometry, destroy_elements
 
 use mod_aero_elements, only: &
   c_elem, t_elem_p !, t_vp
@@ -485,6 +485,7 @@ deallocate( res_old )
 !------ Cleanup ------
 call destroy_wake_panels(wake_panels)
 call destroy_linsys(linsys)
+call destroy_elements(geo)
 call destroy_geometry(geo, elems)
 
 call destroy_hdf5()
