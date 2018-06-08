@@ -1,0 +1,22 @@
+
+
+0.2.0-a
+
+* Added the lifting line model for lifting surfaces, to enable table lookup of aerodynamic coefficients
+* Added actuator disk model with ring wake for a simple representation of rotors
+* Added extensive postprocessing, in binary tecplot, binary vtk and .dat format
+  * History of loads of any defined component in any of the defined reference frames
+  * History of variables in probing location
+  * Volume/slice flowfield visualization
+  * Surface visualization on geometry and wake
+
+
+0.1.0-a
+
+* Added a more comprehensive motion interface
+  * New input
+  * Possibility of motions of the pole
+  * Possibility of sinusoidal motions
+  * Possibility of motion history from file
+* Added automatic creation of multiple reference frames and components
+* First parallel optimizations

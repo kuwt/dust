@@ -568,6 +568,7 @@ subroutine build_references(refs, reference_file, sim_param)
                   &'. It must be 0:constant or 1:sin')
                 end if
               end do
+              deallocate(pol_fun_int, pol_vec, pol_ome, pol_pha, pol_off)
 
             case default
               write(ref_tag_str,'(I5)') refs(iref)%tag
