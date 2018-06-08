@@ -1,4 +1,9 @@
+0.2.1-a
 
+* Extended models for multiple geometries (i.e. rotors)
+* Added restart capabilities
+* Some minor fixes
+* Some documentation and examples added
 
 0.2.0-a
 
