@@ -1,0 +1,8 @@
+
+CompName = wing
+GeoFile = ParamWing.in
+RefTag = Wing
+
+
+FileName = geo_input.h5 
+

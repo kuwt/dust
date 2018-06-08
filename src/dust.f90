@@ -4,7 +4,7 @@
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -13,10 +13,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -25,8 +25,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@polimi.it>
 !!          Davide Montagnani       <davide.montagnani@polimi.it>
 !!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
@@ -47,20 +47,27 @@ use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
 
 use mod_geometry, only: &
-  t_geo, set_parameters_geo, create_geometry, update_geometry, &
-  t_tedge,  destroy_geometry
+  t_geo, &
+  create_geometry, update_geometry, &
+  t_tedge,  destroy_geometry, destroy_elements
 
 use mod_aero_elements, only: &
   c_elem, t_elem_p !, t_vp
 
+use mod_doublet, only: &
+  initialize_doublet
+
+use mod_surfpan, only: &
+  initialize_surfpan
+
 use mod_liftlin, only: &
- update_liftlin, solve_liftlin 
+ update_liftlin, solve_liftlin
 
 use mod_actuatordisk, only: &
  update_actdisk
 
 use mod_c81, only: &
-  t_aero_tab 
+  t_aero_tab
 
 use mod_linsys_vars, only: &
   t_linsys
@@ -79,10 +86,11 @@ use mod_parse, only: &
 
 use mod_wake_pan, only: &
   t_wake_panels, initialize_wake_panels, update_wake_panels, &
-  prepare_wake_panels, destroy_wake_panels
+  prepare_wake_panels, load_wake_panels, destroy_wake_panels
 
 use mod_wake_ring, only: &
-  t_wake_rings, initialize_wake_rings, update_wake_rings, destroy_wake_rings
+  t_wake_rings, initialize_wake_rings, update_wake_rings, &
+  load_wake_rings, destroy_wake_rings
 
 use mod_vtk_out, only: &
   vtk_out_bin
@@ -96,7 +104,7 @@ use mod_hdf5_io, only: &
   write_hdf5, write_hdf5_attr, read_hdf5, read_hdf5_al, append_hdf5
 
 use mod_dust_io, only: &
-  save_status
+  save_status, load_solution, load_time
 
 implicit none
 
@@ -104,6 +112,8 @@ implicit none
 integer :: run_id(10)
 
 !Input
+!> Main parameters parser
+type(t_parse) :: prms
 character(len=*), parameter :: input_file_name_def = 'dust.in'
 character(len=max_char_len) :: input_file_name
 character(len=max_char_len) :: geo_file_name
@@ -112,6 +122,9 @@ character(len=extended_char_len) :: message
 
 !Simulation parameters
 type(t_sim_param) :: sim_param
+! Asymptotic conditions
+real(wp) :: uinf(3)
+real(wp) :: rho , Pinf, Re, Mach
 
 !Time parameters
 real(wp) :: tstart, tend, dt, time
@@ -120,6 +133,12 @@ real(wp) :: t_last_out, t_last_debug_out
 logical  :: time_2_out, time_2_debug_out
 logical  :: output_start
 real(wp) :: dt_out, dt_debug_out
+!Wake parameters
+!> Number of wake panels(/rings)
+integer :: n_wake_panels
+real(wp) :: wake_pan_scaling
+!doublet parameters
+real(wp) :: ff_ratio_dou, ff_ratio_sou, eps_dou, r_Rankine, r_cutoff
 
 !Main variables
 !> All the implicit elements, sorted first static then moving
@@ -130,23 +149,30 @@ type(t_elem_p), allocatable :: elems_ll(:)
 type(t_elem_p), allocatable :: elems_ad(:)
 !> All the elements (panels+ll)
 type(t_elem_p), allocatable :: elems_tot(:)
+!> Geometry
 type(t_geo) :: geo
+!> Trailing edge
 type(t_tedge) :: te
+!> Airfoil table data
 type(t_aero_tab), allocatable :: airfoil_data(:)
-integer :: n_wake_panels
+!> Linear system
 type(t_linsys) :: linsys
-type(t_parse) :: prms
+!> Wake panels
 type(t_wake_panels) :: wake_panels
+!> Wake rings
 type(t_wake_rings) :: wake_rings
 
+!> Timing vars
 real(t_realtime) :: t1 , t0, t00, t11, t22
+!> Level of debug output
 integer :: debug_level
 
-! Asymptotic conditions
-real(wp) :: uinf(3)
-real(wp) :: rho , Pinf
+!Restart
+logical :: restart
+character(len=max_char_len) :: restart_file
 
 
+!>
 character(len=max_char_len) :: frmt
 character(len=max_char_len) :: basename
 character(len=max_char_len) :: basename_debug
@@ -160,7 +186,6 @@ call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
 t00 = dust_time()
 
 call get_run_id(run_id)
-write(*,*) 'run_id: ', run_id
 
 !------ Modules initialization ------
 call initialize_hdf5()
@@ -174,26 +199,49 @@ else
 endif
 
 ! define the parameters to be read
-call prms%SetSection("Time")
+! time:
 call prms%CreateRealOption( 'tstart', "Starting time")
 call prms%CreateRealOption( 'tend',   "Ending time")
 call prms%CreateRealOption( 'dt',     "time step")
 call prms%CreateRealOption( 'dt_out', "output time interval")
 call prms%CreateRealOption( 'dt_debug_out', "debug output time interval")
-call prms%CreateLogicalOption( 'output_start', "output values at starting iteration", 'F')
-call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
-'(/1.0, 0.0, 0.0/)')
-call prms%CreateRealOption( 'P_inf', "free stream pressure", &
-'1.0')
-call prms%CreateRealOption( 'rho_inf', "free stream density", &
-'1.0')
-call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output','0')
-call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
-call prms%CreateStringOption('basename','oputput basename','./')
-call prms%CreateStringOption('basename_debug','oputput basename for debug','./')
+
+! input:
 call prms%CreateStringOption('GeometryFile','Main geometry definition file')
 call prms%CreateStringOption('ReferenceFile','Reference frames file','no_set')
-!call set_parameters_geo(prms)
+
+! output:
+call prms%CreateStringOption('basename','oputput basename','./')
+call prms%CreateStringOption('basename_debug','oputput basename for debug','./')
+call prms%CreateLogicalOption( 'output_start', "output values at starting &
+                                                             & iteration", 'F')
+call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output','0')
+
+! restart
+call prms%CreateLogicalOption('restart_from_file','restarting from file?','F')
+call prms%CreatestringOption('restart_file','restart file name')
+
+! parameters:
+call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
+                                                           '(/1.0, 0.0, 0.0/)')
+call prms%CreateRealOption( 'P_inf', "free stream pressure", '1.0')
+call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')
+call prms%CreateRealOption( 'Re', "Reynolds number", '1000000.0')
+call prms%CreateRealOption( 'Mach', "Mach number", '0.0')
+call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
+call prms%CreateRealOption( 'ImplicitPanelScale', &
+                    "Scaling of the first implicit wake panel", '0.3')
+
+call prms%CreateRealOption( 'FarFieldRatioDoublet', &
+      "Multiplier for far field threshold computation on doublet", '10.0')
+call prms%CreateRealOption( 'FarFieldRatioSource', &
+      "Multiplier for far field threshold computation on sources", '10.0')
+call prms%CreateRealOption( 'DoubletThreshold', &
+      "Thresold for considering the point in plane in doublets", '1.0e-6')
+call prms%CreateRealOption( 'RankineRad', &
+      "Radius of Rankine correction for vortex induction near core", '0.1')
+call prms%CreateRealOption( 'CutoffRad', &
+      "Radius of complete cutoff  for vortex induction near core", '0.001')
 
 
 ! get the parameters and print them out
@@ -209,13 +257,32 @@ output_start = getlogical(prms, 'output_start')
 Pinf = getreal(prms,'P_inf')
 rho  = getreal(prms,'rho_inf')
 uinf = getrealarray(prms, 'u_inf', 3)
+Re   = getreal(prms,'Re')
+Mach = getreal(prms,'Mach')
 
 debug_level = getint(prms, 'debug_level')
 n_wake_panels = getint(prms, 'n_wake_panels')
+wake_pan_scaling = getreal(prms,'ImplicitPanelScale')
 basename = getstr(prms,'basename')
 basename_debug = getstr(prms,'basename_debug')
 geo_file_name = getstr(prms,'GeometryFile')
 ref_file_name = getstr(prms,'ReferenceFile')
+
+ff_ratio_dou  = getreal(prms, 'FarFieldRatioDoublet')
+ff_ratio_sou  = getreal(prms, 'FarFieldRatioSource')
+eps_dou   = getreal(prms, 'DoubletThreshold')
+r_Rankine = getreal(prms, 'RankineRad')
+r_cutoff  = getreal(prms, 'CutoffRad')
+
+call initialize_doublet(ff_ratio_dou, eps_dou, r_Rankine, r_cutoff);
+call initialize_surfpan(ff_ratio_sou);
+
+restart = getlogical(prms,'restart_from_file')
+if (restart) then
+  restart_file = getstr(prms,'restart_file')
+  geo_file_name = restart_file(1:len(trim(restart_file))-11)//'geo.h5'
+  call load_time(restart_file, tstart)
+endif
 
 
 if (debug_level .ge. 3) then
@@ -242,10 +309,13 @@ sim_param%n_timesteps = nstep
 allocate(sim_param%time_vec(sim_param%n_timesteps))
 sim_param%time_vec = (/ ( sim_param%t0 + &
          dble(i-1)*sim_param%dt, i=1,sim_param%n_timesteps ) /)
-allocate(sim_param%u_inf(3)) 
+allocate(sim_param%u_inf(3))
 sim_param%u_inf = uinf
 sim_param%P_inf = Pinf
 sim_param%rho_inf = rho
+sim_param%Re    = Re
+sim_param%Mach  = Mach
+sim_param%first_panel_scaling = wake_pan_scaling
 sim_param%debug_level = debug_level
 sim_param%basename = basename
 
@@ -269,11 +339,10 @@ call ignoredParameters(prms)
 
 call finalizeParameters(prms)
 
+
 !------ Initialization ------
 call printout(nl//'====== Initializing Wake ======')
-call initialize_wake_panels(wake_panels, geo, te, n_wake_panels)
-!Probably could be eliminated
-call prepare_wake_panels(wake_panels,  geo, dt, uinf)
+call initialize_wake_panels(wake_panels, geo, te, n_wake_panels, sim_param)
 
 call initialize_wake_rings(wake_rings, geo, n_wake_panels)
 
@@ -287,10 +356,18 @@ if(debug_level .ge. 1) then
   call printout(message)
 endif
 
+!------ Reloading ------
+if (restart) then
+ call load_solution(restart_file,geo%components)
+ call load_wake_panels(restart_file, wake_panels)
+ call load_wake_rings(restart_file, wake_rings)
+endif
+
 t22 = dust_time()
 write(message,'(A,F9.3,A)') nl//'------ Completed all preliminary operations &
                              &in: ' , t22 - t00,' s.'
 call printout(message)
+
 
 !====== Time Cycle ======
 time = tstart
@@ -322,13 +399,9 @@ do it = 1,nstep
 
 
   !------ Assemble the system ------
-  call prepare_wake_panels(wake_panels, geo, dt, uinf)
+  call prepare_wake_panels(wake_panels, geo, sim_param)
   t0 = dust_time()
 
-! !DEBUG
-! write(*,*) ' allocated(elems   ) , size(elems   ) : ' , allocated(elems   ) , size(elems   ) 
-! write(*,*) ' allocated(elems_ll) , size(elems_ll) : ' , allocated(elems_ll) , size(elems_ll) 
-! write(*,*) ' allocated(elems_ad) , size(elems_ad) : ' , allocated(elems_ad) , size(elems_ad) 
   call assemble_linsys(linsys, elems, elems_ll, elems_ad,  &
                        wake_panels, wake_rings, uinf)
   t1 = dust_time()
@@ -346,14 +419,14 @@ do it = 1,nstep
 
   !------ Solve the system ------
   t0 = dust_time()
-  if (linsys%rank .gt. 0) then 
+  if (linsys%rank .gt. 0) then
     call solve_linsys(linsys)
   endif
   t1 = dust_time()
 
   ! compute time derivative of the result ( = i_vortex = -i_doublet ) ----------
   do i_el = 1 , size(elems)
-    elems(i_el)%p%didou_dt = ( linsys%res(i_el) - res_old(i_el) ) / sim_param%dt 
+    elems(i_el)%p%didou_dt = ( linsys%res(i_el) - res_old(i_el) ) / sim_param%dt
   end do
   res_old = linsys%res
 
@@ -373,6 +446,7 @@ do it = 1,nstep
   ! vortex rings and 3d-panels
   do i_el = 1 , size(elems)
 !   call elems(i_el)%p%compute_cp(elems,uinf)       ! <--TODO: must become "old" as soon as possible
+
     call elems(i_el)%p%compute_pres(elems,sim_param)
     call elems(i_el)%p%compute_dforce(elems,sim_param)
   end do
@@ -397,8 +471,8 @@ do it = 1,nstep
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
   !  next iteration)
-  call update_wake_panels(wake_panels, elems_tot, wake_rings%pan_p, dt, uinf)
-  call update_wake_rings(wake_rings, elems_tot, wake_panels%pan_p, dt, uinf)
+  call update_wake_panels(wake_panels, elems_tot, wake_rings%pan_p, sim_param)
+  call update_wake_rings(wake_rings, elems_tot, wake_panels%pan_p, sim_param)
 
   time = min(tend, time+dt)
 
@@ -411,6 +485,7 @@ deallocate( res_old )
 !------ Cleanup ------
 call destroy_wake_panels(wake_panels)
 call destroy_linsys(linsys)
+call destroy_elements(geo)
 call destroy_geometry(geo, elems)
 
 call destroy_hdf5()
@@ -456,10 +531,10 @@ subroutine copy_geo(sim_param, geo_file, run_id)
  character(len=max_char_len) :: target_file
  integer :: estat, cstat
  integer(h5loc) :: floc
-  
+
   !target file name: same as run basename with appendix
   target_file = trim(sim_param%basename)//'_geo.h5'
- 
+
   !Copy the geometry file
   call execute_command_line('cp '//trim(geo_file)//' '//trim(target_file), &
                                            exitstat=estat,cmdstat=cstat)
@@ -552,13 +627,6 @@ subroutine output_status(elems_tot, geo, wake_panels, basename, it, t)
                     trim(basename)//'_res_'//trim(sit)//'.plt')
 
 
-  !=== Hdf5 output ===
-  !call new_hdf5_file(trim(basename)//'res_'//trim(sit)//'.h5',floc)
-  !call write_hdf5(time,'time',floc)
-  !call write_hdf5(geo%points,'points',floc)
-  !call write_hdf5(el,'elements',floc)
-
-  !call close_hdf5_file(floc)
   deallocate(el,w_el,w_points,w_res)
 
 end subroutine output_status

@@ -138,6 +138,10 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
  real(wp) , allocatable                   :: normalised_coord_e(:,:)
  real(wp) :: trac, radius
 
+ ! Section names for CGNS
+ integer :: nSections, iSection
+ character(len=max_char_len), allocatable :: sectionNamesCGNS(:)
+
  integer :: npoints_chord_tot, nelems_span, nelems_span_tot
  ! Connectivity and te structures 
  integer , allocatable :: neigh(:,:)
@@ -148,6 +152,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
  real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
 
  integer :: i1 , fid
+
+ !DEBUG
+ integer :: id1 , id2
 
  character(len=*), parameter :: this_sub_name = 'build_component'
 
@@ -177,6 +184,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
   call geo_prs%CreateRealOption('Radius', &
                'Radius of the rotor')
 
+  ! Section name from CGNS file
+  call geo_prs%CreateStringOption('SectionName', &
+               'Section name from CGNS file', multiple=.true.)
   
   !read the parameters
   call geo_prs%read_options(geo_file,printout_val=.false.)
@@ -208,9 +218,21 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
    case('basic')
     mesh_file = getstr(geo_prs,'MeshFile')
     call read_mesh_basic(trim(mesh_file),ee, rr)
+
    case('cgns')
     mesh_file = getstr(geo_prs,'MeshFile')
-    call read_mesh_cgns(trim(mesh_file),ee, rr)
+
+    ! Check the selection of mesh sections
+    nSections = countoption(geo_prs, 'SectionName')
+
+    allocate(sectionNamesCGNS(nSections))
+
+    do iSection = 1, nSections
+      sectionNamesCGNS(iSection) = trim(getstr(geo_prs, 'SectionName'))
+    enddo
+
+    call read_mesh_cgns(trim(mesh_file), sectionNamesCGNS,  ee, rr)
+
    case('parametric')
     mesh_file = geo_file
     if ( (ElType .eq. 'v') .or. (ElType .eq. 'p')  ) then

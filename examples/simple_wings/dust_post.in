@@ -1,0 +1,20 @@
+basename = Postprocessing/post
+data_basename = Output/wings
+
+Analysis = {
+  Name = v1
+  Type = Viz
+
+  Format = vtk
+  !Format = tecplot
+
+  StartRes = 1
+  EndRes = 61
+  StepRes = 1
+  Wake = T
+
+  Variable = Vort
+
+}
+
+

@@ -76,18 +76,21 @@ use mod_hdf5_io, only: &
    check_dset_hdf5
 
 use mod_geometry, only: &
-  t_geo
+  t_geo, t_geo_component
 
 use mod_wake_pan, only: &
   t_wake_panels
 
 use mod_wake_ring, only: &
   t_wake_rings
+
+use mod_stringtools, only: &
+  stricmp
 !----------------------------------------------------------------------
 
 implicit none
 
-public :: save_status
+public :: save_status, load_solution, load_time
 
 private
 
@@ -152,15 +155,15 @@ subroutine save_status(geo, wake_pan, wake_rin, sim_params, it, time, run_id)
     call new_hdf5_group(gloc2, 'Solution', gloc3)
 
     ne = size(geo%components(icomp)%el)
-    allocate(vort(ne), cp(ne) , pres(ne) , dforce(ne,3) )
+    allocate(vort(ne), cp(ne) , pres(ne) , dforce(3,ne) )
     do ie = 1,ne
      vort(ie) = geo%components(icomp)%el(ie)%idou
-     cp(ie) = geo%components(icomp)%el(ie)%cp
+     !cp(ie) = geo%components(icomp)%el(ie)%cp
      pres(ie) = geo%components(icomp)%el(ie)%pres
-     dforce(ie,:) = geo%components(icomp)%el(ie)%dforce
+     dforce(:,ie) = geo%components(icomp)%el(ie)%dforce
     enddo
     call write_hdf5(vort,'Vort',gloc3)
-    call write_hdf5(cp,'Cp',gloc3)
+    !call write_hdf5(cp,'Cp',gloc3)
     call write_hdf5(pres,'Pres',gloc3)
     call write_hdf5(dforce,'dF',gloc3)
     deallocate(vort, cp, pres, dforce)
@@ -227,6 +230,89 @@ subroutine save_status(geo, wake_pan, wake_rin, sim_params, it, time, run_id)
 
 
 end subroutine save_status
+
+!----------------------------------------------------------------------
+!> Load the solution from a pre-existent solution file
+!!
+!! Loads just the bodies solution, which is stored into the components,
+!! the loading of the wakes is left to other subroutines
+subroutine load_solution(filename,comps)
+ character(len=max_char_len), intent(in) :: filename
+ type(t_geo_component), intent(inout) :: comps(:)
+
+ integer(h5loc) :: floc, gloc1, gloc2, gloc3
+ integer :: ncomp, icomp, icomp2
+ integer :: ne, ie
+ character(len=max_char_len) :: comp_name_read, comp_id
+ real(wp), allocatable :: idou(:), pres(:), dF(:,:)
+ 
+
+ character(len=*), parameter :: this_sub_name = 'load_solution'
+
+  call open_hdf5_file(filename, floc)
+
+  !TODO: check the run id with the geo file
+  call open_hdf5_group(floc, 'Components', gloc1)
+  
+  !Check if the number of components is consistent
+  call read_hdf5(ncomp, 'NComponents', gloc1)
+  if(ncomp .ne. size(comps)) call error(this_sub_name, this_mod_name, &
+  'Mismatching number of components between geometry and solution files')
+
+  !Cycle on all the components on the file and then on all the local
+  !components: they come from different files and can be mixed up in the
+  !order
+  do icomp = 1, ncomp
+    write(comp_id,'(A,I3.3)')'Comp',icomp
+    call open_hdf5_group(gloc1, trim(comp_id), gloc2)
+
+    call read_hdf5(comp_name_read,'CompName',gloc2)
+    do icomp2 = 1,size(comps)
+      if (stricmp(comp_name_read, comps(icomp2)%comp_name)) then
+        !We found the correct local component, read all
+        call open_hdf5_group(gloc2, 'Solution', gloc3)
+        call read_hdf5_al(idou,'Vort',gloc3)
+        call read_hdf5_al(pres,'Pres',gloc3)
+        call read_hdf5_al(dF,'dF',gloc3)
+        call close_hdf5_group(gloc3)
+        ne = size(comps(icomp2)%el)
+        do ie =1,ne
+          comps(icomp2)%el(ie)%idou   = idou(ie)
+          comps(icomp2)%el(ie)%pres   = pres(ie)
+          comps(icomp2)%el(ie)%dforce = dF(:,ie)
+        enddo
+        deallocate(idou, pres, dF)
+        exit
+      endif
+
+    enddo
+
+    !If the component was not found there is a problem
+    if(icomp2 .gt. size(comps)) call error(this_sub_name, this_mod_name, &
+    'Component loaded from geometry file not found in result file')
+
+    call close_hdf5_group(gloc2)
+  enddo
+
+  call close_hdf5_group(gloc1)
+  call close_hdf5_file(floc)
+
+end subroutine load_solution
+
+!----------------------------------------------------------------------
+subroutine load_time(filename, time)
+ character(len=*), intent(in) :: filename
+ real(wp), intent(out) :: time
+
+ integer(h5loc) :: floc
+
+  call open_hdf5_file(filename, floc)
+
+  call read_hdf5(time,'time',floc)
+
+  call close_hdf5_file(floc)
+end subroutine load_time
+
 !----------------------------------------------------------------------
 
 end module mod_dust_io

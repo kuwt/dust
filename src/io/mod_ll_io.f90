@@ -169,6 +169,10 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
    
   nSections = countoption(pmesh_prs,'chord')
   nRegions  = countoption(pmesh_prs,'span')
+
+  !DEBUG
+  write(*,*) ' nSections : ' , nSections
+  write(*,*) ' nRegions  : ' , nRegions 
   
   ! Check that nSections = nRegion + 1
   if ( nSections .ne. nRegions + 1 ) then
@@ -230,9 +234,11 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 ! allocate(airfoil_table_p (2,npoint_span_tot)) ;
 ! allocate(normalised_coord_p(npoint_span_tot)) ; normalised_coord_p = 0.0_wp
 
-  ! Initialize the span division to the maximum dimension
+! ! Initialize the span division to the maximum dimension
   allocate(rrSection1(3,npoint_chord_tot)) ; rrSection1 = 0.0_wp
   allocate(rrSection2(3,npoint_chord_tot)) ; rrSection2 = 0.0_wp
+! allocate(rrSection1(3,nRegions)) ; rrSection1 = 0.0_wp
+! allocate(rrSection2(3,nRegions)) ; rrSection2 = 0.0_wp
 
   ! Initialise dr_ref for the definition of the actual reference_point 
   !  of each bay (by updating)
@@ -250,7 +256,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 ! check ----
     write(*,*) ' Region ' , iRegion , ' / ' , nRegions
 ! check ----
-  
+ 
     if ( iRegion .gt. 1 ) then  ! first section = last section of the previous region 
       rrSection1 = rrSection2
     else                        ! build points
@@ -276,8 +282,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     rrSection2(:,2) = rrSection2(:,1) + chord_list(iRegion+1) * &
               (/ cos(twist_list(iRegion+1)) , 0.0_wp , -sin(twist_list(iRegion+1)) /)
  
-    
- 
     ! Interpolation of the nodes of the region i (between sections i and i+1)
     do iSpan = 1 , nelem_span_list(iRegion)
       ista = iend + 1 
@@ -293,8 +297,10 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
       ! airfoil file and non-dimensional coordinate between two sections
       i_airfoil_e( 1,ich-1) = iRegion 
       i_airfoil_e( 2,ich-1) = iRegion+1
-      normalised_coord_e(2,ich-1) = ( rr(2,ista) - rrSection1(2,iRegion) ) / &
-                         ( rrSection2(2,iRegion) - rrSection1(2,iRegion) )
+!     normalised_coord_e(2,ich-1) = ( rr(2,ista) - rrSection1(2,iRegion) ) / &
+!                        ( rrSection2(2,iRegion) - rrSection1(2,iRegion) )
+      normalised_coord_e(2,ich-1) = ( rr(2,ista) - rrSection1(2,1) ) / &
+                         ( rrSection2(2,1) - rrSection1(2,1) )
       if ( iSpan .ne. 1 ) then ! else = 0.0_wp
         normalised_coord_e(1,ich-1) = normalised_coord_e(2,ich-2)
       end if

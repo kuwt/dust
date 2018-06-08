@@ -154,7 +154,7 @@ type :: t_parse
   integer              :: maxValueLen         !< maximal string length of the value of an option in the list
   character(len=max_char_len)   :: actualSection = ""  !< actual section, to set section of an option, when inserted into list
   logical              :: printout_val !< print the value when collected in the code or not
-  type(t_parse), pointer :: parent_parse => null()
+  class(t_parse), pointer :: parent_parse => null()
 contains
   procedure :: SetSection                 !< routine to set 'actualSection'
   procedure :: CreateOption               !< general routine to create a option and insert it into the linked list
@@ -294,7 +294,7 @@ subroutine CreateOption(this, opt, name, description, value, multiple)
  character(len=*),intent(in),optional  :: value       !< option value
  logical,intent(in),optional           :: multiple    !< marker if multiple option
 
- class(t_link), pointer :: newLink
+ type(t_link), pointer :: newLink
  character(len=*), parameter :: this_sub_name = 'CreateOption'
 
   opt%hasDefault = present(value)
@@ -526,7 +526,7 @@ function CountOption_(this, name) result(count)
  character(len=*),intent(in)     :: name  !< Search for this keyword in ini file
  integer                         :: count !< number of found occurences of keyword
  
- class(t_link),pointer :: current
+ type(t_link),pointer :: current
   count = 0
   ! iterate over all options and compare names
   current => this%firstLink
@@ -542,11 +542,11 @@ end function  CountOption_
 
 !> Insert a option in front of option with same name in the 'prms' linked list.
 subroutine insertOption(first, opt)
- class(t_link),pointer,intent(inout) :: first !< first item in linked list
+ type(t_link),pointer,intent(inout) :: first !< first item in linked list
  class(option),intent(in)       :: opt   !< option to be inserted
 
- class(t_link),pointer :: current
- class(t_link),pointer :: newLink
+ type(t_link),pointer :: current
+ type(t_link),pointer :: newLink
 
   current =>  first
   do while (associated(current%next))
@@ -623,8 +623,8 @@ subroutine read_options(this, filename, printout_val)
  logical, intent(in), optional :: printout_val !< set the print behaviour of the
                                            !! class, default true
 
- class(t_link), pointer  :: current
- class(t_link), pointer  :: prev_read
+ type(t_link), pointer  :: current
+ type(t_link), pointer  :: prev_read
  class(t_parse), pointer :: actually_reading, root_reading
  class(t_parse), pointer :: sub_option
  integer               :: stat,iniUnit!,iExt
@@ -748,12 +748,12 @@ function read_option(this, line, sub_option, prev_read) result(found)
  class(t_parse),intent(in)    :: this  !< class(t_parse)
  character(len=*),intent(in)  :: line  !< line to be parsed
  class(t_parse), pointer, intent(inout)  :: sub_option
- class(t_link), pointer, intent(inout) :: prev_read
+ type(t_link), pointer, intent(inout) :: prev_read
  logical                      :: found !< marker if option found
 
  character(len=max_char_len)           :: name
  character(len=max_char_len)           :: rest
- class(t_link), pointer         :: current
+ type(t_link), pointer         :: current
  class(option),allocatable    :: newopt
  !type(t_parse),allocatable,target    :: newparse
  integer                      :: i
@@ -837,8 +837,8 @@ end function read_option
 !subroutine check_arg_order(prms)
 ! class(t_parse),intent(in) :: prms  !< class(t_parse)
 !
-! class(t_link), pointer :: current
-! class(t_link), pointer :: prev, next
+! type(t_link), pointer :: current
+! type(t_link), pointer :: prev, next
 !
 ! current => prms%firstLink
 !
@@ -867,7 +867,7 @@ end function read_option
 !! is checked if the previous or next option actually introduced int the input 
 !! file is coherent with the required prev_opt or next_opt
 subroutine check_opt_consistency(olink, prev, prev_opt, next, next_opt)
- class(t_link), intent(in) :: olink
+ type(t_link), intent(in) :: olink
  logical, intent(in), optional :: prev
  character(len=*), intent(in), optional :: prev_opt
  logical, intent(in), optional :: next
@@ -912,7 +912,7 @@ end subroutine check_opt_consistency
 subroutine print_parse_debug(prms)
  class(t_parse),intent(in) :: prms  !< class(t_parse)
 
- class(t_link),pointer :: current
+ type(t_link),pointer :: current
 
   write(*,*) 'List of option: '
   current => prms%firstLink
@@ -935,7 +935,7 @@ end subroutine print_parse_debug
 subroutine IgnoredParameters(prms)
  class(t_parse),intent(in) :: prms  !< class(t_parse)
 
- class(t_link), pointer :: current
+ type(t_link), pointer :: current
  logical              :: prms_ignored
 
   !1) chech if some of the parameters were not collected
@@ -982,7 +982,7 @@ use MOD_StringTools ,only: stricmp
  logical,intent(in)   :: markdown  !< marker whether markdown format is used for output
  character(len=max_char_len)   :: name      !< for this parameter help is printed. If empty print all.
 
- class(t_link), pointer   :: current
+ type(t_link), pointer   :: current
  class(option), pointer :: currentOpt
  integer                :: maxNameLen
  integer                :: maxValueLen
@@ -1161,7 +1161,7 @@ use MOD_Options
  type(t_link), intent(out), pointer, optional :: olink   !< link to the option
  class(*)                             :: value    !< parameter value
 
- class(t_link),pointer   :: current
+ type(t_link),pointer   :: current
  class(Option),pointer :: opt
  character(len=max_char_len)    :: proposal_loc
  character(len=*), parameter :: this_sub_name = 'GetGeneralOption'
@@ -1246,7 +1246,7 @@ use MOD_Options
  type(t_link), intent(out), pointer, optional :: olink   !< link to the option
  class(*)                             :: value(no) !< parameter value
 
- class(t_link),pointer   :: current
+ type(t_link),pointer   :: current
  class(Option),pointer :: opt
  character(len=max_char_len)    :: proposal_loc
  character(len=*), parameter :: this_sub_name = 'GetGeneralArrayOption'
@@ -1357,7 +1357,7 @@ subroutine getsuboption(prms, name, value, olink) !result(value)
  type(t_link), intent(out), pointer, optional :: olink   !< link to the option
  type(t_parse), pointer, intent(out)         :: value    !< parameter value
 
- class(t_link),pointer   :: current
+ type(t_link),pointer   :: current
  class(Option),pointer :: opt
  !character(len=max_char_len)    :: proposal_loc
  character(len=*), parameter :: this_sub_name = 'GetSubOption'
@@ -1521,7 +1521,7 @@ function getdescription(prms,name) result(description)
  character(len=*),intent(in)          :: name        !< parameter name
  character(len=1000)                  :: description !< description
 
- class(t_link),pointer :: current
+ type(t_link),pointer :: current
 
   ! iterate over all options and compare names
   current => prms%firstLink
@@ -1549,7 +1549,7 @@ use MOD_StringTools ,only: isint, stricmp
  character(len=*),intent(in)   :: name        !< parameter name
  integer                       :: value       !< return value
 
- class(t_link),pointer           :: current
+ type(t_link),pointer           :: current
  class(Option),pointer         :: opt
  integer                       :: i
  logical                       :: found
@@ -1624,7 +1624,7 @@ subroutine addStrListEntry(prms, name,string_in,int_in)
  character(len=*),intent(in)    :: string_in !< (in) string used for the option value
  integer         ,intent(in)    :: int_in    !< (in) integer used internally for the option value
 
- class(t_link), pointer           :: current
+ type(t_link), pointer           :: current
  class(option),pointer          :: opt
  integer                        :: listSize         ! current size of list
  character(len=max_char_len),allocatable :: strListTmp(:)    ! temporary string list
@@ -1695,7 +1695,7 @@ end subroutine addStrListEntry
 recursive subroutine FinalizeParameters(prms)
  class(t_parse),intent(in) :: prms  !< class(t_parse)
 
- class(t_link), pointer         :: current, tmp
+ type(t_link), pointer         :: current, tmp
 
   current => prms%firstLink
   do while (associated(current%next))

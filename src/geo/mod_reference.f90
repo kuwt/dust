@@ -61,7 +61,7 @@ use mod_math, only: &
   linear_interp, cross
 
 use mod_param, only: &
-  wp, eps, max_char_len, nl
+  wp, eps, max_char_len, nl , pi
 
 use mod_sim_param, only: &
   t_sim_param
@@ -258,7 +258,7 @@ subroutine build_references(refs, reference_file, sim_param)
 
  type(t_ref), allocatable :: refs_temp(:)
  type(t_parse) :: ref_prs
- type(t_parse), pointer :: sbprms , sbprms_pol , sbprms_rot 
+ type(t_parse), pointer :: sbprms , sbprms_pol , sbprms_rot , sbprms_hin 
  integer :: n_refs, n_refs_input
  integer :: n_mult_refs
  integer :: iref, iref_input, iref2, i_mult_ref
@@ -266,7 +266,8 @@ subroutine build_references(refs, reference_file, sim_param)
  character(len=max_char_len) :: msg
  integer :: prev_id
  type(t_link), pointer :: lnk
- real(wp), allocatable :: psi_0(:)
+!real(wp), allocatable :: psi_0(:)     ! psi_0 *****
+ real(wp) :: psi_0
  real(wp) :: hub_offset, norm(3), rot_axis(3), rot_rate
  integer :: n_in, n_mov, n_mult
 
@@ -286,6 +287,13 @@ subroutine build_references(refs, reference_file, sim_param)
  real(wp) :: rot_amp, rot_ome, rot_pha, rot_off, rot_pos0
  integer :: it , nt
  character(len=max_char_len) :: ref_tag_str
+ ! complex multiple components -----
+ integer :: i_mult_blades , n_mult_blades , count_dofs
+ integer :: hub_id , body_id , hin_id
+ integer :: i_dof , n_dofs
+ character(len=max_char_len), allocatable :: hinge_type(:)
+ real(wp) , allocatable :: hinge_offs(:,:) , hinge_coll(:) , hinge_cyAm(:) , hinge_cyPh(:)
+ 
  integer :: i1
 
   !Define all the parameters to be read
@@ -338,13 +346,13 @@ subroutine build_references(refs, reference_file, sim_param)
                                                              &simple_function')
   ! TODO: add %CreateStrinArrayOption(...) to options/mod_parse.f90
   call sbprms_rot%CreateIntOption('Function','fun definition.&
-                                                         0:constant,1:sin,...')
+                                                    &0:constant,1:sin,...')
   call sbprms_rot%CreateStringOption('File','file .dat containing the motion')
   call sbprms_rot%CreateRealArrayOption('Axis','axis of rotation')
   call sbprms_rot%CreateRealOption('Amplitude','Multiplicative factor for &
                                                   &the motion, default 1','1')
   call sbprms_rot%CreateRealOption('Omega','Pulsation of the motion for &
-                                            &each coordinate, default 1','1.0')
+                                          &each coordinate, default 1','1.0')
   call sbprms_rot%CreateRealOption('Phase','Phase of the motion &
                             &each coordinate, default 0','0.0')
   call sbprms_rot%CreateRealOption('Offset','Offset of the motion &
@@ -361,11 +369,24 @@ subroutine build_references(refs, reference_file, sim_param)
                 sbprms, multiple=.true.)
   call sbprms%CreateStringOption('MultType','Kind of multiplicity')
   call sbprms%CreateIntOption('N_Frames', 'Number of reference frames')
+  call sbprms%CreateIntOption('N_Blades', 'Number of reference repeated structures,&
+               & blades or whatever')
   call sbprms%CreateRealArrayOption('Rot_Axis','Axis of rotation in parent &
                &reference frame')
   call sbprms%CreateRealOption('Hub_Offset','Offset from the pole')
   call sbprms%CreateRealOption('Rot_Rate','Rate of rotation around axis')
-  call sbprms%CreateRealArrayOption('Psi_0','Starting rotation angle') 
+  call sbprms%CreateRealOption('Psi_0','Starting rotation angle') 
+  call sbprms%CreateIntOption('N_Dofs', 'Number of dofs for each blade')
+  ! for complex rotor configurations ---------
+  call sbprms%CreateSubOption('Dof','Definition of a hinge dof',&
+                 sbprms_hin,multiple=.true.)
+  call sbprms_hin%CreateStringOption('Hinge_Type','Char to define the rotation axis: &
+                   & it can be Flap, Pitch, Lag')
+  call sbprms_hin%CreateRealArrayOption('Hinge_Offset','Position of the hinge')
+  call sbprms_hin%CreateRealOption('Collective','Amplitude of the collective motion')
+  call sbprms_hin%CreateRealOption('Cyclic_Ampl','Amplitude of the cyclic motion')
+  call sbprms_hin%CreateRealOption('Cyclic_Phas','Phase of the cyclic motion')
+
   ! End Multiple sub-parser -------------------------------------------
  
  
@@ -512,6 +533,8 @@ subroutine build_references(refs, reference_file, sim_param)
               allocate(refs(iref)%pol_tim(  sim_param%n_timesteps)) 
 
               ! Read the integer id for the user defined functions 0:constant,1:sin              
+              allocate(pol_fun_int(3), pol_vec(3), pol_ome(3), &
+                       pol_pha(3), pol_off(3))
               pol_fun_int = getintarray(sbprms_pol,'Function',3)
               pol_amp = getreal(sbprms_pol,'Amplitude')
               pol_vec = getrealarray(sbprms_pol,'Vector',3)
@@ -545,6 +568,7 @@ subroutine build_references(refs, reference_file, sim_param)
                   &'. It must be 0:constant or 1:sin')
                 end if
               end do
+              deallocate(pol_fun_int, pol_vec, pol_ome, pol_pha, pol_off)
 
             case default
               write(ref_tag_str,'(I5)') refs(iref)%tag
@@ -759,9 +783,9 @@ subroutine build_references(refs, reference_file, sim_param)
                 end do
 
               elseif ( rot_fun_int .eq. 1 ) then ! sin function
-                  refs(iref)%rot_vel(1) = rot_amp * &
-                     sin( rot_ome * refs(iref)%rot_tim(1) - rot_pha ) + rot_off
-                  refs(iref)%rot_pos(1) = rot_pos0  ! Initial condition ...
+                refs(iref)%rot_vel(1) = rot_amp * &
+                   sin( rot_ome * refs(iref)%rot_tim(1) - rot_pha ) + rot_off
+                refs(iref)%rot_pos(1) = rot_pos0  ! Initial condition ...
                 do it = 2 , sim_param%n_timesteps 
                   refs(iref)%rot_vel(it) = rot_amp * &
                      sin( rot_ome * refs(iref)%rot_tim(it) - rot_pha ) + &
@@ -940,6 +964,7 @@ subroutine build_references(refs, reference_file, sim_param)
       refs(iref)%mult_type = trim(getstr(sbprms,'MultType'))
 
       select case(trim(refs(iref)%mult_type))
+       ! ++++++++++++++++++++++ Simple rotor ++++++++++++++++++++++++
        case('simple_rotor')
 
         n_mult_refs = getint(sbprms,'N_Frames')
@@ -955,10 +980,10 @@ subroutine build_references(refs, reference_file, sim_param)
 
 
         !2) Read the inputs
-        allocate( psi_0(n_mult_refs))
+!       allocate( psi_0(n_mult_refs))     ! psi_0 *****
         rot_axis = getrealarray(sbprms,'Rot_Axis',3)
         rot_rate = getreal(sbprms,'Rot_Rate')
-        psi_0 = getrealarray(sbprms,'Psi_0',n_mult_refs)
+        psi_0 = getreal(sbprms,'Psi_0')
         hub_offset = getreal(sbprms,'Hub_Offset')
 
 
@@ -976,8 +1001,8 @@ subroutine build_references(refs, reference_file, sim_param)
           refs(iref)%axis  = rot_axis
           refs(iref)%pole  = (/0.0_wp, 0.0_wp, 0.0_wp/)
           refs(iref)%Omega = rot_rate
-          refs(iref)%psi_0 = psi_0(i_mult_ref)
-          norm = cross(refs(iref)%axis,(/0.0_wp, 1.0_wp, 0.0_wp/))
+          refs(iref)%psi_0 = psi_0 - 2*pi*(i_mult_ref-1)/n_mult_refs    ! psi_0(i_mult_ref)     ! psi_0 *****
+          norm = -cross(refs(iref)%axis,(/0.0_wp, 1.0_wp, 0.0_wp/))
           if (norm2(norm) .le. eps) &
             norm = cross(refs(iref)%axis,(/1.0_wp, 0.0_wp, 0.0_wp/))
           refs(iref)%orig = hub_offset * norm/norm2(norm)
@@ -1001,7 +1026,7 @@ subroutine build_references(refs, reference_file, sim_param)
             refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
             refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
             refs(iref)%rot_pos(  it) = refs(iref)%psi_0 + &
-                 refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1)  )    ! <---- CHECK !!!!
+                 refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1) )    ! <---- CHECK !!!!
             refs(iref)%rot_vel(  it) = refs(iref)%Omega
             refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
           end do 
@@ -1009,7 +1034,239 @@ subroutine build_references(refs, reference_file, sim_param)
           refs(iref)%orig_pol_0 = refs(iref)%orig - refs(iref)%pol_pos(:,1)
 
         enddo
-        deallocate(psi_0)
+!       deallocate(psi_0)     ! psi_0 *****
+       ! ++++++++++++++++++++++     Rotor    ++++++++++++++++++++++++
+       case('rotor')
+      
+         n_mult_blades = getint(sbprms,'N_Blades')
+         refs(iref)%n_mult = n_mult_blades
+         n_dofs   = getint(sbprms,'N_Dofs')
+
+         if ( n_dofs .lt. 0 ) then
+           call warning(this_sub_name, this_mod_name, ' Warning in the input file&
+                  & N_Dofs is set to 0, since it was .lt. 0')
+           n_dofs = 0
+         end if
+         ! check if countoption(Dof) .eq. N_Dofs
+         count_dofs = countoption(sbprms,'Dof')
+         if ( count_dofs .ne. n_dofs ) then
+           write(*,*) " countoption (...,'Dof') = " , count_dofs
+           write(*,*) " n_dofs                  = " , n_dofs
+           call error(this_sub_name, this_mod_name, ' Error in the input file&
+                  & of the Reference systems (References.in?): number of Dof&
+                  & fields .ne. N_Dofs')
+         end if
+
+         !CHECK
+         write(*,*) ' N_Blades : ' , n_mult_blades
+         write(*,*) ' N_Dofs   : ' , n_dofs
+
+
+         !1) allocate a series of extra reference frames and move-alloc everything
+         n_refs = n_refs+n_mult_blades*(n_dofs+1)
+         !allocate(refs_temp(0:n_refs+n_mult_refs))
+         allocate(refs_temp(0:n_refs))
+         refs_temp(0:iref) = refs(0:iref)
+         deallocate(refs)
+         call move_alloc(refs_temp, refs)
+
+         !2) Read the inputs
+         rot_axis = getrealarray(sbprms,'Rot_Axis',3)
+         rot_rate = getreal(sbprms,'Rot_Rate')
+         psi_0 = getreal(sbprms,'Psi_0')
+         hub_offset = getreal(sbprms,'Hub_Offset')
+
+         ! read and allocate some tmp arrays to describe the motion around the hinges
+         if ( n_dofs .gt. 0 ) then
+           allocate(hinge_type(n_dofs  )) 
+           allocate(hinge_offs(n_dofs,3)) ; hinge_offs = 0.0_wp 
+           allocate(hinge_coll(n_dofs  )) ; hinge_coll = 0.0_wp
+           allocate(hinge_cyAm(n_dofs  )) ; hinge_cyAm = 0.0_wp
+           allocate(hinge_cyPh(n_dofs  )) ; hinge_cyPh = 0.0_wp
+           do i_dof = 1 , n_dofs
+             call getsuboption(sbprms,'Dof',sbprms_hin)
+             hinge_type(i_dof  ) = getstr(sbprms_hin,'Hinge_Type') 
+             hinge_offs(i_dof,:) = getrealarray(sbprms_hin,'Hinge_Offset',3)
+             hinge_coll(i_dof  ) = getreal(sbprms_hin,'Collective') 
+             hinge_cyAm(i_dof  ) = getreal(sbprms_hin,'Cyclic_Ampl') 
+             hinge_cyPh(i_dof  ) = getreal(sbprms_hin,'Cyclic_Phas') 
+
+             ! from deg to rad
+             hinge_coll(i_dof) = hinge_coll(i_dof) * pi / 180.0_wp
+             hinge_cyAm(i_dof) = hinge_cyAm(i_dof) * pi / 180.0_wp
+             hinge_cyPh(i_dof) = hinge_cyPh(i_dof) * pi / 180.0_wp
+
+             !CHECK
+             write(*,*) ' i_dof : ' , i_dof
+             write(*,*) ' Hinge_Type   : ' , trim(hinge_type(i_dof))
+             write(*,*) ' Hinge_Offset : ' , hinge_offs(i_dof,:)
+             write(*,*) ' Collective   : ' , hinge_coll(i_dof)
+             write(*,*) ' Cyclic_Ampl  : ' , hinge_cyAm(i_dof)
+             write(*,*) ' Cyclic_Phas  : ' , hinge_cyPh(i_dof)
+             write(*,*)
+
+           end do
+         end if
+
+         !3) for each new reference insert all the parameters
+         hub_id = refs(iref)%id
+         do i_mult_blades = 1 , n_mult_blades ! loop over the blades
+           ! i_dof=0, rotation around the axis
+           ! i_dof=1:n_dofs, hinge dofs
+           do i_dof = 0 , n_dofs ! loop over the dofs
+
+             prev_id = refs(iref)%id
+
+             iref = iref + 1
+             refs(iref)%id = iref 
+
+             ! tag of the ref.sys.----
+             ! for the postpro, the "last" ref.sys. must be <hub_refsys>__<i_mult_blades>
+             !TODO: rationalise tag logics (driven by postpro routines)
+             if ( i_dof .eq. n_dofs ) then
+!              ! double underscore for the last dof
+!              write(msg,'(A,I2.2,A,I2.2)') trim(refs(hub_id)%tag)//'__Body',i_mult_blades, &
+!                         '_Mov',i_dof
+               write(msg,'(A,I2.2)') trim(refs(hub_id)%tag)//'__',i_mult_blades
+             else
+               write(msg,'(A,I2.2,A,I2.2)') trim(refs(hub_id)%tag)//'_Body',i_mult_blades, &
+                          '_Mov',i_dof
+             end if
+             refs(iref)%tag = trim(msg)
+
+             if ( i_dof .eq. 0 ) then
+               refs(iref)%parent_tag = trim(refs(hub_id)%tag)
+             else 
+               refs(iref)%parent_tag = trim(refs(prev_id)%tag)
+             end if
+
+             ! n_chil: initialisation only
+             refs(iref)%n_chil = 0 
+!            if ( i_dof .eq. n_dofs ) refs(iref)%n_chil = 0 
+
+             ! if ( i_dof .eq. 0 ) ---> rotation of the body around the rotor axis
+             !   --> constant rotation
+             ! if ( i_dof .ge. 1 ) ---> rotation of the body around the hinges 
+             !   --> harmonic rotation
+             if ( i_dof .eq. 0 ) then ! constant rotation around the rotor axis 
+
+               allocate(refs(iref)%pole(3), refs(iref)%axis(3))
+               allocate(refs(iref)%orig(3), refs(iref)%frame(3,3))
+               refs(iref)%axis  = rot_axis
+               refs(iref)%pole  = (/0.0_wp, 0.0_wp, 0.0_wp/)
+               refs(iref)%Omega = rot_rate
+               refs(iref)%psi_0 = psi_0 - 2*pi*(i_mult_blades-1)/n_mult_blades
+               !TODO: check the norm vector to define an origin of the psi angle 
+               norm = -cross(refs(iref)%axis,(/0.0_wp, 1.0_wp, 0.0_wp/))
+               if (norm2(norm) .le. eps) &
+                 norm = cross(refs(iref)%axis,(/1.0_wp, 0.0_wp, 0.0_wp/))
+               refs(iref)%orig = hub_offset * norm/norm2(norm)
+               refs(iref)%frame(1:3,3) = refs(iref)%axis/norm2(refs(iref)%axis)
+               refs(iref)%frame(1:3,2) = norm/norm2(norm)
+               refs(iref)%frame(1:3,1) = cross(refs(iref)%frame(1:3,2), &
+                                               refs(iref)%frame(1:3,3))
+               !allocated here, will be set in update_all_refs
+               allocate(refs(iref)%of_g(3), refs(iref)%R_g(3,3))
+               refs(iref)%self_moving = .true.
+               refs(iref)%moving = .false. !standard, will be checked later
+
+               allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps)) 
+               allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps)) 
+               allocate(refs(iref)%pol_tim(  sim_param%n_timesteps)) 
+               allocate(refs(iref)%rot_pos(  sim_param%n_timesteps)) 
+               allocate(refs(iref)%rot_vel(  sim_param%n_timesteps)) 
+               allocate(refs(iref)%rot_tim(  sim_param%n_timesteps)) 
+               do it = 1,sim_param%n_timesteps
+                 refs(iref)%pol_pos(:,it) = refs(iref)%pole
+                 refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
+                 refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
+                 refs(iref)%rot_pos(  it) = refs(iref)%psi_0 + &
+                      refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1) )  ! <---- CHECK !!!!
+                 refs(iref)%rot_vel(  it) = refs(iref)%Omega
+                 refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
+               end do
+ 
+               allocate(refs(iref)%orig_pol_0(3))
+               refs(iref)%orig_pol_0 = refs(iref)%orig - refs(iref)%pol_pos(:,1)
+
+             else ! harmonic rotation around the hinge axis 
+
+               allocate(refs(iref)%pole(3), refs(iref)%axis(3))
+               allocate(refs(iref)%orig(3), refs(iref)%frame(3,3))
+               if ( trim(hinge_type(i_dof)) .eq. 'Flap' ) then
+                 refs(iref)%axis  = (/ 1.0 , 0.0 , 0.0 /)
+               else if ( trim(hinge_type(i_dof)) .eq. 'Pitch' ) then
+                 refs(iref)%axis  = (/ 0.0 , 1.0 , 0.0 /)
+               else if ( trim(hinge_type(i_dof)) .eq. 'Lag' ) then
+                 refs(iref)%axis  = (/ 0.0 , 0.0 , 1.0 /)
+               else
+                 call error(this_sub_name, this_mod_name, 'Unknown hinge type:&
+                      & it must be: Flap, Pitch ot Lag')
+               end if
+               refs(iref)%pole  = hinge_offs(i_dof,:) ! (/ 0.0_wp , 0.0_wp , 0.0_wp /) ! *******
+               refs(iref)%Omega = rot_rate
+               refs(iref)%psi_0 = psi_0 - 2*pi*(i_mult_blades-1)/n_mult_blades
+
+               ! position of the hinge. 
+               ! Orientation is described by the motion only (frame = eye(3))
+               refs(iref)%orig =  hinge_offs(i_dof,:) ! hinge_offs(i_dof,:) ! *******
+               refs(iref)%frame(1:3,1) = (/ 1.0_wp , 0.0_wp , 0.0_wp /)
+               refs(iref)%frame(1:3,2) = (/ 0.0_wp , 1.0_wp , 0.0_wp /)
+               refs(iref)%frame(1:3,3) = (/ 0.0_wp , 0.0_wp , 1.0_wp /)
+
+               !allocated here, will be set in update_all_refs
+               allocate(refs(iref)%of_g(3), refs(iref)%R_g(3,3))
+               refs(iref)%self_moving = .true.
+               refs(iref)%moving = .false. !standard, will be checked later
+
+               allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps)) 
+               allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps)) 
+               allocate(refs(iref)%pol_tim(  sim_param%n_timesteps)) 
+               allocate(refs(iref)%rot_pos(  sim_param%n_timesteps)) 
+               allocate(refs(iref)%rot_vel(  sim_param%n_timesteps)) 
+               allocate(refs(iref)%rot_tim(  sim_param%n_timesteps)) 
+
+               do it = 1,sim_param%n_timesteps
+                 ! position of the pole ---------
+                 refs(iref)%pol_pos(:,it) = refs(iref)%pole
+                 refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
+                 refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
+                 ! rotation ---------------------
+                 refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
+                 if ( refs(iref)%Omega .ne. 0 ) then
+                   refs(iref)%rot_pos(  it) = hinge_coll(i_dof) + hinge_cyAm(i_dof) * &
+                      cos( refs(iref)%Omega * refs(iref)%rot_tim(it) &
+                         + refs(iref)%psi_0 - hinge_cyPh(i_dof) )
+                   refs(iref)%rot_vel(  it) = -refs(iref)%Omega * hinge_cyAm(i_dof) * &
+                      sin( refs(iref)%Omega * refs(iref)%rot_tim(it) &
+                         + refs(iref)%psi_0 - hinge_cyPh(i_dof) )
+                 else
+                   refs(iref)%rot_pos(  it) = hinge_coll(i_dof) 
+                   refs(iref)%rot_vel(  it) = 0.0_wp
+                 end if
+               end do
+
+               allocate(refs(iref)%orig_pol_0(3))
+               refs(iref)%orig_pol_0 = refs(iref)%orig - refs(iref)%pol_pos(:,1)
+
+             end if
+
+   
+           end do ! loop over the dofs
+           
+           !
+         end do ! loop over the blades
+
+         if ( n_dofs .gt. 0 ) then
+           deallocate(hinge_type) 
+           deallocate(hinge_offs)
+           deallocate(hinge_coll)
+           deallocate(hinge_cyAm)
+           deallocate(hinge_cyPh)
+         end if
+
+
+       ! ++++++++++++++++++++++    Default   ++++++++++++++++++++++++
        case default
          call error(this_sub_name, this_mod_name, 'Unknown type of movement')
       end select
