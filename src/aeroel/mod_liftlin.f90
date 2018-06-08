@@ -4,7 +4,7 @@
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -13,10 +13,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -25,22 +25,22 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@polimi.it>
 !!          Davide Montagnani       <davide.montagnani@polimi.it>
 !!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
 !!=====================================================================
 
-!> Module containing the specific subroutines for the lifting line 
+!> Module containing the specific subroutines for the lifting line
 !! type of aerodynamic elements
 module mod_liftlin
 
 use mod_param, only: &
-  wp, pi
+  wp, pi, max_char_len
 
 use mod_handling, only: &
-  error
+  error, printout
 
 use mod_doublet, only: &
   potential_calc_doublet , &
@@ -96,6 +96,7 @@ integer :: it=0
 contains
 !----------------------------------------------------------------------
 
+!> Not present for this element
 subroutine build_row_liftlin (this, elems, linsys, uinf, ie, ista, iend)
  class(t_liftlin), intent(inout) :: this
  type(t_elem_p), intent(in)       :: elems(:)
@@ -104,15 +105,17 @@ subroutine build_row_liftlin (this, elems, linsys, uinf, ie, ista, iend)
  integer, intent(in)              :: ie
  integer, intent(in)              :: ista, iend
  character(len=*), parameter      :: this_sub_name='build_row_liftlin'
- 
+
   call error(this_sub_name, this_mod_name, 'This was not supposed to &
   &happen, a team of professionals is underway to remove the evidence')
- 
+
 end subroutine build_row_liftlin
 
 !----------------------------------------------------------------------
 
-subroutine build_row_static_liftlin (this, elems, ll_elems, ad_elems, linsys, uinf, ie, ista, iend)
+!> Not present for this element
+subroutine build_row_static_liftlin (this, elems, ll_elems, ad_elems, &
+                                     linsys, uinf, ie, ista, iend)
  class(t_liftlin), intent(inout) :: this
  type(t_elem_p), intent(in)       :: elems(:)
  type(t_elem_p), intent(in)       :: ll_elems(:)
@@ -122,7 +125,7 @@ subroutine build_row_static_liftlin (this, elems, ll_elems, ad_elems, linsys, ui
  integer, intent(in)              :: ie
  integer, intent(in)              :: ista, iend
  character(len=*), parameter      :: this_sub_name='build_row_static_liftlin'
- 
+
   call error(this_sub_name, this_mod_name, 'This was not supposed to &
   &happen, a team of professionals is underway to remove the evidence')
 
@@ -130,6 +133,7 @@ end subroutine build_row_static_liftlin
 
 !----------------------------------------------------------------------
 
+!> Not present for this element
 subroutine add_wake_liftlin (this, wake_elems, impl_wake_ind, linsys, uinf, &
                              ie, ista, iend)
  class(t_liftlin), intent(inout) :: this
@@ -141,7 +145,7 @@ subroutine add_wake_liftlin (this, wake_elems, impl_wake_ind, linsys, uinf, &
  integer, intent(in)             :: ista
  integer, intent(in)             :: iend
  character(len=*), parameter      :: this_sub_name='add_wake_liftlin'
- 
+
   call error(this_sub_name, this_mod_name, 'This was not supposed to &
   &happen, a team of professionals is underway to remove the evidence')
 
@@ -149,8 +153,9 @@ end subroutine add_wake_liftlin
 
 !----------------------------------------------------------------------
 
+!> Not present for this element
 subroutine add_liftlin_liftlin (this, ll_elems, linsys, uinf, &
-                             ie, ista, iend)
+                                ie, ista, iend)
  class(t_liftlin), intent(inout) :: this
  type(t_elem_p), intent(in)      :: ll_elems(:)
  type(t_linsys), intent(inout)   :: linsys
@@ -159,7 +164,7 @@ subroutine add_liftlin_liftlin (this, ll_elems, linsys, uinf, &
  integer, intent(in)             :: ista
  integer, intent(in)             :: iend
  character(len=*), parameter      :: this_sub_name='add_liftlin_liftlin'
- 
+
   call error(this_sub_name, this_mod_name, 'This was not supposed to &
   &happen, a team of professionals is underway to remove the evidence')
 
@@ -167,6 +172,7 @@ end subroutine add_liftlin_liftlin
 
 !----------------------------------------------------------------------
 
+!> Not present for this element
 subroutine add_actdisk_liftlin (this, ad_elems, linsys, uinf, &
                              ie, ista, iend)
  class(t_liftlin), intent(inout) :: this
@@ -177,7 +183,7 @@ subroutine add_actdisk_liftlin (this, ad_elems, linsys, uinf, &
  integer, intent(in)             :: ista
  integer, intent(in)             :: iend
  character(len=*), parameter      :: this_sub_name='add_actdisk_liftlin'
- 
+
   call error(this_sub_name, this_mod_name, 'This was not supposed to &
   &happen, a team of professionals is underway to remove the evidence')
 
@@ -185,6 +191,11 @@ end subroutine add_actdisk_liftlin
 
 !----------------------------------------------------------------------
 
+!> Compute the potential due to a lifting line
+!!
+!! this subroutine employs doublets  to calculate
+!! the AIC of a lifting line on a surface panel, adding the contribution
+!! to an equation for the potential.
 subroutine compute_pot_liftlin (this, A, b, pos,i,j)
  class(t_liftlin), intent(inout) :: this
  real(wp), intent(out) :: A
@@ -209,6 +220,11 @@ end subroutine compute_pot_liftlin
 
 !----------------------------------------------------------------------
 
+!> Compute the velocity due to a lifting line
+!!
+!! This subroutine employs doublets basic subroutines to calculate
+!! the AIC coefficients of a lifting line to a vortex ring, adding
+!! the contribution to an equation for the velocity
 subroutine compute_psi_liftlin (this, A, b, pos, nor, i, j )
  class(t_liftlin), intent(inout) :: this
  real(wp), intent(out) :: A
@@ -217,7 +233,7 @@ subroutine compute_psi_liftlin (this, A, b, pos, nor, i, j )
  real(wp), intent(in) :: nor(:)
  integer , intent(in) :: i , j
 
- real(wp) :: vdou(3) 
+ real(wp) :: vdou(3)
 
   call velocity_calc_doublet(this, vdou, pos)
 
@@ -235,6 +251,12 @@ subroutine compute_psi_liftlin (this, A, b, pos, nor, i, j )
 end subroutine compute_psi_liftlin
 
 !----------------------------------------------------------------------
+
+!> Compute the velocity induced by a lifting line in a prescribed position
+!!
+!! WARNING: the velocity calculated, to be consistent with the formulation of
+!! the equations is multiplied by 4*pi, to obtain the actual velocity the
+!! result of the present subroutine MUST be DIVIDED by 4*pi
 subroutine compute_vel_liftlin (this, pos, uinf, vel)
  class(t_liftlin), intent(inout) :: this
  real(wp), intent(in) :: pos(:)
@@ -260,57 +282,64 @@ subroutine compute_cp_liftlin (this, elems, uinf)
  real(wp), intent(in) :: uinf(:)
 
  character(len=*), parameter      :: this_sub_name='compute_cp_liftlin'
- 
+
   call error(this_sub_name, this_mod_name, 'This was not supposed to &
   &happen, a team of professionals is underway to remove the evidence')
-  
+
 !! only steady loads: steady data from table: L -> gam -> p_equiv
 !this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &
 !        norm2(uinf - this%ub) * this%dy / this%area * &
-!             elems(this%id)%p%idou  
+!             elems(this%id)%p%idou
 
-end subroutine compute_cp_liftlin 
+end subroutine compute_cp_liftlin
 
 !----------------------------------------------------------------------
 
+!> The computation of the pressure in the lifting line is not meant to
+!! happen, loads are retrieved from the tables
 subroutine compute_pres_liftlin (this, elems, sim_param)
  class(t_liftlin), intent(inout) :: this
  type(t_elem_p), intent(in) :: elems(:)
  type(t_sim_param), intent(in) :: sim_param
 
  character(len=*), parameter      :: this_sub_name='compute_pres_liftlin'
- 
+
   call error(this_sub_name, this_mod_name, 'This was not supposed to &
   &happen, a team of professionals is underway to remove the evidence')
-  
+
 !! only steady loads: steady data from table: L -> gam -> p_equiv
 !this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &
 !        norm2(uinf - this%ub) * this%dy / this%area * &
-!             elems(this%id)%p%idou  
+!             elems(this%id)%p%idou
 
-end subroutine compute_pres_liftlin 
+end subroutine compute_pres_liftlin
 
 !----------------------------------------------------------------------
 
+!> The computation of loads happens in solve_liftlin and not in
+!! this subroutine, which is not used
 subroutine compute_dforce_liftlin (this, elems, sim_param)
  class(t_liftlin), intent(inout) :: this
  type(t_elem_p), intent(in) :: elems(:)
  type(t_sim_param), intent(in) :: sim_param
 
  character(len=*), parameter      :: this_sub_name='compute_dforce_liftlin'
- 
+
   call error(this_sub_name, this_mod_name, 'This was not supposed to &
   &happen, a team of professionals is underway to remove the evidence')
-  
+
 !! only steady loads: steady data from table: L -> gam -> p_equiv
 !this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &
 !        norm2(uinf - this%ub) * this%dy / this%area * &
-!             elems(this%id)%p%idou  
+!             elems(this%id)%p%idou
 
 end subroutine compute_dforce_liftlin
- 
+
 !----------------------------------------------------------------------
 
+!> Update of the solution of the lifting line.
+!!
+!! Here the extrapolation of the lifting line solution is performed
 subroutine update_liftlin(elems_ll, linsys)
  type(t_elem_p), intent(inout) :: elems_ll(:)
  type(t_linsys), intent(inout) :: linsys
@@ -318,9 +347,7 @@ subroutine update_liftlin(elems_ll, linsys)
  real(wp), allocatable :: res_temp(:)
 
   it = it + 1
-  !DEBUG
-  write(*,*) 'iteration ',it
-  
+
   !HERE extrapolate the solution before the linear system
   if (it .gt. 2) then
     allocate(res_temp(size(linsys%res_expl,1)))
@@ -336,8 +363,13 @@ end subroutine update_liftlin
 
 !----------------------------------------------------------------------
 
-! subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
-subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  sim_param, airfoil_data)
+!> Solve the lifting line, in an iterative way
+!!
+!! The lifting line solution is not obtained from the solution of the linear
+!! system. It is fully explicit, but by being nonlinear requires an
+!! iterative solution.
+subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  sim_param, &
+                         airfoil_data)
  type(t_elem_p), intent(inout) :: elems_ll(:)
  type(t_elem_p), intent(in)    :: elems_tot(:)
  type(t_elem_p), intent(in)    :: elems_wake(:)
@@ -348,7 +380,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  sim_param, airfoil_da
  integer  :: i_l, j, ic
  real(wp) :: vel(3), v(3), up(3)
  real(wp), allocatable :: vel_w(:,:)
- real(wp) :: unorm, alpha, mach, re
+ real(wp) :: unorm, alpha
  real(wp) :: cl
  real(wp), allocatable :: aero_coeff(:)
  real(wp), allocatable :: dou_temp(:)
@@ -359,131 +391,99 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  sim_param, airfoil_da
  real(wp) , allocatable :: a_v(:)   ! size(elems_ll)
  real(wp) , allocatable :: c_m(:,:) ! size(elems_ll) , 3
  real(wp) , allocatable :: u_v(:)   ! size(elems_ll)
+ character(len=max_char_len) :: msg
 
- uinf = sim_param%u_inf
- 
- !TODO: is missing the velocity of the wake
- allocate(dou_temp(size(elems_ll)))
- allocate(vel_w(3,size(elems_ll)))
- 
- do i_l = 1,size(elems_ll)
-   vel_w(:,i_l) = 0.0_wp
-   do j = 1,size(elems_wake)
-     call elems_wake(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
-     vel_w(:,i_l) = vel_w(:,i_l) + v
-   enddo
- enddo
- 
- vel_w = vel_w/(4.0_wp*pi)
+  uinf = sim_param%u_inf
 
- !Crack the starting guess
- !do i_l = 1,size(elems_ll)
- !  elems_ll(i_l)%p%idou = -1
- !enddo
+  allocate(dou_temp(size(elems_ll)))
+  allocate(vel_w(3,size(elems_ll)))
 
- allocate(a_v(size(elems_ll)  )) ; a_v = 0.0_wp
- allocate(c_m(size(elems_ll),3)) ; c_m = 0.0_wp
- allocate(u_v(size(elems_ll)  )) ; u_v = 0.0_wp
+  !velocity from the wake
+  do i_l = 1,size(elems_ll)
+    vel_w(:,i_l) = 0.0_wp
+    do j = 1,size(elems_wake)
+      call elems_wake(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
+      vel_w(:,i_l) = vel_w(:,i_l) + v
+    enddo
+  enddo
 
- !
- do i_l=1,size(elems_ll)
-  select type(el => elems_ll(i_l)%p)
-  type is(t_liftlin)
-    u_v(i_l) = norm2((uinf-el%ub) - &
-        el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
-  end select
- end do
+  vel_w = vel_w/(4.0_wp*pi)
 
- !Calculate the induced velocity on the airfoil
- do ic = 1,100
-   diff = 0.0_wp
-   do i_l = 1,size(elems_ll)
-     vel = 0.0_wp
-     do j = 1,size(elems_tot)
-       call elems_tot(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
-       vel = vel + v
-     enddo
-     select type(el => elems_ll(i_l)%p)
-     type is(t_liftlin)
-       vel = vel/(4.0_wp*pi) + uinf - el%ub +vel_w(:,i_l)
-       !vel = uinf - el%ub
-       up = vel-el%bnorm_cen*sum(el%bnorm_cen*vel)
-       !Employing the free stream velocity to get into tables
-       unorm = u_v(i_l) ! norm2((uinf-el%ub) - el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
-       !unorm = norm2(up)
-       alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
-       alpha = alpha * 180.0_wp/pi
-       
-       !TODO: fix these parameters which are still hard-coded
-       mach = 0.0_wp
-       re = 1000000.0_wp
-       !if (ic .le. 1) then
-       !  cl = 2*pi*alpha*pi/180.0_wp
-       !else
-       call interp_aero_coeff ( airfoil_data ,  &
-                      el%csi_cen, el%i_airfoil , (/alpha, mach, re/) , aero_coeff )
-       cl = aero_coeff(1)
-       !endif
-       dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
-       diff = max(diff,abs(elems_ll(i_l)%p%idou-dou_temp(i_l))) 
-     end select
-     c_m(i_l,:) = aero_coeff
-     a_v(i_l)   = alpha * pi/180.0_wp
-   enddo
-   damp = 5.0_wp
-  
-   do i_l = 1,size(elems_ll)
-     elems_ll(i_l)%p%idou = ( dou_temp(i_l)+ damp*elems_ll(i_l)%p%idou )/(1.0_wp+damp)
-     !elems_ll(i_l)%p%idou = ( (damp)*dou_temp(i_l) + (1.0_wp-damp)*elems_ll(i_l)%p%idou )
-     !elems_ll(i_l)%p%idou = dou_temp(i_l)
-   enddo 
-   
-!  !DEBUG:
-!  write(*,*) 'diff', diff
-   if(diff .le. toll) exit
+  allocate(a_v(size(elems_ll)  )) ; a_v = 0.0_wp
+  allocate(c_m(size(elems_ll),3)) ; c_m = 0.0_wp
+  allocate(u_v(size(elems_ll)  )) ; u_v = 0.0_wp
 
- enddo
+  do i_l=1,size(elems_ll)
+   select type(el => elems_ll(i_l)%p)
+   type is(t_liftlin)
+     u_v(i_l) = norm2((uinf-el%ub) - &
+         el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
+   end select
+  end do
 
- ! Loads computation ------------
- do i_l = 1,size(elems_ll)
-!  old and rough approximation
-!  elems_ll(i_l)%p%cp = & 
-!    2.0_wp / norm2(uinf)**2.0_wp * &
-!           ( norm2(uinf - elems_ll(i_l)%p%ub) * &
-!             elems_ll(i_l)%p%dy / elems_ll(i_l)%p%area * &
-!                  elems_ll(i_l)%p%idou )
-!  elems_ll(i_l)%p%pres = & 
-!           - sim_param%rho_inf * &
-!           ( norm2(sim_param%u_inf - elems_ll(i_l)%p%ub) * &
-!             elems_ll(i_l)%p%dy / elems_ll(i_l)%p%area * &
-!                  elems_ll(i_l)%p%idou )
-!  elems_ll(i_l)%p%dforce = elems_ll(i_l)%p%pres * &
-!                           elems_ll(i_l)%p%area * &
-!                           elems_ll(i_l)%p%nor
-  select type(el => elems_ll(i_l)%p)
-  type is(t_liftlin)
-   el%pres   = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
-              ( c_m(i_l,1) * cos(a_v(i_l)) +  c_m(i_l,2) * sin(a_v(i_l)) )  
-   el%dforce = ( el%nor * el%pres + &
-                 el%tang_cen * & 
-                 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * ( &
-                -c_m(i_l,1) * sin(a_v(i_l)) + c_m(i_l,2) * cos(a_v(i_l)) & 
-                ) ) * el%area
-  end select 
- end do
+  !Calculate the induced velocity on the airfoil
+  do ic = 1,100
+    diff = 0.0_wp
+    do i_l = 1,size(elems_ll)
+      vel = 0.0_wp
+      do j = 1,size(elems_tot)
+        call elems_tot(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
+        vel = vel + v
+      enddo
+      select type(el => elems_ll(i_l)%p)
+      type is(t_liftlin)
+        vel = vel/(4.0_wp*pi) + uinf - el%ub +vel_w(:,i_l)
+        !vel = uinf - el%ub
+        up = vel-el%bnorm_cen*sum(el%bnorm_cen*vel)
+        !Employing the free stream velocity to get into tables
+        ! norm2((uinf-el%ub) - el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
+        unorm = u_v(i_l)
+        !unorm = norm2(up)
+        alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
+        alpha = alpha * 180.0_wp/pi
 
- !DEBUG:
- write(*,*) 'iterations: ',ic
- write(*,*) 'diff',diff
+        call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil, &
+                      (/alpha, sim_param%Mach, sim_param%Re/) , aero_coeff )
+        cl = aero_coeff(1)
+        !endif
+        dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
+        diff = max(diff,abs(elems_ll(i_l)%p%idou-dou_temp(i_l)))
+      end select
+      c_m(i_l,:) = aero_coeff
+      a_v(i_l)   = alpha * pi/180.0_wp
+    enddo
+    damp = 5.0_wp
 
- deallocate(dou_temp, vel_w)
- deallocate(a_v,c_m,u_v)
+    do i_l = 1,size(elems_ll)
+      elems_ll(i_l)%p%idou = ( dou_temp(i_l)+ damp*elems_ll(i_l)%p%idou )&
+                             /(1.0_wp+damp)
+    enddo
 
- !Get the angle of attack, as well as the other parameters
+    if(diff .le. toll) exit
 
- !Get into the tables to obtain the loads
+  enddo
 
- !Get the vorticity of the element
+  ! Loads computation ------------
+  do i_l = 1,size(elems_ll)
+   select type(el => elems_ll(i_l)%p)
+   type is(t_liftlin)
+    el%pres   = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
+               ( c_m(i_l,1) * cos(a_v(i_l)) +  c_m(i_l,2) * sin(a_v(i_l)) )
+    el%dforce = ( el%nor * el%pres + &
+                  el%tang_cen * &
+                  0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * ( &
+                 -c_m(i_l,1) * sin(a_v(i_l)) + c_m(i_l,2) * cos(a_v(i_l)) &
+                 ) ) * el%area
+   end select
+  end do
+
+  if(sim_param%debug_level .ge. 3) then
+    write(msg,*) 'iterations: ',ic; call printout(trim(msg))
+    write(msg,*) 'diff',diff; call printout(trim(msg))
+  endif
+
+  deallocate(dou_temp, vel_w)
+  deallocate(a_v,c_m,u_v)
 
 end subroutine solve_liftlin
 

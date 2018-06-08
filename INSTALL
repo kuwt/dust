@@ -1,0 +1,58 @@
+REQUIREMENTS:
+ to build dust are required:
+ * A Fortran compiler
+ * CMake
+ * A Lapack/BLAS implementation
+ * An HDF5 library
+ * A CGNS library
+
+A Fortran compiler, CMake and a Lapack implementation can be found pre-packed 
+in most linux distributions.
+
+HDF5 can be found packed in many distribution. 
+However it can be easily built with the following procedure:
+  * clone the desired version of HDF5 fromt the git repositories:
+    git clone -b hdf5_1_10_2 https://bitbucket.hdfgroup.org/scm/hdffv/hdf5.git
+  
+  * move into the folder, and build an install folder
+    cd hdf5
+    mkdir install
+
+  *configure the installation
+    ./configure --prefix=./install --enable-fortran
+
+  *build & install
+    make
+    make install
+
+CGNS can be found packed in some distributions, however tends to be outdated, 
+and since CGNS tend to change radically the API behaviour it is advised to
+build it from the git repositories
+  * clone the stable release from the git repositories
+    git clone -b master https://github.com/CGNS/CGNS.git
+
+  * move into folder, create the installation folders
+    cd CGNS
+    mkdir build install
+    cd build
+
+  * configure the installation
+    export HDF5_ROOT=/path/to/hdf5/installation (should not be necessary when employing system libraries)
+    cmake -D CGNS_ENABLE_FORTRAN=ON -D CGNS_ENABLE_HDF5=ON -D CMAKE_INSTALL_PREFIX=../install ../
+
+  * build & install
+    make 
+    make install
+
+
+Build instructions for DUST:
+1) create a build folder inside this folder (can be "build" or anything else)
+2) move to the build directory
+3) ccmake ../  and configure (change values, c to configure iteratively, g to generate makefile)
+   -> If a specific compiler is required, use instead
+      ccmake -D CMAKE_Fortran_COMPILER=ifort ../   for example
+   -> If a specific HDF5 implementation is used, export the variable
+      export HDF5_ROOT=/path/to/hdf5/root before calling ccmake
+   -> If a specific cgns implementation is used, set the appropriate paths
+4) make
+5) The executable should be in build/bin

@@ -49,6 +49,12 @@ use mod_basic_io, only: &
 use mod_aero_elements, only: &
   c_elem, t_elem_p!, t_vp
 
+use mod_doublet, only: &
+  initialize_doublet
+
+use mod_surfpan, only: &
+  initialize_surfpan
+
 !this is for the parsing
 use mod_parse, only: &
   t_parse, &
@@ -109,6 +115,9 @@ implicit none
 !Input
 character(len=*), parameter :: input_file_name_def = 'dust_post.in' 
 character(len=max_char_len) :: input_file_name
+
+!doublet parameters
+real(wp) :: ff_ratio_dou, ff_ratio_sou, eps_dou, r_Rankine, r_cutoff
 
 !Geometry parameters
 type(t_parse) :: prms
@@ -221,6 +230,20 @@ endif
 call prms%CreateStringOption('basename','Base name of the processed data')
 call prms%CreateStringOption('data_basename','Base name of the data to be &
                               &processed')
+
+
+call prms%CreateRealOption( 'FarFieldRatioDoublet', &
+      "Multiplier for far field threshold computation on doublet", '10.0')
+call prms%CreateRealOption( 'FarFieldRatioSource', &
+      "Multiplier for far field threshold computation on sources", '10.0')
+call prms%CreateRealOption( 'DoubletThreshold', &
+      "Thresold for considering the point in plane in doublets", '1.0e-6')
+call prms%CreateRealOption( 'RankineRad', &
+      "Radius of Rankine correction for vortex induction near core", '0.1')
+call prms%CreateRealOption( 'CutoffRad', &
+      "Radius of complete cutoff  for vortex induction near core", '0.001')
+
+
 call prms%CreateSubOption('Analysis','Definition of the motion of a frame', &
                           sbprms, multiple=.true.)
 call sbprms%CreateStringOption('Type','type of analysis')
@@ -264,6 +287,16 @@ call prms%read_options(input_file_name, printout_val=.false.)
 
 basename = getstr(prms,'basename')
 data_basename = getstr(prms,'data_basename')
+
+ff_ratio_dou  = getreal(prms, 'FarFieldRatioDoublet')
+ff_ratio_sou  = getreal(prms, 'FarFieldRatioSource')
+eps_dou   = getreal(prms, 'DoubletThreshold')
+r_Rankine = getreal(prms, 'RankineRad')
+r_cutoff  = getreal(prms, 'CutoffRad')
+
+call initialize_doublet(ff_ratio_dou, eps_dou, r_Rankine, r_cutoff);
+call initialize_surfpan(ff_ratio_sou);
+
 n_analyses = countoption(prms,'Analysis')
 
 !Cycle on all the analyses
@@ -1187,18 +1220,18 @@ end subroutine load_refs
 
 !----------------------------------------------------------------------
 
-subroutine load_res(floc, comps, vort, cp, t)
+subroutine load_res(floc, comps, vort, press, t)
  integer(h5loc), intent(in) :: floc 
  type(t_geo_component), intent(inout) :: comps(:)
  real(wp), allocatable, intent(out) :: vort(:)
- real(wp), allocatable, intent(out) :: cp(:)
+ real(wp), allocatable, intent(out) :: press(:)
  real(wp), intent(out) :: t
 
  integer :: ncomps, icomp, ie
  integer :: nelems, offset, nelems_comp
  integer(h5loc) :: gloc1, gloc2, gloc3
  character(len=max_char_len) :: cname
- real(wp), allocatable :: vort_read(:), cp_read(:)
+ real(wp), allocatable :: vort_read(:)!, cp_read(:)
  real(wp), allocatable :: pres_read(:), dforce_read(:,:)
 
   ncomps = size(comps)
@@ -1213,7 +1246,7 @@ subroutine load_res(floc, comps, vort, cp, t)
   enddo
   
   call read_hdf5(t,'time',floc)
-  allocate(vort(nelems), cp(nelems))
+  allocate(vort(nelems), press(nelems))
   call open_hdf5_group(floc,'Components',gloc1)
 
   offset = 0
@@ -1227,7 +1260,7 @@ subroutine load_res(floc, comps, vort, cp, t)
     !call read_hdf5(vort(offset+1:offset+nelems_comp),'Vort',gloc3)
     !call read_hdf5(cp(offset+1:offset+nelems_comp),'Cp',gloc3)
     call read_hdf5_al(vort_read,'Vort',gloc3)
-    call read_hdf5_al(cp_read,'Cp',gloc3)
+    !call read_hdf5_al(cp_read,'Cp',gloc3)
     call read_hdf5_al(pres_read,'Pres',gloc3)
     call read_hdf5_al(dforce_read,'dF',gloc3)
 
@@ -1247,7 +1280,7 @@ subroutine load_res(floc, comps, vort, cp, t)
     select type(el =>comps(icomp)%el)
      class default
       vort(offset+1:offset+nelems_comp) = vort_read
-      cp(offset+1:offset+nelems_comp) = cp_read
+      press(offset+1:offset+nelems_comp) = pres_read
       offset = offset + nelems_comp
       do ie = 1,nelems_comp
         if(associated(comps(icomp)%el(ie)%idou)) &
@@ -1256,7 +1289,7 @@ subroutine load_res(floc, comps, vort, cp, t)
      type is(t_actdisk)
       do ie = 1,nelems_comp
         vort(offset+1:offset+el(ie)%n_ver) = vort_read(ie)
-        cp(offset+1:offset+el(ie)%n_ver) = cp_read(ie)
+        press(offset+1:offset+el(ie)%n_ver) = pres_read(ie)
         offset = offset + el(ie)%n_ver
         if(associated(comps(icomp)%el(ie)%idou)) then
                         comps(icomp)%el(ie)%idou = vort_read(ie)
@@ -1264,7 +1297,7 @@ subroutine load_res(floc, comps, vort, cp, t)
       enddo
     end select
 
-    deallocate(vort_read, cp_read)
+    deallocate(vort_read)!, cp_read)
 
   enddo
 

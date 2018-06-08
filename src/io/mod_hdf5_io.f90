@@ -365,16 +365,12 @@ subroutine write_string_hdf5(outdata, outname, file_id)
   !check if the dataset on file exists
   call h5Lexists_f(file_id, trim(outname), l_exists, h5err)
 
-  if (.not. l_exists) then
-    !create the dataset on the file
-    call h5Dcreate_f(file_id, trim(outname), filetype_id, dspace_id, &
-                     dset_id, h5err)
-  else
-    !open the dataset
-    !TODO: perform a check on the dimensions
-    call h5Dopen_f(file_id, trim(outname), dset_id, h5err)
-
+  if (l_exists) then
+    call h5gunlink_f(file_id, trim(outname), h5err)
   endif
+  !create the dataset on the file
+  call h5Dcreate_f(file_id, trim(outname), filetype_id, dspace_id, &
+                   dset_id, h5err)
 
   !write
   call h5Dwrite_f(dset_id, memtype_id, outdata, out_size, h5err)

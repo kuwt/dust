@@ -1,0 +1,82 @@
+basename = Postprocessing/post
+data_basename = Output/flapwing
+
+Analysis = {
+  Name = v1
+  Type = Viz
+
+  Format = vtk
+  !Format = tecplot
+
+  StartRes = 1
+  EndRes = 61
+  StepRes = 1
+  Wake = T
+
+  Variable = Vort
+
+}
+
+Analysis = {
+  Type = integral_loads
+  Name = loads1
+
+  StartRes = 1
+  EndRes = 61
+  StepRes = 1
+
+  Format = dat
+  
+  CompName = wing
+  Reference_Tag = 0
+}
+
+Analysis = {
+  Type = integral_loads
+  Name = loads2
+
+  StartRes = 1
+  EndRes = 61
+  StepRes = 1
+
+  Format = dat
+  
+  CompName = wing
+  Reference_Tag = Wing
+}
+
+Analysis = {
+  Name = flow1
+  Type = flow_field
+
+  StartRes = 1
+  EndRes = 61
+  StepRes = 1
+  
+  Format = vtk !tecplot, vtk
+
+  Variable = all
+
+  Nxyz = (/30,1,30/)
+  Minxyz = (/-2.0, 3.5, -3.0/)
+  Maxxyz = (/5.0, 3.5, 3.0/)
+ 
+}
+
+Analysis = {
+  Name = flow2
+  Type = flow_field
+
+  StartRes = 1
+  EndRes = 61
+  StepRes = 1
+  
+  Format = vtk !tecplot, vtk
+
+  Variable = all
+
+  Nxyz = (/1,30,30/)
+  Minxyz = (/2.0, 0.0, -3.0/)
+  Maxxyz = (/2.0, 5.0, 3.0/)
+ 
+}

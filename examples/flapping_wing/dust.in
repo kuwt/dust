@@ -1,0 +1,26 @@
+! --- Time parameters ---
+tstart = 0.0
+tend  = 30.0
+dt = 0.5
+
+! --- Output ---
+dt_out = 0.5 
+dt_debug_out = 0.5
+output_start = T
+basename       = ./Output/flapwing
+basename_debug = ./Debug/flapwing
+debug_level= 3
+
+! --- Sim. Parameters ---
+u_inf = (/1.0, 0.0, 0.0/)
+
+! --- Input files ---
+GeometryFile = geo_input.h5
+ReferenceFile = References.in
+
+! max number of wake panels -------------
+n_wake_panels = 60
+
+! --- Restart ---
+!restart_from_file = T
+!restart_file = ./Output/t5_res_0061.h5

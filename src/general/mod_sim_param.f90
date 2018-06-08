@@ -4,7 +4,7 @@
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -13,10 +13,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -25,8 +25,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@polimi.it>
 !!          Davide Montagnani       <davide.montagnani@polimi.it>
 !!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
@@ -34,7 +34,7 @@
 
 
 !> Module to define the structrues containing the simulation parameters
-!! 
+!!
 module mod_sim_param
 
 use mod_param, only: &
@@ -47,8 +47,9 @@ public :: t_sim_param
 private
 
 type t_sim_param
+  !Time:
   !> Start time
-  real(wp) :: t0 
+  real(wp) :: t0
   !> Time step
   real(wp) :: dt
   !> Final time
@@ -57,12 +58,23 @@ type t_sim_param
   integer  :: n_timesteps
   !> Vector of time instants
   real(wp) , allocatable :: time_vec(:)
+
+  !Physical parameters:
   !> Free stream pressure
   real(wp) :: P_inf
-  !> Free stream density 
+  !> Free stream density
   real(wp) :: rho_inf
   !> Free stream velocity
   real(wp) , allocatable :: u_inf(:)
+  !> Mach number
+  real(wp) :: Mach
+  !> Reynolds number
+  real(wp) :: Re
+
+  !Wake
+  real(wp) :: first_panel_scaling
+
+  !Handling parameters:
   !> Debug level
   integer :: debug_level
   !> Basename

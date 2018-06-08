@@ -50,7 +50,8 @@ public :: wp, &
           pi , &
           eps, &
           prev_tri , next_tri , &
-          prev_qua , next_qua
+          prev_qua , next_qua, &
+          dict
 
 private
 
@@ -90,6 +91,21 @@ real(wp), parameter :: eps = 1.0e-10_wp
 
 !----------------------------------------------------------------------
 
+type :: t_param_dict
 
+ character(len=1) :: actdisk = 'a'
+
+ character(len=1) :: liftlin = 'l'
+
+ character(len=1) :: surfpan = 'p'
+
+ character(len=1) :: vortpan = 'v'
+
+
+end type t_param_dict
+
+type(t_param_dict) :: dict
+
+!----------------------------------------------------------------------
 
 end module mod_param

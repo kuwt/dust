@@ -158,12 +158,12 @@ subroutine save_status(geo, wake_pan, wake_rin, sim_params, it, time, run_id)
     allocate(vort(ne), cp(ne) , pres(ne) , dforce(3,ne) )
     do ie = 1,ne
      vort(ie) = geo%components(icomp)%el(ie)%idou
-     cp(ie) = geo%components(icomp)%el(ie)%cp
+     !cp(ie) = geo%components(icomp)%el(ie)%cp
      pres(ie) = geo%components(icomp)%el(ie)%pres
      dforce(:,ie) = geo%components(icomp)%el(ie)%dforce
     enddo
     call write_hdf5(vort,'Vort',gloc3)
-    call write_hdf5(cp,'Cp',gloc3)
+    !call write_hdf5(cp,'Cp',gloc3)
     call write_hdf5(pres,'Pres',gloc3)
     call write_hdf5(dforce,'dF',gloc3)
     deallocate(vort, cp, pres, dforce)
@@ -240,7 +240,7 @@ subroutine load_solution(filename,comps)
  character(len=max_char_len), intent(in) :: filename
  type(t_geo_component), intent(inout) :: comps(:)
 
- integer(h5loc) :: floc, gloc1, gloc2, gloc3, ploc
+ integer(h5loc) :: floc, gloc1, gloc2, gloc3
  integer :: ncomp, icomp, icomp2
  integer :: ne, ie
  character(len=max_char_len) :: comp_name_read, comp_id
@@ -276,9 +276,6 @@ subroutine load_solution(filename,comps)
         call read_hdf5_al(dF,'dF',gloc3)
         call close_hdf5_group(gloc3)
         ne = size(comps(icomp2)%el)
-        !DEBUG
-        write(*,*) 'size component',size(comps(icomp2)%el)
-        write(*,*) 'size result',shape(idou)
         do ie =1,ne
           comps(icomp2)%el(ie)%idou   = idou(ie)
           comps(icomp2)%el(ie)%pres   = pres(ie)
