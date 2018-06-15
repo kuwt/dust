@@ -55,8 +55,12 @@ use mod_linsys_vars, only: &
 use mod_c81, only: &
   t_aero_tab, interp_aero_coeff
 
-use mod_aero_elements, only: &
-  c_elem, t_elem_p
+!use mod_aero_elements, only: &
+!  c_elem, t_elem_p
+
+use mod_aeroel, only: &
+  c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 !----------------------------------------------------------------------
 
 implicit none
@@ -66,20 +70,14 @@ public :: t_actdisk, update_actdisk
 
 !----------------------------------------------------------------------
 
-type, extends(c_elem) :: t_actdisk
+type, extends(c_expl_elem) :: t_actdisk
   real(wp), allocatable :: traction
   real(wp), allocatable :: radius
 contains
 
-  procedure, pass(this) :: build_row        => build_row_actdisk
-  procedure, pass(this) :: build_row_static => build_row_static_actdisk
-  procedure, pass(this) :: add_wake         => add_wake_actdisk
-  procedure, pass(this) :: add_liftlin      => add_liftlin_actdisk
-  procedure, pass(this) :: add_actdisk      => add_actdisk_actdisk
   procedure, pass(this) :: compute_pot      => compute_pot_actdisk
   procedure, pass(this) :: compute_vel      => compute_vel_actdisk
   procedure, pass(this) :: compute_psi      => compute_psi_actdisk
-  procedure, pass(this) :: compute_cp       => compute_cp_actdisk
   procedure, pass(this) :: compute_pres     => compute_pres_actdisk
   procedure, pass(this) :: compute_dforce   => compute_dforce_actdisk
 end type
@@ -90,101 +88,6 @@ integer :: it=0
 
 !----------------------------------------------------------------------
 contains
-!----------------------------------------------------------------------
-
-!> Not present for this element
-subroutine build_row_actdisk (this, elems, linsys, uinf, ie, ista, iend)
- class(t_actdisk), intent(inout) :: this
- type(t_elem_p), intent(in)       :: elems(:)
- type(t_linsys), intent(inout)    :: linsys
- real(wp), intent(in)             :: uinf(:)
- integer, intent(in)              :: ie
- integer, intent(in)              :: ista, iend
- character(len=*), parameter      :: this_sub_name='build_row_actdisk'
-
-  call error(this_sub_name, this_mod_name, 'This was not supposed to &
-  &happen, a team of professionals is underway to remove the evidence')
-
-end subroutine build_row_actdisk
-
-!----------------------------------------------------------------------
-
-!> Not present for this element
-subroutine build_row_static_actdisk (this, elems, ll_elems, ad_elems, linsys, uinf, ie, ista, iend)
- class(t_actdisk), intent(inout) :: this
- type(t_elem_p), intent(in)       :: elems(:)
- type(t_elem_p), intent(in)       :: ll_elems(:)
- type(t_elem_p), intent(in)       :: ad_elems(:)
- type(t_linsys), intent(inout)    :: linsys
- real(wp), intent(in)             :: uinf(:)
- integer, intent(in)              :: ie
- integer, intent(in)              :: ista, iend
- character(len=*), parameter      :: this_sub_name='build_row_static_actdisk'
-
-  call error(this_sub_name, this_mod_name, 'This was not supposed to &
-  &happen, a team of professionals is underway to remove the evidence')
-
-end subroutine build_row_static_actdisk
-
-!----------------------------------------------------------------------
-
-!> Not present for this element
-subroutine add_wake_actdisk (this, wake_elems, impl_wake_ind, linsys, uinf, &
-                             ie, ista, iend)
- class(t_actdisk), intent(inout) :: this
- type(t_elem_p), intent(in)      :: wake_elems(:)
- integer, intent(in)             :: impl_wake_ind(:,:)
- type(t_linsys), intent(inout)   :: linsys
- real(wp), intent(in)            :: uinf(:)
- integer, intent(in)             :: ie
- integer, intent(in)             :: ista
- integer, intent(in)             :: iend
- character(len=*), parameter      :: this_sub_name='add_wake_actdisk'
-
-  call error(this_sub_name, this_mod_name, 'This was not supposed to &
-  &happen, a team of professionals is underway to remove the evidence')
-
-end subroutine add_wake_actdisk
-
-!----------------------------------------------------------------------
-
-!> Not present for this element
-subroutine add_liftlin_actdisk (this, ll_elems, linsys, uinf, &
-                             ie, ista, iend)
- class(t_actdisk), intent(inout) :: this
- type(t_elem_p), intent(in)      :: ll_elems(:)
- type(t_linsys), intent(inout)   :: linsys
- real(wp), intent(in)            :: uinf(:)
- integer, intent(in)             :: ie
- integer, intent(in)             :: ista
- integer, intent(in)             :: iend
- character(len=*), parameter      :: this_sub_name='add_liftlin_actdisk'
-
-  call error(this_sub_name, this_mod_name, 'This was not supposed to &
-  &happen, a team of professionals is underway to remove the evidence')
-
-end subroutine add_liftlin_actdisk
-
-
-!----------------------------------------------------------------------
-
-!> Not present for this element
-subroutine add_actdisk_actdisk (this, ad_elems, linsys, uinf, &
-                             ie, ista, iend)
- class(t_actdisk), intent(inout) :: this
- type(t_elem_p), intent(in)      :: ad_elems(:)
- type(t_linsys), intent(inout)   :: linsys
- real(wp), intent(in)            :: uinf(:)
- integer, intent(in)             :: ie
- integer, intent(in)             :: ista
- integer, intent(in)             :: iend
- character(len=*), parameter      :: this_sub_name='add_actdisk_actdisk'
-
-  call error(this_sub_name, this_mod_name, 'This was not supposed to &
-  &happen, a team of professionals is underway to remove the evidence')
-
-end subroutine add_actdisk_actdisk
-
 !----------------------------------------------------------------------
 
 !> Compute the potential due to an actuator disk
@@ -266,7 +169,7 @@ subroutine compute_vel_actdisk (this, pos, uinf, vel)
   call velocity_calc_doublet(this, vdou, pos)
 
 
-  vel = vdou*this%idou
+  vel = vdou*this%mag
 
 
 end subroutine compute_vel_actdisk
@@ -339,7 +242,7 @@ subroutine update_actdisk(elems_ad, linsys, sim_param)
    select type(el => elems_ad(ie)%p)
    type is(t_actdisk)
 
-     el%idou = -el%traction*sim_param%dt/(sim_param%rho_inf*pi*el%radius**2)
+     el%mag = -el%traction*sim_param%dt/(sim_param%rho_inf*pi*el%radius**2)
 
    end select
  enddo

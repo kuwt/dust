@@ -102,6 +102,9 @@ type :: t_linsys
  !> Number of static and moving actuator disks
  integer :: nstatic_ad, nmoving_ad, n_ad
 
+ !> Number of static and moving explicit elements
+ integer :: nstatic_expl, nmoving_expl
+
  !> Number of explicit elements
  integer :: n_expl
 

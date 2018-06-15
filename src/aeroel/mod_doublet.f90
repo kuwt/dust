@@ -41,8 +41,10 @@ use mod_param, only: &
   prev_qua , next_qua , &
   pi
 
-use mod_aero_elements, only: &
-  c_elem, t_elem_p
+!use mod_aero_elements, only: &
+!  c_elem, t_elem_p
+use mod_aeroel, only: &
+  c_pot_elem
 
 use mod_math, only: &
   cross
@@ -90,7 +92,7 @@ end subroutine initialize_doublet
 !!   D_ik = -(1/(4*pi)) * Omega_ik
 !!
 subroutine potential_calc_doublet(this, dou, pos)
- class(c_elem), intent(inout) :: this
+ class(c_pot_elem), intent(inout) :: this
  real(wp), intent(out) :: dou
  real(wp), contiguous, intent(in) :: pos(:)
 
@@ -173,7 +175,7 @@ end subroutine potential_calc_doublet
 !! V^{vr}_ik = grad_{r_i} { - int_{S_k} { n \cdot (r_i - r) / |r_i - r|^3 } }
 !!
 subroutine velocity_calc_doublet(this, v_dou, pos)
- class(c_elem), intent(inout) :: this
+ class(c_pot_elem), intent(inout) :: this
  real(wp), intent(out) :: v_dou(3)
  real(wp), intent(in) :: pos(:)
 

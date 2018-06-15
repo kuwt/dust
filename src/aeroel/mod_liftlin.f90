@@ -55,9 +55,12 @@ use mod_sim_param, only: &
 use mod_c81, only: &
   t_aero_tab, interp_aero_coeff
 
-use mod_aero_elements, only: &
-  c_elem, t_elem_p
+!use mod_aero_elements, only: &
+!  c_elem, t_elem_p
 
+use mod_aeroel, only: &
+  c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 !----------------------------------------------------------------------
 
 implicit none
@@ -67,7 +70,7 @@ public :: t_liftlin, update_liftlin, solve_liftlin
 
 !----------------------------------------------------------------------
 
-type, extends(c_elem) :: t_liftlin
+type, extends(c_expl_elem) :: t_liftlin
   real(wp), allocatable :: tang_cen(:)
   real(wp), allocatable :: bnorm_cen(:)
   real(wp)              :: csi_cen
@@ -75,15 +78,9 @@ type, extends(c_elem) :: t_liftlin
   real(wp)              :: chord
 contains
 
-  procedure, pass(this) :: build_row        => build_row_liftlin
-  procedure, pass(this) :: build_row_static => build_row_static_liftlin
-  procedure, pass(this) :: add_wake         => add_wake_liftlin
-  procedure, pass(this) :: add_liftlin      => add_liftlin_liftlin
-  procedure, pass(this) :: add_actdisk      => add_actdisk_liftlin
   procedure, pass(this) :: compute_pot      => compute_pot_liftlin
   procedure, pass(this) :: compute_vel      => compute_vel_liftlin
   procedure, pass(this) :: compute_psi      => compute_psi_liftlin
-  procedure, pass(this) :: compute_cp       => compute_cp_liftlin
   procedure, pass(this) :: compute_pres     => compute_pres_liftlin
   procedure, pass(this) :: compute_dforce   => compute_dforce_liftlin
 end type
@@ -94,101 +91,6 @@ integer :: it=0
 
 !----------------------------------------------------------------------
 contains
-!----------------------------------------------------------------------
-
-!> Not present for this element
-subroutine build_row_liftlin (this, elems, linsys, uinf, ie, ista, iend)
- class(t_liftlin), intent(inout) :: this
- type(t_elem_p), intent(in)       :: elems(:)
- type(t_linsys), intent(inout)    :: linsys
- real(wp), intent(in)             :: uinf(:)
- integer, intent(in)              :: ie
- integer, intent(in)              :: ista, iend
- character(len=*), parameter      :: this_sub_name='build_row_liftlin'
-
-  call error(this_sub_name, this_mod_name, 'This was not supposed to &
-  &happen, a team of professionals is underway to remove the evidence')
-
-end subroutine build_row_liftlin
-
-!----------------------------------------------------------------------
-
-!> Not present for this element
-subroutine build_row_static_liftlin (this, elems, ll_elems, ad_elems, &
-                                     linsys, uinf, ie, ista, iend)
- class(t_liftlin), intent(inout) :: this
- type(t_elem_p), intent(in)       :: elems(:)
- type(t_elem_p), intent(in)       :: ll_elems(:)
- type(t_elem_p), intent(in)       :: ad_elems(:)
- type(t_linsys), intent(inout)    :: linsys
- real(wp), intent(in)             :: uinf(:)
- integer, intent(in)              :: ie
- integer, intent(in)              :: ista, iend
- character(len=*), parameter      :: this_sub_name='build_row_static_liftlin'
-
-  call error(this_sub_name, this_mod_name, 'This was not supposed to &
-  &happen, a team of professionals is underway to remove the evidence')
-
-end subroutine build_row_static_liftlin
-
-!----------------------------------------------------------------------
-
-!> Not present for this element
-subroutine add_wake_liftlin (this, wake_elems, impl_wake_ind, linsys, uinf, &
-                             ie, ista, iend)
- class(t_liftlin), intent(inout) :: this
- type(t_elem_p), intent(in)      :: wake_elems(:)
- integer, intent(in)             :: impl_wake_ind(:,:)
- type(t_linsys), intent(inout)   :: linsys
- real(wp), intent(in)            :: uinf(:)
- integer, intent(in)             :: ie
- integer, intent(in)             :: ista
- integer, intent(in)             :: iend
- character(len=*), parameter      :: this_sub_name='add_wake_liftlin'
-
-  call error(this_sub_name, this_mod_name, 'This was not supposed to &
-  &happen, a team of professionals is underway to remove the evidence')
-
-end subroutine add_wake_liftlin
-
-!----------------------------------------------------------------------
-
-!> Not present for this element
-subroutine add_liftlin_liftlin (this, ll_elems, linsys, uinf, &
-                                ie, ista, iend)
- class(t_liftlin), intent(inout) :: this
- type(t_elem_p), intent(in)      :: ll_elems(:)
- type(t_linsys), intent(inout)   :: linsys
- real(wp), intent(in)            :: uinf(:)
- integer, intent(in)             :: ie
- integer, intent(in)             :: ista
- integer, intent(in)             :: iend
- character(len=*), parameter      :: this_sub_name='add_liftlin_liftlin'
-
-  call error(this_sub_name, this_mod_name, 'This was not supposed to &
-  &happen, a team of professionals is underway to remove the evidence')
-
-end subroutine add_liftlin_liftlin
-
-!----------------------------------------------------------------------
-
-!> Not present for this element
-subroutine add_actdisk_liftlin (this, ad_elems, linsys, uinf, &
-                             ie, ista, iend)
- class(t_liftlin), intent(inout) :: this
- type(t_elem_p), intent(in)      :: ad_elems(:)
- type(t_linsys), intent(inout)   :: linsys
- real(wp), intent(in)            :: uinf(:)
- integer, intent(in)             :: ie
- integer, intent(in)             :: ista
- integer, intent(in)             :: iend
- character(len=*), parameter      :: this_sub_name='add_actdisk_liftlin'
-
-  call error(this_sub_name, this_mod_name, 'This was not supposed to &
-  &happen, a team of professionals is underway to remove the evidence')
-
-end subroutine add_actdisk_liftlin
-
 !----------------------------------------------------------------------
 
 !> Compute the potential due to a lifting line
@@ -269,7 +171,7 @@ subroutine compute_vel_liftlin (this, pos, uinf, vel)
   ! doublet ---
   call velocity_calc_doublet(this, vdou, pos)
 
-  vel = vdou*this%idou
+  vel = vdou*this%mag
 
 
 end subroutine compute_vel_liftlin
@@ -447,7 +349,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  sim_param, &
         cl = aero_coeff(1)
         !endif
         dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
-        diff = max(diff,abs(elems_ll(i_l)%p%idou-dou_temp(i_l)))
+        diff = max(diff,abs(elems_ll(i_l)%p%mag-dou_temp(i_l)))
       end select
       c_m(i_l,:) = aero_coeff
       a_v(i_l)   = alpha * pi/180.0_wp
@@ -455,7 +357,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  sim_param, &
     damp = 5.0_wp
 
     do i_l = 1,size(elems_ll)
-      elems_ll(i_l)%p%idou = ( dou_temp(i_l)+ damp*elems_ll(i_l)%p%idou )&
+      elems_ll(i_l)%p%mag = ( dou_temp(i_l)+ damp*elems_ll(i_l)%p%mag )&
                              /(1.0_wp+damp)
     enddo
 

@@ -46,8 +46,13 @@ use mod_param, only: &
 use mod_handling, only: &
   error, warning, printout
 
-use mod_aero_elements, only: &
-  c_elem, t_elem_p
+!use mod_aero_elements, only: &
+!  c_elem, t_elem_p
+
+use mod_aeroel, only: &
+  c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
+
 
 use mod_doublet, only: &
   potential_calc_doublet , &
@@ -78,8 +83,9 @@ private
 !! This type inherits most of its members from the general \ref c_elem class
 !! however implements its own subroutines to calculate the coefficients of the
 !! linear system and the
-type, extends(c_elem) :: t_surfpan
+type, extends(c_impl_elem) :: t_surfpan
 
+  real(wp), allocatable :: pot_vel_stencil(:,:)
   real(wp), allocatable :: cosTi(:) , sinTi(:)
   real(wp), allocatable :: verp(:,:)
 
@@ -88,12 +94,10 @@ contains
   procedure, pass(this) :: build_row        => build_row_surfpan
   procedure, pass(this) :: build_row_static => build_row_static_surfpan
   procedure, pass(this) :: add_wake         => add_wake_surfpan
-  procedure, pass(this) :: add_liftlin      => add_liftlin_surfpan
-  procedure, pass(this) :: add_actdisk      => add_actdisk_surfpan
+  procedure, pass(this) :: add_expl         => add_expl_surfpan
   procedure, pass(this) :: compute_pot      => compute_pot_surfpan
   procedure, pass(this) :: compute_vel      => compute_vel_surfpan
   procedure, pass(this) :: compute_psi      => compute_psi_surfpan
-  procedure, pass(this) :: compute_cp       => compute_cp_surfpan
   procedure, pass(this) :: compute_pres     => compute_pres_surfpan
   procedure, pass(this) :: compute_dforce   => compute_dforce_surfpan
 
@@ -300,7 +304,7 @@ end subroutine velocity_calc_sou_surfpan
 !! subroutine.
 subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
  class(t_surfpan), intent(inout) :: this
- type(t_elem_p), intent(in)      :: elems(:)
+ type(t_impl_elem_p), intent(in)      :: elems(:)
  type(t_linsys), intent(inout)   :: linsys
  real(wp), intent(in)            :: uinf(:)
  integer, intent(in)             :: ie
@@ -336,12 +340,11 @@ end subroutine build_row_surfpan
 !! In this subroutine only the static part of the equations is built. It is
 !! called just once at the beginning of the simulation, and saves the AIC
 !! coefficients for te static part and the static contribution to the rhs
-subroutine build_row_static_surfpan(this, elems, ll_elems, ad_elems, linsys, &
+subroutine build_row_static_surfpan(this, elems, expl_elems, linsys, &
                                     uinf, ie, ista, iend)
  class(t_surfpan), intent(inout) :: this
- type(t_elem_p), intent(in)      :: elems(:)
- type(t_elem_p), intent(in)      :: ll_elems(:)
- type(t_elem_p), intent(in)      :: ad_elems(:)
+ type(t_impl_elem_p), intent(in)      :: elems(:)
+ type(t_expl_elem_p), intent(in)      :: expl_elems(:)
  type(t_linsys), intent(inout)   :: linsys
  real(wp), intent(in)            :: uinf(:)
  integer, intent(in)             :: ie
@@ -364,18 +367,24 @@ subroutine build_row_static_surfpan(this, elems, ll_elems, ad_elems, linsys, &
 
   end do
 
-  !Now build the static contribution from the lifting line elements
-  do j1 = 1,linsys%nstatic_ll
-    call ll_elems(j1)%p%compute_pot( linsys%L_static(ie,j1), b1,  &
+  !!Now build the static contribution from the lifting line elements
+  !do j1 = 1,linsys%nstatic_ll
+  !  call expl_elems(j1)%p%compute_pot( linsys%L_static(ie,j1), b1,  &
+  !                                this%cen, 1, 2 )
+  !enddo
+
+  !!Now build the static contribution from the actuator disk elements
+  !do j1 = 1,linsys%nstatic_ad
+  !  call ad_elems(j1)%p%compute_pot( linsys%D_static(ie,j1), b1,  &
+  !                                this%cen, 1, 2 )
+  !enddo
+
+
+  !Now build the static contribution from the explicit elements
+  do j1 = 1,linsys%nstatic_expl
+    call expl_elems(j1)%p%compute_pot( linsys%D_static(ie,j1), b1,  &
                                   this%cen, 1, 2 )
   enddo
-
-  !Now build the static contribution from the actuator disk elements
-  do j1 = 1,linsys%nstatic_ad
-    call ad_elems(j1)%p%compute_pot( linsys%D_static(ie,j1), b1,  &
-                                  this%cen, 1, 2 )
-  enddo
-
   !The rest of the dynamic part will be completed during the first
   ! iteration of the assembling
 
@@ -390,7 +399,7 @@ end subroutine build_row_static_surfpan
 subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, uinf, &
                             ie,ista, iend)
  class(t_surfpan), intent(inout) :: this
- type(t_elem_p), intent(in)      :: wake_elems(:)
+ type(t_pot_elem_p), intent(in)      :: wake_elems(:)
  integer, intent(in)             :: impl_wake_ind(:,:)
  type(t_linsys), intent(inout)   :: linsys
  real(wp), intent(in)            :: uinf(:)
@@ -430,7 +439,7 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, uinf, &
     !todo: find a more elegant solution to avoid i=j
     call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
 
-    linsys%b(ie) = linsys%b(ie) - a*wake_elems(j1)%p%idou
+    linsys%b(ie) = linsys%b(ie) - a*wake_elems(j1)%p%mag
 
   end do
 
@@ -442,10 +451,10 @@ end subroutine add_wake_surfpan
 !!
 !! The rhs of the equation for a surface panel is updated  adding the
 !! the contribution of potential due to the lifting lines
-subroutine add_liftlin_surfpan(this, ll_elems, linsys, uinf, &
+subroutine add_expl_surfpan(this, expl_elems, linsys, uinf, &
                             ie,ista, iend)
  class(t_surfpan), intent(inout) :: this
- type(t_elem_p), intent(in)      :: ll_elems(:)
+ type(t_expl_elem_p), intent(in)      :: expl_elems(:)
  type(t_linsys), intent(inout)   :: linsys
  real(wp), intent(in)            :: uinf(:)
  integer, intent(in)             :: ie
@@ -457,56 +466,20 @@ subroutine add_liftlin_surfpan(this, ll_elems, linsys, uinf, &
 
   !Static part: take what was already computed
   do  j1 = 1, ista-1
-    linsys%b(ie) = linsys%b(ie) - linsys%L_static(ie,j1)*ll_elems(j1)%p%idou
+    linsys%b(ie) = linsys%b(ie) - linsys%L_static(ie,j1)*expl_elems(j1)%p%mag
   enddo
 
   !Dynamic part: compute the things now
   do j1 = ista , iend
 
     !todo: find a more elegant solution to avoid i=j
-    call ll_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
+    call expl_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
 
-    linsys%b(ie) = linsys%b(ie) - a*ll_elems(j1)%p%idou
-
-  end do
-
-end subroutine add_liftlin_surfpan
-
-!----------------------------------------------------------------------
-
-!> Add the contribution of actuator disks to one equation for a surface panel
-!!
-!! The rhs of the equation for a surface panel is updated  adding the
-!! the contribution of potential due to the actuator disks
-subroutine add_actdisk_surfpan(this, ad_elems, linsys, uinf, &
-                            ie,ista, iend)
- class(t_surfpan), intent(inout) :: this
- type(t_elem_p), intent(in)      :: ad_elems(:)
- type(t_linsys), intent(inout)   :: linsys
- real(wp), intent(in)            :: uinf(:)
- integer, intent(in)             :: ie
- integer, intent(in)             :: ista
- integer, intent(in)             :: iend
-
- integer :: j1
- real(wp) :: a, b(3)
-
-  !Static part: take what was already computed
-  do  j1 = 1, ista-1
-    linsys%b(ie) = linsys%b(ie) - linsys%D_static(ie,j1)*ad_elems(j1)%p%idou
-  enddo
-
-  !Dynamic part: compute the things now
-  do j1 = ista , iend
-
-    !todo: find a more elegant solution to avoid i=j
-    call ad_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
-
-    linsys%b(ie) = linsys%b(ie) - a*ad_elems(j1)%p%idou
+    linsys%b(ie) = linsys%b(ie) - a*expl_elems(j1)%p%mag
 
   end do
 
-end subroutine add_actdisk_surfpan
+end subroutine add_expl_surfpan
 
 !----------------------------------------------------------------------
 
@@ -597,53 +570,9 @@ subroutine compute_vel_surfpan(this, pos , uinf, vel )
   ! source ----
   call velocity_calc_sou_surfpan(this, vsou, pos)
 
-  vel = vdou*this%idou - vsou*( sum(this%nor*(this%ub-uinf)) )
+  vel = vdou*this%mag - vsou*( sum(this%nor*(this%ub-uinf)) )
 
 end subroutine compute_vel_surfpan
-
-!----------------------------------------------------------------------
-
-subroutine compute_cp_surfpan(this, elems, uinf) !, uinf)
-  class(t_surfpan), intent(inout) :: this
-  type(t_elem_p), intent(in) :: elems(:)
-  real(wp), intent(in) :: uinf(:)
-
-  real(wp) :: vel_phi(3)
-
-  integer :: i_e
-
-  ! perturbation velocity, u ---------------------------------
-  ! Compute velocity from the potential (mu = -phi), exploiting the stencil
-  ! contained in pot_vel_stencil
-  vel_phi = 0.0_wp
-  do i_e = 1 , this%n_ver
-    if ( associated(this%neigh(i_e)%p) ) then
-      vel_phi = vel_phi + &
-        this%pot_vel_stencil(:,i_e) * (this%neigh(i_e)%p%idou - this%idou)
-    ! else
-    end if
-  end do
-
-  !DEBUG
-  if (.not. allocated(this%vel)) then !
-    allocate(this%vel(3)) ; this%vel = 0.0_wp
-    write(*,*) 'allocating this%vel'
-  end if
-
-  vel_phi  = - vel_phi    ! mu = - phi
-
-  ! velocity, U = u_t \hat{t} + u_n \hat{n} + U_inf ----------
-  this%vel = vel_phi - sum(vel_phi*this%nor)*this%nor    +  &
-             this%nor * sum(this%nor * (-uinf+this%ub) ) +  &
-             uinf
-
-  ! pressure coefficient, cp ---------------------------------
-  ! steady problems  : cp = 1 - (V/V_inf)^2 - dphi/dt * 2/(V_inf^2)
-  this%cp  = 1.0_wp - ( norm2(this%vel) / norm2(uinf) )**2.0_wp  &
-           + 2.0_wp * this%didou_dt / norm2(uinf)**2.0_wp
-
-
-end subroutine compute_cp_surfpan
 
 !----------------------------------------------------------------------
 
@@ -651,8 +580,8 @@ end subroutine compute_cp_surfpan
 !!
 subroutine compute_pres_surfpan(this, elems, sim_param)
   class(t_surfpan), intent(inout) :: this
-  type(t_elem_p), intent(in) :: elems(:)
-  type(t_sim_param), intent(in) :: sim_param
+  type(t_elem_p),   intent(in)    :: elems(:)
+  type(t_sim_param), intent(in)   :: sim_param
 
   real(wp) :: vel_phi(3)
 
@@ -665,7 +594,7 @@ subroutine compute_pres_surfpan(this, elems, sim_param)
   do i_e = 1 , this%n_ver
     if ( associated(this%neigh(i_e)%p) ) then
       vel_phi = vel_phi + &
-        this%pot_vel_stencil(:,i_e) * (this%neigh(i_e)%p%idou - this%idou)
+        this%pot_vel_stencil(:,i_e) * (this%neigh(i_e)%p%mag - this%mag)
     ! else
     end if
   end do

@@ -63,11 +63,16 @@ use mod_parametric_io, only: &
 use mod_aero_elements, only: &
   c_elem, t_elem_p
 
+use mod_aeroel, only: &
+  c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
+
+
 use mod_surfpan, only: &
   t_surfpan
 
-use mod_vortring, only: &
-  t_vortring
+use mod_vortlatt, only: &
+  t_vortlatt
 
 use mod_liftlin, only: &
   t_liftlin
@@ -138,7 +143,7 @@ type :: t_geo_component
  !> Elements of the group
  !! The main memory allocation happens here, they will be pointed from
  !! somewhere else
- class(c_elem), allocatable :: el(:)
+ class(c_pot_elem), allocatable :: el(:)
 
  !> Global indexes of the points in the component
  integer, allocatable :: i_points(:)
@@ -186,13 +191,16 @@ end type  t_geo_component
 type :: t_geo
 
  !> Total number of implicit elements
- integer :: nelem
+ integer :: nelem_impl
 
  !> Number of lifting line elements
  integer :: nll
 
  !> Number of actuator disk elements
  integer :: nad
+
+ !> Number of explicit elements
+ integer :: nelem_expl
 
  !> Number of surface panel elements
  integer :: nSurfPan
@@ -206,16 +214,13 @@ type :: t_geo
  !> Number of Actuator disk elements
  integer :: nActDisk
 
- !> Number of statical elements
- integer :: nstatic
- !> Number of moving elements
- integer :: nmoving
+ !> Number of statical implicit elements
+ integer :: nstatic_impl
+ !> Number of moving implicit elements
+ integer :: nmoving_impl
 
  !> Number of static or moving lifting lines
- integer :: nstatic_ll, nmoving_ll
-
- !> Number of static or moving lifting lines
- integer :: nstatic_ad, nmoving_ad
+ integer :: nstatic_expl, nmoving_expl
 
  !> All the components of the geometry
  type(t_geo_component), allocatable :: components(:)
@@ -291,10 +296,9 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
  character(len=*), intent(inout) :: ref_file_name
  character(len=*), intent(in) :: in_file_name
  type(t_geo), intent(out), target :: geo
- type(t_elem_p), allocatable, intent(out) :: elems(:)
- type(t_elem_p), allocatable, intent(out) :: elems_ll(:)
- type(t_elem_p), allocatable, intent(out) :: elems_ad(:)
- type(t_elem_p), allocatable, intent(out) :: elems_tot(:)
+ type(t_impl_elem_p), allocatable, intent(out) :: elems_impl(:)
+ type(t_expl_elem_p), allocatable, intent(out) :: elems_expl(:)
+ type(t_pot_elem_p),  allocatable, intent(out) :: elems_tot(:)
  type(t_tedge), intent(out) :: te
  type(t_aero_tab) , allocatable, intent(out) :: airfoil_data(:)
  type(t_sim_param) , intent(inout) :: sim_param
@@ -812,7 +816,7 @@ subroutine load_components(geo, in_file, sim_param, te)
        case('p')
         allocate(t_surfpan::geo%components(i_comp)%el(size(ee,2)))
        case('v')
-        allocate(t_vortring::geo%components(i_comp)%el(size(ee,2)))
+        allocate(t_vortlatt::geo%components(i_comp)%el(size(ee,2)))
        case('l')
         allocate(t_liftlin::geo%components(i_comp)%el(size(ee,2)))
        case('a')
@@ -1092,7 +1096,7 @@ subroutine prepare_geometry(geo)
        allocate(elem%cosTi(nsides))
        allocate(elem%sinTi(nsides))
 
-      class is(t_vortring)
+      class is(t_vortlatt)
        allocate(elem%tang(3,2))
        allocate(elem%edge_vec(3,nsides))
        allocate(elem%edge_len(nsides))
@@ -1528,7 +1532,7 @@ subroutine create_strip_connectivity(geo)
     ! allocate and fill comp%strip_elem array
     if ( mod(n_el,n_s) .ne. 0 ) then
       call error(this_sub_name, this_mod_name, ' mod(n_elem,n_s) .ne. 0. &
-         & Wrong input file for vortring component.')
+         & Wrong input file for vortlatt component.')
     end if
     n_c = n_el / n_s  ! integer division to find number of chord panels
 
