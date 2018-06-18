@@ -75,12 +75,6 @@ public :: t_vortlatt
 type, extends(c_impl_elem) :: t_vortlatt
 
   !TODO: consider applying the correct element pointer here
-  !> Panel width (= strip width)
-  real(wp)              :: dy
-  !> Previous element in a stripe 
-  type(t_elem_p)        :: stripe_1
-  !> Element indices in the component%strip_elem array
-  type(t_elem_p), allocatable :: stripe_elem(:)
 contains
 
 procedure, pass(this) :: build_row        => build_row_vortlatt

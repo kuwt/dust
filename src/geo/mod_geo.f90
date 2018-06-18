@@ -60,8 +60,8 @@ use mod_cgns_io, only: &
 use mod_parametric_io, only: &
   read_mesh_parametric
 
-use mod_aero_elements, only: &
-  c_elem, t_elem_p
+!use mod_aero_elements, only: &
+!  c_elem, t_elem_p
 
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
@@ -194,10 +194,10 @@ type :: t_geo
  integer :: nelem_impl
 
  !> Number of lifting line elements
- integer :: nll
+ !integer :: nll
 
  !> Number of actuator disk elements
- integer :: nad
+ !integer :: nad
 
  !> Number of explicit elements
  integer :: nelem_expl
@@ -206,7 +206,7 @@ type :: t_geo
  integer :: nSurfPan
 
  !> Number of vortex ring elements
- integer :: nVortRin
+ integer :: nVortLatt
 
  !> Number of lifting line elements
  integer :: nLiftLin
@@ -290,25 +290,28 @@ contains
 !!    moving elements after, and in the total elements surface panels
 !!    and vortex rings before, then lifting lines and finally actuator disks
 subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
-                           te, elems, elems_ll, elems_ad, elems_tot, &
-                           airfoil_data, sim_param)
+                           te, elems_impl, elems_expl, elems_ad, elems_ll, &
+                           elems_tot, airfoil_data, sim_param)
  character(len=*), intent(in) :: geo_file_name
  character(len=*), intent(inout) :: ref_file_name
  character(len=*), intent(in) :: in_file_name
  type(t_geo), intent(out), target :: geo
  type(t_impl_elem_p), allocatable, intent(out) :: elems_impl(:)
  type(t_expl_elem_p), allocatable, intent(out) :: elems_expl(:)
+ type(t_expl_elem_p), allocatable, intent(out) :: elems_ad(:)
+ type(t_expl_elem_p), allocatable, intent(out) :: elems_ll(:)
  type(t_pot_elem_p),  allocatable, intent(out) :: elems_tot(:)
  type(t_tedge), intent(out) :: te
  type(t_aero_tab) , allocatable, intent(out) :: airfoil_data(:)
  type(t_sim_param) , intent(inout) :: sim_param
  real(wp)                     :: tstart
 
- integer :: i, j, is, im,  i_comp, i_ll, i_ad, i_tot
- type(t_elem_p), allocatable :: temp_static(:), temp_moving(:)
-
+ integer :: i, j, is, im,  i_comp, i_ll, i_ad, i_tot, i_expl, i_impl
+ type(t_impl_elem_p), allocatable :: temp_static_i(:), temp_moving_i(:)
+ type(t_expl_elem_p), allocatable :: temp_static_e(:), temp_moving_e(:)
 
  character(len=max_char_len) :: msg
+ character(len=*), parameter :: this_sub_name='create_geometry'
 
   tstart = sim_param%t0
 
@@ -330,58 +333,67 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   call import_aero_tab(geo,airfoil_data)
 
   ! Initialisation
-  geo%nelem      = 0
-  geo%nll        = 0
-  geo%nad        = 0
-  geo%nstatic    = 0
-  geo%nmoving    = 0
-  geo%nstatic_ll = 0
-  geo%nmoving_ll = 0
-  geo%nstatic_ad = 0
-  geo%nmoving_ad = 0
+  geo%nelem_impl   = 0
+  geo%nelem_expl   = 0
+  !geo%nll          = 0
+  !geo%nad          = 0
+  geo%nstatic_impl = 0
+  geo%nmoving_impl = 0
+  geo%nstatic_expl = 0
+  geo%nmoving_expl = 0
   geo%nSurfPan   = 0
-  geo%nVortRin   = 0
+  geo%nVortLatt  = 0
   geo%nLiftLin   = 0
   geo%nActDisk   = 0
 
   ! count the elements
   do i_comp = 1,size(geo%components)
 
-    if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p') then
+    select case(trim(geo%components(i_comp)%comp_el_type))
+     case('p')
+    !if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p') then
       if(geo%components(i_comp)%moving) then
-        geo%nmoving = geo%nmoving + geo%components(i_comp)%nelems
+        geo%nmoving_impl = geo%nmoving_impl + geo%components(i_comp)%nelems
       else
-        geo%nstatic = geo%nstatic + geo%components(i_comp)%nelems
+        geo%nstatic_impl = geo%nstatic_impl + geo%components(i_comp)%nelems
       endif
       geo%nSurfPan = geo%nSurfPan + geo%components(i_comp)%nelems
-      geo%nelem = geo%nelem + geo%components(i_comp)%nelems
+      geo%nelem_impl = geo%nelem_impl + geo%components(i_comp)%nelems
 
-    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'v') then
+     case('v')
+    !elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'v') then
       if(geo%components(i_comp)%moving) then
-        geo%nmoving = geo%nmoving + geo%components(i_comp)%nelems
+        geo%nmoving_impl = geo%nmoving_impl + geo%components(i_comp)%nelems
       else
-        geo%nstatic = geo%nstatic + geo%components(i_comp)%nelems
+        geo%nstatic_impl = geo%nstatic_impl + geo%components(i_comp)%nelems
       endif
-      geo%nVortRin = geo%nVortRin + geo%components(i_comp)%nelems
-      geo%nelem = geo%nelem + geo%components(i_comp)%nelems
+      geo%nVortLatt = geo%nVortLatt + geo%components(i_comp)%nelems
+      geo%nelem_impl = geo%nelem_impl + geo%components(i_comp)%nelems
 
-    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'l') then
+     case('l')
+    !elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'l') then
       if(geo%components(i_comp)%moving) then
-        geo%nmoving_ll = geo%nmoving_ll + geo%components(i_comp)%nelems
+        geo%nmoving_expl = geo%nmoving_expl + geo%components(i_comp)%nelems
       else
-        geo%nstatic_ll = geo%nstatic_ll + geo%components(i_comp)%nelems
+        geo%nstatic_expl = geo%nstatic_expl + geo%components(i_comp)%nelems
       endif
       geo%nLiftLin = geo%nLiftLin + geo%components(i_comp)%nelems
-      geo%nll = geo%nll + geo%components(i_comp)%nelems
-    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'a') then
+      geo%nelem_expl = geo%nelem_expl + geo%components(i_comp)%nelems
+     
+     case('a')
+    !elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'a') then
       if(geo%components(i_comp)%moving) then
-        geo%nmoving_ad = geo%nmoving_ad + geo%components(i_comp)%nelems
+        geo%nmoving_expl = geo%nmoving_expl + geo%components(i_comp)%nelems
       else
-        geo%nstatic_ad = geo%nstatic_ad + geo%components(i_comp)%nelems
+        geo%nstatic_expl = geo%nstatic_expl + geo%components(i_comp)%nelems
       endif
       geo%nActDisk = geo%nActDisk + geo%components(i_comp)%nelems
-      geo%nad = geo%nad + geo%components(i_comp)%nelems
-    endif
+      geo%nelem_expl = geo%nelem_expl + geo%components(i_comp)%nelems
+    !endif
+     case default
+      call error (this_sub_name, this_mod_name, 'Unknow type of element: '&
+                  //trim(geo%components(i_comp)%comp_el_type))
+    end select
 
   enddo
 
@@ -393,129 +405,155 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
 
   if(sim_param%debug_level .ge. 3) then
     call printout(nl//' Geometry details:' )
-    write(msg,'(A,I9)') '  number of elements:        ' ,geo%nelem
+    write(msg,'(A,I9)') '  number of total elements:    ', &
+                                                geo%nelem_impl + geo%nelem_expl
     call printout(msg)
-    write(msg,'(A,I9)') '  number of static elements: ' ,geo%nstatic
+    write(msg,'(A,I9)') '  number of implicit elements: ' ,geo%nelem_impl
     call printout(msg)
-    write(msg,'(A,I9)') '  number of moving elements: ' ,geo%nmoving
+    write(msg,'(A,I9)') '  number of explicit elements: ' ,geo%nelem_expl
     call printout(msg)
-    write(msg,'(A,I9)') '  number of surface panels:  ' ,geo%nsurfpan
+    write(msg,'(A,I9)') '  number of static elements:   ' , &
+                                            geo%nstatic_impl + geo%nstatic_expl
     call printout(msg)
-    write(msg,'(A,I9)') '  number of vortex rings:    ' ,geo%nvortrin
+    write(msg,'(A,I9)') '  number of moving elements:   ' , &
+                                            geo%nmoving_impl + geo%nmoving_expl
     call printout(msg)
-    write(msg,'(A,I9)') '  number of lifting lines:   ' ,geo%nvortrin
+    write(msg,'(A,I9)') '  number of surface panels:    ' ,geo%nsurfpan
     call printout(msg)
-    write(msg,'(A,I9)') '  number of actuator disks:  ' ,geo%nvortrin
+    write(msg,'(A,I9)') '  number of vortex lattices:   ' ,geo%nVortLatt
+    call printout(msg)
+    write(msg,'(A,I9)') '  number of lifting lines:     ' ,geo%nLiftLin
+    call printout(msg)
+    write(msg,'(A,I9)') '  number of actuator disks:    ' ,geo%nActDisk
     call printout(msg)
   endif
 
   !Create the vector of pointers to all the elements
-  allocate(elems(geo%nelem), elems_ll(geo%nll), elems_ad(geo%nad), &
-           elems_tot(geo%nelem+geo%nll+geo%nad))
-  i=0; i_ll=0; i_ad=0; i_tot=0
+  allocate(elems_impl(geo%nelem_impl), elems_expl(geo%nelem_expl),  &
+           elems_tot(geo%nelem_impl+geo%nelem_expl))
+  allocate(elems_ad(geo%nactdisk))
+  i_impl=0; i_expl=0; i_ad=0; i_ll=0; i_tot=0
   do i_comp = 1,size(geo%components)
 
     if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p' .or. &
         trim(geo%components(i_comp)%comp_el_type) .eq. 'v') then
 
       do j = 1,size(geo%components(i_comp)%el)
-        i = i+1
+        i_impl = i_impl+1
         i_tot = i_tot+1
-        elems(i)%p => geo%components(i_comp)%el(j)
+        elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
+        select type(el => geo%components(i_comp)%el(j)); class is(c_impl_elem)
+        !elems_impl(i)%p => geo%components(i_comp)%el(j)
+        elems_impl(i_impl)%p => el
+        end select
       enddo
 
     elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'l') then
 
       do j = 1,size(geo%components(i_comp)%el)
         i_ll = i_ll+1
+        i_expl = i_expl+1
         i_tot = i_tot+1
-        elems_ll(i_ll)%p => geo%components(i_comp)%el(j)
+        elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
+        select type(el => geo%components(i_comp)%el(j)); class is(c_expl_elem)
+          !elems_ll(i_ll)%p => geo%components(i_comp)%el(j)
+          !elems_expl(i_expl)%p => geo%components(i_comp)%el(j)
+          elems_ll(i_ll)%p => el
+          elems_expl(i_expl)%p => el
+        end select
       enddo
 
     elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'a') then
 
       do j = 1,size(geo%components(i_comp)%el)
         i_ad = i_ad+1
+        i_expl = i_expl+1
         i_tot = i_tot+1
-        elems_ad(i_ad)%p => geo%components(i_comp)%el(j)
+        elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
+        select type(el => geo%components(i_comp)%el(j)); class is(c_expl_elem)
+          !elems_ad(i_ad)%p => geo%components(i_comp)%el(j)
+          !elems_expl(i_expl)%p => geo%components(i_comp)%el(j)
+          elems_ad(i_ad)%p => el
+          elems_expl(i_expl)%p => el
+        end select
       enddo
 
     endif
   enddo
 
-  ! Sort elements: first static, then moving -------
+  ! Sort implicit elements: first static, then moving -------
   !fill in the two temporaries
-  allocate(temp_static(geo%nstatic), temp_moving(geo%nmoving))
+  allocate(temp_static_i(geo%nstatic_impl), temp_moving_i(geo%nmoving_impl))
   is = 0; im = 0;
-  do i = 1,geo%nelem
-    if(elems(i)%p%moving) then
+  do i = 1,geo%nelem_impl
+    if(elems_impl(i)%p%moving) then
       im = im+1
-      temp_moving(im) = elems(i)
+      temp_moving_i(im) = elems_impl(i)
     else
       is = is+1
-      temp_static(is) = elems(i)
+      temp_static_i(is) = elems_impl(i)
     endif
   enddo
 
   !Now might be more bombproof to deallocate and allocate, but for the moment..
-  elems(1:geo%nstatic) = temp_static
-  elems(geo%nstatic+1:geo%nelem) = temp_moving
+  elems_impl(1:geo%nstatic_impl) = temp_static_i
+  elems_impl(geo%nstatic_impl+1:geo%nelem_impl) = temp_moving_i
 
+  deallocate(temp_static_i, temp_moving_i)
 
   !Update the indexing since we re-ordered the vector
-  do i = 1,geo%nelem
-    elems(i)%p%id = i
+  do i = 1,geo%nelem_impl
+    elems_impl(i)%p%id = i
   end do
 
-  !Now re-order the lifting line elements
-  deallocate(temp_static, temp_moving)
-  allocate(temp_static(geo%nstatic_ll), temp_moving(geo%nmoving_ll))
+  !Now re-order the explicit elements
+  allocate(temp_static_e(geo%nstatic_expl), temp_moving_e(geo%nmoving_expl))
   is = 0; im = 0;
-  do i = 1,geo%nll
-    if(elems_ll(i)%p%moving) then
+  do i = 1,geo%nelem_expl
+    if(elems_expl(i)%p%moving) then
       im = im+1
-      temp_moving(im) = elems_ll(i)
+      temp_moving_e(im) = elems_expl(i)
     else
       is = is+1
-      temp_static(is) = elems_ll(i)
+      temp_static_e(is) = elems_expl(i)
     endif
   enddo
-  if(geo%nll .gt. 0) then
-    elems_ll(1:geo%nstatic_ll) = temp_static
-    elems_ll(geo%nstatic_ll+1:geo%nll) = temp_moving
+  if(geo%nelem_expl .gt. 0) then
+    elems_expl(1:geo%nstatic_expl) = temp_static_e
+    elems_expl(geo%nstatic_expl+1:geo%nelem_expl) = temp_moving_e
   endif
+  deallocate(temp_static_e, temp_moving_e)
 
-  !Now re-order the actuator disks
-  deallocate(temp_static, temp_moving)
-  allocate(temp_static(geo%nstatic_ad), temp_moving(geo%nmoving_ad))
-  is = 0; im = 0;
-  do i = 1,geo%nad
-    if(elems_ad(i)%p%moving) then
-      im = im+1
-      temp_moving(im) = elems_ad(i)
-    else
-      is = is+1
-      temp_static(is) = elems_ad(i)
-    endif
-  enddo
-  if(geo%nad .gt. 0) then
-    elems_ad(1:geo%nstatic_ad) = temp_static
-    elems_ad(geo%nstatic_ad+1:geo%nad) = temp_moving
-  endif
+  !Update the indexing since we re-ordered the vector
+  do i = 1,geo%nelem_expl
+    elems_expl(i)%p%id = i
+  end do
 
-  deallocate(temp_static, temp_moving)
+  !!Patch together everything in elems_tot
+  !do i = 1, geo%nelem_impl
+  !  select type(el => elems_impl(i)%p)
+  !  class is(c_pot_elem)
+  !    elems_tot(i)%p => el
+  !  end select
+  !enddo
 
-  !Patch together everything in elems_tot
-  elems_tot(1:geo%nelem) = elems
-  elems_tot(geo%nelem+1:geo%nelem+geo%nll) =elems_ll
-  elems_tot(geo%nelem+geo%nll+1:geo%nelem+geo%nll+geo%nad) = elems_ad
+  !do i = 1, geo%nelem_expl
+  !  select type(el => elems_expl(i)%p)
+  !  class is(c_pot_elem)
+  !    elems_tot(geo%nelem_impl+i)%p => el
+  !  end select
+  !enddo
+
+  !elems_tot(1:geo%nelem_impl) = elems_impl
+  !elems_tot(geo%nelem_impl+1:geo%nelem_impl+geo%nelem_expl) =elems_expl
 
   !EXPERIMENTAL
-  do i = 1,size(elems_tot)
-    elems_tot(i)%p%id = i
-  end do
-
-  call create_local_velocity_stencil(geo,elems)    ! for surfpan only (3dP)
+  !do i = 1,size(elems_tot)
+  !  elems_tot(i)%p%id = i
+  !end do
+  
+  !TODO: think about getting both of these into "prepare_geometry"
+  call create_local_velocity_stencil(geo)    ! for surfpan only (3dP)
 
   call create_strip_connectivity(geo)
 
@@ -1071,7 +1109,7 @@ subroutine prepare_geometry(geo)
 
  integer :: i_comp, ie
  integer :: nsides
- class(c_elem), pointer :: elem
+ class(c_pot_elem), pointer :: elem
  character(len=*), parameter :: this_sub_name = 'prepare_geometry'
 
  do i_comp = 1,size(geo%components)
@@ -1083,12 +1121,12 @@ subroutine prepare_geometry(geo)
 
      !Fields common to each element
      allocate(elem%ver(3,nsides))
-     allocate(elem%cen(3))
-     allocate(elem%nor(3))
+     !allocate(elem%cen(3))
+     !allocate(elem%nor(3))
 
      select type(elem)
       class is(t_surfpan)
-       allocate(elem%tang(3,2))
+       !allocate(elem%tang(3,2))
        allocate(elem%verp(3,nsides))
        allocate(elem%edge_vec(3,nsides))
        allocate(elem%edge_len(nsides))
@@ -1097,13 +1135,13 @@ subroutine prepare_geometry(geo)
        allocate(elem%sinTi(nsides))
 
       class is(t_vortlatt)
-       allocate(elem%tang(3,2))
+       !allocate(elem%tang(3,2))
        allocate(elem%edge_vec(3,nsides))
        allocate(elem%edge_len(nsides))
        allocate(elem%edge_uni(3,nsides))
 
       class is(t_liftlin)
-       allocate(elem%tang(3,2))
+       !allocate(elem%tang(3,2))
        allocate(elem%tang_cen(3))
        allocate(elem%bnorm_cen(3))
        allocate(elem%edge_vec(3,nsides))
@@ -1115,7 +1153,7 @@ subroutine prepare_geometry(geo)
        elem%i_airfoil =  geo%components(i_comp)%i_airfoil_e(:,ie)
 
       class is(t_actdisk)
-       allocate(elem%tang(3,2))
+       !allocate(elem%tang(3,2))
        allocate(elem%edge_vec(3,nsides))
        allocate(elem%edge_len(nsides))
        allocate(elem%edge_uni(3,nsides))
@@ -1137,7 +1175,7 @@ end subroutine prepare_geometry
 !! The subroutine calculates all the relevant geometrical quantities of a
 !! panel element (vortex ring or surface panel)
 subroutine calc_geo_data_pan(elem,vert)
- class(c_elem), intent(inout) :: elem
+ class(c_pot_elem), intent(inout) :: elem
  real(wp), intent(in) :: vert(:,:)
 
  integer :: nsides, is
@@ -1226,10 +1264,10 @@ end subroutine calc_geo_data_pan
 !! The subroutine calculates all the relevant geometrical quantities of a
 !! lifting line element
 subroutine calc_geo_data_ll(elem,vert)
- class(c_elem), intent(inout) :: elem
+ class(c_pot_elem), intent(inout) :: elem
  real(wp), intent(in) :: vert(:,:)
 
- integer :: nsides, is
+ integer :: sides, is, nsides
  real(wp):: nor(3), tanl(3)
 
   nsides = size(vert,2)
@@ -1308,7 +1346,7 @@ end subroutine calc_geo_data_ll
 !! The subroutine calculates all the relevant geometrical quantities of an
 !! actuator disk
 subroutine calc_geo_data_ad(elem,vert)
- class(c_elem), intent(inout) :: elem
+ class(c_pot_elem), intent(inout) :: elem
  real(wp), intent(in) :: vert(:,:)
 
  integer :: nsides, is
@@ -1369,7 +1407,7 @@ end subroutine calc_geo_data_ad
 !! boundary condition
 !!
 subroutine calc_geo_vel(elem, G, f)
- class(c_elem), intent(inout) :: elem
+ class(c_pot_elem), intent(inout) :: elem
  real(wp), intent(in) :: f(3), G(3,3)
 
   if(.not.allocated(elem%ub)) allocate(elem%ub(3))
@@ -1399,53 +1437,55 @@ end subroutine calc_node_vel
 !!  in the local frame, associated with the component. In order to obtain
 !!  the components of the velcoity in the base frame, the global rotation
 !!  matrix is needed.
-subroutine create_local_velocity_stencil (geo, elems)
+!TODO: move all this stuff in prepare geometry
+subroutine create_local_velocity_stencil (geo)
  type(t_geo), intent(inout) :: geo
- type(t_elem_p), intent(in)  :: elems(:)
+ !type(t_impl_elem_p), intent(in)  :: elems(:)
 
  real(wp) :: surf_bubble
  integer  :: i_comp , i_el , i_v
 
- do i_comp = 1 , size(geo%components)
+  do i_comp = 1 , size(geo%components)
 
-  ! Field pot_vel_stencil belongs to surfpan elements only!
-  if ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'p' ) then
+    ! Field pot_vel_stencil belongs to surfpan elements only!
+    !if ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'p' ) then
+    select type (el => geo%components(i_comp)%el)
+    type is(t_surfpan)
 
-   do i_el = 1 , size(geo%components(i_comp)%el)
+      do i_el = 1 , size(el)
+        
+        !TODO: consider removing this check if we are pretty sure it will
+        !pass
+        if ( allocated(el(i_el)%pot_vel_stencil) ) then
+          write(*,*) ' WARNING. Already allocated pot_vel_stencil array for '
+          write(*,*) ' component , element ' , i_comp , i_el
+          deallocate(el(i_el)%pot_vel_stencil)
+        end if
+        allocate(el(i_el)%pot_vel_stencil(3,el(i_el)%n_ver) )
 
-    if ( allocated(geo%components(i_comp)%el(i_el)%pot_vel_stencil) ) then
-      write(*,*) ' WARNING. Already allocated pot_vel_stencil array for '
-      write(*,*) ' component , element ' , i_comp , i_el
-      deallocate(geo%components(i_comp)%el(i_el)%pot_vel_stencil)
-    end if
-    allocate(geo%components(i_comp)%el(i_el)%pot_vel_stencil &
-             (3,geo%components(i_comp)%el(i_el)%n_ver) )
+        surf_bubble = el(i_el)%area
 
-    surf_bubble = geo%components(i_comp)%el(i_el)%area
+        do i_v = 1 , el(i_el)%n_ver
 
-    do i_v = 1 , geo%components(i_comp)%el(i_el)%n_ver
+          ! Update surf_bubble
+          surf_bubble = surf_bubble + &
+               el(i_el)%neigh(i_v)%p%area / &
+               real(el(i_el)%neigh(i_v)%p%n_ver,wp)
 
-      ! Update surf_bubble
-      surf_bubble = surf_bubble + &
-           elems(geo%components(i_comp)%el(i_el)%id)%p%area / &
-           dble(elems(geo%components(i_comp)%el(i_el)%id)%p%n_ver)
+          el(i_el)%pot_vel_stencil(:,i_v) = &
+                   cross( el(i_el)%edge_vec(:,i_v) , el(i_el)%nor )
 
-      geo%components(i_comp)%el(i_el)%pot_vel_stencil(:,i_v) = &
-               cross( geo%components(i_comp)%el(i_el)%edge_vec(:,i_v) , &
-                      geo%components(i_comp)%el(i_el)%nor )
+        end do
 
+        el(i_el)%pot_vel_stencil = el(i_el)%pot_vel_stencil / surf_bubble
 
-    end do
-
-    geo%components(i_comp)%el(i_el)%pot_vel_stencil = &
-      geo%components(i_comp)%el(i_el)%pot_vel_stencil / surf_bubble
-
-   end do
+      end do
 
 ! else if ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'v' ) then
 !   no stencil for the velocity ...
 
-  end if
+  !end if
+  end select
 
  end do
 

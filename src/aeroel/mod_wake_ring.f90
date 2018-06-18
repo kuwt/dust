@@ -48,11 +48,15 @@ use mod_handling, only: &
 use mod_geometry, only: &
   t_geo, t_tedge, calc_geo_data_ad
 
-use mod_aero_elements, only: &
-  c_elem, t_elem_p
+!use mod_aero_elements, only: &
+!  c_elem, t_elem_p
 
-use mod_vortring, only: &
-  t_vortring
+use mod_aeroel, only: &
+  c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
+
+use mod_vortlatt, only: &
+  t_vortlatt
 
 use mod_actuatordisk, only: &
   t_actdisk
@@ -99,7 +103,7 @@ type t_wake_rings
  integer :: np_row
 
  !> Generating actuator disk elements
- type(t_elem_p), allocatable :: gen_elems(:)
+ type(t_pot_elem_p), allocatable :: gen_elems(:)
 
 
  !> Ring elements
@@ -109,7 +113,7 @@ type t_wake_rings
  !real(wp), allocatable :: w_points(:,:)
 
  !> vortex intensities
- real(wp), allocatable :: ivort(:,:)
+ real(wp), allocatable :: idou(:,:)
 
  !> pointer to the wake elements to be passed to the linsys
  !! solver
@@ -150,7 +154,7 @@ subroutine initialize_wake_rings(wake, geo, nrings)
   allocate(wake%gen_elems(wake%ndisks))
   !allocate(wake%w_points(3,wake%n_wake_points,npan+1))
   allocate(wake%wake_rings(wake%ndisks,wake%nrings))
-  allocate(wake%ivort(wake%ndisks,wake%nrings))
+  allocate(wake%idou(wake%ndisks,wake%nrings))
   !allocate(wake%pan_p(0))
 
   !Associate
@@ -166,13 +170,13 @@ subroutine initialize_wake_rings(wake, geo, nrings)
 
   do id = 1,wake%ndisks
     do ir = 1,wake%nrings
-      wake%wake_rings(id,ir)%idou => wake%ivort(id,ir)
+      wake%wake_rings(id,ir)%mag => wake%idou(id,ir)
       nsides = wake%gen_elems(id)%p%n_ver
       wake%wake_rings(id,ir)%n_ver = nsides
       allocate(wake%wake_rings(id,ir)%ver(3,nsides))
-      allocate(wake%wake_rings(id,ir)%cen(3))
-      allocate(wake%wake_rings(id,ir)%nor(3))
-      allocate(wake%wake_rings(id,ir)%tang(3,2))
+      !allocate(wake%wake_rings(id,ir)%cen(3))
+      !allocate(wake%wake_rings(id,ir)%nor(3))
+      !allocate(wake%wake_rings(id,ir)%tang(3,2))
       !TODO: check if the following are really used
       allocate(wake%wake_rings(id,ir)%edge_vec(3,nsides))
       allocate(wake%wake_rings(id,ir)%edge_len(nsides))
@@ -181,7 +185,7 @@ subroutine initialize_wake_rings(wake, geo, nrings)
   enddo
 
 
-  wake%ivort = 0.0_wp
+  wake%idou = 0.0_wp
 
   !Starting length of the wake is
   wake%wake_len = 0
@@ -254,7 +258,7 @@ subroutine load_wake_rings(filename, wake)
     enddo
     ip = ip+np
   enddo
-  wake%ivort(:,1:wake%wake_len) = wvort(:,1:wake%wake_len)
+  wake%idou(:,1:wake%wake_len) = wvort(:,1:wake%wake_len)
 
   deallocate(wake%pan_p); allocate(wake%pan_p(wake%ndisks*wake%wake_len))
 
@@ -400,11 +404,11 @@ subroutine update_wake_rings(wake, elems, wake_pan_p, sim_param)
   !       previous panel
   do ir = wake%wake_len,2,-1
     do id = 1,wake%ndisks
-      wake%wake_rings(id,ir)%idou = wake%wake_rings(id,ir-1)%idou
+      wake%wake_rings(id,ir)%mag = wake%wake_rings(id,ir-1)%mag
     enddo
   enddo
   do id = 1,wake%ndisks
-    wake%wake_rings(id,1)%idou  = wake%gen_elems(id)%p%idou
+    wake%wake_rings(id,1)%mag  = wake%gen_elems(id)%p%mag
   enddo
 
   !Update the geometrical quantities

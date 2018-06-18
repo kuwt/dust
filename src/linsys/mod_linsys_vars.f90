@@ -97,10 +97,10 @@ type :: t_linsys
  integer :: nstatic, nmoving
 
  !> Number of static and moving lifting lines
- integer :: nstatic_ll, nmoving_ll, n_ll
+ !integer :: nstatic_ll, nmoving_ll, n_ll
 
  !> Number of static and moving actuator disks
- integer :: nstatic_ad, nmoving_ad, n_ad
+ !integer :: nstatic_ad, nmoving_ad, n_ad
 
  !> Number of static and moving explicit elements
  integer :: nstatic_expl, nmoving_expl

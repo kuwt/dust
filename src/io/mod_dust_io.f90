@@ -46,14 +46,18 @@ use mod_sim_param, only: &
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime, check_preproc
 
-use mod_aero_elements, only: &
-  c_elem, t_elem_p
+!use mod_aero_elements, only: &
+!  c_elem, t_elem_p
+
+use mod_aeroel, only: &
+  c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
 use mod_surfpan, only: &
   t_surfpan
 
-use mod_vortring, only: &
-  t_vortring
+use mod_vortlatt, only: &
+  t_vortlatt
 
 use mod_liftlin, only: &
   t_liftlin
@@ -157,7 +161,7 @@ subroutine save_status(geo, wake_pan, wake_rin, sim_params, it, time, run_id)
     ne = size(geo%components(icomp)%el)
     allocate(vort(ne), cp(ne) , pres(ne) , dforce(3,ne) )
     do ie = 1,ne
-     vort(ie) = geo%components(icomp)%el(ie)%idou
+     vort(ie) = geo%components(icomp)%el(ie)%mag
      !cp(ie) = geo%components(icomp)%el(ie)%cp
      pres(ie) = geo%components(icomp)%el(ie)%pres
      dforce(:,ie) = geo%components(icomp)%el(ie)%dforce
@@ -180,7 +184,7 @@ subroutine save_status(geo, wake_pan, wake_rin, sim_params, it, time, run_id)
 
   call write_hdf5(wake_pan%w_points(:,:,1:wake_pan%wake_len+1),'WakePoints',gloc1 )
   call write_hdf5(wake_pan%i_start_points,'StartPoints',gloc1)
-  call write_hdf5(wake_pan%ivort(:,1:wake_pan%wake_len),'WakeVort',gloc1)
+  call write_hdf5(wake_pan%idou(:,1:wake_pan%wake_len),'WakeVort',gloc1)
 
   call close_hdf5_group(gloc1)
 
@@ -201,7 +205,7 @@ subroutine save_status(geo, wake_pan, wake_rin, sim_params, it, time, run_id)
   call write_hdf5(points_w,'WakePoints',gloc1)
   call write_hdf5(conn_pe,'Conn_pe',gloc1)
   call write_hdf5(cent,'WakeCenters',gloc1)
-  call write_hdf5(wake_rin%ivort(:,1:wake_rin%wake_len),'WakeVort',gloc1)
+  call write_hdf5(wake_rin%idou(:,1:wake_rin%wake_len),'WakeVort',gloc1)
   call close_hdf5_group(gloc1)
   deallocate(points_w, conn_pe, cent)
 
@@ -277,7 +281,7 @@ subroutine load_solution(filename,comps)
         call close_hdf5_group(gloc3)
         ne = size(comps(icomp2)%el)
         do ie =1,ne
-          comps(icomp2)%el(ie)%idou   = idou(ie)
+          comps(icomp2)%el(ie)%mag   = idou(ie)
           comps(icomp2)%el(ie)%pres   = pres(ie)
           comps(icomp2)%el(ie)%dforce = dF(:,ie)
         enddo

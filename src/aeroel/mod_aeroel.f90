@@ -105,11 +105,17 @@ type, abstract, extends(c_elem) :: c_pot_elem
   !> id of the component to which it belongs
   integer :: comp_id
 
+  !> Id of the element, TODO consider removing this
+  integer :: id
+
   !> Number of vertexes
   integer :: n_ver
 
   !> Vertexes coordinates
   real(wp), allocatable :: ver(:,:)
+
+  !> Id of the vertexes
+  integer, allocatable :: i_ver(:)
 
   !> Element area
   real(wp)              :: area
@@ -139,13 +145,23 @@ type, abstract, extends(c_elem) :: c_pot_elem
   logical :: moving
 
   !> Element neighbours global index (in the elements vector)
-  type(t_elem_p), allocatable :: neigh(:)
+  type(t_pot_elem_p), allocatable :: neigh(:)
 
   !> Average pressure on the element
   real(wp)              :: pres
 
   !> Elementary force acting on the element (components in the base ref.sys.)
   real(wp), allocatable :: dforce(:)
+
+  !TODO: these three are used only by vortlatt and liftlin
+  ! consider moving them there, but then change the implementation of
+  ! create_strip_connectivity
+  !> Previous element in a stripe 
+  type(t_pot_elem_p)        :: stripe_1
+  !> Panel width (= strip width)
+  real(wp)              :: dy
+  !> Element indices in the component%strip_elem array
+  type(t_elem_p), allocatable :: stripe_elem(:)
 
   contains
 

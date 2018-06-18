@@ -48,11 +48,15 @@ use mod_handling, only: &
 use mod_geometry, only: &
   t_geo, t_tedge, calc_geo_data_pan, calc_node_vel
 
-use mod_aero_elements, only: &
-  c_elem, t_elem_p
+!use mod_aero_elements, only: &
+!  c_elem, t_elem_p
 
-use mod_vortring, only: &
-  t_vortring
+use mod_aeroel, only: &
+  c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
+
+use mod_vortlatt, only: &
+  t_vortlatt
 
 use mod_hdf5_io, only: &
    h5loc, &
@@ -93,7 +97,7 @@ type :: t_wake_panels
 
  !> Pointer and index of the 2 generating elements of the wake
  !! (2 x n_wake_stripes)
- type(t_elem_p), allocatable :: gen_elems(:,:)
+ type(t_pot_elem_p), allocatable :: gen_elems(:,:)
  integer, allocatable :: gen_elems_id(:,:)
 
  !> Index of the 2 generating points of each wake point
@@ -130,10 +134,10 @@ type :: t_wake_panels
  real(wp), allocatable :: w_vel(:,:,:)
 
  !> elements of the panels
- type(t_vortring), allocatable :: wake_panels(:,:)
+ type(t_vortlatt), allocatable :: wake_panels(:,:)
 
- !> vortex intensities
- real(wp), allocatable :: ivort(:,:)
+ !> doublets intensities
+ real(wp), allocatable :: idou(:,:)
 
  !> pointer to the wake elements to be passed to the linsys
  !! solver
@@ -174,7 +178,7 @@ subroutine initialize_wake_panels(wake, geo, te,  npan, sim_param)
   allocate(wake%w_points(3,wake%n_wake_points,npan+1))
   allocate(wake%w_vel(3,wake%n_wake_points,npan+1))
   allocate(wake%wake_panels(wake%n_wake_stripes,npan))
-  allocate(wake%ivort(wake%n_wake_stripes,npan))
+  allocate(wake%idou(wake%n_wake_stripes,npan))
   !allocate(wake%pan_p(0))
 
   !Associate for all the panels the relevant intensity and allocate all the
@@ -182,11 +186,11 @@ subroutine initialize_wake_panels(wake, geo, te,  npan, sim_param)
   nsides = 4
   do ip = 1,npan
     do iw=1,wake%n_wake_stripes
-     wake%wake_panels(iw,ip)%idou => wake%ivort(iw,ip)
+     wake%wake_panels(iw,ip)%mag => wake%idou(iw,ip)
      allocate(wake%wake_panels(iw,ip)%ver(3,nsides))
-     allocate(wake%wake_panels(iw,ip)%cen(3))
-     allocate(wake%wake_panels(iw,ip)%nor(3))
-     allocate(wake%wake_panels(iw,ip)%tang(3,2))
+     !allocate(wake%wake_panels(iw,ip)%cen(3))
+     !allocate(wake%wake_panels(iw,ip)%nor(3))
+     !allocate(wake%wake_panels(iw,ip)%tang(3,2))
      allocate(wake%wake_panels(iw,ip)%edge_vec(3,nsides))
      allocate(wake%wake_panels(iw,ip)%edge_len(nsides))
      allocate(wake%wake_panels(iw,ip)%edge_uni(3,nsides))
@@ -194,7 +198,16 @@ subroutine initialize_wake_panels(wake, geo, te,  npan, sim_param)
   enddo
 
   !Set the generating elements and points from the trailing edge
-  wake%gen_elems  = te%e
+  !wake%gen_elems  = te%e
+  do iw=1,size(te%e)
+  !TODO: consider shifting the whole t.e. to c_pot_elem to avoid this nightmare
+  select type(el => te%e(1,iw)%p); class is(c_pot_elem)
+    wake%gen_elems(1,iw)%p => el
+  end select
+  select type(el => te%e(2,iw)%p); class is(c_pot_elem)
+    wake%gen_elems(2,iw)%p => el
+  end select
+  enddo
   wake%gen_points = te%i
   wake%gen_dir = te%t
   wake%gen_ref = te%ref
@@ -209,7 +222,7 @@ subroutine initialize_wake_panels(wake, geo, te,  npan, sim_param)
     endif
   enddo
 
-  wake%ivort = 0.0_wp
+  wake%idou = 0.0_wp
 
   
   !The whole first line of (implicit) panels is initialized here to be
@@ -346,7 +359,7 @@ subroutine load_wake_panels(filename, wake)
 
   !store points position and doublets intensity
   wake%w_points(:,:,1:wake%wake_len+1) = wpoints(:,:,1:wake%wake_len+1)
-  wake%ivort(:,1:wake%wake_len) = wvort(:,1:wake%wake_len)
+  wake%idou(:,1:wake%wake_len) = wvort(:,1:wake%wake_len)
 
   deallocate(wake%pan_p)
   allocate(wake%pan_p(wake%n_wake_stripes*wake%wake_len))
@@ -395,10 +408,10 @@ subroutine update_wake_panels(wake, elems, wake_rings_p, sim_param)
   do iw = 1,wake%n_wake_stripes
     !
     if      ( associated(wake%gen_elems(2,iw)%p) ) then
-      wake%wake_panels(iw,1)%idou  = wake%gen_elems(1,iw)%p%idou - &
-                                     wake%gen_elems(2,iw)%p%idou
+      wake%wake_panels(iw,1)%mag  = wake%gen_elems(1,iw)%p%mag - &
+                                     wake%gen_elems(2,iw)%p%mag
     else if ( .not. associated(wake%gen_elems(2,iw)%p) ) then
-      wake%wake_panels(iw,1)%idou  = wake%gen_elems(1,iw)%p%idou
+      wake%wake_panels(iw,1)%mag  = wake%gen_elems(1,iw)%p%mag
     end if
   enddo
 
@@ -485,7 +498,7 @@ subroutine update_wake_panels(wake, elems, wake_rings_p, sim_param)
   !       the previous panel
   do ipan = wake%wake_len,2,-1
     do iw = 1,wake%n_wake_stripes
-      wake%wake_panels(iw,ipan)%idou = wake%wake_panels(iw,ipan-1)%idou
+      wake%wake_panels(iw,ipan)%mag = wake%wake_panels(iw,ipan-1)%mag
     enddo
   enddo
 
