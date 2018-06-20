@@ -382,7 +382,7 @@ subroutine build_row_static_surfpan(this, elems, expl_elems, linsys, &
 
   !Now build the static contribution from the explicit elements
   do j1 = 1,linsys%nstatic_expl
-    call expl_elems(j1)%p%compute_pot( linsys%D_static(ie,j1), b1,  &
+    call expl_elems(j1)%p%compute_pot( linsys%L_static(ie,j1), b1,  &
                                   this%cen, 1, 2 )
   enddo
   !The rest of the dynamic part will be completed during the first
@@ -578,9 +578,9 @@ end subroutine compute_vel_surfpan
 
 !> Compute an approximate value of the mean pressure on the actual element
 !!
-subroutine compute_pres_surfpan(this, elems, sim_param)
+subroutine compute_pres_surfpan(this, sim_param)
   class(t_surfpan), intent(inout) :: this
-  type(t_elem_p),   intent(in)    :: elems(:)
+  !type(t_elem_p),   intent(in)    :: elems(:)
   type(t_sim_param), intent(in)   :: sim_param
 
   real(wp) :: vel_phi(3)
@@ -625,9 +625,9 @@ end subroutine compute_pres_surfpan
 
 ! Compute the elementary force on the on the actual element
 !!
-subroutine compute_dforce_surfpan(this, elems, sim_param)
+subroutine compute_dforce_surfpan(this, sim_param)
   class(t_surfpan), intent(inout) :: this
-  type(t_elem_p), intent(in) :: elems(:)
+  !type(t_elem_p), intent(in) :: elems(:)
   type(t_sim_param), intent(in) :: sim_param
 
   ! first rough approximation

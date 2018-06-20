@@ -51,8 +51,11 @@ use mod_geometry, only: &
   create_geometry, update_geometry, &
   t_tedge,  destroy_geometry, destroy_elements
 
-use mod_aero_elements, only: &
-  c_elem, t_elem_p !, t_vp
+!use mod_aero_elements, only: &
+!  c_elem, t_elem_p !, t_vp
+use mod_aeroel, only: &
+  c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
 use mod_doublet, only: &
   initialize_doublet
@@ -142,13 +145,15 @@ real(wp) :: ff_ratio_dou, ff_ratio_sou, eps_dou, r_Rankine, r_cutoff
 
 !Main variables
 !> All the implicit elements, sorted first static then moving
-type(t_elem_p), allocatable :: elems(:)
+type(t_impl_elem_p), allocatable :: elems(:)
+!> All the explicit elements
+type(t_expl_elem_p), allocatable :: elems_expl(:)
 !> Only the lifting line elements
-type(t_elem_p), allocatable :: elems_ll(:)
+type(t_expl_elem_p), allocatable :: elems_ll(:)
 !> Only the actuator disk elements
-type(t_elem_p), allocatable :: elems_ad(:)
+type(t_expl_elem_p), allocatable :: elems_ad(:)
 !> All the elements (panels+ll)
-type(t_elem_p), allocatable :: elems_tot(:)
+type(t_pot_elem_p), allocatable :: elems_tot(:)
 !> Geometry
 type(t_geo) :: geo
 !> Trailing edge
@@ -324,8 +329,10 @@ call printout(nl//'====== Geometry Creation ======')
 t0 = dust_time()
 call copy_geo(sim_param, geo_file_name, run_id)
 call create_geometry(geo_file_name, ref_file_name, input_file_name, geo, &
-                     te, elems, elems_ll, elems_ad, &
+                     te, elems, elems_expl, elems_ad, elems_ll, &
                      elems_tot, airfoil_data, sim_param)
+  !DEBUG:
+  write(*,*) 'Size of elems_ll ',shape(elems_ll)
 t1 = dust_time()
 if(debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Created geometry in: ' , t1 - t0,' s.'
@@ -333,160 +340,162 @@ if(debug_level .ge. 1) then
 endif
 
 if(debug_level .ge. 15) &
-            call debug_printout_geometry_minimal(elems, geo, basename_debug, 0)
+      call debug_printout_geometry_minimal(elems, geo, basename_debug, 0)
 
 call ignoredParameters(prms)
 
 call finalizeParameters(prms)
 
 
-!!------ Initialization ------
-!call printout(nl//'====== Initializing Wake ======')
-!call initialize_wake_panels(wake_panels, geo, te, n_wake_panels, sim_param)
-!
-!call initialize_wake_rings(wake_rings, geo, n_wake_panels)
-!
-!call printout(nl//'====== Initializing Linear System ======')
-!t0 = dust_time()
-!call initialize_linsys(linsys, geo, elems, elems_ll, elems_ad, &
-!                       wake_panels, wake_rings,  uinf)
-!t1 = dust_time()
-!if(debug_level .ge. 1) then
-!  write(message,'(A,F9.3,A)') 'Initialized linear system in: ' , t1 - t0,' s.'
-!  call printout(message)
-!endif
-!
-!!------ Reloading ------
-!if (restart) then
-! call load_solution(restart_file,geo%components)
-! call load_wake_panels(restart_file, wake_panels)
-! call load_wake_rings(restart_file, wake_rings)
-!endif
-!
-!t22 = dust_time()
-!write(message,'(A,F9.3,A)') nl//'------ Completed all preliminary operations &
-!                             &in: ' , t22 - t00,' s.'
-!call printout(message)
-!
-!
-!!====== Time Cycle ======
-!time = tstart
-!t_last_out = time; t_last_debug_out = time
-!
-!allocate(res_old(size(elems))) ; res_old = 0.0_wp
-!t11 = dust_time()
-!do it = 1,nstep
-!
-!  if(debug_level .ge. 1) then
-!    write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
-!                                                         nstep, ' time: ', time
-!    call printout(message)
-!    t22 = dust_time()
-!    write(message,'(A,F9.3,A)') 'Elapsed time: ',t22-t00
-!    call printout(message)
-!  endif
-!
-!  call init_timestep(time)
-!
-!  call update_geometry(geo, time, .false.)
-!
-!  call update_liftlin(elems_ll,linsys)
-!  call update_actdisk(elems_ad,linsys,sim_param)
-!
-!
-!  if((debug_level .ge. 16).and.time_2_debug_out)&
-!            call debug_printout_geometry(elems, geo, basename_debug, it)
-!
-!
-!  !------ Assemble the system ------
-!  call prepare_wake_panels(wake_panels, geo, sim_param)
-!  t0 = dust_time()
-!
-!  call assemble_linsys(linsys, elems, elems_ll, elems_ad,  &
-!                       wake_panels, wake_rings, uinf)
-!  t1 = dust_time()
-!
-!  if(debug_level .ge. 1) then
-!    write(message,'(A,F9.3,A)') 'Assembled linear system in: ' , t1 - t0,' s.'
-!    call printout(message)
-!  endif
-!
-!  if ((debug_level .ge. 50).and.time_2_debug_out) then
-!    write(frmt,'(I4.4)') it
-!    call dump_linsys(linsys, trim(basename_debug)//'A_'//trim(frmt)//'.dat', &
-!                             trim(basename_debug)//'b_'//trim(frmt)//'.dat' )
-!  endif
-!
-!  !------ Solve the system ------
-!  t0 = dust_time()
-!  if (linsys%rank .gt. 0) then
-!    call solve_linsys(linsys)
-!  endif
-!  t1 = dust_time()
-!
-!  ! compute time derivative of the result ( = i_vortex = -i_doublet ) ----------
-!  do i_el = 1 , size(elems)
-!    elems(i_el)%p%didou_dt = ( linsys%res(i_el) - res_old(i_el) ) / sim_param%dt
-!  end do
-!  res_old = linsys%res
-!
-!  if(debug_level .ge. 1) then
-!    write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
-!    call printout(message)
-!  endif
-!
-!  if (debug_level .ge. 20.and.time_2_debug_out) &
-!                         call debug_printout_result(linsys, basename_debug, it)
-!
-!  !------ Update the explicit part ------
-!  call solve_liftlin(elems_ll, elems_tot, &
-!                 (/ wake_panels%pan_p, wake_rings%pan_p/), sim_param, airfoil_data)
-!
-!  !------ Compute loads -------
-!  ! vortex rings and 3d-panels
-!  do i_el = 1 , size(elems)
-!!   call elems(i_el)%p%compute_cp(elems,uinf)       ! <--TODO: must become "old" as soon as possible
-!
-!    call elems(i_el)%p%compute_pres(elems,sim_param)
-!    call elems(i_el)%p%compute_dforce(elems,sim_param)
-!  end do
-!  ! lifting line in solve_liftlin
-!
-!  if ((debug_level .ge. 10).and.time_2_debug_out) then
-!    call debug_printout_loads(elems, basename_debug, it)
-!  endif
-!
-!  !------ Output the results  ------
-!  !Printout the wake
-!  if((debug_level .ge. 17).and.time_2_debug_out)  &
-!                      call debug_printout_wake(wake_panels, basename_debug, it)
-!
-!  !Print the results
-!  if(time_2_out)  then
-!    !call output_status(elems_tot, geo, wake_panels, basename, &
-!    !                                 it, time)
-!    call save_status(geo, wake_panels, wake_rings, sim_param, it, time, run_id)
-!  endif
-!
-!  !------ Treat the wake ------
-!  ! (this needs to be done after output, in practice the update is for the
-!  !  next iteration)
-!  call update_wake_panels(wake_panels, elems_tot, wake_rings%pan_p, sim_param)
-!  call update_wake_rings(wake_rings, elems_tot, wake_panels%pan_p, sim_param)
-!
-!  time = min(tend, time+dt)
-!
-!enddo
-!
-!deallocate( res_old )
-!!===== End Time Cycle ======
-!
-!
-!!------ Cleanup ------
-!call destroy_wake_panels(wake_panels)
-!call destroy_linsys(linsys)
+!------ Initialization ------
+call printout(nl//'====== Initializing Wake ======')
+call initialize_wake_panels(wake_panels, geo, te, n_wake_panels, sim_param)
+
+call initialize_wake_rings(wake_rings, geo, n_wake_panels)
+
+call printout(nl//'====== Initializing Linear System ======')
+t0 = dust_time()
+call initialize_linsys(linsys, geo, elems, elems_expl, &
+                       wake_panels, wake_rings,  uinf)
+t1 = dust_time()
+if(debug_level .ge. 1) then
+  write(message,'(A,F9.3,A)') 'Initialized linear system in: ' , t1 - t0,' s.'
+  call printout(message)
+endif
+
+!------ Reloading ------
+if (restart) then
+ call load_solution(restart_file,geo%components)
+ call load_wake_panels(restart_file, wake_panels)
+ call load_wake_rings(restart_file, wake_rings)
+endif
+
+t22 = dust_time()
+write(message,'(A,F9.3,A)') nl//'------ Completed all preliminary operations &
+                             &in: ' , t22 - t00,' s.'
+call printout(message)
+
+
+!====== Time Cycle ======
+time = tstart
+t_last_out = time; t_last_debug_out = time
+
+allocate(res_old(size(elems))) ; res_old = 0.0_wp
+t11 = dust_time()
+do it = 1,nstep
+
+  if(debug_level .ge. 1) then
+    write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
+                                                         nstep, ' time: ', time
+    call printout(message)
+    t22 = dust_time()
+    write(message,'(A,F9.3,A)') 'Elapsed time: ',t22-t00
+    call printout(message)
+  endif
+
+  call init_timestep(time)
+
+  call update_geometry(geo, time, .false.)
+
+  call update_liftlin(elems_ll,linsys)
+  call update_actdisk(elems_ad,linsys,sim_param)
+
+
+  if((debug_level .ge. 16).and.time_2_debug_out)&
+            call debug_printout_geometry(elems, geo, basename_debug, it)
+
+
+  !------ Assemble the system ------
+  call prepare_wake_panels(wake_panels, geo, sim_param)
+  t0 = dust_time()
+
+  call assemble_linsys(linsys, elems, elems_expl,  &
+                       wake_panels, wake_rings, uinf)
+  t1 = dust_time()
+
+  if(debug_level .ge. 1) then
+    write(message,'(A,F9.3,A)') 'Assembled linear system in: ' , t1 - t0,' s.'
+    call printout(message)
+  endif
+
+  if ((debug_level .ge. 50).and.time_2_debug_out) then
+    write(frmt,'(I4.4)') it
+    call dump_linsys(linsys, trim(basename_debug)//'A_'//trim(frmt)//'.dat', &
+                             trim(basename_debug)//'b_'//trim(frmt)//'.dat' )
+  endif
+
+  !------ Solve the system ------
+  t0 = dust_time()
+  if (linsys%rank .gt. 0) then
+    call solve_linsys(linsys)
+  endif
+  t1 = dust_time()
+
+  ! compute time derivative of the result ( = i_vortex = -i_doublet ) ----------
+  do i_el = 1 , size(elems)
+    elems(i_el)%p%didou_dt = ( linsys%res(i_el) - res_old(i_el) ) / sim_param%dt
+  end do
+  res_old = linsys%res
+
+  if(debug_level .ge. 1) then
+    write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
+    call printout(message)
+  endif
+
+  if (debug_level .ge. 20.and.time_2_debug_out) &
+                         call debug_printout_result(linsys, basename_debug, it)
+
+  !------ Update the explicit part ------
+  !DEBUG:
+  write(*,*) 'Size of elems_ll ',shape(elems_ll)
+  call solve_liftlin(elems_ll, elems_tot, &
+                 (/ wake_panels%pan_p, wake_rings%pan_p/), sim_param, airfoil_data)
+
+  !------ Compute loads -------
+  ! vortex rings and 3d-panels
+  do i_el = 1 , size(elems)
+!   call elems(i_el)%p%compute_cp(elems,uinf)       ! <--TODO: must become "old" as soon as possible
+
+    call elems(i_el)%p%compute_pres(sim_param)
+    call elems(i_el)%p%compute_dforce(sim_param)
+  end do
+  ! lifting line in solve_liftlin
+
+  !if ((debug_level .ge. 10).and.time_2_debug_out) then
+  !  call debug_printout_loads(elems, basename_debug, it)
+  !endif
+
+  !------ Output the results  ------
+  !Printout the wake
+  if((debug_level .ge. 17).and.time_2_debug_out)  &
+                      call debug_printout_wake(wake_panels, basename_debug, it)
+
+  !Print the results
+  if(time_2_out)  then
+    !call output_status(elems_tot, geo, wake_panels, basename, &
+    !                                 it, time)
+    call save_status(geo, wake_panels, wake_rings, sim_param, it, time, run_id)
+  endif
+
+  !------ Treat the wake ------
+  ! (this needs to be done after output, in practice the update is for the
+  !  next iteration)
+  call update_wake_panels(wake_panels, elems_tot, wake_rings%pan_p, sim_param)
+  call update_wake_rings(wake_rings, elems_tot, wake_panels%pan_p, sim_param)
+
+  time = min(tend, time+dt)
+
+enddo
+
+deallocate( res_old )
+!===== End Time Cycle ======
+
+
+!------ Cleanup ------
+call destroy_wake_panels(wake_panels)
+call destroy_linsys(linsys)
 call destroy_elements(geo)
-call destroy_geometry(geo, elems)
+call destroy_geometry(geo, elems_tot)
 
 call destroy_hdf5()
 
@@ -584,52 +593,52 @@ subroutine init_timestep(t)
 end subroutine init_timestep
 
 !------------------------------------------------------------------------------
-
-subroutine output_status(elems_tot, geo, wake_panels, basename, it, t)
- type(t_elem_p),   intent(in) :: elems_tot(:)
- type(t_geo),      intent(in) :: geo
- type(t_wake_panels), intent(in) :: wake_panels
- character(len=*), intent(in) :: basename
- integer,          intent(in) :: it
- real(wp), intent(in)         :: t
-
- integer, allocatable :: el(:,:), w_el(:,:)
- real(wp), allocatable :: w_points(:,:), w_res(:)
- integer :: ie, of, p1, p2
- character(len=max_char_len) :: sit
-
-  allocate(el(4,size(elems_tot))); el = 0
-  allocate(w_el(4,size(wake_panels%pan_p))); w_el = 0
-  allocate(w_points(3,(wake_panels%n_wake_points)*(wake_panels%wake_len+1)))
-  allocate(w_res(size(wake_panels%pan_p)))
-
-  !=== VTK output ===
-  do ie=1,size(elems_tot)
-    el(1:elems_tot(ie)%p%n_ver,ie) = elems_tot(ie)%p%i_ver
-  enddo
-  do ie=1,size(wake_panels%pan_p)
-    p1 = wake_panels%i_start_points(1,mod(ie-1,wake_panels%n_wake_stripes)+1)
-    p2 = wake_panels%i_start_points(2,mod(ie-1,wake_panels%n_wake_stripes)+1)
-    !of = ie-mod(ie,wake_panels%n_wake_stripes-1)
-    of = wake_panels%n_wake_points*((ie-1)/wake_panels%n_wake_stripes)
-    w_el(1:4,ie) = (/of+p2, of+p1, of+p1+wake_panels%n_wake_points, &
-                     of+p2+wake_panels%n_wake_points/)
-    w_res(ie) = wake_panels%pan_p(ie)%p%idou
-  enddo
-  w_points = reshape(wake_panels%w_points(:,:,1:wake_panels%wake_len+1),&
-    (/3,(wake_panels%n_wake_points)*(wake_panels%wake_len+1)/))
-  write(sit,'(I4.4)') it
-  call vtk_out_bin (geo%points, el, (/linsys%res,linsys%res_expl(:,1)/),  &
-                    w_points, w_el, w_res,  &
-                    trim(basename)//'_res_'//trim(sit)//'.vtu')
-  call tec_out_sol_bin(geo%points, el, (/linsys%res,linsys%res_expl(:,1)/),  &
-                    w_points, w_el, w_res, t,  &
-                    trim(basename)//'_res_'//trim(sit)//'.plt')
-
-
-  deallocate(el,w_el,w_points,w_res)
-
-end subroutine output_status
+!DISCONTINUED: substituted by the routines in dust_io and dust_post
+!subroutine output_status(elems_tot, geo, wake_panels, basename, it, t)
+! type(t_elem_p),   intent(in) :: elems_tot(:)
+! type(t_geo),      intent(in) :: geo
+! type(t_wake_panels), intent(in) :: wake_panels
+! character(len=*), intent(in) :: basename
+! integer,          intent(in) :: it
+! real(wp), intent(in)         :: t
+!
+! integer, allocatable :: el(:,:), w_el(:,:)
+! real(wp), allocatable :: w_points(:,:), w_res(:)
+! integer :: ie, of, p1, p2
+! character(len=max_char_len) :: sit
+!
+!  allocate(el(4,size(elems_tot))); el = 0
+!  allocate(w_el(4,size(wake_panels%pan_p))); w_el = 0
+!  allocate(w_points(3,(wake_panels%n_wake_points)*(wake_panels%wake_len+1)))
+!  allocate(w_res(size(wake_panels%pan_p)))
+!
+!  !=== VTK output ===
+!  do ie=1,size(elems_tot)
+!    el(1:elems_tot(ie)%p%n_ver,ie) = elems_tot(ie)%p%i_ver
+!  enddo
+!  do ie=1,size(wake_panels%pan_p)
+!    p1 = wake_panels%i_start_points(1,mod(ie-1,wake_panels%n_wake_stripes)+1)
+!    p2 = wake_panels%i_start_points(2,mod(ie-1,wake_panels%n_wake_stripes)+1)
+!    !of = ie-mod(ie,wake_panels%n_wake_stripes-1)
+!    of = wake_panels%n_wake_points*((ie-1)/wake_panels%n_wake_stripes)
+!    w_el(1:4,ie) = (/of+p2, of+p1, of+p1+wake_panels%n_wake_points, &
+!                     of+p2+wake_panels%n_wake_points/)
+!    w_res(ie) = wake_panels%pan_p(ie)%p%idou
+!  enddo
+!  w_points = reshape(wake_panels%w_points(:,:,1:wake_panels%wake_len+1),&
+!    (/3,(wake_panels%n_wake_points)*(wake_panels%wake_len+1)/))
+!  write(sit,'(I4.4)') it
+!  call vtk_out_bin (geo%points, el, (/linsys%res,linsys%res_expl(:,1)/),  &
+!                    w_points, w_el, w_res,  &
+!                    trim(basename)//'_res_'//trim(sit)//'.vtu')
+!  call tec_out_sol_bin(geo%points, el, (/linsys%res,linsys%res_expl(:,1)/),  &
+!                    w_points, w_el, w_res, t,  &
+!                    trim(basename)//'_res_'//trim(sit)//'.plt')
+!
+!
+!  deallocate(el,w_el,w_points,w_res)
+!
+!end subroutine output_status
 
 !------------------------------------------------------------------------------
 
@@ -641,7 +650,7 @@ subroutine debug_printout_result(linsys, basename, it)
  real(wp), allocatable :: res(:,:)
  character(len=max_char_len) :: sit
 
-  allocate(res(1,linsys%rank+linsys%n_ll))
+  allocate(res(1,linsys%rank+linsys%n_expl))
   !!res(1,:) = linsys%res
   res(1,:) = (/linsys%res,linsys%res_expl(:,1)/)
   write(sit,'(I4.4)') it
@@ -652,7 +661,7 @@ end subroutine debug_printout_result
 !------------------------------------------------------------------------------
 
 subroutine debug_printout_geometry(elems, geo, basename, it)
- type(t_elem_p),   intent(in) :: elems(:)
+ type(t_impl_elem_p),   intent(in) :: elems(:)
  type(t_geo),      intent(in) :: geo
  character(len=*), intent(in) :: basename
  integer,          intent(in) :: it
@@ -691,7 +700,7 @@ end subroutine debug_printout_geometry
 !------------------------------------------------------------------------------
 
 subroutine debug_printout_geometry_minimal(elems,geo,basename, it)
- type(t_elem_p),   intent(in) :: elems(:)
+ type(t_impl_elem_p),   intent(in) :: elems(:)
  type(t_geo),      intent(in) :: geo
  character(len=*), intent(in) :: basename
  integer,          intent(in) :: it
@@ -723,32 +732,32 @@ subroutine debug_printout_geometry_minimal(elems,geo,basename, it)
 end subroutine debug_printout_geometry_minimal
 
 !----------------------------------------------------------------------
-
-subroutine debug_printout_loads(elems, basename_debug, it)
- type(t_elem_p),   intent(in) :: elems(:)
- character(len=*), intent(in) :: basename_debug
- integer,          intent(in) :: it
-
- real(wp), allocatable :: vel(:,:), cp(:,:), F_aero(:,:)
- integer :: i_el
-
-  allocate( vel(3,size(elems)) )
-  allocate(  cp(1,size(elems)) )
-  allocate(F_aero(3,1))
-  F_aero = 0.0_wp
-  do i_el = 1 , size(elems)
-    vel(:,i_el) = elems(i_el)%p%vel
-    cp (1,i_el) = elems(i_el)%p%cp
-    F_aero(:,1) = F_aero(:,1) - 0.5_wp * rho * norm2(uinf)**2.0_wp * cp(1,i_el) * &
-                     elems(i_el)%p%area * elems(i_el)%p%nor
-  end do
-  write(frmt,'(I4.4)') it
-  call write_basic(vel,trim(basename_debug)//'_velocity_'//trim(frmt)//'.dat')
-  call write_basic(cp ,trim(basename_debug)//'_cp_'//trim(frmt)//'.dat')
-  call write_basic(F_aero ,trim(basename_debug)//'_Faero_'//trim(frmt)//'.dat')
-  deallocate(vel,cp,F_aero)
-
-end subroutine debug_printout_loads
+!UNDER SCRUTINY: employs old stuff, to remove?
+!subroutine debug_printout_loads(elems, basename_debug, it)
+! type(t_elem_p),   intent(in) :: elems(:)
+! character(len=*), intent(in) :: basename_debug
+! integer,          intent(in) :: it
+!
+! real(wp), allocatable :: vel(:,:), cp(:,:), F_aero(:,:)
+! integer :: i_el
+!
+!  allocate( vel(3,size(elems)) )
+!  allocate(  cp(1,size(elems)) )
+!  allocate(F_aero(3,1))
+!  F_aero = 0.0_wp
+!  do i_el = 1 , size(elems)
+!    vel(:,i_el) = elems(i_el)%p%vel
+!    cp (1,i_el) = elems(i_el)%p%cp
+!    F_aero(:,1) = F_aero(:,1) - 0.5_wp * rho * norm2(uinf)**2.0_wp * cp(1,i_el) * &
+!                     elems(i_el)%p%area * elems(i_el)%p%nor
+!  end do
+!  write(frmt,'(I4.4)') it
+!  call write_basic(vel,trim(basename_debug)//'_velocity_'//trim(frmt)//'.dat')
+!  call write_basic(cp ,trim(basename_debug)//'_cp_'//trim(frmt)//'.dat')
+!  call write_basic(F_aero ,trim(basename_debug)//'_Faero_'//trim(frmt)//'.dat')
+!  deallocate(vel,cp,F_aero)
+!
+!end subroutine debug_printout_loads
 
 !----------------------------------------------------------------------
 
@@ -773,7 +782,7 @@ subroutine debug_printout_wake(wake_panels, basename, it)
     of = wake_panels%n_wake_points*((ie-1)/wake_panels%n_wake_stripes)
     el(1:4,ie) = (/of+p2, of+p1, of+p1+wake_panels%n_wake_points, &
                      of+p2+wake_panels%n_wake_points/)
-    res(1,ie) = wake_panels%pan_p(ie)%p%idou
+    res(1,ie) = wake_panels%pan_p(ie)%p%mag
   enddo
   write(sit,'(I4.4)') it
   call write_basic( &

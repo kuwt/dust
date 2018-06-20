@@ -403,11 +403,11 @@ end interface
 
 !> Compute an approximation of the pressure acting on the acutal element
 abstract interface
-  subroutine i_compute_pres (this, elems, sim_param)
+  subroutine i_compute_pres (this, sim_param)
     import :: c_pot_elem , t_elem_p , wp ,t_sim_param
     implicit none
     class(c_pot_elem), intent(inout) :: this
-    type(t_elem_p), intent(in)   :: elems(:)
+    !type(t_elem_p), intent(in)   :: elems(:)
     type(t_sim_param), intent(in):: sim_param
   end subroutine
 end interface
@@ -416,11 +416,11 @@ end interface
 
 !> Compute the elementary force acting on the actual element
 abstract interface
-  subroutine i_compute_dforce (this, elems, sim_param)
+  subroutine i_compute_dforce (this, sim_param)
     import :: c_pot_elem , t_elem_p , wp , t_sim_param
     implicit none
     class(c_pot_elem), intent(inout) :: this
-    type(t_elem_p), intent(in)   :: elems(:)
+    !type(t_elem_p), intent(in)   :: elems(:)
     type(t_sim_param), intent(in):: sim_param
   end subroutine
 end interface

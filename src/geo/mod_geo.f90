@@ -243,7 +243,7 @@ type t_tedge
 
  !> Global id of the elements at the TE
  !integer , allocatable :: e(:,:)
- type(t_elem_p), allocatable :: e(:,:)
+ type(t_pot_elem_p), allocatable :: e(:,:)
 
  !> Global id of the nodes on the TE
  integer , allocatable :: i(:,:)
@@ -431,7 +431,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   !Create the vector of pointers to all the elements
   allocate(elems_impl(geo%nelem_impl), elems_expl(geo%nelem_expl),  &
            elems_tot(geo%nelem_impl+geo%nelem_expl))
-  allocate(elems_ad(geo%nactdisk))
+  allocate(elems_ad(geo%nactdisk), elems_ll(geo%nLiftLin))
   i_impl=0; i_expl=0; i_ad=0; i_ll=0; i_tot=0
   do i_comp = 1,size(geo%components)
 
@@ -526,7 +526,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
 
   !Update the indexing since we re-ordered the vector
   do i = 1,geo%nelem_expl
-    elems_expl(i)%p%id = i
+    elems_expl(i)%p%id = i+geo%nelem_impl
   end do
 
   !!Patch together everything in elems_tot
@@ -556,7 +556,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   call create_local_velocity_stencil(geo)    ! for surfpan only (3dP)
 
   call create_strip_connectivity(geo)
-
+  
 end subroutine create_geometry
 
 !----------------------------------------------------------------------
@@ -576,7 +576,7 @@ subroutine load_components(geo, in_file, sim_param, te)
 
 
  type(t_geo_component), allocatable :: comp_temp(:)
- integer :: i1, i2, i3
+ integer :: i1, i2, i3, i
  integer, allocatable :: ee(:,:)
  real(wp), allocatable :: rr(:,:)
  character(len=max_char_len) :: comp_el_type, comp_name
@@ -604,7 +604,7 @@ subroutine load_components(geo, in_file, sim_param, te)
  real(wp), allocatable :: t_te(:,:)
  integer :: ne_te , nn_te
  ! tmp arrays --------
- type(t_elem_p) , allocatable :: e_te_tmp(:,:)
+ type(t_pot_elem_p) , allocatable :: e_te_tmp(:,:)
  integer, allocatable  :: i_te_tmp(:,:) , ii_te_tmp(:,:)
  integer , allocatable :: neigh_te_tmp(:,:) , o_te_tmp(:,:)
  real(wp), allocatable :: t_te_tmp(:,:)
@@ -953,9 +953,11 @@ subroutine load_components(geo, in_file, sim_param, te)
           e_te_tmp(2,size(te%e,2)+i1)%p => null()
           e_te_tmp(1,size(te%e,2)+i1)%p  => &
                                        geo%components(i_comp)%el(e_te(1,i1))
-          if(e_te(2,i1) .gt. 0) &
+          if(e_te(2,i1) .gt. 0) then
             e_te_tmp(2,size(te%e,2)+i1)%p  => &
                                        geo%components(i_comp)%el(e_te(2,i1))
+          endif
+
         enddo
         call move_alloc(e_te_tmp,te%e)
         allocate(i_te_tmp(2,size(te%i,2)+nn_te))
@@ -1009,6 +1011,7 @@ subroutine load_components(geo, in_file, sim_param, te)
   call write_hdf5(i_comp-1,'NComponents',gloc)
   call close_hdf5_group(gloc)
   call close_hdf5_file(floc)
+
 
 end subroutine load_components
 
@@ -1468,9 +1471,12 @@ subroutine create_local_velocity_stencil (geo)
         do i_v = 1 , el(i_el)%n_ver
 
           ! Update surf_bubble
-          surf_bubble = surf_bubble + &
+          !sum the contribuition only if the neighbour is really present 
+          if(associated(el(i_el)%neigh(i_v)%p)) then
+            surf_bubble = surf_bubble + &
                el(i_el)%neigh(i_v)%p%area / &
                real(el(i_el)%neigh(i_v)%p%n_ver,wp)
+          endif
 
           el(i_el)%pot_vel_stencil(:,i_v) = &
                    cross( el(i_el)%edge_vec(:,i_v) , el(i_el)%nor )
@@ -1702,7 +1708,7 @@ end subroutine destroy_elements
 !!
 subroutine destroy_geometry(geo, elems)
  type(t_geo), intent(out) :: geo
- type(t_elem_p), allocatable, intent(out) :: elems(:)
+ type(t_pot_elem_p), allocatable, intent(out) :: elems(:)
 
  integer :: i
  call destroy_references(geo%refs)

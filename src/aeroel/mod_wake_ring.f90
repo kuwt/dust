@@ -117,7 +117,7 @@ type t_wake_rings
 
  !> pointer to the wake elements to be passed to the linsys
  !! solver
- type(t_elem_p), allocatable :: pan_p(:)
+ type(t_pot_elem_p), allocatable :: pan_p(:)
 
 end type t_wake_rings
 
@@ -284,13 +284,13 @@ end subroutine load_wake_rings
 !! elements
 subroutine update_wake_rings(wake, elems, wake_pan_p, sim_param)
  type(t_wake_rings), intent(inout), target :: wake
- type(t_elem_p), intent(in) :: elems(:)
- type(t_elem_p), intent(in) :: wake_pan_p(:)
+ type(t_pot_elem_p), intent(in) :: elems(:)
+ type(t_pot_elem_p), intent(in) :: wake_pan_p(:)
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: ip,id,ir, ie, np
  real(wp) :: pos_p(3), vel_p(3), v(3)
- type(t_elem_p), allocatable :: pan_p_temp(:)
+ type(t_pot_elem_p), allocatable :: pan_p_temp(:)
  real(wp), allocatable :: points(:,:,:)
  logical :: increase_wake
  integer :: size_old

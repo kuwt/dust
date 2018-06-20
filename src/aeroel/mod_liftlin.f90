@@ -199,9 +199,9 @@ end subroutine compute_cp_liftlin
 
 !> The computation of the pressure in the lifting line is not meant to
 !! happen, loads are retrieved from the tables
-subroutine compute_pres_liftlin (this, elems, sim_param)
+subroutine compute_pres_liftlin (this, sim_param)
  class(t_liftlin), intent(inout) :: this
- type(t_elem_p), intent(in) :: elems(:)
+ !type(t_elem_p), intent(in) :: elems(:)
  type(t_sim_param), intent(in) :: sim_param
 
  character(len=*), parameter      :: this_sub_name='compute_pres_liftlin'
@@ -220,9 +220,9 @@ end subroutine compute_pres_liftlin
 
 !> The computation of loads happens in solve_liftlin and not in
 !! this subroutine, which is not used
-subroutine compute_dforce_liftlin (this, elems, sim_param)
+subroutine compute_dforce_liftlin (this, sim_param)
  class(t_liftlin), intent(inout) :: this
- type(t_elem_p), intent(in) :: elems(:)
+ !type(t_elem_p), intent(in) :: elems(:)
  type(t_sim_param), intent(in) :: sim_param
 
  character(len=*), parameter      :: this_sub_name='compute_dforce_liftlin'
@@ -243,7 +243,7 @@ end subroutine compute_dforce_liftlin
 !!
 !! Here the extrapolation of the lifting line solution is performed
 subroutine update_liftlin(elems_ll, linsys)
- type(t_elem_p), intent(inout) :: elems_ll(:)
+ type(t_expl_elem_p), intent(inout) :: elems_ll(:)
  type(t_linsys), intent(inout) :: linsys
 
  real(wp), allocatable :: res_temp(:)
@@ -272,9 +272,9 @@ end subroutine update_liftlin
 !! iterative solution.
 subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  sim_param, &
                          airfoil_data)
- type(t_elem_p), intent(inout) :: elems_ll(:)
- type(t_elem_p), intent(in)    :: elems_tot(:)
- type(t_elem_p), intent(in)    :: elems_wake(:)
+ type(t_expl_elem_p), intent(inout) :: elems_ll(:)
+ type(t_pot_elem_p), intent(in)    :: elems_tot(:)
+ type(t_pot_elem_p), intent(in)    :: elems_wake(:)
  type(t_sim_param), intent(in) :: sim_param
  type(t_aero_tab),  intent(in) :: airfoil_data(:)
 

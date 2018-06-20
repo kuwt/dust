@@ -141,7 +141,7 @@ type :: t_wake_panels
 
  !> pointer to the wake elements to be passed to the linsys
  !! solver
- type(t_elem_p), allocatable :: pan_p(:)
+ type(t_pot_elem_p), allocatable :: pan_p(:)
 
 end type
 
@@ -199,7 +199,7 @@ subroutine initialize_wake_panels(wake, geo, te,  npan, sim_param)
 
   !Set the generating elements and points from the trailing edge
   !wake%gen_elems  = te%e
-  do iw=1,size(te%e)
+  do iw=1,size(te%e,2)
   !TODO: consider shifting the whole t.e. to c_pot_elem to avoid this nightmare
   select type(el => te%e(1,iw)%p); class is(c_pot_elem)
     wake%gen_elems(1,iw)%p => el
@@ -215,7 +215,11 @@ subroutine initialize_wake_panels(wake, geo, te,  npan, sim_param)
 
   do iw=1,wake%n_wake_stripes
     wake%gen_elems_id(1,iw) = wake%gen_elems(1,iw)%p%id
+    !DEBUG:
+    write(*,*) 'element 1: ',wake%gen_elems(1,iw)%p%id 
     if(associated(wake%gen_elems(2,iw)%p)) then
+      write(*,*) 'element 2 area: ',wake%gen_elems(2,iw)%p%area
+      write(*,*) 'element 2: ',wake%gen_elems(2,iw)%p%id 
       wake%gen_elems_id(2,iw) = wake%gen_elems(2,iw)%p%id
     else
       wake%gen_elems_id(2,iw) = 0
@@ -392,13 +396,13 @@ end subroutine load_wake_panels
 !! elements
 subroutine update_wake_panels(wake, elems, wake_rings_p, sim_param)
  type(t_wake_panels), intent(inout), target :: wake
- type(t_elem_p), intent(in) :: elems(:)
- type(t_elem_p), intent(in) :: wake_rings_p(:)
+ type(t_pot_elem_p), intent(in) :: elems(:)
+ type(t_pot_elem_p), intent(in) :: wake_rings_p(:)
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: iw, ipan, ie, ip, np
  real(wp) :: pos_p(3), vel_p(3), v(3)
- type(t_elem_p), allocatable :: pan_p_temp(:)
+ type(t_pot_elem_p), allocatable :: pan_p_temp(:)
  real(wp), allocatable :: point_old(:,:,:)
 
   wake%w_vel = 0.0_wp

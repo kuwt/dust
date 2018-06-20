@@ -84,7 +84,7 @@ type :: t_linsys
  !!
  !! The contribution of the actuator disk is similar to wake contribution,
  !! however a part could be static on static and can be pre-computed
- real(wp), allocatable :: D_static(:,:)
+ !real(wp), allocatable :: D_static(:,:)
 
  !> Result of the linear system solution (intensity of the panels doublets)
  real(wp), allocatable :: res(:)

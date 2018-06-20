@@ -191,9 +191,9 @@ end subroutine compute_cp_actdisk
 
 !> The computation of the pressure in the actuator disk is not meant to
 !! happen, loads are retrieved from the tables
-subroutine compute_pres_actdisk (this, elems, sim_param)
+subroutine compute_pres_actdisk (this, sim_param)
  class(t_actdisk), intent(inout) :: this
- type(t_elem_p), intent(in) :: elems(:)
+ !type(t_elem_p), intent(in) :: elems(:)
  type(t_sim_param), intent(in) :: sim_param
 
  character(len=*), parameter      :: this_sub_name='compute_pres_actdisk'
@@ -210,9 +210,9 @@ end subroutine compute_pres_actdisk
 
 !----------------------------------------------------------------------
 
-subroutine compute_dforce_actdisk (this, elems, sim_param)
+subroutine compute_dforce_actdisk (this, sim_param)
  class(t_actdisk), intent(inout) :: this
- type(t_elem_p), intent(in) :: elems(:)
+ !type(t_elem_p), intent(in) :: elems(:)
  type(t_sim_param), intent(in) :: sim_param
 
  character(len=*), parameter      :: this_sub_name='compute_dforce_actdisk'
@@ -230,7 +230,7 @@ end subroutine compute_dforce_actdisk
 !----------------------------------------------------------------------
 
 subroutine update_actdisk(elems_ad, linsys, sim_param)
- type(t_elem_p), intent(inout) :: elems_ad(:)
+ type(t_expl_elem_p), intent(inout) :: elems_ad(:)
  type(t_linsys), intent(inout) :: linsys
  type(t_sim_param), intent(in) :: sim_param
 
@@ -254,7 +254,7 @@ end subroutine update_actdisk
 
 !TODO: is this really necessary?
 subroutine solve_actdisk(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
- type(t_elem_p), intent(inout) :: elems_ll(:)
+ type(t_expl_elem_p), intent(inout) :: elems_ll(:)
  type(t_elem_p), intent(in)    :: elems_tot(:)
  type(t_elem_p), intent(in)    :: elems_wake(:)
  real(wp), intent(in)          :: uinf(3)
