@@ -455,7 +455,6 @@ do it = 1,nstep
   ! vortex rings and 3d-panels
   do i_el = 1 , size(elems)
 !   call elems(i_el)%p%compute_cp(elems,uinf)       ! <--TODO: must become "old" as soon as possible
-
     call elems(i_el)%p%compute_pres(sim_param)
     call elems(i_el)%p%compute_dforce(sim_param)
   end do

@@ -100,6 +100,10 @@ contains
   procedure, pass(this) :: compute_psi      => compute_psi_surfpan
   procedure, pass(this) :: compute_pres     => compute_pres_surfpan
   procedure, pass(this) :: compute_dforce   => compute_dforce_surfpan
+  procedure, pass(this) :: calc_geo_data    => calc_geo_data_surfpan
+
+  procedure, pass(this) :: create_local_velocity_stencil => &
+                           create_local_velocity_stencil_surfpan
 
 end type
 
@@ -586,7 +590,7 @@ subroutine compute_pres_surfpan(this, sim_param)
   real(wp) :: vel_phi(3)
 
   integer :: i_e
-
+  
   ! perturbation velocity, u ---------------------------------
   ! Compute velocity from the potential (mu = -phi), exploiting the stencil
   ! contained in pot_vel_stencil
@@ -637,6 +641,117 @@ subroutine compute_dforce_surfpan(this, sim_param)
 
 
 end subroutine compute_dforce_surfpan
+
+!----------------------------------------------------------------------
+
+!> Compute the coefficients (pot_vel_stencil, for surfpan elements) for
+!!  computing the velocity from the velocity potential (phi = -mu).
+!! On-body analysis for 3dPanels (surfpan). This coefficients are constant
+!!  in the local frame, associated with the component. In order to obtain
+!!  the components of the velcoity in the base frame, the global rotation
+!!  matrix is needed.
+subroutine create_local_velocity_stencil_surfpan (this)
+ class(t_surfpan), intent(inout) :: this
+
+ real(wp) :: surf_bubble
+ integer  :: i_v
+        
+  allocate(this%pot_vel_stencil(3,this%n_ver) )
+
+  surf_bubble = this%area
+
+  do i_v = 1 , this%n_ver
+
+    ! Update surf_bubble
+    !sum the contribuition only if the neighbour is really present 
+    if(associated(this%neigh(i_v)%p)) then
+      surf_bubble = surf_bubble + &
+         this%neigh(i_v)%p%area / real(this%neigh(i_v)%p%n_ver,wp)
+    endif
+
+    this%pot_vel_stencil(:,i_v) = &
+             cross( this%edge_vec(:,i_v) , this%nor )
+
+  end do
+
+  this%pot_vel_stencil = this%pot_vel_stencil / surf_bubble
+
+end subroutine create_local_velocity_stencil_surfpan
+
+!----------------------------------------------------------------------
+
+!> Calculate the geometrical quantities of a surface panel
+!!
+!! The subroutine calculates all the relevant geometrical quantities of a
+!! surface panel
+subroutine calc_geo_data_surfpan(this,vert)
+ class(t_surfpan), intent(inout) :: this
+ real(wp), intent(in) :: vert(:,:)
+
+ integer :: nsides, is
+ real(wp):: nor(3), tanl(3)
+
+  this%ver = vert
+  nsides = this%n_ver
+
+  ! center
+  this%cen =  sum ( this%ver,2 ) / real(nsides,wp)
+
+  ! unit normal and area
+  if ( nsides .eq. 4 ) then
+    nor = cross( this%ver(:,3) - this%ver(:,1) , &
+                 this%ver(:,4) - this%ver(:,2)     )
+  else if ( nSides .eq. 3 ) then
+    nor = cross( this%ver(:,3) - this%ver(:,2) , &
+                 this%ver(:,1) - this%ver(:,2)     )
+  end if
+
+  this%area = 0.5_wp * norm2(nor)
+  this%nor = nor / norm2(nor)
+
+  ! local tangent unit vector as in PANAIR
+  tanl = 0.5_wp * ( this%ver(:,nsides) + this%ver(:,1) ) - this%cen
+
+  this%tang(:,1) = tanl / norm2(tanl)
+  this%tang(:,2) = cross( this%nor, this%tang(:,1)  )
+
+  ! vector connecting two consecutive vertices:
+  ! edge_vec(:,1) =  ver(:,2) - ver(:,1)
+  if ( nsides .eq. 3 ) then
+    do is = 1 , nsides
+      this%edge_vec(:,is) = this%ver(:,next_tri(is)) - this%ver(:,is)
+    end do
+  else if ( nsides .eq. 4 ) then
+    do is = 1 , nsides
+      this%edge_vec(:,is) = this%ver(:,next_qua(is)) - this%ver(:,is)
+    end do
+  end if
+
+  ! edge: edge_len(:)
+  do is = 1 , nsides
+    this%edge_len(is) = norm2(this%edge_vec(:,is))
+  end do
+
+  ! unit vector
+  do is = 1 , nSides
+    this%edge_uni(:,is) = this%edge_vec(:,is) / this%edge_len(is)
+  end do
+
+  !surface panels own fields
+  do is = 1 , nsides
+    ! cosTi , sinTi
+    this%cosTi(is) = sum( this%edge_uni(:,is) * this%tang(:,1) )
+    this%sinTi(is) = sum( this%edge_uni(:,is) * this%tang(:,2) )
+    ! projection of the vertices on the mean plane
+    this%verp(:,is) = this%ver(:,is) - this%nor * &
+                    sum( (this%ver(:,is) - this%cen ) * this%nor )
+  end do
+
+  !TODO: is it necessary to initialize it here?
+  this%dforce = 0.0_wp
+
+
+end subroutine calc_geo_data_surfpan
 
 !----------------------------------------------------------------------
 

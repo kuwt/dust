@@ -215,11 +215,7 @@ subroutine initialize_wake_panels(wake, geo, te,  npan, sim_param)
 
   do iw=1,wake%n_wake_stripes
     wake%gen_elems_id(1,iw) = wake%gen_elems(1,iw)%p%id
-    !DEBUG:
-    write(*,*) 'element 1: ',wake%gen_elems(1,iw)%p%id 
     if(associated(wake%gen_elems(2,iw)%p)) then
-      write(*,*) 'element 2 area: ',wake%gen_elems(2,iw)%p%area
-      write(*,*) 'element 2: ',wake%gen_elems(2,iw)%p%id 
       wake%gen_elems_id(2,iw) = wake%gen_elems(2,iw)%p%id
     else
       wake%gen_elems_id(2,iw) = 0

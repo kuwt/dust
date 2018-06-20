@@ -45,6 +45,9 @@ use mod_handling, only: &
 use mod_sim_param, only: &
   t_sim_param
 
+use mod_math, only: &
+  cross
+
 use mod_doublet, only: &
   potential_calc_doublet , &
   velocity_calc_doublet
@@ -80,6 +83,7 @@ contains
   procedure, pass(this) :: compute_psi      => compute_psi_actdisk
   procedure, pass(this) :: compute_pres     => compute_pres_actdisk
   procedure, pass(this) :: compute_dforce   => compute_dforce_actdisk
+  procedure, pass(this) :: calc_geo_data    => calc_geo_data_actdisk
 end type
 
 character(len=*), parameter :: this_mod_name='mod_actuatordisk'
@@ -262,6 +266,63 @@ subroutine solve_actdisk(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
 
 end subroutine solve_actdisk
 
+!----------------------------------------------------------------------
+
+!> Calculate the geometrical quantities of an actuator disk
+!!
+!! The subroutine calculates all the relevant geometrical quantities of an
+!! actuator disk
+subroutine calc_geo_data_actdisk(this, vert)
+ class(t_actdisk), intent(inout) :: this
+ real(wp), intent(in) :: vert(:,:)
+
+ integer :: nsides, is
+ real(wp):: nor(3), tanl(3)
+ integer :: nxt
+
+  this%ver = vert
+  nsides = this%n_ver
+
+  ! center, for the lifting line is the mid-point
+  this%cen =  sum ( this%ver,2 ) / real(nsides,wp)
+
+  this%area = 0.0_wp; this%nor = 0.0_wp
+  do is = 1, nsides
+    nxt = 1+mod(is,nsides)
+    nor = cross(this%ver(:,is) - this%cen,&
+                this%ver(:,nxt) - this%cen )
+    this%area = this%area + 0.5_wp * norm2(nor)
+    this%nor = this%nor + nor/norm2(nor)
+  enddo
+    this%nor = this%nor/real(nsides,wp)
+
+  ! local tangent unit vector: aligned with first node, normal to n
+  tanl = (this%ver(:,1)-this%cen)-&
+          sum((this%ver(:,1)-this%cen)*this%nor)*this%nor
+
+  this%tang(:,1) = tanl / norm2(tanl)
+  this%tang(:,2) = cross( this%nor, this%tang(:,1)  )
+
+  ! vector connecting two consecutive vertices:
+  do is = 1 , nsides
+    nxt = 1+mod(is,nsides)
+    this%edge_vec(:,is) = this%ver(:,nxt) - this%ver(:,is)
+  end do
+
+  ! edge: edge_len(:)
+  do is = 1 , nsides
+    this%edge_len(is) = norm2(this%edge_vec(:,is))
+  end do
+
+  ! unit vector
+  do is = 1 , nsides
+    this%edge_uni(:,is) = this%edge_vec(:,is) / this%edge_len(is)
+  end do
+
+  !TODO: is it necessary to initialize it here?
+  this%dforce = 0.0_wp
+
+end subroutine calc_geo_data_actdisk
 !----------------------------------------------------------------------
 
 end module mod_actuatordisk

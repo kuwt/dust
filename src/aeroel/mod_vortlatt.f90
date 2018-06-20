@@ -51,7 +51,10 @@ use mod_sim_param, only: &
   t_sim_param
 
 use mod_param, only: &
-  wp, pi
+  wp, pi, max_char_len, prev_tri, next_tri, prev_qua, next_qua
+
+use mod_math, only: &
+  cross
 
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
@@ -86,6 +89,7 @@ procedure, pass(this) :: compute_vel      => compute_vel_vortlatt
 procedure, pass(this) :: compute_psi      => compute_psi_vortlatt
 procedure, pass(this) :: compute_pres     => compute_pres_vortlatt
 procedure, pass(this) :: compute_dforce   => compute_dforce_vortlatt
+procedure, pass(this) :: calc_geo_data    => calc_geo_data_vortlatt
 end type
 
 
@@ -427,6 +431,72 @@ this%dforce = this%pres * this%area * this%nor
 
 
 end subroutine compute_dforce_vortlatt
+
+!----------------------------------------------------------------------
+
+!> Calculate the geometrical quantities of a vortex lattice
+!!
+!! The subroutine calculates all the relevant geometrical quantities of a
+!! vortex lattice panel
+subroutine calc_geo_data_vortlatt(this, vert)
+ class(t_vortlatt), intent(inout) :: this
+ real(wp), intent(in) :: vert(:,:)
+
+ integer :: nsides, is
+ real(wp):: nor(3), tanl(3)
+
+  this%ver = vert
+  nsides = this%n_ver
+
+  ! center
+  this%cen =  sum ( this%ver,2 ) / real(nsides,wp)
+
+  ! unit normal and area
+  if ( nsides .eq. 4 ) then
+    nor = cross( this%ver(:,3) - this%ver(:,1) , &
+                 this%ver(:,4) - this%ver(:,2)     )
+  else if ( nSides .eq. 3 ) then
+    nor = cross( this%ver(:,3) - this%ver(:,2) , &
+                 this%ver(:,1) - this%ver(:,2)     )
+  end if
+
+  this%area = 0.5_wp * norm2(nor)
+  this%nor = nor / norm2(nor)
+
+  ! local tangent unit vector as in PANAIR
+  tanl = 0.5_wp * ( this%ver(:,nsides) + this%ver(:,1) ) - this%cen
+
+  this%tang(:,1) = tanl / norm2(tanl)
+  this%tang(:,2) = cross( this%nor, this%tang(:,1)  )
+
+  ! vector connecting two consecutive this%verices:
+  ! edge_vec(:,1) =  ver(:,2) - ver(:,1)
+  if ( nsides .eq. 3 ) then
+    do is = 1 , nsides
+      this%edge_vec(:,is) = this%ver(:,next_tri(is)) - this%ver(:,is)
+    end do
+  else if ( nsides .eq. 4 ) then
+    do is = 1 , nsides
+      this%edge_vec(:,is) = this%ver(:,next_qua(is)) - this%ver(:,is)
+    end do
+  end if
+
+  ! edge: edge_len(:)
+  do is = 1 , nsides
+    this%edge_len(is) = norm2(this%edge_vec(:,is))
+  end do
+
+  ! unit vector
+  do is = 1 , nSides
+    this%edge_uni(:,is) = this%edge_vec(:,is) / this%edge_len(is)
+  end do
+
+
+  !TODO: is it necessary to initialize it here?
+  this%dforce = 0.0_wp
+
+
+end subroutine calc_geo_data_vortlatt
 
 !----------------------------------------------------------------------
 

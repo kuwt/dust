@@ -151,7 +151,7 @@ type, abstract, extends(c_elem) :: c_pot_elem
   real(wp)              :: pres
 
   !> Elementary force acting on the element (components in the base ref.sys.)
-  real(wp), allocatable :: dforce(:)
+  real(wp)              :: dforce(3)
 
   !TODO: these three are used only by vortlatt and liftlin
   ! consider moving them there, but then change the implementation of
@@ -172,6 +172,8 @@ type, abstract, extends(c_elem) :: c_pot_elem
   procedure(i_compute_pres),   deferred, pass(this) :: compute_pres
 
   procedure(i_compute_dforce), deferred, pass(this) :: compute_dforce
+
+  procedure(i_calc_geo_data),  deferred, pass(this) :: calc_geo_data
 
 end type c_pot_elem
 
@@ -427,5 +429,16 @@ end interface
 
 !----------------------------------------------------------------------
 
+!> Compute the geometrical quantities of the elemsnts
+abstract interface
+  subroutine i_calc_geo_data (this,vert)
+    import :: c_pot_elem , t_elem_p , wp , t_sim_param
+    implicit none
+    class(c_pot_elem), intent(inout) :: this
+    real(wp), intent(in) :: vert(:,:)
+  end subroutine
+end interface
+
+!----------------------------------------------------------------------
 
 end module mod_aeroel

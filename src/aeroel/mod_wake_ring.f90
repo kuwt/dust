@@ -251,9 +251,6 @@ subroutine load_wake_rings(filename, wake)
   do id = 1,wake%ndisks
     np = wake%gen_elems(id)%p%n_ver
     do ir = 1,wake%wake_len
-      !DEBUG:
-      write(*,*) 'size ver', shape(wake%wake_rings(id,ir)%ver(:,:))
-      write(*,*) 'size results', shape(wpoints(:,ip:ip+np-1,ir))
       wake%wake_rings(id,ir)%ver(:,:) = wpoints(:,ip:ip+np-1,ir)
     enddo
     ip = ip+np

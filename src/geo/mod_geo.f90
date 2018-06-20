@@ -553,7 +553,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   !end do
   
   !TODO: think about getting both of these into "prepare_geometry"
-  call create_local_velocity_stencil(geo)    ! for surfpan only (3dP)
+  !call create_local_velocity_stencil(geo)    ! for surfpan only (3dP)
 
   call create_strip_connectivity(geo)
   
@@ -1117,55 +1117,40 @@ subroutine prepare_geometry(geo)
 
  do i_comp = 1,size(geo%components)
    do ie = 1,size(geo%components(i_comp)%el)
-     !associate(elem => geo%compnents(i_comp)%el(ie))
      elem => geo%components(i_comp)%el(ie)
 
      nsides = size(elem%i_ver)
 
      !Fields common to each element
      allocate(elem%ver(3,nsides))
-     !allocate(elem%cen(3))
-     !allocate(elem%nor(3))
-
+     allocate(elem%edge_vec(3,nsides))
+     allocate(elem%edge_len(nsides))
+     allocate(elem%edge_uni(3,nsides))
+     
+     !type-specific fields
      select type(elem)
+      !Surface panel
       class is(t_surfpan)
-       !allocate(elem%tang(3,2))
        allocate(elem%verp(3,nsides))
-       allocate(elem%edge_vec(3,nsides))
-       allocate(elem%edge_len(nsides))
-       allocate(elem%edge_uni(3,nsides))
        allocate(elem%cosTi(nsides))
        allocate(elem%sinTi(nsides))
 
-      class is(t_vortlatt)
-       !allocate(elem%tang(3,2))
-       allocate(elem%edge_vec(3,nsides))
-       allocate(elem%edge_len(nsides))
-       allocate(elem%edge_uni(3,nsides))
-
       class is(t_liftlin)
-       !allocate(elem%tang(3,2))
        allocate(elem%tang_cen(3))
        allocate(elem%bnorm_cen(3))
-       allocate(elem%edge_vec(3,nsides))
-       allocate(elem%edge_len(nsides))
-       allocate(elem%edge_uni(3,nsides))
 
        elem%csi_cen = 0.5_wp * &
                       sum(geo%components(i_comp)%normalised_coord_e(:,ie))
        elem%i_airfoil =  geo%components(i_comp)%i_airfoil_e(:,ie)
 
+      class is(t_vortlatt)
+
       class is(t_actdisk)
-       !allocate(elem%tang(3,2))
-       allocate(elem%edge_vec(3,nsides))
-       allocate(elem%edge_len(nsides))
-       allocate(elem%edge_uni(3,nsides))
 
       class default
        call error(this_sub_name, this_mod_name, 'Unknown element type')
      end select
 
-     !end associate
    enddo
  enddo
 
@@ -1254,7 +1239,6 @@ subroutine calc_geo_data_pan(elem,vert)
   end select
 
   ! allocate %dforce
-  if(.not.allocated(elem%dforce)) allocate(elem%dforce(3)) ;
   elem%dforce = 0.0_wp
 
 
@@ -1336,7 +1320,6 @@ subroutine calc_geo_data_ll(elem,vert)
   end select
 
   ! allocate %dforce
-  if(.not.allocated(elem%dforce)) allocate(elem%dforce(3));
   elem%dforce = 0.0_wp
 
 
@@ -1399,7 +1382,6 @@ subroutine calc_geo_data_ad(elem,vert)
   end do
 
   ! allocate %dforce
-  if(.not.allocated(elem%dforce)) allocate(elem%dforce(3))
   elem%dforce = 0.0_wp
 
 end subroutine calc_geo_data_ad
@@ -1434,6 +1416,7 @@ end subroutine calc_node_vel
 
 !----------------------------------------------------------------------
 
+!DISCONTINUED: consider removing
 !> Compute the coefficients (pot_vel_stencil, for surfpan elements) for
 !!  computing the velocity from the velocity potential (phi = -mu).
 !! On-body analysis for 3dPanels (surfpan). This coefficients are constant
@@ -1441,62 +1424,62 @@ end subroutine calc_node_vel
 !!  the components of the velcoity in the base frame, the global rotation
 !!  matrix is needed.
 !TODO: move all this stuff in prepare geometry
-subroutine create_local_velocity_stencil (geo)
- type(t_geo), intent(inout) :: geo
- !type(t_impl_elem_p), intent(in)  :: elems(:)
-
- real(wp) :: surf_bubble
- integer  :: i_comp , i_el , i_v
-
-  do i_comp = 1 , size(geo%components)
-
-    ! Field pot_vel_stencil belongs to surfpan elements only!
-    !if ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'p' ) then
-    select type (el => geo%components(i_comp)%el)
-    type is(t_surfpan)
-
-      do i_el = 1 , size(el)
-        
-        !TODO: consider removing this check if we are pretty sure it will
-        !pass
-        if ( allocated(el(i_el)%pot_vel_stencil) ) then
-          write(*,*) ' WARNING. Already allocated pot_vel_stencil array for '
-          write(*,*) ' component , element ' , i_comp , i_el
-          deallocate(el(i_el)%pot_vel_stencil)
-        end if
-        allocate(el(i_el)%pot_vel_stencil(3,el(i_el)%n_ver) )
-
-        surf_bubble = el(i_el)%area
-
-        do i_v = 1 , el(i_el)%n_ver
-
-          ! Update surf_bubble
-          !sum the contribuition only if the neighbour is really present 
-          if(associated(el(i_el)%neigh(i_v)%p)) then
-            surf_bubble = surf_bubble + &
-               el(i_el)%neigh(i_v)%p%area / &
-               real(el(i_el)%neigh(i_v)%p%n_ver,wp)
-          endif
-
-          el(i_el)%pot_vel_stencil(:,i_v) = &
-                   cross( el(i_el)%edge_vec(:,i_v) , el(i_el)%nor )
-
-        end do
-
-        el(i_el)%pot_vel_stencil = el(i_el)%pot_vel_stencil / surf_bubble
-
-      end do
-
-! else if ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'v' ) then
-!   no stencil for the velocity ...
-
-  !end if
-  end select
-
- end do
-
-
-end subroutine create_local_velocity_stencil
+!subroutine create_local_velocity_stencil (geo)
+! type(t_geo), intent(inout) :: geo
+! !type(t_impl_elem_p), intent(in)  :: elems(:)
+!
+! real(wp) :: surf_bubble
+! integer  :: i_comp , i_el , i_v
+!
+!  do i_comp = 1 , size(geo%components)
+!
+!    ! Field pot_vel_stencil belongs to surfpan elements only!
+!    !if ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'p' ) then
+!    select type (el => geo%components(i_comp)%el)
+!    type is(t_surfpan)
+!
+!      do i_el = 1 , size(el)
+!        
+!        !TODO: consider removing this check if we are pretty sure it will
+!        !pass
+!        if ( allocated(el(i_el)%pot_vel_stencil) ) then
+!          write(*,*) ' WARNING. Already allocated pot_vel_stencil array for '
+!          write(*,*) ' component , element ' , i_comp , i_el
+!          deallocate(el(i_el)%pot_vel_stencil)
+!        end if
+!        allocate(el(i_el)%pot_vel_stencil(3,el(i_el)%n_ver) )
+!
+!        surf_bubble = el(i_el)%area
+!
+!        do i_v = 1 , el(i_el)%n_ver
+!
+!          ! Update surf_bubble
+!          !sum the contribuition only if the neighbour is really present 
+!          if(associated(el(i_el)%neigh(i_v)%p)) then
+!            surf_bubble = surf_bubble + &
+!               el(i_el)%neigh(i_v)%p%area / &
+!               real(el(i_el)%neigh(i_v)%p%n_ver,wp)
+!          endif
+!
+!          el(i_el)%pot_vel_stencil(:,i_v) = &
+!                   cross( el(i_el)%edge_vec(:,i_v) , el(i_el)%nor )
+!
+!        end do
+!
+!        el(i_el)%pot_vel_stencil = el(i_el)%pot_vel_stencil / surf_bubble
+!
+!      end do
+!
+!! else if ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'v' ) then
+!!   no stencil for the velocity ...
+!
+!  !end if
+!  end select
+!
+! end do
+!
+!
+!end subroutine create_local_velocity_stencil
 
 !----------------------------------------------------------------------
 
@@ -1646,40 +1629,34 @@ subroutine update_geometry(geo, t, update_static)
       geo%points(:,comp%i_points) = move_points(comp%loc_points, &
                            geo%refs(comp%ref_id)%R_g, &
                            geo%refs(comp%ref_id)%of_g)
-      select case(trim(comp%comp_el_type))
-       case('p','v')
-        do ie = 1,size(comp%el)
-          call calc_geo_data_pan(comp%el(ie),geo%points(:,comp%el(ie)%i_ver))
 
-          !Calculate the velocity of the centers to impose
-          !the boundary condition
-          call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &
-                                  geo%refs(comp%ref_id)%f_g)
+      do ie = 1,size(comp%el)
+        !comp%el(ie)%ver = move_points(comp%loc_points(:,comp%el(ie)%i_ver), &
+        !                   geo%refs(comp%ref_id)%R_g, &
+        !                   geo%refs(comp%ref_id)%of_g)
+        call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
+      enddo
+      !in the first pass compute also the velocity stencil for surfpans
+      if(update_static) then
+        select type(els=>comp%el); class is(t_surfpan)
+        do ie = 1,size(els)
+          call els(ie)%create_local_velocity_stencil()
         enddo
-       case('l')
-        do ie = 1,size(comp%el)
-          call calc_geo_data_ll(comp%el(ie),geo%points(:,comp%el(ie)%i_ver))
+        end select
+      endif
 
-          !Calculate the velocity of the centers to impose
-          !the boundary condition
-          call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &
-                                  geo%refs(comp%ref_id)%f_g)
-        enddo
-       case('a')
-        do ie = 1,size(comp%el)
-          call calc_geo_data_ad(comp%el(ie),geo%points(:,comp%el(ie)%i_ver))
 
-          !Calculate the velocity of the centers to impose
-          !the boundary condition
-          call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &
-                                  geo%refs(comp%ref_id)%f_g)
-        enddo
-      end select
+      do ie = 1,size(comp%el)
+        !Calculate the velocity of the centers to impose
+        !the boundary condition
+        call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &
+                                geo%refs(comp%ref_id)%f_g)
+      enddo
+
     end if
 
   end associate
  enddo
-
 
 end subroutine update_geometry
 

@@ -37,7 +37,7 @@
 module mod_liftlin
 
 use mod_param, only: &
-  wp, pi, max_char_len
+  wp, pi, max_char_len, prev_tri, next_tri, prev_qua, next_qua
 
 use mod_handling, only: &
   error, printout
@@ -51,6 +51,9 @@ use mod_linsys_vars, only: &
 
 use mod_sim_param, only: &
   t_sim_param
+
+use mod_math, only: &
+  cross
 
 use mod_c81, only: &
   t_aero_tab, interp_aero_coeff
@@ -83,6 +86,7 @@ contains
   procedure, pass(this) :: compute_psi      => compute_psi_liftlin
   procedure, pass(this) :: compute_pres     => compute_pres_liftlin
   procedure, pass(this) :: compute_dforce   => compute_dforce_liftlin
+  procedure, pass(this) :: calc_geo_data    => calc_geo_data_liftlin
 end type
 
 character(len=*), parameter :: this_mod_name='mod_vortring'
@@ -389,6 +393,66 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  sim_param, &
 
 end subroutine solve_liftlin
 
+!----------------------------------------------------------------------
+
+subroutine calc_geo_data_liftlin(this, vert)
+ class(t_liftlin), intent(inout) :: this
+ real(wp), intent(in) :: vert(:,:)
+
+ integer :: sides, is, nsides
+ real(wp):: nor(3), tanl(3)
+
+  this%ver = vert
+  nsides = this%n_ver
+
+
+  ! center, for the lifting line is the mid-point
+  this%cen =  sum ( this%ver(:,1:2),2 ) / 2.0_wp
+
+  ! unit normal and area, ll should always have 4 sides
+  nor = cross( this%ver(:,3) - this%ver(:,1) , &
+               this%ver(:,4) - this%ver(:,2)     )
+
+  this%area = 0.5_wp * norm2(nor)
+  this%nor = nor / norm2(nor)
+
+  ! local tangent unit vector as in PANAIR
+  tanl = 0.5_wp * ( this%ver(:,nsides) + this%ver(:,1) ) - this%cen
+
+  this%tang(:,1) = tanl / norm2(tanl)
+  this%tang(:,2) = cross( this%nor, this%tang(:,1)  )
+
+
+  ! vector connecting two consecutive vertices:
+  ! edge_vec(:,1) =  ver(:,2) - ver(:,1)
+  ! ll should always have 4 sides
+  do is = 1 , nsides
+    this%edge_vec(:,is) = this%ver(:,next_qua(is)) - this%ver(:,is)
+  end do
+
+  ! edge: edge_len(:)
+  do is = 1 , nsides
+    this%edge_len(is) = norm2(this%edge_vec(:,is))
+  end do
+
+  ! unit vector
+  do is = 1 , nSides
+    this%edge_uni(:,is) = this%edge_vec(:,is) / this%edge_len(is)
+  end do
+
+  ! ll-specific fields
+  this%tang_cen = this%edge_uni(:,2) - this%edge_uni(:,4)
+  this%tang_cen = this%tang_cen / norm2(this%tang_cen)
+
+  this%bnorm_cen = cross(this%tang_cen, this%nor)
+  this%bnorm_cen = this%bnorm_cen / norm2(this%bnorm_cen)
+  this%chord = sum(this%edge_len((/2,4/)))*0.5_wp
+
+  !TODO: is it necessary to initialize it here?
+  this%dforce = 0.0_wp
+
+
+end subroutine calc_geo_data_liftlin
 !----------------------------------------------------------------------
 
 end module mod_liftlin
