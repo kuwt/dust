@@ -58,6 +58,9 @@ use mod_aeroel, only: &
 use mod_vortlatt, only: &
   t_vortlatt
 
+use mod_vortline, only: &
+  t_vortline
+
 use mod_hdf5_io, only: &
    h5loc, &
    new_hdf5_file, &
@@ -136,6 +139,9 @@ type :: t_wake_panels
  !> elements of the panels
  type(t_vortlatt), allocatable :: wake_panels(:,:)
 
+ !> end vortices
+ type(t_vortline), allocatable :: end_vorts(:)
+
  !> doublets intensities
  real(wp), allocatable :: idou(:,:)
 
@@ -178,6 +184,7 @@ subroutine initialize_wake_panels(wake, geo, te,  npan, sim_param)
   allocate(wake%w_points(3,wake%n_wake_points,npan+1))
   allocate(wake%w_vel(3,wake%n_wake_points,npan+1))
   allocate(wake%wake_panels(wake%n_wake_stripes,npan))
+  allocate(wake%end_vorts(wake%n_wake_stripes))
   allocate(wake%idou(wake%n_wake_stripes,npan))
   !allocate(wake%pan_p(0))
 
@@ -187,10 +194,8 @@ subroutine initialize_wake_panels(wake, geo, te,  npan, sim_param)
   do ip = 1,npan
     do iw=1,wake%n_wake_stripes
      wake%wake_panels(iw,ip)%mag => wake%idou(iw,ip)
+     wake%wake_panels(iw,ip)%n_ver = nsides
      allocate(wake%wake_panels(iw,ip)%ver(3,nsides))
-     !allocate(wake%wake_panels(iw,ip)%cen(3))
-     !allocate(wake%wake_panels(iw,ip)%nor(3))
-     !allocate(wake%wake_panels(iw,ip)%tang(3,2))
      allocate(wake%wake_panels(iw,ip)%edge_vec(3,nsides))
      allocate(wake%wake_panels(iw,ip)%edge_len(nsides))
      allocate(wake%wake_panels(iw,ip)%edge_uni(3,nsides))
@@ -253,12 +258,17 @@ subroutine initialize_wake_panels(wake, geo, te,  npan, sim_param)
     wake%wake_panels(iw,:)%moving = geo%refs(wake%gen_ref(iw))%moving
     wake%pan_p(iw)%p => wake%wake_panels(iw,1)
   enddo
+
+  !set the end vortexes to null
+  do iw = 1,wake%n_wake_stripes
+    wake%end_vorts(iw)%mag => null()
+  enddo
   
   ! Calculate geometrical quantities of first row
   do iw = 1,wake%n_wake_stripes
     p1 = wake%i_start_points(1,iw)
     p2 = wake%i_start_points(2,iw)
-    call calc_geo_data_pan(wake%wake_panels(iw,1), &
+    call wake%wake_panels(iw,1)%calc_geo_data( &
          reshape((/wake%w_points(:,p1,1),   wake%w_points(:,p2,1), &
                    wake%w_points(:,p2,1+1), wake%w_points(:,p1,1+1)/),&
                                                                    (/3,4/)))
@@ -316,12 +326,24 @@ subroutine prepare_wake_panels(wake, geo, sim_param)
     do iw = 1,wake%n_wake_stripes
       p1 = wake%i_start_points(1,iw)
       p2 = wake%i_start_points(2,iw)
-      call calc_geo_data_pan(wake%wake_panels(iw,ipan), &
+      call wake%wake_panels(iw,ipan)%calc_geo_data( &
            reshape((/wake%w_points(:,p1,ipan),   wake%w_points(:,p2,ipan), &
                     wake%w_points(:,p2,ipan+1), wake%w_points(:,p1,ipan+1)/),&
                                                                      (/3,4/)))
     enddo
   enddo
+
+  !If the wake is full, attach the end vortex
+  if (wake%wake_len .eq. wake%npan) then
+    do iw = 1,wake%n_wake_stripes
+      wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%wake_len)%mag
+      p1 = wake%i_start_points(1,iw)
+      p2 = wake%i_start_points(2,iw)
+      call wake%end_vorts(iw)%calc_geo_data( &
+          reshape((/wake%w_points(:,p1,wake%wake_len+1),  &
+                    wake%w_points(:,p2,wake%wake_len+1)/), (/3,2/)))
+    enddo
+  endif
 
 end subroutine prepare_wake_panels
 
@@ -369,7 +391,7 @@ subroutine load_wake_panels(filename, wake)
     do iw = 1,wake%n_wake_stripes
       p1 = wake%i_start_points(1,iw)
       p2 = wake%i_start_points(2,iw)
-      call calc_geo_data_pan(wake%wake_panels(iw,ipan), &
+      call wake%wake_panels(iw,ipan)%calc_geo_data( &
            reshape((/wake%w_points(:,p1,ipan),   wake%w_points(:,p2,ipan), &
                     wake%w_points(:,p2,ipan+1), wake%w_points(:,p1,ipan+1)/),&
                                                                      (/3,4/)))
@@ -501,6 +523,15 @@ subroutine update_wake_panels(wake, elems, wake_rings_p, sim_param)
       wake%wake_panels(iw,ipan)%mag = wake%wake_panels(iw,ipan-1)%mag
     enddo
   enddo
+
+  !If the wake is full, attach the end vortex
+  if (wake%wake_len .eq. wake%npan) then
+    do iw = 1,wake%n_wake_stripes
+      wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%wake_len)%mag
+    enddo
+  endif
+
+
 
   ! The geometrical quantities of the panels will be all updated at the
   ! beginning of the next iteration in prepare_wake

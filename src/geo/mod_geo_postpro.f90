@@ -63,14 +63,17 @@ use mod_cgns_io, only: &
 use mod_parametric_io, only: &
   read_mesh_parametric
 
-use mod_aero_elements, only: &
-  c_elem, t_elem_p
+!use mod_aero_elements, only: &
+!  c_elem, t_elem_p
+use mod_aeroel, only: &
+  c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
 use mod_surfpan, only: &
   t_surfpan
 
-use mod_vortring, only: &
-  t_vortring
+use mod_vortlatt, only: &
+  t_vortlatt
 
 use mod_liftlin, only: &
   t_liftlin
@@ -515,7 +518,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
        case('p')
         allocate(t_surfpan::comps(i_comp)%el(size(ee,2)))
        case('v')
-        allocate(t_vortring::comps(i_comp)%el(size(ee,2)))
+        allocate(t_vortlatt::comps(i_comp)%el(size(ee,2)))
        case('l')
         allocate(t_liftlin::comps(i_comp)%el(size(ee,2)))
        case('a')
@@ -550,7 +553,6 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         
         !motion
         !geo%components(i_comp)%el(i2)%moving = geo%components(i_comp)%moving
-        allocate(comps(i_comp)%el(i2)%vel(3))
 
       enddo
  
@@ -678,7 +680,7 @@ subroutine prepare_geometry_postpro(comps)
 
  integer :: i_comp, ie
  integer :: nsides
- class(c_elem), pointer :: elem
+ class(c_pot_elem), pointer :: elem
  character(len=*), parameter :: this_sub_name = 'prepare_geometry_postpro'
 
  do i_comp = 1,size(comps)
@@ -689,12 +691,9 @@ subroutine prepare_geometry_postpro(comps)
 
      !Fields common to each element
      allocate(elem%ver(3,nsides))
-     allocate(elem%cen(3))
-     allocate(elem%nor(3))
 
      select type(elem)
       class is(t_surfpan)
-       allocate(elem%tang(3,2))
        allocate(elem%verp(3,nsides))
        allocate(elem%edge_vec(3,nsides))
        allocate(elem%edge_len(nsides))
@@ -702,16 +701,12 @@ subroutine prepare_geometry_postpro(comps)
        allocate(elem%cosTi(nsides))
        allocate(elem%sinTi(nsides))
 
-      class is(t_vortring)
-       allocate(elem%tang(3,2))
+      class is(t_vortlatt)
        allocate(elem%edge_vec(3,nsides))
        allocate(elem%edge_len(nsides))
        allocate(elem%edge_uni(3,nsides))
 
       class is(t_liftlin)
-       allocate(elem%tang(3,2))
-     !!  allocate(elem%tang_cen(3))
-     !!  allocate(elem%bnorm_cen(3))
        allocate(elem%edge_vec(3,nsides))
        allocate(elem%edge_len(nsides))
        allocate(elem%edge_uni(3,nsides))
@@ -726,7 +721,6 @@ subroutine prepare_geometry_postpro(comps)
 
      !!  ! elem%theta   <-- ??? 
       class is(t_actdisk)
-       allocate(elem%tang(3,2))
        allocate(elem%edge_vec(3,nsides))
        allocate(elem%edge_len(nsides))
        allocate(elem%edge_uni(3,nsides))
@@ -775,7 +769,7 @@ subroutine prepare_wake_postpro( wpoints_pan, wpoints_rin, wstart, wconn, &
   allocate(wake_pan%i_start_points(2,wake_pan%n_wake_stripes))
   allocate(wake_pan%w_points(3,wake_pan%n_wake_points,npan+1))
   allocate(wake_pan%wake_panels(wake_pan%n_wake_stripes,npan))
-  allocate(wake_pan%ivort(wake_pan%n_wake_stripes,npan))
+  allocate(wake_pan%idou(wake_pan%n_wake_stripes,npan))
 
   wake_pan%i_start_points = wstart
   wake_pan%w_points       = wpoints_pan
@@ -783,11 +777,8 @@ subroutine prepare_wake_postpro( wpoints_pan, wpoints_rin, wstart, wconn, &
   nsides = 4 
   do ip = 1,npan
     do iw=1,wake_pan%n_wake_stripes
-     wake_pan%wake_panels(iw,ip)%idou => wake_pan%ivort(iw,ip)
+     wake_pan%wake_panels(iw,ip)%mag => wake_pan%idou(iw,ip)
      allocate(wake_pan%wake_panels(iw,ip)%ver(3,nsides))
-     allocate(wake_pan%wake_panels(iw,ip)%cen(3))
-     allocate(wake_pan%wake_panels(iw,ip)%nor(3))
-     allocate(wake_pan%wake_panels(iw,ip)%tang(3,2))
      allocate(wake_pan%wake_panels(iw,ip)%edge_vec(3,nsides))
      allocate(wake_pan%wake_panels(iw,ip)%edge_len(nsides))
      allocate(wake_pan%wake_panels(iw,ip)%edge_uni(3,nsides))
@@ -802,7 +793,7 @@ subroutine prepare_wake_postpro( wpoints_pan, wpoints_rin, wstart, wconn, &
        reshape((/wake_pan%w_points(:,p1,ip),   wake_pan%w_points(:,p2,ip), &
                  wake_pan%w_points(:,p2,ip+1), wake_pan%w_points(:,p1,ip+1)/),&
                                                                    (/3,4/)))
-       wake_pan%wake_panels(iw,ip)%idou = wvort_pan(iw,ip) 
+       wake_pan%wake_panels(iw,ip)%mag = wvort_pan(iw,ip) 
    end do
   end do
 
@@ -811,7 +802,7 @@ subroutine prepare_wake_postpro( wpoints_pan, wpoints_rin, wstart, wconn, &
   nrows = size(wvort_rin,2)
   wake_rin%ndisks = ndisks; wake_rin%wake_len = nrows
   allocate(wake_rin%wake_rings(wake_rin%ndisks,wake_rin%wake_len))
-  allocate(wake_rin%ivort(wake_rin%ndisks,wake_rin%wake_len))
+  allocate(wake_rin%idou(wake_rin%ndisks,wake_rin%wake_len))
 
   do id = 1,wake_rin%ndisks
     !reverse the connectivity, from pts2disk to disk2pts
@@ -827,18 +818,15 @@ subroutine prepare_wake_postpro( wpoints_pan, wpoints_rin, wstart, wconn, &
 
     nsides = npt_disk
     do ir = 1,wake_rin%wake_len
-      wake_rin%wake_rings(id,ir)%idou => wake_rin%ivort(id,ir)
+      wake_rin%wake_rings(id,ir)%mag => wake_rin%idou(id,ir)
       wake_rin%wake_rings(id,ir)%n_ver = nsides
       allocate(wake_rin%wake_rings(id,ir)%ver(3,nsides))
-      allocate(wake_rin%wake_rings(id,ir)%cen(3))
-      allocate(wake_rin%wake_rings(id,ir)%nor(3))
-      allocate(wake_rin%wake_rings(id,ir)%tang(3,2))
       allocate(wake_rin%wake_rings(id,ir)%edge_vec(3,nsides))
       allocate(wake_rin%wake_rings(id,ir)%edge_len(nsides))
       allocate(wake_rin%wake_rings(id,ir)%edge_uni(3,nsides))
       call calc_geo_data_postpro(wake_rin%wake_rings(id,ir), &
                   wpoints_rin(:,disk_pts,ir))
-      wake_rin%wake_rings(id,ir)%idou = wvort_rin(id,ir)
+      wake_rin%wake_rings(id,ir)%mag = wvort_rin(id,ir)
       
     enddo
     deallocate(disk_pts)
@@ -872,7 +860,7 @@ end subroutine prepare_wake_postpro
 !! The subroutine calculates all the relevant geometrical quantities of a
 !! panel element (vortex ring or surface panel) 
 subroutine calc_geo_data_postpro(elem,vert)
- class(c_elem), intent(inout) :: elem  
+ class(c_pot_elem), intent(inout) :: elem  
  real(wp), intent(in) :: vert(:,:)
 
  integer :: nsides, is

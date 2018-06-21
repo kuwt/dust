@@ -263,7 +263,9 @@ subroutine load_wake_rings(filename, wake)
   ipt = 1
   do ir = 1,wake%wake_len
     do id = 1,wake%ndisks
-      call calc_geo_data_ad(wake%wake_rings(id,ir), &
+      !call calc_geo_data_ad(wake%wake_rings(id,ir), &
+      !              wake%wake_rings(id,ir)%ver)
+      call wake%wake_rings(id,ir)%calc_geo_data( &
                     wake%wake_rings(id,ir)%ver)
       wake%pan_p(ipt)%p => wake%wake_rings(id,ir)
       ipt = ipt + 1
@@ -411,7 +413,9 @@ subroutine update_wake_rings(wake, elems, wake_pan_p, sim_param)
   !Update the geometrical quantities
   do ir = 1,wake%wake_len
     do id = 1,wake%ndisks
-      call calc_geo_data_ad(wake%wake_rings(id,ir), &
+      !call calc_geo_data_ad(wake%wake_rings(id,ir), &
+      !              wake%wake_rings(id,ir)%ver)
+      call wake%wake_rings(id,ir)%calc_geo_data( &
                     wake%wake_rings(id,ir)%ver)
     enddo
   enddo

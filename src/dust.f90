@@ -69,6 +69,9 @@ use mod_liftlin, only: &
 use mod_actuatordisk, only: &
  update_actdisk
 
+use mod_vortline, only: &
+ initialize_vortline
+
 use mod_c81, only: &
   t_aero_tab
 
@@ -280,6 +283,7 @@ r_Rankine = getreal(prms, 'RankineRad')
 r_cutoff  = getreal(prms, 'CutoffRad')
 
 call initialize_doublet(ff_ratio_dou, eps_dou, r_Rankine, r_cutoff);
+call initialize_vortline(r_Rankine, r_cutoff);
 call initialize_surfpan(ff_ratio_sou);
 
 restart = getlogical(prms,'restart_from_file')

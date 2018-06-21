@@ -102,7 +102,7 @@ contains
 subroutine compute_pot_actdisk (this, A, b, pos,i,j)
  class(t_actdisk), intent(inout) :: this
  real(wp), intent(out) :: A
- real(wp), intent(out) :: b(3)
+ real(wp), intent(out) :: b
  real(wp), intent(in) :: pos(:)
  integer , intent(in) :: i,j
 
@@ -131,7 +131,7 @@ end subroutine compute_pot_actdisk
 subroutine compute_psi_actdisk (this, A, b, pos, nor, i, j )
  class(t_actdisk), intent(inout) :: this
  real(wp), intent(out) :: A
- real(wp), intent(out) :: b(3)
+ real(wp), intent(out) :: b
  real(wp), intent(in) :: pos(:)
  real(wp), intent(in) :: nor(:)
  integer , intent(in) :: i , j
@@ -146,7 +146,7 @@ subroutine compute_psi_actdisk (this, A, b, pos, nor, i, j )
   !  b = ... (from boundary conditions)
   !TODO: consider moving this outside
   if ( i .eq. j ) then
-    b =  4.0_wp*pi*this%nor
+    b =  4.0_wp*pi
   else
     b = 0.0_wp
   end if
@@ -161,7 +161,7 @@ end subroutine compute_psi_actdisk
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 subroutine compute_vel_actdisk (this, pos, uinf, vel)
- class(t_actdisk), intent(inout) :: this
+ class(t_actdisk), intent(in) :: this
  real(wp), intent(in) :: pos(:)
  real(wp), intent(in) :: uinf(3)
  real(wp), intent(out) :: vel(3)

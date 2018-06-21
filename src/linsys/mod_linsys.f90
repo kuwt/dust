@@ -112,7 +112,8 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
   allocate( linsys%L_static(linsys%nstatic, linsys%nstatic_expl))
  ! allocate( linsys%D_static(linsys%nstatic, linsys%nstatic_ad))
   allocate( linsys%b(linsys%rank) )
-  allocate( linsys%b_static(3,linsys%rank) )
+  !allocate( linsys%b_static(3,linsys%rank) )
+  allocate( linsys%b_static(linsys%nstatic,linsys%nstatic) )
   allocate( linsys%res(linsys%rank) )
   allocate( linsys%res_expl(linsys%n_expl,2))
   linsys%b_static = 0.0_wp
@@ -176,6 +177,12 @@ subroutine assemble_linsys(linsys, elems,  expl_elems, &
 
  nst = linsys%nstatic
  ntot = linsys%rank
+ !calculate the vortex induced velocity
+ do ie =1,linsys%rank
+
+   call elems(ie)%p%get_vort_vel(wake_elems%end_vorts, uinf)
+
+ enddo
 
   !First all the static ones (passing as start and end only the dynamic part)
 !$omp parallel private(ie) firstprivate(nst, ntot)
@@ -195,6 +202,7 @@ subroutine assemble_linsys(linsys, elems,  expl_elems, &
   !Then all the dynamic ones (passing as start and end the whole system)
 !$omp do
   do ie = nst+1,ntot
+
 
     call elems(ie)%p%build_row(elems,linsys,uinf,ie,1,ntot)
 

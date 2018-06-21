@@ -46,8 +46,11 @@ use mod_geometry, only: &
 use mod_basic_io, only: &
   read_mesh_basic, write_basic
 
-use mod_aero_elements, only: &
-  c_elem, t_elem_p!, t_vp
+!use mod_aero_elements, only: &
+!  c_elem, t_elem_p!, t_vp
+use mod_aeroel, only: &
+  c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
 use mod_doublet, only: &
   initialize_doublet
@@ -444,7 +447,7 @@ do ia = 1,n_analyses
       do ic = 1 , size(comps)
        do ie = 1 , size(comps(ic)%el)
         ip = ip + 1
-        comps(ic)%el(ie)%cp = sol_p(ip) 
+        comps(ic)%el(ie)%pres = sol_p(ip) 
        end do
       end do
 
@@ -767,7 +770,7 @@ do ia = 1,n_analyses
     do ic = 1 , size(comps)
      do ie = 1 , size(comps(ic)%el)
       ip = ip + 1
-      comps(ic)%el(ie)%idou => sol(ip) 
+      comps(ic)%el(ie)%mag => sol(ip) 
      end do
     end do
 
@@ -940,7 +943,7 @@ do ia = 1,n_analyses
     do ic = 1 , size(comps)
      do ie = 1 , size(comps(ic)%el)
       ip = ip + 1
-      comps(ic)%el(ie)%idou => sol(ip) 
+      comps(ic)%el(ie)%mag => sol(ip) 
      end do
     end do
 
@@ -1268,9 +1271,6 @@ subroutine load_res(floc, comps, vort, press, t)
 !   TODO: check if something is broken after changing intent(in to inout) for comps
     do ie = 1 , nelems_comp
       comps(icomp)%el(ie)%pres = pres_read(ie) 
-      if( .not. allocated(comps(icomp)%el(ie)%dforce) ) then
-        allocate(comps(icomp)%el(ie)%dforce(3))
-      end if
       comps(icomp)%el(ie)%dforce = dforce_read(:,ie) 
     end do
 
@@ -1283,16 +1283,16 @@ subroutine load_res(floc, comps, vort, press, t)
       press(offset+1:offset+nelems_comp) = pres_read
       offset = offset + nelems_comp
       do ie = 1,nelems_comp
-        if(associated(comps(icomp)%el(ie)%idou)) &
-                        comps(icomp)%el(ie)%idou = vort_read(ie)
+        if(associated(comps(icomp)%el(ie)%mag)) &
+                        comps(icomp)%el(ie)%mag = vort_read(ie)
       enddo
      type is(t_actdisk)
       do ie = 1,nelems_comp
         vort(offset+1:offset+el(ie)%n_ver) = vort_read(ie)
         press(offset+1:offset+el(ie)%n_ver) = pres_read(ie)
         offset = offset + el(ie)%n_ver
-        if(associated(comps(icomp)%el(ie)%idou)) then
-                        comps(icomp)%el(ie)%idou = vort_read(ie)
+        if(associated(comps(icomp)%el(ie)%mag)) then
+                        comps(icomp)%el(ie)%mag = vort_read(ie)
         endif
       enddo
     end select

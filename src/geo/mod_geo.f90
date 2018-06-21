@@ -891,7 +891,6 @@ subroutine load_components(geo, in_file, sim_param, te)
 
         !motion
         geo%components(i_comp)%el(i2)%moving = geo%components(i_comp)%moving
-        allocate(geo%components(i_comp)%el(i2)%vel(3))
 
       enddo
 
@@ -1395,7 +1394,6 @@ subroutine calc_geo_vel(elem, G, f)
  class(c_pot_elem), intent(inout) :: elem
  real(wp), intent(in) :: f(3), G(3,3)
 
-  if(.not.allocated(elem%ub)) allocate(elem%ub(3))
   elem%ub = f + matmul(G,elem%cen)
 
 end subroutine calc_geo_vel

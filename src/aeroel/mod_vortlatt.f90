@@ -90,6 +90,7 @@ procedure, pass(this) :: compute_psi      => compute_psi_vortlatt
 procedure, pass(this) :: compute_pres     => compute_pres_vortlatt
 procedure, pass(this) :: compute_dforce   => compute_dforce_vortlatt
 procedure, pass(this) :: calc_geo_data    => calc_geo_data_vortlatt
+procedure, pass(this) :: get_vort_vel     => get_vort_vel_vortlatt
 end type
 
 
@@ -105,36 +106,45 @@ contains
 !! the rest of the system was already built in the \ref build_row_static
 !! subroutine.
 subroutine build_row_vortlatt(this, elems, linsys, uinf, ie, ista, iend)
-class(t_vortlatt), intent(inout) :: this
-type(t_impl_elem_p), intent(in)       :: elems(:)
-type(t_linsys), intent(inout)    :: linsys
-real(wp), intent(in)             :: uinf(:)
-integer, intent(in)              :: ie
-integer, intent(in)              :: ista, iend
+ class(t_vortlatt), intent(inout) :: this
+ type(t_impl_elem_p), intent(in)       :: elems(:)
+ type(t_linsys), intent(inout)    :: linsys
+ real(wp), intent(in)             :: uinf(:)
+ integer, intent(in)              :: ie
+ integer, intent(in)              :: ista, iend
+ 
+ integer :: j1
+ real(wp) :: b1
+  !Not moving components, in the rhs contribution there is no body velocity
+  !linsys%b(ie) = sum(linsys%b_static(:,ie) * (-uinf))
+  linsys%b(ie) = 0.0_wp
+    do j1 = 1,ista-1
+  
+      linsys%b(ie) = linsys%b(ie) +  &
+             linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-uinf-this%uvort))
+    enddo
+  
+  ! ista and iend will be the end of the unknowns vector, containing
+  ! the moving elements
+  do j1 = ista , iend
+  
+    call elems(j1)%p%compute_psi( linsys%A(ie,j1), b1,  &
+                                  this%cen, this%nor, ie, j1 )
+  
+    if (ie .eq. j1) then
+      !diagonal, we are certainly employing vortrin, enforce the b.c. on ie
+      linsys%b(ie) = linsys%b(ie) + &
+                     b1*sum(elems(ie)%p%nor*(elems(ie)%p%ub-uinf-this%uvort))
+    else
+      ! off-diagonal: if it is a vortrin b1 is zero, if it is a surfpan
+      ! enforce the boundary condition on it (j1)
+      linsys%b(ie) = linsys%b(ie) + &
+                     b1*sum(elems(j1)%p%nor*(elems(j1)%p%ub-uinf-this%uvort))
+    endif
+  
+  end do
 
-integer :: j1
-real(wp) :: b1(3)
-!Not moving components, in the rhs contribution there is no body velocity
-linsys%b(ie) = sum(linsys%b_static(:,ie) * (-uinf))
-
-! ista and iend will be the end of the unknowns vector, containing
-! the moving elements
-do j1 = ista , iend
-
-  call elems(j1)%p%compute_psi( linsys%A(ie,j1), b1,  &
-                                this%cen, this%nor, ie, j1 )
-
-  if (ie .eq. j1) then
-    !diagonal, we are certainly employing vortrin, enforce the b.c. on ie
-    linsys%b(ie) = linsys%b(ie) + sum(b1*(elems(ie)%p%ub-uinf))
-  else
-    ! off-diagonal: if it is a vortrin b1 is zero, if it is a surfpan
-    ! enforce the boundary condition on it (j1)
-    linsys%b(ie) = linsys%b(ie) + sum(b1*(elems(j1)%p%ub-uinf))
-  endif
-
-end do
-
+  
 end subroutine build_row_vortlatt
 
 !----------------------------------------------------------------------
@@ -155,7 +165,7 @@ integer, intent(in)              :: ie
 integer, intent(in)              :: ista, iend
 
 integer :: j1
-real(wp) :: b1(3)
+real(wp) :: b1
 
 linsys%b(ie) = 0.0_wp
 linsys%b_static(:,ie) = 0.0_wp
@@ -167,7 +177,8 @@ do j1 = ista , iend
   call elems(j1)%p%compute_psi( linsys%A(ie,j1), b1,  &
                                 this%cen, this%nor, ie, j1 )
 
-  linsys%b_static(:,ie) = linsys%b_static(:,ie) + b1
+  !linsys%b_static(:,ie) = linsys%b_static(:,ie) + b1
+  linsys%b_static(ie,j1) = b1
 
 end do
 
@@ -210,7 +221,7 @@ integer, intent(in)             :: ista
 integer, intent(in)             :: iend
 
 integer :: j1
-real(wp) :: a, b(3)
+real(wp) :: a, b
 
 
 !Static part: take what was already computed
@@ -248,7 +259,7 @@ integer, intent(in)             :: ista
 integer, intent(in)             :: iend
 
 integer :: j1, ind1, ind2
-real(wp) :: a, b(3)
+real(wp) :: a, b
 integer :: n_impl
 
 !Count the number of implicit wake contributions
@@ -293,7 +304,7 @@ end subroutine add_wake_vortlatt
 subroutine compute_pot_vortlatt(this, A, b, pos,i,j)
 class(t_vortlatt), intent(inout) :: this
 real(wp), intent(out) :: A
-real(wp), intent(out) :: b(3)
+real(wp), intent(out) :: b
 real(wp), intent(in) :: pos(:)
 integer , intent(in) :: i,j
 
@@ -323,7 +334,7 @@ end subroutine compute_pot_vortlatt
 subroutine compute_psi_vortlatt(this, A, b, pos, nor, i, j )
 class(t_vortlatt), intent(inout) :: this
 real(wp), intent(out) :: A
-real(wp), intent(out) :: b(3)
+real(wp), intent(out) :: b
 real(wp), intent(in) :: pos(:)
 real(wp), intent(in) :: nor(:)
 integer , intent(in) :: i , j
@@ -338,7 +349,8 @@ A = sum(vdou * nor)
 ! b = ... (from boundary conditions)
 !TODO: consider moving this outside
 if ( i .eq. j ) then
-  b =  4.0_wp*pi*this%nor
+  !b =  4.0_wp*pi*this%nor
+  b =  4.0_wp*pi
 else
   b = 0.0_wp
 end if
@@ -356,7 +368,7 @@ end subroutine compute_psi_vortlatt
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 subroutine compute_vel_vortlatt(this, pos, uinf, vel)
-class(t_vortlatt), intent(inout) :: this
+class(t_vortlatt), intent(in) :: this
 real(wp), intent(in) :: pos(:)
 real(wp), intent(in) :: uinf(3)
 real(wp), intent(out) :: vel(3)
@@ -497,6 +509,25 @@ subroutine calc_geo_data_vortlatt(this, vert)
 
 
 end subroutine calc_geo_data_vortlatt
+
+!----------------------------------------------------------------------
+
+subroutine get_vort_vel_vortlatt(this, vort_elems, uinf)
+ class(t_vortlatt), intent(inout)  :: this
+ class(c_vort_elem), intent(in)    :: vort_elems(:)
+ real(wp), intent(in) :: uinf(3)
+
+ integer :: iv
+ real(wp) :: vel(3)
+
+ this%uvort = 0.0_wp
+
+ do iv=1,size(vort_elems)
+   call vort_elems(iv)%compute_vel(this%cen, uinf, vel)
+   this%uvort = this%uvort + vel/(4*pi)
+ enddo
+
+end subroutine 
 
 !----------------------------------------------------------------------
 

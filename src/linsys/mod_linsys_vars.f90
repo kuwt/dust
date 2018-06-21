@@ -74,6 +74,8 @@ type :: t_linsys
  !! finally the contribution of the moving panels is added 
  real(wp), allocatable :: b_static(:,:)
 
+
+
  !> Static part of the lifting line contribution
  !!
  !! The contribution of the lifting line is similar to wake contribution,
