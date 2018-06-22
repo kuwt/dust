@@ -427,6 +427,8 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, uinf, &
 
   !Count the number of implicit wake contributions
   n_impl = size(impl_wake_ind,2)
+  !DEBUG:
+  !write(*,*) 'n_impl',n_impl,'size(wake_elems)',size(wake_elems)
 
   !Add the contribution of the implicit wake panels to the linear system
   !Implicitly we assume that the first set of wake panels are the implicit
@@ -454,6 +456,9 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, uinf, &
     call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
 
     linsys%b(ie) = linsys%b(ie) - a*wake_elems(j1)%p%mag
+
+    !DEBUG:
+    !write(*,*) 'i,j,a',ie,j1,a
 
   end do
 
