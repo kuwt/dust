@@ -381,11 +381,11 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
  !integer, allocatable, intent(out)  :: ep_conn(:,:)
  !character(len=*), intent(in) :: in_file
  integer(h5loc), intent(in) :: floc
- character(len=*), allocatable, intent(in) :: components_names(:)
+ character(len=*), allocatable, intent(inout) :: components_names(:)
  logical, intent(in) :: all_comp
 
  type(t_geo_component), allocatable :: comp_temp(:)
- integer :: i2, i3
+ integer :: i1 , i2, i3
  integer, allocatable :: ee(:,:)
  real(wp), allocatable :: rr(:,:)
  character(len=max_char_len) :: comp_el_type, comp_name, comp_name_stripped
@@ -395,7 +395,11 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
  integer :: ref_id
  character(len=max_char_len) :: cname !, msg
  integer(h5loc) :: gloc, cloc , geo_loc
- integer :: n_comp, i_comp, n_comp_tot, i_comp_tot
+ integer :: n_comp, i_comp, n_comp_tot, i_comp_tot , i_comp_tmp
+
+ character(len=max_char_len), allocatable :: components(:) , components_tmp(:)
+ character(len=max_char_len) :: component , component_stripped
+
  !integer :: ie_t, ie
  !integer :: n_mult, i_mult
  !logical :: mult
@@ -426,6 +430,67 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
   call open_hdf5_group(floc,'Components',gloc)
   call read_hdf5(n_comp_tot,'NComponents',gloc)
 
+  allocate(components(n_comp_tot))
+  do i_comp_tot = 1 , n_comp_tot
+    write(cname,'(A,I3.3)') 'Comp',i_comp_tot
+    call open_hdf5_group(gloc,trim(cname),cloc)
+    call read_hdf5(components(i_comp_tot),'CompName',cloc)
+    call close_hdf5_group(cloc)
+  end do
+
+! RE-BUILD components_names() to host multiple components ++++++++++++++++++
+! components_names: input for post-processing
+! comp_name: all the components of the model (blades: Hub01__01, ..., Hub01__Nb)
+! comp_name_stripped: Hub01__01, ..., Hub01__Nb  ---> Hub01
+! multiple components: if components_names(i1) is <Hub>, then add all the blades to the output
+ 
+  allocate(components_tmp(n_comp_tot))
+  i_comp_tmp = 0 
+  if ( allocated(components_names) ) then
+    do i1 = 1 , size(components_names)
+
+      do i2 = 1 , n_comp_tot
+        
+        call strip_mult_appendix(components(i2), component_stripped, '__') 
+        
+        if ( trim(components_names(i1)) .eq. trim(component_stripped) ) then
+          i_comp_tmp = i_comp_tmp + 1
+          components_tmp(i_comp_tmp) = trim(components(i2))
+!         write(*,*) ' +1 '
+        end if
+
+        if ( trim(components_names(i1)) .eq. trim(components(i2)) ) then
+          i_comp_tmp = i_comp_tmp + 1
+          components_tmp(i_comp_tmp) = trim(components(i2))
+!         write(*,*) ' +1 '
+        end if
+
+      end do
+ 
+    end do
+
+    deallocate(components_names)
+    allocate(components_names(i_comp_tmp)) ; components_names = components_tmp   
+ 
+  ! If components_names was not allocated, all the components are required
+  else ! ( .not. allocated(components_names) ) then
+
+    allocate(components_names(n_comp_tot))
+    do i_comp_tot = 1 , n_comp_tot
+      write(cname,'(A,I3.3)') 'Comp',i_comp_tot
+      call open_hdf5_group(gloc,trim(cname),cloc)
+      call read_hdf5(components_names(i_comp_tot),'CompName',cloc)
+      call close_hdf5_group(cloc)
+    end do
+
+  end if
+
+! !DEBUG
+! write(*,*) ' Components_names ' 
+! do i_comp_tot = 1 , size(components_names)
+!   write(*,*) i_comp_tot , ' : ' , trim(components_names(i_comp_tot))
+! end do
+
 !  allocate(comps(n_comp))
   nelem = 0
   i_comp = 0; n_comp = 0 
@@ -438,9 +503,14 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
 
     !Strip the appendix of multiple components, to load all the multiple
     !components at once
+!   write(*,*) ' comp_name : ' , trim(comp_name)
     call strip_mult_appendix(comp_name, comp_name_stripped, '__') 
+!   write(*,*) ' comp_name_stripped : ' , trim(comp_name_stripped)
     
-    if(IsInList(comp_name_stripped, components_names) .or. all_comp) then
+!   if(IsInList(comp_name_stripped, components_names) .or. all_comp) then
+!   write(*,*) ' all_comp  :' , all_comp
+!   write(*,*) ' comp_name :' , trim(comp_name)
+    if(IsInList(comp_name, components_names) .or. all_comp) then
 
       i_comp = i_comp+1; n_comp = n_comp+1
       allocate(comp_temp(n_comp))
@@ -999,6 +1069,7 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, refs_G , refs_
   points(:,comp%i_points) = move_points(comp%loc_points, &
                            refs_R(:,:,comp%ref_id), &
                            refs_off(:,comp%ref_id))
+
   do ie = 1,size(comp%el)
     call calc_geo_data_postpro(comp%el(ie),points(:,comp%el(ie)%i_ver))
 

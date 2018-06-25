@@ -656,6 +656,13 @@ subroutine load_components(geo, in_file, sim_param, te)
     mult = .false.
     n_mult = 1
     mult = geo%refs(ref_id)%multiple
+
+    ! ====== READING =====
+
+    call read_hdf5(comp_el_type,'ElType',cloc)
+
+    call read_hdf5(comp_name,'CompName',cloc)
+
     if(mult) then
       n_mult = geo%refs(ref_id)%n_mult
       n_comp = n_comp+n_mult-1 !(one was already counted)
@@ -694,13 +701,14 @@ subroutine load_components(geo, in_file, sim_param, te)
       geo%components(i_comp)%moving  = geo%refs(ref_id)%moving
 
 
-      ! ====== READING =====
-
-      call read_hdf5(comp_el_type,'ElType',cloc)
+!     ! ====== READING =====
+! *** 2018-06-25. Two calls moved outside the loop on i_mult
+! *** call read_hdf5(comp_el_type,'ElType',cloc)
       geo%components(i_comp)%comp_el_type = trim(comp_el_type)
-
-      call read_hdf5(comp_name,'CompName',cloc)
+!
+! *** call read_hdf5(comp_name,'CompName',cloc)
       !add the multiplicity appendix if multiple
+!     write(*,*) ' ****** CompName : ' , trim(comp_name)
       if(mult) then
         write(geo%components(i_comp)%comp_name,'(A,I2.2)') trim(comp_name)&
                                                             &//'__',i_mult
