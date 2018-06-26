@@ -61,6 +61,9 @@ use mod_vortlatt, only: &
 use mod_vortline, only: &
   t_vortline
 
+use mod_vortpart, only: &
+  t_vortpart, t_vortpart_p
+
 use mod_actuatordisk, only: &
   t_actdisk
 
@@ -133,6 +136,12 @@ type :: t_wake
  !! (n_pan_points)
  integer, allocatable :: pan_gen_ref(:)
 
+ !> Panels neighbours in wake numbering
+ integer, allocatable :: pan_neigh(:,:)
+
+ !> Relative orientation of neighbours
+ integer, allocatable :: pan_neigh_o(:,:)
+
  !> Wake starting points: calculated from the 2 (or 1) starting points of the
  !! geometry possibly moved
  real(wp), allocatable :: w_start_points(:,:)
@@ -177,6 +186,25 @@ type :: t_wake
  !! solver
  type(t_pot_elem_p), allocatable :: rin_p(:)
 
+
+ !! Particles data
+
+ !> Maximum number of particles
+ integer :: nmax_prt
+
+ !> Actual number of particles
+ integer :: n_prt
+
+ !> Wake particles
+ type(t_vortpart), allocatable :: wake_parts(:)
+
+ !> Magnitude of particles vorticity
+ real(wp), allocatable :: prt_ivort(:)
+
+ !> Wake particles pointer
+ type(t_vortpart_p), allocatable :: part_p(:)
+
+
 end type
 
 character(len=*), parameter :: this_mod_name='mod_wake_pan'
@@ -186,12 +214,13 @@ contains
 !----------------------------------------------------------------------
 
 !> Initialize the panel wake
-subroutine initialize_wake(wake, geo, te,  npan, nrings, sim_param)
+subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts, sim_param)
  type(t_wake), intent(out),target :: wake
  type(t_geo), intent(in), target :: geo
  type(t_tedge), intent(in) :: te
  integer, intent(in) :: npan
  integer, intent(in) :: nrings
+ integer, intent(in) :: nparts
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: iw, ip, nsides
@@ -211,6 +240,8 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, sim_param)
   allocate(wake%pan_gen_ref(wake%n_pan_points))
   allocate(wake%w_start_points(3,wake%n_pan_points))
   allocate(wake%i_start_points(2,wake%n_pan_stripes))
+  allocate(wake%pan_neigh(2,wake%n_pan_stripes))
+  allocate(wake%pan_neigh_o(2,wake%n_pan_stripes))
   allocate(wake%pan_w_points(3,wake%n_pan_points,npan+1))
   allocate(wake%w_vel(3,wake%n_pan_points,npan+1))
   allocate(wake%wake_panels(wake%n_pan_stripes,npan))
@@ -292,6 +323,8 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, sim_param)
   wake%pan_gen_dir = te%t
   wake%pan_gen_ref = te%ref
   wake%i_start_points = te%ii
+  wake%pan_neigh = te%neigh
+  wake%pan_neigh_o = te%o
   do iw=1,wake%n_pan_stripes
     wake%pan_gen_elems_id(1,iw) = wake%pan_gen_elems(1,iw)%p%id
     if(associated(wake%pan_gen_elems(2,iw)%p)) then
@@ -349,6 +382,16 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, sim_param)
                                                                    (/3,4/)))
   enddo
 
+
+  !Particles
+  wake%nmax_prt = nparts
+  allocate(wake%wake_parts(wake%nmax_prt))
+  allocate(wake%prt_ivort(wake%nmax_prt))
+  wake%n_prt = 0
+  allocate(wake%part_p(0))
+  do ip = 1,wake%nmax_prt
+    wake%wake_parts(ip)%mag => wake%prt_ivort(ip)
+  enddo
 end subroutine initialize_wake
 
 !----------------------------------------------------------------------
@@ -546,13 +589,17 @@ subroutine update_wake(wake, elems, sim_param)
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: iw, ipan, ie, ip, np
- integer :: id, ir
+ integer :: id, ir, k
+ integer :: p1, p2
  real(wp) :: pos_p(3), vel_p(3), v(3)
  type(t_pot_elem_p), allocatable :: pan_p_temp(:)
  real(wp), allocatable :: point_old(:,:,:)
  real(wp), allocatable :: points(:,:,:)
+ real(wp), allocatable :: points_prt(:,:)
+ real(wp), allocatable :: points_end(:,:)
  logical :: increase_wake
  integer :: size_old
+ real(wp) :: dir(3), partvec(3), ave
 
   wake%w_vel = 0.0_wp
 
@@ -566,8 +613,6 @@ subroutine update_wake(wake, elems, sim_param)
     else if ( .not. associated(wake%pan_gen_elems(2,iw)%p) ) then
       wake%wake_panels(iw,1)%mag  = wake%pan_gen_elems(1,iw)%p%mag
     end if
-    !DEBUG
-    !write(*,*) 'pan',iw,'vort',wake%wake_panels(iw,1)%mag
 
   enddo
 
@@ -578,8 +623,6 @@ subroutine update_wake(wake, elems, sim_param)
                                                         size(wake%pan_w_points,3)))
   point_old = wake%pan_w_points
 
-  !DEBUG:
-  !write(*,*) 'wake length', wake%pan_wake_len, 'size panp ',size(wake%pan_p)
 
   !calculate the velocities at the old positions of the points and then
   !update the positions (from the third row of points: the first is the
@@ -593,27 +636,7 @@ subroutine update_wake(wake, elems, sim_param)
       pos_p = point_old(:,iw,ipan-1)
       vel_p = 0.0_wp
 
-      !calculate the influence of the solid bodies
-      do ie=1,size(elems)
-        v = 0.0_wp
-        call elems(ie)%p%compute_vel(pos_p, sim_param%u_inf, v)
-        vel_p = vel_p + v/(4*pi)
-      enddo
-
-      ! calculate the influence of the wake panels
-      do ie=1,size(wake%pan_p)
-        v = 0.0_wp
-        call wake%pan_p(ie)%p%compute_vel(pos_p, sim_param%u_inf, v)
-        vel_p = vel_p + v/(4*pi)
-      enddo
-
-      ! calculate the influence of the wake rings
-      do ie=1,size(wake%rin_p)
-        v = 0.0_wp
-        call wake%rin_p(ie)%p%compute_vel(pos_p, sim_param%u_inf, v)
-        vel_p = vel_p + v/(4*pi)
-      enddo
-      !calculate the influence of particles
+      call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
 
       ! for OUTPUT only -----
       wake%w_vel(:,iw,ipan-1) = vel_p
@@ -622,11 +645,29 @@ subroutine update_wake(wake, elems, sim_param)
 
       !update the position in time
       wake%pan_w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + vel_p*sim_param%dt
-      !DEBUG:
-      !write(*,*) 'iw, ipan, coord',iw, ipan, wake%pan_w_points(:,iw,ipan)
     enddo
   enddo
 !$omp end parallel do
+  
+  !if the wake is full, calculate another row of points to generate the 
+  !particles
+  if(wake%pan_wake_len .eq. wake%nmax_pan) then
+    allocate(points_end(3,wake%n_pan_points)) 
+
+    ! create another row of points
+    do iw = 1,wake%n_pan_points
+      pos_p = point_old(:,iw,wake%pan_wake_len+1)
+      vel_p = 0.0_wp
+
+      call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
+
+      vel_p    = vel_p   + sim_param%u_inf
+
+      !update the position in time
+      points_end(:,iw) = pos_p + vel_p*sim_param%dt
+    enddo
+  endif
+  
 
   deallocate(point_old)
 
@@ -668,28 +709,7 @@ subroutine update_wake(wake, elems, sim_param)
       pos_p = points(:,ip,ir)
       vel_p = 0.0_wp
 
-      !calculate the influence of the solid bodies
-      do ie=1,size(elems)
-        v = 0.0_wp
-        call elems(ie)%p%compute_vel(pos_p, sim_param%u_inf, v)
-        vel_p = vel_p + v/(4*pi)
-      enddo
-
-      ! calculate the influence of the panel wake
-      do ie=1,size(wake%pan_p)
-        v = 0.0_wp
-        call wake%pan_p(ie)%p%compute_vel(pos_p, sim_param%u_inf, v)
-        vel_p = vel_p + v/(4*pi)
-      enddo
-
-      ! calculate the influence of the ring wake
-      do ie=1,size(wake%rin_p)
-        v = 0.0_wp
-        call wake%rin_p(ie)%p%compute_vel(pos_p, sim_param%u_inf, v)
-        vel_p = vel_p + v/(4*pi)
-      enddo
-
-      !calculate the influence of particles
+      call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
 
       vel_p    = vel_p   +sim_param%u_inf
 
@@ -711,6 +731,98 @@ subroutine update_wake(wake, elems, sim_param)
 
   deallocate(points)
 
+  !==>    Particles: evolve the position in time
+  allocate(points_prt(3,wake%n_prt))
+
+  !calculate the velocities at the points
+  do ip = 1, wake%n_prt
+    pos_p = wake%part_p(ip)%p%cen
+    
+    call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
+
+    vel_p    = vel_p   +sim_param%u_inf
+
+    !update the position
+    points_prt(:,ip) = wake%part_p(ip)%p%cen + vel_p*sim_param%dt
+
+    !TODO: Check if it went out of boundaries, then free the particle
+    
+  enddo
+  do ip = 1, wake%n_prt
+     wake%part_p(ip)%p%cen = points_prt(:,ip)
+  enddo
+
+  !==>    Particles: if the panel wake is at the end, create a particle
+  if(wake%pan_wake_len .eq. wake%nmax_pan) then
+    k = 1
+    do iw = 1,wake%n_pan_stripes
+      p1 = wake%i_start_points(1,iw)
+      p2 = wake%i_start_points(2,iw)
+      partvec = 0.0_wp
+      !Left side
+      dir = wake%pan_w_points(:,p1,wake%nmax_pan+1)-points_end(:,p1)
+      if (wake%pan_neigh(1,iw) .gt. 0) then
+        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
+              wake%pan_neigh_o(1,iw)*wake%wake_panels(wake%pan_neigh(1,iw),wake%pan_wake_len)%mag
+        ave = ave/2.0_wp
+      else
+        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+      endif
+      partvec = partvec + dir*ave
+
+      !Right side
+      dir = -wake%pan_w_points(:,p2,wake%nmax_pan+1)+points_end(:,p2)
+      if (wake%pan_neigh(2,iw) .gt. 0) then
+        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
+              wake%pan_neigh_o(2,iw)*wake%wake_panels(wake%pan_neigh(2,iw),wake%pan_wake_len)%mag
+        ave = ave/2.0_wp
+      else
+        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+      endif
+      partvec = partvec + dir*ave
+
+      !End side
+      dir = points_end(:,p1) - points_end(:,p2)
+      ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+      partvec = partvec + dir*ave
+
+      !Calculate the center
+      pos_p = (points_end(:,p1)+points_end(:,p2)+ &
+              wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
+              wake%pan_w_points(:,p2,wake%nmax_pan+1) )/4.0_wp
+
+
+      !Add the particle
+      do ip = k, size(wake%wake_parts)
+        if (wake%wake_parts(ip)%free) then
+          wake%wake_parts(ip)%free = .false.
+          k = ip+1
+          wake%n_prt = wake%n_prt+1
+          wake%wake_parts(ip)%mag = norm2(partvec)
+          wake%wake_parts(ip)%dir = partvec/norm2(partvec)
+          wake%wake_parts(ip)%cen = pos_p
+          exit
+        endif
+      enddo
+      
+    enddo
+    deallocate(points_end)
+
+    !Recreate the pointer vector
+    if(allocated(wake%part_p)) deallocate(wake%part_p)
+    allocate(wake%part_p(wake%n_prt))
+    !TODO: consider inverting these two cycles
+    k = 1
+    do ip = 1, wake%n_prt
+      do ir=k,wake%nmax_prt
+        if(.not. wake%wake_parts(ir)%free) then
+          k = ir+1
+          wake%part_p(ip)%p => wake%wake_parts(ir)
+          exit
+        endif
+      enddo
+    enddo
+  endif
 
   !==> 4) Panels:  Increase the length of the wake, if it is necessary
   if (wake%pan_wake_len .lt. wake%nmax_pan) then
@@ -732,6 +844,7 @@ subroutine update_wake(wake, elems, sim_param)
       deallocate(pan_p_temp)
 
   endif
+
 
   !==> 5) Rings:  Increase the length of the wake, if it is necessary
   if (increase_wake) then
@@ -794,8 +907,57 @@ subroutine update_wake(wake, elems, sim_param)
   ! The geometrical quantities of the panels will be all updated at the
   ! beginning of the next iteration in prepare_wake
 
-
 end subroutine update_wake
+
+!----------------------------------------------------------------------
+
+subroutine compute_vel_from_all(elems, wake, pos, sim_param, vel)
+ type(t_pot_elem_p), intent(in) :: elems(:)
+ type(t_wake), intent(in) :: wake
+ real(wp), intent(in) :: pos(3)
+ type(t_sim_param), intent(in) :: sim_param
+ real(wp), intent(out) :: vel(3)
+
+ integer :: ie
+ real(wp) :: v(3)
+  
+  vel = 0.0_wp
+
+  !calculate the influence of the solid bodies
+  do ie=1,size(elems)
+    call elems(ie)%p%compute_vel(pos, sim_param%u_inf, v)
+    vel = vel + v/(4*pi)
+  enddo
+
+  ! calculate the influence of the wake panels
+  do ie=1,size(wake%pan_p)
+    call wake%pan_p(ie)%p%compute_vel(pos, sim_param%u_inf, v)
+    vel = vel + v/(4*pi)
+  enddo
+
+  ! calculate the influence of the wake rings
+  do ie=1,size(wake%rin_p)
+    call wake%rin_p(ie)%p%compute_vel(pos, sim_param%u_inf, v)
+    vel = vel+ v/(4*pi)
+  enddo
+
+  !calculate the influence of the end vortex
+  !TODO: check what happens when it is not active
+  do ie=1,size(wake%end_vorts)
+    call wake%end_vorts(ie)%compute_vel(pos, sim_param%u_inf, v)
+    vel = vel+ v/(4*pi)
+  enddo
+
+  !calculate the influence of particles
+  do ie=1,size(wake%part_p)
+    call wake%part_p(ie)%p%compute_vel(pos, sim_param%u_inf, v)
+    vel = vel+ v/(4*pi)
+  enddo
+
+
+
+end subroutine compute_vel_from_all
+
 
 !----------------------------------------------------------------------
 

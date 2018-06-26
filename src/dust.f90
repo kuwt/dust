@@ -72,6 +72,9 @@ use mod_actuatordisk, only: &
 use mod_vortline, only: &
  initialize_vortline
 
+use mod_vortpart, only: &
+ initialize_vortpart
+
 use mod_c81, only: &
   t_aero_tab
 
@@ -290,6 +293,7 @@ r_cutoff  = getreal(prms, 'CutoffRad')
 
 call initialize_doublet(ff_ratio_dou, eps_dou, r_Rankine, r_cutoff);
 call initialize_vortline(r_Rankine, r_cutoff);
+call initialize_vortpart(r_Rankine, r_cutoff);
 call initialize_surfpan(ff_ratio_sou);
 
 restart = getlogical(prms,'restart_from_file')
@@ -363,7 +367,7 @@ call printout(nl//'====== Initializing Wake ======')
 !
 !call initialize_wake_rings(wake_rings, geo, n_wake_panels)
 
-call initialize_wake(wake, geo, te, n_wake_panels, n_wake_panels, sim_param)
+call initialize_wake(wake, geo, te, n_wake_panels, n_wake_panels, 10000, sim_param)
 
 call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()

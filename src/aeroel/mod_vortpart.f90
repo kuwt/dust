@@ -67,7 +67,7 @@ use mod_aeroel, only: &
 
 implicit none
 
-public :: t_vortpart, initialize_vortpart
+public :: t_vortpart, t_vortpart_p, initialize_vortpart
 
 
 !----------------------------------------------------------------------
@@ -75,6 +75,7 @@ public :: t_vortpart, initialize_vortpart
 type, extends(c_vort_elem) :: t_vortpart
   !> Orientation of the vorticity vector
   real(wp) :: dir(3)
+  logical :: free=.true.
 contains
 
   procedure, pass(this) :: compute_vel      => compute_vel_vortpart
@@ -84,7 +85,7 @@ end type
 
 type :: t_vortpart_p
 
-  type(t_vortpart), pointer :: t_vortpart
+  type(t_vortpart), pointer :: p
 
 end type
 
@@ -132,11 +133,11 @@ subroutine compute_vel_vortpart (this, pos, uinf, vel)
   distn = norm2(dist)
   if ( distn .gt. r_Rankine ) then
 
-    vvort = - cross(this%dir,dist) / distn**3
+    vvort =  cross(this%dir,dist) / distn**3
 
   else
 
-    vvort = - cross(this%dir,dist) * distn / r_Rankine**3
+    vvort =  cross(this%dir,dist) * distn / r_Rankine**3
 
   end if
 

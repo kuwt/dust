@@ -144,11 +144,10 @@ subroutine compute_vel_vortline (this, pos, uinf, vel)
         r_Ran = r_Rankine * this%edge_len
         vdou = ((this%edge_len-ai)/R2 + ai/R1)/(r_Ran**2.0_wp)* &
                          cross(this%edge_uni(:),hv)
-!     else
-
+     else
+      vdou = 0.0_wp 
       end if
     end if
-
     vel = vdou*this%mag
 
   else

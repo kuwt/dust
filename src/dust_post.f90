@@ -155,6 +155,7 @@ real(wp), allocatable :: refs_G(:,:,:), refs_f(:,:)
 real(wp), allocatable :: vort(:), cp(:)
 real(wp), allocatable :: wvort(:), wvort_pan(:,:), wvort_rin(:,:)
 real(wp), allocatable :: wpoints(:,:), wpoints_pan(:,:,:), wpoints_rin(:,:,:)
+real(wp), allocatable :: vppoints(:,:)
 !real(wp), allocatable :: wcen(:,:,:)
 integer,  allocatable :: wconn(:)
 
@@ -594,7 +595,7 @@ do ia = 1,n_analyses
       
       if (out_wake) then
         
-        call load_wake_viz(floc, wpoints, welems, wvort)
+        call load_wake_viz(floc, wpoints, welems, wvort, vppoints)
         nelem_w = size(welems,2)
 
         nprint = 0
@@ -622,7 +623,7 @@ do ia = 1,n_analyses
           call  vtk_out_viz(filename, &
                        points_exp, elems, print_vars, print_var_names, &
                        w_rr=wpoints, w_ee=welems, w_vars=print_vars_w, &
-                       w_var_names = print_var_names_w)
+                       w_var_names = print_var_names_w, vp_rr=vppoints)
          case default
            call error('dust_post','','Unknown format '//trim(out_frmt)//&
                       ' for visualization output')
@@ -1349,11 +1350,12 @@ end subroutine load_wake_ring
 
 !----------------------------------------------------------------------
 
-subroutine load_wake_viz(floc, wpoints, welems, wvort)
+subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints)
  integer(h5loc), intent(in) :: floc 
  real(wp), allocatable, intent(out) :: wpoints(:,:)
  integer, allocatable, intent(out)  :: welems(:,:)
  real(wp), allocatable, intent(out) :: wvort(:)
+ real(wp), allocatable, intent(out) :: vppoints(:,:)
 
  integer(h5loc) :: gloc
  logical :: got_dset 
@@ -1487,6 +1489,13 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort)
  wvort(size(wvort_pan)+1:size(wvort)) = wvort_rin
  deallocate(wvort_pan, wvort_rin)
 
+ got_dset = check_dset_hdf5('ParticleWake',floc)
+ if(got_dset) then
+
+  call open_hdf5_group(floc,'ParticleWake',gloc)
+  call read_hdf5_al(vppoints,'WakePoints',gloc)
+  call close_hdf5_group(gloc)
+ endif
 end subroutine load_wake_viz
 
 !----------------------------------------------------------------------

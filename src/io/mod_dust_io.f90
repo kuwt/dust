@@ -128,6 +128,7 @@ subroutine save_status(geo, wake,  sim_params, it, time, run_id)
  real(wp), allocatable :: vort(:), cp(:) , pres(:)
  real(wp), allocatable :: dforce(:,:) 
  real(wp), allocatable :: points_w(:,:,:), cent(:,:,:)
+ real(wp), allocatable :: vort_v(:,:)
  integer, allocatable :: conn_pe(:)
  integer :: ir, id, ip, np
 
@@ -215,6 +216,18 @@ subroutine save_status(geo, wake,  sim_params, it, time, run_id)
   call write_hdf5(wake%rin_idou(:,1:wake%rin_wake_len),'WakeVort',gloc1)
   call close_hdf5_group(gloc1)
   deallocate(points_w, conn_pe, cent)
+
+  call new_hdf5_group(floc, 'ParticleWake', gloc1)
+  allocate(points_w(3,wake%n_prt,1))
+  allocate(vort_v(3,wake%n_prt))
+  do ip = 1, wake%n_prt
+    points_w(:,ip,1) = wake%part_p(ip)%p%cen
+    vort_v(:,ip) = wake%part_p(ip)%p%dir * wake%part_p(ip)%p%mag
+  enddo
+  call write_hdf5(points_w(:,:,1),'WakePoints',gloc1)
+  call write_hdf5(vort_v,'WakeVort',gloc1)
+  call close_hdf5_group(gloc1)
+  deallocate(points_w, vort_v)
 
   ! 3) %%%% References
   ! save the whole list of references
