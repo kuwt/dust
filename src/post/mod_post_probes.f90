@@ -146,8 +146,8 @@ type(t_elem_p), allocatable :: wake_elems(:)
     ! TODO: add Cp
     probe_vel = .false. ; probe_p = .false. ; probe_vort = .false.
     n_vars = countoption(sbprms,'Variable')
-    !DEBUG
-    write(*,*) ' n_vars : ' , n_vars
+!   !DEBUG
+!   write(*,*) ' n_vars : ' , n_vars
 
     if ( n_vars .eq. 0 ) then ! default: velocity | pressure | vorticity
       probe_vel = .true. ; probe_p = .true. ; probe_vort = .true.
@@ -342,8 +342,8 @@ type(t_elem_p), allocatable :: wake_elems(:)
       comps(ic)%el(ie)%mag => null()  
      end do
     end do
-     
     deallocate(sol) 
+
     deallocate(probe_vars,time)
     deallocate(probe_var_names,probe_loc_names)
     deallocate(rr_probes)
