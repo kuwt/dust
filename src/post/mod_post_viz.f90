@@ -269,7 +269,7 @@ do it = an_start, an_end, an_step
 
 end do ! Time loop
 
-deallocate(comps, points)
+deallocate(comps, points,components_names)
 deallocate(var_names)
 
 

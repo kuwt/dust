@@ -61,6 +61,8 @@ public :: post_flowfield
 
 private
 
+character(len=max_char_len), parameter :: this_mod_name = 'mod_post_flowfield'
+
 contains
 
 ! ---------------------------------------------------------------------- 
@@ -76,7 +78,7 @@ integer          , intent(in) :: ia
 character(len=*) , intent(in) :: out_frmt
 type(t_geo_component), allocatable , intent(inout) :: comps(:)
 character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
-logical , intent(in) :: all_comp
+logical , intent(inout) :: all_comp
 integer , intent(in) :: an_start , an_end , an_step
 
 integer , parameter :: n_max_vars = 3 !vel,p,vort, ! TODO: 4 with cp
@@ -127,7 +129,21 @@ integer :: ip , ic , ie , i1 , it
 character(len=max_char_len) :: str_a , var_name 
 character(len=max_char_len) :: filename
 
+character(len=max_char_len), parameter :: & 
+   this_sub_name = 'post_flowfield'
+
     write(*,*) nl//' Analysis:',ia,' post_flowfield() +++++++++ '//nl
+
+! Select all the components
+!   components_names is allocated in load_components_postpro()
+!   and deallocated in dust_post at the end of each analysis
+if ( allocated(components_names) ) then
+  call warning(trim(this_sub_name), trim(this_mod_name), &
+     'All the components are used. <Components> input &
+     &is ignored, and deallocated.' )
+  deallocate(components_names)
+end if 
+all_comp = .true.
 
 ! Read variables to save : velocity | pressure | vorticity
 ! TODO: add Cp
@@ -165,6 +181,16 @@ call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
 call load_components_postpro(comps, points, nelem, floc, & 
                              components_names,  all_comp)
 call close_hdf5_file(floc)
+
+! !DEBUG
+! write(*,*) ' all_comp : ' , all_comp
+! write(*,*) ' allocated(components_names) : ' , &
+!              allocated(components_names)
+! if (allocated(components_names)) then
+!   do i1 = 1,size(components_names) 
+!     write(*,*) trim(components_names(i1))
+!   end do
+! end if
 
 ! Prepare_geometry_postpro
 call prepare_geometry_postpro(comps)
@@ -410,7 +436,7 @@ deallocate(var_names,vars_n)
 
 !TODO: move deallocate(comps) outside this routine.
 ! Check if partial deallocation or nullification is needed.
-deallocate(comps)
+deallocate(comps,components_names)
 
     write(*,*) nl//' post_flowfield done.'//nl
 

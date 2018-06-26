@@ -427,16 +427,28 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
 
  character(len=*), parameter :: this_sub_name = 'load_components_postpro'
 
+  ! Read all the components
   call open_hdf5_group(floc,'Components',gloc)
   call read_hdf5(n_comp_tot,'NComponents',gloc)
 
+! !DEBUG
+! write(*,*) nl//' All the components: '
   allocate(components(n_comp_tot))
   do i_comp_tot = 1 , n_comp_tot
     write(cname,'(A,I3.3)') 'Comp',i_comp_tot
     call open_hdf5_group(gloc,trim(cname),cloc)
     call read_hdf5(components(i_comp_tot),'CompName',cloc)
     call close_hdf5_group(cloc)
+!   !DEBUG
+!   write(*,*) trim(components(i_comp_tot))
   end do
+  
+! if ( allocated(components_names) ) then
+!   write(*,*) ' components_names : '
+!   do i_comp_tot = 1 , size(components_names)
+!     write(*,*) trim(components_names(i_comp_tot))
+!   end do
+! end if
 
 ! RE-BUILD components_names() to host multiple components ++++++++++++++++++
 ! components_names: input for post-processing
@@ -456,13 +468,13 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         if ( trim(components_names(i1)) .eq. trim(component_stripped) ) then
           i_comp_tmp = i_comp_tmp + 1
           components_tmp(i_comp_tmp) = trim(components(i2))
-!         write(*,*) ' +1 '
+          write(*,*) ' a. +1 '
         end if
 
         if ( trim(components_names(i1)) .eq. trim(components(i2)) ) then
           i_comp_tmp = i_comp_tmp + 1
           components_tmp(i_comp_tmp) = trim(components(i2))
-!         write(*,*) ' +1 '
+          write(*,*) ' b. +1 '
         end if
 
       end do
@@ -470,7 +482,9 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
     end do
 
     deallocate(components_names)
-    allocate(components_names(i_comp_tmp)) ; components_names = components_tmp   
+    write(*,*) ' i_comp_tmp : ' , i_comp_tmp
+    allocate(components_names(i_comp_tmp)) 
+    components_names = components_tmp(1:i_comp_tmp)
  
   ! If components_names was not allocated, all the components are required
   else ! ( .not. allocated(components_names) ) then
@@ -486,7 +500,9 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
   end if
 
 ! !DEBUG
-! write(*,*) ' Components_names ' 
+! i_comp_tot = size(components_names)
+! write(*,*) ' i_comp_tot : ' , i_comp_tot
+! write(*,*) ' In load_components_postro. Components_names: ' 
 ! do i_comp_tot = 1 , size(components_names)
 !   write(*,*) i_comp_tot , ' : ' , trim(components_names(i_comp_tot))
 ! end do

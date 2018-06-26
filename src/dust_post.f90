@@ -126,6 +126,9 @@ use mod_post_probes, only: &
 use mod_post_flowfield, only: &
   post_flowfield
 
+use mod_post_integral, only: &
+  post_integral
+
 
 implicit none
 
@@ -319,7 +322,7 @@ n_analyses = countoption(prms,'Analysis')
 !Cycle on all the analyses
 do ia = 1,n_analyses
   
-  !Get some of the options
+  !Get general parameter for the analysis
   call getsuboption(prms,'Analysis',sbprms)
   an_type  = getstr(sbprms,'Type')
   call LowCase(an_type)
@@ -352,192 +355,13 @@ do ia = 1,n_analyses
   !Fork the different kind of analyses
   select case(trim(an_type))
 
-   !//////////////////    Loads     \\\\\\\\\\\\\\\\\
+   !//////////////// Integral Loads  \\\\\\\\\\\\\\\\
    case('integral_loads')
 
-! look in mod_post_integral
-!   call post_integral( sbprms , basename , data_basename , an_name , ia , &
-!                       out_frmt , comps , components_names , all_comp , &
-!                       an_start , an_end , an_step )
-
-    ! load the geo components just once just once
-    call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
-    !TODO: here get the run id
-    call load_components_postpro(comps, points, nelem, floc, & 
-                                 components_names,  all_comp)
-
-    call close_hdf5_file(floc)
-
-    ! Prepare_geometry_postpro
-    call prepare_geometry_postpro(comps)
-
-
-    !n_comps_meas = countoption(sbprms,'CompName')
-    !allocate( comps_meas(n_comps_meas) )
-    !do ic = 1 , n_comps_meas 
-    !  comps_meas(ic) = getstr(sbprms,'CompName') 
-    !end do
-    !!TODO:loads 
-    !! from string to id.s of the ic
-    !allocate( i_comps_meas(n_comps_meas) ) ; i_comps_meas = 0
-    !do ic = 1 , n_comps_meas 
-    !  ! loop over the ref.sys 
-    !  do ic2 = 1 , size(comps)
-    !    if ( trim(comps_meas(ic)) .eq. trim(comps(ic2)%comp_name) ) then
-    !      i_comps_meas(ic) = ic2 
-    !      exit
-    !    end if
-    !  end do
-    !end do
-    if(allocated(components_names)) deallocate(components_names) 
-    allocate(components_names(size(comps)))
-    do ic = 1,size(comps)
-      components_names(ic) = trim(comps(ic)%comp_name)
-    enddo
-
-    ! Allocate sol_p: ...%cp is not a pointer
-    !  comps(ic)%el(ie)%cp = sol_p(ip) in the loop
-    allocate(sol_p(nelem)) ; sol_p = 0.0_wp
-
-    ref_tag = getstr(sbprms,'Reference_Tag')
-
-    nstep = (an_end-an_start)/an_step + 1
-    select case(trim(out_frmt))
-
-     case('dat')
-      ! Open output .dat file
-      call new_file_unit(fid_out, ierr)
-      write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.dat'
-      open(unit=fid_out,file=trim(filename))
-      call dat_out_loads_header( fid_out , components_names , ref_tag )
-
-     case('tecplot')
-      allocate(force(3,nstep), moment(3,nstep), time(nstep))
-
-     case default
-      call error('dust_post','','Unknown format '//trim(out_frmt)//&
-                 ' for loads output')
-    end select
-    
-
-    ! Find the id of the reference where the loads must be projected
-    write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',an_start,'.h5'
-    call open_hdf5_file(trim(filename),floc)
-    call load_refs(floc,refs_R,refs_off,refs_G,refs_f,refs_tag)
-    call close_hdf5_file(floc) 
-    !DEBUG
-    ref_id = -333
-    do it = lbound(refs_tag,1) , ubound(refs_tag,1)
-      if ( stricmp(refs_tag(it),  ref_tag) ) ref_id = it
-    end do
-    if ( ref_id .eq. -333 ) then 
-      write(*,*)
-      write(*,*) ' Available references systems: '
-      do it = lbound(refs_tag,1) , ubound(refs_tag,1)
-        write(*,*) ' ref_id : ' , it , ' ref_tag ' , trim(refs_tag(it))
-      end do
-      call error('dust_post','','Unknown ref.sys. defined for loads output.&
-           & Your input in dust_post.in is '//trim(ref_tag)//'. All the&
-           & available ref.sys. are listed above.')
-    end if
-
-    ires = 0
-    do it=an_start, an_end, an_step
-      ires = ires+1
-
-      ! Open the file:
-      write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
-      call open_hdf5_file(trim(filename),floc)
-
-      ! Load u_inf --------------------------------
-      call open_hdf5_group(floc,'Parameters',ploc)
-      call read_hdf5(u_inf,'u_inf',ploc)
-      call read_hdf5(P_inf,'P_inf',ploc)
-      call read_hdf5(rho,'rho_inf',ploc)
-      call close_hdf5_group(ploc)
-
-      ! Load the references and move the points ---
-      call load_refs(floc,refs_R,refs_off)
-      ! Move the points ---------------------------
-      call update_points_postpro(comps, points, refs_R, refs_off)
-      ! Load the results --------------------------
-      call load_res(floc, comps, vort, cp, t)
-      sol_p = cp
-      !
-      ip = 0
-      do ic = 1 , size(comps)
-       do ie = 1 , size(comps(ic)%el)
-        ip = ip + 1
-        comps(ic)%el(ie)%pres = sol_p(ip) 
-       end do
-      end do
-
-      call close_hdf5_file(floc)
-
-      ! Initialise integral loads in the desired ref.frame
-      F_ref = 0.0_wp ; M_ref = 0.0_wp 
-
-      ! Update the overall load with the comtribution from all the components
-      do ic = 1 , size(comps)
-
-        ! Initialise integral loads in the local ref.frame
-        F_bas = 0.0_wp ; M_bas = 0.0_wp 
-      
-        ! Loads from the ic-th component in the base ref.frame
-        do ie = 1 , size(comps(ic)%el)
-          F_bas1 = comps(ic)%el(ie)%dforce
-
-          F_bas = F_bas + F_bas1
-
-          M_bas = M_bas + cross( comps(ic)%el(ie)%cen &
-                         -refs_off(:,ref_id) , F_bas1 )
-
-        end do !ie
-
-        ! From the base ref.sys to the chosen ref.sys (offset and rotation)
-        F_ref = F_ref + matmul( &
-             transpose( refs_R(:,:, ref_id) ) , F_bas )
-        M_ref = M_ref + matmul( &
-             transpose( refs_R(:,:, ref_id) ) , M_bas )
-
-      end do !ic
-      
-      select case(trim(out_frmt))
-
-       case ('dat')
-        ! Update output file
-        write(fid_out,'(F12.6)'  ,advance='no') t 
-        write(fid_out,'(3F16.6)' ,advance='no') F_ref
-        write(fid_out,'(3F16.6)' ,advance='no') M_ref
-        write(fid_out,'(9F16.10)',advance='no') refs_R(:,:, ref_id)
-        write(fid_out,'(3F16.10)',advance='no') refs_off(:, ref_id)
-        write(fid_out,*) ' '
-
-       case('tecplot')
-        time(ires) = t
-        force(:,ires) = F_ref
-        moment(:,ires) = M_ref
-
-      end select
-
-
-    end do !it
-
-    
-    select case(trim(out_frmt))
-
-     case('dat')
-      close(fid_out)
-     
-     case('tecplot')
-      write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt'
-      call tec_out_loads(filename, time, force, moment)
-      deallocate(time, force, moment)
-
-    end select
-
-    deallocate(comps,components_names)
-    deallocate(sol_p)
+    ! look in mod_post_integral
+    call post_integral( sbprms , basename , data_basename , an_name , ia , &
+                        out_frmt , comps , components_names , all_comp , &
+                        an_start , an_end , an_step )
 
    !//////////////////Visualizations\\\\\\\\\\\\\\\\\
    case('viz') 
@@ -568,13 +392,12 @@ do ia = 1,n_analyses
     call error('dust_post','','Unknown type of analysis: '//trim(an_type))
 
   end select
-
-
   
   if(allocated(var_names)) deallocate(var_names)
   if(allocated(components_names)) deallocate(components_names)
 
   sbprms => null()
+
 enddo !analysis
 
 call destroy_hdf5()

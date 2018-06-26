@@ -57,6 +57,7 @@ public :: post_probes
 
 private
 
+character(len=max_char_len), parameter :: this_mod_name = 'mod_post_probes'
 
 contains
 
@@ -73,7 +74,7 @@ integer          , intent(in) :: ia
 character(len=*) , intent(in) :: out_frmt
 type(t_geo_component), allocatable , intent(inout) :: comps(:)
 character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
-logical , intent(in) :: all_comp
+logical , intent(inout) :: all_comp
 integer , intent(in) :: an_start , an_end , an_step
 
 integer :: nstep
@@ -113,8 +114,23 @@ integer,  allocatable :: wconn(:)
 type(t_wake_panels) :: wake_pan
 type(t_wake_rings)  :: wake_rin
 type(t_elem_p), allocatable :: wake_elems(:)
+integer :: i1
+
+character(len=max_char_len), parameter :: & 
+   this_sub_name = 'post_probes'
 
     write(*,*) nl//' Analysis:',ia,' post_probes() ++++++++++++ '//nl
+
+    ! Select all the components
+    !   components_names is allocated in load_components_postpro()
+    !   and deallocated in dust_post at the end of each analysis
+    if ( allocated(components_names) ) then
+      call warning(trim(this_sub_name), trim(this_mod_name), &
+         'All the components are used. <Components> input &
+         &is ignored, and deallocated.' )
+      deallocate(components_names)
+    end if
+    all_comp = .true.
 
     ! Read probe coordinates: point_list or from_file
     in_type =  getstr(sbprms,'InputType')
@@ -348,7 +364,7 @@ type(t_elem_p), allocatable :: wake_elems(:)
     deallocate(probe_var_names,probe_loc_names)
     deallocate(rr_probes)
 
-    deallocate(comps, points)
+    deallocate(comps, points,components_names)
 
 
     write(*,*) nl//' post_probes done.'//nl
