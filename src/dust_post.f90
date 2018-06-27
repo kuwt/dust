@@ -155,18 +155,19 @@ real(wp), allocatable :: refs_G(:,:,:), refs_f(:,:)
 real(wp), allocatable :: vort(:), cp(:)
 real(wp), allocatable :: wvort(:), wvort_pan(:,:), wvort_rin(:,:)
 real(wp), allocatable :: wpoints(:,:), wpoints_pan(:,:,:), wpoints_rin(:,:,:)
-real(wp), allocatable :: vppoints(:,:)
+real(wp), allocatable :: vppoints(:,:), vpvort(:)
 !real(wp), allocatable :: wcen(:,:,:)
 integer,  allocatable :: wconn(:)
 
 integer,  allocatable :: welems(:,:)
 integer, allocatable  :: wstart(:,:)
-integer :: nelem_w
+integer :: nelem_w, nelem_vp
 real(wp) :: t
 
 real(wp), allocatable :: print_vars(:,:)
 character(len=max_char_len), allocatable :: print_var_names(:)
 real(wp), allocatable :: print_vars_w(:,:)
+real(wp), allocatable :: print_vars_vp(:,:)
 character(len=max_char_len), allocatable :: print_var_names_w(:)
 integer :: nprint, ivar
 
@@ -595,17 +596,20 @@ do ia = 1,n_analyses
       
       if (out_wake) then
         
-        call load_wake_viz(floc, wpoints, welems, wvort, vppoints)
+        call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort)
         nelem_w = size(welems,2)
+        nelem_vp = size(vppoints,2)
 
         nprint = 0
         if(out_vort) nprint = nprint+1
         allocate(print_var_names_w(nprint), print_vars_w(nelem_w, nprint))
+        allocate(print_vars_vp(nelem_vp, nprint))
         
         ivar = 1
         if(out_vort) then
           !print_vars_w(:,ivar) = reshape(wvort,(/nelem_w/))
           print_vars_w(:,ivar) = wvort
+          print_vars_vp(:,ivar) = vpvort
           print_var_names_w(ivar) = 'Vorticity'
           ivar = ivar +1
         endif
@@ -623,7 +627,9 @@ do ia = 1,n_analyses
           call  vtk_out_viz(filename, &
                        points_exp, elems, print_vars, print_var_names, &
                        w_rr=wpoints, w_ee=welems, w_vars=print_vars_w, &
-                       w_var_names = print_var_names_w, vp_rr=vppoints)
+                       w_var_names = print_var_names_w, &
+                       vp_rr=vppoints, vp_vars=print_vars_vp, &
+                       vp_var_names = print_var_names_w)
          case default
            call error('dust_post','','Unknown format '//trim(out_frmt)//&
                       ' for visualization output')
@@ -631,6 +637,7 @@ do ia = 1,n_analyses
       
         deallocate (wpoints, welems,  wvort)
         deallocate(print_var_names_w, print_vars_w)
+        deallocate(print_vars_vp)
 
       else
         
@@ -1350,12 +1357,13 @@ end subroutine load_wake_ring
 
 !----------------------------------------------------------------------
 
-subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints)
+subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort)
  integer(h5loc), intent(in) :: floc 
  real(wp), allocatable, intent(out) :: wpoints(:,:)
  integer, allocatable, intent(out)  :: welems(:,:)
  real(wp), allocatable, intent(out) :: wvort(:)
  real(wp), allocatable, intent(out) :: vppoints(:,:)
+ real(wp), allocatable, intent(out) :: vpvort(:)
 
  integer(h5loc) :: gloc
  logical :: got_dset 
@@ -1494,6 +1502,12 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints)
 
   call open_hdf5_group(floc,'ParticleWake',gloc)
   call read_hdf5_al(vppoints,'WakePoints',gloc)
+  call read_hdf5_al(wvort_read,'WakeVort',gloc)
+  allocate(vpvort(size(wvort_read,2)))
+  do ip = 1,size(vpvort)
+    vpvort(ip) = norm2(wvort_read(:,ip))
+  enddo
+  deallocate(wvort_read)
   call close_hdf5_group(gloc)
  endif
 end subroutine load_wake_viz

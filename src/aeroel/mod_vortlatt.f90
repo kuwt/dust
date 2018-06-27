@@ -413,7 +413,7 @@ if ( i_stripe .gt. 1 ) then
   !           dG_dt )
   ! dunno why elems(this%id)%p%mag was used
   this%pres = - sim_param%rho_inf * &
-        ( norm2(sim_param%u_inf - this%ub) * this%dy / this%area * &
+        ( norm2(sim_param%u_inf + this%uvort - this%ub) * this%dy / this%area * &
         ( this%mag - this%stripe_elem(i_stripe-1)%p%mag ) + &
              dG_dt )
 else
@@ -423,7 +423,7 @@ else
   !           dG_dt )
   ! the same...
   this%pres = - sim_param%rho_inf * &
-        ( norm2(sim_param%u_inf - this%ub) * this%dy / this%area * &
+        ( norm2(sim_param%u_inf +this%uvort - this%ub) * this%dy / this%area * &
                this%mag + &
              dG_dt )
 end if
@@ -514,7 +514,7 @@ end subroutine calc_geo_data_vortlatt
 
 subroutine get_vort_vel_vortlatt(this, vort_elems, uinf)
  class(t_vortlatt), intent(inout)  :: this
- class(c_vort_elem), intent(in)    :: vort_elems(:)
+ type(t_vort_elem_p), intent(in)    :: vort_elems(:)
  real(wp), intent(in) :: uinf(3)
 
  integer :: iv
@@ -523,7 +523,7 @@ subroutine get_vort_vel_vortlatt(this, vort_elems, uinf)
  this%uvort = 0.0_wp
 
  do iv=1,size(vort_elems)
-   call vort_elems(iv)%compute_vel(this%cen, uinf, vel)
+   call vort_elems(iv)%p%compute_vel(this%cen, uinf, vel)
    this%uvort = this%uvort + vel/(4*pi)
  enddo
 

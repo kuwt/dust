@@ -204,6 +204,13 @@ type :: t_wake
  !> Wake particles pointer
  type(t_vortpart_p), allocatable :: part_p(:)
 
+ !> Bounding box
+ real(wp) :: part_box_min(3), part_box_max(3)
+
+ type(t_vort_elem_p), allocatable :: vort_p(:)
+
+ !> Last vortex intensity from removed panels
+ real(wp), allocatable :: last_pan_idou(:)
 
 end type
 
@@ -214,13 +221,15 @@ contains
 !----------------------------------------------------------------------
 
 !> Initialize the panel wake
-subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts, sim_param)
+subroutine initialize_wake(wake, geo, te,  npan, nrings, &
+                           nparts, part_box_min, part_box_max, sim_param)
  type(t_wake), intent(out),target :: wake
  type(t_geo), intent(in), target :: geo
  type(t_tedge), intent(in) :: te
  integer, intent(in) :: npan
  integer, intent(in) :: nrings
  integer, intent(in) :: nparts
+ real(wp), intent(in) :: part_box_min(3), part_box_max(3)
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: iw, ip, nsides
@@ -392,6 +401,13 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts, sim_param)
   do ip = 1,wake%nmax_prt
     wake%wake_parts(ip)%mag => wake%prt_ivort(ip)
   enddo
+  wake%part_box_min = part_box_min
+  wake%part_box_max = part_box_max
+
+  allocate(wake%vort_p(0))
+  allocate(wake%last_pan_idou(wake%n_pan_stripes))
+  wake%last_pan_idou = 0.0_wp
+
 end subroutine initialize_wake
 
 !----------------------------------------------------------------------
@@ -630,7 +646,7 @@ subroutine update_wake(wake, elems, sim_param)
   np = wake%pan_wake_len+1
   if(wake%pan_wake_len .lt. wake%nmax_pan) np = np + 1
 
-!$omp parallel do collapse(2) private(pos_p, vel_p, ie, ipan, iw, v)
+!$omp parallel do collapse(2) private(pos_p, vel_p, ie, ipan, iw)
   do ipan = 3,np
     do iw = 1,wake%n_pan_points
       pos_p = point_old(:,iw,ipan-1)
@@ -703,7 +719,7 @@ subroutine update_wake(wake, elems, sim_param)
   !calculate the velocities at the old positions of the points and then
   !update the positions
 
-!$omp parallel do private(pos_p, vel_p, ip, v)
+!$omp parallel do private(pos_p, vel_p, ip)
   do ip = 1,size(points,2)
     do ir = 1,size(points,3)
       pos_p = points(:,ip,ir)
@@ -735,6 +751,7 @@ subroutine update_wake(wake, elems, sim_param)
   allocate(points_prt(3,wake%n_prt))
 
   !calculate the velocities at the points
+!$omp parallel do private(pos_p, vel_p, ip)
   do ip = 1, wake%n_prt
     pos_p = wake%part_p(ip)%p%cen
     
@@ -748,8 +765,17 @@ subroutine update_wake(wake, elems, sim_param)
     !TODO: Check if it went out of boundaries, then free the particle
     
   enddo
+!$omp end parallel do
+  !Assign the moved points, if they get otside the bounding box free the 
+  !particles
   do ip = 1, wake%n_prt
-     wake%part_p(ip)%p%cen = points_prt(:,ip)
+    if(all(points_prt(:,ip) .ge. wake%part_box_min) .and. &
+       all(points_prt(:,ip) .le. wake%part_box_max)) then
+      wake%part_p(ip)%p%cen = points_prt(:,ip)
+    else
+      wake%part_p(ip)%p%free = .true.
+      wake%n_prt = wake%n_prt -1
+    endif
   enddo
 
   !==>    Particles: if the panel wake is at the end, create a particle
@@ -783,7 +809,8 @@ subroutine update_wake(wake, elems, sim_param)
 
       !End side
       dir = points_end(:,p1) - points_end(:,p2)
-      ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+      ave = wake%wake_panels(iw,wake%pan_wake_len)%mag-wake%last_pan_idou(iw)
+      wake%last_pan_idou(iw) = wake%wake_panels(iw,wake%pan_wake_len)%mag
       partvec = partvec + dir*ave
 
       !Calculate the center
@@ -791,6 +818,7 @@ subroutine update_wake(wake, elems, sim_param)
               wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
               wake%pan_w_points(:,p2,wake%nmax_pan+1) )/4.0_wp
 
+      !pos_p = (points_end(:,p1)+points_end(:,p2))/2.0_wp
 
       !Add the particle
       do ip = k, size(wake%wake_parts)
@@ -811,6 +839,8 @@ subroutine update_wake(wake, elems, sim_param)
     !Recreate the pointer vector
     if(allocated(wake%part_p)) deallocate(wake%part_p)
     allocate(wake%part_p(wake%n_prt))
+    deallocate(wake%vort_p)
+    allocate(wake%vort_p(wake%n_prt + wake%n_pan_stripes))
     !TODO: consider inverting these two cycles
     k = 1
     do ip = 1, wake%n_prt
@@ -818,9 +848,14 @@ subroutine update_wake(wake, elems, sim_param)
         if(.not. wake%wake_parts(ir)%free) then
           k = ir+1
           wake%part_p(ip)%p => wake%wake_parts(ir)
+          wake%vort_p(ip)%p => wake%wake_parts(ir)
           exit
         endif
       enddo
+    enddo
+    !Add the end vortex to the votical elements pointer
+    do iw = 1, wake%n_pan_stripes
+      wake%vort_p(wake%n_prt+iw)%p => wake%end_vorts(iw)
     enddo
   endif
 
@@ -906,6 +941,7 @@ subroutine update_wake(wake, elems, sim_param)
 
   ! The geometrical quantities of the panels will be all updated at the
   ! beginning of the next iteration in prepare_wake
+
 
 end subroutine update_wake
 

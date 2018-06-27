@@ -619,8 +619,8 @@ subroutine compute_pres_surfpan(this, sim_param)
 
   ! velocity, U = u_t \hat{t} + u_n \hat{n} + U_inf ----------
   this%surf_vel = vel_phi - sum(vel_phi*this%nor)*this%nor    +  &
-             this%nor * sum(this%nor * (-sim_param%u_inf+this%ub) ) +  &
-             sim_param%u_inf
+       this%nor * sum(this%nor * (-sim_param%u_inf-this%uvort+this%ub) )+&
+             sim_param%u_inf + this%uvort
 
   ! pressure -------------------------------------------------
   ! steady problems  : P = P_inf - 0.5*rho_inf*V^2 - rho_inf*dphi/dt
@@ -761,9 +761,10 @@ end subroutine calc_geo_data_surfpan
 
 !----------------------------------------------------------------------
 
+!> Calculat the vorticity induced velocity from vortical elements
 subroutine get_vort_vel_surfpan(this, vort_elems, uinf)
  class(t_surfpan), intent(inout)   :: this
- class(c_vort_elem), intent(in)    :: vort_elems(:)
+ type(t_vort_elem_p), intent(in)    :: vort_elems(:)
  real(wp), intent(in) :: uinf(3)
 
  integer :: iv
@@ -772,7 +773,7 @@ subroutine get_vort_vel_surfpan(this, vort_elems, uinf)
  this%uvort = 0.0_wp
 
  do iv=1,size(vort_elems)
-   call vort_elems(iv)%compute_vel(this%cen, uinf, vel)
+   call vort_elems(iv)%p%compute_vel(this%cen, uinf, vel)
    this%uvort = this%uvort + vel/(4*pi)
  enddo
 

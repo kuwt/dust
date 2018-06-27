@@ -149,6 +149,9 @@ real(wp) :: dt_out, dt_debug_out
 !Wake parameters
 !> Number of wake panels(/rings)
 integer :: n_wake_panels
+!> Number of wake particles
+integer :: n_wake_parts
+real(wp) :: part_box_min(3), part_box_max(3)
 real(wp) :: wake_pan_scaling
 !doublet parameters
 real(wp) :: ff_ratio_dou, ff_ratio_sou, eps_dou, r_Rankine, r_cutoff
@@ -246,6 +249,13 @@ call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')
 call prms%CreateRealOption( 'Re', "Reynolds number", '1000000.0')
 call prms%CreateRealOption( 'Mach', "Mach number", '0.0')
 call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
+call prms%CreateIntOption('n_wake_particles', 'number of wake particles', &
+                                                                  '10000')
+call prms%CreateRealArrayOption('particles_box_min', 'min coordinates of the &
+     &particles bounding box', '(/-10.0, -10.0, -10.0/)')
+call prms%CreateRealArrayOption('particles_box_max', 'max coordinates of the &
+     &particles bounding box', '(/10.0, 10.0, 10.0/)')
+
 call prms%CreateRealOption( 'ImplicitPanelScale', &
                     "Scaling of the first implicit wake panel", '0.3')
 
@@ -279,6 +289,10 @@ Mach = getreal(prms,'Mach')
 
 debug_level = getint(prms, 'debug_level')
 n_wake_panels = getint(prms, 'n_wake_panels')
+n_wake_parts = getint(prms, 'n_wake_particles')
+part_box_min = getrealarray(prms, 'particles_box_min',3)
+part_box_max = getrealarray(prms, 'particles_box_max',3)
+
 wake_pan_scaling = getreal(prms,'ImplicitPanelScale')
 basename = getstr(prms,'basename')
 basename_debug = getstr(prms,'basename_debug')
@@ -367,7 +381,8 @@ call printout(nl//'====== Initializing Wake ======')
 !
 !call initialize_wake_rings(wake_rings, geo, n_wake_panels)
 
-call initialize_wake(wake, geo, te, n_wake_panels, n_wake_panels, 10000, sim_param)
+call initialize_wake(wake, geo, te, n_wake_panels, n_wake_panels, &
+       n_wake_parts, part_box_min, part_box_max, sim_param)
 
 call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
@@ -468,12 +483,10 @@ do it = 1,nstep
                          call debug_printout_result(linsys, basename_debug, it)
 
   !------ Update the explicit part ------
-  !DEBUG:
-  write(*,*) 'Size of elems_ll ',shape(elems_ll)
   !call solve_liftlin(elems_ll, elems_tot, &
   !        (/ wake_panels%pan_p, wake_rings%pan_p/), sim_param, airfoil_data)
   call solve_liftlin(elems_ll, elems_tot, &
-          (/ wake%pan_p, wake%rin_p/), sim_param, airfoil_data)
+          (/ wake%pan_p, wake%rin_p/), wake%vort_p, sim_param, airfoil_data)
 
   !------ Compute loads -------
   ! vortex rings and 3d-panels

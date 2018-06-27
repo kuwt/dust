@@ -347,11 +347,11 @@ end interface
 abstract interface
   subroutine i_get_vort_vel(this, vort_elems, uinf)
     import :: c_impl_elem
-    import :: c_vort_elem
+    import :: t_vort_elem_p
     import :: wp
     implicit none
     class(c_impl_elem), intent(inout)  :: this
-    class(c_vort_elem), intent(in)    :: vort_elems(:)
+    type(t_vort_elem_p), intent(in)    :: vort_elems(:)
     real(wp), intent(in) :: uinf(3)
   end subroutine
 end interface

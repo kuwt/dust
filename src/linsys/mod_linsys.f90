@@ -187,7 +187,8 @@ subroutine assemble_linsys(linsys, elems,  expl_elems, &
  do ie =1,linsys%rank
 
    !call elems(ie)%p%get_vort_vel(wake_elems%end_vorts, uinf)
-   call elems(ie)%p%get_vort_vel(wake%end_vorts, uinf)
+   !call elems(ie)%p%get_vort_vel(wake%end_vorts, uinf)
+   call elems(ie)%p%get_vort_vel(wake%vort_p, uinf)
 
  enddo
 

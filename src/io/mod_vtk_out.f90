@@ -518,7 +518,7 @@ end subroutine vtk_out_bin
 subroutine vtk_out_viz (out_filename, & 
                         rr, ee, vars, var_names, &
                         w_rr, w_ee, w_vars, w_var_names, &
-                        vp_rr)
+                        vp_rr, vp_vars, vp_var_names)
  character(len=*), intent(in) :: out_filename 
  real(wp), intent(in) :: rr(:,:)
  integer, intent(in) :: ee(:,:)
@@ -529,6 +529,8 @@ subroutine vtk_out_viz (out_filename, &
  real(wp), intent(in), optional :: w_vars(:,:)
  character(len=*), intent(in), optional :: w_var_names(:)
  real(wp), intent(in), optional :: vp_rr(:,:)
+ real(wp), intent(in), optional :: vp_vars(:,:)
+ character(len=*), intent(in), optional :: vp_var_names(:)
 
  integer :: fu, ierr, i, i_shift
  integer :: npoints, ncells, ne
@@ -539,7 +541,7 @@ subroutine vtk_out_viz (out_filename, &
 
  integer :: ie, nquad, ntria, nquad_w, ntria_w, etype, nvp
  integer :: npoints_w, nw
- integer :: nvars, nvars_w, i_v
+ integer :: nvars, nvars_w, nvars_vp, i_v
  logical :: got_wake, got_particles
 
   got_wake = present(w_var_names)
@@ -558,6 +560,7 @@ subroutine vtk_out_viz (out_filename, &
 
   if(got_particles) then
     nvp = size(vp_rr,2)
+    nvars_vp = size(vp_var_names)
   endif
 
   ! First cycle the elements to get the number of quads and trias
@@ -769,19 +772,21 @@ subroutine vtk_out_viz (out_filename, &
     buffer =  '   </Cells>'//lf; write(fu) trim(buffer)
 
     !Data
-    !if(nvars .gt. 0) then
-    !  buffer =  '   <CellData Scalars="scalars">'//lf; 
-    !  write(fu) trim(buffer)
-    !  do i_v = 1,nvars
-    !    write(ostr,'(I0)') offset
-    !    buffer = '    <DataArray type="Float32" Name="'//trim(var_names(i_v))//'" &
-    !      &Format="appended" offset="'//trim(ostr)//'"/>'//lf
-    !    write(fu) trim(buffer)
-    !    offset = offset + vtk_isize + vtk_fsize*nw
-    !  enddo
+    if(nvars .gt. 0) then
+      !buffer =  '   <PointData>'//lf; 
+      buffer =  '   <CellData Scalars="scalars">'//lf; 
+      write(fu) trim(buffer)
+      do i_v = 1,nvars
+        write(ostr,'(I0)') offset
+        buffer = '    <DataArray type="Float32" Name="'//trim(var_names(i_v))//'" &
+          &Format="appended" offset="'//trim(ostr)//'"/>'//lf
+        write(fu) trim(buffer)
+        offset = offset + vtk_isize + vtk_fsize*nvp
+      enddo
 
-    !  buffer = '   </CellData>'//lf; write(fu) trim(buffer)
-    !endif
+      !buffer = '   </PointData>'//lf; write(fu) trim(buffer)
+      buffer = '   </CellData>'//lf; write(fu) trim(buffer)
+    endif
 
 
     buffer = '  </Piece>'//lf; write(fu) trim(buffer)
@@ -935,18 +940,18 @@ subroutine vtk_out_viz (out_filename, &
     enddo
 
     !Variables
-    !do i_v = 1,nvars_w
-    !  nbytes =  vtk_fsize*nw; write(fu) nbytes
-    !  do i=1,size(w_vars,1)
-    !    write(fu) real(w_vars(i,i_v), vtk_fsize)
-    !  enddo
-    !enddo
-    !do i_v = nvars_w+1,nvars
-    !  nbytes =  vtk_fsize*nw; write(fu) nbytes
-    !  do i=1,size(w_vars,1)
-    !    write(fu) real(0.0_wp, vtk_fsize)
-    !  enddo
-    !enddo
+    do i_v = 1,nvars_vp
+      nbytes =  vtk_fsize*nvp; write(fu) nbytes
+      do i=1,size(vp_vars,1)
+        write(fu) real(vp_vars(i,i_v), vtk_fsize)
+      enddo
+    enddo
+    do i_v = nvars_vp+1,nvars
+      nbytes =  vtk_fsize*nvp; write(fu) nbytes
+      do i=1,size(vp_vars,1)
+        write(fu) real(0.0_wp, vtk_fsize)
+      enddo
+    enddo
   endif
   !!All the variables data
   !do ivar=1,pv_data%n_vars

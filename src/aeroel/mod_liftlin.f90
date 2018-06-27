@@ -274,13 +274,14 @@ end subroutine update_liftlin
 !! The lifting line solution is not obtained from the solution of the linear
 !! system. It is fully explicit, but by being nonlinear requires an
 !! iterative solution.
-subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  sim_param, &
-                         airfoil_data)
+subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  elems_vort, &
+                         sim_param, airfoil_data)
  type(t_expl_elem_p), intent(inout) :: elems_ll(:)
- type(t_pot_elem_p), intent(in)    :: elems_tot(:)
- type(t_pot_elem_p), intent(in)    :: elems_wake(:)
- type(t_sim_param), intent(in) :: sim_param
- type(t_aero_tab),  intent(in) :: airfoil_data(:)
+ type(t_pot_elem_p),  intent(in)    :: elems_tot(:)
+ type(t_pot_elem_p),  intent(in)    :: elems_wake(:)
+ type(t_vort_elem_p), intent(in)    :: elems_vort(:)
+ type(t_sim_param),   intent(in)    :: sim_param
+ type(t_aero_tab),    intent(in)    :: airfoil_data(:)
 
  real(wp) :: uinf(3)
  integer  :: i_l, j, ic
@@ -309,6 +310,10 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  sim_param, &
     vel_w(:,i_l) = 0.0_wp
     do j = 1,size(elems_wake)
       call elems_wake(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
+      vel_w(:,i_l) = vel_w(:,i_l) + v
+    enddo
+    do j = 1,size(elems_vort)
+      call elems_vort(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
   enddo
