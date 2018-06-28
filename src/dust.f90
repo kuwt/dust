@@ -93,14 +93,6 @@ use mod_parse, only: &
   getstr, getlogical, getreal, getint, getrealarray, &
   ignoredParameters, finalizeParameters
 
-!use mod_wake_pan, only: &
-!  t_wake_panels, initialize_wake_panels, update_wake_panels, &
-!  prepare_wake_panels, load_wake_panels, destroy_wake_panels
-!
-!use mod_wake_ring, only: &
-!  t_wake_rings, initialize_wake_rings, update_wake_rings, &
-!  load_wake_rings, destroy_wake_rings
-
 use mod_wake, only: &
   t_wake, initialize_wake, update_wake, &
   prepare_wake, load_wake, destroy_wake
@@ -141,11 +133,12 @@ real(wp) :: rho , Pinf, Re, Mach
 
 !Time parameters
 real(wp) :: tstart, tend, dt, time
-integer  :: it, nstep
+integer  :: it, nstep, nout
 real(wp) :: t_last_out, t_last_debug_out
 logical  :: time_2_out, time_2_debug_out
 logical  :: output_start
 real(wp) :: dt_out, dt_debug_out
+
 !Wake parameters
 !> Number of wake panels(/rings)
 integer :: n_wake_panels
@@ -153,6 +146,7 @@ integer :: n_wake_panels
 integer :: n_wake_parts
 real(wp) :: part_box_min(3), part_box_max(3)
 real(wp) :: wake_pan_scaling
+
 !doublet parameters
 real(wp) :: ff_ratio_dou, ff_ratio_sou, eps_dou, r_Rankine, r_cutoff
 
@@ -175,11 +169,7 @@ type(t_tedge) :: te
 type(t_aero_tab), allocatable :: airfoil_data(:)
 !> Linear system
 type(t_linsys) :: linsys
-!!> Wake panels
-!type(t_wake_panels) :: wake_panels
-!!> Wake rings
-!type(t_wake_rings) :: wake_rings
-
+!> Wake 
 type(t_wake) :: wake
 
 !> Timing vars
@@ -192,7 +182,7 @@ logical :: restart
 character(len=max_char_len) :: restart_file
 
 
-!>
+!I/O prefixes
 character(len=max_char_len) :: frmt
 character(len=max_char_len) :: basename
 character(len=max_char_len) :: basename_debug
@@ -305,15 +295,25 @@ eps_dou   = getreal(prms, 'DoubletThreshold')
 r_Rankine = getreal(prms, 'RankineRad')
 r_cutoff  = getreal(prms, 'CutoffRad')
 
+!-- Parameters Initializations --
 call initialize_doublet(ff_ratio_dou, eps_dou, r_Rankine, r_cutoff);
 call initialize_vortline(r_Rankine, r_cutoff);
 call initialize_vortpart(r_Rankine, r_cutoff);
 call initialize_surfpan(ff_ratio_sou);
 
+nout = 0
 restart = getlogical(prms,'restart_from_file')
 if (restart) then
   restart_file = getstr(prms,'restart_file')
+  call printout('RESTART: restarting from file: '//trim(restart_file))
   geo_file_name = restart_file(1:len(trim(restart_file))-11)//'geo.h5'
+
+  !restarting the same simulation, advance the numbers
+  if(restart_file(1:len(trim(restart_file))-12).eq.trim(basename)) then
+  read(restart_file(len(trim(restart_file))-6:len(trim(restart_file))-3),*) nout 
+    call printout('Identified restart from the same simulation, keeping the&
+    & previous output numbering')
+  endif
   call load_time(restart_file, tstart)
 endif
 
@@ -329,7 +329,7 @@ if (debug_level .ge. 3) then
   write(message,*) 'Free stream velocity:', uinf; call printout(message)
   write(message,*) 'Maximum wake panels:', n_wake_panels; call printout(message)
   write(message,*) 'Results basename: ', trim(basename); call printout(message)
-  write(message,*) 'Debug basename: ', trim(basename); call printout(message)
+  write(message,*) 'Debug basename: ', trim(basename_debug); call printout(message)
 endif
 
 
@@ -359,8 +359,6 @@ call copy_geo(sim_param, geo_file_name, run_id)
 call create_geometry(geo_file_name, ref_file_name, input_file_name, geo, &
                      te, elems, elems_expl, elems_ad, elems_ll, &
                      elems_tot, airfoil_data, sim_param)
-  !DEBUG:
-  write(*,*) 'Size of elems_ll ',shape(elems_ll)
 t1 = dust_time()
 if(debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Created geometry in: ' , t1 - t0,' s.'
@@ -370,24 +368,19 @@ endif
 if(debug_level .ge. 15) &
       call debug_printout_geometry_minimal(elems, geo, basename_debug, 0)
 
+!TODO: check whether to move these calls before, and precisely what they do
 call ignoredParameters(prms)
-
 call finalizeParameters(prms)
 
 
 !------ Initialization ------
 call printout(nl//'====== Initializing Wake ======')
-!call initialize_wake_panels(wake_panels, geo, te, n_wake_panels, sim_param)
-!
-!call initialize_wake_rings(wake_rings, geo, n_wake_panels)
 
 call initialize_wake(wake, geo, te, n_wake_panels, n_wake_panels, &
        n_wake_parts, part_box_min, part_box_max, sim_param)
 
 call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
-!call initialize_linsys(linsys, geo, elems, elems_expl, &
-!                       wake_panels, wake_rings,  uinf)
 call initialize_linsys(linsys, geo, elems, elems_expl, &
                        wake,  uinf)
 t1 = dust_time()
@@ -399,8 +392,6 @@ endif
 !------ Reloading ------
 if (restart) then
  call load_solution(restart_file,geo%components)
- !call load_wake_panels(restart_file, wake_panels)
- !call load_wake_rings(restart_file, wake_rings)
  call load_wake(restart_file, wake)
 endif
 
@@ -444,8 +435,6 @@ do it = 1,nstep
   call prepare_wake(wake, geo, sim_param)
   t0 = dust_time()
 
-  !call assemble_linsys(linsys, elems, elems_expl,  &
-  !                     wake_panels, wake_rings, uinf)
   call assemble_linsys(linsys, elems, elems_expl,  &
                        wake, uinf)
   t1 = dust_time()
@@ -468,9 +457,9 @@ do it = 1,nstep
   endif
   t1 = dust_time()
 
-  ! compute time derivative of the result ( = i_vortex = -i_doublet ) ----------
+  ! compute time derivative of the result ( = i_vortex = -i_doublet ) -------
   do i_el = 1 , size(elems)
-    elems(i_el)%p%didou_dt = ( linsys%res(i_el) - res_old(i_el) ) / sim_param%dt
+    elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
   end do
   res_old = linsys%res
 
@@ -480,22 +469,18 @@ do it = 1,nstep
   endif
 
   if (debug_level .ge. 20.and.time_2_debug_out) &
-                         call debug_printout_result(linsys, basename_debug, it)
+                      call debug_printout_result(linsys, basename_debug, it)
 
   !------ Update the explicit part ------
-  !call solve_liftlin(elems_ll, elems_tot, &
-  !        (/ wake_panels%pan_p, wake_rings%pan_p/), sim_param, airfoil_data)
   call solve_liftlin(elems_ll, elems_tot, &
           (/ wake%pan_p, wake%rin_p/), wake%vort_p, sim_param, airfoil_data)
 
   !------ Compute loads -------
   ! vortex rings and 3d-panels
   do i_el = 1 , size(elems)
-!   call elems(i_el)%p%compute_cp(elems,uinf)       ! <--TODO: must become "old" as soon as possible
     call elems(i_el)%p%compute_pres(sim_param)
     call elems(i_el)%p%compute_dforce(sim_param)
   end do
-  ! lifting line in solve_liftlin
 
   !if ((debug_level .ge. 10).and.time_2_debug_out) then
   !  call debug_printout_loads(elems, basename_debug, it)
@@ -509,17 +494,13 @@ do it = 1,nstep
 
   !Print the results
   if(time_2_out)  then
-    !call output_status(elems_tot, geo, wake_panels, basename, &
-    !                                 it, time)
-    !call save_status(geo, wake_panels, wake_rings, sim_param, it, time, run_id)
-    call save_status(geo, wake, sim_param, it, time, run_id)
+    nout = nout+1
+    call save_status(geo, wake, sim_param, nout, time, run_id)
   endif
 
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
   !  next iteration)
-  !call update_wake_panels(wake_panels, elems_tot, wake_rings%pan_p, sim_param)
-  !call update_wake_rings(wake_rings, elems_tot, wake_panels%pan_p, sim_param)
   call update_wake(wake, elems_tot, sim_param)
 
   time = min(tend, time+dt)
@@ -583,13 +564,15 @@ subroutine copy_geo(sim_param, geo_file, run_id)
 
   !target file name: same as run basename with appendix
   target_file = trim(sim_param%basename)//'_geo.h5'
-
+  
+  if (trim(geo_file) .ne. trim(target_file)) then
   !Copy the geometry file
   call execute_command_line('cp '//trim(geo_file)//' '//trim(target_file), &
                                            exitstat=estat,cmdstat=cstat)
   if((cstat .ne. 0) .or. (estat .ne. 0)) &
     call error('dust','','System errors while trying to copy the geometry &
     &to the output path')
+  endif
 
 
   !Attach the run_id to the file as an attribute

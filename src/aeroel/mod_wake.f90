@@ -37,7 +37,7 @@
 module mod_wake
 
 use mod_param, only: &
-  wp, nl, pi
+  wp, nl, pi, max_char_len
 
 use mod_sim_param, only: &
   t_sim_param
@@ -214,7 +214,7 @@ type :: t_wake
 
 end type
 
-character(len=*), parameter :: this_mod_name='mod_wake_pan'
+character(len=*), parameter :: this_mod_name='mod_wake'
 
 !----------------------------------------------------------------------
 contains
@@ -490,15 +490,17 @@ subroutine load_wake(filename, wake)
 
  integer(h5loc) :: floc, gloc
  real(wp), allocatable :: wpoints(:,:,:), wvort(:,:)
+ real(wp), allocatable :: vppoints(:,:), vpvort(:,:)
  integer, allocatable :: start_points(:,:)
  integer, allocatable :: conn_pe(:)
  integer :: ipan, iw, p1, p2, ipt
  integer :: id, ir, ip, np
  character(len=*), parameter :: this_sub_name = 'load_wake'
    
+  call open_hdf5_file(filename, floc)
+
   !=== Panels ===
   !Read the past results
-  call open_hdf5_file(filename, floc)
   call open_hdf5_group(floc, 'PanelWake', gloc)
 
   call read_hdf5_al(wpoints,'WakePoints',gloc)
@@ -506,7 +508,7 @@ subroutine load_wake(filename, wake)
   call read_hdf5_al(wvort,'WakeVort',gloc)
 
   call close_hdf5_group(gloc)
-  call close_hdf5_file(floc)
+  !call close_hdf5_file(floc)
 
   !Perform a few checks to be sure that the correct size solution was loaded
   if(.not. all(start_points .eq. wake%i_start_points)) call error( &
@@ -542,7 +544,7 @@ subroutine load_wake(filename, wake)
 
   !=== Rings ===
   !Read the past results
-  call open_hdf5_file(filename, floc)
+  !call open_hdf5_file(filename, floc)
   call open_hdf5_group(floc, 'RingWake', gloc)
 
   call read_hdf5_al(wpoints,'WakePoints',gloc)
@@ -550,7 +552,7 @@ subroutine load_wake(filename, wake)
   call read_hdf5_al(wvort,'WakeVort',gloc)
 
   call close_hdf5_group(gloc)
-  call close_hdf5_file(floc)
+  !call close_hdf5_file(floc)
 
   !check the consistency
   ip = 1
@@ -589,6 +591,44 @@ subroutine load_wake(filename, wake)
     enddo
   enddo
 
+  !=== Particles ===
+  call open_hdf5_group(floc, 'ParticleWake', gloc)
+  call read_hdf5_al(vppoints,'WakePoints',gloc)
+  call read_hdf5_al(vpvort,'WakeVort',gloc)
+  call close_hdf5_group(gloc)
+  
+  if(size(vpvort) .gt. wake%nmax_prt) call error(this_sub_name, &
+    this_mod_name, 'Loading a number of particles &
+    & greater than the maximum allowed for this run: cannot truncate the &
+    & particles in a meaningful way. Consider restarting the run with a &
+    & higher amount of maximum particles')
+
+  wake%n_prt = size(vpvort)
+
+  deallocate(wake%part_p)
+  allocate(wake%part_p(wake%n_prt))
+  if(wake%n_prt .gt. 0) then
+    deallocate(wake%vort_p)
+    allocate(wake%vort_p(wake%n_prt+wake%n_pan_stripes))
+    do iw = 1, wake%n_pan_stripes 
+      wake%vort_p(wake%n_prt+iw)%p => wake%end_vorts(iw)
+    enddo
+  endif
+
+  do ip = 1,wake%n_prt
+    wake%wake_parts(ip)%cen = vppoints(:,ip)
+    wake%wake_parts(ip)%mag = norm2(vpvort(:,ip))
+    wake%wake_parts(ip)%dir = vpvort(:,ip)/wake%wake_parts(ip)%mag
+    wake%wake_parts(ip)%free = .false.
+    wake%part_p(ip)%p => wake%wake_parts(ip)
+    wake%vort_p(ip)%p => wake%wake_parts(ip)
+  enddo
+  
+  deallocate(vppoints, vpvort)
+  
+
+
+  call close_hdf5_file(floc)
 end subroutine load_wake
 
 
@@ -616,6 +656,8 @@ subroutine update_wake(wake, elems, sim_param)
  logical :: increase_wake
  integer :: size_old
  real(wp) :: dir(3), partvec(3), ave
+ character(len=max_char_len) :: msg
+ character(len=*), parameter :: this_sub_name='update_wake'
 
   wake%w_vel = 0.0_wp
 
@@ -832,6 +874,12 @@ subroutine update_wake(wake, elems, sim_param)
           exit
         endif
       enddo
+      if (ip .gt. wake%nmax_prt) then
+        write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
+          wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
+          &restarting with a higher number of maximum wake particles'
+      call error(this_sub_name, this_mod_name, trim(msg))
+      endif
       
     enddo
     deallocate(points_end)
