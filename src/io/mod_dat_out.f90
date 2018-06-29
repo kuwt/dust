@@ -67,6 +67,7 @@ subroutine dat_out_loads_header ( fid , comps_meas , ref_sys )
 
  write(istr,'(I0)') n_comps 
  write(fid,*) '# comments ... n.components: ' , istr
+ write(fid,*) '# comments ... ref.sys     : ' , trim(ref_sys)
  ! three-dimensional space
  do ic = 1 , n_comps - 1
    write(fid,'(A)',advance='no') trim(comps_meas(ic))//' , '
