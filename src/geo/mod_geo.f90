@@ -677,6 +677,17 @@ subroutine load_components(geo, in_file, sim_param, te)
     !TODO: consider wrapping in another subroutine
     do i_mult = 1,n_mult
       ref_tag_m = ref_tag
+      !set the component id
+      if(mult) then
+        if(i_mult .eq. 1) then
+          geo%components(i_comp)%comp_id = i_comp_input 
+        else
+          n_comp_write = n_comp_write+1
+          geo%components(i_comp)%comp_id = n_comp_write
+        endif
+      else
+        geo%components(i_comp)%comp_id = i_comp_input 
+      endif
       if(mult)  then
         !look again for the multiple reference
         write(ref_tag_m,'(A,I2.2)') trim(ref_tag)//'__',i_mult
@@ -779,8 +790,9 @@ subroutine load_components(geo, in_file, sim_param, te)
         else
           !Following multiples: need to create a new component in the file and
           !re-write everything
-          n_comp_write = n_comp_write+1
-          write(cname_write,'(A,I3.3)') 'Comp',n_comp_write
+          !n_comp_write = n_comp_write+1
+          !write(cname_write,'(A,I3.3)') 'Comp',n_comp_write
+          write(cname_write,'(A,I3.3)') 'Comp',geo%components(i_comp)%comp_id
           call new_hdf5_group(gloc,trim(cname_write),cloc2)
           call write_hdf5(ref_id,'RefId',cloc2)
           call write_hdf5(trim(ref_tag_m),'RefTag',cloc2)
@@ -876,7 +888,7 @@ subroutine load_components(geo, in_file, sim_param, te)
       do i2=1,size(ee,2)
 
         !Component id
-        geo%components(i_comp)%el(i2)%comp_id = i_comp
+        !geo%components(i_comp)%el(i2)%comp_id = i_comp
 
         !vertices
         n_vert = count(ee(:,i2).ne.0)

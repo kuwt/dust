@@ -153,7 +153,8 @@ subroutine save_status(geo, wake,  sim_params, it, time, run_id)
   call write_hdf5(ncomp, 'NComponents', gloc1)
   !Cycle the components
   do icomp = 1, ncomp
-    write(comp_name,'(A,I3.3)')'Comp',icomp
+    !write(comp_name,'(A,I3.3)')'Comp',icomp
+    write(comp_name,'(A,I3.3)')'Comp',geo%components(icomp)%comp_id
     call new_hdf5_group(gloc1, trim(comp_name), gloc2)
 
     call write_hdf5(trim(geo%components(icomp)%comp_name),'CompName',gloc2)

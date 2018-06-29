@@ -618,7 +618,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       do i2=1,size(ee,2)
         
         !Component id
-        comps(i_comp)%el(i2)%comp_id = i_comp
+        !comps(i_comp)%el(i2)%comp_id = i_comp
         
         !vertices
         n_vert = count(ee(:,i2).ne.0)

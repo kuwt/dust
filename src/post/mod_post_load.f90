@@ -117,6 +117,9 @@ subroutine load_res(floc, comps, vort, press, t)
 
 !   TODO: check if it is general enough *******
 !   TODO: check if something is broken after changing intent(in to inout) for comps
+
+    !DEBUG:
+    write(*,*) 'nelems_comp',nelems_comp
     do ie = 1 , nelems_comp
       comps(icomp)%el(ie)%pres = pres_read(ie) 
       comps(icomp)%el(ie)%dforce = dforce_read(:,ie) 
