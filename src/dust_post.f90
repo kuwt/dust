@@ -129,6 +129,8 @@ use mod_post_flowfield, only: &
 use mod_post_integral, only: &
   post_integral
 
+use mod_post_sectional, only: &
+  post_sectional
 
 implicit none
 
@@ -141,7 +143,7 @@ real(wp) :: ff_ratio_dou, ff_ratio_sou, eps_dou, r_Rankine, r_cutoff
 
 !Geometry parameters
 type(t_parse) :: prms
-type(t_parse), pointer :: sbprms
+type(t_parse), pointer :: sbprms , bxprms
 
 integer :: n_analyses, ia
 character(len=max_char_len) :: basename, data_basename
@@ -211,13 +213,44 @@ call sbprms%CreateRealArrayOption('Minxyz','lower bounds of the box',&
                               multiple=.true.)
 call sbprms%CreateRealArrayOption('Maxxyz','upper bounds of the box',&
                               multiple=.true.)
-
 ! loads --------------------
 call sbprms%CreateStringOption('CompName','Components where loads are computed',&
                               multiple=.true.)
 call sbprms%CreateStringOption('Reference_Tag','Reference frame where loads&
                             & are computed',multiple=.true.)
-
+! sectional loads ----------
+call sbprms%CreateRealArrayOption('AxisDir','Direction of the axis defined the reference&
+                            & points for sectional loads analisys', multiple=.true.)
+call sbprms%CreateRealArrayOption('AxisNod','Node belonging to the axis used for sectional&
+                            & loads analisys', multiple=.true.)
+! sectional loads: box -----
+call sbprms%CreateSubOption('BoxSect','Definition of the box for sectional loads', &
+                          bxprms)
+call bxprms%CreateRealArrayOption('refNode','reference node to build the box')
+call bxprms%CreateRealArrayOption('faceVec','vector identifying the direction of the base side &
+                           &of the sections')
+call bxprms%CreateRealArrayOption('faceBas','dimension along faceVec of the first and last sections')
+call bxprms%CreateRealArrayOption('faceHei','dimension orthogonal to faceVec of the first and last sections')
+call bxprms%CreateRealArrayOption('spanVec','vector defining the out-of plane direction of the box')
+call bxprms%CreateRealOption('spanLen','dimension along the spanVec direction')
+call bxprms%CreateIntOption('numSect','number of sections')
+call bxprms%CreateLogicalOption('reshapeBox','logical input to reshape the box if &
+                           &it is "too large"')
+call sbprms%CreateRealArrayOption('AxisMom','axis for the computation of the moment. Perpendicular to sections')
+! BoxSect = {
+!  refNode = (/ -0.5 , 0.0 , -0.3 /)
+!  faceVec = (/ 1.0 , 0.0 , 0.0 /)
+!  faceBas = (/ 2.0 , 1.0 /) 
+!  faceHei = (/ 1.0 , 1.0 /)
+!  spanVec = (/ 0.0 , 1.0 , 0.0 /)
+!  spanLen = 3.0 
+! }
+! AxisMom  = (/ 0.0 , 1.0 , 0.0 /) 
+! old format
+! call sbprms%CreateStringOption('BoxSect','Boxes delimiting the component for sectional&
+!                             & loads analisys',multiple=.true.)
+! call sbprms%CreateRealArrayOption('AxisMom','Axis for the computation of the moment&
+!                             & in sectional loads analysis',multiple=.true.)
 
 sbprms=>null()
 
@@ -300,9 +333,12 @@ do ia = 1,n_analyses
                           out_frmt , comps , components_names , all_comp , &
                           an_start , an_end , an_step )
 
-   !/////////////// Sectional Loads  \\\\\\\\\\\\\\\\
+   !///////////////  Sectional Loads  \\\\\\\\\\\\\\\
    case('sectional_loads')
-    call error('dust_post','','sectional_loads analysis to be implemented')
+    
+    call post_sectional ( sbprms , bxprms , basename , data_basename , an_name , ia , &
+                          out_frmt , comps , components_names , all_comp , &
+                          an_start , an_end , an_step )
 
    case default
     call error('dust_post','','Unknown type of analysis: '//trim(an_type))

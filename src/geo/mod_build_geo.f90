@@ -205,6 +205,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
   write(comp_name,'(A,I3.3)')'Comp',comp_id
   call new_hdf5_group(gloc, trim(comp_name), comp_loc)
   call write_hdf5(comp_tag,'CompName',comp_loc)
+  call write_hdf5(mesh_file_type,'CompInput',comp_loc)
   call write_hdf5(ref_tag,'RefTag',comp_loc)
 
 ! call new_hdf5_group(file_loc, 'Components', group_loc)
@@ -299,6 +300,18 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
              'Symmetry routines not implemented for this kind of input.')
     end select
   end if
+
+  if ( trim(mesh_file_type) .eq. 'parametric' ) then
+    !DEBUG
+    write(*,*) ' +++ nelems_span_tot : ' , nelems_span_tot
+    write(*,*) ' +++ nelems_chor_tot : ' , npoints_chord_tot - 1
+    !write HDF5 fields
+    call write_hdf5(  nelems_span_tot  ,'parametric_nelems_span',geo_loc)
+    call write_hdf5(npoints_chord_tot-1,'parametric_nelems_chor',geo_loc)
+
+  end if
+
+
   !! treat the points
   !if(allocated(geo%points)) then
   !  points_offset = size(geo%points,2) 

@@ -389,6 +389,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
  integer, allocatable :: ee(:,:)
  real(wp), allocatable :: rr(:,:)
  character(len=max_char_len) :: comp_el_type, comp_name, comp_name_stripped
+ character(len=max_char_len) :: comp_input
  integer :: points_offset, n_vert! , elems_offset
  real(wp), allocatable :: points_tmp(:,:)
  character(len=max_char_len) :: ref_tag, ref_tag_m
@@ -396,7 +397,9 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
  character(len=max_char_len) :: cname !, msg
  integer(h5loc) :: gloc, cloc , geo_loc
  integer :: n_comp, i_comp, n_comp_tot, i_comp_tot , i_comp_tmp
+ integer :: parametric_nelems_span , parametric_nelems_chor
 
+ ! Some structure to handlge multiple components
  character(len=max_char_len), allocatable :: components(:) , components_tmp(:)
  character(len=max_char_len) :: component , component_stripped
 
@@ -438,6 +441,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
     write(cname,'(A,I3.3)') 'Comp',i_comp_tot
     call open_hdf5_group(gloc,trim(cname),cloc)
     call read_hdf5(components(i_comp_tot),'CompName',cloc)
+    call read_hdf5(comp_input,'CompInput',cloc)
     call close_hdf5_group(cloc)
 !   !DEBUG
 !   write(*,*) trim(components(i_comp_tot))
@@ -468,13 +472,13 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         if ( trim(components_names(i1)) .eq. trim(component_stripped) ) then
           i_comp_tmp = i_comp_tmp + 1
           components_tmp(i_comp_tmp) = trim(components(i2))
-          write(*,*) ' a. +1 '
+!debug   !write(*,*) ' a. +1 '
         end if
 
         if ( trim(components_names(i1)) .eq. trim(components(i2)) ) then
           i_comp_tmp = i_comp_tmp + 1
           components_tmp(i_comp_tmp) = trim(components(i2))
-          write(*,*) ' b. +1 '
+!debug   !write(*,*) ' b. +1 '
         end if
 
       end do
@@ -482,7 +486,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
     end do
 
     deallocate(components_names)
-    write(*,*) ' i_comp_tmp : ' , i_comp_tmp
+!debug !write(*,*) ' i_comp_tmp : ' , i_comp_tmp
     allocate(components_names(i_comp_tmp)) 
     components_names = components_tmp(1:i_comp_tmp)
  
@@ -546,11 +550,25 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       comps(i_comp)%comp_el_type = trim(comp_el_type)
 
       comps(i_comp)%comp_name = trim(comp_name)
+      comps(i_comp)%comp_input = trim(comp_input)
 
       ! Geometry --------------------------
       call open_hdf5_group(cloc,'Geometry',geo_loc)
       call read_hdf5_al(ee   ,'ee'   ,geo_loc)
       call read_hdf5_al(rr   ,'rr'   ,geo_loc)
+
+      if ( trim(comps(i_comp)%comp_input) .eq. 'parametric' ) then
+        call read_hdf5( parametric_nelems_span ,'parametric_nelems_span',geo_loc)
+        call read_hdf5( parametric_nelems_chor ,'parametric_nelems_chor',geo_loc)
+        comps(i_comp)%parametric_nelems_span = parametric_nelems_span
+        comps(i_comp)%parametric_nelems_chor = parametric_nelems_chor
+!       !DEBUG
+!       write(*,*) ' component_id : ' , comps(i_comp)%comp_id
+!       write(*,*) ' nelems_span  : ' , comps(i_comp)%parametric_nelems_span
+!       write(*,*) ' nelems_chord : ' , comps(i_comp)%parametric_nelems_chor
+      end if
+
+
       !!call read_hdf5_al(neigh,'neigh',geo_loc)
       !! !element-specific reads 
       !!if ( comp_el_type(1:1) .eq. 'l' ) then

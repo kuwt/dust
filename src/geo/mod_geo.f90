@@ -134,6 +134,9 @@ type :: t_geo_component
  !> Name of the component
  character(len=max_char_len) :: comp_name
 
+ !> Type of input: basic, cgns, parametric
+ character(len=max_char_len) :: comp_input
+
  !> Id of the component (warning: not always defined)
  integer :: comp_id
 
@@ -178,6 +181,9 @@ type :: t_geo_component
  real(wp),allocatable :: normalised_coord_e(:,:)
  !> Id of the airfoil elements (index in airfoil_list char array)
  integer ,allocatable :: i_airfoil_e(:,:)
+
+ !> Dimensions of parametric elements only
+ integer :: parametric_nelems_span , parametric_nelems_chor 
 
 end type  t_geo_component
 
@@ -579,7 +585,7 @@ subroutine load_components(geo, in_file, sim_param, te)
  integer :: i1, i2, i3, i
  integer, allocatable :: ee(:,:)
  real(wp), allocatable :: rr(:,:)
- character(len=max_char_len) :: comp_el_type, comp_name
+ character(len=max_char_len) :: comp_el_type, comp_name, comp_input
  integer :: points_offset, n_vert , elems_offset
  real(wp), allocatable :: points_tmp(:,:)
  character(len=max_char_len) :: ref_tag, ref_tag_m
@@ -597,7 +603,8 @@ subroutine load_components(geo, in_file, sim_param, te)
  integer                 , allocatable :: i_airfoil_e(:,:)
  character(max_char_len) , allocatable :: airfoil_list(:)
  integer                 , allocatable :: nelem_span_list(:)
-
+ ! Parametric elements
+ integer :: par_nelems_span , par_nelems_chor
  ! trailing edge ------
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
  integer , allocatable :: neigh_te(:,:) , o_te(:,:)
@@ -658,10 +665,9 @@ subroutine load_components(geo, in_file, sim_param, te)
     mult = geo%refs(ref_id)%multiple
 
     ! ====== READING =====
-
     call read_hdf5(comp_el_type,'ElType',cloc)
-
     call read_hdf5(comp_name,'CompName',cloc)
+    call read_hdf5(comp_input,'CompInput',cloc)
 
     if(mult) then
       n_mult = geo%refs(ref_id)%n_mult
@@ -713,13 +719,15 @@ subroutine load_components(geo, in_file, sim_param, te)
 
 
 !     ! ====== READING =====
+      geo%components(i_comp)%comp_el_type = trim(comp_el_type)
+      geo%components(i_comp)%comp_input   = trim(comp_input  )
+
 ! *** 2018-06-25. Two calls moved outside the loop on i_mult
 ! *** call read_hdf5(comp_el_type,'ElType',cloc)
-      geo%components(i_comp)%comp_el_type = trim(comp_el_type)
-!
 ! *** call read_hdf5(comp_name,'CompName',cloc)
-      !add the multiplicity appendix if multiple
+!     !add the multiplicity appendix if multiple
 !     write(*,*) ' ****** CompName : ' , trim(comp_name)
+ 
       if(mult) then
         write(geo%components(i_comp)%comp_name,'(A,I2.2)') trim(comp_name)&
                                                             &//'__',i_mult
@@ -752,9 +760,18 @@ subroutine load_components(geo, in_file, sim_param, te)
         call read_hdf5(trac,'Traction',cloc)
         call read_hdf5(rad,'Radius',cloc)
       end if
+
+      ! for PARAMETRIC elements only:
+      ! parametric_nelems_span , parametric_nelems_chor 
+      if ( trim(comp_input) .eq. 'parametric' ) then
+        call read_hdf5(par_nelems_span,'parametric_nelems_span',geo_loc)
+        call read_hdf5(par_nelems_chor,'parametric_nelems_chor',geo_loc)
+        !DEBUG
+        write(*,*) ' par_nelems_span : ' , par_nelems_span
+        write(*,*) ' par_nelems_chor : ' , par_nelems_chor
+      end if
+ 
       call close_hdf5_group(geo_loc)
-
-
 
 
       ! Trailing Edge (not all elements build the trailing edge)
@@ -783,7 +800,8 @@ subroutine load_components(geo, in_file, sim_param, te)
         if(i_mult .eq. 1) then
           !first multiple: the component stays the same, added the reference
           !id and updated the name with the multiple appendix
-          call write_hdf5(trim(geo%components(i_comp)%comp_name),'CompName',cloc)
+          call write_hdf5(trim(geo%components(i_comp)%comp_name),'CompName',cloc) 
+          call write_hdf5(trim(geo%components(i_comp)%comp_input),'CompInput',cloc)
           call write_hdf5(ref_id,'RefId',cloc)
           call write_hdf5(trim(ref_tag_m),'RefTag',cloc)
 
@@ -799,6 +817,8 @@ subroutine load_components(geo, in_file, sim_param, te)
           call write_hdf5(trim(comp_el_type),'ElType',cloc2)
           call write_hdf5(trim(geo%components(i_comp)%comp_name), &
                                                               'CompName',cloc2)
+          call write_hdf5(trim(geo%components(i_comp)%comp_input),&
+                                                             'CompInput',cloc2)
           call new_hdf5_group(cloc2,'Geometry',geo_loc)
 
           call write_hdf5(ee   ,'ee'   ,geo_loc)
@@ -815,6 +835,13 @@ subroutine load_components(geo, in_file, sim_param, te)
             call write_hdf5(rad,'Radius',cloc2)
 
           endif
+
+          if ( trim(comp_input) .eq. 'parametric' ) then
+            !write HDF5 fields
+            call write_hdf5(par_nelems_span,'parametric_nelems_span',geo_loc)
+            call write_hdf5(par_nelems_chor,'parametric_nelems_chor',geo_loc)
+          end if
+
           call close_hdf5_group(geo_loc)
 
           if( comp_el_type(1:1) .eq. 'p' .or. &
