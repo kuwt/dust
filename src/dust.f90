@@ -180,6 +180,7 @@ integer :: debug_level
 !Restart
 logical :: restart
 character(len=max_char_len) :: restart_file
+logical :: reset_time
 
 
 !I/O prefixes
@@ -230,6 +231,8 @@ call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output','0')
 ! restart
 call prms%CreateLogicalOption('restart_from_file','restarting from file?','F')
 call prms%CreatestringOption('restart_file','restart file name')
+call prms%CreateLogicalOption('reset_time','reset the time from previous &
+                               &execution?','F')
 
 ! parameters:
 call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
@@ -304,6 +307,7 @@ call initialize_surfpan(ff_ratio_sou);
 nout = 0
 restart = getlogical(prms,'restart_from_file')
 if (restart) then
+  reset_time = getlogical(prms,'reset_time')
   restart_file = getstr(prms,'restart_file')
   call printout('RESTART: restarting from file: '//trim(restart_file))
   geo_file_name = restart_file(1:len(trim(restart_file))-11)//'geo.h5'
@@ -313,8 +317,10 @@ if (restart) then
   read(restart_file(len(trim(restart_file))-6:len(trim(restart_file))-3),*) nout 
     call printout('Identified restart from the same simulation, keeping the&
     & previous output numbering')
+    !avoid rewriting the same timestep
+    output_start = .false.
   endif
-  call load_time(restart_file, tstart)
+  if(.not. reset_time) call load_time(restart_file, tstart)
 endif
 
 
@@ -391,7 +397,7 @@ endif
 
 !------ Reloading ------
 if (restart) then
- call load_solution(restart_file,geo%components)
+ call load_solution(restart_file, geo%components, geo%refs)
  call load_wake(restart_file, wake)
 endif
 

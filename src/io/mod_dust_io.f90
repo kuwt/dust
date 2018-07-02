@@ -227,6 +227,7 @@ subroutine save_status(geo, wake,  sim_params, it, time, run_id)
   enddo
   call write_hdf5(points_w(:,:,1),'WakePoints',gloc1)
   call write_hdf5(vort_v,'WakeVort',gloc1)
+  call write_hdf5(wake%last_pan_idou,'LastPanIdou',gloc1)
   call close_hdf5_group(gloc1)
   deallocate(points_w, vort_v)
 
@@ -261,9 +262,10 @@ end subroutine save_status
 !!
 !! Loads just the bodies solution, which is stored into the components,
 !! the loading of the wakes is left to other subroutines
-subroutine load_solution(filename,comps)
+subroutine load_solution(filename,comps,refs)
  character(len=max_char_len), intent(in) :: filename
  type(t_geo_component), intent(inout) :: comps(:)
+ type(t_ref), intent(in) :: refs(0:)
 
  integer(h5loc) :: floc, gloc1, gloc2, gloc3
  integer :: ncomp, icomp, icomp2
@@ -295,6 +297,7 @@ subroutine load_solution(filename,comps)
     do icomp2 = 1,size(comps)
       if (stricmp(comp_name_read, comps(icomp2)%comp_name)) then
         !We found the correct local component, read all
+        call check_ref(gloc2, floc, refs(comps(icomp2)%ref_id))
         call open_hdf5_group(gloc2, 'Solution', gloc3)
         call read_hdf5_al(idou,'Vort',gloc3)
         call read_hdf5_al(pres,'Pres',gloc3)
@@ -325,6 +328,46 @@ subroutine load_solution(filename,comps)
 end subroutine load_solution
 
 !----------------------------------------------------------------------
+
+!> Chech that the component that we are about to load will be placed, in
+!! the actual reference frames, in the same position in which it was saved
+!!
+!! This is done comparing offsets and rotations between the actual references
+!! and the one saved
+subroutine check_ref(gloc, floc, ref)
+ integer(h5loc), intent(in) :: gloc
+ integer(h5loc), intent(in) :: floc
+ type(t_ref), intent(in)    :: ref
+
+ integer :: iref
+ integer(h5loc) :: refs_gloc, ref_loc
+ character(len=max_char_len) :: ref_title
+ real(wp) :: R(3,3), of(3)
+ character(len=*), parameter :: this_sub_name='check_ref'
+ 
+  call read_hdf5(iref, 'RefId', gloc)
+  call open_hdf5_group(floc, 'References', refs_gloc)
+  write(ref_title,'(A,I3.3)')'Ref',iref
+  call open_hdf5_group(refs_gloc, trim(ref_title), ref_loc)
+
+  call read_hdf5(R,'R',ref_loc)
+  call read_hdf5(of,'Offset',ref_loc)
+  if ((.not. all(R .eq. ref%R_g)) .or. (.not. all(of .eq. ref%of_g)) ) then
+    call warning(this_sub_name, this_mod_name, 'Mismatching initial position &
+    & while loading reference '//trim(ref%tag)//' This may lead to &
+    &unexpected behaviour')
+  endif
+  
+  
+  call close_hdf5_group(ref_loc)
+  call close_hdf5_group(refs_gloc)
+
+
+end subroutine check_ref
+
+!----------------------------------------------------------------------
+
+!> Load the time value from a result file
 subroutine load_time(filename, time)
  character(len=*), intent(in) :: filename
  real(wp), intent(out) :: time

@@ -595,15 +595,16 @@ subroutine load_wake(filename, wake)
   call open_hdf5_group(floc, 'ParticleWake', gloc)
   call read_hdf5_al(vppoints,'WakePoints',gloc)
   call read_hdf5_al(vpvort,'WakeVort',gloc)
+  call read_hdf5(wake%last_pan_idou,'LastPanIdou',gloc)
   call close_hdf5_group(gloc)
   
-  if(size(vpvort) .gt. wake%nmax_prt) call error(this_sub_name, &
+  if(size(vpvort,2) .gt. wake%nmax_prt) call error(this_sub_name, &
     this_mod_name, 'Loading a number of particles &
     & greater than the maximum allowed for this run: cannot truncate the &
     & particles in a meaningful way. Consider restarting the run with a &
     & higher amount of maximum particles')
 
-  wake%n_prt = size(vpvort)
+  wake%n_prt = size(vpvort,2)
 
   deallocate(wake%part_p)
   allocate(wake%part_p(wake%n_prt))
@@ -618,7 +619,11 @@ subroutine load_wake(filename, wake)
   do ip = 1,wake%n_prt
     wake%wake_parts(ip)%cen = vppoints(:,ip)
     wake%wake_parts(ip)%mag = norm2(vpvort(:,ip))
-    wake%wake_parts(ip)%dir = vpvort(:,ip)/wake%wake_parts(ip)%mag
+    if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
+      wake%wake_parts(ip)%dir = vpvort(:,ip)/wake%wake_parts(ip)%mag
+    else
+      wake%wake_parts(ip)%dir = vpvort(:,ip)
+    endif
     wake%wake_parts(ip)%free = .false.
     wake%part_p(ip)%p => wake%wake_parts(ip)
     wake%vort_p(ip)%p => wake%wake_parts(ip)
@@ -869,7 +874,11 @@ subroutine update_wake(wake, elems, sim_param)
           k = ip+1
           wake%n_prt = wake%n_prt+1
           wake%wake_parts(ip)%mag = norm2(partvec)
-          wake%wake_parts(ip)%dir = partvec/norm2(partvec)
+          if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
+            wake%wake_parts(ip)%dir = partvec/wake%wake_parts(ip)%mag
+          else
+            wake%wake_parts(ip)%dir = partvec
+          endif
           wake%wake_parts(ip)%cen = pos_p
           exit
         endif
