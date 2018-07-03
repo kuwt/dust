@@ -118,10 +118,11 @@ end subroutine dat_out_probes
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_sectional ( basename , y_cen , time , sec_loads , &
+subroutine dat_out_sectional ( basename , y_cen , y_span , time , sec_loads , &
               ref_mat , off_mat )
  character(len=*) , intent(in) :: basename
  real(wp) , intent(in) :: y_cen(:)
+ real(wp) , intent(in) :: y_span(:)
  real(wp) , intent(in) :: time(:)
  real(wp) , intent(in) :: sec_loads(:,:,:)
  real(wp) , intent(in) :: ref_mat(:,:)
@@ -159,8 +160,9 @@ subroutine dat_out_sectional ( basename , y_cen , time , sec_loads , &
    open(unit=fid,file=trim(filename))
    ! Header -----------
    write(fid,'(A)') '# TODO: component name and other beautiful stuff '
-   write(fid,'(A,I0,A,I0)') '# n_sec : ' , size(sec_loads,2) , ' ; n_time : ' , nt
+   write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(sec_loads,2) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
    write(fid,*) y_cen 
+   write(fid,*) y_span
    write(fid,'(A)') '# t , sec(n_sec) , ref_mat(9) , ref_off(3) ' 
    ! Dump data --------
    do it = 1 , nt 

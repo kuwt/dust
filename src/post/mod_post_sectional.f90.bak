@@ -47,8 +47,7 @@ implicit none
 type t_box_secloads
   integer :: nelems
   integer  , allocatable :: elems(:)
-  real(wp) , allocatable :: fracs(:)
-  real(wp) , allocatable :: cen(:,:)
+! real(wp) , allocatable :: element_fraction(:)
 end type t_box_secloads
 
 public :: post_sectional
@@ -104,12 +103,12 @@ real(wp) , allocatable :: sec_loads(:,:,:)
 integer :: is 
 integer :: n_loads = 4   ! F and moment around an axis
 real(wp) , allocatable :: ref_mat(:,:) , off_mat(:,:)
-real(wp) , allocatable :: y_cen(:) , y_span(:)
+real(wp) , allocatable :: y_cen(:)
 real(wp) , parameter   :: tol_y_cen = 1.0e-3_wp
 real(wp) , allocatable :: r_axis(:,:) , r_axis_bas(:,:)
 
 real(wp) :: F_bas(3) , F_bas1(3)
-real(wp) :: M_bas(3) , M_bas1(3)
+real(wp) :: M_bas(3)
 integer :: ie , ic , it , i1
 
 ! sectional loads: box -------------------------------------
@@ -120,7 +119,7 @@ logical :: reshape_box
 real(wp) :: nCoordMaxBox
 real(wp) , allocatable :: box_coord(:,:) , box_coord_tmp(:,:) , box_coord_rotated(:,:)
 real(wp) :: vVec(3) , bVec(3) , wVec(3) , baseLen(2) , heigLen(2) , spanLen
-real(wp) :: nVec(3) , ref_node(3) ! , axis_mom(3)
+real(wp) :: nVec(3) ! , axis_mom(3)
 real(wp) :: nCoordMax , nCoordMin
 real(wp) :: nCoord , dnCoord
 real(wp) , allocatable :: nCoordSec(:)
@@ -131,17 +130,6 @@ real(wp) :: b1Vec(3) , b2Vec(3)
 type(t_box_secloads) , allocatable  :: box_secloads(:)
 real(wp) :: distance(4)
 real(wp) , parameter :: nCoord_relOff = 0.05_wp
-! "extra-param". TODO: check if they are called before #### box
-real(wp) :: nCoordVert(4)   ! TRI o QUAD elements
-integer  :: secVert(4)   ! TRI o QUAD elements
-real(wp) :: interSectPoints(3,2)
-real(wp) :: interSectAreas(2) , interSectCen(3,2)
-integer  :: nInterSect , index2
-real(wp) :: node1(3) , node2(3) , box_secloads_cen(3)
-integer  :: iSec1 , iSec2 , sec1_nVer , sec2_nVer
-integer  :: iSecWork , iSecOth
-integer  :: nNodeInt(2,2)
-integer  :: nver , iv 
 
 character(len=max_char_len) :: filename
 
@@ -263,14 +251,12 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
     ! panel in chord. Then the distance between the <ax_coor> of the centre
     ! of the other panels and y_cen is checked
     !TODO: find y-coord is general enough for all the 'parametric' components
-    allocate(y_cen(n_sect),y_span(n_sect)) 
+    allocate(y_cen(n_sect)) 
     ie = 0  
     do is = 1 , n_sect
       ie = ie + 1
       y_cen(is) = sum(comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver)) / &
                   dble(comps(id_comp)%el(ie)%n_ver)
-      y_span(is) = abs ( comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver(1) ) - &
-                         comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver(2) ) )
       do ic = 2 , nelem_chor ! check 
         ie = ie + 1
         if ( abs( y_cen(is) - & !comps(id_comp)%el(ie)%cen(2) ) .gt. tol_y_cen ) then
@@ -349,11 +335,11 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
     
         ! From global to local coordinates of forces and moments 
         sec_loads(ires,is,1:3) = matmul( &
-             transpose( refs_R(:,:, ref_id) ) , F_bas ) / y_span(is)
+             transpose( refs_R(:,:, ref_id) ) , F_bas )
         ! moment ( only the component around the <ax_coord> )
         M_bas = matmul( &
              transpose( refs_R(:,:, ref_id) ) , M_bas )
-        sec_loads(ires,is,4) = M_bas(ax_coor) / y_span(is)
+        sec_loads(ires,is,4) = M_bas(ax_coor)
     
       end do ! loop over sections
     
@@ -365,13 +351,13 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
     
     write(filename,'(A)') trim(basename)//'_'//trim(an_name) ! and then appen Fx,Fy,Fz,M
     write(*,*) ' +++++++ size(y_cen) : ' , size(y_cen)
-    call dat_out_sectional ( filename , y_cen , y_span , time , sec_loads , &
+    call dat_out_sectional ( filename , y_cen , time , sec_loads , &
                               ref_mat , off_mat ) 
     
     write(*,*) nl//nl//' end of sectional loads'//nl//nl
     
     deallocate(r_axis,r_axis_bas)
-    deallocate(y_cen,y_span)
+    deallocate(y_cen)
     deallocate(sec_loads,time,ref_mat,off_mat)
   
   
@@ -384,8 +370,8 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
   
     ! Read input for box and build the 8 nodes of the box ----------------------------- 
     call getsuboption(sbprms,'BoxSect',bxprms)
-    allocate(box_coord(8,3),box_coord_tmp(8,3))
-    ref_node = getrealarray(bxprms,'refNode',3)
+    allocate(box_coord(8,3))
+    box_coord(1,:) = getrealarray(bxprms,'refNode',3)
     vVec = getrealarray(bxprms,'faceVec',3)
     baseLen = getrealarray(bxprms,'faceBas',2) 
     heigLen = getrealarray(bxprms,'faceHei',2) 
@@ -408,7 +394,6 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
     write(*,*) ' v : ' , vVec
     write(*,*) ' w : ' , wVec
 
-    box_coord(1,:) = ref_node
     box_coord(2,:) = box_coord(1,:) + baseLen(1) * vVec  
     box_coord(3,:) = box_coord(2,:) + heigLen(1) * wVec  
     box_coord(4,:) = box_coord(1,:) + heigLen(1) * wVec  
@@ -461,9 +446,8 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
 
       write(*,*) ' Reshape box: ' , reshape_box , nl
 
-!     ! Update box corners: update only if the box is too large 
-!     allocate(box_coord_tmp(8,3))
-      box_coord_tmp = 0.0_wp
+      ! Update box corners: update only if the box is too large 
+      allocate(box_coord_tmp(8,3))
       ! check
       write(*,*) ' nCoordMaxBox : ' , nCoordMaxBox 
       box_coord_tmp(1,:) = box_coord(1,:) + ( box_coord(5,:) - box_coord(1,:) ) * nCoordMin / spanLen
@@ -477,7 +461,7 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
 
       box_coord = box_coord_tmp
 
-!     deallocate(box_coord_tmp)
+      deallocate(box_coord_tmp)
       !check
       write(*,*) ' Updated box_coord : ' 
       do i1 = 1 ,8 
@@ -506,26 +490,6 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
       write(*,*)  ' nCoordSec(  ',is+1,') : ' , '                            ', nCoordSec(is+1)
     end do
 
-    !TODO: use generalised version of this formula.
-    ! this is valid only if nVec = yVec  
-    allocate(y_cen( n_sect)) ; y_cen = nCoordCen(2,:) ! TODO: ask if this offset is required: + ref_node(2)
-    allocate(y_span(n_sect)) ; y_span= nCoordSec(2:) - nCoordSec(1:n_Sect) 
-
-    allocate(r_axis(3,n_sect),r_axis_bas(3,n_sect))
-    do is = 1 , n_sect
-      r_axis(:,is) = axis_nod + &
-              ( y_cen(is) - axis_nod(2) )/axis_dir(2) * axis_dir
-    end do
-    !debug
-    write(*,*) ' r_axis : '
-    do is = 1 , n_sect
-      write(*,*) r_axis(:,is)
-    end do
-    ! only initialisation here:
-    ! - r_axis: coordinates in the local ref.frame
-    ! - r_axis_bas: coordinates in the base ref.frame
-    r_axis_bas = r_axis
-
     ! Define the unit normal vectors to the 4 planar lateral faces of the boxes
     !    and the reference point, used as the origin for measuring distance from the plane
     refPoiLateralFaces(:,1) = box_coord(1,:)
@@ -534,7 +498,7 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
     refPoiLateralFaces(:,4) = box_coord(4,:)
 
     b1Vec = box_coord(6,:) - box_coord(2,:) ; b1Vec = b1Vec / norm2(b1Vec) 
-    b2Vec = box_coord(8,:) - box_coord(4,:) ; b2Vec = b2Vec / norm2(b2Vec) 
+    b2Vec = box_coord(8,:) - box_coord(4,:) ; b2Vec = b2Vec / norm2(b2Vec)  
     normalLateralFaces(:,1) =  cross( bVec,wVec) / norm2(cross( bVec,wVec))
     normalLateralFaces(:,2) =  cross( vVec,bVec) / norm2(cross( vVec,bVec))
     normalLateralFaces(:,3) = -cross(b1Vec,wVec) / norm2(cross(b1Vec,wVec))
@@ -549,371 +513,64 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
 ! ######################################################################    
 ! #      TO BE CHECKED       ###########################################    
 ! ######################################################################    
-    ! Find the elements belonging to each section ---------------
+    ! Find the elements belonging to each section ---------------------------------------
     ! allocate and initialise
-    allocate(box_secloads(0:n_sect+1))
-    do is = 0 , n_sect+1 ! 0,n_sect+1 to add dummy ghost extrem sections
+    allocate(box_secloads(n_sect))
+    do is = 1 , n_sect
       box_secloads(is)%nelems = 0 
       allocate(box_secloads(is)%elems(size(comps(id_comp)%el))) ; box_secloads(is)%elems = -333
-      allocate(box_secloads(is)%fracs(size(comps(id_comp)%el))) ; box_secloads(is)%fracs = -333.3_wp
-      allocate(box_secloads(is)%cen(3,size(comps(id_comp)%el))) ; box_secloads(is)%cen   = -333.3_wp
     end do
 
-!   ! debug
-!   write(*,*) ' id_comp : ' , id_comp
-!   write(*,*) ' debug: comps%el%cen : '
+    do ie = 1 , size(comps(id_comp)%el)
 
-    do ie = 1 , size(comps(id_comp)%el) ! loop over elems
-
-      ! Reset some useful variables ----------------------------- 
-      nCoordVert = 0.0_wp
-      secVert = 0
-      interSectPoints = 0.0_wp
-      interSectAreas  = 0.0_wp
-      nInterSect = 0
-      nNodeInt = 0
-      nver = comps(id_comp)%el(ie)%n_ver 
-
-      ! Compute cen and area of the elements --------------------
-      ! since no prepare or load geom has been called yet.
-      ! TODO: move this part in the time loop, first timestep
-      ! compute the centre and the area of the element
+      ! compute the centre of the element
       comps(id_comp)%el(ie)%cen =  &
         sum(comps(id_comp)%loc_points(:,comps(id_comp)%el(ie)%i_ver-comps(id_comp)%i_points(1)+1),2) / &
                   dble(comps(id_comp)%el(ie)%n_ver)
-      comps(id_comp)%el(ie)%area =  0.5_wp * norm2( &
-                  cross ( comps(id_comp)%loc_points(:,comps(id_comp)%el(ie)%i_ver(3)) - & 
-                          comps(id_comp)%loc_points(:,comps(id_comp)%el(ie)%i_ver(1)) , & 
-                          comps(id_comp)%loc_points(:,comps(id_comp)%el(ie)%i_ver(2)) - & 
-                          comps(id_comp)%loc_points(:,comps(id_comp)%el(ie)%i_ver(nver)) ) )
-!     !debug
-!     write(*,*) nl//' comps(id_comp)%el(ie)%cen : ' , comps(id_comp)%el(ie)%cen 
-
-      ! Compute the distance of the centre of the elem from -----
-      ! lateral faces of the box
+!     write(*,*) nl , ' comps(id_comp)%el(ie)%cen : ' , comps(id_comp)%el(ie)%cen , nl
+      !TODO: check the vertices of the elements. 
+      ! Up to now, only rough check on the centres of the elements
       do i1 = 1 , 4
         distance(i1) = sum ( ( comps(id_comp)%el(ie)%cen - refPoiLateralFaces(:,i1) ) * normalLateralFaces(:,i1) )
-!       !debug
 !       write(*,*) distance(i1)
-      end do      
+      end do 
 
-      ! if the centre of the element belongs to the box -> compute the slice contributions
       if ( all( distance .gt. 0.0_wp ) ) then
 
-        ! nCoord of the cen of the elem (useless??)
         nCoord = sum ( ( comps(id_comp)%el(ie)%cen - refPoiLateralFaces(:,1) ) * nVec )
 
-        ! nCoord of the vertices of the elem ( (r-refPoi(1))\cdot nVec )
-        do iv = 1 , nver
-          nCoordVert(iv) = &
-             sum ( ( comps(id_comp)%loc_points(:, &
-                                      comps(id_comp)%el(ie)%i_ver(iv) ) &
-                     - refPoiLateralFaces(:,1) ) * nVec )
-        end do
- 
-        ! elems with at least one point s.t. nCoor \in (nCoorMix,nCoorMax) 
-        if ( ( maxval(nCoordVert) .ge. 0.0_wp ) .and. &
-             ( minval(nCoordVert) .le. nCoordMax-nCoordMin ) ) then
-
-           ! find the sections where the ver of the elem belong -------------
-           ! !!! if the one vert is outside the box, secVert keep 0 value !!!
-           do iv = 1 , nver
-             if ( nCoordVert(iv) - nCoordSec(n_sect+1) .gt. 0.0_wp  ) then
-                 secVert(iv) = n_sect + 1
-             elseif ( nCoordVert(iv) - nCoordSec(1) .le. 0.0_wp  ) then
-                 secVert(iv) = 0
-             else
-               do is = 1 , n_sect !TODO: improve this loop; exit when found
-                 if ( ( nCoordVert(iv) - nCoordSec(is)   .gt. 0.0_wp ) .and. & 
-                      ( nCoordVert(iv) - nCoordSec(is+1) .le. 0.0_wp ) ) then
-                   secVert(iv) = is
-                 end if 
-               end do
-             end if 
-           end do
-           write(*,*) ' secVert : ' , secVert(1:nver)
-
-           ! If the elements belong to: -------------------------------------
-           ! (a) .gt. 2 sections ----> error.
-           ! (b) .eq. 1 section  ----> easy  
-           ! (c) .eq. 2 section  ----> find intersections and partial contributions
-           !                          to the sections
-
-           ! (a) check if the elements belong to less than three sections --> otherwise ERROR
-           if ( maxval(secVert(1:nver) ) & 
-              - minval(secVert(1:nver) ) .gt. 1 ) then
-             write(*,*) ' comps(id_comp)%comp_name : ' , comps(id_comp)%comp_name 
-             write(*,*) ' ie : ' , ie  
-             write(*,*) ' secVert : ' , secVert(1:nver)
-             call warning('dust_post','','The element above belongs to more than two&
-                  & sections in sectional_loads analysis. STOP')
-             return
-           end if
-           ! (b)
-           if ( all(  secVert .eq. secVert(1) ) ) then
-             box_secloads(secVert(1))%nelems = box_secloads(secVert(1))%nelems + 1
-             box_secloads(secVert(1))%elems(box_secloads(secVert(1))%nelems) = ie
-             box_secloads(secVert(1))%fracs(box_secloads(secVert(1))%nelems) = 1.0_wp
-             box_secloads(secVert(1))%cen(:,box_secloads(secVert(1))%nelems) = & 
-                                                            comps(id_comp)%el(ie)%cen  
-           else !(c)
-
-             !TODO: treat elements partially belonging to the box.  if ( ... )
-
-             ! Find intersections with the plane delimiting the sections ----
-             do iv = 1 , nver
-
-               index2 = mod(iv,comps(id_comp)%el(ie)%n_ver)+1 ! following node
-
-               ! if two consecutive nodes belong to different sections
-               !  ---> find intersection 
-               if ( secVert( index2 ) .ne. secVert(iv) ) then
-                 nInterSect = nInterSect + 1
-                 node1 = comps(id_comp)%loc_points(:, comps(id_comp)%el(ie)%i_ver(iv) )
-                 node2 = comps(id_comp)%loc_points(:, comps(id_comp)%el(ie)%i_ver(index2) ) 
-                 interSectPoints(:,nInterSect) = node1 + (node2-node1) * &
-                      ( nCoordSec( max( secVert(iv), secVert(index2) ) ) - nCoordVert(iv) ) / &
-                      ( nCoordVert(index2) - nCoordVert(iv) )  ! ^---- max(.,.): id. of the section
-
-                 if ( secVert(iv) .eq. secVert(1) ) then ! sec.1
-                   nNodeInt(1,nInterSect) = iv     ; nNodeInt(2,nInterSect) = index2
-                 else ! sec.2
-                   nNodeInt(1,nInterSect) = index2 ; nNodeInt(2,nInterSect) = iv
-                 end if
-
-               end if
-             end do
-
-             ! Count the nodes belonging to the splitted elem ---------------
-             iSec1 = secVert(1) ; sec1_nVer = 1 ; sec2_nVer = 0
-             do iv = 2 , comps(id_comp)%el(ie)%n_ver
-               if ( secVert(iv) .ne. iSec1 ) then
-                 iSec2 = secVert(iv) ; sec2_nVer = sec2_nVer + 1
-               else
-                 sec1_nVer = sec1_nVer + 1
-               end if
-             end do
-
-             ! Compute the area of the subelem with the minimum n.of points -
-             !  (since it could be only TRI or QUAD) and compute the area of
-             !  the othe elem as a difference.
-             if ( sec1_nVer .le. sec2_nVer ) then
-               if ( sec1_nVer .gt. 2 ) then
-                  write(*,*) ' error in sectional loads . stop ' ; stop
-               end if
-
-               interSectAreas(1) = 0.5_wp * norm2( &
-                    cross( interSectPoints(:,2) - comps(id_comp)%loc_points(:, &
-                             comps(id_comp)%el(ie)%i_ver( nNodeInt(1,1) ) ) , &
-                           interSectPoints(:,1) - comps(id_comp)%loc_points(:, &
-                             comps(id_comp)%el(ie)%i_ver( nNodeInt(1,2) ) ) ) ) ! nNodes(2,iSec1) ) )
-               interSectAreas(2) = comps(id_comp)%el(ie)%area - interSectAreas(1)
-
-               if ( sec1_nVer .eq. 1 ) then
-                 interSectCen(:,1) = ( interSectPoints(:,1) + interSectPoints(:,2) + & 
-                      comps(id_comp)%loc_points(:, &
-                            comps(id_comp)%el(ie)%i_ver(nNodeInt(1,1)) ) ) / 3.0_wp
-               elseif ( sec1_nVer .eq. 2 ) then
-                 interSectCen(:,1) = ( interSectPoints(:,1) + interSectPoints(:,2) + & 
-                      comps(id_comp)%loc_points(:, &
-                            comps(id_comp)%el(ie)%i_ver(nNodeInt(1,1)) ) + &
-                      comps(id_comp)%loc_points(:, &
-                            comps(id_comp)%el(ie)%i_ver(nNodeInt(1,2)) ) ) / 4.0_wp
-               else
-                 write(*,*) 
-               end if
-               interSectCen(:,2) = ( comps(id_comp)%el(ie)%area * comps(id_comp)%el(ie)%cen - &
-                       interSectAreas(1) * interSectCen(:,1) ) / interSectAreas(2)
-
-!              write(*,*) ' el%area : ' , comps(id_comp)%el(ie)%area 
-!              write(*,*) ' interSectArea([1,2]) : ' , interSectAreas(1) , interSectAreas(2)
-             else
-               if ( sec2_nVer .gt. 2 ) then
-                  write(*,*) ' error in sectional loads . stop ' ; stop
-               end if
-
-               interSectAreas(2) = 0.5_wp * norm2( &
-                    cross( interSectPoints(:,2) - comps(id_comp)%loc_points(:, &
-                             comps(id_comp)%el(ie)%i_ver( nNodeInt(2,1) ) ) , &
-                           interSectPoints(:,1) - comps(id_comp)%loc_points(:, &
-                             comps(id_comp)%el(ie)%i_ver( nNodeInt(2,2) ) ) ) ) ! nNodes(2,iSec1) ) )
-               interSectAreas(1) = comps(id_comp)%el(ie)%area - interSectAreas(2)
-
-               if ( sec2_nVer .eq. 1 ) then
-                 interSectCen(:,2) = ( interSectPoints(:,1) + interSectPoints(:,2) + & 
-                      comps(id_comp)%loc_points(:, &
-                            comps(id_comp)%el(ie)%i_ver(nNodeInt(2,1)) ) ) / 3.0_wp
-               elseif ( sec2_nVer .eq. 2 ) then
-                 interSectCen(:,2) = ( interSectPoints(:,1) + interSectPoints(:,2) + & 
-                      comps(id_comp)%loc_points(:, &
-                            comps(id_comp)%el(ie)%i_ver(nNodeInt(2,1)) ) + &
-                      comps(id_comp)%loc_points(:, &
-                            comps(id_comp)%el(ie)%i_ver(nNodeInt(2,2)) ) ) / 4.0_wp
-               else
-                 write(*,*) 
-               end if
-               interSectCen(:,1) = ( comps(id_comp)%el(ie)%area * comps(id_comp)%el(ie)%cen - &
-                       interSectAreas(2) * interSectCen(:,2) ) / interSectAreas(1)
-!              write(*,*) ' el%area : ' , comps(id_comp)%el(ie)%area 
-!              write(*,*) ' interSectArea([2,1]) : ' , interSectAreas(2) , interSectAreas(1)
-
-             end if
-
-             ! Update structures
-             box_secloads(isec1)%nelems = box_secloads(isec1)%nelems + 1
-             box_secloads(isec1)%elems(box_secloads(isec1)%nelems) = ie
-             box_secloads(isec1)%fracs(box_secloads(isec1)%nelems) = interSectAreas(1) / comps(id_comp)%el(ie)%area 
-             box_secloads(isec1)%cen(:,box_secloads(isec1)%nelems) = interSectCen(:,1) 
-             box_secloads(isec2)%nelems = box_secloads(isec2)%nelems + 1
-             box_secloads(isec2)%elems(box_secloads(isec2)%nelems) = ie
-             box_secloads(isec2)%fracs(box_secloads(isec2)%nelems) = interSectAreas(2) / comps(id_comp)%el(ie)%area 
-             box_secloads(isec2)%cen(:,box_secloads(isec2)%nelems) = interSectCen(:,2) 
-
-
-           end if
-
-        end if ! elems with at least one point s.t. nCoor \in (nCoorMix,nCoorMax)
-
-      end if ! centre of the elems between the lateral faces of the box
-
-    end do ! loop over elems
+        if ( ( nCoord .ge. 0.0_wp ) .and. ( nCoord .le. nCoordMax-nCoordMin ) ) then
+!         write(*,*) ' nCoord : ' , nCoord
+          ! Find the slice and update the structure
+          do is = 1 , n_sect
+            if ( ( nCoord - nCoordSec(is)   .gt. 0.0_wp ) .and. & 
+                 ( nCoord - nCoordSec(is+1) .lt. 0.0_wp ) ) then
+              box_secloads(is)%nelems = box_secloads(is)%nelems + 1
+              box_secloads(is)%elems(box_secloads(is)%nelems) = ie
+            end if
+          end do
+        end if
+      end if
+    end do 
 
     ! check ----
     do is = 1 , n_sect
       write(*,*) ' box_secloads(',is,')%nelems = ' , box_secloads(is)%nelems
     end do
 
-    ! Allocations and time loop ++++++++++++++++++++++++++++++++++++++++++++++++++
-
-    ! Find the id of the reference where the loads must be projected -------------
-    write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',an_start,'.h5'
-    call open_hdf5_file(trim(filename),floc)
-    call load_refs(floc,refs_R,refs_off) ! ,refs_G,refs_f,refs_tag)
-    call close_hdf5_file(floc) 
-
-!   ref_id = -333
-!   do it = lbound(refs_tag,1) , ubound(refs_tag,1)
-!     if ( stricmp(refs_tag(it),  comps(id_comp)%ref_tag) ) ref_id = it
-!   end do
-!   if ( ref_id .eq. -333 ) then 
-!     write(*,*)
-!     write(*,*) ' Available references systems: '
-!     do it = lbound(refs_tag,1) , ubound(refs_tag,1)
-!       write(*,*) ' ref_id : ' , it , ' ref_tag ' , trim(refs_tag(it))
-!     end do
-!     call error('dust_post','','Unknown ref.sys. defined for loads output.&
-!          & Your input in dust_post.in is '//trim(ref_tag)//'. All the&
-!          & available ref.sys. are listed above.')
-!   end if
-!   write(*,*) ' Available references systems: '
-!   do it = lbound(refs_tag,1) , ubound(refs_tag,1)
-!     write(*,*) ' ref_id : ' , it , ' ref_tag ' , trim(refs_tag(it))
-!   end do
-!   write(*,*) ' ref_id for force and moment projection : ' , ref_id
-
-    ref_id = comps(id_comp)%ref_id
-    !check
-    write(*,'(A,I0,A)') ' ref. for force and moment projection (', &
-         ref_id , ')  '//trim(comps(id_comp)%ref_tag)
-
-    ! allocate tmp array to store the results --------------
-    n_time = (an_end-an_start)/an_step + 1 ! int general eger division
-    allocate( sec_loads(n_time,n_sect,n_loads) ) ; sec_loads = -333.0_wp ! initialisation for DEBUG
-    allocate( time(n_time) ) ; time = -333.0_wp
-    allocate( ref_mat(n_time,9) , off_mat(n_time,3) ) 
-    ires = 0
-    do it = an_start, an_end, an_step
-
-      write(*,*) ' it : ' , it
-      ires = ires + 1
-      
-      ! Open the file:
-      write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
-      call open_hdf5_file(trim(filename),floc)
-
-      ! Load the references and move the points ---
-      call load_refs(floc,refs_R,refs_off)
-      ! Move the points ---------------------------
-      call update_points_postpro(comps, points, refs_R, refs_off)
-      ! Load the results --------------------------
-      call load_res(floc, comps, vort, cp, t)
-
-      call close_hdf5_file(floc)
-
-      !TODO: projection step to local frame
-      ! ...
-      do is = 1 , n_sect
-
-        ! from local coordinates to coordinates in the base ref.frame
-        r_axis_bas(:,is) = matmul( refs_R(:,:,ref_id) , r_axis(:,is) ) + &
-                           refs_off(:,ref_id)
-
-        ! force
-        F_bas = 0.0_wp ; M_bas = 0.0_wp 
-        do ie = 1 , box_secloads(is)%nelems
-
-          !from local coordinates to coordinates in the base ref.frame
-          box_secloads_cen = matmul( refs_R(:,:,ref_id) , &
-                                     box_secloads(is)%cen(:,ie) ) 
-          
-          F_bas1 = comps(id_comp)%el( box_secloads(is)%elems(ie) )%dforce * &
-                                      box_secloads(is)%fracs(ie)
-          F_bas  = F_bas + F_bas1
-          !TODO: add moment (it requires axis computation)
-!         !debug
-!         write(*,*) ' r : ' , box_secloads_cen - r_axis_bas(:,is) 
-!         write(*,*) ' F : ' , F_bas1
-          M_bas  = M_bas + cross( box_secloads_cen - &
-                                  r_axis_bas(:,is) , F_bas1 )
-!         ! debug
-!         write(*,*) 'sec_cen :', box_secloads(is)%cen(:,ie)
-!         write(*,*) 'r_axis_bas:', r_axis_bas(:,is)  
-!         write(*,*) box_secloads(is)%cen(:,ie) - r_axis_bas(:,is)  
-          ! ...
-        end do
-!       stop
-!       !debug
-!       write(*,*) ' |F|,|M|: ' , norm2(F_bas) , norm2(M_bas)
-
-        ! From global to local coordinates of forces and moments 
-        sec_loads(ires,is,1:3) = matmul( &
-             transpose( refs_R(:,:, ref_id) ) , F_bas ) / y_span(is)
-        ! TODO: moment
-        ! moment ( only the component around the <ax_coord> )
-        M_bas = matmul( &
-             transpose( refs_R(:,:, ref_id) ) , M_bas )
-        sec_loads(ires,is,4) = M_bas(2) / y_span(is)
-      end do
-
-!     write(*,*) ' l.880'
-!     stop
-      ref_mat(ires,:) = reshape(refs_R(:,:,ref_id),(/ 9 /))
-      off_mat(ires,:) = refs_off(:,ref_id)
-      time(ires) = t
-
-    end do
-
-    write(filename,'(A)') trim(basename)//'_'//trim(an_name) ! and then appen Fx,Fy,Fz,M
-    write(*,*) ' +++++++ size(y_cen) : ' , size(y_cen)
-    call dat_out_sectional ( filename , y_cen , y_span , time , sec_loads , &
-                              ref_mat , off_mat ) 
-
-    write(*,*) nl//nl//' end of sectional loads'//nl//nl
 ! ######################################################################    
 ! #      TO BE CHECKED       ###########################################    
 ! ######################################################################    
 
 
     ! destroy box_secloads structure
-    do is = lbound(box_secloads,1) , ubound(box_secloads,1)
+    do is = 1 , size(box_secloads)
       deallocate(box_secloads(is)%elems)
-      deallocate(box_secloads(is)%fracs)
     end do
 
-    deallocate(r_axis,r_axis_bas)
     deallocate(nCoordSec,nCoordCen)
-    deallocate(box_coord_tmp,box_coord)
-    deallocate(y_cen,y_span) 
+    deallocate(box_coord)
+  
   
   case default
   !  call error()
