@@ -665,12 +665,20 @@ subroutine create_local_velocity_stencil_surfpan (this)
   allocate(this%pot_vel_stencil(3,this%n_ver) )
 
   surf_bubble = this%area
+! !debug
+! write(*,*) ' surf_bubble : ' , surf_bubble
 
   do i_v = 1 , this%n_ver
 
     ! Update surf_bubble
     !sum the contribuition only if the neighbour is really present 
     if(associated(this%neigh(i_v)%p)) then
+!     !debug
+!     write(*,*) ' iv , associated(this%neigh(iv)) ' , i_v , associated(this%neigh(i_v)%p)
+!     write(*,*) ' n_ver : ' , this%n_ver
+!     write(*,*) this%neigh(i_v)%p%id
+!     write(*,*) this%neigh(i_v)%p%area
+!     write(*,*) this%neigh(i_v)%p%n_ver
       surf_bubble = surf_bubble + &
          this%neigh(i_v)%p%area / real(this%neigh(i_v)%p%n_ver,wp)
     endif

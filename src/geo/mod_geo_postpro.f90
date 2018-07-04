@@ -434,8 +434,8 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
   call open_hdf5_group(floc,'Components',gloc)
   call read_hdf5(n_comp_tot,'NComponents',gloc)
 
-! !DEBUG
-! write(*,*) nl//' All the components: '
+  !DEBUG
+  write(*,*) nl//' All the components: '
   allocate(components(n_comp_tot))
   do i_comp_tot = 1 , n_comp_tot
     write(cname,'(A,I3.3)') 'Comp',i_comp_tot
@@ -443,8 +443,8 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
     call read_hdf5(components(i_comp_tot),'CompName',cloc)
     call read_hdf5(comp_input,'CompInput',cloc)
     call close_hdf5_group(cloc)
-!   !DEBUG
-!   write(*,*) trim(components(i_comp_tot))
+    !DEBUG
+    write(*,*) trim(components(i_comp_tot)) , ' ; ' , trim(comp_input)
   end do
   
 ! if ( allocated(components_names) ) then
@@ -459,7 +459,18 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
 ! comp_name: all the components of the model (blades: Hub01__01, ..., Hub01__Nb)
 ! comp_name_stripped: Hub01__01, ..., Hub01__Nb  ---> Hub01
 ! multiple components: if components_names(i1) is <Hub>, then add all the blades to the output
- 
+
+  !debug
+  write(*,*) nl//' debug in mod_geo_postpro.f90  ******** '
+  write(*,*) ' n_comp_tot : ' , n_comp_tot , ' size(components_names) : ' , size(components_names)
+  write(*,*) ' allocated(components_names) : ' , allocated(components_names)
+  do i1 = 1 , size(components_names)
+    write(*,*) trim(components_names(i1))
+  end do
+  write(*,*)
+
+! TODO: check user inputs ( to avoid rotorll and rotorll__01 to be considered twice )
+! TODO: check multiple components ( double if statementes ... )
   allocate(components_tmp(n_comp_tot))
   i_comp_tmp = 0 
   if ( allocated(components_names) ) then
@@ -468,17 +479,25 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       do i2 = 1 , n_comp_tot
         
         call strip_mult_appendix(components(i2), component_stripped, '__') 
-        
+
+        !debug
+        write(*,*) ' ++ : ' , trim(components(i2)) , ' , ' ,trim(component_stripped)
+
+        ! CASE #1. Ex.: components_names(i1) .eq. rotorll 
         if ( trim(components_names(i1)) .eq. trim(component_stripped) ) then
           i_comp_tmp = i_comp_tmp + 1
           components_tmp(i_comp_tmp) = trim(components(i2))
 !debug   !write(*,*) ' a. +1 '
-        end if
 
-        if ( trim(components_names(i1)) .eq. trim(components(i2)) ) then
-          i_comp_tmp = i_comp_tmp + 1
-          components_tmp(i_comp_tmp) = trim(components(i2))
-!debug   !write(*,*) ' b. +1 '
+        else
+
+! **** Encapsulated if stat **** for debug
+          if ( trim(components_names(i1)) .eq. trim(components(i2)) ) then
+            i_comp_tmp = i_comp_tmp + 1
+            components_tmp(i_comp_tmp) = trim(components(i2))
+!debug     !write(*,*) ' b. +1 '
+          end if
+
         end if
 
       end do
@@ -503,6 +522,11 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
 
   end if
 
+  !debug
+  write(*,*) ' At the end of load_components_postpro '
+  write(*,*) ' allocated(comps) : ' , allocated(comps)
+
+
 ! !DEBUG
 ! i_comp_tot = size(components_names)
 ! write(*,*) ' i_comp_tot : ' , i_comp_tot
@@ -511,15 +535,27 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
 !   write(*,*) i_comp_tot , ' : ' , trim(components_names(i_comp_tot))
 ! end do
 
+
+! !debug
+! write(*,*) ' n_comp_tot : ' , n_comp_tot
+! write(*,*) ' components_names : '
+! do i_comp = 1 , size(components_names)
+!   write(*,*) trim(components_names(i_comp))
+! end do
+ 
 !  allocate(comps(n_comp))
   nelem = 0
-  i_comp = 0; n_comp = 0 
+  i_comp = 0; n_comp = 0
   do i_comp_tot = 1,n_comp_tot
     
     write(cname,'(A,I3.3)') 'Comp',i_comp_tot
     call open_hdf5_group(gloc,trim(cname),cloc)
     
     call read_hdf5(comp_name,'CompName',cloc)
+    call read_hdf5(comp_input,'CompInput',cloc)
+
+!   write(*,*) ' i_comp_tot ' , i_comp_tot
+!   write(*,*) ' CompName : ' , trim(comp_name)
 
     !Strip the appendix of multiple components, to load all the multiple
     !components at once
@@ -530,7 +566,14 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
 !   if(IsInList(comp_name_stripped, components_names) .or. all_comp) then
 !   write(*,*) ' all_comp  :' , all_comp
 !   write(*,*) ' comp_name :' , trim(comp_name)
+
+    !debug
+    write(*,*) ' comp_name : ' , trim(comp_name)
+
     if(IsInList(comp_name, components_names) .or. all_comp) then
+
+!    !debug
+!     write(*,*) ' **** '
 
       i_comp = i_comp+1; n_comp = n_comp+1
       allocate(comp_temp(n_comp))
@@ -556,6 +599,10 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       call open_hdf5_group(cloc,'Geometry',geo_loc)
       call read_hdf5_al(ee   ,'ee'   ,geo_loc)
       call read_hdf5_al(rr   ,'rr'   ,geo_loc)
+
+      write(*,*) ' comp_name, _input : ' , trim(comps(i_comp)%comp_name) , &
+                 ' ;   ' ,  trim(comps(i_comp)%comp_input) // nl
+      
 
       if ( trim(comps(i_comp)%comp_input) .eq. 'parametric' ) then
         call read_hdf5( parametric_nelems_span ,'parametric_nelems_span',geo_loc)
@@ -684,7 +731,6 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
 
   !  enddo
   !enddo
-
 
 
 end subroutine load_components_postpro

@@ -237,6 +237,8 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, &
  integer :: p1, p2
  real(wp) :: dist(3) , vel_te(3)
 
+! real(wp) , parameter :: te_min_v = 1.0_wp ! hard-coded
+! replaced with sim_param%min_vel_at_te
 
   !panel wake: set and allocate all the relevant variables
   wake%nmax_pan = npan
@@ -361,9 +363,18 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, &
             geo%refs(wake%pan_gen_ref(ip))%G_g, &
             geo%refs(wake%pan_gen_ref(ip))%f_g, &
             vel_te )
-    wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-                dist*sim_param%first_panel_scaling* &
-                norm2(sim_param%u_inf-vel_te)*sim_param%dt
+    if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
+      wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
+                  dist*sim_param%first_panel_scaling* &
+                  norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist)
+  ! normalisation occurs here! --------------------------------------^
+!     write(*,*) ' iii '
+    else
+!     write(*,*) ' ooo '
+      wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
+                  dist*sim_param%first_panel_scaling !* & ! next line may be commented
+!                 te_min_v*sim_param%dt
+    end if
   enddo
 
   !Starting length of the panel wake is 1
@@ -434,12 +445,18 @@ subroutine prepare_wake(wake, geo, sim_param)
  integer :: ip, iw, ipan
  real(wp) :: dist(3) , vel_te(3)
 
+!real(wp) , parameter :: te_min_v = 1.0_wp ! hard-coded
+! replaced with sim_param%min_vel_at_te
+
   !Update the first row of panels: set points positions
 
   !first row  of new points comes from geometry
   wake%w_start_points = 0.5_wp * (geo%points(:,wake%pan_gen_points(1,:)) + &
                                   geo%points(:,wake%pan_gen_points(2,:)))
   wake%pan_w_points(:,:,1) = wake%w_start_points
+
+  !debug 
+write(*,*) 'first_panel_scaling : ' , sim_param%first_panel_scaling
 
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1,wake%n_pan_points
@@ -448,9 +465,16 @@ subroutine prepare_wake(wake, geo, sim_param)
             geo%refs(wake%pan_gen_ref(ip))%G_g, &
             geo%refs(wake%pan_gen_ref(ip))%f_g, &
             vel_te )
-    wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) + &
-                        dist*sim_param%first_panel_scaling* &
-                        norm2(sim_param%u_inf-vel_te)*sim_param%dt
+    if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
+      wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) + &
+                          dist*sim_param%first_panel_scaling* &
+                          norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist)
+  ! normalisation occurs here! -------------------------------------------^
+    else
+      wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
+                  dist*sim_param%first_panel_scaling ! * & ! next line may be commented
+!                  te_min_v*sim_param%dt
+    end if
   enddo
 
   ! Update the panels geometrical quantities of all the panels, the
@@ -815,6 +839,7 @@ subroutine update_wake(wake, elems, sim_param)
 !$omp end parallel do
   !Assign the moved points, if they get otside the bounding box free the 
   !particles
+
   do ip = 1, wake%n_prt
     if(all(points_prt(:,ip) .ge. wake%part_box_min) .and. &
        all(points_prt(:,ip) .le. wake%part_box_max)) then
@@ -870,6 +895,7 @@ subroutine update_wake(wake, elems, sim_param)
       !Add the particle
       do ip = k, size(wake%wake_parts)
         if (wake%wake_parts(ip)%free) then
+          
           wake%wake_parts(ip)%free = .false.
           k = ip+1
           wake%n_prt = wake%n_prt+1

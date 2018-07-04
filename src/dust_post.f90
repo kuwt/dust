@@ -157,6 +157,7 @@ character(len=max_char_len) :: out_frmt
 logical :: all_comp
 type(t_geo_component), allocatable :: comps(:)
 
+integer :: ic
 
 call printout(nl//'>>>>>> DUST POSTPROCESSOR beginning >>>>>>'//nl)
 call initialize_hdf5()
@@ -300,6 +301,16 @@ do ia = 1,n_analyses
     endif
   endif
 
+
+  !debug
+  write(*,*) nl//' debug in dust_post.f90  +++++++ '
+  write(*,*) ' allocated(comps) : ' , allocated(comps)
+  write(*,*) ' all_comp         : ' , all_comp
+  write(*,*) ' n_comp:', n_comp,'; components_names : '
+  do ic = 1 , n_comp
+    write(*,*) ic ,':', trim(components_names(ic))
+  end do
+  
 
   !Fork the different kind of analyses
   select case(trim(an_type))

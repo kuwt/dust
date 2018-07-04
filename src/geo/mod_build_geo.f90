@@ -1199,6 +1199,9 @@ subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &
 ! check ----
        t_te(:,i_n) =  t_te(:,i_n) + nor(:,e_te(1,i_e)) &
                                   + nor(:,e_te(2,i_e))
+!debug
+!      write(*,*) ' nor(:,e_te(1,',i_e,')) : ' , nor(:,e_te(1,i_e)) 
+!      write(*,*) ' nor(:,e_te(2,',i_e,')) : ' , nor(:,e_te(2,i_e)) 
 
 ! **** mod 2018-07-04: avoid projection on v_rel direction.
 ! **** - avoid using hard-coded or params of the solver
@@ -1234,7 +1237,8 @@ subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &
    ! normalisation
    t_te(:,i_n) = t_te(:,i_n) / norm2(t_te(:,i_n))
 ! **** ! >>>>>>>>>>
-   t_te(:,i_n) = t_te(:,i_n) * t_te_len / dble(t_te_nelem)
+   t_te_len = 10.0_wp
+   t_te(:,i_n) = t_te(:,i_n) * t_te_len ! / dble(t_te_nelem)
 ! **** ! >>>>>>>>>>
 
  end do
