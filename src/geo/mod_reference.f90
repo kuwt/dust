@@ -1026,7 +1026,8 @@ subroutine build_references(refs, reference_file, sim_param)
             refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
             refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
             refs(iref)%rot_pos(  it) = refs(iref)%psi_0 + &
-                 refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1) )    ! <---- CHECK !!!!
+                 refs(iref)%Omega * ( sim_param%time_vec(it) )    ! <---- CHECK !!!!
+                 !refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1) )    ! <---- CHECK !!!!
             refs(iref)%rot_vel(  it) = refs(iref)%Omega
             refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
           end do 
@@ -1056,10 +1057,6 @@ subroutine build_references(refs, reference_file, sim_param)
                   & of the Reference systems (References.in?): number of Dof&
                   & fields .ne. N_Dofs')
          end if
-
-         !CHECK
-         write(*,*) ' N_Blades : ' , n_mult_blades
-         write(*,*) ' N_Dofs   : ' , n_dofs
 
 
          !1) allocate a series of extra reference frames and move-alloc everything
@@ -1181,7 +1178,8 @@ subroutine build_references(refs, reference_file, sim_param)
                  refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
                  refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
                  refs(iref)%rot_pos(  it) = refs(iref)%psi_0 + &
-                      refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1) )  ! <---- CHECK !!!!
+                      refs(iref)%Omega * ( sim_param%time_vec(it) )  ! <---- CHECK !!!!
+                      !refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1) )  ! <---- CHECK !!!!
                  refs(iref)%rot_vel(  it) = refs(iref)%Omega
                  refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
                end do
