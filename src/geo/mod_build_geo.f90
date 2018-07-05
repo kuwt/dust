@@ -135,7 +135,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
  character(len=max_char_len), allocatable :: airfoil_list(:)
  integer , allocatable                    :: nelem_span_list(:)
  integer , allocatable                    :: i_airfoil_e(:,:)
- real(wp) , allocatable                   :: normalised_coord_e(:,:)
+ real(wp), allocatable                    :: normalised_coord_e(:,:)
  real(wp) :: trac, radius
 
  ! Section names for CGNS

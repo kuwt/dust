@@ -372,8 +372,8 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, &
     else
 !     write(*,*) ' ooo '
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-                  dist*sim_param%first_panel_scaling !* & ! next line may be commented
-!                 te_min_v*sim_param%dt
+                  dist*sim_param%first_panel_scaling * & ! next line may be commented
+                  sim_param%min_vel_at_te*sim_param%dt
     end if
   enddo
 
@@ -472,8 +472,8 @@ write(*,*) 'first_panel_scaling : ' , sim_param%first_panel_scaling
   ! normalisation occurs here! -------------------------------------------^
     else
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-                  dist*sim_param%first_panel_scaling ! * & ! next line may be commented
-!                  te_min_v*sim_param%dt
+                  dist*sim_param%first_panel_scaling * & ! next line may be commented
+                  sim_param%min_vel_at_te*sim_param%dt
     end if
   enddo
 

@@ -336,6 +336,8 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   call check_preproc(geo_file_name)
   call load_components(geo, trim(geo_file_name), sim_param, te)
 
+  
+
   call import_aero_tab(geo,airfoil_data)
 
   ! Initialisation
@@ -866,7 +868,7 @@ subroutine load_components(geo, in_file, sim_param, te)
         !just write the reference id to the component
         call write_hdf5(ref_id,'RefId',cloc)
 
-      endif
+      endif ! if mult
 
 
       ! ======= CREATING ELEMENTS ======
@@ -987,7 +989,6 @@ subroutine load_components(geo, in_file, sim_param, te)
         allocate(te%o    (2,ne_te) ) ; te%o     =     o_te
         allocate(te%t    (2,nn_te) ) ; te%t     =     t_te
         allocate(te%ref  (  nn_te) ) ; te%ref   = geo%components(i_comp)%ref_id
-        deallocate(e_te, i_te, ii_te, neigh_te, o_te, t_te)
 
       elseif (ne_te .gt. 0) then
         nn_te_prev = size(te%i,2)
@@ -1037,10 +1038,39 @@ subroutine load_components(geo, in_file, sim_param, te)
                                                   geo%components(i_comp)%ref_id
 
         call move_alloc(ref_te_tmp,te%ref)
-        deallocate(e_te, i_te, ii_te, neigh_te, o_te, t_te)
-      end if
 
+
+
+       end if
+
+
+      write(*,*) ' shape(geo%components(i_comp)%el) : ' , shape(geo%components(i_comp)%el)
+      write(*,*) ' geo%components(i_comp)%comp_name : ' , geo%components(i_comp)%comp_name
+      write(*,*) ' i_comp: ' , i_comp
+      ! 2018-07-5. Deassociate neighboring elements through the TE
+      do i1 = 1,ne_te
+        write(*,*) ' e_te ' , e_te(:,i1)
+        write(*,*) i1 , i_comp , geo%components(i_comp)%el(e_te(1,i1))%n_ver ! geo%components(i_comp)%el(e_te(1,i1))%id   
+        do i2 = 1,geo%components(i_comp)%el(e_te(1,i1))%n_ver
+!         if ( geo%components(i_comp)%el(e_te(1,i1))%neigh(i2)%p%id .eq. e_te(2,i1) ) then
+          if ( neigh(i2,e_te(1,i1)) .eq. e_te(2,i1) ) then
+            write(*,*) ' e_te(1,i1) , neigh(i2,e_te(1,i1)): ' , &
+                         e_te(1,i1) , neigh(i2,e_te(1,i1))
+            geo%components(i_comp)%el(e_te(1,i1))%neigh(i2)%p => null() 
+          end if
+        end do
+        do i2 = 1,geo%components(i_comp)%el(e_te(2,i1))%n_ver
+          if ( neigh(i2,e_te(2,i1)) .eq. e_te(1,i1) ) then
+            write(*,*) ' e_te(2,i1) , neigh(i2,e_te(2,i1)): ' , &
+                         e_te(2,i1) , neigh(i2,e_te(2,i1))
+            geo%components(i_comp)%el(e_te(2,i1))%neigh(i2)%p => null() 
+          end if
+        end do
+      end do
+
+      deallocate(e_te, i_te, ii_te, neigh_te, o_te, t_te)
       !:::::::::::::::::::::::::::::::::::::::::::::::::::
+
 
       ! Update elems_offset for the next component
       elems_offset = elems_offset + size(ee,2)
