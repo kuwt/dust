@@ -275,7 +275,19 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
       write(message,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
       call printout(message)
      end if
-     souLog = log( (R1+R2+this%edge_len(i1)) / (R1+R2-this%edge_len(i1)) )
+     if ( abs(R1+R2+this%edge_len(i1)) .lt. 1e-6 ) then
+      call warning(this_sub_name, this_mod_name, &
+        'too small numerator in calculation of velocity')
+      write(message,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
+      call printout(message)
+     end if
+     
+     if ( R1+R2-this%edge_len(i1) .lt. 1e-12 ) then
+       souLog = 0.0_wp
+     else
+       souLog = log( (R1+R2+this%edge_len(i1)) / (R1+R2-this%edge_len(i1)) )
+     endif
+
 
      phix = phix + this%sinTi(i1) * souLog
      phiy = phiy - this%cosTi(i1) * souLog

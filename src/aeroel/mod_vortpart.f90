@@ -137,7 +137,8 @@ subroutine compute_vel_vortpart (this, pos, uinf, vel)
 
   else
 
-    vvort =  cross(this%dir,dist) * distn / r_Rankine**3
+    !vvort =  cross(this%dir,dist) * distn / r_Rankine**3
+    vvort =  cross(this%dir,dist)  / r_Rankine**3
 
   end if
 
