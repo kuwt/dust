@@ -148,7 +148,7 @@ do it = an_start, an_end, an_step
 
       !Load the results ! TODO: check this routine and the content of the files to be read
       ! TODO : compute the missing quantities
-      call load_res(floc, comps, vort, cp, t)
+      call load_res(floc, comps, vort, press, t)
 
       !Prepare the variable for output
       nelem_out = size(vort)
@@ -159,7 +159,8 @@ do it = an_start, an_end, an_step
       if(out_press) nprint = nprint+1  !<--- *** TODO ***
       ! TODO: compute/or read pressure and velocity field. Now set equal to zero
       allocate(  vel(size(vort,1)) ) ; vel   = 0.0_wp
-      allocate(press(size(  cp,1)) ) ; press = 0.0_wp
+!     allocate(press(size(   cp,1)) ) ; press = 0.0_wp ! loaded from solver
+!     allocate(   cp(size(press,1)) ) ;    cp = 0.0_wp
 
       allocate(print_var_names(nprint), print_vars(nelem_out, nprint))
       
@@ -254,9 +255,13 @@ do it = an_start, an_end, an_step
 
       call close_hdf5_file(floc)
 
-      deallocate(refs_R, refs_off, vort, cp, vel, press)
+      deallocate(refs_R, refs_off)
       deallocate(print_var_names, print_vars)
 
+      if (allocated(vort ) ) deallocate(vort )
+      if (allocated(press) ) deallocate(press)
+      if (allocated(vel  ) ) deallocate(vel  )
+      if (allocated(cp   ) ) deallocate(cp   )
 
 
 end do ! Time loop

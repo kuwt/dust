@@ -472,6 +472,12 @@ subroutine calc_geo_data_vortlatt(this, vert)
                  this%ver(:,1) - this%ver(:,2)     )
   end if
 
+! !debug
+! write(*,*) ' nsides : ' , nsides, ' this%vert :'
+! do is = 1 , nsides
+!   write(*,*) this%ver(:,is)
+! end do
+
   this%area = 0.5_wp * norm2(nor)
   this%nor = nor / norm2(nor)
 

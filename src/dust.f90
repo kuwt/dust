@@ -145,7 +145,7 @@ integer :: n_wake_panels
 !> Number of wake particles
 integer :: n_wake_parts
 real(wp) :: part_box_min(3), part_box_max(3)
-real(wp) :: wake_pan_scaling
+real(wp) :: wake_pan_scaling , wake_pan_minvel
 
 !doublet parameters
 real(wp) :: ff_ratio_dou, ff_ratio_sou, eps_dou, r_Rankine, r_cutoff
@@ -251,6 +251,8 @@ call prms%CreateRealArrayOption('particles_box_max', 'max coordinates of the &
 
 call prms%CreateRealOption( 'ImplicitPanelScale', &
                     "Scaling of the first implicit wake panel", '0.3')
+call prms%CreateRealOption( 'ImplicitPanelMinVel', &
+                    "Minimum velocity at the trailing edge", '1.0')
 
 call prms%CreateRealOption( 'FarFieldRatioDoublet', &
       "Multiplier for far field threshold computation on doublet", '10.0')
@@ -287,6 +289,7 @@ part_box_min = getrealarray(prms, 'particles_box_min',3)
 part_box_max = getrealarray(prms, 'particles_box_max',3)
 
 wake_pan_scaling = getreal(prms,'ImplicitPanelScale')
+wake_pan_minvel  = getreal(prms,'ImplicitPanelMinVel')
 basename = getstr(prms,'basename')
 basename_debug = getstr(prms,'basename_debug')
 geo_file_name = getstr(prms,'GeometryFile')
@@ -355,6 +358,7 @@ sim_param%rho_inf = rho
 sim_param%Re    = Re
 sim_param%Mach  = Mach
 sim_param%first_panel_scaling = wake_pan_scaling
+sim_param%min_vel_at_te       = wake_pan_minvel 
 sim_param%debug_level = debug_level
 sim_param%basename = basename
 

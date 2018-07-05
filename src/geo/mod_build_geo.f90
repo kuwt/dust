@@ -135,7 +135,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
  character(len=max_char_len), allocatable :: airfoil_list(:)
  integer , allocatable                    :: nelem_span_list(:)
  integer , allocatable                    :: i_airfoil_e(:,:)
- real(wp) , allocatable                   :: normalised_coord_e(:,:)
+ real(wp), allocatable                    :: normalised_coord_e(:,:)
  real(wp) :: trac, radius
 
  ! Section names for CGNS
@@ -988,6 +988,9 @@ subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &
  integer  :: ind1 , ind2 , i_node1 , i_node2 , i_node1_max , i_node2_max
  real(wp) ::  mi1 ,  mi2
 
+ real(wp) :: t_te_len
+ integer  :: t_te_nelem
+
  real(wp), parameter :: inner_prod_thresh = - 0.5d0
 
  real(wp), dimension(3) , parameter :: u_rel = (/ 1.0_wp , 0.0_wp , 0.0_wp /) 
@@ -1022,9 +1025,10 @@ subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &
 
    nSides = count( ee(:,i_e) .ne. 0 )
 
-   nor(:,i_e) = cross( rr(:,ee(     3,i_e)) - rr(:,ee(1,i_e)) , & 
-                       rr(:,ee(nSides,i_e)) - rr(:,ee(2,i_e))     )
-   nor(:,i_e) = nor(:,i_e) / norm2(nor(:,i_e))
+   nor(:,i_e) = 0.5_wp * cross( rr(:,ee(     3,i_e)) - rr(:,ee(1,i_e)) , & 
+                                rr(:,ee(nSides,i_e)) - rr(:,ee(2,i_e))     )
+   area( i_e) = norm2(nor(:,i_e))
+   nor(:,i_e) = nor(:,i_e) / area(i_e) 
   
    do i1 = 1 , nSides
      cen(:,i_e) = cen(:,i_e) + rr(:,ee(i1,i_e))
@@ -1183,6 +1187,8 @@ subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &
  allocate(t_te  (3,nn_te)) ; t_te = 0.0_wp  
  do i_n = 1 , nn_te
    vec1 = 0.0_wp
+   t_te_len = 0.0_wp
+   t_te_nelem = 0
    do i_e = 1 , ne_te 
      if ( any( i_n .eq. ii_te(:,i_e)) ) then
 ! check ----
@@ -1193,24 +1199,47 @@ subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &
 ! check ----
        t_te(:,i_n) =  t_te(:,i_n) + nor(:,e_te(1,i_e)) &
                                   + nor(:,e_te(2,i_e))
-       ! TODO: refine the definition of the vec1
-       vec1 = vec1 + cross(nor(:,e_te(1,i_e)) , nor(:,e_te(2,i_e)) )
+!debug
+!      write(*,*) ' nor(:,e_te(1,',i_e,')) : ' , nor(:,e_te(1,i_e)) 
+!      write(*,*) ' nor(:,e_te(2,',i_e,')) : ' , nor(:,e_te(2,i_e)) 
+
+! **** mod 2018-07-04: avoid projection on v_rel direction.
+! **** - avoid using hard-coded or params of the solver
+! **** - for simulating fixed elements w/o free-stream velocity 
+
+! **** ! <<<<<<<<<<
+! **** ! TODO: refine the definition of the vec1
+! **** vec1 = vec1 + cross(nor(:,e_te(1,i_e)) , nor(:,e_te(2,i_e)) )
+
+! **** ! >>>>>>>>>>
+       t_te_len = t_te_len + sqrt(area(e_te(1,i_e))) + sqrt(area(e_te(2,i_e)))
+       t_te_nelem = t_te_nelem + 2
+! **** ! >>>>>>>>>>
+
      end if
    end do
-!  ! projection along the 'relative velocity'
+
+! tests: projection tests
+!  ! 1. projection along the 'relative velocity'
 !  t_te(:,i_n) = sum(t_te(:,i_n)*v_rel) * v_rel
-   ! projection perpendicular to the side_slip direction
+!  ! 2. projection perpendicular to the side_slip direction
 !  t_te(:,i_n) = t_te(:,i_n) - sum(t_te(:,i_n)*side_dir) * side_dir
 
-   vec1 = vec1 - sum(vec1*v_rel) * v_rel
-   vec1 = vec1 / norm2(vec1)
-
-   ! projection ****
-!  write(*,*) ' vec1 ' , vec1
-   t_te(:,i_n) = t_te(:,i_n) - sum(t_te(:,i_n)*vec1) * vec1
+! **** ! <<<<<<<<<<
+! **** vec1 = vec1 - sum(vec1*v_rel) * v_rel
+! **** vec1 = vec1 / norm2(vec1)
+! ****
+! **** ! projection ****
+! **** write(*,*) ' vec1 ' , vec1
+! **** t_te(:,i_n) = t_te(:,i_n) - sum(t_te(:,i_n)*vec1) * vec1
+! **** ! <<<<<<<<<<
 
    ! normalisation
    t_te(:,i_n) = t_te(:,i_n) / norm2(t_te(:,i_n))
+! **** ! >>>>>>>>>>
+   t_te_len = 10.0_wp
+   t_te(:,i_n) = t_te(:,i_n) * t_te_len ! / dble(t_te_nelem)
+! **** ! >>>>>>>>>>
 
  end do
 

@@ -223,11 +223,11 @@ do it=an_start, an_end, an_step ! Time loop
   select case(trim(out_frmt))
 
    case ('dat')
-    write(fid_out,'(F12.6)'  ,advance='no') t 
-    write(fid_out,'(3F16.6)' ,advance='no') F_ref
-    write(fid_out,'(3F16.6)' ,advance='no') M_ref
-    write(fid_out,'(9F16.10)',advance='no') refs_R(:,:, ref_id)
-    write(fid_out,'(3F16.10)',advance='no') refs_off(:, ref_id)
+    write(fid_out,'(E12.3)'  ,advance='no') t 
+    write(fid_out,'(3E12.3)' ,advance='no') F_ref
+    write(fid_out,'(3E12.3)' ,advance='no') M_ref
+    write(fid_out,'(9E12.3)',advance='no') refs_R(:,:, ref_id)
+    write(fid_out,'(3E12.3)',advance='no') refs_off(:, ref_id)
     write(fid_out,*) ' '
 
    case('tecplot')

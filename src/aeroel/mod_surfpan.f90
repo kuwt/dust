@@ -620,10 +620,12 @@ subroutine compute_pres_surfpan(this, sim_param)
   ! contained in pot_vel_stencil
   vel_phi = 0.0_wp
   do i_e = 1 , this%n_ver
-    if ( associated(this%neigh(i_e)%p) ) then
+    if ( associated(this%neigh(i_e)%p) ) then !  .and. &
+!     if  ( sum( this%nor*this%neigh(i_e)%p%nor) .gt. -0.5_wp ) then
       vel_phi = vel_phi + &
         this%pot_vel_stencil(:,i_e) * (this%neigh(i_e)%p%mag - this%mag)
     ! else
+!     end  if
     end if
   end do
 
@@ -635,8 +637,11 @@ subroutine compute_pres_surfpan(this, sim_param)
              sim_param%u_inf + this%uvort
 
   ! pressure -------------------------------------------------
-  ! steady problems  : P = P_inf - 0.5*rho_inf*V^2 - rho_inf*dphi/dt
+  ! unsteady problems  : P = P_inf + 0.5*rho_inf*V_inf^2
+  !                                - 0.5*rho_inf*V^2 - rho_inf*dphi/dt
+  ! with idou = -phi
   this%pres  = sim_param%P_inf &
+    + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
     - 0.5_wp * sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp  &
              + sim_param%rho_inf * this%didou_dt
 
@@ -671,20 +676,26 @@ end subroutine compute_dforce_surfpan
 subroutine create_local_velocity_stencil_surfpan (this)
  class(t_surfpan), intent(inout) :: this
 
- real(wp) :: surf_bubble
+ real(wp) :: bubble_surf
  integer  :: i_v
         
   allocate(this%pot_vel_stencil(3,this%n_ver) )
 
-  surf_bubble = this%area
+  bubble_surf = this%area
 
   do i_v = 1 , this%n_ver
 
     ! Update surf_bubble
     !sum the contribuition only if the neighbour is really present 
     if(associated(this%neigh(i_v)%p)) then
-      surf_bubble = surf_bubble + &
-         this%neigh(i_v)%p%area / real(this%neigh(i_v)%p%n_ver,wp)
+
+!     ! 2018-07-05: the same criterion as for the TE identification.
+!     ! Modification required for closed TE
+!     if ( sum( this%nor * this%neigh(i_v)%p%nor ) .gt. -0.5_wp ) then
+        bubble_surf = bubble_surf + &
+           this%neigh(i_v)%p%area / real(this%neigh(i_v)%p%n_ver,wp)
+!     end if
+
     endif
 
     this%pot_vel_stencil(:,i_v) = &
@@ -692,7 +703,7 @@ subroutine create_local_velocity_stencil_surfpan (this)
 
   end do
 
-  this%pot_vel_stencil = this%pot_vel_stencil / surf_bubble
+  this%pot_vel_stencil = this%pot_vel_stencil / bubble_surf
 
 end subroutine create_local_velocity_stencil_surfpan
 
