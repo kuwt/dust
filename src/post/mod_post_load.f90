@@ -17,14 +17,20 @@ use mod_hdf5_io, only: &
    close_hdf5_group, &
    read_hdf5, &
    read_hdf5_al, &
-   check_dset_hdf5
+   check_dset_hdf5, &
+   get_dset_dimensions_hdf5
 
 use mod_actuatordisk, only: &
   t_actdisk
 
+use mod_wake, only: &
+  t_wake
+
+use mod_aeroel, only: &
+  t_elem_p
 implicit none
 
-public :: load_refs , load_res , load_wake_viz , load_wake_pan , load_wake_ring
+public :: load_refs , load_res , load_wake_post, load_wake_viz , load_wake_pan , load_wake_ring
 
 private
 
@@ -323,11 +329,9 @@ subroutine load_wake_pan(floc, wpoints, wstart, wvort)
  integer(h5loc) :: gloc
   
   call open_hdf5_group(floc,'PanelWake',gloc)
-  
   call read_hdf5_al(wpoints,'WakePoints',gloc)
   call read_hdf5_al(wstart,'StartPoints',gloc)
   call read_hdf5_al(wvort,'WakeVort',gloc)
-
   call close_hdf5_group(gloc)
 
 end subroutine load_wake_pan
@@ -353,5 +357,203 @@ subroutine load_wake_ring(floc, wpoints, wconn, wvort)
   call close_hdf5_group(gloc)
 
 end subroutine load_wake_ring
+
+!----------------------------------------------------------------------
+
+!> Load the wake for the postprocessing. 
+!! do everything 
+subroutine load_wake_post(floc, wake, wake_p)
+ integer(h5loc), intent(in) :: floc 
+ type(t_wake), target, intent(out)  :: wake
+ type(t_elem_p), allocatable, intent(out) :: wake_p(:)
+
+ integer(h5loc) :: gloc
+ real(wp), allocatable :: wpoints_pan(:,:,:)
+ integer,  allocatable :: wstart_pan(:,:)
+ real(wp), allocatable :: wvort_pan(:,:)
+ real(wp), allocatable :: wpoints_rin(:,:,:)
+ integer,  allocatable :: wconn_rin(:)
+ real(wp), allocatable :: wvort_rin(:,:)
+ real(wp), allocatable :: vppoints(:,:), vpvort(:,:)
+ integer :: n_wake_stripes , npan, ndisks, nrows
+ integer :: nsides
+ integer :: p1 , p2 
+ integer :: ip , iw, id, ir, iconn, ie, i
+ integer :: npt_disk
+ integer, allocatable :: disk_pts(: )
+
+  !=== Panels ===
+  call open_hdf5_group(floc,'PanelWake',gloc)
+  call read_hdf5_al(wpoints_pan,'WakePoints',gloc)
+  call read_hdf5_al(wstart_pan,'StartPoints',gloc)
+  call read_hdf5_al(wvort_pan,'WakeVort',gloc)
+  call close_hdf5_group(gloc)
+
+  n_wake_stripes = size(wstart_pan ,2)
+  npan           = size(wvort_pan  ,2) 
+
+  wake%nmax_pan = npan
+  wake%n_pan_stripes = n_wake_stripes
+  wake%pan_wake_len = npan
+  wake%n_pan_points = size(wpoints_pan,2)
+  allocate(wake%i_start_points(2,wake%n_pan_stripes))
+  allocate(wake%pan_w_points(3,wake%n_pan_points,npan+1))
+  allocate(wake%wake_panels(wake%n_pan_stripes,npan))
+  allocate(wake%pan_idou(wake%n_pan_stripes,npan))
+
+  wake%i_start_points     = wstart_pan
+  wake%pan_w_points       = wpoints_pan
+
+  nsides = 4 
+  do ip = 1,npan
+    do iw=1,wake%n_pan_stripes
+     wake%wake_panels(iw,ip)%mag => wake%pan_idou(iw,ip)
+     wake%wake_panels(iw,ip)%n_ver = nsides
+     allocate(wake%wake_panels(iw,ip)%ver(3,nsides))
+     allocate(wake%wake_panels(iw,ip)%edge_vec(3,nsides))
+     allocate(wake%wake_panels(iw,ip)%edge_len(nsides))
+     allocate(wake%wake_panels(iw,ip)%edge_uni(3,nsides))
+    enddo
+  enddo
+
+  do ip = 1,wake%pan_wake_len
+   do iw = 1,wake%n_pan_stripes
+       p1 = wake%i_start_points(1,iw)
+       p2 = wake%i_start_points(2,iw)
+       call wake%wake_panels(iw,ip)%calc_geo_data( &
+       reshape((/wake%pan_w_points(:,p1,ip),   wake%pan_w_points(:,p2,ip), &
+                 wake%pan_w_points(:,p2,ip+1), wake%pan_w_points(:,p1,ip+1)/),&
+                                                                   (/3,4/)))
+       wake%wake_panels(iw,ip)%mag = wvort_pan(iw,ip) 
+   end do
+  end do
+
+  !=== Rings ===
+  call open_hdf5_group(floc,'RingWake',gloc)
+  call read_hdf5_al(wpoints_rin,'WakePoints',gloc)
+  call read_hdf5_al(wconn_rin,'Conn_pe',gloc)
+  call read_hdf5_al(wvort_rin,'WakeVort',gloc)
+  call close_hdf5_group(gloc)
+
+  ndisks = size(wvort_rin,1)
+  nrows = size(wvort_rin,2)
+  wake%ndisks = ndisks; wake%rin_wake_len = nrows
+  allocate(wake%wake_rings(wake%ndisks,wake%rin_wake_len))
+  allocate(wake%rin_idou(wake%ndisks,wake%rin_wake_len))
+
+  do id = 1,wake%ndisks
+    !reverse the connectivity, from pts2disk to disk2pts
+    npt_disk = count(wconn_rin .eq. id)
+    allocate(disk_pts(npt_disk))
+    iconn = 1
+    do ip = 1,size(wconn_rin)
+      if(wconn_rin(ip) .eq. id) then
+        disk_pts(iconn) = ip
+        iconn = iconn+1
+      endif
+    enddo
+
+    nsides = npt_disk
+    do ir = 1,wake%rin_wake_len
+      wake%wake_rings(id,ir)%mag => wake%rin_idou(id,ir)
+      wake%wake_rings(id,ir)%n_ver = nsides
+      allocate(wake%wake_rings(id,ir)%ver(3,nsides))
+      allocate(wake%wake_rings(id,ir)%edge_vec(3,nsides))
+      allocate(wake%wake_rings(id,ir)%edge_len(nsides))
+      allocate(wake%wake_rings(id,ir)%edge_uni(3,nsides))
+      call wake%wake_rings(id,ir)%calc_geo_data(wpoints_rin(:,disk_pts,ir))
+      wake%wake_rings(id,ir)%mag = wvort_rin(id,ir)
+      
+    enddo
+    deallocate(disk_pts)
+  enddo
+
+  !=== Particles + Line vortex ===
+  call open_hdf5_group(floc, 'ParticleWake', gloc)
+  call read_hdf5_al(vppoints,'WakePoints',gloc)
+  call read_hdf5_al(vpvort,'WakeVort',gloc)
+  call close_hdf5_group(gloc)
+
+  wake%n_prt = size(vpvort,2)
+  wake%nmax_prt = size(vpvort,2)
+
+  allocate(wake%wake_parts(wake%nmax_prt))
+  allocate(wake%prt_ivort(wake%nmax_prt))
+  allocate(wake%part_p(wake%n_prt))
+  if(wake%n_prt .gt. 0) then
+    allocate(wake%vort_p(wake%n_prt+wake%n_pan_stripes))
+    allocate(wake%end_vorts(wake%n_pan_stripes))
+    do iw = 1, wake%n_pan_stripes 
+      wake%vort_p(wake%n_prt+iw)%p => wake%end_vorts(iw)
+      wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag
+      p1 = wake%i_start_points(1,iw)
+      p2 = wake%i_start_points(2,iw)
+      call wake%end_vorts(iw)%calc_geo_data( &
+          reshape((/wake%pan_w_points(:,p1,wake%pan_wake_len+1),  &
+                    wake%pan_w_points(:,p2,wake%pan_wake_len+1)/), (/3,2/)))
+    enddo
+  else
+    allocate(wake%vort_p(wake%n_prt))
+  endif
+
+  do ip = 1,wake%n_prt
+    wake%wake_parts(ip)%cen = vppoints(:,ip)
+    wake%wake_parts(ip)%mag => wake%prt_ivort(ip)
+    wake%wake_parts(ip)%mag = norm2(vpvort(:,ip))
+    if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
+      wake%wake_parts(ip)%dir = vpvort(:,ip)/wake%wake_parts(ip)%mag
+    else
+      wake%wake_parts(ip)%dir = vpvort(:,ip)
+    endif
+    wake%wake_parts(ip)%free = .false.
+    wake%part_p(ip)%p => wake%wake_parts(ip)
+    wake%vort_p(ip)%p => wake%wake_parts(ip)
+  enddo
+  
+  deallocate(vppoints, vpvort)
+
+  !Stitch everything together
+  if(wake%n_prt .gt. 0) then
+    allocate(wake_p(wake%n_pan_stripes*wake%pan_wake_len &
+    + wake%ndisks*wake%rin_wake_len + &
+      wake%n_pan_stripes+ wake%n_prt))
+  else
+    allocate(wake_p(wake%n_pan_stripes*wake%pan_wake_len &
+    + wake%ndisks*wake%rin_wake_len))
+  endif
+ 
+
+  i=0
+  !panels
+  do ip = 1,wake%pan_wake_len
+    do iw=1,wake%n_pan_stripes
+    i = i+1
+    wake_p(i)%p => wake%wake_panels(iw,ip)
+    enddo
+  enddo
+  !rings
+  do ir = 1,wake%rin_wake_len
+    do id = 1,wake%ndisks
+    i = i+1
+    wake_p(i)%p => wake%wake_rings(id,ir)
+    enddo
+  enddo
+
+  if(wake%n_prt .gt. 0) then
+    !end vortices
+    do iw=1,wake%n_pan_stripes
+      i = i+1
+      wake_p(i)%p => wake%end_vorts(iw)
+    enddo
+    !particles
+    do ip = 1,wake%n_prt
+      i = i+1
+      wake_p(i)%p => wake%wake_parts(ip)
+    enddo
+  endif
+
+end subroutine
+
+!----------------------------------------------------------------------
 
 end module mod_post_load

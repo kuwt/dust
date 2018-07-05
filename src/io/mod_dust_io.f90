@@ -352,7 +352,9 @@ subroutine check_ref(gloc, floc, ref)
 
   call read_hdf5(R,'R',ref_loc)
   call read_hdf5(of,'Offset',ref_loc)
-  if ((.not. all(R .eq. ref%R_g)) .or. (.not. all(of .eq. ref%of_g)) ) then
+
+  if ((.not. all(real(R) .eq. real(ref%R_g))) .or. &
+      (.not. all(real(of) .eq. real(ref%of_g))) ) then
     call warning(this_sub_name, this_mod_name, 'Mismatching initial position &
     & while loading reference '//trim(ref%tag)//' This may lead to &
     &unexpected behaviour')

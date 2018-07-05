@@ -4,10 +4,10 @@ use mod_param, only: &
   wp, nl, max_char_len, extended_char_len , pi
 
 use mod_handling, only: &
-  error, warning ! , info, printout, dust_time, t_realtime, new_file_unit
+  error, warning  , info, printout, dust_time, t_realtime, new_file_unit
 
 use mod_geometry, only: &
-  t_geo_component ! , t_geo
+  t_geo_component 
 
 use mod_parse, only: &
   t_parse, &
@@ -15,42 +15,41 @@ use mod_parse, only: &
   countoption
 
 use mod_hdf5_io, only: &
-! initialize_hdf5, destroy_hdf5, &
    h5loc, &
-!  new_hdf5_file, &
    open_hdf5_file, &
    close_hdf5_file , &
-!  new_hdf5_group, &
    open_hdf5_group, &
    close_hdf5_group, &
-!  write_hdf5, &
    read_hdf5
-!  read_hdf5_al, &
-!  check_dset_hdf5
 
 use mod_stringtools, only: &
-  LowCase !, isInList, stricmp
+  LowCase 
 
 use mod_geo_postpro, only: &
   load_components_postpro, update_points_postpro , prepare_geometry_postpro , &
-  prepare_wake_postpro  ! expand_actdisk_postpro, 
+  prepare_wake_postpro   
 
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
-use mod_wake_pan, only: &
-  t_wake_panels
-
-use mod_wake_ring, only: &
-  t_wake_rings
+use mod_wake, only: &
+  t_wake
 
 use mod_actuatordisk, only: &
   t_actdisk
 
 use mod_post_load, only: &
-  load_refs, load_res, load_wake_viz , load_wake_pan , load_wake_ring
+  load_refs, load_res, load_wake_post
 
+use mod_tecplot_out, only: &
+  tec_out_probes
+
+use mod_dat_out, only: & 
+  dat_out_probes_header
+
+
+  
 implicit none
 
 public :: post_probes
@@ -111,10 +110,11 @@ real(wp), allocatable :: wvort(:), wvort_pan(:,:), wvort_rin(:,:)
 real(wp), allocatable :: wpoints(:,:), wpoints_pan(:,:,:), wpoints_rin(:,:,:)
 !real(wp), allocatable :: wcen(:,:,:)
 integer,  allocatable :: wconn(:)
-type(t_wake_panels) :: wake_pan
-type(t_wake_rings)  :: wake_rin
+!type(t_wake_panels) :: wake_pan
+!type(t_wake_rings)  :: wake_rin
+type(t_wake) :: wake
 type(t_elem_p), allocatable :: wake_elems(:)
-integer :: i1
+integer :: i1, ivar, ierr
 
 character(len=max_char_len), parameter :: & 
    this_sub_name = 'post_probes'
@@ -162,8 +162,6 @@ character(len=max_char_len), parameter :: &
     ! TODO: add Cp
     probe_vel = .false. ; probe_p = .false. ; probe_vort = .false.
     n_vars = countoption(sbprms,'Variable')
-!   !DEBUG
-!   write(*,*) ' n_vars : ' , n_vars
 
     if ( n_vars .eq. 0 ) then ! default: velocity | pressure | vorticity
       probe_vel = .true. ; probe_p = .true. ; probe_vort = .true.
@@ -281,13 +279,14 @@ character(len=max_char_len), parameter :: &
      !sol = vort
 
      ! Load the wake -----------------------------
-     call load_wake_pan(floc, wpoints_pan, wstart, wvort_pan)
-     call load_wake_ring(floc, wpoints_rin, wconn, wvort_rin)
+     !call load_wake_pan(floc, wpoints_pan, wstart, wvort_pan)
+     !call load_wake_ring(floc, wpoints_rin, wconn, wvort_rin)
    
+     call load_wake_post(floc, wake, wake_elems) 
      call close_hdf5_file(floc)
      
-     call prepare_wake_postpro( wpoints_pan, wpoints_rin, wstart, wconn, &
-                 wvort_pan,  wvort_rin, wake_pan, wake_rin, wake_elems )
+     !call prepare_wake_postpro( wpoints_pan, wpoints_rin, wstart, wconn, &
+     !            wvort_pan,  wvort_rin, wake_pan, wake_rin, wake_elems )
 
      time(ires) = t
 
@@ -351,6 +350,36 @@ character(len=max_char_len), parameter :: &
 ! quick and dirty copy and paste -------
 
     end do
+
+    !Output the results in the correct format
+    select case (trim(out_frmt))
+
+     case ('dat')
+      call new_file_unit(fid_out, ierr)
+      write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.dat'
+      open(unit=fid_out,file=trim(filename)) 
+      call dat_out_probes_header( fid_out , rr_probes , vars_str )
+
+      do ires = 1, size(time)
+        write(fid_out,'(F12.6)',advance='no') time(ires)
+        do ip = 1, n_probes
+          do ivar = 1, size(probe_vars,1)
+            write(fid_out,'(3F12.6)',advance='no') probe_vars(ivar,ires,ip)
+            write(fid_out,'(A)',advance='no') ' '
+          enddo
+        enddo
+        write(fid_out,*) ' '
+      enddo
+      close(fid_out)
+
+     case ('tecplot')
+      write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt'
+      call tec_out_probes(filename, time, probe_vars, probe_var_names, probe_loc_names)
+    case default
+      call error('dust_post','','Unknown format '//trim(out_frmt)//&
+                 ' for probe output')
+    end select
+
 
     do ic = 1 , size(comps)
      do ie = 1 , size(comps(ic)%el)

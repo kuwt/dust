@@ -100,10 +100,10 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_integral'
     write(*,*) nl//' Analysis:',ia,' post_integral() ++++++++++ '//nl
 
 !DEBUG
-write(*,*) ' before load_components_postpro '
-do ic = 1 , size(components_names)
-  write(*,*) trim(components_names(ic))
-end do
+!write(*,*) ' before load_components_postpro '
+!do ic = 1 , size(components_names)
+!  write(*,*) trim(components_names(ic))
+!end do
 
 ! load the geo components just once just once
 call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
@@ -113,10 +113,10 @@ call load_components_postpro(comps, points, nelem, floc, &
 call close_hdf5_file(floc)
 
 !DEBUG
-write(*,*) '  after load_components_postpro '
-do ic = 1 , size(components_names)
-  write(*,*) trim(components_names(ic))
-end do
+!write(*,*) '  after load_components_postpro '
+!do ic = 1 , size(components_names)
+!  write(*,*) trim(components_names(ic))
+!end do
 
 ! Prepare_geometry_postpro
 call prepare_geometry_postpro(comps)

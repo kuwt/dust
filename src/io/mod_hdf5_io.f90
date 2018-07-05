@@ -71,7 +71,8 @@ use mod_handling, only: &
    append_hdf5, &
    h5t_mem_float, &
    h5t_file_float, &
-   check_dset_hdf5
+   check_dset_hdf5, &
+   get_dset_dimensions_hdf5
 
 
  private
@@ -328,6 +329,41 @@ function check_dset_hdf5(dsetname, loc_id) result(dset_exists)
   dset_exists = l_exists
 
 end function check_dset_hdf5
+
+
+!-----------------------------------------------------------------------
+
+subroutine get_dset_dimensions_hdf5(dsetname, loc_id, dims)
+ character(len=*), intent(in)  :: dsetname
+ integer(HID_T), intent(in)    :: loc_id
+ integer, allocatable, intent(out) :: dims(:)
+
+ integer(HID_T) :: dset_id
+ integer(HID_T) :: filespace_id
+ integer :: h5err
+ integer :: dset_rank
+ integer(HSIZE_T), allocatable :: max_dims(:), act_dims(:)
+ character(len=*), parameter :: this_sub_name = 'get_dset_dimensions_hdf5_hdf5'
+
+  !open the dataset
+  call h5Dopen_f(loc_id, dsetname, dset_id, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                               'Problems opening dataset  '//dsetname)
+  !get its dataspace
+  call h5Dget_space_f(dset_id, filespace_id, h5err)
+  !get dataspace rank and dimensions
+  call h5Sget_simple_extent_ndims_f(filespace_id, dset_rank, h5err)
+  allocate(act_dims(dset_rank), max_dims(dset_rank))
+  call h5Sget_simple_extent_dims_f(filespace_id, act_dims, &
+                                   max_dims, h5err)
+
+  call h5Sclose_f(filespace_id, h5err)
+  call h5Dclose_f(dset_id, h5err)
+
+  allocate(dims(dset_rank))
+  dims = int(act_dims)
+  deallocate(act_dims, max_dims)
+end subroutine get_dset_dimensions_hdf5
 
 !-----------------------------------------------------------------------
 !==== String Operations ====

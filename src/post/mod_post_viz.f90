@@ -216,7 +216,9 @@ do it = an_start, an_end, an_step
           call  tec_out_viz(filename, t, &
                        points_exp, elems, print_vars, print_var_names, &
                        w_rr=wpoints, w_ee=welems, w_vars=print_vars_w, &
-                       w_var_names = print_var_names_w)
+                       w_var_names = print_var_names_w, &
+                       vp_rr=vppoints, vp_vars=print_vars_vp, &
+                       vp_var_names = print_var_names_w)
          case ('vtk')
           filename = trim(filename)//'.vtu'
           call  vtk_out_viz(filename, &

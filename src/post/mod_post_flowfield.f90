@@ -15,45 +15,35 @@ use mod_parse, only: &
   countoption
 
 use mod_aeroel, only: &
-! c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
-  t_elem_p ! , t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
+  t_elem_p 
 
-use mod_wake_pan, only: &
-  t_wake_panels
 
-use mod_wake_ring, only: &
-  t_wake_rings
+use mod_wake, only: &
+  t_wake
 
 use mod_hdf5_io, only: &
-!  initialize_hdf5, destroy_hdf5, &
    h5loc, &
-!  new_hdf5_file, &
    open_hdf5_file, &
    close_hdf5_file, & ! , &
-!  new_hdf5_group, &
    open_hdf5_group, &
    close_hdf5_group, &
-!  write_hdf5, &
    read_hdf5 
-!  read_hdf5_al, &
-!  check_dset_hdf5
 
 use mod_stringtools, only: &
   LowCase !, isInList, stricmp
 
 use mod_geo_postpro, only: &
   load_components_postpro, update_points_postpro , &
-  prepare_geometry_postpro , & 
-  prepare_wake_postpro  ! expand_actdisk_postpro, 
+  prepare_geometry_postpro  
 
 use mod_tecplot_out, only: &
-  tec_out_box ! , tec_out_loads, tec_out_viz, tec_out_probes, 
+  tec_out_box 
 
 use mod_vtk_out, only: &
-  vtr_write ! ,vtk_out_viz , 
+  vtr_write  
 
 use mod_post_load, only: &
-  load_refs , load_res , load_wake_pan , load_wake_ring
+  load_refs , load_res, load_wake_post
 
 implicit none
 
@@ -101,13 +91,11 @@ real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
 real(wp), allocatable :: refs_G(:,:,:), refs_f(:,:)
 real(wp), allocatable :: vort(:), cp(:)
 
-type(t_wake_panels) :: wake_pan
-type(t_wake_rings)  :: wake_rin
+type(t_wake)        :: wake
 type(t_elem_p), allocatable :: wake_elems(:)
 
 real(wp), allocatable :: wvort(:), wvort_pan(:,:), wvort_rin(:,:)
 real(wp), allocatable :: wpoints(:,:), wpoints_pan(:,:,:), wpoints_rin(:,:,:)
-!real(wp), allocatable :: wcen(:,:,:)
 integer,  allocatable :: wconn(:)
 integer,  allocatable :: welems(:,:)
 integer, allocatable  :: wstart(:,:)
@@ -181,16 +169,6 @@ call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
 call load_components_postpro(comps, points, nelem, floc, & 
                              components_names,  all_comp)
 call close_hdf5_file(floc)
-
-! !DEBUG
-! write(*,*) ' all_comp : ' , all_comp
-! write(*,*) ' allocated(components_names) : ' , &
-!              allocated(components_names)
-! if (allocated(components_names)) then
-!   do i1 = 1,size(components_names) 
-!     write(*,*) trim(components_names(i1))
-!   end do
-! end if
 
 ! Prepare_geometry_postpro
 call prepare_geometry_postpro(comps)
@@ -306,13 +284,8 @@ do it = an_start, an_end, an_step ! Time history
   !sol = vort
 
   ! Load the wake -----------------------------
-  call load_wake_pan(floc, wpoints_pan, wstart, wvort_pan)
-  call load_wake_ring(floc, wpoints_rin, wconn, wvort_rin)
-  
+  call load_wake_post(floc, wake, wake_elems) 
   call close_hdf5_file(floc)
-  
-  call prepare_wake_postpro( wpoints_pan, wpoints_rin, wstart, wconn, &
-              wvort_pan,  wvort_rin, wake_pan, wake_rin, wake_elems )
 
   ! Compute fields to be plotted +++++++++++++++++++++++++++++
   ip = 0

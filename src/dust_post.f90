@@ -58,6 +58,12 @@ use mod_doublet, only: &
 use mod_surfpan, only: &
   initialize_surfpan
 
+use mod_vortline, only: &
+ initialize_vortline
+
+use mod_vortpart, only: &
+ initialize_vortpart
+
 !this is for the parsing
 use mod_parse, only: &
   t_parse, &
@@ -238,20 +244,6 @@ call bxprms%CreateIntOption('numSect','number of sections')
 call bxprms%CreateLogicalOption('reshapeBox','logical input to reshape the box if &
                            &it is "too large"')
 call sbprms%CreateRealArrayOption('AxisMom','axis for the computation of the moment. Perpendicular to sections')
-! BoxSect = {
-!  refNode = (/ -0.5 , 0.0 , -0.3 /)
-!  faceVec = (/ 1.0 , 0.0 , 0.0 /)
-!  faceBas = (/ 2.0 , 1.0 /) 
-!  faceHei = (/ 1.0 , 1.0 /)
-!  spanVec = (/ 0.0 , 1.0 , 0.0 /)
-!  spanLen = 3.0 
-! }
-! AxisMom  = (/ 0.0 , 1.0 , 0.0 /) 
-! old format
-! call sbprms%CreateStringOption('BoxSect','Boxes delimiting the component for sectional&
-!                             & loads analisys',multiple=.true.)
-! call sbprms%CreateRealArrayOption('AxisMom','Axis for the computation of the moment&
-!                             & in sectional loads analysis',multiple=.true.)
 
 sbprms=>null()
 
@@ -267,7 +259,9 @@ r_Rankine = getreal(prms, 'RankineRad')
 r_cutoff  = getreal(prms, 'CutoffRad')
 
 call initialize_doublet(ff_ratio_dou, eps_dou, r_Rankine, r_cutoff);
-call initialize_surfpan(ff_ratio_sou);
+call initialize_surfpan(ff_ratio_sou)
+call initialize_vortline(r_Rankine, r_cutoff)
+call initialize_vortpart(r_Rankine, r_cutoff)
 
 n_analyses = countoption(prms,'Analysis')
 
