@@ -38,6 +38,9 @@ use mod_post_load, only: &
 use mod_dat_out, only: &
    dat_out_sectional
 
+use mod_tecplot_out, only: &
+  tec_out_sectional
+
 use mod_math, only: &
   cross
 
@@ -363,11 +366,16 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
     
     end do
     
-    write(filename,'(A)') trim(basename)//'_'//trim(an_name) ! and then appen Fx,Fy,Fz,M
-    write(*,*) ' +++++++ size(y_cen) : ' , size(y_cen)
-    call dat_out_sectional ( filename , y_cen , y_span , time , sec_loads , &
+    select case(trim(out_frmt))
+     case('dat')
+      write(filename,'(A)') trim(basename)//'_'//trim(an_name) 
+      call dat_out_sectional ( filename, y_cen, y_span, time, sec_loads, &
                               ref_mat , off_mat ) 
-    
+     case('tecplot')
+      write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
+      call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span ) 
+    end select
+
     write(*,*) nl//nl//' end of sectional loads'//nl//nl
     
     deallocate(r_axis,r_axis_bas)
@@ -559,9 +567,6 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
       allocate(box_secloads(is)%cen(3,size(comps(id_comp)%el))) ; box_secloads(is)%cen   = -333.3_wp
     end do
 
-!   ! debug
-!   write(*,*) ' id_comp : ' , id_comp
-!   write(*,*) ' debug: comps%el%cen : '
 
     do ie = 1 , size(comps(id_comp)%el) ! loop over elems
 
@@ -586,8 +591,6 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
                           comps(id_comp)%loc_points(:,comps(id_comp)%el(ie)%i_ver(1)) , & 
                           comps(id_comp)%loc_points(:,comps(id_comp)%el(ie)%i_ver(2)) - & 
                           comps(id_comp)%loc_points(:,comps(id_comp)%el(ie)%i_ver(nver)) ) )
-!     !debug
-!     write(*,*) nl//' comps(id_comp)%el(ie)%cen : ' , comps(id_comp)%el(ie)%cen 
 
       ! Compute the distance of the centre of the elem from -----
       ! lateral faces of the box
@@ -725,8 +728,6 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
                interSectCen(:,2) = ( comps(id_comp)%el(ie)%area * comps(id_comp)%el(ie)%cen - &
                        interSectAreas(1) * interSectCen(:,1) ) / interSectAreas(2)
 
-!              write(*,*) ' el%area : ' , comps(id_comp)%el(ie)%area 
-!              write(*,*) ' interSectArea([1,2]) : ' , interSectAreas(1) , interSectAreas(2)
              else
                if ( sec2_nVer .gt. 2 ) then
                   write(*,*) ' error in sectional loads . stop ' ; stop
@@ -754,8 +755,6 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
                end if
                interSectCen(:,1) = ( comps(id_comp)%el(ie)%area * comps(id_comp)%el(ie)%cen - &
                        interSectAreas(2) * interSectCen(:,2) ) / interSectAreas(1)
-!              write(*,*) ' el%area : ' , comps(id_comp)%el(ie)%area 
-!              write(*,*) ' interSectArea([2,1]) : ' , interSectAreas(2) , interSectAreas(1)
 
              end if
 
@@ -860,20 +859,9 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
                                       box_secloads(is)%fracs(ie)
           F_bas  = F_bas + F_bas1
           !TODO: add moment (it requires axis computation)
-!         !debug
-!         write(*,*) ' r : ' , box_secloads_cen - r_axis_bas(:,is) 
-!         write(*,*) ' F : ' , F_bas1
           M_bas  = M_bas + cross( box_secloads_cen - &
                                   r_axis_bas(:,is) , F_bas1 )
-!         ! debug
-!         write(*,*) 'sec_cen :', box_secloads(is)%cen(:,ie)
-!         write(*,*) 'r_axis_bas:', r_axis_bas(:,is)  
-!         write(*,*) box_secloads(is)%cen(:,ie) - r_axis_bas(:,is)  
-          ! ...
         end do
-!       stop
-!       !debug
-!       write(*,*) ' |F|,|M|: ' , norm2(F_bas) , norm2(M_bas)
 
         ! From global to local coordinates of forces and moments 
         sec_loads(ires,is,1:3) = matmul( &
@@ -885,18 +873,21 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
         sec_loads(ires,is,4) = M_bas(2) / y_span(is)
       end do
 
-!     write(*,*) ' l.880'
-!     stop
       ref_mat(ires,:) = reshape(refs_R(:,:,ref_id),(/ 9 /))
       off_mat(ires,:) = refs_off(:,ref_id)
       time(ires) = t
 
     end do
 
-    write(filename,'(A)') trim(basename)//'_'//trim(an_name) ! and then appen Fx,Fy,Fz,M
-    write(*,*) ' +++++++ size(y_cen) : ' , size(y_cen)
-    call dat_out_sectional ( filename , y_cen , y_span , time , sec_loads , &
+    select case(trim(out_frmt))
+     case('dat')
+      write(filename,'(A)') trim(basename)//'_'//trim(an_name) 
+      call dat_out_sectional ( filename, y_cen, y_span, time, sec_loads, &
                               ref_mat , off_mat ) 
+     case('tecplot')
+      write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
+      call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span ) 
+    end select
 
     write(*,*) nl//nl//' end of sectional loads'//nl//nl
 ! ######################################################################    
