@@ -455,9 +455,6 @@ subroutine prepare_wake(wake, geo, sim_param)
                                   geo%points(:,wake%pan_gen_points(2,:)))
   wake%pan_w_points(:,:,1) = wake%w_start_points
 
-  !debug 
-write(*,*) 'first_panel_scaling : ' , sim_param%first_panel_scaling
-
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1,wake%n_pan_points
     dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))

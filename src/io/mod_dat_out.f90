@@ -56,10 +56,11 @@ contains
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_loads_header ( fid , comps_meas , ref_sys )
+subroutine dat_out_loads_header ( fid , comps_meas , ref_sys , average)
  integer , intent(in) :: fid
  character(len=*), intent(in) :: comps_meas(:)
  character(len=*), intent(in) :: ref_sys 
+ logical, intent(in)          :: average
 
  character(len=max_char_len) :: istr
  integer :: n_comps , ic
@@ -74,7 +75,13 @@ subroutine dat_out_loads_header ( fid , comps_meas , ref_sys )
    write(fid,'(A)',advance='no') trim(comps_meas(ic))//' , '
  end do
  write(fid,'(A)') trim(comps_meas(n_comps))
- write(fid,*) '#  t  Fx  Fy  Fz  Mx  My  Mz  ' 
+ if (.not. average)  then
+   write(fid,*) '#  t  Fx  Fy  Fz  Mx  My  Mz  ' 
+ else
+   write(fid,*) '# Fx_average  Fy_average  Fz_average &
+                    & Mx_average  My_average  Mz_average ' 
+ endif
+   
 
 end subroutine dat_out_loads_header
 

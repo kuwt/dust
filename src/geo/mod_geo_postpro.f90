@@ -403,39 +403,12 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
  character(len=max_char_len), allocatable :: components(:) , components_tmp(:)
  character(len=max_char_len) :: component , component_stripped
 
- !integer :: ie_t, ie
- !integer :: n_mult, i_mult
- !logical :: mult
-
- ! Connectivity and te structures 
- !integer , allocatable :: neigh(:,:)
- ! Lifting Line elements
- !real(wp), allocatable :: normalised_coord_e(:,:)
- !integer                 , allocatable :: i_airfoil_e(:,:)
- !character(max_char_len) , allocatable :: airfoil_list(:)
- !integer                 , allocatable :: nelem_span_list(:)
-
- ! trailing edge ------
- !integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
- !integer , allocatable :: neigh_te(:,:) , o_te(:,:)
- !real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
- !integer :: ne_te , nn_te
- ! tmp arrays --------
- !type(t_elem_p) , allocatable :: e_te_tmp(:,:)
- !integer, allocatable  ::i_te_tmp(:,:) , ii_te_tmp(:,:) 
- !integer , allocatable :: neigh_te_tmp(:,:) , o_te_tmp(:,:)
- !real(wp), allocatable ::rr_te_tmp(:,:) , t_te_tmp(:,:)
- !integer , allocatable :: ref_te_tmp(:)
- !integer :: ne_te_prev , nn_te_prev ! # n. elements and nodes at TE ( of the prev. comps) 
-
  character(len=*), parameter :: this_sub_name = 'load_components_postpro'
 
   ! Read all the components
   call open_hdf5_group(floc,'Components',gloc)
   call read_hdf5(n_comp_tot,'NComponents',gloc)
 
-  !DEBUG
-  write(*,*) nl//' All the components: '
   allocate(components(n_comp_tot))
   do i_comp_tot = 1 , n_comp_tot
     write(cname,'(A,I3.3)') 'Comp',i_comp_tot
@@ -443,31 +416,14 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
     call read_hdf5(components(i_comp_tot),'CompName',cloc)
     call read_hdf5(comp_input,'CompInput',cloc)
     call close_hdf5_group(cloc)
-    !DEBUG
-    write(*,*) trim(components(i_comp_tot)) , ' ; ' , trim(comp_input)
   end do
   
-! if ( allocated(components_names) ) then
-!   write(*,*) ' components_names : '
-!   do i_comp_tot = 1 , size(components_names)
-!     write(*,*) trim(components_names(i_comp_tot))
-!   end do
-! end if
 
 ! RE-BUILD components_names() to host multiple components ++++++++++++++++++
 ! components_names: input for post-processing
 ! comp_name: all the components of the model (blades: Hub01__01, ..., Hub01__Nb)
 ! comp_name_stripped: Hub01__01, ..., Hub01__Nb  ---> Hub01
 ! multiple components: if components_names(i1) is <Hub>, then add all the blades to the output
-
-  !debug
-  write(*,*) nl//' debug in mod_geo_postpro.f90  ******** '
-  write(*,*) ' n_comp_tot : ' , n_comp_tot , ' size(components_names) : ' , size(components_names)
-  write(*,*) ' allocated(components_names) : ' , allocated(components_names)
-  do i1 = 1 , size(components_names)
-    write(*,*) trim(components_names(i1))
-  end do
-  write(*,*)
 
 ! TODO: check user inputs ( to avoid rotorll and rotorll__01 to be considered twice )
 ! TODO: check multiple components ( double if statementes ... )
@@ -480,14 +436,11 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         
         call strip_mult_appendix(components(i2), component_stripped, '__') 
 
-        !debug
-        write(*,*) ' ++ : ' , trim(components(i2)) , ' , ' ,trim(component_stripped)
 
         ! CASE #1. Ex.: components_names(i1) .eq. rotorll 
         if ( trim(components_names(i1)) .eq. trim(component_stripped) ) then
           i_comp_tmp = i_comp_tmp + 1
           components_tmp(i_comp_tmp) = trim(components(i2))
-!debug   !write(*,*) ' a. +1 '
 
         else
 
@@ -495,7 +448,6 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
           if ( trim(components_names(i1)) .eq. trim(components(i2)) ) then
             i_comp_tmp = i_comp_tmp + 1
             components_tmp(i_comp_tmp) = trim(components(i2))
-!debug     !write(*,*) ' b. +1 '
           end if
 
         end if
@@ -505,7 +457,6 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
     end do
 
     deallocate(components_names)
-!debug !write(*,*) ' i_comp_tmp : ' , i_comp_tmp
     allocate(components_names(i_comp_tmp)) 
     components_names = components_tmp(1:i_comp_tmp)
  
@@ -521,27 +472,6 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
     end do
 
   end if
-
-  !debug
-  write(*,*) ' At the end of load_components_postpro '
-  write(*,*) ' allocated(comps) : ' , allocated(comps)
-
-
-! !DEBUG
-! i_comp_tot = size(components_names)
-! write(*,*) ' i_comp_tot : ' , i_comp_tot
-! write(*,*) ' In load_components_postro. Components_names: ' 
-! do i_comp_tot = 1 , size(components_names)
-!   write(*,*) i_comp_tot , ' : ' , trim(components_names(i_comp_tot))
-! end do
-
-
-! !debug
-! write(*,*) ' n_comp_tot : ' , n_comp_tot
-! write(*,*) ' components_names : '
-! do i_comp = 1 , size(components_names)
-!   write(*,*) trim(components_names(i_comp))
-! end do
  
 !  allocate(comps(n_comp))
   nelem = 0
@@ -554,26 +484,14 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
     call read_hdf5(comp_name,'CompName',cloc)
     call read_hdf5(comp_input,'CompInput',cloc)
 
-!   write(*,*) ' i_comp_tot ' , i_comp_tot
-!   write(*,*) ' CompName : ' , trim(comp_name)
 
     !Strip the appendix of multiple components, to load all the multiple
     !components at once
-!   write(*,*) ' comp_name : ' , trim(comp_name)
     call strip_mult_appendix(comp_name, comp_name_stripped, '__') 
-!   write(*,*) ' comp_name_stripped : ' , trim(comp_name_stripped)
     
-!   if(IsInList(comp_name_stripped, components_names) .or. all_comp) then
-!   write(*,*) ' all_comp  :' , all_comp
-!   write(*,*) ' comp_name :' , trim(comp_name)
 
-    !debug
-    write(*,*) ' comp_name : ' , trim(comp_name)
 
     if(IsInList(comp_name, components_names) .or. all_comp) then
-
-!    !debug
-!     write(*,*) ' **** '
 
       i_comp = i_comp+1; n_comp = n_comp+1
       allocate(comp_temp(n_comp))
@@ -599,9 +517,6 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       call open_hdf5_group(cloc,'Geometry',geo_loc)
       call read_hdf5_al(ee   ,'ee'   ,geo_loc)
       call read_hdf5_al(rr   ,'rr'   ,geo_loc)
-
-      write(*,*) ' comp_name, _input : ' , trim(comps(i_comp)%comp_name) , &
-                 ' ;   ' ,  trim(comps(i_comp)%comp_input) // nl
       
 
       if ( trim(comps(i_comp)%comp_input) .eq. 'parametric' ) then
@@ -609,10 +524,6 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         call read_hdf5( parametric_nelems_chor ,'parametric_nelems_chor',geo_loc)
         comps(i_comp)%parametric_nelems_span = parametric_nelems_span
         comps(i_comp)%parametric_nelems_chor = parametric_nelems_chor
-!       !DEBUG
-!       write(*,*) ' component_id : ' , comps(i_comp)%comp_id
-!       write(*,*) ' nelems_span  : ' , comps(i_comp)%parametric_nelems_span
-!       write(*,*) ' nelems_chord : ' , comps(i_comp)%parametric_nelems_chor
       end if
 
 
@@ -734,92 +645,6 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
 
 
 end subroutine load_components_postpro
-
-!----------------------------------------------------------------------
-
-!!subroutine import_aero_tab(geo,coeff)
-!! type(t_geo), intent(inout), target :: geo
-!! type(t_aero_tab) , allocatable , intent(inout) :: coeff(:)
-!!
-!! integer :: n_tmp , n_tmp2
-!! character(len=max_char_len) , allocatable :: list_tmp(:) 
-!! character(len=max_char_len) , allocatable :: list_tmp_tmp(:) 
-!! integer , allocatable :: i_airfoil_e_tmp (:,:)
-!!
-!! integer :: i_c, n_c, i_a, n_a, i_l
-!!
-!! n_tmp = 30 
-!! allocate(list_tmp(n_tmp)) 
-!!
-!! ! Count # of different airfoil
-!! n_c = size(geo%components) 
-!! n_a = 0
-!! do i_c = 1 ,  n_c
-!!
-!!   if ( geo%components(i_c)%comp_el_type .eq. 'l' ) then
-!!    
-!!     allocate( i_airfoil_e_tmp( &
-!!          size(geo%components(i_c)%i_airfoil_e,1), size(geo%components(i_c)%i_airfoil_e,2) ) ) 
-!!     i_airfoil_e_tmp = 0
-!!
-!!     do i_a = 1 , size(geo%components(i_c)%airfoil_list)
-!!
-!!       if ( all( geo%components(i_c)%airfoil_list(i_a) .ne. list_tmp(1:n_a) ) ) then
-!!         ! new airfoil ----
-!!         n_a = n_a + 1
-!!
-!!         where ( geo%components(i_c)%i_airfoil_e .eq. i_a ) i_airfoil_e_tmp = n_a 
-!!        
-!!         ! if n_a > n_tmp --> movalloc
-!!         if ( n_a .gt. n_tmp ) then
-!!           n_tmp2 = n_tmp + n_tmp
-!!           allocate(list_tmp_tmp(n_tmp2))
-!!           list_tmp_tmp(1:n_tmp) = list_tmp
-!!           deallocate(list_tmp)
-!!           call move_alloc(list_tmp_tmp,list_tmp)
-!!           n_tmp = n_tmp2
-!!         end if
-!! 
-!!         list_tmp(n_a) = geo%components(i_c)%airfoil_list(i_a)
-!!
-!!       else
-!!         ! airfoil already used: find the element and replace the global index
-!!         do i_l = 1 , n_a
-!!           if ( geo%components(i_c)%airfoil_list(i_a) .eq. list_tmp(i_l) ) exit
-!!         end do
-!!
-!!         where ( geo%components(i_c)%i_airfoil_e .eq. i_a ) i_airfoil_e_tmp = i_l 
-!!
-!!       end if
-!!
-!!
-!!     end do
-!!
-!!   geo%components(i_c)%i_airfoil_e = i_airfoil_e_tmp
-!!
-!!   deallocate(i_airfoil_e_tmp)
-!!     
-!!   ! check ----
-!!   write(*,*) ' mod_geo.f89/import_aero_tab().  Component: ' , i_c
-!!   write(*,*) ' size(geo%components(',i_c,')%i_airfoil_e : ' , shape(geo%components(i_c)%i_airfoil_e)
-!!   do i_l = 1 , size(geo%components(i_c)%i_airfoil_e,2)
-!!     write(*,*) geo%components(i_c)%i_airfoil_e(:,i_l)
-!!   end do
-!!   write(*,*)
-!!   ! check ----
-!!
-!!   end if
-!!
-!! end do
-!!
-!! ! Read tables and fill coeff structure
-!! allocate(coeff(n_a))
-!! write(*,*) ' Number of different airfoils : ' , n_a
-!! do i_a = 1 , n_a
-!!   call read_c81_table( list_tmp(i_a) , coeff(i_a) )
-!! end do
-!!
-!!end subroutine import_aero_tab
 
 !----------------------------------------------------------------------
 

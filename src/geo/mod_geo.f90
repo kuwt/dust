@@ -1048,6 +1048,7 @@ subroutine load_components(geo, in_file, sim_param, te)
       write(*,*) ' geo%components(i_comp)%comp_name : ' , geo%components(i_comp)%comp_name
       write(*,*) ' i_comp: ' , i_comp
       ! 2018-07-5. Deassociate neighboring elements through the TE
+      if(trim(geo%components(i_comp)%comp_el_type) .eq. 'p') then
       do i1 = 1,ne_te
         write(*,*) ' e_te ' , e_te(:,i1)
         write(*,*) i1 , i_comp , geo%components(i_comp)%el(e_te(1,i1))%n_ver ! geo%components(i_comp)%el(e_te(1,i1))%id   
@@ -1067,6 +1068,7 @@ subroutine load_components(geo, in_file, sim_param, te)
           end if
         end do
       end do
+      endif
 
       deallocate(e_te, i_te, ii_te, neigh_te, o_te, t_te)
       !:::::::::::::::::::::::::::::::::::::::::::::::::::

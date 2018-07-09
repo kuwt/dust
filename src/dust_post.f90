@@ -161,6 +161,7 @@ character(len=max_char_len), allocatable :: var_names(:)
 character(len=max_char_len) :: lowstr
 character(len=max_char_len) :: out_frmt
 logical :: all_comp
+logical :: average
 type(t_geo_component), allocatable :: comps(:)
 
 integer :: ic
@@ -198,6 +199,7 @@ call sbprms%CreateStringOption('Name','specification of the analysis')
 call sbprms%CreateIntOption('StartRes', 'Starting result of the analysis')
 call sbprms%CreateIntOption('EndRes', 'Final result of the analysis')
 call sbprms%CreateIntOption('StepRes', 'Result stride of the analysis')
+call sbprms%CreateLogicalOption('Average', 'Perform time averaging','F')
 call sbprms%CreateLogicalOption('Wake', 'Output also the wake for &
                                 &visualization','T')
 call sbprms%CreateStringOption('Format','Output format')
@@ -278,6 +280,7 @@ do ia = 1,n_analyses
   an_start = getint(sbprms,'StartRes')
   an_end   = getint(sbprms,'EndRes')
   an_step  = getint(sbprms,'StepRes')
+  average  = getlogical(sbprms, 'Average')
  
   !Check if we are analysing all the components or just some
   all_comp = .false.
@@ -295,17 +298,6 @@ do ia = 1,n_analyses
     endif
   endif
 
-
-  !debug
-  write(*,*) nl//' debug in dust_post.f90  +++++++ '
-  write(*,*) ' allocated(comps) : ' , allocated(comps)
-  write(*,*) ' all_comp         : ' , all_comp
-  write(*,*) ' n_comp:', n_comp,'; components_names : '
-  do ic = 1 , n_comp
-    write(*,*) ic ,':', trim(components_names(ic))
-  end do
-  
-
   !Fork the different kind of analyses
   select case(trim(an_type))
 
@@ -315,14 +307,14 @@ do ia = 1,n_analyses
     ! look in mod_post_integral
     call post_integral( sbprms , basename , data_basename , an_name , ia , &
                         out_frmt , comps , components_names , all_comp , &
-                        an_start , an_end , an_step )
+                        an_start , an_end , an_step, average)
 
    !//////////////////Visualizations\\\\\\\\\\\\\\\\\
    case('viz') 
 
     call post_viz( sbprms , basename , data_basename , an_name , ia , &
                    out_frmt , comps , components_names , all_comp , &
-                   an_start , an_end , an_step )
+                   an_start , an_end , an_step, average )
 
    !//////////////////Domain probes \\\\\\\\\\\\\\\\\
    case('probes')
