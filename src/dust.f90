@@ -122,6 +122,7 @@ type(t_parse) :: prms
 character(len=*), parameter :: input_file_name_def = 'dust.in'
 character(len=max_char_len) :: input_file_name
 character(len=max_char_len) :: geo_file_name
+character(len=max_char_len) :: target_file
 character(len=max_char_len) :: ref_file_name
 character(len=extended_char_len) :: message
 
@@ -365,10 +366,12 @@ sim_param%basename = basename
 !------ Geometry creation ------
 call printout(nl//'====== Geometry Creation ======')
 t0 = dust_time()
-call copy_geo(sim_param, geo_file_name, run_id)
+!call copy_geo(sim_param, geo_file_name, run_id)
+target_file = trim(sim_param%basename)//'_geo.h5'
 call create_geometry(geo_file_name, ref_file_name, input_file_name, geo, &
                      te, elems, elems_expl, elems_ad, elems_ll, &
-                     elems_tot, airfoil_data, sim_param)
+                     elems_tot, airfoil_data, sim_param, target_file, run_id)
+
 t1 = dust_time()
 if(debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Created geometry in: ' , t1 - t0,' s.'
@@ -563,6 +566,7 @@ subroutine get_run_id (run_id)
 end subroutine
 
 !------------------------------------------------------------------------------
+!DISCONTINUED: consider removing
 subroutine copy_geo(sim_param, geo_file, run_id)
  type(t_sim_param), intent(inout) :: sim_param
  character(len=*), intent(inout)     :: geo_file
