@@ -95,9 +95,11 @@ use mod_hdf5_io, only: &
    open_hdf5_file, &
    close_hdf5_file, &
    new_hdf5_group, &
+   new_hdf5_group, &
    open_hdf5_group, &
    close_hdf5_group, &
    write_hdf5, &
+   write_hdf5_attr, &
    read_hdf5, &
    read_hdf5_al, &
    check_dset_hdf5
@@ -296,8 +298,8 @@ contains
 !!    moving elements after, and in the total elements surface panels
 !!    and vortex rings before, then lifting lines and finally actuator disks
 subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
-                           te, elems_impl, elems_expl, elems_ad, elems_ll, &
-                           elems_tot, airfoil_data, sim_param)
+                      te, elems_impl, elems_expl, elems_ad, elems_ll, &
+                    elems_tot, airfoil_data, sim_param, target_file, run_id)
  character(len=*), intent(in) :: geo_file_name
  character(len=*), intent(inout) :: ref_file_name
  character(len=*), intent(in) :: in_file_name
@@ -310,11 +312,15 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
  type(t_tedge), intent(out) :: te
  type(t_aero_tab) , allocatable, intent(out) :: airfoil_data(:)
  type(t_sim_param) , intent(inout) :: sim_param
+ character(len=*), intent(in) :: target_file
+ integer, intent(in)              :: run_id(10)
+
  real(wp)                     :: tstart
 
  integer :: i, j, is, im,  i_comp, i_ll, i_ad, i_tot, i_expl, i_impl
  type(t_impl_elem_p), allocatable :: temp_static_i(:), temp_moving_i(:)
  type(t_expl_elem_p), allocatable :: temp_static_e(:), temp_moving_e(:)
+ integer(h5loc) :: floc
 
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name='create_geometry'
@@ -330,11 +336,15 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   endif
   call build_references(geo%refs, trim(ref_file_name), sim_param)
 
+  !Create the output geometry file
+  call new_hdf5_file(trim(target_file), floc)
+  call write_hdf5_attr(run_id, 'run_id', floc)
+  call close_hdf5_file(floc)
 
   !Load the components from the file created by the preprocessor
-  !geo_file_name = getstr(prms, 'GeometryFile')
   call check_preproc(geo_file_name)
-  call load_components(geo, trim(geo_file_name), sim_param, te)
+  call load_components(geo, trim(geo_file_name), trim(target_file), &
+                       sim_param, te)
 
   
 
@@ -343,8 +353,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   ! Initialisation
   geo%nelem_impl   = 0
   geo%nelem_expl   = 0
-  !geo%nll          = 0
-  !geo%nad          = 0
   geo%nstatic_impl = 0
   geo%nmoving_impl = 0
   geo%nstatic_expl = 0
@@ -359,7 +367,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
 
     select case(trim(geo%components(i_comp)%comp_el_type))
      case('p')
-    !if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p') then
       if(geo%components(i_comp)%moving) then
         geo%nmoving_impl = geo%nmoving_impl + geo%components(i_comp)%nelems
       else
@@ -369,7 +376,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
       geo%nelem_impl = geo%nelem_impl + geo%components(i_comp)%nelems
 
      case('v')
-    !elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'v') then
       if(geo%components(i_comp)%moving) then
         geo%nmoving_impl = geo%nmoving_impl + geo%components(i_comp)%nelems
       else
@@ -379,7 +385,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
       geo%nelem_impl = geo%nelem_impl + geo%components(i_comp)%nelems
 
      case('l')
-    !elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'l') then
       if(geo%components(i_comp)%moving) then
         geo%nmoving_expl = geo%nmoving_expl + geo%components(i_comp)%nelems
       else
@@ -389,7 +394,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
       geo%nelem_expl = geo%nelem_expl + geo%components(i_comp)%nelems
      
      case('a')
-    !elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'a') then
       if(geo%components(i_comp)%moving) then
         geo%nmoving_expl = geo%nmoving_expl + geo%components(i_comp)%nelems
       else
@@ -397,7 +401,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
       endif
       geo%nActDisk = geo%nActDisk + geo%components(i_comp)%nelems
       geo%nelem_expl = geo%nelem_expl + geo%components(i_comp)%nelems
-    !endif
      case default
       call error (this_sub_name, this_mod_name, 'Unknow type of element: '&
                   //trim(geo%components(i_comp)%comp_el_type))
@@ -451,7 +454,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
         i_tot = i_tot+1
         elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
         select type(el => geo%components(i_comp)%el(j)); class is(c_impl_elem)
-        !elems_impl(i)%p => geo%components(i_comp)%el(j)
         elems_impl(i_impl)%p => el
         end select
       enddo
@@ -464,8 +466,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
         i_tot = i_tot+1
         elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
         select type(el => geo%components(i_comp)%el(j)); class is(c_expl_elem)
-          !elems_ll(i_ll)%p => geo%components(i_comp)%el(j)
-          !elems_expl(i_expl)%p => geo%components(i_comp)%el(j)
           elems_ll(i_ll)%p => el
           elems_expl(i_expl)%p => el
         end select
@@ -479,8 +479,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
         i_tot = i_tot+1
         elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
         select type(el => geo%components(i_comp)%el(j)); class is(c_expl_elem)
-          !elems_ad(i_ad)%p => geo%components(i_comp)%el(j)
-          !elems_expl(i_expl)%p => geo%components(i_comp)%el(j)
           elems_ad(i_ad)%p => el
           elems_expl(i_expl)%p => el
         end select
@@ -537,32 +535,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
     elems_expl(i)%p%id = i+geo%nelem_impl
   end do
 
-  !!Patch together everything in elems_tot
-  !do i = 1, geo%nelem_impl
-  !  select type(el => elems_impl(i)%p)
-  !  class is(c_pot_elem)
-  !    elems_tot(i)%p => el
-  !  end select
-  !enddo
-
-  !do i = 1, geo%nelem_expl
-  !  select type(el => elems_expl(i)%p)
-  !  class is(c_pot_elem)
-  !    elems_tot(geo%nelem_impl+i)%p => el
-  !  end select
-  !enddo
-
-  !elems_tot(1:geo%nelem_impl) = elems_impl
-  !elems_tot(geo%nelem_impl+1:geo%nelem_impl+geo%nelem_expl) =elems_expl
-
-  !EXPERIMENTAL
-  !do i = 1,size(elems_tot)
-  !  elems_tot(i)%p%id = i
-  !end do
-  
-  !TODO: think about getting both of these into "prepare_geometry"
-  !call create_local_velocity_stencil(geo)    ! for surfpan only (3dP)
-
   call create_strip_connectivity(geo)
   
 end subroutine create_geometry
@@ -576,9 +548,10 @@ end subroutine create_geometry
 !! attached to their relative reference frames.
 !! The points and the elements are then genereated.
 !! Finally the trailing edge is created
-subroutine load_components(geo, in_file, sim_param, te)
+subroutine load_components(geo, in_file, out_file, sim_param, te)
  type(t_geo), intent(inout),target :: geo
  character(len=*), intent(in) :: in_file
+ character(len=*), intent(in) :: out_file
  type(t_sim_param) :: sim_param
  type(t_tedge), intent(out) :: te
 
@@ -594,6 +567,7 @@ subroutine load_components(geo, in_file, sim_param, te)
  integer :: ref_id, iref
  character(len=max_char_len) :: msg, cname, cname_write
  integer(h5loc) :: floc, gloc, cloc , geo_loc , te_loc, cloc2
+ integer(h5loc) :: floc_out, gloc_out, cloc_out , geo_loc_out , te_loc_out
  integer :: n_comp, i_comp, n_comp_input, i_comp_input, n_comp_write
  integer :: n_mult, i_mult
  logical :: mult
@@ -628,12 +602,51 @@ subroutine load_components(geo, in_file, sim_param, te)
   call open_hdf5_group(floc,'Components',gloc)
   call read_hdf5(n_comp,'NComponents',gloc)
 
+  ! First it is necessary to count how many actual components will 
+  ! be present, including the multiples. Due to pointers pointing to
+  ! allocatables the components array cannot be expanded later
+  n_comp_input = n_comp
+  do i_comp_input = 1,n_comp_input
+    write(cname,'(A,I3.3)') 'Comp',i_comp_input
+    call open_hdf5_group(gloc,trim(cname),cloc)
+    call read_hdf5(ref_tag,'RefTag',cloc)
+    !Look for the reference frame of the component
+    ref_id = -1
+    do iref = 0,ubound(geo%refs,1)
+      if (trim(geo%refs(iref)%tag) .eq. trim(ref_tag)) then
+        !set id
+        ref_id = iref
+      endif
+    enddo
+    !if not found the reference
+    if (ref_id .lt. 0) then
+      write(msg,'(A,I2,A,A,A)') 'For component ',i_comp, &
+                   ' a reference with tag ',trim(ref_tag),' was not found'
+      call error(this_sub_name, this_mod_name, msg)
+    endif
+    mult = .false.
+    n_mult = 1
+    mult = geo%refs(ref_id)%multiple
+    if(mult) then
+      n_mult = geo%refs(ref_id)%n_mult
+      n_comp = n_comp+n_mult-1 !(one was already counted)
+    endif
+    call close_hdf5_group(cloc)
+  enddo
+  
+  ! Allocate the components of the right full size
   allocate(geo%components(n_comp))
 
-  elems_offset = 0
+  !Open and prepare the output file
+  call open_hdf5_file(trim(out_file),floc_out)
+  call new_hdf5_group(floc_out,'Components',gloc_out)
+  call write_hdf5(n_comp,'NComponents',gloc_out)
 
-  n_comp_input = n_comp
+  elems_offset = 0
+  
+  !TODO check this
   n_comp_write = n_comp
+
   i_comp = 1
   do i_comp_input = 1,n_comp_input
 
@@ -673,11 +686,6 @@ subroutine load_components(geo, in_file, sim_param, te)
 
     if(mult) then
       n_mult = geo%refs(ref_id)%n_mult
-      n_comp = n_comp+n_mult-1 !(one was already counted)
-      allocate(comp_temp(n_comp))
-      comp_temp(1:i_comp) = geo%components(1:i_comp)
-      deallocate(geo%components)
-      call move_alloc(comp_temp, geo%components)
     endif
 
     !cycle on all the possible multiple references, if it is not multiple
@@ -686,16 +694,7 @@ subroutine load_components(geo, in_file, sim_param, te)
     do i_mult = 1,n_mult
       ref_tag_m = ref_tag
       !set the component id
-      if(mult) then
-        if(i_mult .eq. 1) then
-          geo%components(i_comp)%comp_id = i_comp_input 
-        else
-          n_comp_write = n_comp_write+1
-          geo%components(i_comp)%comp_id = n_comp_write
-        endif
-      else
-        geo%components(i_comp)%comp_id = i_comp_input 
-      endif
+      geo%components(i_comp)%comp_id = i_comp
       if(mult)  then
         !look again for the multiple reference
         write(ref_tag_m,'(A,I2.2)') trim(ref_tag)//'__',i_mult
@@ -723,12 +722,6 @@ subroutine load_components(geo, in_file, sim_param, te)
 !     ! ====== READING =====
       geo%components(i_comp)%comp_el_type = trim(comp_el_type)
       geo%components(i_comp)%comp_input   = trim(comp_input  )
-
-! *** 2018-06-25. Two calls moved outside the loop on i_mult
-! *** call read_hdf5(comp_el_type,'ElType',cloc)
-! *** call read_hdf5(comp_name,'CompName',cloc)
-!     !add the multiplicity appendix if multiple
-!     write(*,*) ' ****** CompName : ' , trim(comp_name)
  
       if(mult) then
         write(geo%components(i_comp)%comp_name,'(A,I2.2)') trim(comp_name)&
@@ -768,9 +761,6 @@ subroutine load_components(geo, in_file, sim_param, te)
       if ( trim(comp_input) .eq. 'parametric' ) then
         call read_hdf5(par_nelems_span,'parametric_nelems_span',geo_loc)
         call read_hdf5(par_nelems_chor,'parametric_nelems_chor',geo_loc)
-        !DEBUG
-        write(*,*) ' par_nelems_span : ' , par_nelems_span
-        write(*,*) ' par_nelems_chor : ' , par_nelems_chor
       end if
  
       call close_hdf5_group(geo_loc)
@@ -792,84 +782,61 @@ subroutine load_components(geo, in_file, sim_param, te)
         call close_hdf5_group(te_loc)
       else
         allocate(e_te(0,0), i_te(2,0), ii_te(2,0), neigh_te(2,0), o_te(2,0),&
-                 t_te(2,0))
+                 t_te(3,0))
+      endif
+      
+      !Re-write all that was read in the new output file (cannot just copy 
+      !the read file since the components order will be changed when emplying
+      !the multiple components)
+
+      write(cname_write,'(A,I3.3)') 'Comp',geo%components(i_comp)%comp_id
+      call new_hdf5_group(gloc_out,trim(cname_write),cloc2)
+      call write_hdf5(ref_id,'RefId',cloc2)
+      call write_hdf5(trim(ref_tag_m),'RefTag',cloc2)
+      call write_hdf5(trim(comp_el_type),'ElType',cloc2)
+      call write_hdf5(trim(geo%components(i_comp)%comp_name), &
+                                                          'CompName',cloc2)
+      call write_hdf5(trim(geo%components(i_comp)%comp_input),&
+                                                         'CompInput',cloc2)
+      call new_hdf5_group(cloc2,'Geometry',geo_loc)
+
+      call write_hdf5(ee   ,'ee'   ,geo_loc)
+      call write_hdf5(rr   ,'rr'   ,geo_loc)
+      call write_hdf5(neigh,'neigh',geo_loc)
+      if ( comp_el_type(1:1) .eq. 'l' ) then
+        call write_hdf5(airfoil_list      ,'airfoil_list'      ,geo_loc)
+        call write_hdf5(nelem_span_list   ,'nelem_span_list'   ,geo_loc)
+        call write_hdf5(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
+        call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
+
+      else if (comp_el_type(1:1) .eq. 'a') then
+        call write_hdf5(trac,'Traction',cloc2)
+        call write_hdf5(rad,'Radius',cloc2)
+
       endif
 
-      !Treat the multiplicity: if it is multiple we need to re-write the
-      !components into the geometry file
+      if ( trim(comp_input) .eq. 'parametric' ) then
+        !write HDF5 fields
+        call write_hdf5(par_nelems_span,'parametric_nelems_span',geo_loc)
+        call write_hdf5(par_nelems_chor,'parametric_nelems_chor',geo_loc)
+      end if
 
-      if(mult) then
-        if(i_mult .eq. 1) then
-          !first multiple: the component stays the same, added the reference
-          !id and updated the name with the multiple appendix
-          call write_hdf5(trim(geo%components(i_comp)%comp_name),'CompName',cloc) 
-          call write_hdf5(trim(geo%components(i_comp)%comp_input),'CompInput',cloc)
-          call write_hdf5(ref_id,'RefId',cloc)
-          call write_hdf5(trim(ref_tag_m),'RefTag',cloc)
+      call close_hdf5_group(geo_loc)
 
-        else
-          !Following multiples: need to create a new component in the file and
-          !re-write everything
-          !n_comp_write = n_comp_write+1
-          !write(cname_write,'(A,I3.3)') 'Comp',n_comp_write
-          write(cname_write,'(A,I3.3)') 'Comp',geo%components(i_comp)%comp_id
-          call new_hdf5_group(gloc,trim(cname_write),cloc2)
-          call write_hdf5(ref_id,'RefId',cloc2)
-          call write_hdf5(trim(ref_tag_m),'RefTag',cloc2)
-          call write_hdf5(trim(comp_el_type),'ElType',cloc2)
-          call write_hdf5(trim(geo%components(i_comp)%comp_name), &
-                                                              'CompName',cloc2)
-          call write_hdf5(trim(geo%components(i_comp)%comp_input),&
-                                                             'CompInput',cloc2)
-          call new_hdf5_group(cloc2,'Geometry',geo_loc)
+      if( comp_el_type(1:1) .eq. 'p' .or. &
+          comp_el_type(1:1) .eq. 'v' .or. &
+          comp_el_type(1:1) .eq. 'l') then
+        call new_hdf5_group(cloc2,'Trailing_Edge',te_loc)
+        call write_hdf5(    e_te,    'e_te',te_loc)
+        call write_hdf5(    i_te,    'i_te',te_loc)
+        call write_hdf5(   ii_te,   'ii_te',te_loc)
+        call write_hdf5(neigh_te,'neigh_te',te_loc)
+        call write_hdf5(    o_te,    'o_te',te_loc)
+        call write_hdf5(    t_te,    't_te',te_loc)
+        call close_hdf5_group(te_loc)
+      endif
 
-          call write_hdf5(ee   ,'ee'   ,geo_loc)
-          call write_hdf5(rr   ,'rr'   ,geo_loc)
-          call write_hdf5(neigh,'neigh',geo_loc)
-          if ( comp_el_type(1:1) .eq. 'l' ) then
-            call write_hdf5(airfoil_list      ,'airfoil_list'      ,geo_loc)
-            call write_hdf5(nelem_span_list   ,'nelem_span_list'   ,geo_loc)
-            call write_hdf5(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
-            call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
-
-          else if (comp_el_type(1:1) .eq. 'a') then
-            call write_hdf5(trac,'Traction',cloc2)
-            call write_hdf5(rad,'Radius',cloc2)
-
-          endif
-
-          if ( trim(comp_input) .eq. 'parametric' ) then
-            !write HDF5 fields
-            call write_hdf5(par_nelems_span,'parametric_nelems_span',geo_loc)
-            call write_hdf5(par_nelems_chor,'parametric_nelems_chor',geo_loc)
-          end if
-
-          call close_hdf5_group(geo_loc)
-
-          if( comp_el_type(1:1) .eq. 'p' .or. &
-              comp_el_type(1:1) .eq. 'v' .or. &
-              comp_el_type(1:1) .eq. 'l') then
-            call new_hdf5_group(cloc2,'Trailing_Edge',te_loc)
-            call write_hdf5(    e_te,    'e_te',te_loc)
-            call write_hdf5(    i_te,    'i_te',te_loc)
-            call write_hdf5(   ii_te,   'ii_te',te_loc)
-            call write_hdf5(neigh_te,'neigh_te',te_loc)
-            call write_hdf5(    o_te,    'o_te',te_loc)
-            call write_hdf5(    t_te,    't_te',te_loc)
-            call close_hdf5_group(te_loc)
-          endif
-
-
-          call close_hdf5_group(cloc2)
-        endif
-
-      else
-        !Not multiple:
-        !just write the reference id to the component
-        call write_hdf5(ref_id,'RefId',cloc)
-
-      endif ! if mult
-
+      call close_hdf5_group(cloc2)
 
       ! ======= CREATING ELEMENTS ======
 
@@ -916,9 +883,6 @@ subroutine load_components(geo, in_file, sim_param, te)
       !fill (some) of the elements fields
       do i2=1,size(ee,2)
 
-        !Component id
-        !geo%components(i_comp)%el(i2)%comp_id = i_comp
-
         !vertices
         n_vert = count(ee(:,i2).ne.0)
         allocate(geo%components(i_comp)%el(i2)%i_ver(n_vert))
@@ -933,8 +897,6 @@ subroutine load_components(geo, in_file, sim_param, te)
           else
             ! do nothing, keep the neighbour pointer not associated
             geo%components(i_comp)%el(i2)%neigh(i3)%p => null()
-            !geo%components(i_comp)%el(i2)%i_neigh(i3) = &
-            !                        neigh(i3,i2)
           end if
         end do
 
@@ -987,7 +949,7 @@ subroutine load_components(geo, in_file, sim_param, te)
         allocate(te%ii   (2,ne_te) ) ; te%ii    =    ii_te
         allocate(te%neigh(2,ne_te) ) ; te%neigh = neigh_te
         allocate(te%o    (2,ne_te) ) ; te%o     =     o_te
-        allocate(te%t    (2,nn_te) ) ; te%t     =     t_te
+        allocate(te%t    (3,nn_te) ) ; te%t     =     t_te
         allocate(te%ref  (  nn_te) ) ; te%ref   = geo%components(i_comp)%ref_id
 
       elseif (ne_te .gt. 0) then
@@ -1041,28 +1003,18 @@ subroutine load_components(geo, in_file, sim_param, te)
 
 
 
-       end if
+      end if
 
 
-      write(*,*) ' shape(geo%components(i_comp)%el) : ' , shape(geo%components(i_comp)%el)
-      write(*,*) ' geo%components(i_comp)%comp_name : ' , geo%components(i_comp)%comp_name
-      write(*,*) ' i_comp: ' , i_comp
       ! 2018-07-5. Deassociate neighboring elements through the TE
       do i1 = 1,ne_te
-        write(*,*) ' e_te ' , e_te(:,i1)
-        write(*,*) i1 , i_comp , geo%components(i_comp)%el(e_te(1,i1))%n_ver ! geo%components(i_comp)%el(e_te(1,i1))%id   
         do i2 = 1,geo%components(i_comp)%el(e_te(1,i1))%n_ver
-!         if ( geo%components(i_comp)%el(e_te(1,i1))%neigh(i2)%p%id .eq. e_te(2,i1) ) then
           if ( neigh(i2,e_te(1,i1)) .eq. e_te(2,i1) ) then
-            write(*,*) ' e_te(1,i1) , neigh(i2,e_te(1,i1)): ' , &
-                         e_te(1,i1) , neigh(i2,e_te(1,i1))
             geo%components(i_comp)%el(e_te(1,i1))%neigh(i2)%p => null() 
           end if
         end do
         do i2 = 1,geo%components(i_comp)%el(e_te(2,i1))%n_ver
           if ( neigh(i2,e_te(2,i1)) .eq. e_te(1,i1) ) then
-            write(*,*) ' e_te(2,i1) , neigh(i2,e_te(2,i1)): ' , &
-                         e_te(2,i1) , neigh(i2,e_te(2,i1))
             geo%components(i_comp)%el(e_te(2,i1))%neigh(i2)%p => null() 
           end if
         end do
@@ -1084,10 +1036,11 @@ subroutine load_components(geo, in_file, sim_param, te)
 
   enddo !i_comp
   !update the total number of components
-  call write_hdf5(i_comp-1,'NComponents',gloc)
+  !call write_hdf5(i_comp-1,'NComponents',gloc)
   call close_hdf5_group(gloc)
   call close_hdf5_file(floc)
-
+  call close_hdf5_group(gloc_out)
+  call close_hdf5_file(floc_out)
 
 end subroutine load_components
 
@@ -1157,22 +1110,12 @@ subroutine import_aero_tab(geo,coeff)
 
    deallocate(i_airfoil_e_tmp)
 
-   ! check ----
-   write(*,*) ' mod_geo.f89/import_aero_tab().  Component: ' , i_c
-   write(*,*) ' size(geo%components(',i_c,')%i_airfoil_e : ' , shape(geo%components(i_c)%i_airfoil_e)
-   do i_l = 1 , size(geo%components(i_c)%i_airfoil_e,2)
-     write(*,*) geo%components(i_c)%i_airfoil_e(:,i_l)
-   end do
-   write(*,*)
-   ! check ----
-
    end if
 
  end do
 
  ! Read tables and fill coeff structure
  allocate(coeff(n_a))
- write(*,*) ' Number of different airfoils : ' , n_a
  do i_a = 1 , n_a
    call read_c81_table( list_tmp(i_a) , coeff(i_a) )
  end do
@@ -1491,73 +1434,6 @@ end subroutine calc_node_vel
 
 !----------------------------------------------------------------------
 
-!DISCONTINUED: consider removing
-!> Compute the coefficients (pot_vel_stencil, for surfpan elements) for
-!!  computing the velocity from the velocity potential (phi = -mu).
-!! On-body analysis for 3dPanels (surfpan). This coefficients are constant
-!!  in the local frame, associated with the component. In order to obtain
-!!  the components of the velcoity in the base frame, the global rotation
-!!  matrix is needed.
-!TODO: move all this stuff in prepare geometry
-!subroutine create_local_velocity_stencil (geo)
-! type(t_geo), intent(inout) :: geo
-! !type(t_impl_elem_p), intent(in)  :: elems(:)
-!
-! real(wp) :: surf_bubble
-! integer  :: i_comp , i_el , i_v
-!
-!  do i_comp = 1 , size(geo%components)
-!
-!    ! Field pot_vel_stencil belongs to surfpan elements only!
-!    !if ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'p' ) then
-!    select type (el => geo%components(i_comp)%el)
-!    type is(t_surfpan)
-!
-!      do i_el = 1 , size(el)
-!        
-!        !TODO: consider removing this check if we are pretty sure it will
-!        !pass
-!        if ( allocated(el(i_el)%pot_vel_stencil) ) then
-!          write(*,*) ' WARNING. Already allocated pot_vel_stencil array for '
-!          write(*,*) ' component , element ' , i_comp , i_el
-!          deallocate(el(i_el)%pot_vel_stencil)
-!        end if
-!        allocate(el(i_el)%pot_vel_stencil(3,el(i_el)%n_ver) )
-!
-!        surf_bubble = el(i_el)%area
-!
-!        do i_v = 1 , el(i_el)%n_ver
-!
-!          ! Update surf_bubble
-!          !sum the contribuition only if the neighbour is really present 
-!          if(associated(el(i_el)%neigh(i_v)%p)) then
-!            surf_bubble = surf_bubble + &
-!               el(i_el)%neigh(i_v)%p%area / &
-!               real(el(i_el)%neigh(i_v)%p%n_ver,wp)
-!          endif
-!
-!          el(i_el)%pot_vel_stencil(:,i_v) = &
-!                   cross( el(i_el)%edge_vec(:,i_v) , el(i_el)%nor )
-!
-!        end do
-!
-!        el(i_el)%pot_vel_stencil = el(i_el)%pot_vel_stencil / surf_bubble
-!
-!      end do
-!
-!! else if ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'v' ) then
-!!   no stencil for the velocity ...
-!
-!  !end if
-!  end select
-!
-! end do
-!
-!
-!end subroutine create_local_velocity_stencil
-
-!----------------------------------------------------------------------
-
 ! Updatad node-element connectivity ( ee array )
 ! It is assumed that nodes and elements are sorted as follows
 !
@@ -1642,12 +1518,10 @@ subroutine create_strip_connectivity(geo)
 
     do i_s = 1 , n_s
       do i_c = 1 , n_c
-!       write(*,*) ' comp%el(',i_c+(i_s-1)*n_c,')%stripe_elem : '
         allocate( comp%el(i_c+(i_s-1)*n_c)%stripe_elem(i_c) )
         do i_c2 = 1 , i_c
           comp%el(i_c+(i_s-1)*n_c)%stripe_elem(i_c2)%p => &
                                         comp%el(i_c2+(i_s-1)*n_c)
-!         write(*,*) comp%el(i_c+(i_s-1)*n_c)%stripe_elem(i_c2)
         end do
       end do
     end do
