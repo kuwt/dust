@@ -202,8 +202,12 @@ subroutine compute_pres_actdisk (this, sim_param)
 
  character(len=*), parameter      :: this_sub_name='compute_pres_actdisk'
 
-  call error(this_sub_name, this_mod_name, 'This was not supposed to &
-  &happen, a team of professionals is underway to remove the evidence')
+! Add this simple routine in order to easily include AD elements in postpro
+ this%pres   = this%traction  / this%area
+!write(*,*) ' debug. this%pres   : ' , this%pres
+
+! call error(this_sub_name, this_mod_name, 'This was not supposed to &
+! &happen, a team of professionals is underway to remove the evidence')
 
 !! only steady loads: steady data from table: L -> gam -> p_equiv
 !this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &
@@ -221,8 +225,12 @@ subroutine compute_dforce_actdisk (this, sim_param)
 
  character(len=*), parameter      :: this_sub_name='compute_dforce_actdisk'
 
-  call error(this_sub_name, this_mod_name, 'This was not supposed to &
-  &happen, a team of professionals is underway to remove the evidence')
+! Add this simple routine in order to easily include AD elements in postpro
+ this%dforce = this%traction * this%nor 
+!write(*,*) ' debug. this%dforce : ' , this%dforce
+
+! call error(this_sub_name, this_mod_name, 'This was not supposed to &
+! &happen, a team of professionals is underway to remove the evidence')
 
 !! only steady loads: steady data from table: L -> gam -> p_equiv
 !this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &

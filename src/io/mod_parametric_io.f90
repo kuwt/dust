@@ -237,9 +237,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
   ! Initialise dr_ref for the definition of the actual reference_point 
   !  of each bay (by updating)
-  dx_ref = 0.0_wp
-  dy_ref = 0.0_wp
-  dz_ref = 0.0_wp
+  dx_ref = ref_point(1)       ! 0.0_wp
+  dy_ref = ref_point(2)       ! 0.0_wp
+  dz_ref = ref_point(3)       ! 0.0_wp
 
 
   ista = 1 ; iend = npoint_chord_tot
@@ -261,9 +261,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
       write(*,*) size(rrSection1,1) , size(rrSection1,2)
       write(*,*) size(xySection1,1) , size(xySection1,2)
-      rrSection1(1,:) = xySection1(1,:)
-      rrSection1(2,:) = 0.0_wp              ! <--- read from region structure
-      rrSection1(3,:) = xySection1(2,:)
+      rrSection1(1,:) = xySection1(1,:) + ref_point(1)  
+      rrSection1(2,:) = 0.0_wp          + ref_point(2)     ! <--- read from region structure
+      rrSection1(3,:) = xySection1(2,:) + ref_point(3)
 
       ! Update rr
       rr(:,ista:iend) = rrSection1

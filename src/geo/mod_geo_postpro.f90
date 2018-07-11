@@ -472,6 +472,23 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
     end do
 
   end if
+
+  !TODO: check if this is necessary but not enough
+  ! to avoid Components that do not exist as an input in dust_post.in
+  if ( .not. allocated(components_names) ) then
+    call error(this_sub_name, this_mod_name, &
+                 'components_names .not. allocated. Something strange &  
+                 &and unexpected happened. It could be a bug')
+  end if
+  if ( size(components_names) .le. 0 ) then
+    call error(this_sub_name, this_mod_name, &
+                 'size(components_names) .eq. 0: No Components received as &
+                &input really exist')
+  end if
+
+! ! debug
+! write(*,*) ' debug. mod_geo_postpro.load_components_postpro(). '
+! write(*,*) ' size(components_names) ' , size(components_names) , nl
  
 !  allocate(comps(n_comp))
   nelem = 0
@@ -658,7 +675,10 @@ subroutine prepare_geometry_postpro(comps)
  class(c_pot_elem), pointer :: elem
  character(len=*), parameter :: this_sub_name = 'prepare_geometry_postpro'
 
+ !debug
+!write(*,*) ' size(comps) : ' , size(comps)
  do i_comp = 1,size(comps)
+!  write(*,*) ' size(comps(',i_comp,')%el : ' , size(comps(i_comp)%el)
    do ie = 1,size(comps(i_comp)%el)
      elem => comps(i_comp)%el(ie)
 

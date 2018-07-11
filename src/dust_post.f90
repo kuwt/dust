@@ -297,6 +297,12 @@ do ia = 1,n_analyses
       all_comp = .true.
     endif
   endif
+  !debug
+  write(*,*) ' dust_post. n_comp : ' , n_comp
+  do i_comp = 1 , n_comp
+    write(*,*) ' comp',i_comp,' : ', &
+                   trim(components_names(i_comp))
+  end do
 
   !Fork the different kind of analyses
   select case(trim(an_type))
