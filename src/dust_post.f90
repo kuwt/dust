@@ -335,7 +335,7 @@ do ia = 1,n_analyses
     
     call post_sectional ( sbprms , bxprms , basename , data_basename , an_name , ia , &
                           out_frmt , comps , components_names , all_comp , &
-                          an_start , an_end , an_step )
+                          an_start , an_end , an_step, average )
 
    case default
     call error('dust_post','','Unknown type of analysis: '//trim(an_type))

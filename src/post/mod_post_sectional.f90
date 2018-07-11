@@ -68,9 +68,9 @@ contains
 ! - parametric components aligned with y-axis
 ! - tol_y_cen is hard-coded. write tol_y_cen as an input
 ! - ...
-subroutine post_sectional ( sbprms , bxprms , basename , data_basename , an_name , ia , &
-                            out_frmt , comps , components_names , all_comp , &
-                            an_start , an_end , an_step )
+subroutine post_sectional (sbprms, bxprms, basename, data_basename, an_name, &
+                           ia, out_frmt, comps, components_names, all_comp, &
+                           an_start, an_end, an_step, average )
 type(t_parse), pointer :: sbprms
 type(t_parse), pointer :: bxprms
 character(len=*) , intent(in) :: basename
@@ -82,6 +82,7 @@ type(t_geo_component), allocatable , intent(inout) :: comps(:)
 character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
 logical , intent(in) :: all_comp
 integer , intent(in) :: an_start , an_end , an_step
+logical , intent(in) :: average
 
 character(len=max_char_len) :: cname !, msg
 integer(h5loc) :: floc, gloc, cloc
@@ -104,6 +105,7 @@ integer :: ires
 real(wp) :: axis_dir(3) , axis_nod(3) 
 character(len=max_char_len) :: comp_name_stripped
 real(wp) , allocatable :: sec_loads(:,:,:)
+real(wp) , allocatable :: sec_loads_ave(:,:,:)
 integer :: is 
 integer :: n_loads = 4   ! F and moment around an axis
 real(wp) , allocatable :: ref_mat(:,:) , off_mat(:,:)
@@ -365,16 +367,32 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
       time(ires) = t
     
     end do
-    
-    select case(trim(out_frmt))
-     case('dat')
-      write(filename,'(A)') trim(basename)//'_'//trim(an_name) 
-      call dat_out_sectional ( filename, y_cen, y_span, time, sec_loads, &
-                              ref_mat , off_mat ) 
-     case('tecplot')
-      write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
-      call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span ) 
-    end select
+   
+    if(average) then
+      allocate(sec_loads_ave(1,size(sec_loads,2),size(sec_loads,3)))
+      sec_loads_ave(1,:,:) = sum(sec_loads, 1)/real(size(sec_loads,1),wp)
+      select case(trim(out_frmt))
+       case('dat')
+        write(filename,'(A)') trim(basename)//'_'//trim(an_name) 
+        call dat_out_sectional ( filename, y_cen, y_span, time, &
+                          sec_loads_ave, ref_mat , off_mat, average ) 
+       case('tecplot')
+        write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt' 
+        call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
+                                                                     y_span ) 
+      end select
+      deallocate(sec_loads_ave)
+    else
+      select case(trim(out_frmt))
+       case('dat')
+        write(filename,'(A)') trim(basename)//'_'//trim(an_name) 
+        call dat_out_sectional ( filename, y_cen, y_span, time, sec_loads, &
+                                ref_mat, off_mat, average ) 
+       case('tecplot')
+        write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
+        call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span ) 
+      end select
+    endif
 
     write(*,*) nl//nl//' end of sectional loads'//nl//nl
     
@@ -879,15 +897,41 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
 
     end do
 
-    select case(trim(out_frmt))
-     case('dat')
-      write(filename,'(A)') trim(basename)//'_'//trim(an_name) 
-      call dat_out_sectional ( filename, y_cen, y_span, time, sec_loads, &
-                              ref_mat , off_mat ) 
-     case('tecplot')
-      write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
-      call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span ) 
-    end select
+    !select case(trim(out_frmt))
+    ! case('dat')
+    !  write(filename,'(A)') trim(basename)//'_'//trim(an_name) 
+    !  call dat_out_sectional ( filename, y_cen, y_span, time, sec_loads, &
+    !                          ref_mat , off_mat ) 
+    ! case('tecplot')
+    !  write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
+    !  call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span ) 
+    !end select
+
+    if(average) then
+      allocate(sec_loads_ave(1,size(sec_loads,2),size(sec_loads,3)))
+      sec_loads_ave(1,:,:) = sum(sec_loads, 1)/real(size(sec_loads,1),wp)
+      select case(trim(out_frmt))
+       case('dat')
+        write(filename,'(A)') trim(basename)//'_'//trim(an_name) 
+        call dat_out_sectional ( filename, y_cen, y_span, time, &
+                          sec_loads_ave, ref_mat , off_mat, average ) 
+       case('tecplot')
+        write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt' 
+        call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
+                                                                     y_span ) 
+      end select
+      deallocate(sec_loads_ave)
+    else
+      select case(trim(out_frmt))
+       case('dat')
+        write(filename,'(A)') trim(basename)//'_'//trim(an_name) 
+        call dat_out_sectional ( filename, y_cen, y_span, time, sec_loads, &
+                                ref_mat, off_mat, average) 
+       case('tecplot')
+        write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
+        call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span ) 
+      end select
+    endif
 
     write(*,*) nl//nl//' end of sectional loads'//nl//nl
 ! ######################################################################    

@@ -125,8 +125,8 @@ end subroutine dat_out_probes
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_sectional ( basename , y_cen , y_span , time , sec_loads , &
-              ref_mat , off_mat )
+subroutine dat_out_sectional (basename, y_cen ,y_span ,time ,sec_loads , &
+              ref_mat , off_mat, average )
  character(len=*) , intent(in) :: basename
  real(wp) , intent(in) :: y_cen(:)
  real(wp) , intent(in) :: y_span(:)
@@ -134,50 +134,60 @@ subroutine dat_out_sectional ( basename , y_cen , y_span , time , sec_loads , &
  real(wp) , intent(in) :: sec_loads(:,:,:)
  real(wp) , intent(in) :: ref_mat(:,:)
  real(wp) , intent(in) :: off_mat(:,:)
+ logical,   intent(in) :: average
  
  character(len=2) :: load_str(4)
  character(len=max_char_len) :: filename
  integer :: it , nt , fid , i1 
 
- load_str = (/ 'Fx' , 'Fy' , 'Fz' , 'Mo' /)
-
- nt = size(time)
-
- ! Some checks --------
- if ( size(y_cen) .ne. size(sec_loads,2) ) then
-   write(*,*) ' size(sec_loads,2) : ' , size(sec_loads,2)
-   write(*,*) ' size(y_cen)       : ' , size(y_cen)
-   call error(trim(this_mod_name),'','Inconsistent inputs.& 
-           & size(sec_loads,2) .ne. size(y_cen). Stop ')
- end if
- if ( size(sec_loads,1) .ne. nt ) then
-   call error(trim(this_mod_name),'','Inconsistent inputs.& 
-           & size(sec_loads,1) .ne. size(time). Stop ')
- end if
- if ( size(sec_loads,3) .ne. 4 ) then
-   call error(trim(this_mod_name),'','Inconsistent inputs.& 
-           & size(sec_loads,3) .ne. 4. Stop ')
- end if
-
- ! Print out .dat files
- fid = 21
- do i1 = 1 , 4 
-
-   write(filename,'(A)') trim(basename)//'_'//trim(load_str(i1))//'.dat'
-   open(unit=fid,file=trim(filename))
-   ! Header -----------
-   write(fid,'(A)') '# TODO: component name and other beautiful stuff '
-   write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(sec_loads,2) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
-   write(fid,*) y_cen 
-   write(fid,*) y_span
-   write(fid,'(A)') '# t , sec(n_sec) , ref_mat(9) , ref_off(3) ' 
-   ! Dump data --------
-   do it = 1 , nt 
-     write(fid,*) time(it) , sec_loads(it,:,i1) , ref_mat(it,:) , off_mat(it,:) 
-   end do
-   close(fid)
-
- end do
+  load_str = (/ 'Fx' , 'Fy' , 'Fz' , 'Mo' /)
+ 
+  nt = size(time)
+ 
+  ! Some checks --------
+  if ( size(y_cen) .ne. size(sec_loads,2) ) then
+    write(*,*) ' size(sec_loads,2) : ' , size(sec_loads,2)
+    write(*,*) ' size(y_cen)       : ' , size(y_cen)
+    call error(trim(this_mod_name),'','Inconsistent inputs.& 
+            & size(sec_loads,2) .ne. size(y_cen). Stop ')
+  end if
+  if ( size(sec_loads,1) .ne. nt ) then
+    call error(trim(this_mod_name),'','Inconsistent inputs.& 
+            & size(sec_loads,1) .ne. size(time). Stop ')
+  end if
+  if ( size(sec_loads,3) .ne. 4 ) then
+    call error(trim(this_mod_name),'','Inconsistent inputs.& 
+            & size(sec_loads,3) .ne. 4. Stop ')
+  end if
+ 
+  ! Print out .dat files
+  fid = 21
+  do i1 = 1 , 4 
+    if(average) then
+      write(filename,'(A)') trim(basename)//'_'//trim(load_str(i1))//'_ave.dat'
+    else
+      write(filename,'(A)') trim(basename)//'_'//trim(load_str(i1))//'.dat'
+    endif
+    open(unit=fid,file=trim(filename))
+    ! Header -----------
+    write(fid,'(A)') '# TODO: component name and other beautiful stuff '
+    write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(sec_loads,2) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
+    write(fid,*) y_cen 
+    write(fid,*) y_span
+    
+    if(average) then
+      write(fid,'(A)') '#sec(n_sec)' 
+        write(fid,*) sec_loads(1,:,i1)
+    else
+      write(fid,'(A)') '# t , sec(n_sec) , ref_mat(9) , ref_off(3) ' 
+      ! Dump data --------
+      do it = 1 , nt 
+        write(fid,*) time(it) , sec_loads(it,:,i1) , ref_mat(it,:) , off_mat(it,:) 
+      end do
+    endif
+    close(fid)
+ 
+  end do
 
 
 end subroutine dat_out_sectional
