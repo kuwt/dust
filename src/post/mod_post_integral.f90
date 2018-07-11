@@ -1,3 +1,39 @@
+!!=====================================================================
+!!
+!! Copyright (C) 2018 Politecnico di Milano
+!!
+!! This file is part of DUST, an aerodynamic solver for complex
+!! configurations.
+!! 
+!! Permission is hereby granted, free of charge, to any person
+!! obtaining a copy of this software and associated documentation
+!! files (the "Software"), to deal in the Software without
+!! restriction, including without limitation the rights to use,
+!! copy, modify, merge, publish, distribute, sublicense, and/or sell
+!! copies of the Software, and to permit persons to whom the
+!! Software is furnished to do so, subject to the following
+!! conditions:
+!! 
+!! The above copyright notice and this permission notice shall be
+!! included in all copies or substantial portions of the Software.
+!! 
+!! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+!! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+!! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+!! NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+!! HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+!! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+!! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+!! OTHER DEALINGS IN THE SOFTWARE.
+!! 
+!! Authors: 
+!!          Federico Fonte             <federico.fonte@polimi.it>
+!!          Davide Montagnani       <davide.montagnani@polimi.it>
+!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
+!!=====================================================================
+
+!> Module containing the subroutines to perform integral loads calculations
+!! during postprocessing
 module mod_post_integral
 
 use mod_param, only: &
@@ -71,7 +107,6 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
  
  integer(h5loc) :: floc , ploc
  real(wp), allocatable :: points(:,:)
- integer , allocatable :: elems(:,:)
  integer :: nelem
  
  character(len=max_char_len) :: filename
@@ -81,13 +116,13 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
  real(wp), allocatable :: vort(:), cp(:)
  character(len=max_char_len) :: ref_tag
  integer                     :: ref_id
- real(wp) :: F_loc(3) , F_ref(3) , F_bas(3) , F_bas1(3)
- real(wp) :: M_loc(3) , M_ref(3) , M_bas(3)
+ real(wp) :: F_ref(3) , F_bas(3) , F_bas1(3)
+ real(wp) :: M_ref(3) , M_bas(3)
  real(wp) :: F_ave(3), M_ave(3)
  real(wp), allocatable :: force(:,:), moment(:,:)
  real(wp) :: u_inf(3)
  real(wp) :: P_inf , rho
- integer :: ic2 , ic , it , ie , ierr , ires , fid_out , nstep
+ integer :: ic , it , ie , ierr , ires , fid_out , nstep
  real(wp), allocatable :: time(:)
  real(wp) :: t
  

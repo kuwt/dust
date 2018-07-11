@@ -1,3 +1,39 @@
+!!=====================================================================
+!!
+!! Copyright (C) 2018 Politecnico di Milano
+!!
+!! This file is part of DUST, an aerodynamic solver for complex
+!! configurations.
+!! 
+!! Permission is hereby granted, free of charge, to any person
+!! obtaining a copy of this software and associated documentation
+!! files (the "Software"), to deal in the Software without
+!! restriction, including without limitation the rights to use,
+!! copy, modify, merge, publish, distribute, sublicense, and/or sell
+!! copies of the Software, and to permit persons to whom the
+!! Software is furnished to do so, subject to the following
+!! conditions:
+!! 
+!! The above copyright notice and this permission notice shall be
+!! included in all copies or substantial portions of the Software.
+!! 
+!! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+!! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+!! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+!! NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+!! HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+!! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+!! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+!! OTHER DEALINGS IN THE SOFTWARE.
+!! 
+!! Authors: 
+!!          Federico Fonte             <federico.fonte@polimi.it>
+!!          Davide Montagnani       <davide.montagnani@polimi.it>
+!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
+!!=====================================================================
+
+!> Module containing the subroutines to perform sectional loads 
+!! analysis during postprocessing
 module mod_post_sectional
 
 use mod_param, only: &
@@ -27,7 +63,7 @@ use mod_hdf5_io, only: &
 
 use mod_geo_postpro, only: &
   load_components_postpro, update_points_postpro , prepare_geometry_postpro , &
-  prepare_wake_postpro  ! expand_actdisk_postpro, 
+  prepare_wake_postpro
 
 use mod_geometry, only: &
   t_geo, t_geo_component
@@ -87,10 +123,8 @@ logical , intent(in) :: average
 character(len=max_char_len) :: cname !, msg
 integer(h5loc) :: floc, gloc, cloc
 real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
-real(wp), allocatable :: refs_G(:,:,:), refs_f(:,:)
 real(wp), allocatable :: vort(:), cp(:)
 real(wp), allocatable :: points(:,:)
-integer , allocatable :: elems(:,:)
 integer :: nelem
 integer :: n_comp , n_comp_tot , i_comp , id_comp , ax_coor , ref_id
 character(len=max_char_len), allocatable :: all_components_names(:)
@@ -103,7 +137,6 @@ integer :: ires
 
 ! sectional loads: paramteric components -------------------
 real(wp) :: axis_dir(3) , axis_nod(3) 
-character(len=max_char_len) :: comp_name_stripped
 real(wp) , allocatable :: sec_loads(:,:,:)
 real(wp) , allocatable :: sec_loads_ave(:,:,:)
 integer :: is 
@@ -114,7 +147,7 @@ real(wp) , parameter   :: tol_y_cen = 1.0e-3_wp
 real(wp) , allocatable :: r_axis(:,:) , r_axis_bas(:,:)
 
 real(wp) :: F_bas(3) , F_bas1(3)
-real(wp) :: M_bas(3) , M_bas1(3)
+real(wp) :: M_bas(3)! , M_bas1(3)
 integer :: ie , ic , it , i1
 
 ! sectional loads: box -------------------------------------
@@ -123,7 +156,7 @@ integer :: n_box
 logical :: reshape_box
 !TODO: clean declarations
 real(wp) :: nCoordMaxBox
-real(wp) , allocatable :: box_coord(:,:) , box_coord_tmp(:,:) , box_coord_rotated(:,:)
+real(wp) , allocatable :: box_coord(:,:) , box_coord_tmp(:,:)! , box_coord_rotated(:,:)
 real(wp) :: vVec(3) , bVec(3) , wVec(3) , baseLen(2) , heigLen(2) , spanLen
 real(wp) :: nVec(3) , ref_node(3) ! , axis_mom(3)
 real(wp) :: nCoordMax , nCoordMin
@@ -144,7 +177,6 @@ real(wp) :: interSectAreas(2) , interSectCen(3,2)
 integer  :: nInterSect , index2
 real(wp) :: node1(3) , node2(3) , box_secloads_cen(3)
 integer  :: iSec1 , iSec2 , sec1_nVer , sec2_nVer
-integer  :: iSecWork , iSecOth
 integer  :: nNodeInt(2,2)
 integer  :: nver , iv 
 
@@ -154,14 +186,6 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
 
   write(*,*) nl//' Analysis:',ia,' post_sectional() +++++++++ '//nl
 
-  ! DONE DONE DONE DONE DONE DONE DONE DONE DONE DONE DONE DONE DONE DONE DONE !
-  !TODO: deal with multiple components.                                        !
-  ! A good strategy could be to avoid dealing with multiple components:        !
-  ! --> check if load_components_postpro() subroutine is ok for this strategy  !
-  !     OR stop everything before, reading only the names of the actual        !
-  !        components (around l.90).                                           !
-  !        Look for: ! *** Check if the component really exists *** !          !
-  ! DONE DONE DONE DONE DONE DONE DONE DONE DONE DONE DONE DONE DONE DONE DONE !
   
   ! Some warnings and errors -------------------------------
   ! WARNING: sectional loads are computed for one components only
