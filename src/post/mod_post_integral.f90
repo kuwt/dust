@@ -1,7 +1,7 @@
 module mod_post_integral
 
 use mod_param, only: &
-  wp, nl, max_char_len, extended_char_len , pi
+  wp, nl, max_char_len, extended_char_len , pi, ascii_real
 
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime, new_file_unit
@@ -12,31 +12,25 @@ use mod_parse, only: &
   countoption
 
 use mod_hdf5_io, only: &
-!  initialize_hdf5, destroy_hdf5, &
    h5loc, &
-!  new_hdf5_file, &
    open_hdf5_file, &
-   close_hdf5_file, & ! , &
-!  new_hdf5_group, &
+   close_hdf5_file, & 
    open_hdf5_group, &
    close_hdf5_group, &
-!  write_hdf5, &
    read_hdf5 
-!  read_hdf5_al, &
-!  check_dset_hdf5
 
 use mod_stringtools, only: &
   LowCase, isInList, stricmp
 
 use mod_geo_postpro, only: &
   load_components_postpro, update_points_postpro , prepare_geometry_postpro , &
-  prepare_wake_postpro  ! expand_actdisk_postpro, 
+  prepare_wake_postpro
 
 use mod_geometry, only: &
   t_geo, t_geo_component
 
 use mod_post_load, only: &
-  load_refs, load_res ! , load_wake_viz , load_wake_pan , load_wake_ring
+  load_refs, load_res
 
 use mod_tecplot_out, only: &
   tec_out_loads
@@ -225,11 +219,11 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
       select case(trim(out_frmt))
   
        case ('dat')
-        write(fid_out,'(E12.3)'  ,advance='no') t 
-        write(fid_out,'(3E12.3)' ,advance='no') F_ref
-        write(fid_out,'(3E12.3)' ,advance='no') M_ref
-        write(fid_out,'(9E12.3)',advance='no') refs_R(:,:, ref_id)
-        write(fid_out,'(3E12.3)',advance='no') refs_off(:, ref_id)
+        write(fid_out, '('//ascii_real//')',advance='no') t 
+        write(fid_out,'(3'//ascii_real//')',advance='no') F_ref
+        write(fid_out,'(3'//ascii_real//')',advance='no') M_ref
+        write(fid_out,'(9'//ascii_real//')',advance='no') refs_R(:,:, ref_id)
+        write(fid_out,'(3'//ascii_real//')',advance='no') refs_off(:, ref_id)
         write(fid_out,*) ' '
   
        case('tecplot')
@@ -251,8 +245,8 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
     if(.not. average) then
       close(fid_out)
     else
-        write(fid_out,'(3E12.3)' ,advance='no') F_ave
-        write(fid_out,'(3E12.3)' ,advance='no') M_ave
+        write(fid_out,'(3'//ascii_real//')' ,advance='no') F_ave
+        write(fid_out,'(3'//ascii_real//')' ,advance='no') M_ave
     endif
    
    case('tecplot')

@@ -374,7 +374,7 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
       select case(trim(out_frmt))
        case('dat')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name) 
-        call dat_out_sectional ( filename, y_cen, y_span, time, &
+        call dat_out_sectional ( filename, y_cen, y_span, time(1:1), &
                           sec_loads_ave, ref_mat , off_mat, average ) 
        case('tecplot')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt' 
@@ -897,23 +897,13 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
 
     end do
 
-    !select case(trim(out_frmt))
-    ! case('dat')
-    !  write(filename,'(A)') trim(basename)//'_'//trim(an_name) 
-    !  call dat_out_sectional ( filename, y_cen, y_span, time, sec_loads, &
-    !                          ref_mat , off_mat ) 
-    ! case('tecplot')
-    !  write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
-    !  call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span ) 
-    !end select
-
     if(average) then
       allocate(sec_loads_ave(1,size(sec_loads,2),size(sec_loads,3)))
       sec_loads_ave(1,:,:) = sum(sec_loads, 1)/real(size(sec_loads,1),wp)
       select case(trim(out_frmt))
        case('dat')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name) 
-        call dat_out_sectional ( filename, y_cen, y_span, time, &
+        call dat_out_sectional ( filename, y_cen, y_span, time(1:1), &
                           sec_loads_ave, ref_mat , off_mat, average ) 
        case('tecplot')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt' 

@@ -1,7 +1,7 @@
 module mod_post_probes
 
 use mod_param, only: &
-  wp, nl, max_char_len, extended_char_len , pi
+  wp, nl, max_char_len, extended_char_len , pi, ascii_real
 
 use mod_handling, only: &
   error, warning  , info, printout, dust_time, t_realtime, new_file_unit
@@ -338,7 +338,6 @@ character(len=max_char_len), parameter :: &
       ! compute vorticity
       if ( probe_vort ) then
         vort_probe = 0.0_wp
-        !write(fid_out,'(3F12.6)',advance='no') vort_probe
         probe_vars(i_var:i_var+2, ires, ip) = vort_probe
         i_var = i_var+3
       end if
@@ -361,10 +360,10 @@ character(len=max_char_len), parameter :: &
       call dat_out_probes_header( fid_out , rr_probes , vars_str )
 
       do ires = 1, size(time)
-        write(fid_out,'(F12.6)',advance='no') time(ires)
+        write(fid_out,'('//ascii_real//')',advance='no') time(ires)
         do ip = 1, n_probes
           do ivar = 1, size(probe_vars,1)
-            write(fid_out,'(3F12.6)',advance='no') probe_vars(ivar,ires,ip)
+            write(fid_out,'('//ascii_real//')',advance='no') probe_vars(ivar,ires,ip)
             write(fid_out,'(A)',advance='no') ' '
           enddo
         enddo
