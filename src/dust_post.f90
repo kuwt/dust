@@ -46,8 +46,6 @@ use mod_geometry, only: &
 use mod_basic_io, only: &
   read_mesh_basic, write_basic
 
-!use mod_aero_elements, only: &
-!  c_elem, t_elem_p!, t_vp
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
@@ -64,7 +62,6 @@ use mod_vortline, only: &
 use mod_vortpart, only: &
  initialize_vortpart
 
-!this is for the parsing
 use mod_parse, only: &
   t_parse, &
   getstr, getlogical, getreal, getint, &
@@ -163,8 +160,6 @@ character(len=max_char_len) :: out_frmt
 logical :: all_comp
 logical :: average
 type(t_geo_component), allocatable :: comps(:)
-
-integer :: ic
 
 call printout(nl//'>>>>>> DUST POSTPROCESSOR beginning >>>>>>'//nl)
 call initialize_hdf5()
@@ -341,7 +336,7 @@ do ia = 1,n_analyses
     
     call post_sectional ( sbprms , bxprms , basename , data_basename , an_name , ia , &
                           out_frmt , comps , components_names , all_comp , &
-                          an_start , an_end , an_step )
+                          an_start , an_end , an_step, average )
 
    case default
     call error('dust_post','','Unknown type of analysis: '//trim(an_type))

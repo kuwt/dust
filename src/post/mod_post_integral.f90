@@ -1,7 +1,43 @@
+!!=====================================================================
+!!
+!! Copyright (C) 2018 Politecnico di Milano
+!!
+!! This file is part of DUST, an aerodynamic solver for complex
+!! configurations.
+!! 
+!! Permission is hereby granted, free of charge, to any person
+!! obtaining a copy of this software and associated documentation
+!! files (the "Software"), to deal in the Software without
+!! restriction, including without limitation the rights to use,
+!! copy, modify, merge, publish, distribute, sublicense, and/or sell
+!! copies of the Software, and to permit persons to whom the
+!! Software is furnished to do so, subject to the following
+!! conditions:
+!! 
+!! The above copyright notice and this permission notice shall be
+!! included in all copies or substantial portions of the Software.
+!! 
+!! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+!! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+!! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+!! NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+!! HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+!! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+!! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+!! OTHER DEALINGS IN THE SOFTWARE.
+!! 
+!! Authors: 
+!!          Federico Fonte             <federico.fonte@polimi.it>
+!!          Davide Montagnani       <davide.montagnani@polimi.it>
+!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
+!!=====================================================================
+
+!> Module containing the subroutines to perform integral loads calculations
+!! during postprocessing
 module mod_post_integral
 
 use mod_param, only: &
-  wp, nl, max_char_len, extended_char_len , pi
+  wp, nl, max_char_len, extended_char_len , pi, ascii_real
 
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime, new_file_unit
@@ -12,25 +48,19 @@ use mod_parse, only: &
   countoption
 
 use mod_hdf5_io, only: &
-!  initialize_hdf5, destroy_hdf5, &
    h5loc, &
-!  new_hdf5_file, &
    open_hdf5_file, &
-   close_hdf5_file, & ! , &
-!  new_hdf5_group, &
+   close_hdf5_file, & 
    open_hdf5_group, &
    close_hdf5_group, &
-!  write_hdf5, &
    read_hdf5 
-!  read_hdf5_al, &
-!  check_dset_hdf5
 
 use mod_stringtools, only: &
   LowCase, isInList, stricmp
 
 use mod_geo_postpro, only: &
   load_components_postpro, update_points_postpro , prepare_geometry_postpro , &
-  prepare_wake_postpro  ! expand_actdisk_postpro, 
+  prepare_wake_postpro
 
 use mod_geometry, only: &
   t_geo, t_geo_component
@@ -38,7 +68,6 @@ use mod_geometry, only: &
 use mod_post_load, only: &
   load_refs, load_res , &
   check_if_components_exist
- ! , load_wake_viz , load_wake_pan , load_wake_ring
 
 use mod_tecplot_out, only: &
   tec_out_loads
@@ -79,7 +108,6 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
  
  integer(h5loc) :: floc , ploc
  real(wp), allocatable :: points(:,:)
- integer , allocatable :: elems(:,:)
  integer :: nelem
  
  character(len=max_char_len) :: filename
@@ -89,13 +117,13 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
  real(wp), allocatable :: vort(:), cp(:)
  character(len=max_char_len) :: ref_tag
  integer                     :: ref_id
- real(wp) :: F_loc(3) , F_ref(3) , F_bas(3) , F_bas1(3)
- real(wp) :: M_loc(3) , M_ref(3) , M_bas(3)
+ real(wp) :: F_ref(3) , F_bas(3) , F_bas1(3)
+ real(wp) :: M_ref(3) , M_bas(3)
  real(wp) :: F_ave(3), M_ave(3)
  real(wp), allocatable :: force(:,:), moment(:,:)
  real(wp) :: u_inf(3)
  real(wp) :: P_inf , rho
- integer :: ic2 , ic , it , ie , ierr , ires , fid_out , nstep
+ integer :: ic , it , ie , ierr , ires , fid_out , nstep
  real(wp), allocatable :: time(:)
  real(wp) :: t
  
@@ -238,11 +266,11 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
       select case(trim(out_frmt))
   
        case ('dat')
-        write(fid_out,'(E12.3)'  ,advance='no') t 
-        write(fid_out,'(3E12.3)' ,advance='no') F_ref
-        write(fid_out,'(3E12.3)' ,advance='no') M_ref
-        write(fid_out,'(9E12.3)',advance='no') refs_R(:,:, ref_id)
-        write(fid_out,'(3E12.3)',advance='no') refs_off(:, ref_id)
+        write(fid_out, '('//ascii_real//')',advance='no') t 
+        write(fid_out,'(3'//ascii_real//')',advance='no') F_ref
+        write(fid_out,'(3'//ascii_real//')',advance='no') M_ref
+        write(fid_out,'(9'//ascii_real//')',advance='no') refs_R(:,:, ref_id)
+        write(fid_out,'(3'//ascii_real//')',advance='no') refs_off(:, ref_id)
         write(fid_out,*) ' '
   
        case('tecplot')
@@ -264,8 +292,8 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
     if(.not. average) then
       close(fid_out)
     else
-        write(fid_out,'(3E12.3)' ,advance='no') F_ave
-        write(fid_out,'(3E12.3)' ,advance='no') M_ave
+        write(fid_out,'(3'//ascii_real//')' ,advance='no') F_ave
+        write(fid_out,'(3'//ascii_real//')' ,advance='no') M_ave
     endif
    
    case('tecplot')

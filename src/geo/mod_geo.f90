@@ -38,8 +38,7 @@
 module mod_geometry
 
 use mod_param, only: &
-  wp, max_char_len, nl, prev_tri, next_tri, prev_qua, next_qua, &
-  dict
+  wp, max_char_len, nl, prev_tri, next_tri, prev_qua, next_qua
 
 use mod_sim_param, only: &
   t_sim_param

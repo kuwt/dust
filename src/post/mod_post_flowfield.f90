@@ -1,10 +1,46 @@
+!!=====================================================================
+!!
+!! Copyright (C) 2018 Politecnico di Milano
+!!
+!! This file is part of DUST, an aerodynamic solver for complex
+!! configurations.
+!! 
+!! Permission is hereby granted, free of charge, to any person
+!! obtaining a copy of this software and associated documentation
+!! files (the "Software"), to deal in the Software without
+!! restriction, including without limitation the rights to use,
+!! copy, modify, merge, publish, distribute, sublicense, and/or sell
+!! copies of the Software, and to permit persons to whom the
+!! Software is furnished to do so, subject to the following
+!! conditions:
+!! 
+!! The above copyright notice and this permission notice shall be
+!! included in all copies or substantial portions of the Software.
+!! 
+!! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+!! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+!! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+!! NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+!! HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+!! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+!! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+!! OTHER DEALINGS IN THE SOFTWARE.
+!! 
+!! Authors: 
+!!          Federico Fonte             <federico.fonte@polimi.it>
+!!          Davide Montagnani       <davide.montagnani@polimi.it>
+!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
+!!=====================================================================
+
+!> Module containing the subroutines to perform flowfield visualizations
+!! during postprocessing
 module mod_post_flowfield
 
 use mod_param, only: &
   wp, nl, max_char_len, extended_char_len , pi
 
 use mod_handling, only: &
-  error, warning ! , info, printout, dust_time, t_realtime, new_file_unit
+  error, warning
 
 use mod_geometry, only: &
   t_geo, t_geo_component
@@ -24,13 +60,13 @@ use mod_wake, only: &
 use mod_hdf5_io, only: &
    h5loc, &
    open_hdf5_file, &
-   close_hdf5_file, & ! , &
+   close_hdf5_file, & 
    open_hdf5_group, &
    close_hdf5_group, &
    read_hdf5 
 
 use mod_stringtools, only: &
-  LowCase !, isInList, stricmp
+  LowCase
 
 use mod_geo_postpro, only: &
   load_components_postpro, update_points_postpro , &
@@ -80,7 +116,7 @@ real(wp) :: u_inf(3)
 real(wp) :: P_inf , rho
 real(wp) :: vel_probe(3) = 0.0_wp , vort_probe(3) = 0.0_wp
 real(wp) :: pres_probe 
-real(wp) :: v(3) = 0.0_wp , w(3) = 0.0_wp
+real(wp) :: v(3) = 0.0_wp
 
 real(wp), allocatable , target :: sol(:) 
 integer(h5loc) :: floc , ploc
@@ -94,13 +130,6 @@ real(wp), allocatable :: vort(:), cp(:)
 type(t_wake)        :: wake
 type(t_elem_p), allocatable :: wake_elems(:)
 
-real(wp), allocatable :: wvort(:), wvort_pan(:,:), wvort_rin(:,:)
-real(wp), allocatable :: wpoints(:,:), wpoints_pan(:,:,:), wpoints_rin(:,:,:)
-integer,  allocatable :: wconn(:)
-integer,  allocatable :: welems(:,:)
-integer, allocatable  :: wstart(:,:)
-integer :: nelem_w
-
 real(wp) :: t
 
 integer :: nxyz(3)
@@ -110,7 +139,7 @@ real(wp) :: dxbox , dybox , dzbox
 real(wp), allocatable :: box_vel(:,:) , box_p(:) , box_vort(:,:)
 integer :: ix , iy , iz
 real(wp), allocatable :: vars(:,:) 
-integer :: i_vars , i_var_v , i_var_p , i_var_w
+integer :: i_var_v , i_var_p , i_var_w
 
 integer :: ip , ic , ie , i1 , it
 

@@ -1,7 +1,43 @@
+!!=====================================================================
+!!
+!! Copyright (C) 2018 Politecnico di Milano
+!!
+!! This file is part of DUST, an aerodynamic solver for complex
+!! configurations.
+!! 
+!! Permission is hereby granted, free of charge, to any person
+!! obtaining a copy of this software and associated documentation
+!! files (the "Software"), to deal in the Software without
+!! restriction, including without limitation the rights to use,
+!! copy, modify, merge, publish, distribute, sublicense, and/or sell
+!! copies of the Software, and to permit persons to whom the
+!! Software is furnished to do so, subject to the following
+!! conditions:
+!! 
+!! The above copyright notice and this permission notice shall be
+!! included in all copies or substantial portions of the Software.
+!! 
+!! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+!! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+!! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+!! NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+!! HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+!! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+!! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+!! OTHER DEALINGS IN THE SOFTWARE.
+!! 
+!! Authors: 
+!!          Federico Fonte             <federico.fonte@polimi.it>
+!!          Davide Montagnani       <davide.montagnani@polimi.it>
+!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
+!!=====================================================================
+
+!> Module containing the subroutines to perform probes data collection
+!! during postprocessing
 module mod_post_probes
 
 use mod_param, only: &
-  wp, nl, max_char_len, extended_char_len , pi
+  wp, nl, max_char_len, extended_char_len , pi, ascii_real
 
 use mod_handling, only: &
   error, warning  , info, printout, dust_time, t_realtime, new_file_unit
@@ -90,31 +126,22 @@ integer :: ie , ip , ic , it , ires
 integer(h5loc) :: floc , ploc
 character(len=max_char_len) :: filename
 real(wp), allocatable :: points(:,:)
-integer, allocatable :: elems(:,:)
 integer :: nelem 
 
 real(wp) :: u_inf(3)
 real(wp) :: P_inf , rho
 real(wp) :: vel_probe(3) = 0.0_wp , vort_probe(3) = 0.0_wp 
-real(wp) :: v(3) = 0.0_wp , w(3) = 0.0_wp
+real(wp) :: v(3) = 0.0_wp !, w(3) = 0.0_wp
 real(wp), allocatable , target :: sol(:) 
 real(wp) :: pres_probe
 real(wp) :: t
 
 real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
-real(wp), allocatable :: vort(:), cp(:), vel(:), press(:)
+real(wp), allocatable :: vort(:), cp(:)!, vel(:), press(:)
 
-! wake ------------
-integer, allocatable  :: wstart(:,:)
-real(wp), allocatable :: wvort(:), wvort_pan(:,:), wvort_rin(:,:)
-real(wp), allocatable :: wpoints(:,:), wpoints_pan(:,:,:), wpoints_rin(:,:,:)
-!real(wp), allocatable :: wcen(:,:,:)
-integer,  allocatable :: wconn(:)
-!type(t_wake_panels) :: wake_pan
-!type(t_wake_rings)  :: wake_rin
 type(t_wake) :: wake
 type(t_elem_p), allocatable :: wake_elems(:)
-integer :: i1, ivar, ierr
+integer :: ivar, ierr
 
 character(len=max_char_len), parameter :: & 
    this_sub_name = 'post_probes'
@@ -276,18 +303,10 @@ character(len=max_char_len), parameter :: &
      call update_points_postpro(comps, points, refs_R, refs_off)
      ! Load the results --------------------------
      call load_res(floc, comps, vort, cp, t)
-     !sol = vort
-
-     ! Load the wake -----------------------------
-     !call load_wake_pan(floc, wpoints_pan, wstart, wvort_pan)
-     !call load_wake_ring(floc, wpoints_rin, wconn, wvort_rin)
    
      call load_wake_post(floc, wake, wake_elems) 
      call close_hdf5_file(floc)
      
-     !call prepare_wake_postpro( wpoints_pan, wpoints_rin, wstart, wconn, &
-     !            wvort_pan,  wvort_rin, wake_pan, wake_rin, wake_elems )
-
      time(ires) = t
 
      ! Compute velocity --------------------------
@@ -312,9 +331,6 @@ character(len=max_char_len), parameter :: &
           vel_probe = vel_probe + v/(4*pi) 
         enddo
 
-        !TODO: check ??? is it enough to include all the body and wake elements ???
-
-        ! + u_inf
         vel_probe = vel_probe + u_inf
       end if
 
@@ -338,7 +354,6 @@ character(len=max_char_len), parameter :: &
       ! compute vorticity
       if ( probe_vort ) then
         vort_probe = 0.0_wp
-        !write(fid_out,'(3F12.6)',advance='no') vort_probe
         probe_vars(i_var:i_var+2, ires, ip) = vort_probe
         i_var = i_var+3
       end if
@@ -361,10 +376,10 @@ character(len=max_char_len), parameter :: &
       call dat_out_probes_header( fid_out , rr_probes , vars_str )
 
       do ires = 1, size(time)
-        write(fid_out,'(F12.6)',advance='no') time(ires)
+        write(fid_out,'('//ascii_real//')',advance='no') time(ires)
         do ip = 1, n_probes
           do ivar = 1, size(probe_vars,1)
-            write(fid_out,'(3F12.6)',advance='no') probe_vars(ivar,ires,ip)
+            write(fid_out,'('//ascii_real//')',advance='no') probe_vars(ivar,ires,ip)
             write(fid_out,'(A)',advance='no') ' '
           enddo
         enddo
