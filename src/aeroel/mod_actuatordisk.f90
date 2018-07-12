@@ -329,6 +329,7 @@ subroutine calc_geo_data_actdisk(this, vert)
 
   !TODO: is it necessary to initialize it here?
   this%dforce = 0.0_wp
+  this%dmom   = 0.0_wp
 
 end subroutine calc_geo_data_actdisk
 !----------------------------------------------------------------------

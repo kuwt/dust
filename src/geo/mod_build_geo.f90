@@ -86,11 +86,13 @@ character(len=*), parameter :: this_mod_name = 'mod_build_geo'
 
 contains 
 
-subroutine build_geometry(geo_files, ref_tags, comp_names, output_file)
+subroutine build_geometry(geo_files, ref_tags, comp_names, output_file, & 
+                          global_tol_sew , global_inner_prod_te )
  character(len=*), intent(in) :: geo_files(:)
  character(len=*), intent(in) :: ref_tags(:)
  character(len=*), intent(in) :: comp_names(:)
  character(len=*), intent(in) :: output_file
+ real(wp),intent(in) :: global_tol_sew , global_inner_prod_te
 
  integer :: n_geo, i_geo
  integer(h5loc) :: file_loc, group_loc
@@ -102,7 +104,8 @@ subroutine build_geometry(geo_files, ref_tags, comp_names, output_file)
   call write_hdf5(n_geo,'NComponents',group_loc)
   do i_geo = 1,n_geo
     call build_component(group_loc, trim(geo_files(i_geo)), &
-                         trim(ref_tags(i_geo)), trim(comp_names(i_geo)), i_geo)
+                         trim(ref_tags(i_geo)), trim(comp_names(i_geo)), i_geo , &
+                         global_tol_sew , global_inner_prod_te )
   enddo
 
   call close_hdf5_group(group_loc)
@@ -112,12 +115,14 @@ end subroutine build_geometry
 
 !-----------------------------------------------------------------------
 
-subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
+subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
+                           global_tol_sew , global_inner_prod_te)
  integer(h5loc), intent(in)   :: gloc
  character(len=*), intent(in) :: geo_file
  character(len=*), intent(in) :: ref_tag
  character(len=*), intent(in) :: comp_tag
  integer, intent(in)          :: comp_id
+ real(wp),intent(in) :: global_tol_sew , global_inner_prod_te
 
  type(t_parse) :: geo_prs
  character(len=max_char_len) :: mesh_file
@@ -145,6 +150,13 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
  integer :: npoints_chord_tot, nelems_span, nelems_span_tot
  ! Connectivity and te structures 
  integer , allocatable :: neigh(:,:)
+
+ ! Parameters for gap sewing and te identification
+ real(wp) :: tol_sewing , inner_product_threshold
+ integer :: i_count 
+ ! Projection of the unit tangent exiting from te
+ logical  :: te_proj_logical
+ real(wp) , allocatable :: te_proj_dir(:)
 
  ! trailing edge ------
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
@@ -179,6 +191,20 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
   call geo_prs%CreateRealOption('Radius', &
                'Radius of the rotor')
 
+  ! Parameters for gap sewing and edge identification
+  call geo_prs%CreateRealOption('TolSewing', &
+               'Dimension of the gaps that will be filled, to close TE', &
+               '0.001')  ! very rough default value
+  call geo_prs%CreateRealOption('InnerProductTe', &
+               'Threshold of the inner product of adiacent elements &
+               &across the TE','-0.5')  ! very rough default value
+
+  ! Parameters for te unit tangent vector generation
+  call geo_prs%CreateLogicalOption('ProjTe','Remove some component &
+               &from te vectors','F')
+  call geo_prs%CreateRealArrayOption('ProjTeVector','Vector used to remove &
+               &the te projection.')
+
   ! Section name from CGNS file
   call geo_prs%CreateStringOption('SectionName', &
                'Section name from CGNS file', multiple=.true.)
@@ -196,7 +222,58 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
   comp_el_type = getstr(geo_prs,'ElType')
   ElType = comp_el_type(1:1)
 
-  !Build the group
+  ! Parameters for gap sewing and edge identification ------------------
+  ! TolSewing --------------------------------------
+  i_count = countoption(geo_prs,'TolSewing') 
+  if ( i_count .eq. 1 ) then
+    tol_sewing = getreal(geo_prs,'TolSewing')
+  else if ( i_count .eq. 0 ) then
+    ! Inherit tol_sewing from general parameter
+    tol_sewing = global_tol_sew 
+  else
+    tol_sewing = getreal(geo_prs,'TolSewing')
+
+    call warning(this_sub_name, this_mod_name, 'More than one &
+       &TolSewing parameter defined for component'//trim(comp_tag)// &
+       ', defined in file: '//trim(geo_file)//'.')
+  end if
+ 
+  ! InnerProductTe ---------------------------------
+  i_count = countoption(geo_prs,'InnerProductTe') 
+  if ( i_count .eq. 1 ) then
+    inner_product_threshold = getreal(geo_prs,'InnerProductTe')
+  else if ( i_count .eq. 0 ) then
+    ! Inherit tol_sewing from general parameter
+    inner_product_threshold = global_inner_prod_te
+  else
+    inner_product_threshold = getreal(geo_prs,'InnerProductTe')
+
+    call warning(this_sub_name, this_mod_name, 'More than one &
+       &InnerProductTe parameter defined for component'//trim(comp_tag)// &
+       ', defined in file: '//trim(geo_file)//'. First value used.')
+  end if 
+
+  ! te projection ----------------------------------
+  i_count = countoption(geo_prs,'ProjTe')
+  if ( i_count .eq. 1 ) then
+    te_proj_logical = getlogical(geo_prs,'ProjTe') 
+  end if
+  
+  if ( te_proj_logical ) then
+    i_count = countoption(geo_prs,'ProjTeVector' )
+    if ( i_count .eq. 1 ) then
+      te_proj_dir  = getrealarray(geo_prs, 'ProjTeVector',3)
+      !check
+      write(*,*) ' check in mod_build_geo.f90 +++ '
+    else
+      call error (this_sub_name, this_mod_name, 'ProjTe = T, but &
+         & no ProjTeVector defined for component'//trim(comp_tag)// &
+         ', defined in file: '//trim(geo_file)//'. First value used.')
+    end if
+  end if
+
+
+  !Build the group -----------------------------------------------------
   write(comp_name,'(A,I3.3)')'Comp',comp_id
   call new_hdf5_group(gloc, trim(comp_name), comp_loc)
   call write_hdf5(comp_tag,'CompName',comp_loc)
@@ -334,7 +411,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
            npoints_chord_tot , nelems_span_tot , &
            e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
       else
-        call build_te_general ( ee , rr , ElType ,  &
+        call build_te_general ( ee , rr , ElType , &
+                  tol_sewing , inner_product_threshold , &
+                  te_proj_logical , te_proj_dir , &
                   e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
                                                             !te as an output
       end if
@@ -343,7 +422,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
 
       call build_connectivity_general( ee , neigh )
 
-      call build_te_general ( ee , rr , ElType ,  &
+      call build_te_general ( ee , rr , ElType , &
+                tol_sewing , inner_product_threshold , &
+                te_proj_logical , te_proj_dir , &
                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
                                                           !te as an output
 
@@ -728,12 +809,18 @@ end subroutine build_connectivity_parametric
 
 !----------------------------------------------------------------------
 
-subroutine build_te_general ( ee , rr , ElType ,  &
+subroutine build_te_general ( ee , rr , ElType , &
+                 tol_sewing , inner_prod_thresh ,  &
+                 te_proj_logical , te_proj_dir , &
                  e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
                                                           !te as an output
  integer   , intent(in) :: ee(:,:)
  real(wp)  , intent(in) :: rr(:,:)
  character , intent(in) :: ElType
+ real(wp)  , intent(in) :: tol_sewing
+ real(wp)  , intent(in) :: inner_prod_thresh
+ logical   , intent(in) :: te_proj_logical
+ real(wp)  , intent(in) :: te_proj_dir(:)
 
  ! te structures
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
@@ -741,9 +828,9 @@ subroutine build_te_general ( ee , rr , ElType ,  &
  real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
 
  ! merge ------
- ! 1e-0 for nasa-crm , 3e-3_wp for naca0012
- real(wp),   parameter :: tol_sewing = 1e-3_wp  
- !real(wp),   parameter :: tol_sewing = 1e-0_wp  
+!! 1e-0 for nasa-crm , 3e-3_wp for naca0012      !!! old, hardcoded params
+!real(wp),   parameter :: tol_sewing = 1e-3_wp   !!! now tol_sewing is an input 
+!!real(wp),   parameter :: tol_sewing = 1e-0_wp  !!!
  real(wp), allocatable :: rr_m(:,:)
  integer , allocatable :: ee_m(:,:) , i_m(:,:)
  ! 'closed-te' connectivity -----
@@ -766,7 +853,8 @@ subroutine build_te_general ( ee , rr , ElType ,  &
  write(*,*) '   build_connectivity_general ... done.'
 
 
- call find_te_general ( rr , ee , neigh_m , &  
+ call find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &  
+                te_proj_logical , te_proj_dir , &
                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
                                                          !te as an output
 
@@ -841,12 +929,16 @@ end subroutine merge_nodes_general
 
 ! -------------
 
-subroutine find_te_general ( rr , ee , neigh_m , &  
+subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , & 
+                te_proj_logical , te_proj_dir , & 
                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
                                                          !te as an output
 
  real(wp), intent(in) :: rr(:,:)
  integer , intent(in) :: ee(:,:) , neigh_m(:,:)
+ real(wp), intent(in) :: inner_prod_thresh
+ logical   , intent(in) :: te_proj_logical
+ real(wp)  , intent(in) :: te_proj_dir(:)
  ! actual arrays -----
  integer , allocatable , intent(out) :: e_te(:,:) , i_te(:,:) , ii_te(:,:) 
  integer , allocatable , intent(out) :: neigh_te(:,:) , o_te(:,:)
@@ -869,12 +961,13 @@ subroutine find_te_general ( rr , ee , neigh_m , &
  real(wp) :: t_te_len
  integer  :: t_te_nelem
 
- real(wp), parameter :: inner_prod_thresh = - 0.5d0
+!real(wp), parameter :: inner_prod_thresh = - 0.5d0 ! old hardcoded, now an input
 
- real(wp), dimension(3) , parameter :: u_rel = (/ 1.0_wp , 0.0_wp , 0.0_wp /) 
-                                                ! hard-coded parameter ... 
- real(wp), dimension(3) , parameter :: side_dir = (/ 0.0_wp , 1.0_wp , 0.0_wp /) 
-                                                 ! hard-coded parameter ... 
+!real(wp), dimension(3) , parameter :: u_rel = (/ 1.0_wp , 0.0_wp , 0.0_wp /) 
+!                                               ! hard-coded parameter ... 
+!real(wp), dimension(3) , parameter :: side_dir = (/ 0.0_wp , 1.0_wp , 0.0_wp /) 
+!                                                ! hard-coded parameter ...
+ real(wp) , dimension(3) :: side_dir 
  ! TODO: read as an input of the component
  real(wp) , dimension(3) :: vec1
 
@@ -1059,7 +1152,7 @@ subroutine find_te_general ( rr , ee , neigh_m , &
  !  for the first implicit wake panel  ----------------
  allocate(t_te  (3,nn_te)) ; t_te = 0.0_wp  
  do i_n = 1 , nn_te
-   vec1 = 0.0_wp
+!  vec1 = 0.0_wp
    t_te_len = 0.0_wp
    t_te_nelem = 0
    do i_e = 1 , ne_te 
@@ -1099,11 +1192,17 @@ subroutine find_te_general ( rr , ee , neigh_m , &
 ! **** ! <<<<<<<<<<
 
    ! normalisation
-   t_te(:,i_n) = t_te(:,i_n) / norm2(t_te(:,i_n))
+   t_te(:,i_n) = t_te(:,i_n) / norm2(t_te(:,i_n)) ! TODO: check if it is right
 ! **** ! >>>>>>>>>>
-   t_te_len = 10.0_wp
+   t_te_len = 1.0_wp    ! 10.0_wp TODO: clean
    t_te(:,i_n) = t_te(:,i_n) * t_te_len ! / dble(t_te_nelem)
 ! **** ! >>>>>>>>>>
+
+   side_dir = te_proj_dir
+   if ( te_proj_logical ) then
+     t_te(:,i_n) = t_te(:,i_n) - sum(t_te(:,i_n)*side_dir) * side_dir
+   end if
+
 
  end do
 

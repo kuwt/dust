@@ -130,7 +130,7 @@ character(len=extended_char_len) :: message
 type(t_sim_param) :: sim_param
 ! Asymptotic conditions
 real(wp) :: uinf(3)
-real(wp) :: rho , Pinf, Re, Mach
+real(wp) :: rho , Pinf, a_inf , mu_inf  ! Re, Mach
 
 !Time parameters
 real(wp) :: tstart, tend, dt, time
@@ -240,8 +240,10 @@ call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
                                                            '(/1.0, 0.0, 0.0/)')
 call prms%CreateRealOption( 'P_inf', "free stream pressure", '1.0')
 call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')
-call prms%CreateRealOption( 'Re', "Reynolds number", '1000000.0')
-call prms%CreateRealOption( 'Mach', "Mach number", '0.0')
+! call prms%CreateRealOption( 'Re', "Reynolds number", '1000000.0')
+! call prms%CreateRealOption( 'Mach', "Mach number", '0.0')
+call prms%CreateRealOption( 'a_inf', "Speed of sound", '340.0')  ! m/s
+call prms%CreateRealOption( 'mu_inf', "Dynamic viscosity", '0.00001') ! kg/ms
 call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
 call prms%CreateIntOption('n_wake_particles', 'number of wake particles', &
                                                                   '10000')
@@ -280,8 +282,10 @@ output_start = getlogical(prms, 'output_start')
 Pinf = getreal(prms,'P_inf')
 rho  = getreal(prms,'rho_inf')
 uinf = getrealarray(prms, 'u_inf', 3)
-Re   = getreal(prms,'Re')
-Mach = getreal(prms,'Mach')
+a_inf  = getreal(prms,'a_inf')
+mu_inf = getreal(prms,'mu_inf')
+! Re   = getreal(prms,'Re')
+! Mach = getreal(prms,'Mach')
 
 debug_level = getint(prms, 'debug_level')
 n_wake_panels = getint(prms, 'n_wake_panels')
@@ -356,8 +360,11 @@ allocate(sim_param%u_inf(3))
 sim_param%u_inf = uinf
 sim_param%P_inf = Pinf
 sim_param%rho_inf = rho
-sim_param%Re    = Re
-sim_param%Mach  = Mach
+sim_param%a_inf = a_inf
+sim_param%mu_inf = mu_inf
+! old, element depending for moving bodies, e.g. rotating blades +++++++
+! sim_param%Re    = Re
+! sim_param%Mach  = Mach
 sim_param%first_panel_scaling = wake_pan_scaling
 sim_param%min_vel_at_te       = wake_pan_minvel 
 sim_param%debug_level = debug_level

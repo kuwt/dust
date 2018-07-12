@@ -1259,8 +1259,12 @@ subroutine calc_geo_data_pan(elem,vert)
     end do
   end select
 
-  ! allocate %dforce
+  ! initialise %dforce
   elem%dforce = 0.0_wp
+
+  ! initialise %dmom  
+  elem%dmom   = 0.0_wp
+
 
 
 end subroutine calc_geo_data_pan
@@ -1340,9 +1344,11 @@ subroutine calc_geo_data_ll(elem,vert)
   elem%chord = sum(elem%edge_len((/2,4/)))*0.5_wp
   end select
 
-  ! allocate %dforce
+  ! initialise %dforce
   elem%dforce = 0.0_wp
 
+  ! initialise %dmom  
+  elem%dmom   = 0.0_wp
 
 end subroutine calc_geo_data_ll
 
@@ -1402,8 +1408,11 @@ subroutine calc_geo_data_ad(elem,vert)
     elem%edge_uni(:,is) = elem%edge_vec(:,is) / elem%edge_len(is)
   end do
 
-  ! allocate %dforce
+  ! initialise %dforce
   elem%dforce = 0.0_wp
+
+  ! initialise %dmom  
+  elem%dmom   = 0.0_wp
 
 end subroutine calc_geo_data_ad
 

@@ -404,7 +404,7 @@ this%pres = 0.0_wp
 
 i_stripe = size(this%stripe_elem)
 
-dG_dt = this%didou_dt
+! dG_dt = this%didou_dt
 
 if ( i_stripe .gt. 1 ) then
   !this%pres = - sim_param%rho_inf * &
@@ -415,7 +415,7 @@ if ( i_stripe .gt. 1 ) then
   this%pres = - sim_param%rho_inf * &
         ( norm2(sim_param%u_inf + this%uvort - this%ub) * this%dy / this%area * &
         ( this%mag - this%stripe_elem(i_stripe-1)%p%mag ) + &
-             dG_dt )
+             this%didou_dt ) ! dG_dt )
 else
   !this%pres = - sim_param%rho_inf * &
   !      ( norm2(sim_param%u_inf - this%ub) * this%dy / this%area * &
@@ -425,7 +425,7 @@ else
   this%pres = - sim_param%rho_inf * &
         ( norm2(sim_param%u_inf +this%uvort - this%ub) * this%dy / this%area * &
                this%mag + &
-             dG_dt )
+             this%didou_dt ) ! dG_dt )
 end if
 
 
@@ -441,6 +441,7 @@ type(t_sim_param), intent(in) :: sim_param
 
 this%dforce = this%pres * this%area * this%nor
 
+! TODO: add viscosity and compressibility corrections
 
 end subroutine compute_dforce_vortlatt
 
@@ -512,6 +513,7 @@ subroutine calc_geo_data_vortlatt(this, vert)
 
   !TODO: is it necessary to initialize it here?
   this%dforce = 0.0_wp
+  this%dmom   = 0.0_wp
 
 
 end subroutine calc_geo_data_vortlatt

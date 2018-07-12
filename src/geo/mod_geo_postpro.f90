@@ -480,11 +480,11 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
                  'components_names .not. allocated. Something strange &  
                  &and unexpected happened. It could be a bug')
   end if
-  if ( size(components_names) .le. 0 ) then
-    call error(this_sub_name, this_mod_name, &
-                 'size(components_names) .eq. 0: No Components received as &
-                &input really exist')
-  end if
+! if ( size(components_names) .le. 0 ) then
+!   call error(this_sub_name, this_mod_name, &
+!                'size(components_names) .eq. 0: No Components received as &
+!               &input really exist')
+! end if
 
 ! ! debug
 ! write(*,*) ' debug. mod_geo_postpro.load_components_postpro(). '

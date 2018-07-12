@@ -147,9 +147,9 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
                                components_names,  all_comp)
   call close_hdf5_file(floc)
   
-  ! Check if the desired components really exist
-  write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',an_start,'.h5'
-  call check_if_components_exist ( components_names , filename )
+! ! Check if the desired components really exist
+! write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',an_start,'.h5'
+! call check_if_components_exist ( components_names , filename )
   
   ! Prepare_geometry_postpro
   call prepare_geometry_postpro(comps)
@@ -248,8 +248,9 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
   
         F_bas = F_bas + F_bas1
   
-        M_bas = M_bas + cross( comps(ic)%el(ie)%cen &
-                       -refs_off(:,ref_id) , F_bas1 )
+        M_bas = M_bas + cross( comps(ic)%el(ie)%cen    &
+                      - refs_off(:,ref_id) , F_bas1 )  &
+                      + comps(ic)%el(ie)%dmom   ! updated 2018-07-12
   
       end do !ie
   

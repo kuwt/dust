@@ -150,6 +150,9 @@ type, abstract, extends(c_elem) :: c_pot_elem
   !> Elementary force acting on the element (components in the base ref.sys.)
   real(wp)              :: dforce(3)
 
+  !> Elementary force acting on the element (components in the base ref.sys.)
+  real(wp)              :: dmom(3)
+
   !TODO: these three are used only by vortlatt and liftlin
   ! consider moving them there, but then change the implementation of
   ! create_strip_connectivity
