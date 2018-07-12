@@ -402,6 +402,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
       endif
       geo%nActDisk = geo%nActDisk + geo%components(i_comp)%nelems
       geo%nelem_expl = geo%nelem_expl + geo%components(i_comp)%nelems
+
      case default
       call error (this_sub_name, this_mod_name, 'Unknow type of element: '&
                   //trim(geo%components(i_comp)%comp_el_type))

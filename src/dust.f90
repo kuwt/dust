@@ -489,10 +489,18 @@ do it = 1,nstep
           (/ wake%pan_p, wake%rin_p/), wake%vort_p, sim_param, airfoil_data)
 
   !------ Compute loads -------
-  ! vortex rings and 3d-panels
+  ! Implicit elements: vortex rings and 3d-panels
   do i_el = 1 , size(elems)
     call elems(i_el)%p%compute_pres(sim_param)
     call elems(i_el)%p%compute_dforce(sim_param)
+  end do
+  ! Explicit elements:
+  ! - liftlin: _pres and _dforce computed in solve_liftin()
+  ! - actdisk: avg delta_pressure and force computed here,
+  !            to include thier effects in postpro (e.g. integral loads)
+  do i_el = 1 , size(elems_ad)
+    call elems_ad(i_el)%p%compute_pres(sim_param)
+    call elems_ad(i_el)%p%compute_dforce(sim_param)
   end do
 
   !if ((debug_level .ge. 10).and.time_2_debug_out) then

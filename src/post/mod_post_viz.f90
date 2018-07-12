@@ -43,7 +43,7 @@ use mod_vtk_out, only: &
   vtk_out_viz ! , vtr_write
 
 use mod_post_load, only: &
-  load_refs, load_res, load_wake_viz
+  load_refs, load_res, load_wake_viz , check_if_components_exist
 
 implicit none
 

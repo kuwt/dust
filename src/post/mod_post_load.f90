@@ -28,11 +28,17 @@ use mod_wake, only: &
 
 use mod_aeroel, only: &
   t_elem_p
+
 implicit none
 
-public :: load_refs , load_res , load_wake_post, load_wake_viz , load_wake_pan , load_wake_ring
+public :: load_refs , load_res ,  &
+          load_wake_post, load_wake_viz , &
+          load_wake_pan , load_wake_ring , &
+          check_if_components_exist
 
 private
+
+character(len=*), parameter :: this_mod_name = 'mod_post_load'
 
 contains
 
@@ -553,6 +559,65 @@ subroutine load_wake_post(floc, wake, wake_p)
   endif
 
 end subroutine
+
+!----------------------------------------------------------------------
+
+!TODO: include the possibility of defining multiple components as an input
+subroutine check_if_components_exist( components_list , filename )
+ character(len=*) , intent(in) :: components_list(:)
+ character(len=*) , intent(in) :: filename
+
+ character(len=max_char_len) , allocatable :: components(:)
+ character(len=max_char_len) :: cname !, msg
+ integer(h5loc) :: floc , gloc , cloc
+ integer :: n_comp_tot , n_comp_inp
+
+ integer :: i1 , i2 , i_check , i_comp
+
+ character(len=*), parameter :: this_sub_name = 'check_if_components_exist'
+
+ n_comp_inp = size(components_list) ; write(*,*) ' n_comp_inp : ' , n_comp_inp
+ !debug
+  do i_comp = 1 , n_comp_inp
+    write(*,*) 'comp',i_comp,':',components_list(i_comp)
+  end do
+
+ write(*,*) nl//' ++++ Check component input : '
+ write(*,*) ' checking file: ', trim(filename)
+ call open_hdf5_file(trim(filename),floc)
+ call open_hdf5_group(floc,'Components',gloc)
+ call read_hdf5(n_comp_tot,'NComponents',gloc)
+
+ allocate(components(n_comp_tot))
+ do i_comp = 1 , n_comp_tot
+   write(cname,'(A,I3.3)') 'Comp',i_comp
+   call open_hdf5_group(gloc,trim(cname),cloc)
+   call read_hdf5(components(i_comp),'CompName',cloc)
+   call close_hdf5_group(cloc)
+ end do
+ call close_hdf5_group(gloc)
+ call close_hdf5_file(floc)
+
+ do i1 = 1 , n_comp_inp
+   i_check = 0 ; write(*,*) ' i_check : ' , i_check 
+   do i2 = 1 , n_comp_tot
+     if ( trim(components(i2)) .eq. trim(components_list(i1)) ) &
+                                                        i_check = 1  
+   end do
+   if ( i_check .eq. 0 ) then
+     write(*,*) ' All the available SINGLE components are: '
+     do i2 = 1 , n_comp_tot
+       write(*,*) i2 , ' : ' , trim(components(i2))
+     end do
+     call error(this_sub_name, this_mod_name, &
+              'Component '//trim(components_list(i1))//' received as &
+             &an input does not exist.') 
+   end if 
+ end do 
+
+ write(*,*) nl//' ++++ Check component input : OK. '//nl 
+
+end subroutine check_if_components_exist
 
 !----------------------------------------------------------------------
 

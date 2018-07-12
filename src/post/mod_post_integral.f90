@@ -66,7 +66,8 @@ use mod_geometry, only: &
   t_geo, t_geo_component
 
 use mod_post_load, only: &
-  load_refs, load_res
+  load_refs, load_res , &
+  check_if_components_exist
 
 use mod_tecplot_out, only: &
   tec_out_loads
@@ -130,7 +131,14 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
  character(len=max_char_len), parameter :: this_sub_name = 'post_integral'
 
   write(*,*) nl//' Analysis:',ia,' post_integral() ++++++++++ '//nl
-  
+
+  !debug
+  write(*,*) ' mod_post_integral. n_comp : ' , size(components_names)
+  do ic = 1 , size(components_names)
+    write(*,*) ' comp',ic,' : ', &
+                   trim(components_names(ic))
+  end do
+
   
   ! load the geo components just once just once
   call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
@@ -139,6 +147,9 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
                                components_names,  all_comp)
   call close_hdf5_file(floc)
   
+  ! Check if the desired components really exist
+  write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',an_start,'.h5'
+  call check_if_components_exist ( components_names , filename )
   
   ! Prepare_geometry_postpro
   call prepare_geometry_postpro(comps)
@@ -202,6 +213,7 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
   
     ! Open the file:
     write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
+
     call open_hdf5_file(trim(filename),floc)
   
     ! Load u_inf --------------------------------
