@@ -253,7 +253,7 @@ call prms%CreateRealArrayOption('particles_box_max', 'max coordinates of the &
 call prms%CreateRealOption( 'ImplicitPanelScale', &
                     "Scaling of the first implicit wake panel", '0.3')
 call prms%CreateRealOption( 'ImplicitPanelMinVel', &
-                    "Minimum velocity at the trailing edge", '1.0')
+                    "Minimum velocity at the trailing edge", '1.0e-8')
 
 call prms%CreateRealOption( 'FarFieldRatioDoublet', &
       "Multiplier for far field threshold computation on doublet", '10.0')
@@ -433,7 +433,8 @@ do it = 1,nstep
 
   call init_timestep(time)
 
-  call update_geometry(geo, time, .false.)
+  !call update_geometry(geo, time, .false.)
+  !call prepare_wake(wake, geo, sim_param, it)
 
   call update_liftlin(elems_ll,linsys)
   call update_actdisk(elems_ad,linsys,sim_param)
@@ -444,8 +445,7 @@ do it = 1,nstep
 
 
   !------ Assemble the system ------
-  !call prepare_wake_panels(wake_panels, geo, sim_param)
-  call prepare_wake(wake, geo, sim_param)
+  !call prepare_wake(wake, geo, sim_param)
   t0 = dust_time()
 
   call assemble_linsys(linsys, elems, elems_expl,  &
@@ -517,6 +517,9 @@ do it = 1,nstep
   call update_wake(wake, elems_tot, sim_param)
 
   time = min(tend, time+dt)
+  call update_geometry(geo, time, .false.)
+  call prepare_wake(wake, geo, sim_param)
+  !call update_wake(wake, geo, elems_tot, sim_param)
 
 enddo
 

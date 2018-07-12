@@ -335,10 +335,12 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   endif
   call build_references(geo%refs, trim(ref_file_name), sim_param)
 
-  !Create the output geometry file
-  call new_hdf5_file(trim(target_file), floc)
-  call write_hdf5_attr(run_id, 'run_id', floc)
-  call close_hdf5_file(floc)
+  !Create the output geometry file (if it is not restarting with the same name)
+  if(trim(geo_file_name).ne.trim(target_file)) then
+    call new_hdf5_file(trim(target_file), floc)
+    call write_hdf5_attr(run_id, 'run_id', floc)
+    call close_hdf5_file(floc)
+  endif
 
   !Load the components from the file created by the preprocessor
   call check_preproc(geo_file_name)
@@ -594,8 +596,14 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
  ! # n. elements and nodes at TE ( of the prev. comps)
  integer :: ne_te_prev , nn_te_prev
  real(wp) :: trac, rad
+ logical :: rewrite_geo
 
  character(len=*), parameter :: this_sub_name = 'load_components'
+
+  !Re-write the geometry only if it is not restarting from a previous run
+  !with the same name
+  rewrite_geo = .true.
+  if(trim(in_file).eq.trim(out_file)) rewrite_geo = .false.
 
   call open_hdf5_file(trim(in_file),floc)
   call open_hdf5_group(floc,'Components',gloc)
@@ -636,10 +644,12 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
   ! Allocate the components of the right full size
   allocate(geo%components(n_comp))
 
-  !Open and prepare the output file
-  call open_hdf5_file(trim(out_file),floc_out)
-  call new_hdf5_group(floc_out,'Components',gloc_out)
-  call write_hdf5(n_comp,'NComponents',gloc_out)
+  !Open and prepare the output file (if not restarting with the same name)
+  if(rewrite_geo) then
+    call open_hdf5_file(trim(out_file),floc_out)
+    call new_hdf5_group(floc_out,'Components',gloc_out)
+    call write_hdf5(n_comp,'NComponents',gloc_out)
+  endif
 
   elems_offset = 0
   
@@ -786,56 +796,59 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
       
       !Re-write all that was read in the new output file (cannot just copy 
       !the read file since the components order will be changed when emplying
-      !the multiple components)
+      !the multiple components). If it is restarting with the same name
+      !avoid write
 
       write(cname_write,'(A,I3.3)') 'Comp',geo%components(i_comp)%comp_id
-      call new_hdf5_group(gloc_out,trim(cname_write),cloc2)
-      call write_hdf5(ref_id,'RefId',cloc2)
-      call write_hdf5(trim(ref_tag_m),'RefTag',cloc2)
-      call write_hdf5(trim(comp_el_type),'ElType',cloc2)
-      call write_hdf5(trim(geo%components(i_comp)%comp_name), &
-                                                          'CompName',cloc2)
-      call write_hdf5(trim(geo%components(i_comp)%comp_input),&
-                                                         'CompInput',cloc2)
-      call new_hdf5_group(cloc2,'Geometry',geo_loc)
+      if(rewrite_geo) then
+        call new_hdf5_group(gloc_out,trim(cname_write),cloc2)
+        call write_hdf5(ref_id,'RefId',cloc2)
+        call write_hdf5(trim(ref_tag_m),'RefTag',cloc2)
+        call write_hdf5(trim(comp_el_type),'ElType',cloc2)
+        call write_hdf5(trim(geo%components(i_comp)%comp_name), &
+                                                            'CompName',cloc2)
+        call write_hdf5(trim(geo%components(i_comp)%comp_input),&
+                                                           'CompInput',cloc2)
+        call new_hdf5_group(cloc2,'Geometry',geo_loc)
 
-      call write_hdf5(ee   ,'ee'   ,geo_loc)
-      call write_hdf5(rr   ,'rr'   ,geo_loc)
-      call write_hdf5(neigh,'neigh',geo_loc)
-      if ( comp_el_type(1:1) .eq. 'l' ) then
-        call write_hdf5(airfoil_list      ,'airfoil_list'      ,geo_loc)
-        call write_hdf5(nelem_span_list   ,'nelem_span_list'   ,geo_loc)
-        call write_hdf5(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
-        call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
+        call write_hdf5(ee   ,'ee'   ,geo_loc)
+        call write_hdf5(rr   ,'rr'   ,geo_loc)
+        call write_hdf5(neigh,'neigh',geo_loc)
+        if ( comp_el_type(1:1) .eq. 'l' ) then
+          call write_hdf5(airfoil_list      ,'airfoil_list'      ,geo_loc)
+          call write_hdf5(nelem_span_list   ,'nelem_span_list'   ,geo_loc)
+          call write_hdf5(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
+          call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
 
-      else if (comp_el_type(1:1) .eq. 'a') then
-        call write_hdf5(trac,'Traction',cloc2)
-        call write_hdf5(rad,'Radius',cloc2)
+        else if (comp_el_type(1:1) .eq. 'a') then
+          call write_hdf5(trac,'Traction',cloc2)
+          call write_hdf5(rad,'Radius',cloc2)
 
+        endif
+
+        if ( trim(comp_input) .eq. 'parametric' ) then
+          !write HDF5 fields
+          call write_hdf5(par_nelems_span,'parametric_nelems_span',geo_loc)
+          call write_hdf5(par_nelems_chor,'parametric_nelems_chor',geo_loc)
+        end if
+
+        call close_hdf5_group(geo_loc)
+
+        if( comp_el_type(1:1) .eq. 'p' .or. &
+            comp_el_type(1:1) .eq. 'v' .or. &
+            comp_el_type(1:1) .eq. 'l') then
+          call new_hdf5_group(cloc2,'Trailing_Edge',te_loc)
+          call write_hdf5(    e_te,    'e_te',te_loc)
+          call write_hdf5(    i_te,    'i_te',te_loc)
+          call write_hdf5(   ii_te,   'ii_te',te_loc)
+          call write_hdf5(neigh_te,'neigh_te',te_loc)
+          call write_hdf5(    o_te,    'o_te',te_loc)
+          call write_hdf5(    t_te,    't_te',te_loc)
+          call close_hdf5_group(te_loc)
+        endif
+
+        call close_hdf5_group(cloc2)
       endif
-
-      if ( trim(comp_input) .eq. 'parametric' ) then
-        !write HDF5 fields
-        call write_hdf5(par_nelems_span,'parametric_nelems_span',geo_loc)
-        call write_hdf5(par_nelems_chor,'parametric_nelems_chor',geo_loc)
-      end if
-
-      call close_hdf5_group(geo_loc)
-
-      if( comp_el_type(1:1) .eq. 'p' .or. &
-          comp_el_type(1:1) .eq. 'v' .or. &
-          comp_el_type(1:1) .eq. 'l') then
-        call new_hdf5_group(cloc2,'Trailing_Edge',te_loc)
-        call write_hdf5(    e_te,    'e_te',te_loc)
-        call write_hdf5(    i_te,    'i_te',te_loc)
-        call write_hdf5(   ii_te,   'ii_te',te_loc)
-        call write_hdf5(neigh_te,'neigh_te',te_loc)
-        call write_hdf5(    o_te,    'o_te',te_loc)
-        call write_hdf5(    t_te,    't_te',te_loc)
-        call close_hdf5_group(te_loc)
-      endif
-
-      call close_hdf5_group(cloc2)
 
       ! ======= CREATING ELEMENTS ======
 
@@ -1040,8 +1053,10 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
   !call write_hdf5(i_comp-1,'NComponents',gloc)
   call close_hdf5_group(gloc)
   call close_hdf5_file(floc)
-  call close_hdf5_group(gloc_out)
-  call close_hdf5_file(floc_out)
+  if(rewrite_geo) then
+    call close_hdf5_group(gloc_out)
+    call close_hdf5_file(floc_out)
+  endif
 
 end subroutine load_components
 

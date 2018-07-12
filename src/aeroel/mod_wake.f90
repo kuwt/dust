@@ -212,7 +212,13 @@ type :: t_wake
  !> Last vortex intensity from removed panels
  real(wp), allocatable :: last_pan_idou(:)
 
+ !> Are the panels full? (and so need to produce particles...)
+ logical :: full_panels=.false.
+
 end type
+
+!module variables to share among the different subroutines
+ real(wp), allocatable :: points_end(:,:)
 
 character(len=*), parameter :: this_mod_name='mod_wake'
 
@@ -419,6 +425,8 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, &
   allocate(wake%last_pan_idou(wake%n_pan_stripes))
   wake%last_pan_idou = 0.0_wp
 
+  wake%full_panels = .false.
+
 end subroutine initialize_wake
 
 !----------------------------------------------------------------------
@@ -429,6 +437,7 @@ subroutine destroy_wake(wake)
 
  !dummy to avoid compiler warnings
  wake%nmax_pan = -1
+ deallocate(points_end)
 
 end subroutine
 
@@ -437,16 +446,17 @@ end subroutine
 !> Prepare the first row of panels to be inserted inside the linear system
 !!
 subroutine prepare_wake(wake, geo, sim_param)
- type(t_wake), intent(inout) :: wake
+ type(t_wake), target, intent(inout) :: wake
  type(t_geo), intent(in) :: geo
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: p1, p2
  integer :: ip, iw, ipan
- real(wp) :: dist(3) , vel_te(3)
-
-!real(wp) , parameter :: te_min_v = 1.0_wp ! hard-coded
-! replaced with sim_param%min_vel_at_te
+ real(wp) :: dist(3) , vel_te(3), pos_p(3)
+ real(wp) :: dir(3), partvec(3), ave
+ integer :: ir, k
+ character(len=max_char_len) :: msg
+ character(len=*), parameter :: this_sub_name='prepare_wake'
 
   !Update the first row of panels: set points positions
 
@@ -488,8 +498,98 @@ subroutine prepare_wake(wake, geo, sim_param)
     enddo
   enddo
 
+  !==>    Particles: if the panel wake is at the end, create a particle
+  if(wake%full_panels) then
+    k = 1
+    do iw = 1,wake%n_pan_stripes
+      p1 = wake%i_start_points(1,iw)
+      p2 = wake%i_start_points(2,iw)
+      partvec = 0.0_wp
+      !Left side
+      dir = wake%pan_w_points(:,p1,wake%nmax_pan+1)-points_end(:,p1)
+      if (wake%pan_neigh(1,iw) .gt. 0) then
+        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
+              wake%pan_neigh_o(1,iw)*wake%wake_panels(wake%pan_neigh(1,iw),wake%pan_wake_len)%mag
+        ave = ave/2.0_wp
+      else
+        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+      endif
+      partvec = partvec + dir*ave
+
+      !Right side
+      dir = -wake%pan_w_points(:,p2,wake%nmax_pan+1)+points_end(:,p2)
+      if (wake%pan_neigh(2,iw) .gt. 0) then
+        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
+              wake%pan_neigh_o(2,iw)*wake%wake_panels(wake%pan_neigh(2,iw),wake%pan_wake_len)%mag
+        ave = ave/2.0_wp
+      else
+        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+      endif
+      partvec = partvec + dir*ave
+
+      !End side
+      dir = points_end(:,p1) - points_end(:,p2)
+      ave = wake%wake_panels(iw,wake%pan_wake_len)%mag-wake%last_pan_idou(iw)
+      wake%last_pan_idou(iw) = wake%wake_panels(iw,wake%pan_wake_len)%mag
+      partvec = partvec + dir*ave
+
+      !Calculate the center
+      pos_p = (points_end(:,p1)+points_end(:,p2)+ &
+              wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
+              wake%pan_w_points(:,p2,wake%nmax_pan+1) )/4.0_wp
+
+      !pos_p = (points_end(:,p1)+points_end(:,p2))/2.0_wp
+
+      !Add the particle
+      do ip = k, size(wake%wake_parts)
+        if (wake%wake_parts(ip)%free) then
+          
+          wake%wake_parts(ip)%free = .false.
+          k = ip+1
+          wake%n_prt = wake%n_prt+1
+          wake%wake_parts(ip)%mag = norm2(partvec)
+          if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
+            wake%wake_parts(ip)%dir = partvec/wake%wake_parts(ip)%mag
+          else
+            wake%wake_parts(ip)%dir = partvec
+          endif
+          wake%wake_parts(ip)%cen = pos_p
+          exit
+        endif
+      enddo
+      if (ip .gt. wake%nmax_prt) then
+        write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
+          wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
+          &restarting with a higher number of maximum wake particles'
+      call error(this_sub_name, this_mod_name, trim(msg))
+      endif
+      
+    enddo
+
+    !Recreate the pointer vector
+    if(allocated(wake%part_p)) deallocate(wake%part_p)
+    allocate(wake%part_p(wake%n_prt))
+    deallocate(wake%vort_p)
+    allocate(wake%vort_p(wake%n_prt + wake%n_pan_stripes))
+    !TODO: consider inverting these two cycles
+    k = 1
+    do ip = 1, wake%n_prt
+      do ir=k,wake%nmax_prt
+        if(.not. wake%wake_parts(ir)%free) then
+          k = ir+1
+          wake%part_p(ip)%p => wake%wake_parts(ir)
+          wake%vort_p(ip)%p => wake%wake_parts(ir)
+          exit
+        endif
+      enddo
+    enddo
+    !Add the end vortex to the votical elements pointer
+    do iw = 1, wake%n_pan_stripes
+      wake%vort_p(wake%n_prt+iw)%p => wake%end_vorts(iw)
+    enddo
+  endif
   !If the wake is full, attach the end vortex
-  if (wake%pan_wake_len .eq. wake%nmax_pan) then
+  if (wake%full_panels) then
     do iw = 1,wake%n_pan_stripes
       wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag
       p1 = wake%i_start_points(1,iw)
@@ -673,12 +773,13 @@ subroutine update_wake(wake, elems, sim_param)
  integer :: iw, ipan, ie, ip, np
  integer :: id, ir, k
  integer :: p1, p2
+ real(wp) :: dist(3) , vel_te(3)
  real(wp) :: pos_p(3), vel_p(3), v(3)
  type(t_pot_elem_p), allocatable :: pan_p_temp(:)
  real(wp), allocatable :: point_old(:,:,:)
  real(wp), allocatable :: points(:,:,:)
  real(wp), allocatable :: points_prt(:,:)
- real(wp), allocatable :: points_end(:,:)
+ !real(wp), allocatable :: points_end(:,:)
  logical :: increase_wake
  integer :: size_old
  real(wp) :: dir(3), partvec(3), ave
@@ -686,6 +787,8 @@ subroutine update_wake(wake, elems, sim_param)
  character(len=*), parameter :: this_sub_name='update_wake'
 
   wake%w_vel = 0.0_wp
+
+  if(wake%pan_wake_len .eq. wake%nmax_pan) wake%full_panels=.true.
 
   !==> 1)Panels:  Update the first row of vortex intensities:
   !      it was already calculated (implicitly) in the linear system
@@ -736,7 +839,7 @@ subroutine update_wake(wake, elems, sim_param)
   !if the wake is full, calculate another row of points to generate the 
   !particles
   if(wake%pan_wake_len .eq. wake%nmax_pan) then
-    allocate(points_end(3,wake%n_pan_points)) 
+    if(.not.allocated(points_end)) allocate(points_end(3,wake%n_pan_points)) 
 
     ! create another row of points
     do iw = 1,wake%n_pan_points
@@ -847,97 +950,97 @@ subroutine update_wake(wake, elems, sim_param)
     endif
   enddo
 
-  !==>    Particles: if the panel wake is at the end, create a particle
-  if(wake%pan_wake_len .eq. wake%nmax_pan) then
-    k = 1
-    do iw = 1,wake%n_pan_stripes
-      p1 = wake%i_start_points(1,iw)
-      p2 = wake%i_start_points(2,iw)
-      partvec = 0.0_wp
-      !Left side
-      dir = wake%pan_w_points(:,p1,wake%nmax_pan+1)-points_end(:,p1)
-      if (wake%pan_neigh(1,iw) .gt. 0) then
-        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
-              wake%pan_neigh_o(1,iw)*wake%wake_panels(wake%pan_neigh(1,iw),wake%pan_wake_len)%mag
-        ave = ave/2.0_wp
-      else
-        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
-      endif
-      partvec = partvec + dir*ave
+  !!==>    Particles: if the panel wake is at the end, create a particle
+  !if(wake%pan_wake_len .eq. wake%nmax_pan) then
+  !  k = 1
+  !  do iw = 1,wake%n_pan_stripes
+  !    p1 = wake%i_start_points(1,iw)
+  !    p2 = wake%i_start_points(2,iw)
+  !    partvec = 0.0_wp
+  !    !Left side
+  !    dir = wake%pan_w_points(:,p1,wake%nmax_pan+1)-points_end(:,p1)
+  !    if (wake%pan_neigh(1,iw) .gt. 0) then
+  !      ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
+  !            wake%pan_neigh_o(1,iw)*wake%wake_panels(wake%pan_neigh(1,iw),wake%pan_wake_len)%mag
+  !      ave = ave/2.0_wp
+  !    else
+  !      ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+  !    endif
+  !    partvec = partvec + dir*ave
 
-      !Right side
-      dir = -wake%pan_w_points(:,p2,wake%nmax_pan+1)+points_end(:,p2)
-      if (wake%pan_neigh(2,iw) .gt. 0) then
-        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
-              wake%pan_neigh_o(2,iw)*wake%wake_panels(wake%pan_neigh(2,iw),wake%pan_wake_len)%mag
-        ave = ave/2.0_wp
-      else
-        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
-      endif
-      partvec = partvec + dir*ave
+  !    !Right side
+  !    dir = -wake%pan_w_points(:,p2,wake%nmax_pan+1)+points_end(:,p2)
+  !    if (wake%pan_neigh(2,iw) .gt. 0) then
+  !      ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
+  !            wake%pan_neigh_o(2,iw)*wake%wake_panels(wake%pan_neigh(2,iw),wake%pan_wake_len)%mag
+  !      ave = ave/2.0_wp
+  !    else
+  !      ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+  !    endif
+  !    partvec = partvec + dir*ave
 
-      !End side
-      dir = points_end(:,p1) - points_end(:,p2)
-      ave = wake%wake_panels(iw,wake%pan_wake_len)%mag-wake%last_pan_idou(iw)
-      wake%last_pan_idou(iw) = wake%wake_panels(iw,wake%pan_wake_len)%mag
-      partvec = partvec + dir*ave
+  !    !End side
+  !    dir = points_end(:,p1) - points_end(:,p2)
+  !    ave = wake%wake_panels(iw,wake%pan_wake_len)%mag-wake%last_pan_idou(iw)
+  !    wake%last_pan_idou(iw) = wake%wake_panels(iw,wake%pan_wake_len)%mag
+  !    partvec = partvec + dir*ave
 
-      !Calculate the center
-      pos_p = (points_end(:,p1)+points_end(:,p2)+ &
-              wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
-              wake%pan_w_points(:,p2,wake%nmax_pan+1) )/4.0_wp
+  !    !Calculate the center
+  !    pos_p = (points_end(:,p1)+points_end(:,p2)+ &
+  !            wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
+  !            wake%pan_w_points(:,p2,wake%nmax_pan+1) )/4.0_wp
 
-      !pos_p = (points_end(:,p1)+points_end(:,p2))/2.0_wp
+  !    !pos_p = (points_end(:,p1)+points_end(:,p2))/2.0_wp
 
-      !Add the particle
-      do ip = k, size(wake%wake_parts)
-        if (wake%wake_parts(ip)%free) then
-          
-          wake%wake_parts(ip)%free = .false.
-          k = ip+1
-          wake%n_prt = wake%n_prt+1
-          wake%wake_parts(ip)%mag = norm2(partvec)
-          if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
-            wake%wake_parts(ip)%dir = partvec/wake%wake_parts(ip)%mag
-          else
-            wake%wake_parts(ip)%dir = partvec
-          endif
-          wake%wake_parts(ip)%cen = pos_p
-          exit
-        endif
-      enddo
-      if (ip .gt. wake%nmax_prt) then
-        write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
-          wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
-          &restarting with a higher number of maximum wake particles'
-      call error(this_sub_name, this_mod_name, trim(msg))
-      endif
-      
-    enddo
-    deallocate(points_end)
+  !    !Add the particle
+  !    do ip = k, size(wake%wake_parts)
+  !      if (wake%wake_parts(ip)%free) then
+  !        
+  !        wake%wake_parts(ip)%free = .false.
+  !        k = ip+1
+  !        wake%n_prt = wake%n_prt+1
+  !        wake%wake_parts(ip)%mag = norm2(partvec)
+  !        if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
+  !          wake%wake_parts(ip)%dir = partvec/wake%wake_parts(ip)%mag
+  !        else
+  !          wake%wake_parts(ip)%dir = partvec
+  !        endif
+  !        wake%wake_parts(ip)%cen = pos_p
+  !        exit
+  !      endif
+  !    enddo
+  !    if (ip .gt. wake%nmax_prt) then
+  !      write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
+  !        wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
+  !        &restarting with a higher number of maximum wake particles'
+  !    call error(this_sub_name, this_mod_name, trim(msg))
+  !    endif
+  !    
+  !  enddo
+  !  !deallocate(points_end)
 
-    !Recreate the pointer vector
-    if(allocated(wake%part_p)) deallocate(wake%part_p)
-    allocate(wake%part_p(wake%n_prt))
-    deallocate(wake%vort_p)
-    allocate(wake%vort_p(wake%n_prt + wake%n_pan_stripes))
-    !TODO: consider inverting these two cycles
-    k = 1
-    do ip = 1, wake%n_prt
-      do ir=k,wake%nmax_prt
-        if(.not. wake%wake_parts(ir)%free) then
-          k = ir+1
-          wake%part_p(ip)%p => wake%wake_parts(ir)
-          wake%vort_p(ip)%p => wake%wake_parts(ir)
-          exit
-        endif
-      enddo
-    enddo
-    !Add the end vortex to the votical elements pointer
-    do iw = 1, wake%n_pan_stripes
-      wake%vort_p(wake%n_prt+iw)%p => wake%end_vorts(iw)
-    enddo
-  endif
+  !  !Recreate the pointer vector
+  !  if(allocated(wake%part_p)) deallocate(wake%part_p)
+  !  allocate(wake%part_p(wake%n_prt))
+  !  deallocate(wake%vort_p)
+  !  allocate(wake%vort_p(wake%n_prt + wake%n_pan_stripes))
+  !  !TODO: consider inverting these two cycles
+  !  k = 1
+  !  do ip = 1, wake%n_prt
+  !    do ir=k,wake%nmax_prt
+  !      if(.not. wake%wake_parts(ir)%free) then
+  !        k = ir+1
+  !        wake%part_p(ip)%p => wake%wake_parts(ir)
+  !        wake%vort_p(ip)%p => wake%wake_parts(ir)
+  !        exit
+  !      endif
+  !    enddo
+  !  enddo
+  !  !Add the end vortex to the votical elements pointer
+  !  do iw = 1, wake%n_pan_stripes
+  !    wake%vort_p(wake%n_prt+iw)%p => wake%end_vorts(iw)
+  !  enddo
+  !endif
 
   !==> 4) Panels:  Increase the length of the wake, if it is necessary
   if (wake%pan_wake_len .lt. wake%nmax_pan) then
@@ -1017,7 +1120,6 @@ subroutine update_wake(wake, elems, sim_param)
                     wake%wake_rings(id,ir)%ver)
     enddo
   enddo
-
 
   ! The geometrical quantities of the panels will be all updated at the
   ! beginning of the next iteration in prepare_wake
