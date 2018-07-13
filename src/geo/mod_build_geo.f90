@@ -153,10 +153,11 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
  ! Parameters for gap sewing and te identification
  real(wp) :: tol_sewing , inner_product_threshold
- integer :: i_count 
+ integer :: i_count , i_count2    
  ! Projection of the unit tangent exiting from te
  logical  :: te_proj_logical
- real(wp) , allocatable :: te_proj_dir(:)
+ character(len=max_char_len) :: te_proj_dir
+ real(wp) , allocatable :: te_proj_vec(:)
 
  ! trailing edge ------
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
@@ -201,8 +202,10 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   ! Parameters for te unit tangent vector generation
   call geo_prs%CreateLogicalOption('ProjTe','Remove some component &
-               &from te vectors','F')
-  call geo_prs%CreateRealArrayOption('ProjTeVector','Vector used to remove &
+               &from te vectors.')
+  call geo_prs%CreateStringOption('ProjTeDir','Parallel or normal to &
+               &ProjTeVector direction.','parallel') 
+  call geo_prs%CreateRealArrayOption('ProjTeVector','Vector used for &
                &the te projection.')
 
   ! Section name from CGNS file
@@ -259,15 +262,42 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     te_proj_logical = getlogical(geo_prs,'ProjTe') 
   end if
   
+  ! ------
+  if ( te_proj_logical ) then
+    i_count = countoption(geo_prs,'ProjTeDir' )
+    if ( i_count .eq. 1 ) then
+      te_proj_dir  = getstr(geo_prs, 'ProjTeDir')
+    elseif ( i_count .lt. 1 ) then
+      te_proj_dir = 'parallel'
+      call warning (this_sub_name, this_mod_name, 'ProjTe = T, but &
+         & no ProjTeVDir defined for component'//trim(comp_tag)// &
+         ', defined in file: '//trim(geo_file)//" Default: 'parallel'.")
+    else
+      te_proj_dir = getstr(geo_prs, 'ProjTeDir') 
+      call warning(this_sub_name, this_mod_name, 'ProjTe = T, and &
+         & more than one ProjTeDir defined for component'//trim(comp_tag)// &
+         ', defined in file: '//trim(geo_file)//'. First value used.')
+    end if
+  end if
+  if ( ( trim(te_proj_dir) .ne. 'parallel' ) .and. &
+       ( trim(te_proj_dir) .ne. 'normal'   )         ) then 
+    call error (this_sub_name, this_mod_name, "Wrong 'ProjTeDir' &
+       & input for component"//trim(comp_tag)// &
+       ', defined in file: '//trim(geo_file)//'.')
+  end if 
+  ! ------
   if ( te_proj_logical ) then
     i_count = countoption(geo_prs,'ProjTeVector' )
     if ( i_count .eq. 1 ) then
-      te_proj_dir  = getrealarray(geo_prs, 'ProjTeVector',3)
-      !check
-      write(*,*) ' check in mod_build_geo.f90 +++ '
-    else
+      te_proj_vec  = getrealarray(geo_prs, 'ProjTeVector',3)
+    elseif ( i_count .lt. 1 ) then
       call error (this_sub_name, this_mod_name, 'ProjTe = T, but &
          & no ProjTeVector defined for component'//trim(comp_tag)// &
+         ', defined in file: '//trim(geo_file)//'.')
+    else 
+      te_proj_vec  = getrealarray(geo_prs, 'ProjTeVector',3)
+      call warning(this_sub_name, this_mod_name, 'ProjTe = T, but &
+         & more than one ProjTeVector defined for component'//trim(comp_tag)// &
          ', defined in file: '//trim(geo_file)//'. First value used.')
     end if
   end if
@@ -413,7 +443,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       else
         call build_te_general ( ee , rr , ElType , &
                   tol_sewing , inner_product_threshold , &
-                  te_proj_logical , te_proj_dir , &
+                  te_proj_logical , te_proj_dir , te_proj_vec , &
                   e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
                                                             !te as an output
       end if
@@ -424,7 +454,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
       call build_te_general ( ee , rr , ElType , &
                 tol_sewing , inner_product_threshold , &
-                te_proj_logical , te_proj_dir , &
+                te_proj_logical , te_proj_dir , te_proj_vec , &
                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
                                                           !te as an output
 
@@ -811,7 +841,7 @@ end subroutine build_connectivity_parametric
 
 subroutine build_te_general ( ee , rr , ElType , &
                  tol_sewing , inner_prod_thresh ,  &
-                 te_proj_logical , te_proj_dir , &
+                 te_proj_logical , te_proj_dir , te_proj_vec , &
                  e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
                                                           !te as an output
  integer   , intent(in) :: ee(:,:)
@@ -820,7 +850,8 @@ subroutine build_te_general ( ee , rr , ElType , &
  real(wp)  , intent(in) :: tol_sewing
  real(wp)  , intent(in) :: inner_prod_thresh
  logical   , intent(in) :: te_proj_logical
- real(wp)  , intent(in) :: te_proj_dir(:)
+ character(len=*), intent(in) :: te_proj_dir
+ real(wp)  , intent(in) :: te_proj_vec(:)
 
  ! te structures
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
@@ -854,7 +885,7 @@ subroutine build_te_general ( ee , rr , ElType , &
 
 
  call find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &  
-                te_proj_logical , te_proj_dir , &
+                te_proj_logical , te_proj_dir , te_proj_vec , &
                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
                                                          !te as an output
 
@@ -930,7 +961,7 @@ end subroutine merge_nodes_general
 ! -------------
 
 subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , & 
-                te_proj_logical , te_proj_dir , & 
+                te_proj_logical , te_proj_dir , te_proj_vec ,  & 
                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
                                                          !te as an output
 
@@ -938,7 +969,8 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
  integer , intent(in) :: ee(:,:) , neigh_m(:,:)
  real(wp), intent(in) :: inner_prod_thresh
  logical   , intent(in) :: te_proj_logical
- real(wp)  , intent(in) :: te_proj_dir(:)
+ character(len=*), intent(in) :: te_proj_dir
+ real(wp)  , intent(in) :: te_proj_vec(:)
  ! actual arrays -----
  integer , allocatable , intent(out) :: e_te(:,:) , i_te(:,:) , ii_te(:,:) 
  integer , allocatable , intent(out) :: neigh_te(:,:) , o_te(:,:)
@@ -1198,11 +1230,21 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
    t_te(:,i_n) = t_te(:,i_n) * t_te_len ! / dble(t_te_nelem)
 ! **** ! >>>>>>>>>>
 
-   side_dir = te_proj_dir
-   if ( te_proj_logical ) then
-     t_te(:,i_n) = t_te(:,i_n) - sum(t_te(:,i_n)*side_dir) * side_dir
-   end if
+   if ( trim(te_proj_dir) .eq. 'normal' ) then
+   
+     side_dir = te_proj_vec
+     if ( te_proj_logical ) then
+       t_te(:,i_n) = t_te(:,i_n) - sum(t_te(:,i_n)*side_dir) * side_dir
+     end if
 
+   elseif ( trim(te_proj_dir) .eq. 'parallel' ) then
+   
+     side_dir = te_proj_vec
+     if ( te_proj_logical ) then
+       t_te(:,i_n) = sum(t_te(:,i_n)*side_dir) * side_dir
+     end if
+
+   end if
 
  end do
 
