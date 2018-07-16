@@ -621,11 +621,8 @@ subroutine compute_pres_surfpan(this, sim_param)
   vel_phi = 0.0_wp
   do i_e = 1 , this%n_ver
     if ( associated(this%neigh(i_e)%p) ) then !  .and. &
-!     if  ( sum( this%nor*this%neigh(i_e)%p%nor) .gt. -0.5_wp ) then
       vel_phi = vel_phi + &
         this%pot_vel_stencil(:,i_e) * (this%neigh(i_e)%p%mag - this%mag)
-    ! else
-!     end  if
     end if
   end do
 
@@ -639,10 +636,12 @@ subroutine compute_pres_surfpan(this, sim_param)
   ! pressure -------------------------------------------------
   ! unsteady problems  : P = P_inf + 0.5*rho_inf*V_inf^2
   !                                - 0.5*rho_inf*V^2 - rho_inf*dphi/dt
+  !                                     + rho * ub.u_phi
   ! with idou = -phi
   this%pres  = sim_param%P_inf &
     + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
     - 0.5_wp * sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp  &
+             + sim_param%rho_inf * sum(this%ub*vel_phi) &
              + sim_param%rho_inf * this%didou_dt
 
 
@@ -689,12 +688,8 @@ subroutine create_local_velocity_stencil_surfpan (this)
     !sum the contribuition only if the neighbour is really present 
     if(associated(this%neigh(i_v)%p)) then
 
-!     ! 2018-07-05: the same criterion as for the TE identification.
-!     ! Modification required for closed TE
-!     if ( sum( this%nor * this%neigh(i_v)%p%nor ) .gt. -0.5_wp ) then
         bubble_surf = bubble_surf + &
            this%neigh(i_v)%p%area / real(this%neigh(i_v)%p%n_ver,wp)
-!     end if
 
     endif
 
@@ -778,6 +773,7 @@ subroutine calc_geo_data_surfpan(this,vert)
 
   !TODO: is it necessary to initialize it here?
   this%dforce = 0.0_wp
+  this%dmom   = 0.0_wp
 
 
 end subroutine calc_geo_data_surfpan

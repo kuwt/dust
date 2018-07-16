@@ -294,6 +294,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  elems_vort, &
  real(wp) :: damp=2.0_wp
  real(wp), parameter :: toll=1e-6_wp
  real(wp) :: diff
+ ! mach and reynolds number for each el
+ real(wp) :: mach , reynolds
  ! arrays used for force projection
  real(wp) , allocatable :: a_v(:)   ! size(elems_ll)
  real(wp) , allocatable :: c_m(:,:) ! size(elems_ll) , 3
@@ -324,45 +326,67 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  elems_vort, &
   allocate(c_m(size(elems_ll),3)) ; c_m = 0.0_wp
   allocate(u_v(size(elems_ll)  )) ; u_v = 0.0_wp
 
+  ! Remove the "out-of-plane" component of the relative velocity:
+  ! 2d-velocity to enter the airfoil look-up-tables
   do i_l=1,size(elems_ll)
    select type(el => elems_ll(i_l)%p)
    type is(t_liftlin)
      u_v(i_l) = norm2((uinf-el%ub) - &
-         el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
+         el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub))) 
    end select
   end do
 
   !Calculate the induced velocity on the airfoil
-  do ic = 1,100
+  do ic = 1,100   !TODO: Refine this iterative process 
     diff = 0.0_wp
     do i_l = 1,size(elems_ll)
+
+      ! compute velocity
       vel = 0.0_wp
       do j = 1,size(elems_tot)
         call elems_tot(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
         vel = vel + v
       enddo
+
       select type(el => elems_ll(i_l)%p)
       type is(t_liftlin)
         vel = vel/(4.0_wp*pi) + uinf - el%ub +vel_w(:,i_l)
         !vel = uinf - el%ub
         up = vel-el%bnorm_cen*sum(el%bnorm_cen*vel)
-        !Employing the free stream velocity to get into tables
-        ! norm2((uinf-el%ub) - el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
-        unorm = u_v(i_l)
-        !unorm = norm2(up)
+
+        ! Compute reference velocity (includes the motion of the body)
+        ! to use in LUT (.c81) of aerodynamic loads (2d airfoil)
+        !TODO: test these two approximations
+        unorm = u_v(i_l)      ! velocity w/o induced velocity
+      ! unorm = norm2(up)     ! full velocity
+       
+        ! Angle of incidence (full velocity)
         alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
-        alpha = alpha * 180.0_wp/pi
+        alpha = alpha * 180.0_wp/pi  ! .c81 tables defined with angles in [deg]
+
+        ! compute local Reynolds and Mach numbers for the section
+        ! needed to enter the LUT (.c81) of aerodynamic loads (2d airfoil)
+        mach     = unorm / sim_param%a_inf      
+        reynolds = sim_param%rho_inf * unorm * & 
+                   el%chord / sim_param%mu_inf    
 
         call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil, &
-                      (/alpha, sim_param%Mach, sim_param%Re/) , aero_coeff )
-        cl = aero_coeff(1)
-        !endif
+                      (/alpha, mach, reynolds/) , aero_coeff )
+        cl = aero_coeff(1)   ! cl needed for the iterative process
+       
+        ! Compute the "equivalent" intensity of the vortex line 
         dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
         diff = max(diff,abs(elems_ll(i_l)%p%mag-dou_temp(i_l)))
+
       end select
+
       c_m(i_l,:) = aero_coeff
       a_v(i_l)   = alpha * pi/180.0_wp
+
     enddo
+
+    !TODO: while refining the iterative process, 
+    ! move this hardcoded parameter in the input files
     damp = 5.0_wp
 
     do i_l = 1,size(elems_ll)
@@ -378,13 +402,21 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  elems_vort, &
   do i_l = 1,size(elems_ll)
    select type(el => elems_ll(i_l)%p)
    type is(t_liftlin)
+    ! avg delta_p = \vec{F}.\vec{n} / A = ( L*cos(al)+D*sin(al) ) / A
     el%pres   = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
                ( c_m(i_l,1) * cos(a_v(i_l)) +  c_m(i_l,2) * sin(a_v(i_l)) )
+    ! elementary force = p*n + tangential contribution from L,D
     el%dforce = ( el%nor * el%pres + &
                   el%tang_cen * &
                   0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * ( &
                  -c_m(i_l,1) * sin(a_v(i_l)) + c_m(i_l,2) * cos(a_v(i_l)) &
                  ) ) * el%area
+    ! elementary moment = 0.5 * rho * v^2 * A * c * cm, 
+    ! - around bnorm_cen (always? TODO: check)
+    ! - referred to the ref.point of the elem,
+    !   ( here, cen of the elem = cen of the liftlin (for liftlin elems) )
+    el%dmom = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
+                   el%chord * el%area * c_m(i_l,3)
    end select
   end do
 
@@ -455,6 +487,7 @@ subroutine calc_geo_data_liftlin(this, vert)
 
   !TODO: is it necessary to initialize it here?
   this%dforce = 0.0_wp
+  this%dmom   = 0.0_wp
 
 
 end subroutine calc_geo_data_liftlin

@@ -272,8 +272,6 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
   
   case ( 'parametric' )
   
-    !TODO: move to a subroutine
-    
     ! Some assumptions ---------------
     id_comp = 1   ! 1. only one component is loaded
     ax_coor = 2   ! 2. the parametric elements is defined
@@ -373,7 +371,8 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
           F_bas1 = comps(id_comp)%el(ie)%dforce
           F_bas  = F_bas + F_bas1
           M_bas  = M_bas + cross( comps(id_comp)%el(ie)%cen &
-                         - r_axis_bas(:,is) , F_bas1 )
+                         - r_axis_bas(:,is) , F_bas1 )      &
+                         + comps(id_comp)%el(ie)%dmom ! updated 2018-07-12 
         end do ! loop over chord
     
         ! From global to local coordinates of forces and moments 
@@ -901,8 +900,10 @@ character(len=max_char_len), parameter :: this_sub_name = 'post_sectional'
                                       box_secloads(is)%fracs(ie)
           F_bas  = F_bas + F_bas1
           !TODO: add moment (it requires axis computation)
-          M_bas  = M_bas + cross( box_secloads_cen - &
-                                  r_axis_bas(:,is) , F_bas1 )
+          M_bas  = M_bas + cross( box_secloads_cen -          &
+                                  r_axis_bas(:,is) , F_bas1 ) &
+                         + comps(id_comp)%el(                 &
+                             box_secloads(is)%elems(ie) )%dmom ! updated 2018-07-12 
         end do
 
         ! From global to local coordinates of forces and moments 

@@ -364,23 +364,29 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, &
 
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1,wake%n_pan_points
-    dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
+!   dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
     call calc_node_vel( wake%w_start_points(:,ip), &
             geo%refs(wake%pan_gen_ref(ip))%G_g, &
             geo%refs(wake%pan_gen_ref(ip))%f_g, &
             vel_te )
     if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
+
+      dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
+
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                   dist*sim_param%first_panel_scaling* &
                   norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist)
   ! normalisation occurs here! --------------------------------------^
-!     write(*,*) ' iii '
+
     else
-!     write(*,*) ' ooo '
+
+      dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
+
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                   dist*sim_param%first_panel_scaling * & ! next line may be commented
                   sim_param%min_vel_at_te*sim_param%dt
     end if
+
   enddo
 
   !Starting length of the panel wake is 1

@@ -78,8 +78,12 @@ character(len=max_char_len), allocatable :: ref_tags(:)
 
 !Geometry parameters
 type(t_parse) :: prms
- type(t_link), pointer :: lnk
+type(t_link), pointer :: lnk
 
+!General parameters: tol_sew,inner_prod_thr
+real(wp) :: tol_sew
+real(wp) :: inner_prod_thr
+integer :: n_tol_sew , n_inner_prod
 
 integer :: n_geo, n_tag, n_name, i
 
@@ -110,14 +114,26 @@ endif
 call prms%CreateStringOption('CompName','Component Name', multiple=.true.)
 call prms%CreateStringOption('GeoFile','Geometry definition files', multiple=.true.)
 call prms%CreateStringOption('RefTag','Reference Tag of the component', multiple=.true.)
-call prms%CreateStringOption('FileName','Preprocessor output file')
 
+call prms%CreateRealOption('TolSewing','Global parameter for closing gaps','0.001')
+call prms%CreateRealOption('InnerProductTe','Global parameter for edge identification','-0.5')
+
+call prms%CreateStringOption('FileName','Preprocessor output file')
 
 call prms%read_options(input_file_name, printout_val=.false.)
 
 n_name = countoption(prms,'CompName')
 n_geo  = countoption(prms,'GeoFile')
 n_tag  = countoption(prms,'RefTag')
+
+n_tol_sew = countoption(prms,'TolSewing')
+if ( n_tol_sew .eq. 1 ) then
+  tol_sew = getreal(prms,'TolSewing')
+end if
+n_inner_prod = countoption(prms,'InnerProductTe')
+if ( n_inner_prod .eq. 1 ) then
+  inner_prod_thr = getreal(prms,'InnerProductTe')
+end if
 
 if(n_geo .ne. n_name)  call error('dust_pre','','Different number of components &
   & and components names in input file "'//trim(input_file_name)//'"')
@@ -128,7 +144,7 @@ output_file_name_read = getstr(prms, 'FileName')
 
 allocate(comp_names(n_geo), geo_files(n_geo), ref_tags(n_geo))
 do i=1,n_geo
-  comp_names(i) = getstr(prms, 'CompName')
+  comp_names(i) = getstr(prms,'CompName')
   geo_files(i) = getstr(prms,'GeoFile',olink=lnk)
   call check_opt_consistency(lnk,prev=.true.,prev_opt='CompName')
   call check_opt_consistency(lnk,next=.true.,next_opt='RefTag')
@@ -137,7 +153,8 @@ enddo
 
 if (.not. cmd_set_filename) output_file_name = output_file_name_read
 
-call build_geometry(geo_files,ref_tags,comp_names,trim(output_file_name))
+call build_geometry(geo_files,ref_tags,comp_names,trim(output_file_name), &
+                 tol_sew , inner_prod_thr )
 
 
 deallocate(comp_names, geo_files, ref_tags)
