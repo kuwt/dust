@@ -147,6 +147,7 @@ integer :: n_wake_panels
 integer :: n_wake_parts
 real(wp) :: part_box_min(3), part_box_max(3)
 real(wp) :: wake_pan_scaling , wake_pan_minvel
+logical :: rigid_wake
 
 !doublet parameters
 real(wp) :: ff_ratio_dou, ff_ratio_sou, eps_dou, r_Rankine, r_cutoff
@@ -268,6 +269,8 @@ call prms%CreateRealOption( 'RankineRad', &
 call prms%CreateRealOption( 'CutoffRad', &
       "Radius of complete cutoff  for vortex induction near core", '0.001')
 
+call prms%CreateLogicalOption('rigid_wake','rigid wake?','F')
+
 
 ! get the parameters and print them out
 call printout(nl//'====== Input parameters: ======')
@@ -292,6 +295,7 @@ n_wake_panels = getint(prms, 'n_wake_panels')
 n_wake_parts = getint(prms, 'n_wake_particles')
 part_box_min = getrealarray(prms, 'particles_box_min',3)
 part_box_max = getrealarray(prms, 'particles_box_max',3)
+rigid_wake = getlogical(prms, 'rigid_wake')
 
 wake_pan_scaling = getreal(prms,'ImplicitPanelScale')
 wake_pan_minvel  = getreal(prms,'ImplicitPanelMinVel')
@@ -367,6 +371,7 @@ sim_param%mu_inf = mu_inf
 ! sim_param%Mach  = Mach
 sim_param%first_panel_scaling = wake_pan_scaling
 sim_param%min_vel_at_te       = wake_pan_minvel 
+sim_param%rigid_wake = rigid_wake
 sim_param%debug_level = debug_level
 sim_param%basename = basename
 

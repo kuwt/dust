@@ -89,6 +89,7 @@ public :: t_wake, initialize_wake, update_wake, &
 
 private
 
+
 !> Type containing wake panels information
 type :: t_wake
 
@@ -220,6 +221,35 @@ end type
 !module variables to share among the different subroutines
  real(wp), allocatable :: points_end(:,:)
 
+!> Class to change methods from different wake implementations
+type, abstract :: c_wake_mov
+  contains
+  procedure(i_get_vel), deferred, pass(this) :: get_vel
+end type
+
+abstract interface 
+ subroutine i_get_vel(this, elems, wake, pos, sim_param, vel)
+   import :: c_wake_mov, wp, t_pot_elem_p, t_wake, t_sim_param
+   class(c_wake_mov) :: this
+   type(t_pot_elem_p), intent(in) :: elems(:)
+   type(t_wake), intent(in) :: wake
+   real(wp), intent(in) :: pos(3)
+   type(t_sim_param), intent(in) :: sim_param
+   real(wp), intent(out) :: vel(3)
+ end subroutine
+end interface
+
+type, extends(c_wake_mov) :: t_free_wake
+contains
+  procedure, pass(this) :: get_vel => get_vel_free
+end type
+
+type, extends(c_wake_mov) :: t_rigid_wake
+contains
+  procedure, pass(this) :: get_vel => get_vel_rigid
+end type
+
+class(c_wake_mov), allocatable :: wake_movement
 character(len=*), parameter :: this_mod_name='mod_wake'
 
 !----------------------------------------------------------------------
@@ -246,6 +276,11 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, &
 ! real(wp) , parameter :: te_min_v = 1.0_wp ! hard-coded
 ! replaced with sim_param%min_vel_at_te
 
+  if (sim_param%rigid_wake) then
+    allocate(t_rigid_wake::wake_movement)
+  else
+    allocate(t_free_wake::wake_movement)
+  endif
   !panel wake: set and allocate all the relevant variables
   wake%nmax_pan = npan
   wake%n_pan_stripes = size(te%e,2)
@@ -830,12 +865,13 @@ subroutine update_wake(wake, elems, sim_param)
       pos_p = point_old(:,iw,ipan-1)
       vel_p = 0.0_wp
 
-      call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
+      !call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
 
-      ! for OUTPUT only -----
-      wake%w_vel(:,iw,ipan-1) = vel_p
+      !! for OUTPUT only -----
+      !wake%w_vel(:,iw,ipan-1) = vel_p
 
-      vel_p    = vel_p   + sim_param%u_inf
+      !vel_p    = vel_p   + sim_param%u_inf
+      call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
 
       !update the position in time
       wake%pan_w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + vel_p*sim_param%dt
@@ -857,6 +893,7 @@ subroutine update_wake(wake, elems, sim_param)
       call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
 
       vel_p    = vel_p   + sim_param%u_inf
+      !call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
 
       !update the position in time
       points_end(:,iw) = pos_p + vel_p*sim_param%dt
@@ -904,9 +941,10 @@ subroutine update_wake(wake, elems, sim_param)
       pos_p = points(:,ip,ir)
       vel_p = 0.0_wp
 
-      call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
+      !call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
 
-      vel_p    = vel_p   +sim_param%u_inf
+      !vel_p    = vel_p   +sim_param%u_inf
+      call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
 
       !update the position in time
       points(:,ip,ir) = points(:,ip,ir) + vel_p*sim_param%dt
@@ -935,9 +973,10 @@ subroutine update_wake(wake, elems, sim_param)
   do ip = 1, wake%n_prt
     pos_p = wake%part_p(ip)%p%cen
     
-    call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
+    !call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
 
-    vel_p    = vel_p   +sim_param%u_inf
+    !vel_p    = vel_p   +sim_param%u_inf
+    call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
 
     !update the position
     points_prt(:,ip) = wake%part_p(ip)%p%cen + vel_p*sim_param%dt
@@ -1095,7 +1134,35 @@ subroutine compute_vel_from_all(elems, wake, pos, sim_param, vel)
 
 end subroutine compute_vel_from_all
 
+!----------------------------------------------------------------------
 
+subroutine get_vel_free(this, elems, wake, pos, sim_param, vel)
+ class(t_free_wake) :: this
+ type(t_pot_elem_p), intent(in) :: elems(:)
+ type(t_wake), intent(in) :: wake
+ real(wp), intent(in) :: pos(3)
+ type(t_sim_param), intent(in) :: sim_param
+ real(wp), intent(out) :: vel(3)
+
+  call compute_vel_from_all(elems, wake, pos, sim_param, vel)
+  
+  vel = vel + sim_param%u_inf
+
+end subroutine get_vel_free
+
+!----------------------------------------------------------------------
+
+subroutine get_vel_rigid(this, elems, wake, pos, sim_param, vel)
+ class(t_rigid_wake) :: this
+ type(t_pot_elem_p), intent(in) :: elems(:)
+ type(t_wake), intent(in) :: wake
+ real(wp), intent(in) :: pos(3)
+ type(t_sim_param), intent(in) :: sim_param
+ real(wp), intent(out) :: vel(3)
+
+  vel = sim_param%u_inf
+
+end subroutine get_vel_rigid
 !----------------------------------------------------------------------
 
 end module mod_wake

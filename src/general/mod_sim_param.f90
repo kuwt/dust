@@ -80,6 +80,7 @@ type t_sim_param
   !Wake
   real(wp) :: first_panel_scaling
   real(wp) :: min_vel_at_te
+  logical :: rigid_wake
 
   !Handling parameters:
   !> Debug level
