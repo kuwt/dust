@@ -485,10 +485,6 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
                  'size(components_names) .eq. 0: No Components received as &
                 &input really exist')
   end if
-
-! ! debug
-! write(*,*) ' debug. mod_geo_postpro.load_components_postpro(). '
-! write(*,*) ' size(components_names) ' , size(components_names) , nl
  
 !  allocate(comps(n_comp))
   nelem = 0
@@ -521,7 +517,6 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
 
       comps(i_comp)%ref_id  = ref_id
       comps(i_comp)%ref_tag = trim(ref_tag)
-      !geo%components(i_comp)%moving  = geo%refs(ref_id)%moving
 
       ! ====== READING =====
       call read_hdf5(comp_el_type,'ElType',cloc)

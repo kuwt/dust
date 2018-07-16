@@ -290,14 +290,9 @@ do ia = 1,n_analyses
     call LowCase(components_names(1),lowstr)    ! char 
     if(trim(lowstr) .eq. 'all') then
       all_comp = .true.
+      deallocate(components_names)
     endif
   endif
-  !debug
-  write(*,*) ' dust_post. n_comp : ' , n_comp
-  do i_comp = 1 , n_comp
-    write(*,*) ' comp',i_comp,' : ', &
-                   trim(components_names(i_comp))
-  end do
 
   !Fork the different kind of analyses
   select case(trim(an_type))
