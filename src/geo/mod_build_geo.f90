@@ -261,7 +261,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   if ( i_count .eq. 1 ) then
     te_proj_logical = getlogical(geo_prs,'ProjTe') 
   end if
-  
+   
   ! ------
   if ( te_proj_logical ) then
     i_count = countoption(geo_prs,'ProjTeDir' )
@@ -278,13 +278,13 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
          & more than one ProjTeDir defined for component'//trim(comp_tag)// &
          ', defined in file: '//trim(geo_file)//'. First value used.')
     end if
+    if ( ( trim(te_proj_dir) .ne. 'parallel' ) .and. &
+         ( trim(te_proj_dir) .ne. 'normal'   )         ) then 
+      call error (this_sub_name, this_mod_name, "Wrong 'ProjTeDir' &
+         & input for component"//trim(comp_tag)// &
+         ', defined in file: '//trim(geo_file)//'.')
+    end if 
   end if
-  if ( ( trim(te_proj_dir) .ne. 'parallel' ) .and. &
-       ( trim(te_proj_dir) .ne. 'normal'   )         ) then 
-    call error (this_sub_name, this_mod_name, "Wrong 'ProjTeDir' &
-       & input for component"//trim(comp_tag)// &
-       ', defined in file: '//trim(geo_file)//'.')
-  end if 
   ! ------
   if ( te_proj_logical ) then
     i_count = countoption(geo_prs,'ProjTeVector' )

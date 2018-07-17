@@ -216,10 +216,14 @@ type :: t_wake
  !> Are the panels full? (and so need to produce particles...)
  logical :: full_panels=.false.
 
+ !> Are the rings full? (and so need to produce particles...)
+ logical :: full_rings=.false.
+
 end type
 
 !module variables to share among the different subroutines
  real(wp), allocatable :: points_end(:,:)
+ real(wp), allocatable :: points_end_ring(:,:)
 
 !> Class to change methods from different wake implementations
 type, abstract :: c_wake_mov
@@ -492,7 +496,7 @@ subroutine prepare_wake(wake, geo, sim_param)
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: p1, p2
- integer :: ip, iw, ipan
+ integer :: ip, iw, ipan, id, is, nprev
  real(wp) :: dist(3) , vel_te(3), pos_p(3)
  real(wp) :: dir(3), partvec(3), ave
  integer :: ir, k
@@ -580,6 +584,10 @@ subroutine prepare_wake(wake, geo, sim_param)
               wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
               wake%pan_w_points(:,p2,wake%nmax_pan+1) )/4.0_wp
 
+      !pos_p = (1.5_wp*points_end(:,p1)+1.5_wp*points_end(:,p2)+ &
+      !        wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
+      !        wake%pan_w_points(:,p2,wake%nmax_pan+1) )/5.0_wp
+
       !pos_p = (points_end(:,p1)+points_end(:,p2))/2.0_wp
 
       !Add the particle
@@ -607,7 +615,53 @@ subroutine prepare_wake(wake, geo, sim_param)
       endif
       
     enddo
+  endif
 
+  if(wake%full_rings) then
+    k = 1
+    nprev = 0
+    do id = 1,wake%ndisks
+      do is = 1,wake%wake_rings(id,wake%rin_wake_len)%n_ver
+        p1 = is + nprev
+        p2 = nprev + 1 + mod(is,wake%wake_rings(id,wake%rin_wake_len)%n_ver)
+        partvec = 0.0_wp
+
+        dir = points_end_ring(:,p2)-points_end_ring(:,p1)
+        ave = wake%wake_rings(id,wake%rin_wake_len)%mag
+        partvec =dir*ave
+
+        !Calculate the center
+        pos_p = (points_end_ring(:,p1)+points_end_ring(:,p2))/2.0_wp
+
+        !Add the particle
+        do ip = k, size(wake%wake_parts)
+          if (wake%wake_parts(ip)%free) then
+            
+            wake%wake_parts(ip)%free = .false.
+            k = ip+1
+            wake%n_prt = wake%n_prt+1
+            wake%wake_parts(ip)%mag = norm2(partvec)
+            if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
+              wake%wake_parts(ip)%dir = partvec/wake%wake_parts(ip)%mag
+            else
+              wake%wake_parts(ip)%dir = partvec
+            endif
+            wake%wake_parts(ip)%cen = pos_p
+            exit
+          endif
+        enddo  !ip
+        if (ip .gt. wake%nmax_prt) then
+          write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
+            wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
+            &restarting with a higher number of maximum wake particles'
+        call error(this_sub_name, this_mod_name, trim(msg))
+        endif
+      enddo !is
+      nprev = nprev + wake%wake_rings(id,wake%rin_wake_len)%n_ver
+    enddo !id
+  endif
+
+  if(wake%full_panels .or. wake%full_rings) then
     !Recreate the pointer vector
     if(allocated(wake%part_p)) deallocate(wake%part_p)
     allocate(wake%part_p(wake%n_prt))
@@ -630,6 +684,7 @@ subroutine prepare_wake(wake, geo, sim_param)
       wake%vort_p(wake%n_prt+iw)%p => wake%end_vorts(iw)
     enddo
   endif
+
   !If the wake is full, attach the end vortex
   if (wake%full_panels) then
     do iw = 1,wake%n_pan_stripes
@@ -881,7 +936,6 @@ subroutine update_wake(wake, elems, sim_param)
   
   !if the wake is full, calculate another row of points to generate the 
   !particles
-  !if(wake%pan_wake_len .eq. wake%nmax_pan) then
   if(wake%full_panels) then
     if(.not.allocated(points_end)) allocate(points_end(3,wake%n_pan_points)) 
 
@@ -910,6 +964,8 @@ subroutine update_wake(wake, elems, sim_param)
   if(wake%rin_wake_len .lt. wake%nmax_rin) then
     wake%rin_wake_len = wake%rin_wake_len+1
     increase_wake = .true.
+  else
+    wake%full_rings = .true.
   endif
   allocate(points(3,wake%np_row,wake%rin_wake_len))
 
@@ -952,6 +1008,32 @@ subroutine update_wake(wake, elems, sim_param)
   enddo !ip
 !$omp end parallel do
 
+  !if the wake is full, calculate another row of points to generate the 
+  !particles
+  if(wake%full_rings) then
+    if(.not.allocated(points_end_ring)) allocate(points_end_ring(3,wake%np_row)) 
+    !Store the end points
+    ip=1
+    do id = 1,wake%ndisks
+      np = wake%wake_rings(id,ir)%n_ver
+      points_end_ring(:,ip:ip+np-1) = wake%wake_rings(id,ir)%ver(:,:)
+      ip = ip+np
+    enddo
+    ! calculate velocity and evolve them
+    do ip = 1,wake%np_row
+      pos_p = points_end_ring(:,ip)
+      vel_p = 0.0_wp
+
+      !call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
+
+      !vel_p    = vel_p   + sim_param%u_inf
+      call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
+
+      !update the position in time
+      points_end_ring(:,ip) = pos_p + vel_p*sim_param%dt
+    enddo
+  endif
+
   !redistribute the points
   do ir = 1,wake%rin_wake_len
     ip = 1
@@ -963,6 +1045,7 @@ subroutine update_wake(wake, elems, sim_param)
   enddo
 
   deallocate(points)
+
 
   !==>    Particles: evolve the position in time
 
