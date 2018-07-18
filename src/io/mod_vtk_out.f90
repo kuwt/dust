@@ -517,7 +517,8 @@ end subroutine vtk_out_bin
 !! This is a more advanced version, supporting different variables
 subroutine vtk_out_viz (out_filename, & 
                         rr, ee, vars, var_names, &
-                        w_rr, w_ee, w_vars, w_var_names )
+                        w_rr, w_ee, w_vars, w_var_names, &
+                        vp_rr, vp_vars, vp_var_names)
  character(len=*), intent(in) :: out_filename 
  real(wp), intent(in) :: rr(:,:)
  integer, intent(in) :: ee(:,:)
@@ -527,6 +528,9 @@ subroutine vtk_out_viz (out_filename, &
  integer, intent(in), optional :: w_ee(:,:)
  real(wp), intent(in), optional :: w_vars(:,:)
  character(len=*), intent(in), optional :: w_var_names(:)
+ real(wp), intent(in), optional :: vp_rr(:,:)
+ real(wp), intent(in), optional :: vp_vars(:,:)
+ character(len=*), intent(in), optional :: vp_var_names(:)
 
  integer :: fu, ierr, i, i_shift
  integer :: npoints, ncells, ne
@@ -535,12 +539,13 @@ subroutine vtk_out_viz (out_filename, &
  character(len=20) :: ostr, str1, str2
  character(len=1)  :: lf
 
- integer :: ie, nquad, ntria, nquad_w, ntria_w, etype
+ integer :: ie, nquad, ntria, nquad_w, ntria_w, etype, nvp
  integer :: npoints_w, nw
- integer :: nvars, nvars_w, i_v
- logical :: got_wake
+ integer :: nvars, nvars_w, nvars_vp, i_v
+ logical :: got_wake, got_particles
 
   got_wake = present(w_var_names)
+  got_particles = got_wake .and. (size(vp_rr,2) .gt. 0)
 
   lf = char(10) !line feed char
   ne = size(ee,2) !number of elements
@@ -551,6 +556,11 @@ subroutine vtk_out_viz (out_filename, &
     nw = size(w_ee,2) !number of wake elements
     npoints_w = size(w_rr,2)
     nvars_w = size(w_var_names)
+  endif
+
+  if(got_particles) then
+    nvp = size(vp_rr,2)
+    nvars_vp = size(vp_var_names)
   endif
 
   ! First cycle the elements to get the number of quads and trias
@@ -723,6 +733,67 @@ subroutine vtk_out_viz (out_filename, &
     buffer = '  </Piece>'//lf; write(fu) trim(buffer)
   endif
 
+  !=== Vortex Particles
+  if(got_particles) then
+    write(str1,'(I0)') size(vp_rr,2)
+    buffer = '  <Piece NumberOfPoints="'//trim(str1)//'" NumberOfCells="'//&
+                     trim(str1)//'">'//lf; write(fu) trim(buffer)
+    !Points
+    buffer =  '   <Points>'//lf; write(fu) trim(buffer)
+    write(ostr,'(I0)') offset
+    buffer='    <DataArray type="Float32" Name="Coordinates" &
+                    &NumberOfComponents="3" format="appended" &
+           &offset="'//trim(ostr)//'"/>'//lf;write(fu) trim(Buffer)
+
+    buffer =  '   </Points>'//lf; write(fu) trim(buffer)
+    offset = offset + vtk_isize + vtk_fsize*size(vp_rr,1)*size(vp_rr,2)
+
+    !Cells
+    buffer =  '   <Cells>'//lf; write(fu) trim(buffer)
+
+    write(ostr,'(I0)') offset
+    buffer = '    <DataArray type="Int32" Name="connectivity" &
+             &Format="appended" offset="'//trim(ostr)//'"/>'//lf; 
+    write(fu) trim(buffer)
+    offset = offset + vtk_isize  + vtk_isize*1*nvp
+
+    write(ostr,'(I0)') offset
+    buffer =  '    <DataArray type="Int32" Name="offsets" &
+      &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
+    write(fu) trim(buffer)
+    offset = offset + vtk_isize + vtk_isize*nvp
+
+    write(ostr,'(I0)') offset
+    buffer = '    <DataArray type="Int32" Name="types" &
+      &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
+    write(fu) trim(buffer)
+    offset = offset + vtk_isize + vtk_isize*nvp
+
+    buffer =  '   </Cells>'//lf; write(fu) trim(buffer)
+
+    !Data
+    if(nvars .gt. 0) then
+      !buffer =  '   <PointData>'//lf; 
+      buffer =  '   <CellData Scalars="scalars">'//lf; 
+      write(fu) trim(buffer)
+      do i_v = 1,nvars
+        write(ostr,'(I0)') offset
+        buffer = '    <DataArray type="Float32" Name="'//trim(var_names(i_v))//'" &
+          &Format="appended" offset="'//trim(ostr)//'"/>'//lf
+        write(fu) trim(buffer)
+        offset = offset + vtk_isize + vtk_fsize*nvp
+      enddo
+
+      !buffer = '   </PointData>'//lf; write(fu) trim(buffer)
+      buffer = '   </CellData>'//lf; write(fu) trim(buffer)
+    endif
+
+
+    buffer = '  </Piece>'//lf; write(fu) trim(buffer)
+
+
+  endif
+
 
 
 
@@ -839,6 +910,49 @@ subroutine vtk_out_viz (out_filename, &
     enddo
   endif
   
+  !=  == Particles
+  if (got_particles) then
+    !Points
+    nbytes = vtk_fsize *  &
+                 size(vp_rr,1)*size(vp_rr,2)
+    write(fu) nbytes
+    do i=1,size(vp_rr,2)
+     write(fu) real(vp_rr(:,i),vtk_fsize)
+    enddo
+
+    !Connectivity
+    nbytes = vtk_isize*nvp; write(fu) nbytes
+    do i=1,nvp
+      write(fu) i-1
+    enddo
+
+    !Offset
+    nbytes =  vtk_isize*nvp; write(fu) nbytes
+    do i=1,nvp
+      write(fu) i
+    enddo
+
+    !Cell types
+    nbytes = vtk_isize*nvp; write(fu) nbytes
+    do i=1,nvp
+      etype = 1
+      write(fu) etype
+    enddo
+
+    !Variables
+    do i_v = 1,nvars_vp
+      nbytes =  vtk_fsize*nvp; write(fu) nbytes
+      do i=1,size(vp_vars,1)
+        write(fu) real(vp_vars(i,i_v), vtk_fsize)
+      enddo
+    enddo
+    do i_v = nvars_vp+1,nvars
+      nbytes =  vtk_fsize*nvp; write(fu) nbytes
+      do i=1,size(vp_vars,1)
+        write(fu) real(0.0_wp, vtk_fsize)
+      enddo
+    enddo
+  endif
   !!All the variables data
   !do ivar=1,pv_data%n_vars
   !  if(pv_data%vars(ivar)%output) then

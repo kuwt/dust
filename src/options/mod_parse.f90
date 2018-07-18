@@ -881,12 +881,19 @@ subroutine check_opt_consistency(olink, prev, prev_opt, next, next_opt)
 
    if(.not.present(prev_opt)) call error(this_sub_name, this_mod_name, &
    'No prev_opt provided when asked to check previous argument')
-   
-   res = olink%prev_read%opt%nameequals(trim(prev_opt))
-   if (.not. res) call error(this_sub_name, this_mod_name, &
-   'It is required that in the input file before the option '//&
-   trim(olink%opt%name)//' the option '//trim(prev_opt)//' is introduced.&
-   & However the option '//trim(olink%prev_read%opt%name)//' was found.')
+   if (associated(olink%prev_read))  then
+     res = olink%prev_read%opt%nameequals(trim(prev_opt))
+     if (.not. res) call error(this_sub_name, this_mod_name, &
+     'It is required that in the input file before the option '//&
+     trim(olink%opt%name)//' the option '//trim(prev_opt)//' is introduced.&
+     & However the option '//trim(olink%prev_read%opt%name)//' was found.')
+   else
+     call error(this_sub_name, this_mod_name, &
+     'It is required that in the input file before the option '//&
+     trim(olink%opt%name)//' the option '//trim(prev_opt)//' is introduced.&
+     & However no option was found.')
+   endif
+
 
  endif
  endif

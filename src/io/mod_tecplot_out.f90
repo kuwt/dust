@@ -44,7 +44,7 @@ use mod_handling, only: &
 implicit none
 
 public :: tec_out_sol_bin, tec_out_viz, tec_out_probes, tec_out_box, &
-          tec_out_loads
+          tec_out_loads, tec_out_sectional
 
 private
 
@@ -352,7 +352,8 @@ end subroutine tec_out_sol_bin
 
 subroutine tec_out_viz(out_filename, t, &
                        rr, ee, vars, var_names,  &
-                     w_rr, w_ee, w_vars, w_var_names)
+                     w_rr, w_ee, w_vars, w_var_names, &
+                     vp_rr, vp_vars, vp_var_names)
  character(len=*), intent(in) :: out_filename 
  real(wp), intent(in) :: t
  real(wp), intent(in) :: rr(:,:)
@@ -363,6 +364,9 @@ subroutine tec_out_viz(out_filename, t, &
  integer, intent(in), optional  :: w_ee(:,:)
  real(wp), intent(in), optional :: w_vars(:,:)
  character(len=*), intent(in), optional :: w_var_names(:)
+ real(wp), intent(in), optional :: vp_rr(:,:)
+ real(wp), intent(in), optional :: vp_vars(:,:)
+ character(len=*), intent(in), optional :: vp_var_names(:)
 
  character, parameter :: zc = char(0)
  integer :: npoints, ncells, ne
@@ -370,13 +374,14 @@ subroutine tec_out_viz(out_filename, t, &
  real(kind=4)  , parameter :: zoneMarker = 299.0
  real(kind=4)  , parameter :: eohMarker  = 357.0
  character(len=max_char_len) :: buffer_char
- integer :: ie, nquad, ntria
+ integer :: ie, nquad, ntria, nvp
  integer npoints_w, nw
- logical :: got_wake
- integer :: nvars, w_nvars, iv
+ logical :: got_wake, got_particles
+ integer :: nvars, w_nvars, iv, nvars_vp
 
 
   got_wake = present(w_var_names)
+  got_particles = got_wake .and. (size(vp_rr,2) .gt. 0)
 
   ne = size(ee,2) !number of elements
   npoints = size(rr,2)
@@ -387,6 +392,11 @@ subroutine tec_out_viz(out_filename, t, &
     nw = size(w_ee,2) !number of wake elements
     npoints_w = size(w_rr,2)
     w_nvars = size(w_var_names)
+  endif
+
+  if(got_particles) then
+    nvp = size(vp_rr,2)
+    nvars_vp = size(vp_var_names)
   endif
 
   !WARNING: for the moment we are assuming that the number and type of 
@@ -533,6 +543,50 @@ subroutine tec_out_viz(out_filename, t, &
     write(fu) int(0,s_size)
   endif
 
+  !PARTICLES ZONE HERE
+  if (got_particles) then
+    !Zone marker
+    write(fu) zoneMarker
+
+    !Zone name
+    call put_tec_string('Particles',fu)
+
+    !Parent zone: -1 for no parent (not too clear)
+    write(fu) int(-1,s_size)
+
+    !Strand id: -2 for automatic generation
+    write(fu) int(-2,s_size)
+
+    !Solution time
+    write(fu) real(t,d_size)
+
+    !"not used, set to -1"
+    write(fu) int(-1,s_size) 
+    
+    !Zone type: 0 ordered, 3 unstructured quadrilateral
+    write(fu) int(0,s_size)
+
+    !Toggle variable location specification
+    !0 default, variable at nodes
+    write(fu) int(0,s_size)
+
+    !are local neighbour supplied? No.
+    write(fu) int(0,s_size)
+
+    !Number of miscellaneous somethings
+    write(fu) int(0,s_size)
+    
+    !imax
+    write(fu) int(nvp, s_size)
+    !jmax
+    write(fu) int(1,s_size)
+    !kmax
+    write(fu) int(1,s_size)
+    
+    !"no more auxilliary name/value pairs"
+    write(fu) int(0,s_size)
+  endif
+
 
   !DATA
   write(fu) eohMarker
@@ -653,8 +707,8 @@ subroutine tec_out_viz(out_filename, t, &
     write(fu) dble(maxval( w_rr(3,:) ))
     !Vars
     do iv = 1,w_nvars
-      write(fu) dble(minval( vars(:,iv) ))
-      write(fu) dble(maxval( vars(:,iv) ))
+      write(fu) dble(minval( w_vars(:,iv) ))
+      write(fu) dble(maxval( w_vars(:,iv) ))
     enddo
 
     !The actual data
@@ -682,9 +736,79 @@ subroutine tec_out_viz(out_filename, t, &
       endif
     end do
 
-    close(fu)
+  endif
+
+  !PARTICLES
+  if(got_particles) then
+    !Zone marker
+    write(fu) zoneMarker
+
+    !Size of the variables: 2=double
+    write(fu) int(2,s_size)
+    write(fu) int(2,s_size)
+    write(fu) int(2,s_size)
+    do iv = 1,nvars
+      write(fu) int(2,s_size)
+    enddo
+    
+    if (nvars_vp .lt. nvars) then
+      !Has passive variables?
+      write(fu) int(1,s_size)
+      !x-y-z are not passive
+      write(fu) int(0,s_size)
+      write(fu) int(0,s_size)
+      write(fu) int(0,s_size)
+      !first variables are not passive
+      do iv=1,nvars_vp
+        write(fu) int(0,s_size)
+      enddo
+      !last variables are passive
+      do iv = 1,(nvars-nvars_vp)
+        write(fu) int(1,s_size)
+      enddo
+    else
+      !Has passive variables?
+      write(fu) int(0,s_size)
+    endif
+
+    !Has variable sharing
+    write(fu) int(0,s_size)
+
+    !sharing connectivity? -1 no sharing
+    write(fu) int(-1,s_size)
+    
+    !Min and max of all the variables
+    !x
+    write(fu) dble(minval( vp_rr(1,:) ))
+    write(fu) dble(maxval( vp_rr(1,:) ))
+    !y
+    write(fu) dble(minval( vp_rr(2,:) ))
+    write(fu) dble(maxval( vp_rr(2,:) ))
+    !z
+    write(fu) dble(minval( vp_rr(3,:) ))
+    write(fu) dble(maxval( vp_rr(3,:) ))
+    !Vars
+    do iv = 1,nvars_vp
+      write(fu) dble(minval( vp_vars(:,iv) ))
+      write(fu) dble(maxval( vp_vars(:,iv) ))
+    enddo
+
+    !The actual data
+    ! x, y, z
+    do i1 = 1 , 3
+      do i2 = 1 , size(vp_rr,2)
+        write(fu) real(vp_rr(i1,i2), d_size)
+      end do
+    end do
+    ! Vort
+    do iv = 1,nvars_vp
+      do i2 = 1 , size(vp_vars,1)
+        write(fu) real(vp_vars(i2,iv),d_size)
+      end do
+    enddo
   endif
   
+  close(fu)
 
 end subroutine tec_out_viz
 
@@ -969,7 +1093,157 @@ subroutine tec_out_probes(out_filename, time, vars, var_names, zone_names)
 
   enddo
 
-end subroutine
+end subroutine tec_out_probes
+
+!---------------------------------------------------------------------
+
+subroutine tec_out_sectional(out_filename, time, vars, span, span_size)
+ character(len=*), intent(in) :: out_filename 
+ real(wp), intent(in) :: time(:)
+ real(wp), intent(in) :: vars(:,:,:)
+ real(wp), intent(in) :: span(:)
+ real(wp), intent(in) :: span_size(:)
+ character(len=*), parameter :: var_names(4) = (/ 'Fx' , 'Fy' , 'Fz' , 'Mo' /)
+ 
+ character, parameter :: zc = char(0)
+ integer :: fu, ierr, i, j
+ real(kind=4)  , parameter :: zoneMarker = 299.0
+ real(kind=4)  , parameter :: eohMarker  = 357.0
+ character(len=max_char_len) :: buffer_char
+ integer :: nvars, nsec, timelen, iv
+
+
+  nvars = 4
+  nsec = size(vars, 2)
+  timelen = size(vars, 1)
+
+  call new_file_unit(fu,ierr)
+  open(unit=fu,file=trim(out_filename),status='replace',access='stream', &
+       form='unformatted',iostat=ierr)
+
+  !magic number
+  buffer_char = "#!TDV112" ;  write(fu) trim(buffer_char) 
+
+  !integer 1 to set the byte order
+  write(fu) int(1,s_size)
+
+  !integer 0 to mark a full file (1=solution only, 2=grid only)
+  write(fu) int(0,s_size)
+
+  !title
+  call put_tec_string('DUST sectional loads',fu)
+
+  !number of variables
+  write(fu) int(3+nvars,s_size) !t+span+span_size+nvars
+
+  !Variables names
+  call put_tec_string('t',fu)
+  call put_tec_string('span',fu)
+  call put_tec_string('span size',fu)
+  do iv = 1,nvars
+    call put_tec_string(trim(var_names(iv)),fu)
+  enddo
+  
+  !Zone marker
+  write(fu) zoneMarker
+
+  !Zone name
+  call put_tec_string('Sectional loads',fu)
+
+  !Parent zone: -1 for no parent (not too clear)
+  write(fu) int(-1,s_size)
+
+  !Strand id: -2 for automatic generation
+  write(fu) int(-2,s_size)
+
+  !Solution time, useless in this case
+  write(fu) real(0.0,d_size)
+
+  !"not used, set to -1"
+  write(fu) int(-1,s_size) 
+  
+  !Zone type: 0 ordered, 3 unstructured quadrilateral
+  write(fu) int(0,s_size)
+
+  !Toggle variable location specification: no, default on nodes
+  write(fu) int(0,s_size)
+
+  !are local neighbour supplied? No.
+  write(fu) int(0,s_size)
+
+  !Number of miscellaneous somethings
+  write(fu) int(0,s_size)
+
+  !Ordered zone: Imax, Jmax, Kmax
+  write(fu) int(timelen,s_size)
+  write(fu) int(nsec,s_size)
+  write(fu) int(1,s_size)
+
+  !"no more auxilliary name/value pairs"
+  write(fu) int(0,s_size)
+
+
+  !DATA
+  write(fu) eohMarker
+
+
+  !Zone marker
+  write(fu) zoneMarker
+
+  !Size of the variables: 2=double
+  write(fu) int(2,s_size) !time
+  write(fu) int(2,s_size) !span
+  write(fu) int(2,s_size) !span_size
+  do iv = 1,nvars
+    write(fu) int(2,s_size)
+  enddo
+
+  !Has passive variables?
+  write(fu) int(0,s_size)
+
+  !Has variable sharing?
+  write(fu) int(0,s_size)
+
+  !sharing connectivity? -1 no sharing
+  write(fu) int(-1,s_size)
+
+  !Min e max
+  write(fu) dble(minval( time ))
+  write(fu) dble(maxval( time ))
+  write(fu) dble(minval( span ))
+  write(fu) dble(maxval( span ))
+  write(fu) dble(minval( span_size ))
+  write(fu) dble(maxval( span_size ))
+  do iv = 1,nvars
+    write(fu) dble(minval( vars(:,:,iv) ))
+    write(fu) dble(maxval( vars(:,:,iv) ))
+  enddo
+
+  !The actual data
+  do j = 1, nsec
+    do i = 1, timelen
+      write(fu) real(time(i), d_size)
+    enddo
+  enddo
+  do j = 1, nsec
+    do i = 1, timelen
+      write(fu) real(span(j), d_size)
+    enddo
+  enddo
+  do j = 1, nsec
+    do i = 1, timelen
+      write(fu) real(span_size(j), d_size)
+    enddo
+  enddo
+  do iv = 1,nvars
+    do j = 1, nsec
+      do i = 1, timelen
+        write(fu) real(vars(i,j,iv),d_size)
+      enddo
+    enddo
+  enddo
+
+end subroutine tec_out_sectional
 
 !---------------------------------------------------------------------
 

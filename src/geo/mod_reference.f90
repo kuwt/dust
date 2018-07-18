@@ -117,10 +117,10 @@ type :: t_ref
   integer, allocatable :: chil_id(:)
 
   !> Origin in the parent
-  real(wp), allocatable :: orig(:)
+  real(wp) :: orig(3)
 
   !> Frame with respect to the parent
-  real(wp), allocatable :: frame(:,:)
+  real(wp) :: frame(3,3)
 
   !> Is the frame moving with respect to the parent?
   logical :: self_moving
@@ -142,10 +142,10 @@ type :: t_ref
   integer :: n_mult
 
   !> Rotation pole
-  real(wp), allocatable :: pole(:)
+  real(wp) :: pole(3)
 
   !> Rotation axis
-  real(wp), allocatable :: axis(:)
+  real(wp) :: axis(3)
 
   !> Rotation rate around the axis
   real(wp) :: Omega
@@ -154,17 +154,16 @@ type :: t_ref
   real(wp) :: psi_0
 
   !> Total offset with respect to the base reference
-  real(wp), allocatable :: of_g(:)
+  real(wp) :: of_g(3)
 
   !> Total rotation with respect to the base reference
-  real(wp), allocatable :: R_g(:,:)
-
+  real(wp) :: R_g(3,3)
   
   !> Total frame velocity with respect to the base reference
-  real(wp), allocatable :: f_g(:)
+  real(wp) :: f_g(3)
 
   !> Total frame rotation rate with respect to the base reference
-  real(wp), allocatable :: G_g(:,:)
+  real(wp) :: G_g(3,3)
 
   !> General motion arrays
 ! type(t_motion) :: motion
@@ -191,38 +190,6 @@ type :: t_ref
 
 
 end type t_ref
-
-!-----------------------------------
-
-! type t_motion
-! 
-!   !> Moviment type
-!   character(len=max_char_len) :: mov_type
-!   !> Rotation pole
-!   real(wp), allocatable :: pole(:)
-!   !> Rotation axis
-!   real(wp), allocatable :: axis(:)
-!   !> Rotation rate around the axis
-!   real(wp) :: Omega
-!   !> Starting rotation angle
-!   real(wp) :: psi_0
-! 
-!   !> Position of the origin w.r.t. the position of the pole (at t = 0)
-!   real(wp), allocatable :: orig_pol_0(:)
-!   !> Position of the pole
-!   real(wp), allocatable :: pol_pos(:,:)
-!   !> Velocity of the pole
-!   real(wp), allocatable :: pol_vel(:,:)
-!   !> Time arrays containing the time instants when the motion of the pole is defined
-!   real(wp), allocatable :: pol_tim(:)
-!   !> Rotation around the axis
-!   real(wp), allocatable :: rot_pos(:)
-!   !> Angular Velocity around the axis
-!   real(wp), allocatable :: rot_vel(:)
-!   !> Time arrays containing the time instants when the rotation around the pole is defined
-!   real(wp), allocatable :: rot_tim(:)
-! 
-! end type t_motion
 
 !-----------------------------------
 
@@ -273,10 +240,6 @@ subroutine build_references(refs, reference_file, sim_param)
 
  character(len=*), parameter :: this_sub_name = 'build_references'
 
-! old ---
- !character(len=max_char_len) :: omega_filen , pol_pos_filen , pol_vel_filen
- !real(wp) , allocatable :: omega_mat(:,:) , pol_pos_mat(:,:) , pol_vel_mat(:,:)
-! old ---
  character(len=max_char_len) :: rot_filen , pol_filen 
  real(wp) , allocatable :: rot_mat(:,:) , pol_mat(:,:)
  integer , allocatable :: pol_fun_int(:)
@@ -289,7 +252,7 @@ subroutine build_references(refs, reference_file, sim_param)
  character(len=max_char_len) :: ref_tag_str
  ! complex multiple components -----
  integer :: i_mult_blades , n_mult_blades , count_dofs
- integer :: hub_id , body_id , hin_id
+ integer :: hub_id
  integer :: i_dof , n_dofs
  character(len=max_char_len), allocatable :: hinge_type(:)
  real(wp) , allocatable :: hinge_offs(:,:) , hinge_coll(:) , hinge_cyAm(:) , hinge_cyPh(:)
@@ -432,14 +395,12 @@ subroutine build_references(refs, reference_file, sim_param)
   refs(0)%parent_id = -1
   refs(0)%parent_tag = '-1'
   refs(0)%n_chil = 0
-  allocate(refs(0)%orig(3), refs(0)%frame(3,3))
   refs(0)%orig = (/0.0_wp, 0.0_wp, 0.0_wp/)
   refs(0)%frame = reshape((/1.0_wp, 0.0_wp, 0.0_wp, &
                             0.0_wp, 1.0_wp, 0.0_wp, &
                             0.0_wp, 0.0_wp, 1.0_wp/),(/3,3/))
   refs(0)%self_moving = .false.
   refs(0)%moving = .false.
-  allocate(refs(0)%of_g(3), refs(0)%R_g(3,3))
   refs(0)%of_g = (/0.0_wp, 0.0_wp, 0.0_wp/)
   refs(0)%R_g = reshape((/1.0_wp, 0.0_wp, 0.0_wp, &
                           0.0_wp, 1.0_wp, 0.0_wp, & 
@@ -455,12 +416,10 @@ subroutine build_references(refs, reference_file, sim_param)
     refs(iref)%parent_tag = getstr(ref_prs,'Parent_Tag')
     refs(iref)%n_chil = 0
 
-    allocate(refs(iref)%orig(3), refs(iref)%frame(3,3))
     refs(iref)%orig  = getrealarray(ref_prs,'Origin',3, olink=lnk)
     call check_opt_consistency(lnk,next=.true.,next_opt='Orientation')
     refs(iref)%frame = reshape(getrealarray(ref_prs,'Orientation',9),(/3,3/))
     !allocated here, will be set in update_all_refs
-    allocate(refs(iref)%of_g(3), refs(iref)%R_g(3,3))
 
     refs(iref)%self_moving = getlogical(ref_prs,'Moving', olink=lnk)
     refs(iref)%moving = .false. !standard, will be checked later
@@ -996,8 +955,6 @@ subroutine build_references(refs, reference_file, sim_param)
           refs(iref)%tag = trim(msg)
           refs(iref)%parent_tag = trim(refs(prev_id)%tag)
           refs(iref)%n_chil = 0
-          allocate(refs(iref)%pole(3), refs(iref)%axis(3))
-          allocate(refs(iref)%orig(3), refs(iref)%frame(3,3))
           refs(iref)%axis  = rot_axis
           refs(iref)%pole  = (/0.0_wp, 0.0_wp, 0.0_wp/)
           refs(iref)%Omega = rot_rate
@@ -1011,7 +968,6 @@ subroutine build_references(refs, reference_file, sim_param)
           refs(iref)%frame(1:3,1) = cross(refs(iref)%frame(1:3,2), &
                                           refs(iref)%frame(1:3,3))
           !allocated here, will be set in update_all_refs
-          allocate(refs(iref)%of_g(3), refs(iref)%R_g(3,3))
           refs(iref)%self_moving = .true.
           refs(iref)%moving = .false. !standard, will be checked later
 
@@ -1026,7 +982,8 @@ subroutine build_references(refs, reference_file, sim_param)
             refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
             refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
             refs(iref)%rot_pos(  it) = refs(iref)%psi_0 + &
-                 refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1) )    ! <---- CHECK !!!!
+                 refs(iref)%Omega * ( sim_param%time_vec(it) )    ! <---- CHECK !!!!
+                 !refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1) )    ! <---- CHECK !!!!
             refs(iref)%rot_vel(  it) = refs(iref)%Omega
             refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
           end do 
@@ -1056,10 +1013,6 @@ subroutine build_references(refs, reference_file, sim_param)
                   & of the Reference systems (References.in?): number of Dof&
                   & fields .ne. N_Dofs')
          end if
-
-         !CHECK
-         write(*,*) ' N_Blades : ' , n_mult_blades
-         write(*,*) ' N_Dofs   : ' , n_dofs
 
 
          !1) allocate a series of extra reference frames and move-alloc everything
@@ -1150,8 +1103,6 @@ subroutine build_references(refs, reference_file, sim_param)
              !   --> harmonic rotation
              if ( i_dof .eq. 0 ) then ! constant rotation around the rotor axis 
 
-               allocate(refs(iref)%pole(3), refs(iref)%axis(3))
-               allocate(refs(iref)%orig(3), refs(iref)%frame(3,3))
                refs(iref)%axis  = rot_axis
                refs(iref)%pole  = (/0.0_wp, 0.0_wp, 0.0_wp/)
                refs(iref)%Omega = rot_rate
@@ -1165,8 +1116,6 @@ subroutine build_references(refs, reference_file, sim_param)
                refs(iref)%frame(1:3,2) = norm/norm2(norm)
                refs(iref)%frame(1:3,1) = cross(refs(iref)%frame(1:3,2), &
                                                refs(iref)%frame(1:3,3))
-               !allocated here, will be set in update_all_refs
-               allocate(refs(iref)%of_g(3), refs(iref)%R_g(3,3))
                refs(iref)%self_moving = .true.
                refs(iref)%moving = .false. !standard, will be checked later
 
@@ -1181,7 +1130,8 @@ subroutine build_references(refs, reference_file, sim_param)
                  refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
                  refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
                  refs(iref)%rot_pos(  it) = refs(iref)%psi_0 + &
-                      refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1) )  ! <---- CHECK !!!!
+                      refs(iref)%Omega * ( sim_param%time_vec(it) )  ! <---- CHECK !!!!
+                      !refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1) )  ! <---- CHECK !!!!
                  refs(iref)%rot_vel(  it) = refs(iref)%Omega
                  refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
                end do
@@ -1191,14 +1141,12 @@ subroutine build_references(refs, reference_file, sim_param)
 
              else ! harmonic rotation around the hinge axis 
 
-               allocate(refs(iref)%pole(3), refs(iref)%axis(3))
-               allocate(refs(iref)%orig(3), refs(iref)%frame(3,3))
                if ( trim(hinge_type(i_dof)) .eq. 'Flap' ) then
-                 refs(iref)%axis  = (/ 1.0 , 0.0 , 0.0 /)
+                 refs(iref)%axis  = (/ 1.0_wp , 0.0_wp , 0.0_wp /)
                else if ( trim(hinge_type(i_dof)) .eq. 'Pitch' ) then
-                 refs(iref)%axis  = (/ 0.0 , 1.0 , 0.0 /)
+                 refs(iref)%axis  = (/ 0.0_wp , 1.0_wp , 0.0_wp /)
                else if ( trim(hinge_type(i_dof)) .eq. 'Lag' ) then
-                 refs(iref)%axis  = (/ 0.0 , 0.0 , 1.0 /)
+                 refs(iref)%axis  = (/ 0.0_wp , 0.0_wp , 1.0_wp /)
                else
                  call error(this_sub_name, this_mod_name, 'Unknown hinge type:&
                       & it must be: Flap, Pitch ot Lag')
@@ -1214,8 +1162,6 @@ subroutine build_references(refs, reference_file, sim_param)
                refs(iref)%frame(1:3,2) = (/ 0.0_wp , 1.0_wp , 0.0_wp /)
                refs(iref)%frame(1:3,3) = (/ 0.0_wp , 0.0_wp , 1.0_wp /)
 
-               !allocated here, will be set in update_all_refs
-               allocate(refs(iref)%of_g(3), refs(iref)%R_g(3,3))
                refs(iref)%self_moving = .true.
                refs(iref)%moving = .false. !standard, will be checked later
 
@@ -1398,7 +1344,6 @@ recursive subroutine reference_update_ref(this,refs,t,R,of,G,f)
   !Update the local transformation with respect to the parent 
   
   call this%update_self(t,R, of,  R_loc, of_loc, G_loc, f_loc)
-
 
   !Update the transformation with respect to the base system
   this%R_g  = matmul( R , R_loc )

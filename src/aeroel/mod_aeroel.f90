@@ -36,7 +36,7 @@
 !! elements
 
 
-module mod_aero_elements
+module mod_aeroel
 
 use mod_linsys_vars, only: t_linsys
 
@@ -48,99 +48,173 @@ use mod_param, only: &
 
 implicit none
 
-public :: c_elem, t_elem_p
+public :: c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
+          t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
 private
 
 !----------------------------------------------------------------------
-!> Pointer to an element, used to build arrays of pointers to different
-!! elements
+
+!> Pointers to different levels of classes
 type :: t_elem_p
   class(c_elem), pointer :: p
 end type
+
+type :: t_pot_elem_p
+  class(c_pot_elem), pointer :: p
+end type
+
+type :: t_vort_elem_p
+  class(c_vort_elem), pointer :: p
+end type
+
+type :: t_impl_elem_p
+  class(c_impl_elem), pointer :: p
+end type
+
+type :: t_expl_elem_p
+  class(c_expl_elem), pointer :: p
+end type
+
+!----------------------------------------------------------------------
 
 !> Abstract type defining a generic aerodynamic element
 !!
 !! It needs to be extended into more specific elements
 type, abstract :: c_elem
 
-  !> Intensity of the doublets/vortexes
-  real(wp), pointer :: idou => null()
-  real(wp)          :: didou_dt
+  !> Magnitude of the singularity, pointer to the actual location
+  real(wp), pointer :: mag => null()
 
-  !> Element id
-  integer :: id
-
-  !> id of the component to which it belongs
-  integer :: comp_id
-
-  !> Number of vertexes
-  integer :: n_ver
-  !> Vertexes coordinates
-  !real(wp), pointer :: ver(:,:)
-  real(wp), allocatable :: ver(:,:)
-
-  !> Global index of vertexes
-  integer,  allocatable :: i_ver(:)
-  !> Element area
-  real(wp)              :: area
-  !> Element centre coordinates
-  real(wp), allocatable :: cen(:)
-  !> Element normal vector
-  real(wp), allocatable :: nor(:)
-  !> Element tangential vectors
-  real(wp), allocatable :: tang(:,:) ! tangent unit vectors as in PANAIR
-  real(wp), allocatable :: edge_vec(:,:)
-  real(wp), allocatable :: edge_len(:)
-  real(wp), allocatable :: edge_uni(:,:)
-  !> Body velocity at the centre
-  real(wp), allocatable :: ub(:)
-  !> Is the element moving during simulation?
-  logical :: moving
-  !> Element neighbours global index (in the elements vector)
-  !integer, allocatable :: i_neigh(:)
-  type(t_elem_p), allocatable :: neigh(:)
-
-  !> Coefficients to compute local velocity from the velocity potential
-  !! on a stencil of neighboring elements (for surfpan only)
-  real(wp), allocatable :: pot_vel_stencil(:,:)
-
-  !> Panel width (= strip width) (for vortring only)
-  real(wp)              :: dy
-  !> Previous element in a stripe (for vortring only)
-  !integer               :: stripe_1
-  type(t_elem_p)        :: stripe_1
-  !> Element indices in the component%strip_elem array (for vortring only)
-  !integer, allocatable  :: stripe_elem(:)
-  type(t_elem_p), allocatable :: stripe_elem(:)
-
-  !> Fluid velocity at center for boundary condition (U_inf-rel vel)
-  real(wp), allocatable :: vel(:)
-  !> Average pressure coefficient on the element
-  real(wp)              :: cp
-  !> Average pressure on the element
-  real(wp)              :: pres
-  !> Elementary force acting on the element (components in the base ref.sys.)
-  real(wp), allocatable :: dforce(:)
+  !> Center of the element
+  real(wp) :: cen(3)
 
   contains
 
-! linear system ------
+  procedure(i_compute_vel), deferred, pass(this) :: compute_vel
+
+end type c_elem
+
+
+!----------------------------------------------------------------------
+
+!> Class (not abstract, but to be further expanded) to contain potential
+!! elements
+type, abstract, extends(c_elem) :: c_pot_elem
+
+  !> id of the component to which it belongs
+  !integer :: comp_id
+
+  !> Id of the element, TODO consider removing this
+  integer :: id
+
+  !> Number of vertexes
+  integer :: n_ver
+
+  !> Vertexes coordinates
+  real(wp), allocatable :: ver(:,:)
+
+  !> Id of the vertexes
+  integer, allocatable :: i_ver(:)
+
+  !> Element area
+  real(wp)              :: area
+
+  !> Element normal vector
+  real(wp) :: nor(3)
+
+  !> Element tangential vectors
+  real(wp) :: tang(3,2) ! tangent unit vectors as in PANAIR
+  
+  !> Vector of each edge
+  real(wp), allocatable :: edge_vec(:,:)
+
+  !> Length of each edge
+  real(wp), allocatable :: edge_len(:)
+
+  !> Unit vector of each edge
+  real(wp), allocatable :: edge_uni(:,:)
+
+  !> Body velocity at the centre
+  real(wp) :: ub(3)
+
+  !> Is the element moving during simulation?
+  logical :: moving
+
+  !> Element neighbours global index (in the elements vector)
+  type(t_pot_elem_p), allocatable :: neigh(:)
+
+  !> Average pressure on the element
+  real(wp)              :: pres
+
+  !> Elementary force acting on the element (components in the base ref.sys.)
+  real(wp)              :: dforce(3)
+
+  !> Elementary force acting on the element (components in the base ref.sys.)
+  real(wp)              :: dmom(3)
+
+  !TODO: these three are used only by vortlatt and liftlin
+  ! consider moving them there, but then change the implementation of
+  ! create_strip_connectivity
+  !> Previous element in a stripe 
+  type(t_pot_elem_p)        :: stripe_1
+  !> Panel width (= strip width)
+  real(wp)              :: dy
+  !> Element indices in the component%strip_elem array
+  type(t_elem_p), allocatable :: stripe_elem(:)
+
+  contains
+
+  procedure(i_compute_pot),    deferred, pass(this) :: compute_pot
+
+  procedure(i_compute_psi),    deferred, pass(this) :: compute_psi
+
+  procedure(i_compute_pres),   deferred, pass(this) :: compute_pres
+
+  procedure(i_compute_dforce), deferred, pass(this) :: compute_dforce
+
+  procedure(i_calc_geo_data),  deferred, pass(this) :: calc_geo_data
+
+end type c_pot_elem
+
+!----------------------------------------------------------------------
+
+!> Class to contain vortical elements
+type, abstract, extends(c_elem) :: c_vort_elem
+
+end type c_vort_elem
+
+!----------------------------------------------------------------------
+
+!> Class to contain the implicit elements (Vortex lattices and surface panels)
+type, abstract, extends(c_pot_elem) :: c_impl_elem
+
+  real(wp)          :: didou_dt
+  !> Vorticity induced velocity at the centre
+  real(wp)          :: uvort(3)
+
+  contains
+
   procedure(i_build_row)  , deferred, pass(this)      :: build_row
+
   procedure(i_build_row_static), deferred, pass(this) :: build_row_static
+
   procedure(i_add_wake),    deferred, pass(this)      :: add_wake
-  procedure(i_add_liftlin), deferred, pass(this)      :: add_liftlin
-  procedure(i_add_actdisk), deferred, pass(this)      :: add_actdisk
-  procedure(i_compute_pot), deferred, pass(this)      :: compute_pot
-  procedure(i_compute_vel), deferred, pass(this)      :: compute_vel
-  procedure(i_compute_psi), deferred, pass(this)      :: compute_psi
-! loads --------------
-  procedure(i_compute_cp     ), deferred, pass(this)      :: compute_cp
-  procedure(i_compute_pres   ), deferred, pass(this)      :: compute_pres
-  procedure(i_compute_dforce ), deferred, pass(this)      :: compute_dforce
 
+  procedure(i_add_expl), deferred, pass(this)         :: add_expl
 
-end type
+  procedure(i_get_vort_vel), deferred, pass(this)     :: get_vort_vel
+
+end type c_impl_elem
+
+!----------------------------------------------------------------------
+
+!> Class to contain the explicit elements
+type, abstract, extends(c_pot_elem) :: c_expl_elem
+
+end type c_expl_elem
+
+!----------------------------------------------------------------------
 
 !----------------------------------------------------------------------
 
@@ -157,12 +231,12 @@ end type
 abstract interface
   subroutine i_build_row(this, elems, linsys, uinf, ie, ista, iend)
     import :: wp
-    import :: c_elem
-    import :: t_elem_p
+    import :: c_impl_elem
+    import :: t_impl_elem_p
     import :: t_linsys
     implicit none
-    class(c_elem), intent(inout)  :: this
-    type(t_elem_p), intent(in)    :: elems(:)
+    class(c_impl_elem), intent(inout)  :: this
+    type(t_impl_elem_p), intent(in)    :: elems(:)
     type(t_linsys), intent(inout) :: linsys
     real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
@@ -188,17 +262,17 @@ end interface
 !! The function operates only on the components from ista to iend, which
 !! should be the static ones ordered at the beginning of the array
 abstract interface
-  subroutine i_build_row_static(this, elems, ll_elems, ad_elems, linsys, &
+  subroutine i_build_row_static(this, elems, expl_elems, linsys, &
                                 uinf, ie, ista, iend)
     import :: wp
-    import :: c_elem
-    import :: t_elem_p
+    import :: c_impl_elem
+    import :: t_impl_elem_p
+    import :: t_expl_elem_p
     import :: t_linsys
     implicit none
-    class(c_elem), intent(inout)  :: this
-    type(t_elem_p), intent(in)    :: elems(:)
-    type(t_elem_p), intent(in)    :: ll_elems(:)
-    type(t_elem_p), intent(in)    :: ad_elems(:)
+    class(c_impl_elem), intent(inout)  :: this
+    type(t_impl_elem_p), intent(in)    :: elems(:)
+    type(t_expl_elem_p), intent(in)    :: expl_elems(:)
     type(t_linsys), intent(inout) :: linsys
     real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
@@ -226,12 +300,12 @@ abstract interface
   subroutine i_add_wake(this, wake_elems, impl_wake_ind, linsys, uinf, &
                         ie, ista, iend)
     import :: wp
-    import :: c_elem
-    import :: t_elem_p
+    import :: c_impl_elem
+    import :: t_pot_elem_p
     import :: t_linsys
     implicit none
-    class(c_elem), intent(inout)  :: this
-    type(t_elem_p), intent(in)    :: wake_elems(:)
+    class(c_impl_elem), intent(inout)  :: this
+    type(t_pot_elem_p), intent(in)    :: wake_elems(:)
     integer, intent(in)           :: impl_wake_ind(:,:)
     type(t_linsys), intent(inout) :: linsys
     real(wp), intent(in)          :: uinf(:)
@@ -243,23 +317,24 @@ end interface
 
 !----------------------------------------------------------------------
 
-!> Add the contribution of the lifting line to the linear system.
+
+!> Add the contribution of explicit elements to the linear system.
 !!
-!! Since the lifitng lines are completely explicit their contribution does
+!! Since the actuator disks are completely explicit their contribution does
 !! not affect the system matrix, but only the system right han side.
 !! The contribution affecting the stationary part was already calculated
 !! and just retrieved, while the contribution due to the moving components
 !! is calculated and added
 abstract interface
-  subroutine i_add_liftlin(this, ll_elems, linsys, uinf, &
+  subroutine i_add_expl(this, expl_elems, linsys, uinf, &
                         ie, ista, iend)
     import :: wp
-    import :: c_elem
-    import :: t_elem_p
+    import :: c_impl_elem
+    import :: t_expl_elem_p
     import :: t_linsys
     implicit none
-    class(c_elem), intent(inout)  :: this
-    type(t_elem_p), intent(in)    :: ll_elems(:)
+    class(c_impl_elem), intent(inout)  :: this
+    type(t_expl_elem_p), intent(in)    :: expl_elems(:)
     type(t_linsys), intent(inout) :: linsys
     real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
@@ -270,29 +345,17 @@ end interface
 
 !----------------------------------------------------------------------
 
-
-!> Add the contribution of the actuator disks to the linear system.
+!> Get the velocity generated by vortical elements on implicit elements.
 !!
-!! Since the actuator disks are completely explicit their contribution does
-!! not affect the system matrix, but only the system right han side.
-!! The contribution affecting the stationary part was already calculated
-!! and just retrieved, while the contribution due to the moving components
-!! is calculated and added
 abstract interface
-  subroutine i_add_actdisk(this, ad_elems, linsys, uinf, &
-                        ie, ista, iend)
+  subroutine i_get_vort_vel(this, vort_elems, uinf)
+    import :: c_impl_elem
+    import :: t_vort_elem_p
     import :: wp
-    import :: c_elem
-    import :: t_elem_p
-    import :: t_linsys
     implicit none
-    class(c_elem), intent(inout)  :: this
-    type(t_elem_p), intent(in)    :: ad_elems(:)
-    type(t_linsys), intent(inout) :: linsys
-    real(wp), intent(in)          :: uinf(:)
-    integer, intent(in)           :: ie
-    integer, intent(in)           :: ista
-    integer, intent(in)           :: iend
+    class(c_impl_elem), intent(inout)  :: this
+    type(t_vort_elem_p), intent(in)    :: vort_elems(:)
+    real(wp), intent(in) :: uinf(3)
   end subroutine
 end interface
 
@@ -306,11 +369,11 @@ end interface
 !! for an equation for the potential
 abstract interface
   subroutine i_compute_pot(this, A, b, pos,i,j)
-    import :: c_elem , wp , t_linsys
+    import :: c_pot_elem , wp , t_linsys
     implicit none
-    class(c_elem), intent(inout) :: this
+    class(c_pot_elem), intent(inout) :: this
     real(wp), intent(out) :: A
-    real(wp), intent(out) :: b(3)
+    real(wp), intent(out) :: b
     real(wp), intent(in) :: pos(:)
     integer , intent(in) :: i,j
   end subroutine
@@ -328,7 +391,7 @@ abstract interface
   subroutine i_compute_vel(this, pos, uinf, vel)
     import :: c_elem , wp
     implicit none
-    class(c_elem), intent(inout) :: this
+    class(c_elem), intent(in) :: this
     real(wp), intent(in) :: pos(:)
     real(wp), intent(in) :: uinf(3)
     real(wp), intent(out) :: vel(3)
@@ -347,11 +410,11 @@ end interface
 !! for an equation for the velocity.
 abstract interface
   subroutine i_compute_psi(this, A, b, pos, nor,i,j)
-    import :: c_elem , wp , t_linsys
+    import :: c_pot_elem , wp , t_linsys
     implicit none
-    class(c_elem), intent(inout) :: this
+    class(c_pot_elem), intent(inout) :: this
     real(wp), intent(out) :: A
-    real(wp), intent(out) :: b(3)
+    real(wp), intent(out) :: b
     real(wp), intent(in) :: pos(:)
     real(wp), intent(in) :: nor(:)
     integer , intent(in) :: i,j
@@ -360,25 +423,13 @@ end interface
 
 !----------------------------------------------------------------------
 
-abstract interface
-  subroutine i_compute_cp (this, elems, uinf)
-    import :: c_elem , t_elem_p , wp
-    implicit none
-    class(c_elem), intent(inout) :: this
-    type(t_elem_p), intent(in)   :: elems(:)
-    real(wp), intent(in)         :: uinf(:)
-  end subroutine
-end interface
-
-!----------------------------------------------------------------------
-
 !> Compute an approximation of the pressure acting on the acutal element
 abstract interface
-  subroutine i_compute_pres (this, elems, sim_param)
-    import :: c_elem , t_elem_p , wp ,t_sim_param
+  subroutine i_compute_pres (this, sim_param)
+    import :: c_pot_elem , t_elem_p , wp ,t_sim_param
     implicit none
-    class(c_elem), intent(inout) :: this
-    type(t_elem_p), intent(in)   :: elems(:)
+    class(c_pot_elem), intent(inout) :: this
+    !type(t_elem_p), intent(in)   :: elems(:)
     type(t_sim_param), intent(in):: sim_param
   end subroutine
 end interface
@@ -387,16 +438,27 @@ end interface
 
 !> Compute the elementary force acting on the actual element
 abstract interface
-  subroutine i_compute_dforce (this, elems, sim_param)
-    import :: c_elem , t_elem_p , wp , t_sim_param
+  subroutine i_compute_dforce (this, sim_param)
+    import :: c_pot_elem , t_elem_p , wp , t_sim_param
     implicit none
-    class(c_elem), intent(inout) :: this
-    type(t_elem_p), intent(in)   :: elems(:)
+    class(c_pot_elem), intent(inout) :: this
+    !type(t_elem_p), intent(in)   :: elems(:)
     type(t_sim_param), intent(in):: sim_param
   end subroutine
 end interface
 
 !----------------------------------------------------------------------
 
+!> Compute the geometrical quantities of the elemsnts
+abstract interface
+  subroutine i_calc_geo_data (this,vert)
+    import :: c_pot_elem , t_elem_p , wp , t_sim_param
+    implicit none
+    class(c_pot_elem), intent(inout) :: this
+    real(wp), intent(in) :: vert(:,:)
+  end subroutine
+end interface
 
-end module mod_aero_elements
+!----------------------------------------------------------------------
+
+end module mod_aeroel

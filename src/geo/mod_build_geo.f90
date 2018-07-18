@@ -86,11 +86,13 @@ character(len=*), parameter :: this_mod_name = 'mod_build_geo'
 
 contains 
 
-subroutine build_geometry(geo_files, ref_tags, comp_names, output_file)
+subroutine build_geometry(geo_files, ref_tags, comp_names, output_file, & 
+                          global_tol_sew , global_inner_prod_te )
  character(len=*), intent(in) :: geo_files(:)
  character(len=*), intent(in) :: ref_tags(:)
  character(len=*), intent(in) :: comp_names(:)
  character(len=*), intent(in) :: output_file
+ real(wp),intent(in) :: global_tol_sew , global_inner_prod_te
 
  integer :: n_geo, i_geo
  integer(h5loc) :: file_loc, group_loc
@@ -102,7 +104,8 @@ subroutine build_geometry(geo_files, ref_tags, comp_names, output_file)
   call write_hdf5(n_geo,'NComponents',group_loc)
   do i_geo = 1,n_geo
     call build_component(group_loc, trim(geo_files(i_geo)), &
-                         trim(ref_tags(i_geo)), trim(comp_names(i_geo)), i_geo)
+                         trim(ref_tags(i_geo)), trim(comp_names(i_geo)), i_geo , &
+                         global_tol_sew , global_inner_prod_te )
   enddo
 
   call close_hdf5_group(group_loc)
@@ -112,12 +115,14 @@ end subroutine build_geometry
 
 !-----------------------------------------------------------------------
 
-subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
+subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
+                           global_tol_sew , global_inner_prod_te)
  integer(h5loc), intent(in)   :: gloc
  character(len=*), intent(in) :: geo_file
  character(len=*), intent(in) :: ref_tag
  character(len=*), intent(in) :: comp_tag
  integer, intent(in)          :: comp_id
+ real(wp),intent(in) :: global_tol_sew , global_inner_prod_te
 
  type(t_parse) :: geo_prs
  character(len=max_char_len) :: mesh_file
@@ -135,7 +140,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
  character(len=max_char_len), allocatable :: airfoil_list(:)
  integer , allocatable                    :: nelem_span_list(:)
  integer , allocatable                    :: i_airfoil_e(:,:)
- real(wp) , allocatable                   :: normalised_coord_e(:,:)
+ real(wp), allocatable                    :: normalised_coord_e(:,:)
  real(wp) :: trac, radius
 
  ! Section names for CGNS
@@ -146,15 +151,18 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
  ! Connectivity and te structures 
  integer , allocatable :: neigh(:,:)
 
+ ! Parameters for gap sewing and te identification
+ real(wp) :: tol_sewing , inner_product_threshold
+ integer :: i_count
+ ! Projection of the unit tangent exiting from te
+ logical  :: te_proj_logical
+ character(len=max_char_len) :: te_proj_dir
+ real(wp) , allocatable :: te_proj_vec(:)
+
  ! trailing edge ------
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
  integer , allocatable :: neigh_te(:,:) , o_te(:,:)
  real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
-
- integer :: i1 , fid
-
- !DEBUG
- integer :: id1 , id2
 
  character(len=*), parameter :: this_sub_name = 'build_component'
 
@@ -184,6 +192,22 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
   call geo_prs%CreateRealOption('Radius', &
                'Radius of the rotor')
 
+  ! Parameters for gap sewing and edge identification
+  call geo_prs%CreateRealOption('TolSewing', &
+               'Dimension of the gaps that will be filled, to close TE', &
+               '0.001')  ! very rough default value
+  call geo_prs%CreateRealOption('InnerProductTe', &
+               'Threshold of the inner product of adiacent elements &
+               &across the TE','-0.5')  ! very rough default value
+
+  ! Parameters for te unit tangent vector generation
+  call geo_prs%CreateLogicalOption('ProjTe','Remove some component &
+               &from te vectors.')
+  call geo_prs%CreateStringOption('ProjTeDir','Parallel or normal to &
+               &ProjTeVector direction.','parallel') 
+  call geo_prs%CreateRealArrayOption('ProjTeVector','Vector used for &
+               &the te projection.')
+
   ! Section name from CGNS file
   call geo_prs%CreateStringOption('SectionName', &
                'Section name from CGNS file', multiple=.true.)
@@ -201,10 +225,89 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
   comp_el_type = getstr(geo_prs,'ElType')
   ElType = comp_el_type(1:1)
 
-  !Build the group
+  ! Parameters for gap sewing and edge identification ------------------
+  ! TolSewing --------------------------------------
+  i_count = countoption(geo_prs,'TolSewing') 
+  if ( i_count .eq. 1 ) then
+    tol_sewing = getreal(geo_prs,'TolSewing')
+  else if ( i_count .eq. 0 ) then
+    ! Inherit tol_sewing from general parameter
+    tol_sewing = global_tol_sew 
+  else
+    tol_sewing = getreal(geo_prs,'TolSewing')
+
+    call warning(this_sub_name, this_mod_name, 'More than one &
+       &TolSewing parameter defined for component'//trim(comp_tag)// &
+       ', defined in file: '//trim(geo_file)//'.')
+  end if
+ 
+  ! InnerProductTe ---------------------------------
+  i_count = countoption(geo_prs,'InnerProductTe') 
+  if ( i_count .eq. 1 ) then
+    inner_product_threshold = getreal(geo_prs,'InnerProductTe')
+  else if ( i_count .eq. 0 ) then
+    ! Inherit tol_sewing from general parameter
+    inner_product_threshold = global_inner_prod_te
+  else
+    inner_product_threshold = getreal(geo_prs,'InnerProductTe')
+
+    call warning(this_sub_name, this_mod_name, 'More than one &
+       &InnerProductTe parameter defined for component'//trim(comp_tag)// &
+       ', defined in file: '//trim(geo_file)//'. First value used.')
+  end if 
+
+  ! te projection ----------------------------------
+  i_count = countoption(geo_prs,'ProjTe')
+  if ( i_count .eq. 1 ) then
+    te_proj_logical = getlogical(geo_prs,'ProjTe') 
+  end if
+   
+  ! ------
+  if ( te_proj_logical ) then
+    i_count = countoption(geo_prs,'ProjTeDir' )
+    if ( i_count .eq. 1 ) then
+      te_proj_dir  = getstr(geo_prs, 'ProjTeDir')
+    elseif ( i_count .lt. 1 ) then
+      te_proj_dir = 'parallel'
+      call warning (this_sub_name, this_mod_name, 'ProjTe = T, but &
+         & no ProjTeVDir defined for component'//trim(comp_tag)// &
+         ', defined in file: '//trim(geo_file)//" Default: 'parallel'.")
+    else
+      te_proj_dir = getstr(geo_prs, 'ProjTeDir') 
+      call warning(this_sub_name, this_mod_name, 'ProjTe = T, and &
+         & more than one ProjTeDir defined for component'//trim(comp_tag)// &
+         ', defined in file: '//trim(geo_file)//'. First value used.')
+    end if
+    if ( ( trim(te_proj_dir) .ne. 'parallel' ) .and. &
+         ( trim(te_proj_dir) .ne. 'normal'   )         ) then 
+      call error (this_sub_name, this_mod_name, "Wrong 'ProjTeDir' &
+         & input for component"//trim(comp_tag)// &
+         ', defined in file: '//trim(geo_file)//'.')
+    end if 
+  end if
+  ! ------
+  if ( te_proj_logical ) then
+    i_count = countoption(geo_prs,'ProjTeVector' )
+    if ( i_count .eq. 1 ) then
+      te_proj_vec  = getrealarray(geo_prs, 'ProjTeVector',3)
+    elseif ( i_count .lt. 1 ) then
+      call error (this_sub_name, this_mod_name, 'ProjTe = T, but &
+         & no ProjTeVector defined for component'//trim(comp_tag)// &
+         ', defined in file: '//trim(geo_file)//'.')
+    else 
+      te_proj_vec  = getrealarray(geo_prs, 'ProjTeVector',3)
+      call warning(this_sub_name, this_mod_name, 'ProjTe = T, but &
+         & more than one ProjTeVector defined for component'//trim(comp_tag)// &
+         ', defined in file: '//trim(geo_file)//'. First value used.')
+    end if
+  end if
+
+
+  !Build the group -----------------------------------------------------
   write(comp_name,'(A,I3.3)')'Comp',comp_id
   call new_hdf5_group(gloc, trim(comp_name), comp_loc)
   call write_hdf5(comp_tag,'CompName',comp_loc)
+  call write_hdf5(mesh_file_type,'CompInput',comp_loc)
   call write_hdf5(ref_tag,'RefTag',comp_loc)
 
 ! call new_hdf5_group(file_loc, 'Components', group_loc)
@@ -299,45 +402,20 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
              'Symmetry routines not implemented for this kind of input.')
     end select
   end if
-  !! treat the points
-  !if(allocated(geo%points)) then
-  !  points_offset = size(geo%points,2) 
-  !else
-  !  points_offset = 0
-  !endif
-  !!store the read points into the local points
-  !allocate(geo%components(i_comp)%loc_points(3,size(rr,2)))
-  !geo%components(i_comp)%loc_points = rr
-  !
-  
-!!Now for the moments the points are stored here without moving them, 
-  !!will be moved later, consider not storing them here at all
-  !allocate(points_tmp(3,size(rr,2)+points_offset))
-  !if (points_offset .gt. 0) points_tmp(:,1:points_offset) = geo%points
-  !points_tmp(:,points_offset+1:points_offset+size(rr,2)) = rr
-  !call move_alloc(points_tmp, geo%points)
-  !allocate(geo%components(i_comp)%i_points(size(rr,2)))
-  !geo%components(i_comp)%i_points = &
-  !                   (/((i3),i3=points_offset+1,points_offset+size(rr,2))/)
+
+  if ( trim(mesh_file_type) .eq. 'parametric' ) then
+    !DEBUG
+    write(*,*) ' +++ nelems_span_tot : ' , nelems_span_tot
+    write(*,*) ' +++ nelems_chor_tot : ' , npoints_chord_tot - 1
+    !write HDF5 fields
+    call write_hdf5(  nelems_span_tot  ,'parametric_nelems_span',geo_loc)
+    call write_hdf5(npoints_chord_tot-1,'parametric_nelems_chor',geo_loc)
+
+  end if
+
 
   call write_hdf5(rr,'rr',geo_loc)
   call write_hdf5(ee,'ee',geo_loc)
-
-! stop
-
-  !! treat the elements
-  !allocate(geo%components(i_comp)%temp_elems(size(ee,2)))
-  !do i2=1,size(ee,2)
-  !  n_vert = count(ee(:,i2).ne.0)
-  !  allocate(geo%components(i_comp)%temp_elems(i2)%vert(n_vert))
-  !  geo%components(i_comp)%temp_elems(i2)%vert(1:n_vert) = &
-  !                                        ee(1:n_vert,i2) + points_offset
-  !  geo%components(i_comp)%temp_elems(i2)%etype = comp_el_type(1:1)
-  !enddo
-
-  !geo%components(i_comp)%nSurfPan = 0; geo%components(i_comp)%nVortRin = 0;
-  !if(comp_el_type(1:1) .eq. 'p') geo%components(i_comp)%nSurfPan = size(ee,2)
-  !if(comp_el_type(1:1) .eq. 'v') geo%components(i_comp)%nVortRin = size(ee,2)
 
   !:::::::::::::::::::::::::::::::::::::::::::::::::::
 
@@ -363,30 +441,28 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
            npoints_chord_tot , nelems_span_tot , &
            e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
       else
-        call build_te_general ( ee , rr , neigh , ElType ,  &
+        call build_te_general ( ee , rr , ElType , &
+                  tol_sewing , inner_product_threshold , &
+                  te_proj_logical , te_proj_dir , te_proj_vec , &
                   e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
                                                             !te as an output
       end if
-
-!     call create_local_velocity_stencil_general()
-!     call create_strip_connectivity_general()
 
     case( 'cgns' )
 
       call build_connectivity_general( ee , neigh )
 
-      call build_te_general ( ee , rr , neigh , ElType ,  &
+      call build_te_general ( ee , rr , ElType , &
+                tol_sewing , inner_product_threshold , &
+                te_proj_logical , te_proj_dir , te_proj_vec , &
                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
                                                           !te as an output
 
-!     call create_local_velocity_stencil_general()
-!     call create_strip_connectivity_general()
-
     case( 'parametric' )
      if ( ElType .eq. 'l' .or. ElType .eq. 'v' .or. ElType .eq. 'p' ) then
-        call build_connectivity_parametric( trim(mesh_file) , ee ,     &
-                      ElType , npoints_chord_tot , nelems_span_tot , &
-                      mesh_reflection , neigh )
+        call build_connectivity_parametric( ee ,     &
+                       npoints_chord_tot , nelems_span_tot , &
+                       neigh )
         call build_te_parametric( ee , rr , ElType ,  &
            npoints_chord_tot , nelems_span_tot , &
            e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
@@ -395,8 +471,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id)
        neigh = 0 !All actuator disk are isolated
      endif
 
-!       call create_local_velocity_stencil_parametric()
-!       call create_strip_connectivity_parametric()
 
 !! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !!
 !! Same routines used for all parametric elements: p,v,l        !!
@@ -480,7 +554,6 @@ subroutine reflect_mesh(ee, rr, cent, norm)
       ee_temp(iv,ne+ie) = np+ee(nv-iv+2,ie)
     enddo
   enddo
-  !ee_temp(:,ne+1:2*ne) = ee+np
  
   !calculate normal unit vector and distance from origin
   n = norm/norm2(norm) 
@@ -506,7 +579,6 @@ end subroutine reflect_mesh
 !! Given a plane defined by a center point and a normal vector, the mesh 
 !! is doubled: all the points are reflected and new mirrored elements 
 !! introduced. The elements and points arrays are doubled.
- 
 subroutine reflect_mesh_structured( ee, rr, &
               npoints_chord_tot , nelems_span , cent, norm )
  integer, allocatable, intent(inout) :: ee(:,:)
@@ -607,15 +679,10 @@ subroutine reflect_mesh_structured( ee, rr, &
     ee_temp(2,ne+ie) = np-npoints_chord_tot+ee(1,ie)
     ee_temp(3,ne+ie) = np-npoints_chord_tot+ee(4,ie)
     ee_temp(4,ne+ie) = np-npoints_chord_tot+ee(3,ie)
-!     do iv = 2,nv
-!       ee_temp(iv,ne+ie) = np-npoints_chord_tot+ee(iv,ie)
-! !     ee_temp(iv,ne+ie) = np+ee(nv-iv+2,ie)
-!     enddo
   enddo
   ! correct the first elements ----- 
   ee_temp(1,ne+(/(i1,i1=1,npoints_chord_tot-1)/)) = (/(i1,i1=1,npoints_chord_tot-1)/)
   ee_temp(4,ne+(/(i1,i1=1,npoints_chord_tot-1)/)) = (/(i1,i1=2,npoints_chord_tot  )/)
-  !ee_temp(:,ne+1:2*ne) = ee+np
  
   !calculate normal unit vector and distance from origin
   n = norm/norm2(norm) 
@@ -638,9 +705,6 @@ subroutine reflect_mesh_structured( ee, rr, &
     ee_sort(:,1+(i1-1)*nelems_chord+ne:i1*nelems_chord+ne) = &
        ee_temp(:,1+(i1-1)*nelems_chord:i1*nelems_chord)
   end do
-
-  ! sort rr array ???
-  ! WARNING : if rr must be sorted, ee must be arranged as well
 
 ! !move alloc back to the original vectors
   call move_alloc(rr_temp, rr)
@@ -672,21 +736,10 @@ subroutine build_connectivity_general ( ee , neigh )
  integer :: vert1 , vert2
  integer :: ie1 , ie2 , iv1 , iv2
 
- integer :: i1
-
  character(len=*), parameter :: this_sub_name = 'build_connectivity_general'
 
  nelems = size( ee , 2 )
  nverts = 4
-
-! check ----
-        write(*,*)
-        do i1 = 1 , 16
-          write(*,*) i1 , '     ' , ee(:,i1)
-        end do
-        write(*,*)
-! check ----
-
  
  if ( size(ee,1) .ne. nverts ) then
    write(*,*) ' In build_connectivity_general(), wrong size(ee,1).'
@@ -749,47 +802,21 @@ end subroutine build_connectivity_general
 !! Quad elements allowed only
 
 ! WARNING: no fairing at the wing tip is allowed (up to now)
+subroutine build_connectivity_parametric ( ee , & 
+                 npoints_chord_tot , nelems_span , neigh )
 
-subroutine build_connectivity_parametric ( mesh_file , ee , & 
-                        ElType , npoints_chord_tot , nelems_span , symm , neigh )
-
-character(len=*) , intent(in) :: mesh_file
 integer , allocatable , intent(in) :: ee(:,:)
-character , intent(in) :: ElType
 integer , intent(in) :: npoints_chord_tot , nelems_span
-logical , intent(in) :: symm
-! if symm = .t. ---> nelem_span = nelem_span of the half-model
-! if symm = .f. ---> nelem_span = nelem_span
 integer , allocatable , intent(out):: neigh(:,:)
 
 integer :: nelems_chord ! , nelems_span
-!ype(t_parse) :: pmesh_prs
-!nteger   :: nelem_span 
-!nteger   :: nelem_chord , nelem_chord_tot
-!nteger   :: nRegions , iRegion
-
 integer :: i1 , i2 , iel
-
 character(len=*), parameter :: this_sub_name = 'build_component_parametric'
-
-! debug ----
-write(*,*) ' nelem_span        : ' , nelems_span
-write(*,*) ' npoints_chord_tot : ' , npoints_chord_tot
-! debug ----
 
 if ( allocated(neigh) )   deallocate(neigh)
 allocate(neigh(4,size(ee,2))) ; neigh = 0
 
 nelems_chord = npoints_chord_tot - 1
-!!! if ( .not. symm ) then
-! ! first strip ------
-! do i2 = 1 , nelems_chord
-!   iel = i2
-!   neigh(1,iel) = iel - 1
-!   neigh(2,iel) = 0  ! iel - nelems_chord
-!   neigh(3,iel) = iel + 1
-!   neigh(4,iel) = iel + nelems_chord
-! end do
   ! inner strips -----
   do i1 = 1 , nelems_span
     do i2 = 1 , nelems_chord
@@ -800,45 +827,31 @@ nelems_chord = npoints_chord_tot - 1
       neigh(4,iel) = iel + nelems_chord
     end do
   end do
-! ! last strip -------
-! do i2 = 1 , nelems_chord
-!   iel = i2 + ( nelems_span - 1 ) * nelems_chord
-!   neigh(1,iel) = iel - 1
-!   neigh(2,iel) = iel - nelems_chord
-!   neigh(3,iel) = iel + 1
-!   neigh(4,iel) = 0 ! iel + nelems_chord
-! end do
   ! correct tip   elements
   neigh(2,(/ (    i1                          , i1 = 1,nelems_chord) /)) = 0
   neigh(4,(/ (i1+(nelems_span-1)*nelems_chord , i1 = 1,nelems_chord) /)) = 0
   ! correct le-te elements
   neigh(1,(/ ( 1+(i1-1)*nelems_chord , i1 = 1,nelems_span) /)) = 0
   neigh(3,(/ (   (i1  )*nelems_chord , i1 = 1,nelems_span) /)) = 0
-! else
-! 
-! end if
-
-! check ----
-!open(unit=25,file='./neigh_symm.dat')
-!do i1 = 1 , size(neigh,2)
-!  write(25,*) neigh(:,i1)
-!end do
-!close(25)
-! check ----
 
 
 end subroutine build_connectivity_parametric
 
 !----------------------------------------------------------------------
 
-subroutine build_te_general ( ee , rr , neigh , ElType ,  &
+subroutine build_te_general ( ee , rr , ElType , &
+                 tol_sewing , inner_prod_thresh ,  &
+                 te_proj_logical , te_proj_dir , te_proj_vec , &
                  e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
                                                           !te as an output
-
  integer   , intent(in) :: ee(:,:)
  real(wp)  , intent(in) :: rr(:,:)
- integer   , intent(in) :: neigh(:,:)
  character , intent(in) :: ElType
+ real(wp)  , intent(in) :: tol_sewing
+ real(wp)  , intent(in) :: inner_prod_thresh
+ logical   , intent(in) :: te_proj_logical
+ character(len=*), intent(in) :: te_proj_dir
+ real(wp)  , intent(in) :: te_proj_vec(:)
 
  ! te structures
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
@@ -846,16 +859,13 @@ subroutine build_te_general ( ee , rr , neigh , ElType ,  &
  real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
 
  ! merge ------
- ! 1e-0 for nasa-crm , 3e-3_wp for naca0012
- real(wp),   parameter :: tol_sewing = 1e-3_wp  
- !real(wp),   parameter :: tol_sewing = 1e-0_wp  
+!! 1e-0 for nasa-crm , 3e-3_wp for naca0012      !!! old, hardcoded params
+!real(wp),   parameter :: tol_sewing = 1e-3_wp   !!! now tol_sewing is an input 
+!!real(wp),   parameter :: tol_sewing = 1e-0_wp  !!!
  real(wp), allocatable :: rr_m(:,:)
  integer , allocatable :: ee_m(:,:) , i_m(:,:)
  ! 'closed-te' connectivity -----
  integer , allocatable :: neigh_m(:,:)
-
- integer :: fid , i1
-
  character(len=*), parameter :: this_sub_name = 'build_te_general'
 
  if ( ElType .ne. 'p' ) then
@@ -874,7 +884,8 @@ subroutine build_te_general ( ee , rr , neigh , ElType ,  &
  write(*,*) '   build_connectivity_general ... done.'
 
 
- call find_te_general ( rr , ee , neigh , ee_m , neigh_m , &  
+ call find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &  
+                te_proj_logical , te_proj_dir , te_proj_vec , &
                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
                                                          !te as an output
 
@@ -949,13 +960,17 @@ end subroutine merge_nodes_general
 
 ! -------------
 
-subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &  
+subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , & 
+                te_proj_logical , te_proj_dir , te_proj_vec ,  & 
                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
                                                          !te as an output
 
  real(wp), intent(in) :: rr(:,:)
- integer , intent(in) :: ee(:,:) , neigh(:,:) , ee_m(:,:) , neigh_m(:,:)
-
+ integer , intent(in) :: ee(:,:) , neigh_m(:,:)
+ real(wp), intent(in) :: inner_prod_thresh
+ logical   , intent(in) :: te_proj_logical
+ character(len=*), intent(in) :: te_proj_dir
+ real(wp)  , intent(in) :: te_proj_vec(:)
  ! actual arrays -----
  integer , allocatable , intent(out) :: e_te(:,:) , i_te(:,:) , ii_te(:,:) 
  integer , allocatable , intent(out) :: neigh_te(:,:) , o_te(:,:)
@@ -975,15 +990,17 @@ subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &
  integer  :: ind1 , ind2 , i_node1 , i_node2 , i_node1_max , i_node2_max
  real(wp) ::  mi1 ,  mi2
 
- real(wp), parameter :: inner_prod_thresh = - 0.5d0
+ real(wp) :: t_te_len
+ integer  :: t_te_nelem
 
- real(wp), dimension(3) , parameter :: u_rel = (/ 1.0_wp , 0.0_wp , 0.0_wp /) 
-                                                ! hard-coded parameter ... 
- real(wp), dimension(3) :: v_rel = u_rel / norm2(u_rel)
- real(wp), dimension(3) , parameter :: side_dir = (/ 0.0_wp , 1.0_wp , 0.0_wp /) 
-                                                 ! hard-coded parameter ... 
+!real(wp), parameter :: inner_prod_thresh = - 0.5d0 ! old hardcoded, now an input
+
+!real(wp), dimension(3) , parameter :: u_rel = (/ 1.0_wp , 0.0_wp , 0.0_wp /) 
+!                                               ! hard-coded parameter ... 
+!real(wp), dimension(3) , parameter :: side_dir = (/ 0.0_wp , 1.0_wp , 0.0_wp /) 
+!                                                ! hard-coded parameter ...
+ real(wp) , dimension(3) :: side_dir 
  ! TODO: read as an input of the component
- real(wp) , dimension(3) :: vec1
 
  integer :: i1 , i2 
  character(len=*), parameter :: this_sub_name = 'find_te_general'
@@ -1009,9 +1026,10 @@ subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &
 
    nSides = count( ee(:,i_e) .ne. 0 )
 
-   nor(:,i_e) = cross( rr(:,ee(     3,i_e)) - rr(:,ee(1,i_e)) , & 
-                       rr(:,ee(nSides,i_e)) - rr(:,ee(2,i_e))     )
-   nor(:,i_e) = nor(:,i_e) / norm2(nor(:,i_e))
+   nor(:,i_e) = 0.5_wp * cross( rr(:,ee(     3,i_e)) - rr(:,ee(1,i_e)) , & 
+                                rr(:,ee(nSides,i_e)) - rr(:,ee(2,i_e))     )
+   area( i_e) = norm2(nor(:,i_e))
+   nor(:,i_e) = nor(:,i_e) / area(i_e) 
   
    do i1 = 1 , nSides
      cen(:,i_e) = cen(:,i_e) + rr(:,ee(i1,i_e))
@@ -1070,10 +1088,6 @@ subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &
            end if
          end do
          
-          ! elems(neigh_ib_ie)%p%i_ver(ind1) )
-          ! elems(neigh_ib_ie)%p%i_ver(ind2) )
-          ! elems(neigh_ib_ie)%p%i_ver(ind1) )
-          ! elems(neigh_ib_ie)%p%i_ver(ind2) )
          i_node1     = min(i_el_nodes_tmp(1,ne_te), ee(ind1,neigh_m(i_b,i_e)) )  
          i_node2     = min(i_el_nodes_tmp(2,ne_te), ee(ind2,neigh_m(i_b,i_e)) )  
          i_node1_max = max(i_el_nodes_tmp(1,ne_te), ee(ind1,neigh_m(i_b,i_e)) )  
@@ -1169,103 +1183,73 @@ subroutine find_te_general ( rr , ee , neigh , ee_m , neigh_m , &
  !  for the first implicit wake panel  ----------------
  allocate(t_te  (3,nn_te)) ; t_te = 0.0_wp  
  do i_n = 1 , nn_te
-   vec1 = 0.0_wp
+!  vec1 = 0.0_wp
+   t_te_len = 0.0_wp
+   t_te_nelem = 0
    do i_e = 1 , ne_te 
      if ( any( i_n .eq. ii_te(:,i_e)) ) then
-! check ----
-!      write(*,*) '    i_e             : ' , i_e
-!      write(*,*) '    e_te(:,i_e)     : ' , e_te(:,i_e)
-!      write(*,*) '    nor(e_te(1,i_e)): ' , nor(:,e_te(1,i_e))
-!      write(*,*) '    nor(e_te(2,i_e)): ' , nor(:,e_te(2,i_e))
-! check ----
        t_te(:,i_n) =  t_te(:,i_n) + nor(:,e_te(1,i_e)) &
                                   + nor(:,e_te(2,i_e))
-       ! TODO: refine the definition of the vec1
-       vec1 = vec1 + cross(nor(:,e_te(1,i_e)) , nor(:,e_te(2,i_e)) )
+
+! **** mod 2018-07-04: avoid projection on v_rel direction.
+! **** - avoid using hard-coded or params of the solver
+! **** - for simulating fixed elements w/o free-stream velocity 
+
+! **** ! <<<<<<<<<<
+! **** ! TODO: refine the definition of the vec1
+! **** vec1 = vec1 + cross(nor(:,e_te(1,i_e)) , nor(:,e_te(2,i_e)) )
+
+! **** ! >>>>>>>>>>
+       t_te_len = t_te_len + sqrt(area(e_te(1,i_e))) + sqrt(area(e_te(2,i_e)))
+       t_te_nelem = t_te_nelem + 2
+! **** ! >>>>>>>>>>
+
      end if
    end do
-!  ! projection along the 'relative velocity'
+
+! tests: projection tests
+!  ! 1. projection along the 'relative velocity'
 !  t_te(:,i_n) = sum(t_te(:,i_n)*v_rel) * v_rel
-   ! projection perpendicular to the side_slip direction
+!  ! 2. projection perpendicular to the side_slip direction
 !  t_te(:,i_n) = t_te(:,i_n) - sum(t_te(:,i_n)*side_dir) * side_dir
 
-   vec1 = vec1 - sum(vec1*v_rel) * v_rel
-   vec1 = vec1 / norm2(vec1)
-
-   ! projection ****
-!  write(*,*) ' vec1 ' , vec1
-   t_te(:,i_n) = t_te(:,i_n) - sum(t_te(:,i_n)*vec1) * vec1
+! **** ! <<<<<<<<<<
+! **** vec1 = vec1 - sum(vec1*v_rel) * v_rel
+! **** vec1 = vec1 / norm2(vec1)
+! ****
+! **** ! projection ****
+! **** write(*,*) ' vec1 ' , vec1
+! **** t_te(:,i_n) = t_te(:,i_n) - sum(t_te(:,i_n)*vec1) * vec1
+! **** ! <<<<<<<<<<
 
    ! normalisation
-   t_te(:,i_n) = t_te(:,i_n) / norm2(t_te(:,i_n))
+   t_te(:,i_n) = t_te(:,i_n) / norm2(t_te(:,i_n)) ! TODO: check if it is right
+! **** ! >>>>>>>>>>
+   t_te_len = 1.0_wp    ! 10.0_wp TODO: clean
+   t_te(:,i_n) = t_te(:,i_n) * t_te_len ! / dble(t_te_nelem)
+! **** ! >>>>>>>>>>
+
+   if ( trim(te_proj_dir) .eq. 'normal' ) then
+   
+     side_dir = te_proj_vec
+     if ( te_proj_logical ) then
+       t_te(:,i_n) = t_te(:,i_n) - sum(t_te(:,i_n)*side_dir) * side_dir
+     end if
+
+   elseif ( trim(te_proj_dir) .eq. 'parallel' ) then
+   
+     side_dir = te_proj_vec
+     if ( te_proj_logical ) then
+       t_te(:,i_n) = sum(t_te(:,i_n)*side_dir) * side_dir
+     end if
+
+   end if
 
  end do
 
 
 ! WARNING: in mod_geo.f90 the inverse transformation was introduced in the 
 !  definition of the streamwise tangent unit vector at the te
-
-
-
-! check ----
-! fid = 26
-! open(unit=fid,file='./check/general_3dp/e_te.dat')
-! do i1 = 1 , size(e_te,2)
-!   write(fid,*) e_te(:,i1)
-! end do
-! close(fid)
-! open(unit=fid,file='./check/general_3dp/i_te.dat')
-! do i1 = 1 , size(i_te,2)
-!   write(fid,*) i_te(:,i1)
-! end do
-! close(fid)
-! open(unit=fid,file='./check/general_3dp/rr_te.dat')
-! do i1 = 1 , size(rr_te,2)
-!   write(fid,*) rr_te(:,i1)
-! end do
-! close(fid)
-! open(unit=fid,file='./check/general_3dp/ii_te.dat')
-! do i1 = 1 , size(ii_te,2)
-!   write(fid,*) ii_te(:,i1)
-! end do
-! close(fid)
-! open(unit=fid,file='./check/general_3dp/neigh_te.dat')
-! do i1 = 1 , size(neigh_te,2)
-!   write(fid,*) neigh_te(:,i1)
-! end do
-! close(fid)
-! open(unit=fid,file='./check/general_3dp/o_te.dat')
-! do i1 = 1 , size(o_te,2)
-!   write(fid,*) o_te(:,i1)
-! end do
-! close(fid)
-! open(unit=fid,file='./check/general_3dp/ref_te.dat')
-! do i1 = 1 , size(ref_te)
-!   write(fid,*) ref_te(i1)
-! end do
-! close(fid)
-! open(unit=fid,file='./check/general_3dp/t_te.dat')
-! do i1 = 1 , size(t_te,2)
-!   write(fid,*) t_te(:,i1)
-! end do
-! close(fid)
-! 
-! ! Extra check ----
-! open(unit=fid,file='./check/general_3dp/cen_e_te.dat')
-! do i1 = 1 ,  size(e_te,2)
-!   write(fid,*) cen(:,e_te(1,i1)) 
-!   write(fid,*) cen(:,e_te(2,i1)) 
-! end do
-! close(fid)
-! open(unit=fid,file='./check/general_3dp/nor_e_te.dat')
-! do i1 = 1 ,  size(e_te,2)
-!   write(fid,*) nor(:,e_te(1,i1)) 
-!   write(fid,*) nor(:,e_te(2,i1)) 
-! end do
-! close(fid)
-! 
-! check ----
-
 
 
 
@@ -1390,44 +1374,6 @@ subroutine build_te_parametric ( ee , rr , ElType , &
  
  end if
 
-! check ----
-! fid = 25
-! open(unit=fid,file='./check/param_e_te.dat')
-! do i1 = 1 , size(e_te,2)
-!     write(fid,*) e_te(:,i1)
-! end do
-! close(fid)
-! open(unit=fid,file='./check/param_i_te.dat')
-! do i1 = 1 , size(i_te,2)
-!     write(fid,*) i_te(:,i1)
-! end do
-! close(fid)
-! open(unit=fid,file='./check/param_rr_te.dat')
-! do i1 = 1 , size(rr_te,2)
-!     write(fid,*) rr_te(:,i1)
-! end do
-! close(fid)
-! open(unit=fid,file='./check/param_ii_te.dat')
-! do i1 = 1 , size(ii_te,2)
-!     write(fid,*) ii_te(:,i1)
-! end do
-! close(fid)
-! open(unit=fid,file='./check/param_neigh_te.dat')
-! do i1 = 1 , size(neigh_te,2)
-!     write(fid,*) neigh_te(:,i1)
-! end do
-! close(fid)
-! open(unit=fid,file='./check/param_o_te.dat')
-! do i1 = 1 , size(o_te,2)
-!     write(fid,*) o_te(:,i1)
-! end do
-! close(fid)
-! open(unit=fid,file='./check/param_t_te.dat')
-! do i1 = 1 , size(t_te,2)
-!     write(fid,*) t_te(:,i1)
-! end do
-! close(fid)
-! check ----
 
 end subroutine build_te_parametric
 
