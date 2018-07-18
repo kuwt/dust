@@ -37,7 +37,7 @@ ELSEIF(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
 #  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -standard-semantics")
   set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS} -O3 -g -xHost")
   set(CMAKE_Fortran_FLAGS_PROFILE "${CMAKE_Fortran_FLAGS} -O3 -g -xHost")
-  set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS} -g -O0 -stand f08 -check all -check noarg_temp_created -warn all -fpe0 -traceback -ftrapuv -fp-stack-check")
+  set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS} -g -O0 -stand f08 -check all -check noarg_temp_created -warn all -fpe0 -traceback -ftrapuv -fp-stack-check -assume norealloc_lhs")
 ELSE()
   message(ERROR "Unknown compiler")
 ENDIF()
@@ -98,6 +98,7 @@ file(GLOB_RECURSE sources ${PROJECT_SOURCE_DIR}/src/geo/*.f90
                           ${PROJECT_SOURCE_DIR}/src/aeroel/*.f90 
                           ${PROJECT_SOURCE_DIR}/src/linsys/*.f90
                           ${PROJECT_SOURCE_DIR}/src/io/*.f90
+                          ${PROJECT_SOURCE_DIR}/src/post/*.f90
                           ${PROJECT_SOURCE_DIR}/src/options/*.f90)
 
 

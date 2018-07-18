@@ -46,14 +46,18 @@ use mod_sim_param, only: &
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime, check_preproc
 
-use mod_aero_elements, only: &
-  c_elem, t_elem_p
+!use mod_aero_elements, only: &
+!  c_elem, t_elem_p
+
+use mod_aeroel, only: &
+  c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
 use mod_surfpan, only: &
   t_surfpan
 
-use mod_vortring, only: &
-  t_vortring
+use mod_vortlatt, only: &
+  t_vortlatt
 
 use mod_liftlin, only: &
   t_liftlin
@@ -78,11 +82,8 @@ use mod_hdf5_io, only: &
 use mod_geometry, only: &
   t_geo, t_geo_component
 
-use mod_wake_pan, only: &
-  t_wake_panels
-
-use mod_wake_ring, only: &
-  t_wake_rings
+use mod_wake, only: &
+  t_wake
 
 use mod_stringtools, only: &
   stricmp
@@ -102,10 +103,9 @@ character(len=*), parameter :: this_mod_name = 'mod_dust_io'
 contains
 
 !----------------------------------------------------------------------
-subroutine save_status(geo, wake_pan, wake_rin, sim_params, it, time, run_id)
+subroutine save_status(geo, wake,  sim_params, it, time, run_id)
  type(t_geo), intent(in)         :: geo
- type(t_wake_panels), intent(in) :: wake_pan
- type(t_wake_rings), intent(in) :: wake_rin
+ type(t_wake), intent(in) :: wake
  type(t_sim_param), intent(in)  :: sim_params
  integer, intent(in)             :: it
  real(wp), intent(in)            :: time
@@ -120,6 +120,7 @@ subroutine save_status(geo, wake_pan, wake_rin, sim_params, it, time, run_id)
  real(wp), allocatable :: vort(:), cp(:) , pres(:)
  real(wp), allocatable :: dforce(:,:) 
  real(wp), allocatable :: points_w(:,:,:), cent(:,:,:)
+ real(wp), allocatable :: vort_v(:,:)
  integer, allocatable :: conn_pe(:)
  integer :: ir, id, ip, np
 
@@ -145,7 +146,8 @@ subroutine save_status(geo, wake_pan, wake_rin, sim_params, it, time, run_id)
   call write_hdf5(ncomp, 'NComponents', gloc1)
   !Cycle the components
   do icomp = 1, ncomp
-    write(comp_name,'(A,I3.3)')'Comp',icomp
+    !write(comp_name,'(A,I3.3)')'Comp',icomp
+    write(comp_name,'(A,I3.3)')'Comp',geo%components(icomp)%comp_id
     call new_hdf5_group(gloc1, trim(comp_name), gloc2)
 
     call write_hdf5(trim(geo%components(icomp)%comp_name),'CompName',gloc2)
@@ -157,7 +159,7 @@ subroutine save_status(geo, wake_pan, wake_rin, sim_params, it, time, run_id)
     ne = size(geo%components(icomp)%el)
     allocate(vort(ne), cp(ne) , pres(ne) , dforce(3,ne) )
     do ie = 1,ne
-     vort(ie) = geo%components(icomp)%el(ie)%idou
+     vort(ie) = geo%components(icomp)%el(ie)%mag
      !cp(ie) = geo%components(icomp)%el(ie)%cp
      pres(ie) = geo%components(icomp)%el(ie)%pres
      dforce(:,ie) = geo%components(icomp)%el(ie)%dforce
@@ -178,22 +180,25 @@ subroutine save_status(geo, wake_pan, wake_rin, sim_params, it, time, run_id)
   ! connectivity to build connectivity after
   call new_hdf5_group(floc, 'PanelWake', gloc1)
 
-  call write_hdf5(wake_pan%w_points(:,:,1:wake_pan%wake_len+1),'WakePoints',gloc1 )
-  call write_hdf5(wake_pan%i_start_points,'StartPoints',gloc1)
-  call write_hdf5(wake_pan%ivort(:,1:wake_pan%wake_len),'WakeVort',gloc1)
+  !call write_hdf5(wake_pan%w_points(:,:,1:wake_pan%wake_len+1),'WakePoints',gloc1 )
+  !call write_hdf5(wake_pan%i_start_points,'StartPoints',gloc1)
+  !call write_hdf5(wake_pan%idou(:,1:wake_pan%wake_len),'WakeVort',gloc1)
+  call write_hdf5(wake%pan_w_points(:,:,1:wake%pan_wake_len+1),'WakePoints',gloc1 )
+  call write_hdf5(wake%i_start_points,'StartPoints',gloc1)
+  call write_hdf5(wake%pan_idou(:,1:wake%pan_wake_len),'WakeVort',gloc1)
 
   call close_hdf5_group(gloc1)
 
   call new_hdf5_group(floc, 'RingWake', gloc1)
-  allocate(points_w(3,wake_rin%np_row,wake_rin%wake_len))
-  allocate(conn_pe(wake_rin%np_row))
-  allocate(cent(3,wake_rin%ndisks,wake_rin%wake_len))
+  allocate(points_w(3,wake%np_row,wake%rin_wake_len))
+  allocate(conn_pe(wake%np_row))
+  allocate(cent(3,wake%ndisks,wake%rin_wake_len))
   ip = 1
-  do id = 1,wake_rin%ndisks
-    np = wake_rin%gen_elems(id)%p%n_ver
-    do ir = 1,wake_rin%wake_len
-      points_w(:,ip:ip+np-1,ir) = wake_rin%wake_rings(id,ir)%ver(:,:)
-      cent(:,id,ir) = wake_rin%wake_rings(id,ir)%cen(:)
+  do id = 1,wake%ndisks
+    np = wake%rin_gen_elems(id)%p%n_ver
+    do ir = 1,wake%rin_wake_len
+      points_w(:,ip:ip+np-1,ir) = wake%wake_rings(id,ir)%ver(:,:)
+      cent(:,id,ir) = wake%wake_rings(id,ir)%cen(:)
     enddo
     conn_pe(ip:ip+np-1) = id
     ip = ip+np
@@ -201,9 +206,22 @@ subroutine save_status(geo, wake_pan, wake_rin, sim_params, it, time, run_id)
   call write_hdf5(points_w,'WakePoints',gloc1)
   call write_hdf5(conn_pe,'Conn_pe',gloc1)
   call write_hdf5(cent,'WakeCenters',gloc1)
-  call write_hdf5(wake_rin%ivort(:,1:wake_rin%wake_len),'WakeVort',gloc1)
+  call write_hdf5(wake%rin_idou(:,1:wake%rin_wake_len),'WakeVort',gloc1)
   call close_hdf5_group(gloc1)
   deallocate(points_w, conn_pe, cent)
+
+  call new_hdf5_group(floc, 'ParticleWake', gloc1)
+  allocate(points_w(3,wake%n_prt,1))
+  allocate(vort_v(3,wake%n_prt))
+  do ip = 1, wake%n_prt
+    points_w(:,ip,1) = wake%part_p(ip)%p%cen
+    vort_v(:,ip) = wake%part_p(ip)%p%dir * wake%part_p(ip)%p%mag
+  enddo
+  call write_hdf5(points_w(:,:,1),'WakePoints',gloc1)
+  call write_hdf5(vort_v,'WakeVort',gloc1)
+  call write_hdf5(wake%last_pan_idou,'LastPanIdou',gloc1)
+  call close_hdf5_group(gloc1)
+  deallocate(points_w, vort_v)
 
   ! 3) %%%% References
   ! save the whole list of references
@@ -236,9 +254,10 @@ end subroutine save_status
 !!
 !! Loads just the bodies solution, which is stored into the components,
 !! the loading of the wakes is left to other subroutines
-subroutine load_solution(filename,comps)
+subroutine load_solution(filename,comps,refs)
  character(len=max_char_len), intent(in) :: filename
  type(t_geo_component), intent(inout) :: comps(:)
+ type(t_ref), intent(in) :: refs(0:)
 
  integer(h5loc) :: floc, gloc1, gloc2, gloc3
  integer :: ncomp, icomp, icomp2
@@ -270,6 +289,7 @@ subroutine load_solution(filename,comps)
     do icomp2 = 1,size(comps)
       if (stricmp(comp_name_read, comps(icomp2)%comp_name)) then
         !We found the correct local component, read all
+        call check_ref(gloc2, floc, refs(comps(icomp2)%ref_id))
         call open_hdf5_group(gloc2, 'Solution', gloc3)
         call read_hdf5_al(idou,'Vort',gloc3)
         call read_hdf5_al(pres,'Pres',gloc3)
@@ -277,7 +297,7 @@ subroutine load_solution(filename,comps)
         call close_hdf5_group(gloc3)
         ne = size(comps(icomp2)%el)
         do ie =1,ne
-          comps(icomp2)%el(ie)%idou   = idou(ie)
+          comps(icomp2)%el(ie)%mag   = idou(ie)
           comps(icomp2)%el(ie)%pres   = pres(ie)
           comps(icomp2)%el(ie)%dforce = dF(:,ie)
         enddo
@@ -300,6 +320,48 @@ subroutine load_solution(filename,comps)
 end subroutine load_solution
 
 !----------------------------------------------------------------------
+
+!> Chech that the component that we are about to load will be placed, in
+!! the actual reference frames, in the same position in which it was saved
+!!
+!! This is done comparing offsets and rotations between the actual references
+!! and the one saved
+subroutine check_ref(gloc, floc, ref)
+ integer(h5loc), intent(in) :: gloc
+ integer(h5loc), intent(in) :: floc
+ type(t_ref), intent(in)    :: ref
+
+ integer :: iref
+ integer(h5loc) :: refs_gloc, ref_loc
+ character(len=max_char_len) :: ref_title
+ real(wp) :: R(3,3), of(3)
+ character(len=*), parameter :: this_sub_name='check_ref'
+ 
+  call read_hdf5(iref, 'RefId', gloc)
+  call open_hdf5_group(floc, 'References', refs_gloc)
+  write(ref_title,'(A,I3.3)')'Ref',iref
+  call open_hdf5_group(refs_gloc, trim(ref_title), ref_loc)
+
+  call read_hdf5(R,'R',ref_loc)
+  call read_hdf5(of,'Offset',ref_loc)
+
+  if ((.not. all(real(R) .eq. real(ref%R_g))) .or. &
+      (.not. all(real(of) .eq. real(ref%of_g))) ) then
+    call warning(this_sub_name, this_mod_name, 'Mismatching initial position &
+    & while loading reference '//trim(ref%tag)//' This may lead to &
+    &unexpected behaviour')
+  endif
+  
+  
+  call close_hdf5_group(ref_loc)
+  call close_hdf5_group(refs_gloc)
+
+
+end subroutine check_ref
+
+!----------------------------------------------------------------------
+
+!> Load the time value from a result file
 subroutine load_time(filename, time)
  character(len=*), intent(in) :: filename
  real(wp), intent(out) :: time

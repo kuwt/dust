@@ -99,8 +99,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 !real(wp) :: th1 , th2 , ch1 , ch2 
  real(wp) :: dx_ref , dy_ref , dz_ref
  integer :: ista , iend , ich
- 
- integer :: fid
 
  character(len=*), parameter :: this_sub_name = 'read_mesh_parametric'
 

@@ -66,13 +66,21 @@ type t_sim_param
   real(wp) :: rho_inf
   !> Free stream velocity
   real(wp) , allocatable :: u_inf(:)
-  !> Mach number
-  real(wp) :: Mach
-  !> Reynolds number
-  real(wp) :: Re
+  !> Free stream speed of sound
+  real(wp) :: a_inf
+  !> Free stream dynamic viscosity
+  real(wp) :: mu_inf
+
+! old, element depending for moving bodies, e.g. rotating blades +++++++
+! !> Mach number 
+! real(wp) :: Mach
+! !> Reynolds number
+! real(wp) :: Re
 
   !Wake
   real(wp) :: first_panel_scaling
+  real(wp) :: min_vel_at_te
+  logical :: rigid_wake
 
   !Handling parameters:
   !> Debug level

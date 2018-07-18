@@ -397,7 +397,7 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
       allocate(coordinateList(nNodes))
       allocate(rr(ndim,nNodesUsed))
       do i = 1, ndim
-        coordinateList = 0;
+        coordinateList = 0.0_wp;
         call cg_coord_read_f(INDEX_FILE, ibase, izone, coordname(i), &
                              iprec, 1, isize(1), coordinateList, ier);
         if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
@@ -413,7 +413,7 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
       allocate(coordinateList(nNodes))
       allocate(rr(ndim,nNodes))
       do i = 1, ndim
-        coordinateList = 0;
+        coordinateList = 0.0_wp;
 
         !TODO: passing rr(1,:) is not a contiguous memory location and
         !needs a temporary, and rises a warning. Consider either using 
@@ -430,19 +430,6 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
 
   end do ! Loop on zones
 
-  ! ! Check +++++
-  ! open(unit=21,file='./rr.dat')
-  ! do i1 = 1 , size(rr,2)
-  !   write(21,*) rr(:,i1)
-  ! end do
-  ! close(21)
-
-  ! open(unit=21,file='./ee.dat')
-  ! do i1 = 1 , size(ee,2)
-  !   write(21,*) ee(:,i1)
-  ! end do
-  ! close(21)
-  ! ! Check +++++
 
   
 end subroutine read_mesh_cgns
