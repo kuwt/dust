@@ -62,8 +62,7 @@ use mod_stringtools, only: &
   LowCase 
 
 use mod_geo_postpro, only: &
-  load_components_postpro, update_points_postpro , prepare_geometry_postpro , &
-  prepare_wake_postpro   
+  load_components_postpro, update_points_postpro , prepare_geometry_postpro
 
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &

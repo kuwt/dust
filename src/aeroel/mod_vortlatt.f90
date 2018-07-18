@@ -398,7 +398,6 @@ class(t_vortlatt), intent(inout) :: this
 type(t_sim_param), intent(in) :: sim_param
 
 integer  :: i_stripe
-real(wp) :: dG_dt
 
 this%pres = 0.0_wp
 

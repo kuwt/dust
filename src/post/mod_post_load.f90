@@ -384,7 +384,7 @@ subroutine load_wake_post(floc, wake, wake_p)
  integer :: n_wake_stripes , npan, ndisks, nrows
  integer :: nsides
  integer :: p1 , p2 
- integer :: ip , iw, id, ir, iconn, ie, i
+ integer :: ip , iw, id, ir, iconn, i
  integer :: npt_disk
  integer, allocatable :: disk_pts(: )
 

@@ -252,7 +252,7 @@ subroutine build_references(refs, reference_file, sim_param)
  character(len=max_char_len) :: ref_tag_str
  ! complex multiple components -----
  integer :: i_mult_blades , n_mult_blades , count_dofs
- integer :: hub_id , body_id , hin_id
+ integer :: hub_id
  integer :: i_dof , n_dofs
  character(len=max_char_len), allocatable :: hinge_type(:)
  real(wp) , allocatable :: hinge_offs(:,:) , hinge_coll(:) , hinge_cyAm(:) , hinge_cyPh(:)
@@ -1142,11 +1142,11 @@ subroutine build_references(refs, reference_file, sim_param)
              else ! harmonic rotation around the hinge axis 
 
                if ( trim(hinge_type(i_dof)) .eq. 'Flap' ) then
-                 refs(iref)%axis  = (/ 1.0 , 0.0 , 0.0 /)
+                 refs(iref)%axis  = (/ 1.0_wp , 0.0_wp , 0.0_wp /)
                else if ( trim(hinge_type(i_dof)) .eq. 'Pitch' ) then
-                 refs(iref)%axis  = (/ 0.0 , 1.0 , 0.0 /)
+                 refs(iref)%axis  = (/ 0.0_wp , 1.0_wp , 0.0_wp /)
                else if ( trim(hinge_type(i_dof)) .eq. 'Lag' ) then
-                 refs(iref)%axis  = (/ 0.0 , 0.0 , 1.0 /)
+                 refs(iref)%axis  = (/ 0.0_wp , 0.0_wp , 1.0_wp /)
                else
                  call error(this_sub_name, this_mod_name, 'Unknown hinge type:&
                       & it must be: Flap, Pitch ot Lag')

@@ -482,7 +482,8 @@ subroutine destroy_wake(wake)
 
  !dummy to avoid compiler warnings
  wake%nmax_pan = -1
- deallocate(points_end)
+ if(allocated(points_end)) deallocate(points_end)
+ if(allocated(points_end_ring)) deallocate(points_end_ring)
 
 end subroutine
 
@@ -868,10 +869,9 @@ subroutine update_wake(wake, elems, sim_param)
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: iw, ipan, ie, ip, np
- integer :: id, ir, k
- integer :: p1, p2
- real(wp) :: dist(3) , vel_te(3)
- real(wp) :: pos_p(3), vel_p(3), v(3)
+ integer :: id, ir
+ !real(wp) :: dist(3) , vel_te(3)
+ real(wp) :: pos_p(3), vel_p(3)
  type(t_pot_elem_p), allocatable :: pan_p_temp(:)
  real(wp), allocatable :: point_old(:,:,:)
  real(wp), allocatable :: points(:,:,:)
@@ -879,8 +879,6 @@ subroutine update_wake(wake, elems, sim_param)
  !real(wp), allocatable :: points_end(:,:)
  logical :: increase_wake
  integer :: size_old
- real(wp) :: dir(3), partvec(3), ave
- character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name='update_wake'
 
   wake%w_vel = 0.0_wp
@@ -944,10 +942,10 @@ subroutine update_wake(wake, elems, sim_param)
       pos_p = point_old(:,iw,wake%pan_wake_len+1)
       vel_p = 0.0_wp
 
-      call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
+      !call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
 
-      vel_p    = vel_p   + sim_param%u_inf
-      !call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
+      !vel_p    = vel_p   + sim_param%u_inf
+      call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
 
       !update the position in time
       points_end(:,iw) = pos_p + vel_p*sim_param%dt

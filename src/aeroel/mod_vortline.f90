@@ -162,22 +162,12 @@ subroutine calc_geo_data_vortline(this, vert)
  class(t_vortline), intent(inout) :: this
  real(wp), intent(in) :: vert(:,:)
 
- integer :: sides, is, nsides
- real(wp):: nor(3), tanl(3)
 
   this%ver = vert
 
 
   ! center, for lines  is the mid-point
   this%cen =  sum ( this%ver(:,1:2),2 ) / 2.0_wp
-
-
-  !! local tangent unit vector as in PANAIR
-  !tanl = 0.5_wp * ( this%ver(:,nsides) + this%ver(:,1) ) - this%cen
-
-  !this%tang(:,1) = tanl / norm2(tanl)
-  !this%tang(:,2) = cross( this%nor, this%tang(:,1)  )
-
 
   !! vector connecting the two consecutive vertices:
   this%edge_vec(:) = this%ver(:,2) - this%ver(:,1)

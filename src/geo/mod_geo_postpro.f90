@@ -84,9 +84,6 @@ use mod_actuatordisk, only: &
 use mod_c81, only: &
   t_aero_tab , read_c81_table , interp_aero_coeff
 
-!use read_naca00xx, only: &
-!  read_naca_arrays
-
 use mod_math, only: &
   cross
 
@@ -109,12 +106,6 @@ use mod_hdf5_io, only: &
 use mod_geometry, only: &
   t_geo, t_geo_component , calc_geo_data_pan , calc_geo_vel
 
-use mod_wake_pan, only: &
-  t_wake_panels
-
-use mod_wake_ring, only: &
-  t_wake_rings
-
 use mod_stringtools, only: &
   LowCase, IsInList, strip_mult_appendix
 
@@ -122,8 +113,8 @@ use mod_stringtools, only: &
 
 implicit none
 
-public :: load_components_postpro, update_points_postpro , prepare_geometry_postpro, expand_actdisk_postpro, &
-          prepare_wake_postpro
+public :: load_components_postpro, update_points_postpro , &
+          prepare_geometry_postpro, expand_actdisk_postpro
 
 private
 
@@ -136,241 +127,6 @@ character(len=*), parameter :: this_mod_name = 'mod_geo_postpro'
 contains
 
 !----------------------------------------------------------------------
-
-!----------------------------------------------------------------------
-
-!!!> Create all the goemetry
-!!!! 
-!!!! The geometry creation proceeds in this way:
-!!!! -# The main geometry file is read, and the components therein contained are
-!!!!    created (reading the mesh)
-!!!! -# If some additional geometry files are present, each one is read and all
-!!!!    its component are created
-!!!! -# The main geometry arrays, SurfPan and VortRin are allocated and filled
-!!!!    in the prepare_geometry routine
-!!!! -# The element pointer array used to build/solve the linear system is
-!!!!    created, pointed at each element and then re-ordered with the static
-!!!!    elements first, and the dynamic elements at the end
-!!subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
-!!                           te, elems, elems_ll, elems_tot, airfoil_data, &
-!!                           sim_param)
-!! character(len=*), intent(in) :: geo_file_name
-!! character(len=*), intent(inout) :: ref_file_name
-!! character(len=*), intent(in) :: in_file_name
-!! type(t_geo), intent(out), target :: geo
-!! type(t_elem_p), allocatable, intent(out) :: elems(:)
-!! type(t_elem_p), allocatable, intent(out) :: elems_ll(:)
-!! type(t_elem_p), allocatable, intent(out) :: elems_tot(:)
-!! type(t_tedge), intent(out) :: te
-!! type(t_aero_tab) , allocatable, intent(out) :: airfoil_data(:)
-!! type(t_sim_param) , intent(inout) :: sim_param
-!! real(wp)                     :: tstart
-!!
-!! !character(len=max_char_len) :: reference_file
-!! !character(len=max_char_len) :: geo_file_name
-!!
-!! integer :: i, j, is, im,  i_comp, i_ll, i_tot
-!! type(t_elem_p), allocatable :: temp_static(:), temp_moving(:)
-!!
-!! integer , allocatable :: el_id_old(:), el_id_old_static(:), el_id_old_moving(:)
-!!
-!! character(len=max_char_len) :: msg
-!!
-!!  tstart = sim_param%t0
-!! 
-!!  !build the reference frames
-!!  !read which is the reference frame file, if default the main input file is 
-!!  !employed
-!!  !reference_file = getstr(prms, 'ReferenceFile')
-!!  if (trim(ref_file_name) .eq. 'no_set') then
-!!    ref_file_name = trim(in_file_name)
-!!  endif
-!!
-!!  call build_references(geo%refs, trim(ref_file_name), sim_param)
-!!
-!!  !Load the components from the file created by the preprocessor
-!!  !geo_file_name = getstr(prms, 'GeometryFile')
-!!  call check_preproc(geo_file_name)
-!!  call load_components(geo, trim(geo_file_name), sim_param, te)
-!!
-!!  call import_aero_tab(geo,airfoil_data)
-!!
-!!  ! Initialisation
-!!  geo%nelem      = 0
-!!  geo%nll        = 0
-!!  geo%nstatic    = 0
-!!  geo%nmoving    = 0
-!!  geo%nstatic_ll = 0
-!!  geo%nmoving_ll = 0
-!!  geo%nSurfPan   = 0
-!!  geo%nVortRin   = 0
-!!  geo%nLiftLin   = 0
-!!
-!!  ! count the elements
-!!  do i_comp = 1,size(geo%components)
-!!
-!!    if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p') then
-!!      if(geo%components(i_comp)%moving) then
-!!        geo%nmoving = geo%nmoving + geo%components(i_comp)%nelems
-!!      else
-!!        geo%nstatic = geo%nstatic + geo%components(i_comp)%nelems
-!!      endif
-!!      geo%nSurfPan = geo%nSurfPan + geo%components(i_comp)%nelems
-!!      geo%nelem = geo%nelem + geo%components(i_comp)%nelems
-!!
-!!    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'v') then
-!!      if(geo%components(i_comp)%moving) then
-!!        geo%nmoving = geo%nmoving + geo%components(i_comp)%nelems
-!!      else
-!!        geo%nstatic = geo%nstatic + geo%components(i_comp)%nelems
-!!      endif
-!!      geo%nVortRin = geo%nVortRin + geo%components(i_comp)%nelems
-!!      geo%nelem = geo%nelem + geo%components(i_comp)%nelems
-!!
-!!    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'l') then
-!!      if(geo%components(i_comp)%moving) then
-!!        geo%nmoving_ll = geo%nmoving_ll + geo%components(i_comp)%nelems
-!!      else
-!!        geo%nstatic_ll = geo%nstatic_ll + geo%components(i_comp)%nelems
-!!      endif
-!!      geo%nLiftLin = geo%nLiftLin + geo%components(i_comp)%nelems
-!!      geo%nll = geo%nll + geo%components(i_comp)%nelems
-!!    endif
-!!    
-!!  enddo
-!!
-!!  ! calculate the geometric quantities
-!!  ! already update the geometry for the first time to get the right 
-!!  ! starting geometrical condition
-!!  call prepare_geometry(geo)
-!!  call update_geometry(geo, tstart, update_static=.true.)
-!!
-!!  if(sim_param%debug_level .ge. 3) then
-!!    call printout(nl//' Geometry details:' ) 
-!!    write(msg,'(A,I9)') '  number of elements:        ' ,geo%nelem
-!!    call printout(msg)
-!!    write(msg,'(A,I9)') '  number of static elements: ' ,geo%nstatic
-!!    call printout(msg)
-!!    write(msg,'(A,I9)') '  number of moving elements: ' ,geo%nmoving
-!!    call printout(msg)
-!!    write(msg,'(A,I9)') '  number of surface panels:  ' ,geo%nsurfpan
-!!    call printout(msg)
-!!    write(msg,'(A,I9)') '  number of vortex rings:    ' ,geo%nvortrin
-!!    call printout(msg)
-!!  endif
-!!
-!!  !Create the vector of pointers to all the elements
-!!  allocate(elems(geo%nelem), elems_ll(geo%nll), elems_tot(geo%nelem+geo%nll)) 
-!!  i=0; i_ll=0; i_tot=0
-!!  do i_comp = 1,size(geo%components)
-!!    
-!!    if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p' .or. &
-!!        trim(geo%components(i_comp)%comp_el_type) .eq. 'v') then
-!!
-!!      do j = 1,size(geo%components(i_comp)%el)
-!!        i = i+1
-!!        i_tot = i_tot+1
-!!        elems(i)%p => geo%components(i_comp)%el(j)
-!!  !      elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
-!!      enddo
-!!
-!!    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'l') then
-!!
-!!      do j = 1,size(geo%components(i_comp)%el)
-!!        i_ll = i_ll+1
-!!        i_tot = i_tot+1
-!!        elems_ll(i_ll)%p => geo%components(i_comp)%el(j)
-!!  !      elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
-!!      enddo
-!!
-!!    endif
-!!  enddo
-!!
-!!  ! Sort elements: first static, then moving ------- 
-!!  !fill in the two temporaries
-!!  allocate(temp_static(geo%nstatic), temp_moving(geo%nmoving))
-!!  allocate(el_id_old(geo%nelem))          ; el_id_old = 0
-!!  allocate(el_id_old_static(geo%nstatic)) ; el_id_old_static = 0
-!!  allocate(el_id_old_moving(geo%nmoving)) ; el_id_old_moving = 0
-!!  is = 0; im = 0;
-!!  do i = 1,geo%nelem
-!!    if(elems(i)%p%moving) then
-!!      im = im+1
-!!      temp_moving(im) = elems(i)
-!!      el_id_old_moving(im) = i
-!!    else
-!!      is = is+1
-!!      temp_static(is) = elems(i)
-!!      el_id_old_static(is) = i
-!!    endif
-!!  enddo
-!!
-!!  !Now might be more bombproof to deallocate and allocate, but for the moment..
-!!  elems(1:geo%nstatic) = temp_static
-!!  elems(geo%nstatic+1:geo%nelem) = temp_moving
-!!
-!!  el_id_old(1:geo%nstatic) = el_id_old_static
-!!  el_id_old(geo%nstatic+1:geo%nelem) = el_id_old_moving
-!! 
-!!  !Update the indexing since we re-ordered the vector
-!!  do i = 1,geo%nelem
-!!    elems(i)%p%id = i
-!!  end do
-!!  !Update elem-elem connectivity after re-ordering, for the moment only for
-!!  !implicit panel elements
-!!  !do i = 1,geo%nelem
-!!  !  do j = 1,elems(i)%p%n_ver
-!!  !    if ( elems(i)%p%i_neigh(j) .ne. 0 ) then
-!!  !      elems(i)%p%i_neigh(j) = el_id_old( elems(i)%p%i_neigh(j) )
-!!  !    else
-!!  !      elems(i)%p%i_neigh(j) = 0 
-!!  !    end if     
-!!  !  end do 
-!!  !end do 
-!!  !Update te structure
-!!  !do i = 1,size(te%e,2)
-!!  !  do j = 1,2
-!!  !    if ( te%e(j,i) .ne. 0 ) then
-!!  !      te%e(j,i) = el_id_old( te%e(j,i) )
-!!  !    else
-!!  !      te%e(j,i) = 0 
-!!  !    end if     
-!!  !  end do 
-!!  !end do
-!!
-!!  !Now re-order the lifting line elements
-!!  deallocate(temp_static, temp_moving)
-!!  allocate(temp_static(geo%nstatic_ll), temp_moving(geo%nmoving_ll))
-!!  is = 0; im = 0;
-!!  do i = 1,geo%nll
-!!    if(elems_ll(i)%p%moving) then
-!!      im = im+1
-!!      temp_moving(im) = elems_ll(i)
-!!    else
-!!      is = is+1
-!!      temp_static(is) = elems_ll(i)
-!!    endif
-!!  enddo
-!!  if(geo%nll .gt. 0) then
-!!    elems_ll(1:geo%nstatic_ll) = temp_static
-!!    elems_ll(geo%nstatic_ll+1:geo%nll) = temp_moving
-!!  endif
-!!
-!!  !Update te%neigh NOT NEEDED, because in te numbering
-!!
-!!  deallocate(temp_static, temp_moving)
-!!  deallocate(el_id_old, el_id_old_static, el_id_old_moving)
-!!
-!!  !Patch together everything in elems_tot
-!!  elems_tot(1:geo%nelem) = elems
-!!  elems_tot(geo%nelem+1:geo%nelem+geo%nll) =elems_ll
-!!
-!!  call create_local_velocity_stencil(geo,elems)    ! for surfpan only (3dP)
-!!
-!!  call create_strip_connectivity(geo)
-!!
-!!end subroutine create_geometry
-
 !----------------------------------------------------------------------
 
 subroutine load_components_postpro(comps, points, nelem, floc, &
@@ -392,7 +148,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
  character(len=max_char_len) :: comp_input
  integer :: points_offset, n_vert! , elems_offset
  real(wp), allocatable :: points_tmp(:,:)
- character(len=max_char_len) :: ref_tag, ref_tag_m
+ character(len=max_char_len) :: ref_tag
  integer :: ref_id
  character(len=max_char_len) :: cname !, msg
  integer(h5loc) :: gloc, cloc , geo_loc
@@ -401,7 +157,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
 
  ! Some structure to handlge multiple components
  character(len=max_char_len), allocatable :: components(:) , components_tmp(:)
- character(len=max_char_len) :: component , component_stripped
+ character(len=max_char_len) :: component_stripped
 
  character(len=*), parameter :: this_sub_name = 'load_components_postpro'
 
@@ -724,124 +480,6 @@ subroutine prepare_geometry_postpro(comps)
  enddo
 
 end subroutine prepare_geometry_postpro
-
-!----------------------------------------------------------------------
-
-subroutine prepare_wake_postpro( wpoints_pan, wpoints_rin, wstart, wconn, &
-                  wvort_pan, wvort_rin,  wake_pan, wake_rin, wake_elems )
- real(wp), intent(in) :: wpoints_pan(:,:,:)
- real(wp), intent(in) :: wpoints_rin(:,:,:)
- integer , intent(in) :: wstart(:,:)
- integer , intent(in) :: wconn(:)
- real(wp), intent(in) :: wvort_pan(:,:)
- real(wp), intent(in) :: wvort_rin(:,:)
- type(t_wake_panels), target, intent(out) :: wake_pan
- type(t_wake_rings), target,  intent(out) :: wake_rin
- type(t_elem_p), allocatable, intent(out) :: wake_elems(:)
-
-
- integer :: n_wake_stripes , npan, ndisks, nrows
- integer :: nsides
- integer :: p1 , p2 
- integer :: ip , iw, id, ir, iconn, ie
- integer :: npt_disk
- integer, allocatable :: disk_pts(:)
-
-  !First get all the panel wake
-  n_wake_stripes = size(wstart ,2)
-  npan           = size(wvort_pan  ,2) 
-
-  !TODO: check if the following dimensions are right
-  wake_pan%npan = npan
-  wake_pan%n_wake_stripes = n_wake_stripes
-  wake_pan%wake_len = npan
-! wake%n_wake_points = ...
-  allocate(wake_pan%i_start_points(2,wake_pan%n_wake_stripes))
-  allocate(wake_pan%w_points(3,wake_pan%n_wake_points,npan+1))
-  allocate(wake_pan%wake_panels(wake_pan%n_wake_stripes,npan))
-  allocate(wake_pan%idou(wake_pan%n_wake_stripes,npan))
-
-  wake_pan%i_start_points = wstart
-  wake_pan%w_points       = wpoints_pan
-
-  nsides = 4 
-  do ip = 1,npan
-    do iw=1,wake_pan%n_wake_stripes
-     wake_pan%wake_panels(iw,ip)%mag => wake_pan%idou(iw,ip)
-     allocate(wake_pan%wake_panels(iw,ip)%ver(3,nsides))
-     allocate(wake_pan%wake_panels(iw,ip)%edge_vec(3,nsides))
-     allocate(wake_pan%wake_panels(iw,ip)%edge_len(nsides))
-     allocate(wake_pan%wake_panels(iw,ip)%edge_uni(3,nsides))
-    enddo
-  enddo
-
-  do ip = 1,wake_pan%wake_len
-   do iw = 1,wake_pan%n_wake_stripes
-       p1 = wake_pan%i_start_points(1,iw)
-       p2 = wake_pan%i_start_points(2,iw)
-       call calc_geo_data_postpro(wake_pan%wake_panels(iw,ip), &
-       reshape((/wake_pan%w_points(:,p1,ip),   wake_pan%w_points(:,p2,ip), &
-                 wake_pan%w_points(:,p2,ip+1), wake_pan%w_points(:,p1,ip+1)/),&
-                                                                   (/3,4/)))
-       wake_pan%wake_panels(iw,ip)%mag = wvort_pan(iw,ip) 
-   end do
-  end do
-
-  !Then get all the ring wake
-  ndisks = size(wvort_rin,1)
-  nrows = size(wvort_rin,2)
-  wake_rin%ndisks = ndisks; wake_rin%wake_len = nrows
-  allocate(wake_rin%wake_rings(wake_rin%ndisks,wake_rin%wake_len))
-  allocate(wake_rin%idou(wake_rin%ndisks,wake_rin%wake_len))
-
-  do id = 1,wake_rin%ndisks
-    !reverse the connectivity, from pts2disk to disk2pts
-    npt_disk = count(wconn .eq. id)
-    allocate(disk_pts(npt_disk))
-    iconn = 1
-    do ip = 1,size(wconn)
-      if(wconn(ip) .eq. id) then
-        disk_pts(iconn) = ip
-        iconn = iconn+1
-      endif
-    enddo
-
-    nsides = npt_disk
-    do ir = 1,wake_rin%wake_len
-      wake_rin%wake_rings(id,ir)%mag => wake_rin%idou(id,ir)
-      wake_rin%wake_rings(id,ir)%n_ver = nsides
-      allocate(wake_rin%wake_rings(id,ir)%ver(3,nsides))
-      allocate(wake_rin%wake_rings(id,ir)%edge_vec(3,nsides))
-      allocate(wake_rin%wake_rings(id,ir)%edge_len(nsides))
-      allocate(wake_rin%wake_rings(id,ir)%edge_uni(3,nsides))
-      call calc_geo_data_postpro(wake_rin%wake_rings(id,ir), &
-                  wpoints_rin(:,disk_pts,ir))
-      wake_rin%wake_rings(id,ir)%mag = wvort_rin(id,ir)
-      
-    enddo
-    deallocate(disk_pts)
-  enddo
-
-  !Stitch together everything
-  allocate(wake_elems(wake_pan%n_wake_stripes*wake_pan%wake_len + &
-                      wake_rin%ndisks*wake_rin%wake_len))
-  ie = 1
-  do ip = 1,wake_pan%wake_len
-   do iw = 1,wake_pan%n_wake_stripes
-     wake_elems(ie)%p => wake_pan%wake_panels(iw,ip)
-     ie = ie + 1
-   end do
-  end do
-
-  do ir = 1,wake_rin%wake_len
-    do id = 1,wake_rin%ndisks
-      wake_elems(ie)%p => wake_rin%wake_rings(id,ir)
-      ie = ie+1
-    enddo
-  enddo
-
-
-end subroutine prepare_wake_postpro
 
 !----------------------------------------------------------------------
 

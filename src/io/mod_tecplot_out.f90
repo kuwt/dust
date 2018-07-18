@@ -1110,7 +1110,7 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size)
  real(kind=4)  , parameter :: zoneMarker = 299.0
  real(kind=4)  , parameter :: eohMarker  = 357.0
  character(len=max_char_len) :: buffer_char
- integer :: nvars, ip, nsec, timelen, iv
+ integer :: nvars, nsec, timelen, iv
 
 
   nvars = 4

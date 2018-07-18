@@ -122,10 +122,6 @@ subroutine compute_vel_vortpart (this, pos, uinf, vel)
 
  real(wp) :: vvort(3)
  real(wp) :: dist(3), distn
- real(wp) :: av(3) , hv(3)
- real(wp) :: ai    , hi
- real(wp) :: R1 , R2
- real(wp) :: r_Ran
 
   !TODO: add far field approximations
 
@@ -137,7 +133,6 @@ subroutine compute_vel_vortpart (this, pos, uinf, vel)
 
   else
 
-    !vvort =  cross(this%dir,dist) * distn / r_Rankine**3
     vvort =  cross(this%dir,dist)  / r_Rankine**3
 
   end if

@@ -92,13 +92,7 @@ use mod_stringtools, only: &
 
 use mod_geo_postpro, only: &
   load_components_postpro, update_points_postpro , prepare_geometry_postpro, &
-  expand_actdisk_postpro, prepare_wake_postpro
-
-use mod_wake_pan, only: &
-  t_wake_panels
-
-use mod_wake_ring, only: &
-  t_wake_rings
+  expand_actdisk_postpro
 
 use mod_tecplot_out, only: &
   tec_out_viz, tec_out_probes, tec_out_box, tec_out_loads

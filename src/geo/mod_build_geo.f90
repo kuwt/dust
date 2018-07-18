@@ -153,7 +153,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
  ! Parameters for gap sewing and te identification
  real(wp) :: tol_sewing , inner_product_threshold
- integer :: i_count , i_count2    
+ integer :: i_count
  ! Projection of the unit tangent exiting from te
  logical  :: te_proj_logical
  character(len=max_char_len) :: te_proj_dir
@@ -1001,7 +1001,6 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
 !                                                ! hard-coded parameter ...
  real(wp) , dimension(3) :: side_dir 
  ! TODO: read as an input of the component
- real(wp) , dimension(3) :: vec1
 
  integer :: i1 , i2 
  character(len=*), parameter :: this_sub_name = 'find_te_general'

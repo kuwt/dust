@@ -246,8 +246,6 @@ subroutine update_actdisk(elems_ad, linsys, sim_param)
  type(t_linsys), intent(inout) :: linsys
  type(t_sim_param), intent(in) :: sim_param
 
- real(wp), allocatable :: res_temp(:)
-
  integer :: ie
 
  do ie=1,size(elems_ad)

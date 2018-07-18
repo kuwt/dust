@@ -82,12 +82,6 @@ use mod_hdf5_io, only: &
 use mod_geometry, only: &
   t_geo, t_geo_component
 
-use mod_wake_pan, only: &
-  t_wake_panels
-
-use mod_wake_ring, only: &
-  t_wake_rings
-
 use mod_wake, only: &
   t_wake
 
@@ -111,8 +105,6 @@ contains
 !----------------------------------------------------------------------
 subroutine save_status(geo, wake,  sim_params, it, time, run_id)
  type(t_geo), intent(in)         :: geo
- !type(t_wake_panels), intent(in) :: wake_pan
- !type(t_wake_rings), intent(in) :: wake_rin
  type(t_wake), intent(in) :: wake
  type(t_sim_param), intent(in)  :: sim_params
  integer, intent(in)             :: it

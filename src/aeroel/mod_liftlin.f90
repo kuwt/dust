@@ -436,7 +436,7 @@ subroutine calc_geo_data_liftlin(this, vert)
  class(t_liftlin), intent(inout) :: this
  real(wp), intent(in) :: vert(:,:)
 
- integer :: sides, is, nsides
+ integer :: is, nsides
  real(wp):: nor(3), tanl(3)
 
   this%ver = vert

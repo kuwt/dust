@@ -117,16 +117,6 @@ end subroutine dat_out_probes_header
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_probes ( fid , vars )
- integer , intent(in) :: fid
- real(wp), intent(in) :: vars(:)
-
- 
-
-end subroutine dat_out_probes
-
-!---------------------------------------------------------------------
-
 subroutine dat_out_sectional (basename, y_cen ,y_span ,time ,sec_loads , &
               ref_mat , off_mat, average )
  character(len=*) , intent(in) :: basename

@@ -193,7 +193,7 @@ subroutine interp_aero_coeff ( airfoil_data ,  &
   real(wp) :: cf1(3) , cf2(3)
   real(wp) , allocatable :: coeff1(:) , coeff2(:)
   real(wp) , allocatable :: coeff_airfoil(:,:) 
-  integer :: nRe , i_a , id_a , i1
+  integer :: nRe, i_a, id_a
 
   real(wp) :: reyn1 , reyn2
   integer  :: irey

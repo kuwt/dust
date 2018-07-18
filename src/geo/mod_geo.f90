@@ -558,8 +558,7 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
  type(t_tedge), intent(out) :: te
 
 
- type(t_geo_component), allocatable :: comp_temp(:)
- integer :: i1, i2, i3, i
+ integer :: i1, i2, i3
  integer, allocatable :: ee(:,:)
  real(wp), allocatable :: rr(:,:)
  character(len=max_char_len) :: comp_el_type, comp_name, comp_input
@@ -569,7 +568,7 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
  integer :: ref_id, iref
  character(len=max_char_len) :: msg, cname, cname_write
  integer(h5loc) :: floc, gloc, cloc , geo_loc , te_loc, cloc2
- integer(h5loc) :: floc_out, gloc_out, cloc_out , geo_loc_out , te_loc_out
+ integer(h5loc) :: floc_out, gloc_out
  integer :: n_comp, i_comp, n_comp_input, i_comp_input, n_comp_write
  integer :: n_mult, i_mult
  logical :: mult
@@ -1294,7 +1293,7 @@ subroutine calc_geo_data_ll(elem,vert)
  class(c_pot_elem), intent(inout) :: elem
  real(wp), intent(in) :: vert(:,:)
 
- integer :: sides, is, nsides
+ integer :: is, nsides
  real(wp):: nor(3), tanl(3)
 
   nsides = size(vert,2)
