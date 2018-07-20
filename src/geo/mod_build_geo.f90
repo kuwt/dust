@@ -258,6 +258,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   ! te projection ----------------------------------
   i_count = countoption(geo_prs,'ProjTe')
+  te_proj_logical = .false.
   if ( i_count .eq. 1 ) then
     te_proj_logical = getlogical(geo_prs,'ProjTe') 
   end if

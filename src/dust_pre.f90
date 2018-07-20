@@ -47,9 +47,6 @@ use mod_geometry, only: &
 use mod_basic_io, only: &
   read_mesh_basic, write_basic
 
-use mod_aero_elements, only: &
-  c_elem, t_elem_p!, t_vp
-
 !this is for the parsing
 use mod_parse, only: &
   t_parse, &
@@ -126,14 +123,8 @@ n_name = countoption(prms,'CompName')
 n_geo  = countoption(prms,'GeoFile')
 n_tag  = countoption(prms,'RefTag')
 
-n_tol_sew = countoption(prms,'TolSewing')
-if ( n_tol_sew .eq. 1 ) then
-  tol_sew = getreal(prms,'TolSewing')
-end if
-n_inner_prod = countoption(prms,'InnerProductTe')
-if ( n_inner_prod .eq. 1 ) then
-  inner_prod_thr = getreal(prms,'InnerProductTe')
-end if
+tol_sew = getreal(prms,'TolSewing')
+inner_prod_thr = getreal(prms,'InnerProductTe')
 
 if(n_geo .ne. n_name)  call error('dust_pre','','Different number of components &
   & and components names in input file "'//trim(input_file_name)//'"')
