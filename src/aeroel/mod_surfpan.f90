@@ -643,6 +643,14 @@ subroutine compute_pres_surfpan(this, sim_param)
     - 0.5_wp * sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp  &
              + sim_param%rho_inf * sum(this%ub*vel_phi) &
              + sim_param%rho_inf * this%didou_dt
+ 
+! ! debug
+! if ( this%id .eq. 1 ) then
+!   write(*,*) this%ub 
+!   write(*,*) vel_phi
+!   write(*,*) sum(this%ub*vel_phi) 
+!   write(*,*)
+! end if
 
 
 end subroutine compute_pres_surfpan
@@ -678,7 +686,9 @@ subroutine create_local_velocity_stencil_surfpan (this)
  real(wp) :: bubble_surf
  integer  :: i_v
         
-  allocate(this%pot_vel_stencil(3,this%n_ver) )
+  if ( .not. allocated(this%pot_vel_stencil) ) then
+    allocate(this%pot_vel_stencil(3,this%n_ver) )
+  end if
 
   bubble_surf = this%area
 

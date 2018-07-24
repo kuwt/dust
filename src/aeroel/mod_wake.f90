@@ -1241,7 +1241,8 @@ subroutine get_vel_rigid(this, elems, wake, pos, sim_param, vel)
  type(t_sim_param), intent(in) :: sim_param
  real(wp), intent(out) :: vel(3)
 
-  vel = sim_param%u_inf
+! vel = sim_param%u_inf
+ vel = sim_param%rigid_wake_vel
 
 end subroutine get_vel_rigid
 !----------------------------------------------------------------------

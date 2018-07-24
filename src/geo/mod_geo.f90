@@ -1610,14 +1610,14 @@ subroutine update_geometry(geo, t, update_static)
         !                   geo%refs(comp%ref_id)%of_g)
         call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
       enddo
-      !in the first pass compute also the velocity stencil for surfpans
-      if(update_static) then
+!     !in the first pass compute also the velocity stencil for surfpans
+!     if(update_static) then
         select type(els=>comp%el); class is(t_surfpan)
         do ie = 1,size(els)
           call els(ie)%create_local_velocity_stencil()
         enddo
         end select
-      endif
+!     endif
 
 
       do ie = 1,size(comp%el)

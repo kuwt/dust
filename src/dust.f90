@@ -90,6 +90,7 @@ use mod_basic_io, only: &
 
 use mod_parse, only: &
   t_parse, &
+  countoption , &
   getstr, getlogical, getreal, getint, getrealarray, &
   ignoredParameters, finalizeParameters
 
@@ -147,7 +148,9 @@ integer :: n_wake_panels
 integer :: n_wake_parts
 real(wp) :: part_box_min(3), part_box_max(3)
 real(wp) :: wake_pan_scaling , wake_pan_minvel
-logical :: rigid_wake
+logical  :: rigid_wake
+real(wp) :: rigid_wake_vel(3)
+character(len=max_char_len) :: rigid_wake_vel_str
 
 !doublet parameters
 real(wp) :: ff_ratio_dou, ff_ratio_sou, eps_dou, r_Rankine, r_cutoff
@@ -270,6 +273,7 @@ call prms%CreateRealOption( 'CutoffRad', &
       "Radius of complete cutoff  for vortex induction near core", '0.001')
 
 call prms%CreateLogicalOption('rigid_wake','rigid wake?','F')
+call prms%CreateRealArrayOption( 'rigid_wake_vel', "rigid wake velocity" )
 
 
 ! get the parameters and print them out
@@ -296,6 +300,21 @@ n_wake_parts = getint(prms, 'n_wake_particles')
 part_box_min = getrealarray(prms, 'particles_box_min',3)
 part_box_max = getrealarray(prms, 'particles_box_max',3)
 rigid_wake = getlogical(prms, 'rigid_wake')
+rigid_wake_vel = uinf   ! initialisation
+if ( rigid_wake ) then
+  if ( countoption(prms,'rigid_wake_vel') .eq. 1 ) then
+    rigid_wake_vel = getrealarray(prms, 'rigid_wake_vel',3)
+  else if ( countoption(prms,'rigid_wake_vel') .le. 0 ) then
+    call warning('dust','dust','no rigid_wake_vel parameter set, &
+         &with rigid_wake = T; rigid_wake_vel = u_inf')
+    rigid_wake_vel = uinf
+  else if ( countoption(prms,'rigid_wake_vel') .gt. 1 ) then
+    rigid_wake_vel = getrealarray(prms, 'rigid_wake_vel',3)
+    write(rigid_wake_vel_str,'(E12.4)') rigid_wake_vel
+    call warning('dust','dust','more than one rigid_wake_vel param, &
+         &set. The first value is used: '//trim(rigid_wake_vel_str))
+  end if
+end if
 
 wake_pan_scaling = getreal(prms,'ImplicitPanelScale')
 wake_pan_minvel  = getreal(prms,'ImplicitPanelMinVel')
@@ -372,6 +391,8 @@ sim_param%mu_inf = mu_inf
 sim_param%first_panel_scaling = wake_pan_scaling
 sim_param%min_vel_at_te       = wake_pan_minvel 
 sim_param%rigid_wake = rigid_wake
+allocate(sim_param%rigid_wake_vel(3))
+sim_param%rigid_wake_vel = rigid_wake_vel
 sim_param%debug_level = debug_level
 sim_param%basename = basename
 

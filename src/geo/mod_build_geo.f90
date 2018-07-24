@@ -224,6 +224,13 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   comp_el_type = getstr(geo_prs,'ElType')
   ElType = comp_el_type(1:1)
+  if ( ( trim(ElType) .ne. 'p' ) .and. ( trim(ElType) .ne. 'v') .and. & 
+       ( trim(ElType) .ne. 'l' ) .and. ( trim(ElType) .ne. 'a') ) then
+    call error (this_sub_name, this_mod_name, 'Wrong ElType ('// &
+         trim(ElType)//') for component'//trim(comp_tag)// &
+         ', defined in file: '//trim(geo_file)//'. ElType must be:'// &
+         ' p,v,l,a.')
+  end if
 
   ! Parameters for gap sewing and edge identification ------------------
   ! TolSewing --------------------------------------
