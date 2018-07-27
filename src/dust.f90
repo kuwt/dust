@@ -517,8 +517,8 @@ do it = 1,nstep
   if (debug_level .ge. 20.and.time_2_debug_out) &
                       call debug_printout_result(linsys, basename_debug, it)
 
-  !------ Update the explicit part ------
-  call solve_liftlin(elems_ll, elems_tot, &
+  !------ Update the explicit part ------  % v-----implicit elems: p,v
+  call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
           (/ wake%pan_p, wake%rin_p/), wake%vort_p, sim_param, airfoil_data)
 
   !------ Compute loads -------
