@@ -627,6 +627,8 @@ subroutine compute_pres_surfpan(this, sim_param)
   end do
 
   vel_phi  = - vel_phi    ! mu = - phi
+! ! debug
+! vel_phi = 0.0_wp
 
   ! velocity, U = u_t \hat{t} + u_n \hat{n} + U_inf ----------
   this%surf_vel = vel_phi - sum(vel_phi*this%nor)*this%nor    +  &
@@ -690,21 +692,34 @@ subroutine create_local_velocity_stencil_surfpan (this)
     allocate(this%pot_vel_stencil(3,this%n_ver) )
   end if
 
+!  ! method #1: very sensitive to dimension gradient of neighbouring elements
+!  bubble_surf = this%area
+!
+!  do i_v = 1 , this%n_ver
+!
+!    ! Update surf_bubble
+!    !sum the contribuition only if the neighbour is really present 
+!    if(associated(this%neigh(i_v)%p)) then
+!
+!        bubble_surf = bubble_surf + &
+!           this%neigh(i_v)%p%area / real(this%neigh(i_v)%p%n_ver,wp)
+!
+!    endif
+!
+!    this%pot_vel_stencil(:,i_v) = &
+!             cross( this%edge_vec(:,i_v) , this%nor )
+!
+!  end do
+!
+!  this%pot_vel_stencil = this%pot_vel_stencil / bubble_surf
+
+  ! method #2: w/o averaging on neighbouring elements ; 0.5 factor added
   bubble_surf = this%area
 
   do i_v = 1 , this%n_ver
 
-    ! Update surf_bubble
-    !sum the contribuition only if the neighbour is really present 
-    if(associated(this%neigh(i_v)%p)) then
-
-        bubble_surf = bubble_surf + &
-           this%neigh(i_v)%p%area / real(this%neigh(i_v)%p%n_ver,wp)
-
-    endif
-
     this%pot_vel_stencil(:,i_v) = &
-             cross( this%edge_vec(:,i_v) , this%nor )
+     0.5_wp * cross( this%edge_vec(:,i_v) , this%nor )
 
   end do
 

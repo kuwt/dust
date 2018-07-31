@@ -518,8 +518,10 @@ do it = 1,nstep
                       call debug_printout_result(linsys, basename_debug, it)
 
   !------ Update the explicit part ------  % v-----implicit elems: p,v
-  call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
-          (/ wake%pan_p, wake%rin_p/), wake%vort_p, sim_param, airfoil_data)
+  if ( size(elems_ll) .gt. 0 ) then
+    call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
+            (/ wake%pan_p, wake%rin_p/), wake%vort_p, sim_param, airfoil_data)
+  end if
 
   !------ Compute loads -------
   ! Implicit elements: vortex rings and 3d-panels
