@@ -326,12 +326,12 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                           0.5_wp * ( rrSection2 - rrSection1 ) * &
                                      cos(i1*pi/ dble(nelem_span_list(iRegion)) ) 
       else if ( trim(type_span_list(iRegion)) .eq. 'cosineOB' ) then    
-        ! cosine  spacing in span
+        ! cosine  spacing in span: outboard refinement
         rr(:,ista:iend) = rrSection1 + &
                         ( rrSection2 - rrSection1 ) * &
                                      sin(0.5_wp*i1*pi/ dble(nelem_span_list(iRegion)) ) 
       else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then    
-        ! cosine  spacing in span
+        ! cosine  spacing in span: inboard refinement
         rr(:,ista:iend) = rrSection2 - &
                         ( rrSection2 - rrSection1 ) * &
                                      cos(0.5_wp*i1*pi/ dble(nelem_span_list(iRegion)) ) 
