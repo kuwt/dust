@@ -47,13 +47,13 @@ use mod_handling, only: &
 use mod_stringtools, only: &
   IsInList, StripSpaces
 
-!use cgns
+use cgns
 
 !----------------------------------------------------------------------
 
 implicit none
 
-include 'cgnslib_f.h'
+!include 'cgnslib_f.h'
 
 public :: read_mesh_cgns
 

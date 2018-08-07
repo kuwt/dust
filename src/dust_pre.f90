@@ -80,7 +80,6 @@ type(t_link), pointer :: lnk
 !General parameters: tol_sew,inner_prod_thr
 real(wp) :: tol_sew
 real(wp) :: inner_prod_thr
-integer :: n_tol_sew , n_inner_prod
 
 integer :: n_geo, n_tag, n_name, i
 

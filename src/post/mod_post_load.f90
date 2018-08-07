@@ -96,6 +96,9 @@ subroutine load_res(floc, comps, vort, press, t)
  character(len=max_char_len) :: cname
  real(wp), allocatable :: vort_read(:)!, cp_read(:)
  real(wp), allocatable :: pres_read(:), dforce_read(:,:)
+ integer :: ncomps_sol
+
+ character(len=*), parameter :: this_sub_name = 'load_res'
 
   ncomps = size(comps)
   nelems = 0
@@ -111,6 +114,9 @@ subroutine load_res(floc, comps, vort, press, t)
   call read_hdf5(t,'time',floc)
   allocate(vort(nelems), press(nelems))
   call open_hdf5_group(floc,'Components',gloc1)
+  call read_hdf5(ncomps_sol,'NComponents',gloc1)
+  if(ncomps_sol .ne. ncomps) call error(this_sub_name, this_mod_name, &
+  'Different number of components between solution and geometry')
 
   offset = 0
   do icomp = 1, ncomps
@@ -126,6 +132,13 @@ subroutine load_res(floc, comps, vort, press, t)
     !call read_hdf5_al(cp_read,'Cp',gloc3)
     call read_hdf5_al(pres_read,'Pres',gloc3)
     call read_hdf5_al(dforce_read,'dF',gloc3)
+
+    !check consistency of geometry and solution
+    if((size(vort_read,1) .ne. nelems_comp) .or. &
+       (size(pres_read,1) .ne. nelems_comp) .or. &
+       (size(dforce_read,2) .ne. nelems_comp)) call error(this_mod_name, &
+       this_sub_name, 'inconsistent number of elements between geometry and&
+       & solution')   
 
 !   TODO: check if it is general enough *******
 !   TODO: check if something is broken after changing intent(in to inout) for comps
