@@ -90,7 +90,7 @@ contains
 ! ---------------------------------------------------------------------- 
 
 subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
-                          out_frmt, comps , components_names, all_comp , &
+                          out_frmt, components_names, all_comp , &
                           an_start, an_end, an_step, average )
  type(t_parse), pointer :: sbprms
  character(len=*) , intent(in) :: basename
@@ -98,13 +98,13 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
  character(len=*) , intent(in) :: an_name
  integer          , intent(in) :: ia
  character(len=*) , intent(in) :: out_frmt
- type(t_geo_component), allocatable , intent(inout) :: comps(:)
  character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
  logical , intent(in) :: all_comp
  integer , intent(in) :: an_start , an_end , an_step
  logical , intent(in) :: average
  
  
+ type(t_geo_component), allocatable :: comps(:)
  integer(h5loc) :: floc , ploc
  real(wp), allocatable :: points(:,:)
  integer :: nelem

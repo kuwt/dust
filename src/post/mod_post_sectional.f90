@@ -104,7 +104,7 @@ contains
 ! - tol_y_cen is hard-coded. write tol_y_cen as an input
 ! - ...
 subroutine post_sectional (sbprms, bxprms, basename, data_basename, an_name, &
-                           ia, out_frmt, comps, components_names, all_comp, &
+                           ia, out_frmt, components_names, all_comp, &
                            an_start, an_end, an_step, average )
 type(t_parse), pointer :: sbprms
 type(t_parse), pointer :: bxprms
@@ -113,12 +113,12 @@ character(len=*) , intent(in) :: data_basename
 character(len=*) , intent(in) :: an_name
 integer          , intent(in) :: ia
 character(len=*) , intent(in) :: out_frmt
-type(t_geo_component), allocatable , intent(inout) :: comps(:)
 character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
 logical , intent(in) :: all_comp
 integer , intent(in) :: an_start , an_end , an_step
 logical , intent(in) :: average
 
+type(t_geo_component), allocatable :: comps(:)
 character(len=max_char_len) :: cname !, msg
 integer(h5loc) :: floc, gloc, cloc
 real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)

@@ -94,7 +94,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
  real(wp) :: dx_ref , dy_ref , dz_ref
  integer :: ista , iend
 
- character :: ElType , symmetry
+ character :: ElType
+ logical :: symmetry
  real(wp), allocatable :: chord_fraction(:), span_fraction(:)
  character(len=max_char_len) :: type_chord
  integer :: i1  
@@ -107,7 +108,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   ! Global parameters
   call pmesh_prs%CreateStringOption('ElType', &
                 'element type (temporary) p panel v vortex ring')
-  call pmesh_prs%CreateStringOption('mesh_reflection', &
+  call pmesh_prs%CreateLogicalOption('mesh_reflection', &
                 'symmetry yes/no' )
   call pmesh_prs%CreateIntOption('nelem_chord',&
                 'number of chord-wise elements', &
@@ -160,7 +161,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
   nelem_chord = getint(pmesh_prs,'nelem_chord')
   ElType  = getstr(pmesh_prs,'ElType')
-  symmetry= getstr(pmesh_prs,'mesh_reflection')
+  symmetry= getlogical(pmesh_prs,'mesh_reflection')
    
   nSections = countoption(pmesh_prs,'chord')
   nRegions  = countoption(pmesh_prs,'span')

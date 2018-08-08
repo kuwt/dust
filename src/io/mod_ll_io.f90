@@ -95,7 +95,8 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
  real(wp), allocatable :: span_list(:) , sweep_list(:) , dihed_list(:)
  character(len=max_char_len), allocatable :: type_span_list(:)
  integer :: n_type_span
- character :: ElType , symmetry
+ character :: ElType
+ logical :: symmetry
  ! Sections 1. 2.
  real(wp), allocatable :: rrSection1(:,:) , rrSection2(:,:) 
 !real(wp) :: th1 , th2 , ch1 , ch2 
@@ -109,8 +110,8 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   ! Global parameters
   call pmesh_prs%CreateStringOption('ElType', &
                 'element type (temporary) p panel v vortex ring')
-  call pmesh_prs%CreateStringOption('mesh_reflection', &
-                'symmetry yes/no' )
+  call pmesh_prs%CreateLogicalOption('mesh_reflection', &
+                'symmetry yes/no','F' )
 ! !!! USELESS !!! for LIFTING LINE components !!!!!!!!!!!!
 ! call pmesh_prs%CreateIntOption('nelem_chord',&
 !               'number of chord-wise elements', &
@@ -165,7 +166,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   nelem_chord     = 1          !  getint(pmesh_prs,'nelem_chord')   !!! USELESS !!!
   nelem_chord_tot = 1          !  getint(pmesh_prs,'nelem_chord')   !!! USELESS !!!
   ElType  = getstr(pmesh_prs,'ElType')
-  symmetry= getstr(pmesh_prs,'mesh_reflection')
+  symmetry= getlogical(pmesh_prs,'mesh_reflection')
    
   nSections = countoption(pmesh_prs,'chord')
   nRegions  = countoption(pmesh_prs,'span')

@@ -98,7 +98,7 @@ contains
 ! ---------------------------------------------------------------------- 
 
 subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
-                      out_frmt , comps , components_names , all_comp , &
+                      out_frmt , components_names , all_comp , &
                       an_start , an_end , an_step )
 type(t_parse), pointer :: sbprms
 character(len=*) , intent(in) :: basename
@@ -106,11 +106,11 @@ character(len=*) , intent(in) :: data_basename
 character(len=*) , intent(in) :: an_name
 integer          , intent(in) :: ia
 character(len=*) , intent(in) :: out_frmt
-type(t_geo_component), allocatable , intent(inout) :: comps(:)
 character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
 logical , intent(inout) :: all_comp
 integer , intent(in) :: an_start , an_end , an_step
 
+type(t_geo_component), allocatable :: comps(:)
 integer :: nstep
 real(wp), allocatable :: probe_vars(:,:,:)
 real(wp), allocatable :: time(:)
