@@ -283,6 +283,7 @@ do ia = 1,n_analyses
     call LowCase(components_names(1),lowstr)    ! char 
     if(trim(lowstr) .eq. 'all') then
       all_comp = .true.
+      n_comp = 0
       deallocate(components_names)
     endif
   endif

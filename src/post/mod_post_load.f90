@@ -115,7 +115,7 @@ subroutine load_res(floc, comps, vort, press, t)
   allocate(vort(nelems), press(nelems))
   call open_hdf5_group(floc,'Components',gloc1)
   call read_hdf5(ncomps_sol,'NComponents',gloc1)
-  if(ncomps_sol .ne. ncomps) call error(this_sub_name, this_mod_name, &
+  if(ncomps_sol .lt. ncomps) call error(this_sub_name, this_mod_name, &
   'Different number of components between solution and geometry')
 
   offset = 0
