@@ -238,8 +238,8 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
   end if
   if ( size(components_names) .le. 0 ) then
     call error(this_sub_name, this_mod_name, &
-                 'size(components_names) .eq. 0: No Components received as &
-                &input really exist')
+                 'No component found corresponding to the requested one(s) &
+                 &for this analysis')
   end if
  
 !  allocate(comps(n_comp))
