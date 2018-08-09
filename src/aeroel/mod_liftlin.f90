@@ -317,7 +317,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   !Compute the velocity from all the elements except for liftling elems
   ! and store it outside the loop, since it is constant
-  write(*,*) ' in mod_liftlin(). size(elems_ll) : ' , size(elems_ll)
   do i_l = 1,size(elems_ll)
     do j = 1,size(elems_impl) ! body panels: liftlin, vortlat 
       call elems_impl(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)

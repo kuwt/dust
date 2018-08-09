@@ -557,7 +557,13 @@ do it = 1,nstep
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
   !  next iteration)
+  t0 = dust_time()
   call update_wake(wake, elems_tot, sim_param)
+  t1 = dust_time()
+  if(debug_level .ge. 1) then
+    write(message,'(A,F9.3,A)') 'Updated wake in: ' , t1 - t0,' s.'
+    call printout(message)
+  endif
 
   time = min(tend, time+dt)
   call update_geometry(geo, time, .false.)
