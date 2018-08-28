@@ -61,7 +61,7 @@ use mod_doublet, only: &
   initialize_doublet
 
 use mod_surfpan, only: &
-  initialize_surfpan
+  t_surfpan , initialize_surfpan
 
 use mod_liftlin, only: &
  update_liftlin, solve_liftlin
@@ -753,9 +753,18 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
  character(len=max_char_len) :: sit
  integer :: ie, iv
 
+ ! surf_vel and vel_phi
+ real(wp), allocatable :: surf_vel(:,:), vel_phi(:,:) 
+ integer :: i_e
+
+
   allocate(norm(3,size(elems)), cent(3,size(elems)), velb(3,size(elems)))
   allocate(el(4,size(elems))); el = 0
   allocate(conn(4,size(elems))); conn = -666;
+  ! surf_vel and vel_phi
+  allocate( surf_vel(3,size(elems)), vel_phi(3,size(elems)) )
+  surf_vel = -666.6 ; vel_phi = -666.6 
+ 
   do ie=1,size(elems)
     norm(:,ie) = elems(ie)%p%nor
     cent(:,ie) = elems(ie)%p%cen
@@ -768,7 +777,25 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
         conn(iv, ie) = 0
       endif
     enddo
+
+    ! surf_vel and vel_phi for surfpan only
+    select type( el => elems(ie)%p )
+     class is(t_surfpan) 
+      surf_vel(:,ie) = el%surf_vel   ! elems(ie)%p%surf_vel
+      
+      vel_phi(:,ie) = 0.0_wp
+      do i_e = 1 , el%n_ver    ! elems(ie)%p%n_ver
+        if ( associated(el%neigh(i_e)%p) ) then !  .and. &
+          vel_phi(:,ie) = vel_phi(:,ie) + &
+            el%pot_vel_stencil(:,i_e) * (el%neigh(i_e)%p%mag - el%mag)
+        end if
+      end do
+      vel_phi(:,ie)  = - vel_phi(:,ie)
+ 
+    end select
+  
   enddo
+
   write(sit,'(I4.4)') it
   call write_basic(geo%points, trim(basename)//'_mesh_points_'//trim(sit)//'.dat')
   call write_basic(norm,       trim(basename)//'_mesh_norm_'  //trim(sit)//'.dat')
@@ -777,6 +804,12 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
   call write_basic(el,         trim(basename)//'_mesh_elems_'  //trim(sit)//'.dat')
   call write_basic(conn,       trim(basename)//'_mesh_conn_'   //trim(sit)//'.dat')
   deallocate(norm, cent, el, conn, velb)
+
+  ! surf_vel and vel_phi
+  call write_basic(surf_vel,   trim(basename)//'_mesh_surfvel_'  //trim(sit)//'.dat')
+  call write_basic(vel_phi ,   trim(basename)//'_mesh_velphi_'   //trim(sit)//'.dat')
+  deallocate(surf_vel,vel_phi)
+
 end subroutine debug_printout_geometry
 
 !------------------------------------------------------------------------------

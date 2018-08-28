@@ -1244,6 +1244,9 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
        t_te(:,i_n) = t_te(:,i_n) - sum(t_te(:,i_n)*side_dir) * side_dir
      end if
 
+     !debug
+     write(*,*) ' proj_te normal : ' , t_te(:,i_n)
+
    elseif ( trim(te_proj_dir) .eq. 'parallel' ) then
    
      side_dir = te_proj_vec

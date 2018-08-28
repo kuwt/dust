@@ -611,29 +611,39 @@ subroutine compute_pres_surfpan(this, sim_param)
   !type(t_elem_p),   intent(in)    :: elems(:)
   type(t_sim_param), intent(in)   :: sim_param
 
-  real(wp) :: vel_phi(3)
+  real(wp) :: vel_phi_t(3) , vel_phi(3)
 
   integer :: i_e
   
   ! perturbation velocity, u ---------------------------------
   ! Compute velocity from the potential (mu = -phi), exploiting the stencil
-  ! contained in pot_vel_stencil
-  vel_phi = 0.0_wp
+  ! contained in pot_vel_stencil.
+  ! ''Tangential component'' from the surface stencil
+  !   Normal component       from the boundary conditions U.n = b.n
+
+  ! tangential part
+  vel_phi_t = 0.0_wp
   do i_e = 1 , this%n_ver
     if ( associated(this%neigh(i_e)%p) ) then !  .and. &
-      vel_phi = vel_phi + &
+      vel_phi_t = vel_phi_t + &
         this%pot_vel_stencil(:,i_e) * (this%neigh(i_e)%p%mag - this%mag)
     end if
   end do
 
-  vel_phi  = - vel_phi    ! mu = - phi
+! vel_phi_t  = - vel_phi_t    ! mu = - phi
+  vel_phi_t = - vel_phi_t + sum(vel_phi_t*this%nor) * this%nor
+  vel_phi = vel_phi_t +  &
+        sum(this%nor*(this%ub-sim_param%u_inf-this%uvort)) * this%nor 
+
 ! ! debug
 ! vel_phi = 0.0_wp
 
   ! velocity, U = u_t \hat{t} + u_n \hat{n} + U_inf ----------
-  this%surf_vel = vel_phi - sum(vel_phi*this%nor)*this%nor    +  &
-       this%nor * sum(this%nor * (-sim_param%u_inf-this%uvort+this%ub) )+&
-             sim_param%u_inf + this%uvort
+  this%surf_vel = sim_param%u_inf + vel_phi + this%uvort
+! old and wrong
+! this%surf_vel = vel_phi - sum(vel_phi*this%nor)*this%nor + &
+!      this%nor * sum(this%nor * (-sim_param%u_inf-this%uvort+this%ub) ) + &
+!            sim_param%u_inf + this%uvort
 
   ! pressure -------------------------------------------------
   ! unsteady problems  : P = P_inf + 0.5*rho_inf*V_inf^2
@@ -641,18 +651,30 @@ subroutine compute_pres_surfpan(this, sim_param)
   !                                     + rho * ub.u_phi
   ! with idou = -phi
   this%pres  = sim_param%P_inf &
+! reduced equation after some manipulation
+!   - 0.5 * sim_param%rho_inf * norm2(vel_phi+this%uvort)**2.0_wp & 
+!         - sim_param%rho_inf * sum( & 
+!            (sim_param%u_inf-this%ub)*(vel_phi+this%uvort) ) & 
+!         + sim_param%rho_inf * this%didou_dt
+! full equation
     + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
     - 0.5_wp * sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp  &
-             + sim_param%rho_inf * sum(this%ub*vel_phi) &
+             + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
              + sim_param%rho_inf * this%didou_dt
- 
-! ! debug
-! if ( this%id .eq. 1 ) then
-!   write(*,*) this%ub 
-!   write(*,*) vel_phi
-!   write(*,*) sum(this%ub*vel_phi) 
-!   write(*,*)
-! end if
+
+!   ! debug
+!   if ( this%id .eq. 1 ) then
+!     write(*,*)  ' this%nor : ' , this%nor 
+!     write(*,*)  ' this%uvort:' , this%uvort
+!     write(*,*)  ' vel_phi  : ' , vel_phi
+!     write(*,*)  ' sim_param%u_inf : ' , sim_param%u_inf
+!     write(*,*)  ' this%surf_vel   : ' , this%surf_vel 
+!     write(*,*)  ' this%surf_vel-sim_param%u_inf : ' , this%surf_vel-sim_param%u_inf
+!     write(*,*)  ' sum(this%surf_vel*this%nor) : ' , sum(this%surf_vel*this%nor) 
+!     write(*,*)  ' sum(this%ub      *this%nor) : ' , sum(this%ub      *this%nor) 
+!     write(*,*)  ' this%pres : ' , this%pres 
+! !   write(*,*)
+!   end if
 
 
 end subroutine compute_pres_surfpan
