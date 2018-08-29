@@ -146,6 +146,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  ! Section names for CGNS
  integer :: nSections, iSection
  character(len=max_char_len), allocatable :: sectionNamesCGNS(:)
+ ! Offset and scaling factor for CGNS
+ real(wp) :: offset(3)
+ real(wp) :: scaling
 
  integer :: npoints_chord_tot, nelems_span, nelems_span_tot
  ! Connectivity and te structures 
@@ -163,6 +166,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
  integer , allocatable :: neigh_te(:,:) , o_te(:,:)
  real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
+
+ integer :: i
 
  character(len=*), parameter :: this_sub_name = 'build_component'
 
@@ -211,6 +216,12 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   ! Section name from CGNS file
   call geo_prs%CreateStringOption('SectionName', &
                'Section name from CGNS file', multiple=.true.)
+ 
+  ! Scaling factor to scale CGNS files
+  call geo_prs%CreateRealArrayOption('Offset',&
+         'Offset the points coordinates (before scaling)','(/0.0, 0.0, 0.0/)')
+  call geo_prs%CreateRealOption('ScalingFactor', &
+                                'Scaling of the points coordinates.', '1.0')
   
   !read the parameters
   call geo_prs%read_options(geo_file,printout_val=.false.)
@@ -343,6 +354,21 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     enddo
 
     call read_mesh_cgns(trim(mesh_file), sectionNamesCGNS,  ee, rr)
+
+    ! scale 
+    offset   = getrealarray(geo_prs, 'Offset',3)
+    scaling  = getreal(geo_prs, 'ScalingFactor')
+
+    if (any(offset .ne. 0.0_wp)) then
+      do i = 1,size(rr,2)
+        rr(:,i) = rr(:,i) + offset
+      enddo
+    endif
+
+    if (scaling .ne. 1.0_wp) then
+      rr = rr * scaling
+    endif
+
 
    case('parametric')
     mesh_file = geo_file
