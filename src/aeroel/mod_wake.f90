@@ -526,7 +526,7 @@ subroutine prepare_wake(wake, geo, sim_param)
     else
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                   dist*sim_param%first_panel_scaling * & ! next line may be commented
-                  sim_param%min_vel_at_te*sim_param%dt
+                  sim_param%min_vel_at_te*sim_param%dt / norm2(dist)
     end if
   enddo
 
