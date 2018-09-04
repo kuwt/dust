@@ -1265,27 +1265,24 @@ subroutine avoid_collision(elems, wake, pos, sim_param, vel)
  integer :: ie
  real(wp) :: v(3)
  real(wp) :: dist(3), n(3)
- real(wp) :: distn1, distn2, damp
- real(wp) :: damp_radius
+ real(wp) :: distn, distnor, damp, normvel
+ real(wp) :: damp_radius, cont
 
 damp_radius = 0.3
+cont = 0.9
 
   !calculate the influence of the solid bodies
   do ie=1,size(elems)
     dist = pos-elems(ie)%p%cen
-    distn1 = norm2(dist)
-    distn2 = sum(dist*elems(ie)%p%nor)
-    !DEBUG
-    !write(*,*) 'distn1',distn1
-    !write(*,*) 'distn2',distn2
-    if ((distn1 .lt. damp_radius) .and. (distn2 .lt. damp_radius)) then
-      !DEBUG
-      !write(*,*) 'I am actually correcting the velocity'
-      !damp = (distn/damp_radius)**10
-
+    distn = norm2(dist)
+    if ((distn .lt. damp_radius)) then
+      distnor = sum(dist * elems(ie)%p%nor)
       !n = dist/distn
       n = elems(ie)%p%nor
-      vel = vel - sum(vel*n) * n
+      normvel = max(sum(vel*n) , -cont*distnor/sim_param%dt)
+      !normvel = max(sum(vel*n) , 0.0_wp)
+      vel = vel - (sum(vel*n) - normvel) * n
+      !vel = vel - (sum(vel*n) + cont*distnor/sim_param%dt) * n
       !vel = vel - sum(vel*n) * (1-damp) * n
     endif
   enddo
