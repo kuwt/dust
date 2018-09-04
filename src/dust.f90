@@ -654,6 +654,8 @@ end subroutine copy_geo
 
 !------------------------------------------------------------------------------
 
+!> Perform preliminary procedures each timestep, mainly chech if it is time
+!! to perform output or not
 subroutine init_timestep(t)
  real(wp), intent(in) :: t
 
@@ -671,6 +673,15 @@ subroutine init_timestep(t)
     time_2_debug_out = .false.
   endif
 
+  !If it is the last timestep output the solution, unless dt_out is set
+  !longer than the whole execution, declaring implicitly that no output is 
+  !required.
+  if((it .eq. nstep) .and. (dt_out .le. tend)) then
+    time_2_out = .true.
+    time_2_debug_out = .true.
+  endif
+ 
+  !if requested, print the output also at the first step (t0)
   if ((t.eq.tstart) .and. output_start) then
     t_last_out = t
     t_last_debug_out = t
