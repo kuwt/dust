@@ -1059,10 +1059,18 @@ subroutine update_wake(wake, elems, sim_param)
     !vel_p    = vel_p   +sim_param%u_inf
     call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
 
+    !experimental: treat velocity to avoid collisions
+    call avoid_collision(elems, wake, pos_p, sim_param, vel_p)
+
     !update the position
     points_prt(:,ip) = wake%part_p(ip)%p%cen + vel_p*sim_param%dt
-
-    !TODO: Check if it went out of boundaries, then free the particle
+    
+    !DEBUG
+    if ((points_prt(1,ip)**2+points_prt(3,ip)**2) .le. 1.0_wp ) then
+      write(*,*) 'Particle',ip,'got inside'
+      write(*,*) 'Previous position', pos_p
+      write(*,*) 'next position',points_prt(:,ip)
+    endif
     
   enddo
 !$omp end parallel do
@@ -1246,5 +1254,44 @@ subroutine get_vel_rigid(this, elems, wake, pos, sim_param, vel)
 
 end subroutine get_vel_rigid
 !----------------------------------------------------------------------
+
+subroutine avoid_collision(elems, wake, pos, sim_param, vel)
+ type(t_pot_elem_p), intent(in) :: elems(:)
+ type(t_wake), intent(in) :: wake
+ real(wp), intent(in) :: pos(3)
+ type(t_sim_param), intent(in) :: sim_param
+ real(wp), intent(inout) :: vel(3)
+
+ integer :: ie
+ real(wp) :: v(3)
+ real(wp) :: dist(3), n(3)
+ real(wp) :: distn1, distn2, damp
+ real(wp) :: damp_radius
+
+damp_radius = 0.3
+
+  !calculate the influence of the solid bodies
+  do ie=1,size(elems)
+    dist = pos-elems(ie)%p%cen
+    distn1 = norm2(dist)
+    distn2 = sum(dist*elems(ie)%p%nor)
+    !DEBUG
+    !write(*,*) 'distn1',distn1
+    !write(*,*) 'distn2',distn2
+    if ((distn1 .lt. damp_radius) .and. (distn2 .lt. damp_radius)) then
+      !DEBUG
+      !write(*,*) 'I am actually correcting the velocity'
+      !damp = (distn/damp_radius)**10
+
+      !n = dist/distn
+      n = elems(ie)%p%nor
+      vel = vel - sum(vel*n) * n
+      !vel = vel - sum(vel*n) * (1-damp) * n
+    endif
+  enddo
+
+
+
+end subroutine avoid_collision
 
 end module mod_wake
