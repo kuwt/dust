@@ -310,7 +310,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   uinf = sim_param%u_inf
 
-  allocate(dou_temp(size(elems_ll)))
+  allocate(dou_temp(size(elems_ll))) ; dou_temp = 0.0_wp
   allocate(vel_w(3,size(elems_ll))) 
   ! Initialisation
   vel_w(:,:) = 0.0_wp 
@@ -354,14 +354,14 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   !Calculate the induced velocity on the airfoil
   do ic = 1,100   !TODO: Refine this iterative process 
-    diff = 0.0_wp
+    diff = 0.0_wp    ! max diff ("norm \infty")
     max_mag_ll = 0.0_wp
     do i_l = 1,size(elems_ll)
 
       ! compute velocity
       vel = 0.0_wp
       do j = 1,size(elems_ll)
-        call elems_tot(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
+        call elems_ll(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
         vel = vel + v
       enddo
 
@@ -410,12 +410,14 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       elems_ll(i_l)%p%mag = ( dou_temp(i_l)+ damp*elems_ll(i_l)%p%mag )&
                              /(1.0_wp+damp)
       max_mag_ll = max(max_mag_ll,abs(elems_ll(i_l)%p%mag))
+
     enddo
 
 !   if(diff .le. toll) exit
     if(diff/max_mag_ll .le. toll) exit
 
   enddo
+
 
   ! Loads computation ------------
   do i_l = 1,size(elems_ll)

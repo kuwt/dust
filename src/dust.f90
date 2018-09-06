@@ -413,6 +413,8 @@ endif
 
 if(debug_level .ge. 15) &
       call debug_printout_geometry_minimal(elems, geo, basename_debug, 0)
+if(debug_level .ge. 15) &
+      call debug_ll_printout_geometry(elems_ll, geo, basename_debug, 0)
 
 !TODO: check whether to move these calls before, and precisely what they do
 call ignoredParameters(prms)
@@ -475,6 +477,8 @@ do it = 1,nstep
 
   if((debug_level .ge. 16).and.time_2_debug_out)&
             call debug_printout_geometry(elems, geo, basename_debug, it)
+  if((debug_level .ge. 16).and.time_2_debug_out)&
+            call debug_ll_printout_geometry(elems_ll, geo, basename_debug, it)
 
 
   !------ Assemble the system ------
@@ -863,6 +867,83 @@ subroutine debug_printout_geometry_minimal(elems,geo,basename, it)
   deallocate(norm, cent, el)
 end subroutine debug_printout_geometry_minimal
 
+! ------------------------------------------------------------------------------
+
+subroutine debug_ll_printout_geometry(elems, geo, basename, it)
+ type(t_expl_elem_p),   intent(in) :: elems(:)
+ type(t_geo),      intent(in) :: geo
+ character(len=*), intent(in) :: basename
+ integer,          intent(in) :: it
+
+ real(wp), allocatable :: norm(:,:), cent(:,:), velb(:,:)
+ integer, allocatable  :: el(:,:), conn(:,:)
+ character(len=max_char_len) :: sit
+ integer :: ie, iv
+
+ ! surf_vel and vel_phi
+ real(wp), allocatable :: surf_vel(:,:), vel_phi(:,:) 
+ integer :: i_e
+
+
+  allocate(norm(3,size(elems)), cent(3,size(elems)), velb(3,size(elems)))
+  allocate(el(4,size(elems))); el = 0
+  allocate(conn(4,size(elems))); conn = -666;
+
+! only for surfpan !!!!!!
+! ! surf_vel and vel_phi
+! allocate( surf_vel(3,size(elems)), vel_phi(3,size(elems)) )
+! surf_vel = -666.6 ; vel_phi = -666.6 
+ 
+  do ie=1,size(elems)
+    norm(:,ie) = elems(ie)%p%nor
+    cent(:,ie) = elems(ie)%p%cen
+    velb(:,ie) = elems(ie)%p%ub
+    el(1:elems(ie)%p%n_ver,ie) = elems(ie)%p%i_ver
+    do iv=1,elems(ie)%p%n_ver
+      if(associated(elems(ie)%p%neigh(iv)%p)) then
+        conn(iv, ie) = elems(ie)%p%neigh(iv)%p%id
+      else
+        conn(iv, ie) = 0
+      endif
+    enddo
+
+! only for surfpan !!!!!!
+!   ! surf_vel and vel_phi for surfpan only
+!   select type( el => elems(ie)%p )
+!    class is(t_surfpan) 
+!     surf_vel(:,ie) = el%surf_vel   ! elems(ie)%p%surf_vel
+!     
+!     vel_phi(:,ie) = 0.0_wp
+!     do i_e = 1 , el%n_ver    ! elems(ie)%p%n_ver
+!       if ( associated(el%neigh(i_e)%p) ) then !  .and. &
+!         vel_phi(:,ie) = vel_phi(:,ie) + &
+!           el%pot_vel_stencil(:,i_e) * (el%neigh(i_e)%p%mag - el%mag)
+!       end if
+!     end do
+!     vel_phi(:,ie)  = - vel_phi(:,ie)
+!
+!   end select
+  
+  enddo
+
+  write(sit,'(I4.4)') it
+  call write_basic(geo%points, trim(basename)//'_ll_mesh_points_'//trim(sit)//'.dat')
+  call write_basic(norm,       trim(basename)//'_ll_mesh_norm_'  //trim(sit)//'.dat')
+  call write_basic(velb,       trim(basename)//'_ll_mesh_velb_'  //trim(sit)//'.dat')
+  call write_basic(cent,       trim(basename)//'_ll_mesh_cent_'  //trim(sit)//'.dat')
+  call write_basic(el,         trim(basename)//'_ll_mesh_elems_'  //trim(sit)//'.dat')
+  call write_basic(conn,       trim(basename)//'_ll_mesh_conn_'   //trim(sit)//'.dat')
+  deallocate(norm, cent, el, conn, velb)
+
+! only for surfpan !!!!!!
+! ! surf_vel and vel_phi
+! call write_basic(surf_vel,   trim(basename)//'_mesh_surfvel_'  //trim(sit)//'.dat')
+! call write_basic(vel_phi ,   trim(basename)//'_mesh_velphi_'   //trim(sit)//'.dat')
+! deallocate(surf_vel,vel_phi)
+
+end subroutine debug_ll_printout_geometry
+
+!------------------------------------------------------------------------------
 !----------------------------------------------------------------------
 !UNDER SCRUTINY: employs old stuff, to remove?
 !subroutine debug_printout_loads(elems, basename_debug, it)
