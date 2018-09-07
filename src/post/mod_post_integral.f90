@@ -62,7 +62,7 @@ use mod_geo_postpro, only: &
   load_components_postpro, update_points_postpro , prepare_geometry_postpro
 
 use mod_geometry, only: &
-  t_geo, t_geo_component
+  t_geo, t_geo_component, destroy_elements
 
 use mod_post_load, only: &
   load_refs, load_res , &
@@ -311,6 +311,7 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
   
   !TODO: move deallocate(comps) outside this routine,
   !      because it is common to all the analyses
+  call destroy_elements(comps)
   deallocate(comps,components_names)
   
   write(msg,'(A,I0,A)') nl//'++++++++++ Integral loads done'//nl

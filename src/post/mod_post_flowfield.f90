@@ -43,7 +43,7 @@ use mod_handling, only: &
   error, warning
 
 use mod_geometry, only: &
-  t_geo, t_geo_component
+  t_geo, t_geo_component, destroy_elements
 
 use mod_parse, only: &
   t_parse, &
@@ -438,6 +438,7 @@ deallocate(var_names,vars_n)
 
 !TODO: move deallocate(comps) outside this routine.
 ! Check if partial deallocation or nullification is needed.
+call destroy_elements(comps)
 deallocate(comps,components_names)
 
     write(*,*) nl//' post_flowfield done.'//nl

@@ -66,7 +66,7 @@ use mod_stringtools, only: &
 ! LowCase, isInList, stricmp
 
 use mod_geometry, only: &
-  t_geo, t_geo_component
+  t_geo, t_geo_component, destroy_elements
 
 use mod_geo_postpro, only: &
   load_components_postpro, update_points_postpro, prepare_geometry_postpro, &
@@ -362,7 +362,9 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     end select
   endif
   
-  deallocate(comps, points,components_names)
+  deallocate(points)
+  call destroy_elements(comps)
+  deallocate(comps)
   deallocate(var_names)
   
   

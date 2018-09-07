@@ -43,7 +43,7 @@ use mod_handling, only: &
   error, warning  , info, printout, dust_time, t_realtime, new_file_unit
 
 use mod_geometry, only: &
-  t_geo_component 
+  t_geo_component, destroy_elements
 
 use mod_parse, only: &
   t_parse, &
@@ -407,6 +407,7 @@ character(len=max_char_len), parameter :: &
     deallocate(probe_var_names,probe_loc_names)
     deallocate(rr_probes)
 
+    call destroy_elements(comps)
     deallocate(comps, points,components_names)
 
 
