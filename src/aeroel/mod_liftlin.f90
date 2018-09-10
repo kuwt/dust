@@ -274,10 +274,14 @@ end subroutine update_liftlin
 !! The lifting line solution is not obtained from the solution of the linear
 !! system. It is fully explicit, but by being nonlinear requires an
 !! iterative solution.
-subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  elems_vort, &
+subroutine solve_liftlin(elems_ll, elems_tot, &
+                         elems_impl, elems_ad, &
+                         elems_wake, elems_vort, &
                          sim_param, airfoil_data)
  type(t_expl_elem_p), intent(inout) :: elems_ll(:)
  type(t_pot_elem_p),  intent(in)    :: elems_tot(:)
+ type(t_impl_elem_p), intent(in)    :: elems_impl(:)
+ type(t_expl_elem_p), intent(in)    :: elems_ad(:)
  type(t_pot_elem_p),  intent(in)    :: elems_wake(:)
  type(t_vort_elem_p), intent(in)    :: elems_vort(:)
  type(t_sim_param),   intent(in)    :: sim_param
@@ -302,19 +306,31 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  elems_vort, &
  real(wp) , allocatable :: u_v(:)   ! size(elems_ll)
  character(len=max_char_len) :: msg
 
+ real(wp) :: max_mag_ll
+
   uinf = sim_param%u_inf
 
-  allocate(dou_temp(size(elems_ll)))
-  allocate(vel_w(3,size(elems_ll)))
+  allocate(dou_temp(size(elems_ll))) ; dou_temp = 0.0_wp
+  allocate(vel_w(3,size(elems_ll))) 
+  ! Initialisation
+  vel_w(:,:) = 0.0_wp 
 
-  !velocity from the wake
+  !Compute the velocity from all the elements except for liftling elems
+  ! and store it outside the loop, since it is constant
   do i_l = 1,size(elems_ll)
-    vel_w(:,i_l) = 0.0_wp
-    do j = 1,size(elems_wake)
+    do j = 1,size(elems_impl) ! body panels: liftlin, vortlat 
+      call elems_impl(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
+      vel_w(:,i_l) = vel_w(:,i_l) + v
+    enddo
+    do j = 1,size(elems_ad) ! actuator disks 
+      call elems_ad(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
+      vel_w(:,i_l) = vel_w(:,i_l) + v
+    enddo
+    do j = 1,size(elems_wake) ! wake panels
       call elems_wake(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
-    do j = 1,size(elems_vort)
+    do j = 1,size(elems_vort) ! wake vort
       call elems_vort(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
@@ -338,13 +354,14 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  elems_vort, &
 
   !Calculate the induced velocity on the airfoil
   do ic = 1,100   !TODO: Refine this iterative process 
-    diff = 0.0_wp
+    diff = 0.0_wp    ! max diff ("norm \infty")
+    max_mag_ll = 0.0_wp
     do i_l = 1,size(elems_ll)
 
       ! compute velocity
       vel = 0.0_wp
-      do j = 1,size(elems_tot)
-        call elems_tot(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
+      do j = 1,size(elems_ll)
+        call elems_ll(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
         vel = vel + v
       enddo
 
@@ -392,11 +409,15 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  elems_vort, &
     do i_l = 1,size(elems_ll)
       elems_ll(i_l)%p%mag = ( dou_temp(i_l)+ damp*elems_ll(i_l)%p%mag )&
                              /(1.0_wp+damp)
+      max_mag_ll = max(max_mag_ll,abs(elems_ll(i_l)%p%mag))
+
     enddo
 
-    if(diff .le. toll) exit
+!   if(diff .le. toll) exit
+    if(diff/max_mag_ll .le. toll) exit
 
   enddo
+
 
   ! Loads computation ------------
   do i_l = 1,size(elems_ll)
@@ -423,6 +444,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, elems_wake,  elems_vort, &
   if(sim_param%debug_level .ge. 3) then
     write(msg,*) 'iterations: ',ic; call printout(trim(msg))
     write(msg,*) 'diff',diff; call printout(trim(msg))
+    write(msg,*) 'diff/max_mag_ll:',diff/max_mag_ll; call printout(trim(msg))
   endif
 
   deallocate(dou_temp, vel_w)

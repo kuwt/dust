@@ -215,8 +215,8 @@ subroutine interp_aero_coeff ( airfoil_data ,  &
   
    ! Some checks ----
    if ( nRe .eq. 1 ) then
-    write(*,*) ' WARNING: aerodynamic coeffs defined for one value of Re only.'
-    write(*,*) '          It is assumed that aero coeffs do not depend on Re. '
+    !write(*,*) ' WARNING: aerodynamic coeffs defined for one value of Re only.'
+    !write(*,*) '          It is assumed that aero coeffs do not depend on Re. '
 
     call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(1)%coeff , &
                                                  aero_par(1:2) , coeff1 )

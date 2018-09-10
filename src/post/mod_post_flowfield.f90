@@ -43,7 +43,7 @@ use mod_handling, only: &
   error, warning
 
 use mod_geometry, only: &
-  t_geo, t_geo_component
+  t_geo, t_geo_component, destroy_elements
 
 use mod_parse, only: &
   t_parse, &
@@ -93,8 +93,8 @@ contains
 
 ! ---------------------------------------------------------------------- 
 
-subroutine post_flowfield ( sbprms , basename , data_basename , an_name , ia , &
-                            out_frmt , comps , components_names , all_comp , &
+subroutine post_flowfield( sbprms , basename , data_basename , an_name , ia , &
+                            out_frmt , components_names , all_comp , &
                             an_start , an_end , an_step )
 type(t_parse), pointer :: sbprms
 character(len=*) , intent(in) :: basename
@@ -102,11 +102,11 @@ character(len=*) , intent(in) :: data_basename
 character(len=*) , intent(in) :: an_name
 integer          , intent(in) :: ia
 character(len=*) , intent(in) :: out_frmt
-type(t_geo_component), allocatable , intent(inout) :: comps(:)
 character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
 logical , intent(inout) :: all_comp
 integer , intent(in) :: an_start , an_end , an_step
 
+type(t_geo_component), allocatable  :: comps(:)
 integer , parameter :: n_max_vars = 3 !vel,p,vort, ! TODO: 4 with cp
 character(len=max_char_len), allocatable :: var_names(:)
 integer , allocatable :: vars_n(:)
@@ -438,6 +438,7 @@ deallocate(var_names,vars_n)
 
 !TODO: move deallocate(comps) outside this routine.
 ! Check if partial deallocation or nullification is needed.
+call destroy_elements(comps)
 deallocate(comps,components_names)
 
     write(*,*) nl//' post_flowfield done.'//nl

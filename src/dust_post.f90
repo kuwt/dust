@@ -153,7 +153,6 @@ character(len=max_char_len) :: lowstr
 character(len=max_char_len) :: out_frmt
 logical :: all_comp
 logical :: average
-type(t_geo_component), allocatable :: comps(:)
 
 call printout(nl//'>>>>>> DUST POSTPROCESSOR beginning >>>>>>'//nl)
 call initialize_hdf5()
@@ -284,6 +283,7 @@ do ia = 1,n_analyses
     call LowCase(components_names(1),lowstr)    ! char 
     if(trim(lowstr) .eq. 'all') then
       all_comp = .true.
+      n_comp = 0
       deallocate(components_names)
     endif
   endif
@@ -296,35 +296,35 @@ do ia = 1,n_analyses
 
     ! look in mod_post_integral
     call post_integral( sbprms , basename , data_basename , an_name , ia , &
-                        out_frmt , comps , components_names , all_comp , &
+                        out_frmt , components_names , all_comp , &
                         an_start , an_end , an_step, average)
 
    !//////////////////Visualizations\\\\\\\\\\\\\\\\\
    case('viz') 
 
     call post_viz( sbprms , basename , data_basename , an_name , ia , &
-                   out_frmt , comps , components_names , all_comp , &
+                   out_frmt , components_names , all_comp , &
                    an_start , an_end , an_step, average )
 
    !//////////////////Domain probes \\\\\\\\\\\\\\\\\
    case('probes')
 
     call post_probes( sbprms , basename , data_basename , an_name , ia , &
-                      out_frmt , comps , components_names , all_comp , &
+                      out_frmt , components_names , all_comp , &
                       an_start , an_end , an_step )
 
    !////////////////// Flow Field  \\\\\\\\\\\\\\\\\\
    case('flow_field')
 
     call post_flowfield ( sbprms , basename , data_basename , an_name , ia , &
-                          out_frmt , comps , components_names , all_comp , &
+                          out_frmt , components_names , all_comp , &
                           an_start , an_end , an_step )
 
    !///////////////  Sectional Loads  \\\\\\\\\\\\\\\
    case('sectional_loads')
     
     call post_sectional ( sbprms , bxprms , basename , data_basename , an_name , ia , &
-                          out_frmt , comps , components_names , all_comp , &
+                          out_frmt , components_names , all_comp , &
                           an_start , an_end , an_step, average )
 
    case default

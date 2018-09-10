@@ -86,13 +86,16 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
  ! regions  ---
  integer , allocatable :: nelem_span_list(:)
  real(wp), allocatable :: span_list(:) , sweep_list(:) , dihed_list(:)
+ character(len=max_char_len), allocatable :: type_span_list(:)
+ integer :: n_type_span
  ! Sections 1. 2.
  real(wp), allocatable :: xySection1(:,:) , xySection2(:,:)
  real(wp), allocatable :: rrSection1(:,:) , rrSection2(:,:)
  real(wp) :: dx_ref , dy_ref , dz_ref
  integer :: ista , iend
 
- character :: ElType , symmetry
+ character :: ElType
+ logical :: symmetry
  real(wp), allocatable :: chord_fraction(:), span_fraction(:)
  character(len=max_char_len) :: type_chord
  integer :: i1  
@@ -105,7 +108,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   ! Global parameters
   call pmesh_prs%CreateStringOption('ElType', &
                 'element type (temporary) p panel v vortex ring')
-  call pmesh_prs%CreateStringOption('mesh_reflection', &
+  call pmesh_prs%CreateLogicalOption('mesh_reflection', &
                 'symmetry yes/no' )
   call pmesh_prs%CreateIntOption('nelem_chord',&
                 'number of chord-wise elements', &
@@ -149,8 +152,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                 multiple=.true.);
   call pmesh_prs%CreateIntOption( 'nelem_span', 'number of span-wise elements in the region',&
                 multiple=.true.);
-  call pmesh_prs%CreateStringOption('type_span', 'type of span-wise division: uniform, cosine, cosineIB, cosineOB', &
-                multiple=.true.);
+  call pmesh_prs%CreateStringOption('type_span', 'type of span-wise division: &
+                &uniform, cosine, cosineIB, cosineOB', multiple=.true.);
 
 
   !read the parameters
@@ -158,7 +161,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
   nelem_chord = getint(pmesh_prs,'nelem_chord')
   ElType  = getstr(pmesh_prs,'ElType')
-  symmetry= getstr(pmesh_prs,'mesh_reflection')
+  symmetry= getlogical(pmesh_prs,'mesh_reflection')
    
   nSections = countoption(pmesh_prs,'chord')
   nRegions  = countoption(pmesh_prs,'span')
@@ -187,6 +190,25 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     dihed_list(iRegion) = getreal(pmesh_prs,'dihed')
     nelem_span_tot = nelem_span_tot + nelem_span_list(iRegion)
   enddo
+
+  ! type_span
+  allocate( type_span_list(nRegions));!   type_span_list = ''
+  n_type_span = countoption(pmesh_prs,'type_span')
+  if ( n_type_span .eq. 0 ) then ! default is 'uniform'
+    do iRegion = 1 , nRegions
+      type_span_list(iRegion) = 'uniform'
+    end do
+  else if ( n_type_span .eq. nRegions ) then
+    do iRegion = 1 , nRegions
+      type_span_list(iRegion) = getstr(pmesh_prs,'type_span')
+    end do
+  else
+   write(*,*) ' mesh_file   : ' , trim(mesh_file)
+   write(*,*) ' n_type_span : ' , n_type_span
+   write(*,*) ' nRegions    : ' , nRegions    
+   call error(this_sub_name, this_mod_name, 'Unconsistent input: &
+         &n_type_span .ne. nRegions. Stop.')
+  end if
 
   allocate(chord_list  (nSections))  ; chord_list = 0.0d0
   allocate(twist_list  (nSections))  ; twist_list = 0.0d0
@@ -294,10 +316,33 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     do i1 = 1 , nelem_span_list(iRegion)
       ista = iend + 1 
       iend = iend + npoint_chord_tot
-    
-      ! uniform spacing in span
-      rr(:,ista:iend) = rrSection1 + dble(i1) / dble(nelem_span_list(iRegion)) * &
-                      ( rrSection2 - rrSection1 )
+
+      if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then    
+        ! uniform spacing in span
+        rr(:,ista:iend) = rrSection1 + dble(i1) / dble(nelem_span_list(iRegion)) * &
+                        ( rrSection2 - rrSection1 )
+      else if ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then    
+        ! cosine  spacing in span
+        rr(:,ista:iend) = 0.5_wp * ( rrSection1 + rrSection2 ) - &
+                          0.5_wp * ( rrSection2 - rrSection1 ) * &
+                                     cos(i1*pi/ dble(nelem_span_list(iRegion)) ) 
+      else if ( trim(type_span_list(iRegion)) .eq. 'cosineOB' ) then    
+        ! cosine  spacing in span: outboard refinement
+        rr(:,ista:iend) = rrSection1 + &
+                        ( rrSection2 - rrSection1 ) * &
+                                     sin(0.5_wp*i1*pi/ dble(nelem_span_list(iRegion)) ) 
+      else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then    
+        ! cosine  spacing in span: inboard refinement
+        rr(:,ista:iend) = rrSection2 - &
+                        ( rrSection2 - rrSection1 ) * &
+                                     cos(0.5_wp*i1*pi/ dble(nelem_span_list(iRegion)) ) 
+      else
+        write(*,*) ' mesh_file   : ' , trim(mesh_file)
+        write(*,*) ' type_span_list(',iRegion,') : ' , trim(type_span_list(iRegion)) 
+        call error(this_sub_name, this_mod_name, 'Unconsistent input: &
+              & type_span must be equal to uniform, cosine, cosineIB, cosineOB.')
+      end if 
+
     
     end do
 
@@ -417,9 +462,9 @@ subroutine naca4digits(airfoil_name, nelem_chord,&
   read(str1,*,iostat=ierr) pp
   str2 = airfoil_name(3:4)
   read(str2,*,iostat=ierr) ss
-  mm = 0
-  pp = 0
-  ss = 12
+! mm = 0
+! pp = 0
+! ss = 12
 
   m = dble(mm)/100.0_wp
   p = dble(pp)/10.0_wp

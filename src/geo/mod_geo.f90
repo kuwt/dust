@@ -276,7 +276,17 @@ type t_tedge
 
 end type t_tedge
 
-!-----------------------------------
+!----------------------------------------------------------------------
+
+interface destroy_elements
+
+  module procedure destroy_elements_geo
+  module procedure destroy_elements_comps
+
+end interface 
+
+
+!----------------------------------------------------------------------
 
 character(len=*), parameter :: this_mod_name = 'mod_geo'
 
@@ -1610,14 +1620,14 @@ subroutine update_geometry(geo, t, update_static)
         !                   geo%refs(comp%ref_id)%of_g)
         call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
       enddo
-      !in the first pass compute also the velocity stencil for surfpans
-      if(update_static) then
+!     !in the first pass compute also the velocity stencil for surfpans
+!     if(update_static) then
         select type(els=>comp%el); class is(t_surfpan)
         do ie = 1,size(els)
           call els(ie)%create_local_velocity_stencil()
         enddo
         end select
-      endif
+!     endif
 
 
       do ie = 1,size(comp%el)
@@ -1642,7 +1652,7 @@ end subroutine update_geometry
 !! Newer versions of the compiler and ifort deallocate also the 
 !! vector of pointers alongside the geometry in destroy_geometry,
 !! however gcc 4.8 gives a SIGSEGV and needs and explicit deallocation
-subroutine destroy_elements(geo)
+subroutine destroy_elements_geo(geo)
  type(t_geo), intent(inout) :: geo
 
  integer :: ic
@@ -1651,7 +1661,26 @@ subroutine destroy_elements(geo)
    if(allocated(geo%components(ic)%el)) deallocate(geo%components(ic)%el)
  enddo
 
-end subroutine destroy_elements
+end subroutine destroy_elements_geo
+
+!----------------------------------------------------------------------
+
+!> Destroy the pointers array of the components
+!!
+!! This subroutine is needed just for compatibility with gcc 4.8
+!! Newer versions of the compiler and ifort deallocate also the 
+!! vector of pointers alongside the geometry in destroy_geometry,
+!! however gcc 4.8 gives a SIGSEGV and needs and explicit deallocation
+subroutine destroy_elements_comps(components)
+ type(t_geo_component), intent(inout) :: components(:)
+
+ integer :: ic
+
+ do ic=1,size(components)
+   if(allocated(components(ic)%el)) deallocate(components(ic)%el)
+ enddo
+
+end subroutine destroy_elements_comps
 
 !----------------------------------------------------------------------
 

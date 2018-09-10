@@ -1,3 +1,38 @@
+!!=====================================================================
+!!
+!! Copyright (C) 2018 Politecnico di Milano
+!!
+!! This file is part of DUST, an aerodynamic solver for complex
+!! configurations.
+!! 
+!! Permission is hereby granted, free of charge, to any person
+!! obtaining a copy of this software and associated documentation
+!! files (the "Software"), to deal in the Software without
+!! restriction, including without limitation the rights to use,
+!! copy, modify, merge, publish, distribute, sublicense, and/or sell
+!! copies of the Software, and to permit persons to whom the
+!! Software is furnished to do so, subject to the following
+!! conditions:
+!! 
+!! The above copyright notice and this permission notice shall be
+!! included in all copies or substantial portions of the Software.
+!! 
+!! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+!! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+!! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+!! NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+!! HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+!! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+!! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+!! OTHER DEALINGS IN THE SOFTWARE.
+!! 
+!! Authors: 
+!!          Federico Fonte             <federico.fonte@polimi.it>
+!!          Davide Montagnani       <davide.montagnani@polimi.it>
+!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
+!!=====================================================================
+
+!> Module containing the tools to load the solution for postprocessing
 module mod_post_load
 
 use mod_param, only: &
@@ -96,6 +131,9 @@ subroutine load_res(floc, comps, vort, press, t)
  character(len=max_char_len) :: cname
  real(wp), allocatable :: vort_read(:)!, cp_read(:)
  real(wp), allocatable :: pres_read(:), dforce_read(:,:)
+ integer :: ncomps_sol
+
+ character(len=*), parameter :: this_sub_name = 'load_res'
 
   ncomps = size(comps)
   nelems = 0
@@ -111,6 +149,9 @@ subroutine load_res(floc, comps, vort, press, t)
   call read_hdf5(t,'time',floc)
   allocate(vort(nelems), press(nelems))
   call open_hdf5_group(floc,'Components',gloc1)
+  call read_hdf5(ncomps_sol,'NComponents',gloc1)
+  if(ncomps_sol .lt. ncomps) call error(this_sub_name, this_mod_name, &
+  'Different number of components between solution and geometry')
 
   offset = 0
   do icomp = 1, ncomps
@@ -126,6 +167,13 @@ subroutine load_res(floc, comps, vort, press, t)
     !call read_hdf5_al(cp_read,'Cp',gloc3)
     call read_hdf5_al(pres_read,'Pres',gloc3)
     call read_hdf5_al(dforce_read,'dF',gloc3)
+
+    !check consistency of geometry and solution
+    if((size(vort_read,1) .ne. nelems_comp) .or. &
+       (size(pres_read,1) .ne. nelems_comp) .or. &
+       (size(dforce_read,2) .ne. nelems_comp)) call error(this_mod_name, &
+       this_sub_name, 'inconsistent number of elements between geometry and&
+       & solution')   
 
 !   TODO: check if it is general enough *******
 !   TODO: check if something is broken after changing intent(in to inout) for comps

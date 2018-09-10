@@ -62,7 +62,7 @@ use mod_geo_postpro, only: &
   load_components_postpro, update_points_postpro , prepare_geometry_postpro
 
 use mod_geometry, only: &
-  t_geo, t_geo_component
+  t_geo, t_geo_component, destroy_elements
 
 use mod_post_load, only: &
   load_refs, load_res , &
@@ -83,14 +83,15 @@ public :: post_integral
 
 private
 
-character(len=max_char_len), parameter :: this_mod_name = 'mod_post_integral'
+character(len=*), parameter :: this_mod_name = 'mod_post_integral'
+character(len=max_char_len) :: msg
 
 contains
 
 ! ---------------------------------------------------------------------- 
 
 subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
-                          out_frmt, comps , components_names, all_comp , &
+                          out_frmt, components_names, all_comp , &
                           an_start, an_end, an_step, average )
  type(t_parse), pointer :: sbprms
  character(len=*) , intent(in) :: basename
@@ -98,13 +99,13 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
  character(len=*) , intent(in) :: an_name
  integer          , intent(in) :: ia
  character(len=*) , intent(in) :: out_frmt
- type(t_geo_component), allocatable , intent(inout) :: comps(:)
  character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
  logical , intent(in) :: all_comp
  integer , intent(in) :: an_start , an_end , an_step
  logical , intent(in) :: average
  
  
+ type(t_geo_component), allocatable :: comps(:)
  integer(h5loc) :: floc , ploc
  real(wp), allocatable :: points(:,:)
  integer :: nelem
@@ -127,17 +128,21 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
  real(wp) :: t
  
  
- character(len=max_char_len), parameter :: this_sub_name = 'post_integral'
+ character(len=*), parameter :: this_sub_name = 'post_integral'
 
-  write(*,*) nl//' Analysis:',ia,' post_integral() ++++++++++ '//nl
+  write(msg,'(A,I0,A)') nl//'++++++++++ Analysis: ',ia,' integral loads'//nl
+  call printout(trim(msg))
 
   !debug
-  write(*,*) ' mod_post_integral. n_comp : ' , size(components_names)
-  do ic = 1 , size(components_names)
-    write(*,*) ' comp',ic,' : ', &
-                   trim(components_names(ic))
-  end do
-
+  if (all_comp) then
+    call printout('  Analysing all components.')
+  else
+    call printout('  Analysing the following components:')
+    do ic = 1 , size(components_names)
+      write(msg,'(A,I0,A)') '   ',ic,') '//trim(components_names(ic))
+      call printout(trim(msg))
+    end do
+  endif
   
   ! load the geo components just once just once
   call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
@@ -167,14 +172,14 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
     if ( stricmp(refs_tag(it),  ref_tag) ) ref_id = it
   end do
   if ( ref_id .eq. -333 ) then 
-    write(*,*)
-    write(*,*) ' Available references systems: '
+    call warning(this_sub_name, this_mod_name, 'Unknown reference system &
+    &requested for the analysis, these are the valid reference frames: ')
+    call printout('   Available references systems: ')
     do it = lbound(refs_tag,1) , ubound(refs_tag,1)
-      write(*,*) ' ref_id : ' , it , ' ref_tag ' , trim(refs_tag(it))
+      write(msg,*) ' ref_id : ' , it , ' ref_tag ' , trim(refs_tag(it))
+      call printout(trim(msg))
     end do
-    call warning('dust_post','','Unknown ref.sys. defined for loads output.&
-         & Your input in dust_post.in is '//trim(ref_tag)//'. All the&
-         & available ref.sys. are listed above.')
+    call warning(this_sub_name, this_mod_name, 'Analysis skipped')
     return ! jump this analysis if the reference frame is not available
   end if
   
@@ -306,9 +311,11 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
   
   !TODO: move deallocate(comps) outside this routine,
   !      because it is common to all the analyses
+  call destroy_elements(comps)
   deallocate(comps,components_names)
   
-      write(*,*) nl//' post_integral done.'//nl
+  write(msg,'(A,I0,A)') nl//'++++++++++ Integral loads done'//nl
+  call printout(trim(msg))
 
 end subroutine post_integral
 

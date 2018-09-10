@@ -61,7 +61,7 @@ use mod_doublet, only: &
   initialize_doublet
 
 use mod_surfpan, only: &
-  initialize_surfpan
+  t_surfpan , initialize_surfpan
 
 use mod_liftlin, only: &
  update_liftlin, solve_liftlin
@@ -90,6 +90,7 @@ use mod_basic_io, only: &
 
 use mod_parse, only: &
   t_parse, &
+  countoption , &
   getstr, getlogical, getreal, getint, getrealarray, &
   ignoredParameters, finalizeParameters
 
@@ -147,7 +148,9 @@ integer :: n_wake_panels
 integer :: n_wake_parts
 real(wp) :: part_box_min(3), part_box_max(3)
 real(wp) :: wake_pan_scaling , wake_pan_minvel
-logical :: rigid_wake
+logical  :: rigid_wake
+real(wp) :: rigid_wake_vel(3)
+character(len=max_char_len) :: rigid_wake_vel_str
 
 !doublet parameters
 real(wp) :: ff_ratio_dou, ff_ratio_sou, eps_dou, r_Rankine, r_cutoff
@@ -270,6 +273,7 @@ call prms%CreateRealOption( 'CutoffRad', &
       "Radius of complete cutoff  for vortex induction near core", '0.001')
 
 call prms%CreateLogicalOption('rigid_wake','rigid wake?','F')
+call prms%CreateRealArrayOption( 'rigid_wake_vel', "rigid wake velocity" )
 
 
 ! get the parameters and print them out
@@ -296,6 +300,21 @@ n_wake_parts = getint(prms, 'n_wake_particles')
 part_box_min = getrealarray(prms, 'particles_box_min',3)
 part_box_max = getrealarray(prms, 'particles_box_max',3)
 rigid_wake = getlogical(prms, 'rigid_wake')
+rigid_wake_vel = uinf   ! initialisation
+if ( rigid_wake ) then
+  if ( countoption(prms,'rigid_wake_vel') .eq. 1 ) then
+    rigid_wake_vel = getrealarray(prms, 'rigid_wake_vel',3)
+  else if ( countoption(prms,'rigid_wake_vel') .le. 0 ) then
+    call warning('dust','dust','no rigid_wake_vel parameter set, &
+         &with rigid_wake = T; rigid_wake_vel = u_inf')
+    rigid_wake_vel = uinf
+  else if ( countoption(prms,'rigid_wake_vel') .gt. 1 ) then
+    rigid_wake_vel = getrealarray(prms, 'rigid_wake_vel',3)
+    write(rigid_wake_vel_str,'(E12.4)') rigid_wake_vel
+    call warning('dust','dust','more than one rigid_wake_vel param, &
+         &set. The first value is used: '//trim(rigid_wake_vel_str))
+  end if
+end if
 
 wake_pan_scaling = getreal(prms,'ImplicitPanelScale')
 wake_pan_minvel  = getreal(prms,'ImplicitPanelMinVel')
@@ -372,6 +391,8 @@ sim_param%mu_inf = mu_inf
 sim_param%first_panel_scaling = wake_pan_scaling
 sim_param%min_vel_at_te       = wake_pan_minvel 
 sim_param%rigid_wake = rigid_wake
+allocate(sim_param%rigid_wake_vel(3))
+sim_param%rigid_wake_vel = rigid_wake_vel
 sim_param%debug_level = debug_level
 sim_param%basename = basename
 
@@ -392,6 +413,8 @@ endif
 
 if(debug_level .ge. 15) &
       call debug_printout_geometry_minimal(elems, geo, basename_debug, 0)
+if(debug_level .ge. 15) &
+      call debug_ll_printout_geometry(elems_ll, geo, basename_debug, 0)
 
 !TODO: check whether to move these calls before, and precisely what they do
 call ignoredParameters(prms)
@@ -454,6 +477,8 @@ do it = 1,nstep
 
   if((debug_level .ge. 16).and.time_2_debug_out)&
             call debug_printout_geometry(elems, geo, basename_debug, it)
+  if((debug_level .ge. 16).and.time_2_debug_out)&
+            call debug_ll_printout_geometry(elems_ll, geo, basename_debug, it)
 
 
   !------ Assemble the system ------
@@ -496,9 +521,11 @@ do it = 1,nstep
   if (debug_level .ge. 20.and.time_2_debug_out) &
                       call debug_printout_result(linsys, basename_debug, it)
 
-  !------ Update the explicit part ------
-  call solve_liftlin(elems_ll, elems_tot, &
-          (/ wake%pan_p, wake%rin_p/), wake%vort_p, sim_param, airfoil_data)
+  !------ Update the explicit part ------  % v-----implicit elems: p,v
+  if ( size(elems_ll) .gt. 0 ) then
+    call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
+            (/ wake%pan_p, wake%rin_p/), wake%vort_p, sim_param, airfoil_data)
+  end if
 
   !------ Compute loads -------
   ! Implicit elements: vortex rings and 3d-panels
@@ -534,7 +561,13 @@ do it = 1,nstep
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
   !  next iteration)
+  t0 = dust_time()
   call update_wake(wake, elems_tot, sim_param)
+  t1 = dust_time()
+  if(debug_level .ge. 1) then
+    write(message,'(A,F9.3,A)') 'Updated wake in: ' , t1 - t0,' s.'
+    call printout(message)
+  endif
 
   time = min(tend, time+dt)
   call update_geometry(geo, time, .false.)
@@ -625,6 +658,8 @@ end subroutine copy_geo
 
 !------------------------------------------------------------------------------
 
+!> Perform preliminary procedures each timestep, mainly chech if it is time
+!! to perform output or not
 subroutine init_timestep(t)
  real(wp), intent(in) :: t
 
@@ -642,6 +677,15 @@ subroutine init_timestep(t)
     time_2_debug_out = .false.
   endif
 
+  !If it is the last timestep output the solution, unless dt_out is set
+  !longer than the whole execution, declaring implicitly that no output is 
+  !required.
+  if((it .eq. nstep) .and. (dt_out .le. tend)) then
+    time_2_out = .true.
+    time_2_debug_out = .true.
+  endif
+ 
+  !if requested, print the output also at the first step (t0)
   if ((t.eq.tstart) .and. output_start) then
     t_last_out = t
     t_last_debug_out = t
@@ -730,9 +774,18 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
  character(len=max_char_len) :: sit
  integer :: ie, iv
 
+ ! surf_vel and vel_phi
+ real(wp), allocatable :: surf_vel(:,:), vel_phi(:,:) 
+ integer :: i_e
+
+
   allocate(norm(3,size(elems)), cent(3,size(elems)), velb(3,size(elems)))
   allocate(el(4,size(elems))); el = 0
   allocate(conn(4,size(elems))); conn = -666;
+  ! surf_vel and vel_phi
+  allocate( surf_vel(3,size(elems)), vel_phi(3,size(elems)) )
+  surf_vel = -666.6 ; vel_phi = -666.6 
+ 
   do ie=1,size(elems)
     norm(:,ie) = elems(ie)%p%nor
     cent(:,ie) = elems(ie)%p%cen
@@ -745,7 +798,25 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
         conn(iv, ie) = 0
       endif
     enddo
+
+    ! surf_vel and vel_phi for surfpan only
+    select type( el => elems(ie)%p )
+     class is(t_surfpan) 
+      surf_vel(:,ie) = el%surf_vel   ! elems(ie)%p%surf_vel
+      
+      vel_phi(:,ie) = 0.0_wp
+      do i_e = 1 , el%n_ver    ! elems(ie)%p%n_ver
+        if ( associated(el%neigh(i_e)%p) ) then !  .and. &
+          vel_phi(:,ie) = vel_phi(:,ie) + &
+            el%pot_vel_stencil(:,i_e) * (el%neigh(i_e)%p%mag - el%mag)
+        end if
+      end do
+      vel_phi(:,ie)  = - vel_phi(:,ie)
+ 
+    end select
+  
   enddo
+
   write(sit,'(I4.4)') it
   call write_basic(geo%points, trim(basename)//'_mesh_points_'//trim(sit)//'.dat')
   call write_basic(norm,       trim(basename)//'_mesh_norm_'  //trim(sit)//'.dat')
@@ -754,6 +825,12 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
   call write_basic(el,         trim(basename)//'_mesh_elems_'  //trim(sit)//'.dat')
   call write_basic(conn,       trim(basename)//'_mesh_conn_'   //trim(sit)//'.dat')
   deallocate(norm, cent, el, conn, velb)
+
+  ! surf_vel and vel_phi
+  call write_basic(surf_vel,   trim(basename)//'_mesh_surfvel_'  //trim(sit)//'.dat')
+  call write_basic(vel_phi ,   trim(basename)//'_mesh_velphi_'   //trim(sit)//'.dat')
+  deallocate(surf_vel,vel_phi)
+
 end subroutine debug_printout_geometry
 
 !------------------------------------------------------------------------------
@@ -790,6 +867,83 @@ subroutine debug_printout_geometry_minimal(elems,geo,basename, it)
   deallocate(norm, cent, el)
 end subroutine debug_printout_geometry_minimal
 
+! ------------------------------------------------------------------------------
+
+subroutine debug_ll_printout_geometry(elems, geo, basename, it)
+ type(t_expl_elem_p),   intent(in) :: elems(:)
+ type(t_geo),      intent(in) :: geo
+ character(len=*), intent(in) :: basename
+ integer,          intent(in) :: it
+
+ real(wp), allocatable :: norm(:,:), cent(:,:), velb(:,:)
+ integer, allocatable  :: el(:,:), conn(:,:)
+ character(len=max_char_len) :: sit
+ integer :: ie, iv
+
+ ! surf_vel and vel_phi
+ real(wp), allocatable :: surf_vel(:,:), vel_phi(:,:) 
+ integer :: i_e
+
+
+  allocate(norm(3,size(elems)), cent(3,size(elems)), velb(3,size(elems)))
+  allocate(el(4,size(elems))); el = 0
+  allocate(conn(4,size(elems))); conn = -666;
+
+! only for surfpan !!!!!!
+! ! surf_vel and vel_phi
+! allocate( surf_vel(3,size(elems)), vel_phi(3,size(elems)) )
+! surf_vel = -666.6 ; vel_phi = -666.6 
+ 
+  do ie=1,size(elems)
+    norm(:,ie) = elems(ie)%p%nor
+    cent(:,ie) = elems(ie)%p%cen
+    velb(:,ie) = elems(ie)%p%ub
+    el(1:elems(ie)%p%n_ver,ie) = elems(ie)%p%i_ver
+    do iv=1,elems(ie)%p%n_ver
+      if(associated(elems(ie)%p%neigh(iv)%p)) then
+        conn(iv, ie) = elems(ie)%p%neigh(iv)%p%id
+      else
+        conn(iv, ie) = 0
+      endif
+    enddo
+
+! only for surfpan !!!!!!
+!   ! surf_vel and vel_phi for surfpan only
+!   select type( el => elems(ie)%p )
+!    class is(t_surfpan) 
+!     surf_vel(:,ie) = el%surf_vel   ! elems(ie)%p%surf_vel
+!     
+!     vel_phi(:,ie) = 0.0_wp
+!     do i_e = 1 , el%n_ver    ! elems(ie)%p%n_ver
+!       if ( associated(el%neigh(i_e)%p) ) then !  .and. &
+!         vel_phi(:,ie) = vel_phi(:,ie) + &
+!           el%pot_vel_stencil(:,i_e) * (el%neigh(i_e)%p%mag - el%mag)
+!       end if
+!     end do
+!     vel_phi(:,ie)  = - vel_phi(:,ie)
+!
+!   end select
+  
+  enddo
+
+  write(sit,'(I4.4)') it
+  call write_basic(geo%points, trim(basename)//'_ll_mesh_points_'//trim(sit)//'.dat')
+  call write_basic(norm,       trim(basename)//'_ll_mesh_norm_'  //trim(sit)//'.dat')
+  call write_basic(velb,       trim(basename)//'_ll_mesh_velb_'  //trim(sit)//'.dat')
+  call write_basic(cent,       trim(basename)//'_ll_mesh_cent_'  //trim(sit)//'.dat')
+  call write_basic(el,         trim(basename)//'_ll_mesh_elems_'  //trim(sit)//'.dat')
+  call write_basic(conn,       trim(basename)//'_ll_mesh_conn_'   //trim(sit)//'.dat')
+  deallocate(norm, cent, el, conn, velb)
+
+! only for surfpan !!!!!!
+! ! surf_vel and vel_phi
+! call write_basic(surf_vel,   trim(basename)//'_mesh_surfvel_'  //trim(sit)//'.dat')
+! call write_basic(vel_phi ,   trim(basename)//'_mesh_velphi_'   //trim(sit)//'.dat')
+! deallocate(surf_vel,vel_phi)
+
+end subroutine debug_ll_printout_geometry
+
+!------------------------------------------------------------------------------
 !----------------------------------------------------------------------
 !UNDER SCRUTINY: employs old stuff, to remove?
 !subroutine debug_printout_loads(elems, basename_debug, it)

@@ -66,7 +66,7 @@ use mod_stringtools, only: &
 ! LowCase, isInList, stricmp
 
 use mod_geometry, only: &
-  t_geo, t_geo_component
+  t_geo, t_geo_component, destroy_elements
 
 use mod_geo_postpro, only: &
   load_components_postpro, update_points_postpro, prepare_geometry_postpro, &
@@ -95,7 +95,7 @@ contains
 ! ---------------------------------------------------------------------- 
 
 subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
-                     out_frmt , comps , components_names , all_comp , &
+                     out_frmt , components_names , all_comp , &
                      an_start , an_end , an_step, average )
  type(t_parse), pointer :: sbprms
  character(len=*) , intent(in) :: basename
@@ -103,12 +103,12 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
  character(len=*) , intent(in) :: an_name
  integer          , intent(in) :: ia
  character(len=*) , intent(in) :: out_frmt
- type(t_geo_component), allocatable , intent(inout) :: comps(:)
  character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
  logical , intent(in) :: all_comp
  integer , intent(in) :: an_start , an_end , an_step
  logical, intent(in) :: average
  
+ type(t_geo_component), allocatable :: comps(:)
  character(len=max_char_len) :: filename
  integer(h5loc) :: floc , ploc
  logical :: out_vort, out_vel, out_cp, out_press , out_wake
@@ -362,7 +362,9 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     end select
   endif
   
-  deallocate(comps, points,components_names)
+  deallocate(points)
+  call destroy_elements(comps)
+  deallocate(comps)
   deallocate(var_names)
   
   
