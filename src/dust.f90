@@ -112,6 +112,10 @@ use mod_hdf5_io, only: &
 use mod_dust_io, only: &
   save_status, load_solution, load_time
 
+use mod_octree, only: &
+  initialize_octree, sort_particles, t_octree
+  
+
 implicit none
 
 !run-id
@@ -196,6 +200,10 @@ character(len=max_char_len) :: basename_debug
 real(wp) , allocatable :: res_old(:)
 
 integer :: i_el , i
+
+
+!octree stuff
+type(t_octree) :: octree
 
 
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
@@ -437,6 +445,18 @@ if(debug_level .ge. 1) then
   call printout(message)
 endif
 
+!===========EXPERIMENTAL PART, OCTREE========
+call printout(nl//'====== Initializing Octree ======')
+t0 = dust_time()
+call initialize_octree(10.0_wp, (/2,1,1/), (/-2.0_wp, -5.0_wp, -5.0_wp/), &
+                       5, 5, octree)
+t1 = dust_time()
+if(debug_level .ge. 1) then
+  write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
+  call printout(message)
+endif
+!============================================
+
 !------ Reloading ------
 if (restart) then
  call load_solution(restart_file, geo%components, geo%refs)
@@ -573,7 +593,17 @@ do it = 1,nstep
   call update_geometry(geo, time, .false.)
   call prepare_wake(wake, geo, sim_param)
 
+  !== EXPERIMENTAL, OCTREE ==
+  t0 = dust_time()
+  call sort_particles(wake%part_p, octree)
+  t1 = dust_time()
+  if(debug_level .ge. 1) then
+    write(message,'(A,F9.3,A)') 'Updated wake in: ' , t1 - t0,' s.'
+    call printout(message)
+  endif
+
 enddo
+
 
 deallocate( res_old )
 !===== End Time Cycle ======
