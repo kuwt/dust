@@ -99,6 +99,7 @@ file(GLOB_RECURSE sources ${PROJECT_SOURCE_DIR}/src/geo/*.f90
                           ${PROJECT_SOURCE_DIR}/src/linsys/*.f90
                           ${PROJECT_SOURCE_DIR}/src/io/*.f90
                           ${PROJECT_SOURCE_DIR}/src/post/*.f90
+                          ${PROJECT_SOURCE_DIR}/src/fmm/*.f90
                           ${PROJECT_SOURCE_DIR}/src/options/*.f90)
 
 

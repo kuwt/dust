@@ -68,6 +68,8 @@ type :: t_cell
 
   logical :: leaf
 
+  logical :: branch
+
   logical :: active
 
   type(t_cell_p) :: parent
@@ -338,6 +340,7 @@ subroutine sort_particles(part,octree)
  real(wp) :: csize
  integer :: l, i,j,k, child
  integer :: imax, jmax, kmax, ll
+ logical :: got_leaves
  
   ll = octree%nlevels
   csize = octree%layers(ll)%cell_size
@@ -352,6 +355,7 @@ subroutine sort_particles(part,octree)
       call reset_cell(octree%layers(l)%lcells(i,j,k)%p)
     enddo; enddo; enddo !layer cells i,j,k
   enddo
+  deallocate(octree%leaves); allocate(octree%leaves(0))
 
   t0 = dust_time()
   !cycle on all the particles
@@ -369,45 +373,112 @@ subroutine sort_particles(part,octree)
   write(msg,'(A,F9.3,A)') 'Sorted particles in: ' , t1 - t0,' s.'
   call printout(msg)
 
-  !From the lowest level to the first, add all the particles
-  !TODO: this might not be 100% needed. When in the following step I will
-  ! need to push the particles upward, I will need to know the particles in 
-  ! the siblings of the parents. I could calculate them on the fly there, 
-  ! but this way it is simpler
   t0 = dust_time()
+  !Bottom level: just check if are leaves
+  imax=octree%nbox(1)*2**(ll-1); 
+  jmax=octree%nbox(2)*2**(ll-1); 
+  kmax=octree%nbox(3)*2**(ll-1);
+  do k = 1,kmax; do j = 1,jmax; do i = 1,imax
+    if( octree%layers(ll)%lcells(i,j,k)%p%npart .ge. min_part_4_cell) then
+      octree%layers(ll)%lcells(i,j,k)%p%leaf = .true.
+      call push_ptr(octree%leaves, octree%layers(ll)%lcells(i,j,k)%p)
+    endif
+  enddo; enddo; enddo !layer cells i,j,k
+  t1 = dust_time()
+  write(msg,'(A,F9.3,A)') 'Checked bottom level in: ' , t1 - t0,' s.'
+  call printout(msg)
+
+  !From the bottom level upwards
   do l = ll-1,1,-1
     imax=octree%nbox(1)*2**(l-1); 
     jmax=octree%nbox(2)*2**(l-1); 
     kmax=octree%nbox(3)*2**(l-1);
     !cycle on the elements on the level
     do k = 1,kmax; do j = 1,jmax; do i = 1,imax
-      !cycle on all the childs
+
+    !cycle on the children, gather the number of particles and if are 
+    !leaves
+    got_leaves = .false.
+    do child = 1,8
+      if(octree%layers(l)%lcells(i,j,k)%p%children(child)%p%leaf) &
+                                                          got_leaves = .true.
+      octree%layers(l)%lcells(i,j,k)%p%npart = &
+            octree%layers(l)%lcells(i,j,k)%p%npart + &
+            octree%layers(l)%lcells(i,j,k)%p%children(child)%p%npart
+    enddo !child
+    if (.not. octree%layers(l)%lcells(i,j,k)%p%branch) then
+      !if it is not a branch analyse the situation of the children
+      if(got_leaves) then
+        !Some of the children are leaves: set all children as leaves and then
+        !set the current cell and all the branch upwards as branch
+        do child = 1,8
+          octree%layers(l)%lcells(i,j,k)%p%children(child)%p%leaf = .true.
+          call push_ptr(octree%leaves, octree%layers(l)%lcells(i,j,k)%p%children(child)%p)
+        enddo
+        call set_branch(octree%layers(l)%lcells(i,j,k)%p)
+      else
+        !None of the children are leaves. Inherit the particles and check 
+        !if the current cell is a leaf
+        do child = 1,8
+          octree%layers(l)%lcells(i,j,k)%p%children(child)%p%active = .false.
+          call push_ptr(octree%layers(l)%lcells(i,j,k)%p%cell_parts, &
+          octree%layers(l)%lcells(i,j,k)%p%children(child)%p%cell_parts)
+        enddo
+      endif
+    else
+      !if it is a branch we still need to check that one of the children
+      !is not orphaned, i.e. not a leaf nor a branch. Since it is a sibling
+      !of a branch it must become a leaf even if it has not enough particles
+    endif
       do child = 1,8
-        !gather the particles from all the childs
-        octree%layers(l)%lcells(i,j,k)%p%npart = &
-                               octree%layers(l)%lcells(i,j,k)%p%npart + &
-                  octree%layers(l)%lcells(i,j,k)%p%children(child)%p%npart
-                               
-      enddo
+        if( .not. octree%layers(l)%lcells(i,j,k)%p%children(child)%p%leaf &
+      .and. .not. octree%layers(l)%lcells(i,j,k)%p%children(child)%p%branch) then
+          octree%layers(l)%lcells(i,j,k)%p%children(child)%p%leaf = .true.
+          call push_ptr(octree%leaves, octree%layers(l)%lcells(i,j,k)%p%children(child)%p)
+        endif
+      enddo !child
+
     enddo; enddo; enddo !layer cells i,j,k
   enddo
-  t1 = dust_time()
-  write(msg,'(A,F9.3,A)') 'Summed particles upward in: ' , t1 - t0,' s.'
-  call printout(msg)
+  !!From the lowest level to the first, add all the particles
+  !!TODO: this might not be 100% needed. When in the following step I will
+  !! need to push the particles upward, I will need to know the particles in 
+  !! the siblings of the parents. I could calculate them on the fly there, 
+  !! but this way it is simpler
+  !t0 = dust_time()
+  !do l = ll-1,1,-1
+  !  imax=octree%nbox(1)*2**(l-1); 
+  !  jmax=octree%nbox(2)*2**(l-1); 
+  !  kmax=octree%nbox(3)*2**(l-1);
+  !  !cycle on the elements on the level
+  !  do k = 1,kmax; do j = 1,jmax; do i = 1,imax
+  !    !cycle on all the childs
+  !    do child = 1,8
+  !      !gather the particles from all the childs
+  !      octree%layers(l)%lcells(i,j,k)%p%npart = &
+  !                             octree%layers(l)%lcells(i,j,k)%p%npart + &
+  !                octree%layers(l)%lcells(i,j,k)%p%children(child)%p%npart
+  !                             
+  !    enddo
+  !  enddo; enddo; enddo !layer cells i,j,k
+  !enddo
+  !t1 = dust_time()
+  !write(msg,'(A,F9.3,A)') 'Summed particles upward in: ' , t1 - t0,' s.'
+  !call printout(msg)
 
-  !Only on the lowest level: set the leaves (potentially recursively)
-  t0 = dust_time()
-  deallocate(octree%leaves); allocate(octree%leaves(0))
-  imax=octree%nbox(1)*2**(ll-1); 
-  jmax=octree%nbox(2)*2**(ll-1); 
-  kmax=octree%nbox(3)*2**(ll-1);
-  !cycle on the elements on the level
-  do k = 1,kmax; do j = 1,jmax; do i = 1,imax
-    call check_cell_content(octree%layers(ll)%lcells(i,j,k)%p, octree%leaves)
-  enddo; enddo; enddo !layer cells i,j,k
-  t1 = dust_time()
-  write(msg,'(A,F9.3,A)') 'Leaves set in: ' , t1 - t0,' s.'
-  call printout(msg)
+  !!Only on the lowest level: set the leaves (potentially recursively)
+  !t0 = dust_time()
+  !deallocate(octree%leaves); allocate(octree%leaves(0))
+  !imax=octree%nbox(1)*2**(ll-1); 
+  !jmax=octree%nbox(2)*2**(ll-1); 
+  !kmax=octree%nbox(3)*2**(ll-1);
+  !!cycle on the elements on the level
+  !do k = 1,kmax; do j = 1,jmax; do i = 1,imax
+  !  call check_cell_content(octree%layers(ll)%lcells(i,j,k)%p, octree%leaves)
+  !enddo; enddo; enddo !layer cells i,j,k
+  !t1 = dust_time()
+  !write(msg,'(A,F9.3,A)') 'Leaves set in: ' , t1 - t0,' s.'
+  !call printout(msg)
 
 end subroutine sort_particles
 
@@ -495,6 +566,16 @@ recursive subroutine set_leaf(cell,leaf)
 
 end subroutine set_leaf
 
+!----------------------------------------------------------------------
+
+recursive subroutine set_branch(cell)
+ type(t_cell), intent(inout) :: cell
+
+ cell%branch = .true.
+
+ if(associated(cell%parent%p)) call set_branch(cell%parent%p)
+
+end subroutine set_branch
 
 !----------------------------------------------------------------------
 
@@ -614,6 +695,7 @@ subroutine reset_cell(cell)
  allocate(cell%cell_parts(0))
  cell%npart = 0
  cell%active = .true.
+ cell%branch = .false.
  cell%leaf = .false.
 
 end subroutine reset_cell
