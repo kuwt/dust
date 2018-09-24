@@ -91,7 +91,7 @@ use mod_basic_io, only: &
 use mod_parse, only: &
   t_parse, &
   countoption , &
-  getstr, getlogical, getreal, getint, getrealarray, &
+  getstr, getlogical, getreal, getint, getrealarray, getintarray, &
   ignoredParameters, finalizeParameters
 
 use mod_wake, only: &
@@ -204,6 +204,10 @@ integer :: i_el , i
 
 !octree stuff
 type(t_octree) :: octree
+real(wp) :: BoxLength
+integer :: NBox(3)
+real(wp) :: OctreeOrigin(3)
+integer :: NOctreeLevels, MinOctreePart
 
 
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
@@ -284,6 +288,14 @@ call prms%CreateLogicalOption('rigid_wake','rigid wake?','F')
 call prms%CreateRealArrayOption( 'rigid_wake_vel', "rigid wake velocity" )
 
 
+!== Octree stuff == 
+call prms%CreateRealOption('BoxLength','length of the octree box')
+call prms%CreateIntArrayOption('NBox','number of boxes in each direction')
+call prms%CreateRealArrayOption( 'OctreeOrigin', "rigid wake velocity" )
+call prms%CreateIntOption('NOctreeLevels','number of octree levels')
+call prms%CreateIntOption('MinOctreePart','minimum number of octree particles')
+
+
 ! get the parameters and print them out
 call printout(nl//'====== Input parameters: ======')
 call prms%read_options(input_file_name, printout_val=.true.)
@@ -336,6 +348,15 @@ ff_ratio_sou  = getreal(prms, 'FarFieldRatioSource')
 eps_dou   = getreal(prms, 'DoubletThreshold')
 r_Rankine = getreal(prms, 'RankineRad')
 r_cutoff  = getreal(prms, 'CutoffRad')
+
+BoxLength = getreal(prms, 'BoxLength')
+NBox = getintarray(prms, 'NBox',3)
+OctreeOrigin = getrealarray(prms, 'OctreeOrigin',3)
+NOctreeLevels = getint(prms, 'NOctreeLevels')
+MinOctreePart = getint(prms, 'MinOctreePart')
+
+
+!Octree stuff
 
 !-- Parameters Initializations --
 call initialize_doublet(ff_ratio_dou, eps_dou, r_Rankine, r_cutoff);
@@ -448,8 +469,8 @@ endif
 !===========EXPERIMENTAL PART, OCTREE========
 call printout(nl//'====== Initializing Octree ======')
 t0 = dust_time()
-call initialize_octree(10.0_wp, (/2,1,1/), (/-2.0_wp, -5.0_wp, -5.0_wp/), &
-                       5, 5, octree)
+call initialize_octree(BoxLength, NBox, OctreeOrigin, &
+                       NOctreeLevels, MinOctreePart, octree)
 t1 = dust_time()
 if(debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
@@ -594,11 +615,12 @@ do it = 1,nstep
   call prepare_wake(wake, geo, sim_param)
 
   !== EXPERIMENTAL, OCTREE ==
+  write(*,*) 'Number of particles: ',size(wake%part_p)
   t0 = dust_time()
   call sort_particles(wake%part_p, octree)
   t1 = dust_time()
   if(debug_level .ge. 1) then
-    write(message,'(A,F9.3,A)') 'Updated wake in: ' , t1 - t0,' s.'
+    write(message,'(A,F9.3,A)') 'Updated particles in octree in: ' , t1 - t0,' s.'
     call printout(message)
   endif
 
