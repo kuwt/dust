@@ -97,7 +97,7 @@ type :: t_cell_layer
 
   real(wp) :: cell_size
   
-  type(t_cell_p), allocatable :: lcells(:,:,:)
+  type(t_cell), allocatable :: lcells(:,:,:)
 
 end type
 
@@ -120,7 +120,7 @@ type :: t_octree
  integer :: ncells_tot
 
  !> all the actual cells, in a 1d array
- type(t_cell), allocatable :: cells(:)
+ !type(t_cell), allocatable :: cells(:)
  
  !> cell pointers organized in layers, each layer corresponding to 
  !! a level of the octree
@@ -175,7 +175,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, octree
     octree%ncells_tot = octree%ncells_tot + product(nbox)*8**(l-1)
   enddo
 
-  allocate(octree%cells(octree%ncells_tot))
+  !allocate(octree%cells(octree%ncells_tot))
   allocate(octree%leaves(0))
 
   !build the hierarchical tree
@@ -183,17 +183,19 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, octree
 
   ! == Prepare the hierarchical tree
   !first level
-  c = 1 !start the counter for the global cells array
+  !c = 1 !start the counter for the global cells array
   octree%layers(1)%cell_size = box_length
 
   allocate(octree%layers(1)%lcells(nbox(1),nbox(2),nbox(3)))
   do k = 1,nbox(3)
     do j = 1,nbox(2)
       do i = 1,nbox(1)
-        octree%layers(1)%lcells(i,j,k)%p => octree%cells(c)
-        octree%cells(c)%cart_index = (/i,j,k/)
-        octree%cells(c)%level = 1
-        c = c+1
+        !octree%layers(1)%lcells(i,j,k)%p => octree%cells(c)
+        !octree%cells(c)%cart_index = (/i,j,k/)
+        !octree%cells(c)%level = 1
+        octree%layers(1)%lcells(i,j,k)%cart_index = (/i,j,k/)
+        octree%layers(1)%lcells(i,j,k)%level = 1
+   !     c = c+1
       enddo
     enddo
   enddo
@@ -202,9 +204,6 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, octree
     
     octree%layers(l)%cell_size = box_length/(2**(l-1))
     allocate(octree%layers(l)%lcells(nbox(1)*2**(l-1),nbox(2)*2**(l-1),nbox(3)*2**(l-1)))
-    !DEBUG
-    write(*,*) 'Level',l
-    write(*,*) 'size of layer',shape(octree%layers(l)%lcells)
     !cycle on the parents
     do k = 1,nbox(3)*2**(l-2)
     do j = 1,nbox(2)*2**(l-2)
@@ -215,14 +214,20 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, octree
       do jc = 1,2
       do ic = 1,2
         !point the cell in the ordered layer
-        octree%layers(l)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%p => octree%cells(c)
-        octree%cells(c)%cart_index = (/2*(i-1)+ic, 2*(j-1)+jc, 2*(k-1)+kc/)
-        octree%cells(c)%level = l
+        !octree%layers(l)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%p => octree%cells(c)
+        !octree%cells(c)%cart_index = (/2*(i-1)+ic, 2*(j-1)+jc, 2*(k-1)+kc/)
+        !octree%cells(c)%level = l
+        octree%layers(l)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%cart_index &
+                             = (/2*(i-1)+ic, 2*(j-1)+jc, 2*(k-1)+kc/)        
+        octree%layers(l)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%level = l
 
         !set the parent
-        octree%cells(c)%parent%p => octree%layers(l-1)%lcells(i,j,k)%p 
+        octree%layers(l)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%parent%p &
+                                     => octree%layers(l-1)%lcells(i,j,k) 
+        octree%layers(l)%lcells(i,j,k)%level = l
         !set the present cell as children of the parent
-        octree%layers(l-1)%lcells(i,j,k)%p%children(p)%p => octree%cells(c)
+        octree%layers(l-1)%lcells(i,j,k)%children(p)%p => &
+        octree%layers(l)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)
 
         !update the counters
         c = c+1; p = p+1
@@ -246,18 +251,18 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, octree
             ((j+jc).ge.1 .and. (j+jc).le.jmax) .and. & 
             ((k+kc).ge.1 .and. (k+kc).le.kmax) .and. & 
             .not.(ic.eq.0 .and. jc.eq.0 .and. kc.eq.0) ) then
-          octree%layers(l)%lcells(i,j,k)%p%neighbours(ic,jc,kc)%p =>  &
-             octree%layers(l)%lcells(i+ic,j+jc,k+kc)%p
+          octree%layers(l)%lcells(i,j,k)%neighbours(ic,jc,kc)%p =>  &
+             octree%layers(l)%lcells(i+ic,j+jc,k+kc)
         endif
 
       enddo; enddo; enddo !neighbours ic,jc,kc
 
       !initialize few things
-      allocate(octree%layers(l)%lcells(i,j,k)%p%cell_parts(0))
-      octree%layers(l)%lcells(i,j,k)%p%npart = 0
-      octree%layers(l)%lcells(i,j,k)%p%active = .true.
-      octree%layers(l)%lcells(i,j,k)%p%leaf = .false.
-      allocate(octree%layers(l)%lcells(i,j,k)%p%interaction_list(0) )
+      allocate(octree%layers(l)%lcells(i,j,k)%cell_parts(0))
+      octree%layers(l)%lcells(i,j,k)%npart = 0
+      octree%layers(l)%lcells(i,j,k)%active = .true.
+      octree%layers(l)%lcells(i,j,k)%leaf = .false.
+      allocate(octree%layers(l)%lcells(i,j,k)%interaction_list(0) )
 
     enddo; enddo; enddo !layer cells i,j,k
   enddo
@@ -275,9 +280,9 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, octree
     !cycle again on all the cells on first level
     do kc = 1,kmax; do jc = 1,jmax; do ic = 1,imax
           indx = (/ic,jc,kc/)
-          if(any(abs(indx - octree%layers(1)%lcells(i,j,k)%p%cart_index).gt.1)) then
-            call push_ptr(octree%layers(1)%lcells(i,j,k)%p%interaction_list, &
-            octree%layers(1)%lcells(ic,jc,kc)%p)
+          if(any(abs(indx - octree%layers(1)%lcells(i,j,k)%cart_index).gt.1)) then
+            call push_ptr(octree%layers(1)%lcells(i,j,k)%interaction_list, &
+            octree%layers(1)%lcells(ic,jc,kc))
           endif
     enddo; enddo; enddo !layer cells i,j,k
   enddo; enddo; enddo !layer cells i,j,k
@@ -294,11 +299,11 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, octree
       do kc = -1,1; do jc = -1,1; do ic = -1,1
         !cycle on all the childs
         do child = 1,8
-          if(associated(octree%layers(l)%lcells(i,j,k)%p%parent%p%neighbours(ic,jc,kc)%p)) then
-            indx = octree%layers(l)%lcells(i,j,k)%p%parent%p%neighbours(ic,jc,kc)%p%children(child)%p%cart_index
-            if(any(abs(indx - octree%layers(l)%lcells(i,j,k)%p%cart_index).gt.1)) then
-              call push_ptr(octree%layers(l)%lcells(i,j,k)%p%interaction_list, &
-            octree%layers(l)%lcells(i,j,k)%p%parent%p%neighbours(ic,jc,kc)%p%children(child)%p)
+          if(associated(octree%layers(l)%lcells(i,j,k)%parent%p%neighbours(ic,jc,kc)%p)) then
+            indx = octree%layers(l)%lcells(i,j,k)%parent%p%neighbours(ic,jc,kc)%p%children(child)%p%cart_index
+            if(any(abs(indx - octree%layers(l)%lcells(i,j,k)%cart_index).gt.1)) then
+              call push_ptr(octree%layers(l)%lcells(i,j,k)%interaction_list, &
+            octree%layers(l)%lcells(i,j,k)%parent%p%neighbours(ic,jc,kc)%p%children(child)%p)
             endif
           endif
 
@@ -352,7 +357,7 @@ subroutine sort_particles(part,octree)
     kmax=octree%nbox(3)*2**(l-1);
     !cycle on the elements on the level
     do k = 1,kmax; do j = 1,jmax; do i = 1,imax
-      call reset_cell(octree%layers(l)%lcells(i,j,k)%p)
+      call reset_cell(octree%layers(l)%lcells(i,j,k))
     enddo; enddo; enddo !layer cells i,j,k
   enddo
   deallocate(octree%leaves); allocate(octree%leaves(0))
@@ -364,9 +369,9 @@ subroutine sort_particles(part,octree)
     !check in which cell at the lowest level it is located
     idx = ceiling((part(ip)%p%cen-octree%xmin)/csize)
     !add the particle to the lowest level
-    octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%p%npart = &
-                    octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%p%npart + 1
-    call push_ptr(octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%p%cell_parts,part(ip)%p)
+    octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npart = &
+                    octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npart + 1
+    call push_ptr(octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%cell_parts,part(ip)%p)
 
   enddo
   t1 = dust_time()
@@ -379,9 +384,9 @@ subroutine sort_particles(part,octree)
   jmax=octree%nbox(2)*2**(ll-1); 
   kmax=octree%nbox(3)*2**(ll-1);
   do k = 1,kmax; do j = 1,jmax; do i = 1,imax
-    if( octree%layers(ll)%lcells(i,j,k)%p%npart .ge. min_part_4_cell) then
-      octree%layers(ll)%lcells(i,j,k)%p%leaf = .true.
-      call push_ptr(octree%leaves, octree%layers(ll)%lcells(i,j,k)%p)
+    if( octree%layers(ll)%lcells(i,j,k)%npart .ge. min_part_4_cell) then
+      octree%layers(ll)%lcells(i,j,k)%leaf = .true.
+      call push_ptr(octree%leaves, octree%layers(ll)%lcells(i,j,k))
     endif
   enddo; enddo; enddo !layer cells i,j,k
   t1 = dust_time()
@@ -400,29 +405,29 @@ subroutine sort_particles(part,octree)
     !leaves
     got_leaves = .false.
     do child = 1,8
-      if(octree%layers(l)%lcells(i,j,k)%p%children(child)%p%leaf) &
+      if(octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf) &
                                                           got_leaves = .true.
-      octree%layers(l)%lcells(i,j,k)%p%npart = &
-            octree%layers(l)%lcells(i,j,k)%p%npart + &
-            octree%layers(l)%lcells(i,j,k)%p%children(child)%p%npart
+      octree%layers(l)%lcells(i,j,k)%npart = &
+            octree%layers(l)%lcells(i,j,k)%npart + &
+            octree%layers(l)%lcells(i,j,k)%children(child)%p%npart
     enddo !child
-    if (.not. octree%layers(l)%lcells(i,j,k)%p%branch) then
+    if (.not. octree%layers(l)%lcells(i,j,k)%branch) then
       !if it is not a branch analyse the situation of the children
       if(got_leaves) then
         !Some of the children are leaves: set all children as leaves and then
         !set the current cell and all the branch upwards as branch
         do child = 1,8
-          octree%layers(l)%lcells(i,j,k)%p%children(child)%p%leaf = .true.
-          call push_ptr(octree%leaves, octree%layers(l)%lcells(i,j,k)%p%children(child)%p)
+          octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf = .true.
+          call push_ptr(octree%leaves, octree%layers(l)%lcells(i,j,k)%children(child)%p)
         enddo
-        call set_branch(octree%layers(l)%lcells(i,j,k)%p)
+        call set_branch(octree%layers(l)%lcells(i,j,k))
       else
         !None of the children are leaves. Inherit the particles and check 
         !if the current cell is a leaf
         do child = 1,8
-          octree%layers(l)%lcells(i,j,k)%p%children(child)%p%active = .false.
-          call push_ptr(octree%layers(l)%lcells(i,j,k)%p%cell_parts, &
-          octree%layers(l)%lcells(i,j,k)%p%children(child)%p%cell_parts)
+          octree%layers(l)%lcells(i,j,k)%children(child)%p%active = .false.
+          call push_ptr(octree%layers(l)%lcells(i,j,k)%cell_parts, &
+          octree%layers(l)%lcells(i,j,k)%children(child)%p%cell_parts)
         enddo
       endif
     else
@@ -431,10 +436,10 @@ subroutine sort_particles(part,octree)
       !of a branch it must become a leaf even if it has not enough particles
     endif
       do child = 1,8
-        if( .not. octree%layers(l)%lcells(i,j,k)%p%children(child)%p%leaf &
-      .and. .not. octree%layers(l)%lcells(i,j,k)%p%children(child)%p%branch) then
-          octree%layers(l)%lcells(i,j,k)%p%children(child)%p%leaf = .true.
-          call push_ptr(octree%leaves, octree%layers(l)%lcells(i,j,k)%p%children(child)%p)
+        if( .not. octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf &
+      .and. .not. octree%layers(l)%lcells(i,j,k)%children(child)%p%branch) then
+          octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf = .true.
+          call push_ptr(octree%leaves, octree%layers(l)%lcells(i,j,k)%children(child)%p)
         endif
       enddo !child
 
