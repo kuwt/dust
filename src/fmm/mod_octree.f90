@@ -48,6 +48,9 @@ use mod_handling, only: &
 use mod_vortpart, only: &
   t_vortpart, t_vortpart_p
 
+use mod_multipole, only: &
+  t_multipole, t_polyexp
+
 !----------------------------------------------------------------------
 
 implicit none
@@ -87,6 +90,10 @@ type :: t_cell
   integer :: npart
 
   type(t_vortpart_p), allocatable :: cell_parts(:)
+
+  real(wp) :: cen(3)
+
+  type(t_multipole) :: mp
 
 end type
 
@@ -132,6 +139,12 @@ type :: t_octree
  !> number of leaves
  integer :: nleaves
 
+ !> Degree of multipole expansion
+ integer :: degree
+
+ !> Polynomial expansion tools
+ type(t_polyexp) :: pexp
+
 end type
 
 !----------------------------------------------------------------------
@@ -153,12 +166,14 @@ contains
 !----------------------------------------------------------------------
 
 !> Initialize the octree
-subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, octree)
+subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
+                             degree, octree)
  real(wp), intent(in) :: box_length
  integer,  intent(in) :: nbox(3)
  real(wp), intent(in) :: origin(3)
  integer,  intent(in) :: nlevels
  integer,  intent(in) :: min_part
+ integer,  intent(in) :: degree
  type(t_octree), intent(out), target :: octree
 
  integer :: l, i,j,k, ic,jc,kc
@@ -172,6 +187,9 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, octree
   octree%nlevels = nlevels
 
   min_part_4_cell = min_part
+
+  octree%degree = degree
+  call octree%pexp%set_degree(degree)
 
   octree%ncells_tot = product(nbox)
   do l = 2,nlevels
@@ -199,6 +217,11 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, octree
         !octree%cells(c)%level = 1
         octree%layers(1)%lcells(i,j,k)%cart_index = (/i,j,k/)
         octree%layers(1)%lcells(i,j,k)%level = 1
+
+
+        octree%layers(1)%lcells(i,j,k)%cen = octree%xmin + &
+                    (real((/i,j,k/),wp)-0.5_wp)*(octree%xmax-octree%xmin) &
+                    /real(nbox,wp)
    !     c = c+1
       enddo
     enddo
@@ -233,6 +256,11 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, octree
         octree%layers(l-1)%lcells(i,j,k)%children(p)%p => &
         octree%layers(l)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)
 
+        octree%layers(l)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%cen = &
+               octree%xmin + &
+               (real((/2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc/),wp)-0.5_wp)* &
+               (octree%xmax-octree%xmin)/real(nbox*2**(l-1),wp)
+
         !update the counters
         p = p+1
       
@@ -242,7 +270,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, octree
 
 
   t0 = dust_time()
-  ! == Set the neighbours
+  ! == Set the neighbours and perform initializations
   do l = 1,nlevels
 
     imax=nbox(1)*2**(l-1); jmax=nbox(2)*2**(l-1); kmax=nbox(3)*2**(l-1);
