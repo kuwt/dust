@@ -208,6 +208,7 @@ real(wp) :: BoxLength
 integer :: NBox(3)
 real(wp) :: OctreeOrigin(3)
 integer :: NOctreeLevels, MinOctreePart
+integer :: multipole_deg
 
 
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
@@ -294,6 +295,7 @@ call prms%CreateIntArrayOption('NBox','number of boxes in each direction')
 call prms%CreateRealArrayOption( 'OctreeOrigin', "rigid wake velocity" )
 call prms%CreateIntOption('NOctreeLevels','number of octree levels')
 call prms%CreateIntOption('MinOctreePart','minimum number of octree particles')
+call prms%CreateIntOption('MultipoleDegree','multipole expansion degree')
 
 
 ! get the parameters and print them out
@@ -354,6 +356,7 @@ NBox = getintarray(prms, 'NBox',3)
 OctreeOrigin = getrealarray(prms, 'OctreeOrigin',3)
 NOctreeLevels = getint(prms, 'NOctreeLevels')
 MinOctreePart = getint(prms, 'MinOctreePart')
+multipole_deg = getint(prms,'MultipoleDegree')
 
 
 !Octree stuff
@@ -470,7 +473,7 @@ endif
 call printout(nl//'====== Initializing Octree ======')
 t0 = dust_time()
 call initialize_octree(BoxLength, NBox, OctreeOrigin, &
-                       NOctreeLevels, MinOctreePart, octree)
+                       NOctreeLevels, MinOctreePart, multipole_deg, octree)
 t1 = dust_time()
 if(debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
