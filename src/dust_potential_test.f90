@@ -38,7 +38,7 @@
 program dust
 
 use mod_param, only: &
-  wp, nl, max_char_len, extended_char_len
+  wp, nl, max_char_len, pi, extended_char_len
 
 use mod_sim_param, only: &
   t_sim_param
@@ -113,7 +113,7 @@ use mod_dust_io, only: &
   save_status, load_solution, load_time
 
 use mod_octree, only: &
-  initialize_octree, sort_particles, t_octree
+  initialize_octree, sort_particles, t_octree, perform_multipole
   
 use mod_vortpart, only: &
   t_vortpart, t_vortpart_p
@@ -211,7 +211,7 @@ real(wp) :: BoxLength
 integer :: NBox(3)
 real(wp) :: OctreeOrigin(3)
 integer :: NOctreeLevels, MinOctreePart
-
+integer :: MultipoleDegree
 
 !particles
 type(t_vortpart), allocatable, target :: parts(:,:,:)
@@ -220,6 +220,9 @@ type(t_vortpart_p), allocatable :: part_p(:)
 
 real(wp), allocatable :: potential_bf(:,:,:)
 real(wp), allocatable :: potential_fm(:,:,:)
+
+real(wp) :: err, rel_err
+
 
 
 call printout(nl//'>>>>>> DUST potential test beginning >>>>>>'//nl)
@@ -267,6 +270,7 @@ call prms%CreateIntArrayOption('NBox','number of boxes in each direction','(/1,1
 call prms%CreateRealArrayOption( 'OctreeOrigin', "rigid wake velocity" )
 call prms%CreateIntOption('NOctreeLevels','number of octree levels')
 call prms%CreateIntOption('MinOctreePart','minimum number of octree particles')
+call prms%CreateIntOption('MultipoleDegree','')
 
 
 ! get the parameters and print them out
@@ -291,6 +295,7 @@ NBox = getintarray(prms, 'NBox',3)
 OctreeOrigin = getrealarray(prms, 'OctreeOrigin',3)
 NOctreeLevels = getint(prms, 'NOctreeLevels')
 MinOctreePart = getint(prms, 'MinOctreePart')
+MultipoleDegree = getint(prms, 'MultipoleDegree')
 
 
 !Octree stuff
@@ -316,7 +321,7 @@ call finalizeParameters(prms)
 call printout(nl//'====== Initializing Octree ======')
 t0 = dust_time()
 call initialize_octree(BoxLength, NBox, OctreeOrigin, &
-                       NOctreeLevels, MinOctreePart, octree)
+                       NOctreeLevels, MinOctreePart, MultipoleDegree, r_Rankine, octree)
 t1 = dust_time()
 write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
 call printout(message)
@@ -335,9 +340,12 @@ ip = 0
 do k=1,n_parts; do j=1,n_parts; do i=1,n_parts 
   parts(i,j,k)%mag => prt_mag(i,j,k)
   parts(i,j,k)%mag = 1.0_wp
-  parts(i,j,k)%cen(1) = -BoxLength/2.0_wp+real(i,wp)*BoxLength/real(n_parts,wp)
-  parts(i,j,k)%cen(2) = -BoxLength/2.0_wp+real(j,wp)*BoxLength/real(n_parts,wp)
-  parts(i,j,k)%cen(3) = -BoxLength/2.0_wp+real(k,wp)*BoxLength/real(n_parts,wp)
+  !parts(i,j,k)%cen(1) = -BoxLength/2.0_wp+real(i,wp)*BoxLength/real(n_parts,wp)
+  !parts(i,j,k)%cen(2) = -BoxLength/2.0_wp+real(j,wp)*BoxLength/real(n_parts,wp)
+  !parts(i,j,k)%cen(3) = -BoxLength/2.0_wp+real(k,wp)*BoxLength/real(n_parts,wp)
+  parts(i,j,k)%cen(1) = OctreeOrigin(1)+real(i,wp)*BoxLength/real(n_parts,wp)
+  parts(i,j,k)%cen(2) = OctreeOrigin(2)+real(j,wp)*BoxLength/real(n_parts,wp)
+  parts(i,j,k)%cen(3) = OctreeOrigin(3)+real(k,wp)*BoxLength/real(n_parts,wp)
   ip = ip + 1
   part_p(ip)%p => parts(i,j,k)
 
@@ -356,8 +364,10 @@ t0 = dust_time()
 potential_bf = 0
 do kq=1,n_parts; do jq=1,n_parts; do iq=1,n_parts 
   do k=1,n_parts; do j=1,n_parts; do i=1,n_parts 
+    if(.not.all( (/i-iq, j-jq, k-kq/) .eq. 0)) then
     potential_bf(iq,jq,kq) =  potential_bf(iq,jq,kq) + &
-    1.0_wp/sqrt(sum((parts(i,j,k)%cen-parts(iq,jq,kq)%cen)**2)-r_Rankine**2)
+    1.0_wp/(sqrt(sum((parts(i,j,k)%cen-parts(iq,jq,kq)%cen)**2)+r_Rankine**2)*4.0_wp*pi)
+    endif
   enddo; enddo; enddo;
 enddo; enddo; enddo;
 t1 = dust_time()
@@ -370,15 +380,30 @@ call printout(message)
 
 call printout(nl//'====== Performing octree interactions ======')
 t0 = dust_time()
+call sort_particles(part_p, octree)
+call perform_multipole(part_p, octree)
 
 
 t1 = dust_time()
-write(message,'(A,F9.3,A)') 'Brute octree interactions in: ' , t1 - t0,' s.'
+write(message,'(A,F9.3,A)') 'Octree interactions in: ' , t1 - t0,' s.'
 call printout(message)
 !============================================
 
 
 !=========CHECKS AND OUTPUT==================
+ip = 0
+do kq=1,n_parts; do jq=1,n_parts; do iq=1,n_parts 
+  ip = ip + 1
+  potential_fm(iq,jq,kq) =  parts(iq,jq,kq)%dir(1)
+enddo; enddo; enddo;
+
+err = norm2(potential_fm-potential_bf)
+rel_err = err/norm2(potential_bf)
+write(*,*) 'error',err
+write(*,*) 'rel_err',rel_err
+
+  call write_basic(potential_fm(:,:,10),'fast_multipole.dat')
+  call write_basic(potential_bf(:,:,10),'brute_force.dat')
 
 !============================================
 

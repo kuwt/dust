@@ -472,8 +472,8 @@ endif
 !===========EXPERIMENTAL PART, OCTREE========
 call printout(nl//'====== Initializing Octree ======')
 t0 = dust_time()
-call initialize_octree(BoxLength, NBox, OctreeOrigin, &
-                       NOctreeLevels, MinOctreePart, multipole_deg, octree)
+!call initialize_octree(BoxLength, NBox, OctreeOrigin, &
+!                       NOctreeLevels, MinOctreePart, multipole_deg, octree)
 t1 = dust_time()
 if(debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
@@ -620,7 +620,7 @@ do it = 1,nstep
   !== EXPERIMENTAL, OCTREE ==
   write(*,*) 'Number of particles: ',size(wake%part_p)
   t0 = dust_time()
-  call sort_particles(wake%part_p, octree)
+ ! call sort_particles(wake%part_p, octree)
   t1 = dust_time()
   if(debug_level .ge. 1) then
     write(message,'(A,F9.3,A)') 'Updated particles in octree in: ' , t1 - t0,' s.'
