@@ -106,13 +106,15 @@ type :: t_polyexp
 
   integer, allocatable :: fact(:)
 
+  integer, allocatable :: nfact(:,:,:)
+
 contains
 
   procedure, pass(this) :: set_degree => set_degree_polyexp  
 
   procedure, pass(this) :: nbinom => nbinom_polyexp
 
-  procedure, pass(this) :: nfact => nfact_polyexp
+  !procedure, pass(this) :: nfact => nfact_polyexp
 
 end type
 
@@ -200,8 +202,13 @@ subroutine M2L_multipole(this, ker_der, pexp, pexp_der, multipol_int)
     do n = 1, pexp%n_mon
       idx = pexp%pwr(:,m)+pexp%pwr(:,n)
       idx_der = pexp_der%idx(idx(1),idx(2),idx(3))
-      sum1 = sum1 +  ker_der%D(1,idx_der)*pexp_der%nfact(idx) &
-           /(pexp%nfact(pexp%pwr(:,m))*pexp%nfact(pexp%pwr(:,n))) * &
+      !sum1 = sum1 +  ker_der%D(1,idx_der)*pexp_der%nfact(idx) &
+      !     /(pexp%nfact(pexp%pwr(:,m))*pexp%nfact(pexp%pwr(:,n))) * &
+      !     multipol_int%a(1,n)
+      sum1 = sum1 +  &
+      ker_der%D(1,idx_der)*pexp_der%nfact(idx(1),idx(2),idx(3))/( &
+      pexp%nfact(pexp%pwr(1,m),pexp%pwr(2,m),pexp%pwr(3,m))*&
+      pexp%nfact(pexp%pwr(1,n),pexp%pwr(2,n),pexp%pwr(3,n))) * &
            multipol_int%a(1,n)
     enddo
     this%b(1,m) = this%b(1,m) + real((-1)**(sum(pexp%pwr(:,m))),wp)*sum1
@@ -318,6 +325,11 @@ subroutine set_degree_polyexp(this, deg)
   do o = 1,deg
     this%fact(o) = o*this%fact(o-1)
   enddo
+
+  allocate(this%nfact(0:deg,0:deg,0:deg))
+  do i=0,deg; do j=0,deg; do k=0,deg
+    this%nfact(i,j,k) = nfact_polyexp(this,(/i,j,k/))
+  enddo; enddo; enddo
 
 end subroutine set_degree_polyexp
 

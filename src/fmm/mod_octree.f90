@@ -706,7 +706,7 @@ subroutine perform_multipole(part,octree)
 
             octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) = &
               octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) + &
-              1.0_wp/(4.0_wp*pi*sqrt(Rnorm2))
+              octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p%mag/(4.0_wp*pi*sqrt(Rnorm2))
           enddo
         endif
       enddo; enddo; enddo
@@ -721,7 +721,7 @@ subroutine perform_multipole(part,octree)
 
               octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) = &
                 octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) + &
-                1.0_wp/(4.0_wp*pi*sqrt(Rnorm2))
+                octree%leaves(lv)%p%cell_parts(ipp)%p%mag/(4.0_wp*pi*sqrt(Rnorm2))
             endif
           enddo
 

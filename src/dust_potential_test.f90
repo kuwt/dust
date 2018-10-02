@@ -221,6 +221,8 @@ type(t_vortpart_p), allocatable :: part_p(:)
 real(wp), allocatable :: potential_bf(:,:,:)
 real(wp), allocatable :: potential_fm(:,:,:)
 
+real(wp) :: partmag
+
 real(wp) :: err, rel_err
 
 
@@ -337,9 +339,10 @@ allocate(part_p(n_parts*n_parts*n_parts))
 allocate(potential_bf(n_parts,n_parts,n_parts))
 allocate(potential_fm(n_parts,n_parts,n_parts))
 ip = 0
+partmag = 1.0_wp/real(n_parts**3,wp)
 do k=1,n_parts; do j=1,n_parts; do i=1,n_parts 
   parts(i,j,k)%mag => prt_mag(i,j,k)
-  parts(i,j,k)%mag = 1.0_wp
+  parts(i,j,k)%mag = partmag
   !parts(i,j,k)%cen(1) = -BoxLength/2.0_wp+real(i,wp)*BoxLength/real(n_parts,wp)
   !parts(i,j,k)%cen(2) = -BoxLength/2.0_wp+real(j,wp)*BoxLength/real(n_parts,wp)
   !parts(i,j,k)%cen(3) = -BoxLength/2.0_wp+real(k,wp)*BoxLength/real(n_parts,wp)
@@ -366,7 +369,7 @@ do kq=1,n_parts; do jq=1,n_parts; do iq=1,n_parts
   do k=1,n_parts; do j=1,n_parts; do i=1,n_parts 
     if(.not.all( (/i-iq, j-jq, k-kq/) .eq. 0)) then
     potential_bf(iq,jq,kq) =  potential_bf(iq,jq,kq) + &
-    1.0_wp/(sqrt(sum((parts(i,j,k)%cen-parts(iq,jq,kq)%cen)**2)+r_Rankine**2)*4.0_wp*pi)
+    parts(i,j,k)%mag/(sqrt(sum((parts(i,j,k)%cen-parts(iq,jq,kq)%cen)**2)+r_Rankine**2)*4.0_wp*pi)
     endif
   enddo; enddo; enddo;
 enddo; enddo; enddo;
@@ -402,8 +405,8 @@ rel_err = err/norm2(potential_bf)
 write(*,*) 'error',err
 write(*,*) 'rel_err',rel_err
 
-  call write_basic(potential_fm(:,:,10),'fast_multipole.dat')
-  call write_basic(potential_bf(:,:,10),'brute_force.dat')
+  call write_basic(potential_fm(:,:,2),'fast_multipole.dat')
+  call write_basic(potential_bf(:,:,2),'brute_force.dat')
 
 !============================================
 
