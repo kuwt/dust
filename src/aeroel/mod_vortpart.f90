@@ -75,6 +75,7 @@ public :: t_vortpart, t_vortpart_p, initialize_vortpart
 type, extends(c_vort_elem) :: t_vortpart
   !> Orientation of the vorticity vector
   real(wp) :: dir(3)
+  real(wp), pointer :: vel(:)
   logical :: free=.true.
 contains
 

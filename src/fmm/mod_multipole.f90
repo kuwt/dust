@@ -42,6 +42,9 @@ use mod_param, only: &
 use mod_sim_param, only: &
   t_sim_param
 
+use mod_math, only: &
+  cross
+
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
 
@@ -130,8 +133,8 @@ subroutine init_multipole(this, polyexp)
  class(t_multipole) :: this
  type(t_polyexp), intent(in) :: polyexp
 
-  allocate(this%a(1,polyexp%n_mon))
-  allocate(this%b(1,polyexp%n_mon))
+  allocate(this%a(3,polyexp%n_mon))
+  allocate(this%b(3,polyexp%n_mon))
 
 
 end subroutine
@@ -149,8 +152,9 @@ subroutine leaf_M_multipole(this, cen, parts, pexp)
   this%a = 0.0_wp
   do m=1,size(this%a,2) 
     do i=1,size(parts)
-      this%a(1,m) = this%a(1,m) + &
-      parts(i)%p%mag*product((parts(i)%p%cen-cen)**pexp%pwr(:,m))
+      this%a(:,m) = this%a(:,m) + &
+      parts(i)%p%mag*product((parts(i)%p%cen-cen)**pexp%pwr(:,m))* &
+      parts(i)%p%dir
     enddo
   enddo
 
@@ -192,7 +196,7 @@ subroutine M2L_multipole(this, ker_der, pexp, pexp_der, multipol_int)
  type(t_polyexp), intent(in) :: pexp_der
  type(t_multipole), intent(in) :: multipol_int
 
- real(wp) :: sum1
+ real(wp) :: sum1(3)
 
  integer :: n, m, idx(3), idx_der
 
@@ -206,12 +210,12 @@ subroutine M2L_multipole(this, ker_der, pexp, pexp_der, multipol_int)
       !     /(pexp%nfact(pexp%pwr(:,m))*pexp%nfact(pexp%pwr(:,n))) * &
       !     multipol_int%a(1,n)
       sum1 = sum1 +  &
-      ker_der%D(1,idx_der)*pexp_der%nfact(idx(1),idx(2),idx(3))/( &
+      pexp_der%nfact(idx(1),idx(2),idx(3))/( &
       pexp%nfact(pexp%pwr(1,m),pexp%pwr(2,m),pexp%pwr(3,m))*&
       pexp%nfact(pexp%pwr(1,n),pexp%pwr(2,n),pexp%pwr(3,n))) * &
-           multipol_int%a(1,n)
+       cross(ker_der%D(:,idx_der), multipol_int%a(:,n))
     enddo
-    this%b(1,m) = this%b(1,m) + real((-1)**(sum(pexp%pwr(:,m))),wp)*sum1
+    this%b(:,m) = this%b(:,m) + real((-1)**(sum(pexp%pwr(:,m))),wp)*sum1
   enddo 
 
 end subroutine
@@ -253,35 +257,43 @@ subroutine compute_der_ker(this,diff,delta,pexp)
  integer :: i, j, k
  real(wp) :: kmod, Rnorm2
  real(wp) :: sum1, sum2
+ real(wp), allocatable :: bk(:)
 
 
-  allocate(this%D(1,pexp%n_mon))
+  allocate(this%D(3,pexp%n_mon))
+  allocate(bk(pexp%n_mon))
   this%D = 0.0_wp
+  bk = 0.0_wp
   Rnorm2 = sum(diff**2) + delta**2 
 
   do k=0,pexp%degree;  do j=0,pexp%degree-k; do i=0,pexp%degree-j-k;
     kmod = real(k+j+i,wp)
 
     if (all((/i,j,k/).eq.0)) then
-      this%D(1,pexp%idx(i,j,k)) = 1.0_wp/(4.0_wp*pi*sqrt(Rnorm2))
+      bk(pexp%idx(i,j,k)) = 1.0_wp/(4.0_wp*pi*sqrt(Rnorm2))
     else
 
         sum1 = 0.0_wp; sum2 = 0.0_wp
 
-        if(i-1 .ge. 0) sum1 = sum1 + diff(1)*this%D(1,pexp%idx(i-1,j,k))
-        if(j-1 .ge. 0) sum1 = sum1 + diff(2)*this%D(1,pexp%idx(i,j-1,k))
-        if(k-1 .ge. 0) sum1 = sum1 + diff(3)*this%D(1,pexp%idx(i,j,k-1))
+        if(i-1 .ge. 0) sum1 = sum1 + diff(1)*bk(pexp%idx(i-1,j,k))
+        if(j-1 .ge. 0) sum1 = sum1 + diff(2)*bk(pexp%idx(i,j-1,k))
+        if(k-1 .ge. 0) sum1 = sum1 + diff(3)*bk(pexp%idx(i,j,k-1))
 
-        if(i-2 .ge. 0) sum2 = sum2 + this%D(1,pexp%idx(i-2,j,k))
-        if(j-2 .ge. 0) sum2 = sum2 + this%D(1,pexp%idx(i,j-2,k))
-        if(k-2 .ge. 0) sum2 = sum2 + this%D(1,pexp%idx(i,j,k-2))
+        if(i-2 .ge. 0) sum2 = sum2 + bk(pexp%idx(i-2,j,k))
+        if(j-2 .ge. 0) sum2 = sum2 + bk(pexp%idx(i,j-2,k))
+        if(k-2 .ge. 0) sum2 = sum2 + bk(pexp%idx(i,j,k-2))
 
 
-        this%D(1,pexp%idx(i,j,k)) = 1.0_wp/(Rnorm2*kmod)*&
+        bk(pexp%idx(i,j,k)) = 1.0_wp/(Rnorm2*kmod)*&
                      ((2.0_wp*kmod-1.0_wp)*sum1 - (kmod-1.0_wp)*sum2) 
     endif
   enddo; enddo; enddo
 
+  do k=0,pexp%degree-1;  do j=0,pexp%degree-1-k; do i=0,pexp%degree-1-j-k;
+    this%D(1,pexp%idx(i,j,k)) = - (1+i)*bk(pexp%idx(i+1,j,k))
+    this%D(2,pexp%idx(i,j,k)) = - (1+j)*bk(pexp%idx(i,j+1,k))
+    this%D(3,pexp%idx(i,j,k)) = - (1+k)*bk(pexp%idx(i,j,k+1))
+  enddo; enddo; enddo
 end subroutine
 
 !----------------------------------------------------------------------

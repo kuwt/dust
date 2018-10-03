@@ -39,6 +39,9 @@ module mod_octree
 use mod_param, only: &
   wp, nl, pi, max_char_len
 
+use mod_math, only: &
+  cross
+
 use mod_sim_param, only: &
   t_sim_param
 
@@ -198,7 +201,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
 
   octree%degree = degree
   call octree%pexp%set_degree(degree)
-  call octree%pexp_der%set_degree(2*degree)
+  call octree%pexp_der%set_degree(2*degree+1)
 
   octree%ncells_tot = product(nbox)
   do l = 2,nlevels
@@ -566,7 +569,7 @@ subroutine perform_multipole(part,octree)
  integer :: i, j, k, lv, l, child, il, ip, ine, ipp, m
  integer :: imax, jmax, kmax, ll
  integer :: idx_diff(3)
- real(wp) :: Rnorm2
+ real(wp) :: Rnorm2, vel(3)
 
   ll = octree%nlevels
   !reset everything (might be done elsewhere)
@@ -680,17 +683,21 @@ subroutine perform_multipole(part,octree)
   do lv = 1, octree%nleaves
     !I am on a leaf, cycle on all the particles inside the leaf
     do ip = 1,octree%leaves(lv)%p%npart
-
-      !Reset the interaction LAZY: the potential is stored in the direction..
-      octree%leaves(lv)%p%cell_parts(ip)%p%dir = 0.0_wp
+      
+      vel = 0.0_wp
 
       !first apply the local multipole expansion
       do m = 1,size(octree%leaves(lv)%p%mp%b,2)
-        octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) = &
-          octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) + &
-          octree%leaves(lv)%p%mp%b(1,m)* &
+        vel = vel + &
+          octree%leaves(lv)%p%mp%b(:,m)* &
           product((octree%leaves(lv)%p%cell_parts(ip)%p%cen- &
           octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
+
+        !octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) = &
+        !  octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) + &
+        !  octree%leaves(lv)%p%mp%b(1,m)* &
+        !  product((octree%leaves(lv)%p%cell_parts(ip)%p%cen- &
+        !  octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
       enddo
 
       !then interact with all the neighbouring cell particles
@@ -704,29 +711,44 @@ subroutine perform_multipole(part,octree)
             octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p%cen &
             )**2) + octree%delta**2 
 
-            octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) = &
-              octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) + &
-              octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p%mag/(4.0_wp*pi*sqrt(Rnorm2))
+            vel = vel - &
+              octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p%mag/&
+                                               (4.0_wp*pi*sqrt(Rnorm2)**3)* &
+              cross(octree%leaves(lv)%p%cell_parts(ip)%p%cen - &
+            octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p%cen, &
+            octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p%dir)
+
+            !octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) = &
+            !  octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) + &
+            !  octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p%mag/(4.0_wp*pi*sqrt(Rnorm2))
           enddo
         endif
       enddo; enddo; enddo
 
       !finally interact with the particles inside the cell 
-          do ipp = 1,octree%leaves(lv)%p%npart
-            if (ipp .ne. ip) then
-              Rnorm2 = sum(( &
-              octree%leaves(lv)%p%cell_parts(ip)%p%cen - &
-              octree%leaves(lv)%p%cell_parts(ipp)%p%cen &
-              )**2) + octree%delta**2 
+      do ipp = 1,octree%leaves(lv)%p%npart
+        if (ipp .ne. ip) then
+          Rnorm2 = sum(( &
+          octree%leaves(lv)%p%cell_parts(ip)%p%cen - &
+          octree%leaves(lv)%p%cell_parts(ipp)%p%cen &
+          )**2) + octree%delta**2 
 
-              octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) = &
-                octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) + &
-                octree%leaves(lv)%p%cell_parts(ipp)%p%mag/(4.0_wp*pi*sqrt(Rnorm2))
-            endif
-          enddo
+          vel = vel - &
+            octree%leaves(lv)%p%cell_parts(ipp)%p%mag/&
+            (4.0_wp*pi*sqrt(Rnorm2)**3)*&
+            cross(octree%leaves(lv)%p%cell_parts(ip)%p%cen - &
+          octree%leaves(lv)%p%cell_parts(ipp)%p%cen, &
+          octree%leaves(lv)%p%cell_parts(ipp)%p%dir)
 
+            
+          !octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) = &
+          !  octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) + &
+          !  octree%leaves(lv)%p%cell_parts(ipp)%p%mag/(4.0_wp*pi*sqrt(Rnorm2))
+        endif
+      enddo
+
+      octree%leaves(lv)%p%cell_parts(ip)%p%vel = vel
     enddo
-
   enddo
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Calculated leaves interactions in: ' , t1 - t0,' s.'

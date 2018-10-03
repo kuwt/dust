@@ -43,6 +43,9 @@ use mod_param, only: &
 use mod_sim_param, only: &
   t_sim_param
 
+use mod_math, only: &
+  cross
+
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
 
@@ -218,12 +221,13 @@ type(t_vortpart), allocatable, target :: parts(:,:,:)
 real(wp),target,  allocatable :: prt_mag(:,:,:)
 type(t_vortpart_p), allocatable :: part_p(:)
 
-real(wp), allocatable :: potential_bf(:,:,:)
-real(wp), allocatable :: potential_fm(:,:,:)
+real(wp), allocatable :: velocity_bf(:,:,:,:)
+real(wp), allocatable, target :: velocity_fm(:,:,:,:)
+real(wp), allocatable :: velocity_fm_long(:,:)
 
 real(wp) :: partmag
 
-real(wp) :: err, rel_err
+real(wp) :: err, rel_err, R2
 
 
 
@@ -336,13 +340,15 @@ t0 = dust_time()
 allocate(parts(n_parts,n_parts,n_parts))
 allocate(prt_mag(n_parts,n_parts,n_parts))
 allocate(part_p(n_parts*n_parts*n_parts))
-allocate(potential_bf(n_parts,n_parts,n_parts))
-allocate(potential_fm(n_parts,n_parts,n_parts))
+allocate(velocity_bf(3,n_parts,n_parts,n_parts))
+allocate(velocity_fm(3,n_parts,n_parts,n_parts))
+allocate(velocity_fm_long(3,n_parts*n_parts*n_parts))
 ip = 0
 partmag = 1.0_wp/real(n_parts**3,wp)
 do k=1,n_parts; do j=1,n_parts; do i=1,n_parts 
   parts(i,j,k)%mag => prt_mag(i,j,k)
   parts(i,j,k)%mag = partmag
+  parts(i,j,k)%dir = (/1.0_wp, 0.0_wp, 0.0_wp/)
   !parts(i,j,k)%cen(1) = -BoxLength/2.0_wp+real(i,wp)*BoxLength/real(n_parts,wp)
   !parts(i,j,k)%cen(2) = -BoxLength/2.0_wp+real(j,wp)*BoxLength/real(n_parts,wp)
   !parts(i,j,k)%cen(3) = -BoxLength/2.0_wp+real(k,wp)*BoxLength/real(n_parts,wp)
@@ -351,6 +357,7 @@ do k=1,n_parts; do j=1,n_parts; do i=1,n_parts
   parts(i,j,k)%cen(3) = OctreeOrigin(3)+real(k,wp)*BoxLength/real(n_parts,wp)
   ip = ip + 1
   part_p(ip)%p => parts(i,j,k)
+  parts(i,j,k)%vel => velocity_fm(:,i,j,k)
 
 enddo; enddo; enddo;
 npart_tot = n_parts**3
@@ -364,12 +371,15 @@ call printout(message)
 !==========BRUTE FORCE INTERACTION===========
 call printout(nl//'====== Performing brute force interactions ======')
 t0 = dust_time()
-potential_bf = 0
+velocity_bf = 0.0_wp
 do kq=1,n_parts; do jq=1,n_parts; do iq=1,n_parts 
   do k=1,n_parts; do j=1,n_parts; do i=1,n_parts 
     if(.not.all( (/i-iq, j-jq, k-kq/) .eq. 0)) then
-    potential_bf(iq,jq,kq) =  potential_bf(iq,jq,kq) + &
-    parts(i,j,k)%mag/(sqrt(sum((parts(i,j,k)%cen-parts(iq,jq,kq)%cen)**2)+r_Rankine**2)*4.0_wp*pi)
+    R2 = sum((parts(iq,jq,kq)%cen-parts(i,j,k)%cen)**2)+r_Rankine**2
+    velocity_bf(:,iq,jq,kq) =  velocity_bf(:,iq,jq,kq) - &
+    parts(i,j,k)%mag/(4.0_wp*pi*sqrt(R2)**3) * &
+      cross((-parts(i,j,k)%cen+parts(iq,jq,kq)%cen),parts(i,j,k)%dir )
+
     endif
   enddo; enddo; enddo;
 enddo; enddo; enddo;
@@ -394,19 +404,19 @@ call printout(message)
 
 
 !=========CHECKS AND OUTPUT==================
-ip = 0
-do kq=1,n_parts; do jq=1,n_parts; do iq=1,n_parts 
-  ip = ip + 1
-  potential_fm(iq,jq,kq) =  parts(iq,jq,kq)%dir(1)
-enddo; enddo; enddo;
+!ip = 0
+!do kq=1,n_parts; do jq=1,n_parts; do iq=1,n_parts 
+!  ip = ip + 1
+!  velocity_fm(:,iq,jq,kq) =  velocity_fm_long(:,ip)
+!enddo; enddo; enddo;
 
-err = norm2(potential_fm-potential_bf)
-rel_err = err/norm2(potential_bf)
+err = norm2(velocity_fm-velocity_bf)
+rel_err = err/norm2(velocity_bf)
 write(*,*) 'error',err
 write(*,*) 'rel_err',rel_err
 
-  call write_basic(potential_fm(:,:,2),'fast_multipole.dat')
-  call write_basic(potential_bf(:,:,2),'brute_force.dat')
+  call write_basic(velocity_fm(2,:,:,2),'fast_multipole.dat')
+  call write_basic(velocity_bf(2,:,:,2),'brute_force.dat')
 
 !============================================
 
