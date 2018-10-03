@@ -80,6 +80,9 @@ use mod_hdf5_io, only: &
    read_hdf5, &
    read_hdf5_al, &
    check_dset_hdf5
+
+use mod_octree, only: &
+  t_octree, sort_particles, calculate_multipole, apply_multipole
 !----------------------------------------------------------------------
 
 implicit none
@@ -202,6 +205,9 @@ type :: t_wake
  !> Magnitude of particles vorticity
  real(wp), allocatable :: prt_ivort(:)
 
+ !> Velocity of the particles (consider removing)
+ real(wp), allocatable :: prt_vel(:,:)
+
  !> Wake particles pointer
  type(t_vortpart_p), allocatable :: part_p(:)
 
@@ -254,6 +260,8 @@ contains
 end type
 
 class(c_wake_mov), allocatable :: wake_movement
+character(len=max_char_len) :: msg
+real(t_realtime) :: t1 , t0
 character(len=*), parameter :: this_mod_name='mod_wake'
 
 !----------------------------------------------------------------------
@@ -863,9 +871,10 @@ end subroutine load_wake
 !! Note: at this subroutine is passed the whole array of elements,
 !! comprising both the implicit panels and the explicit (ll)
 !! elements
-subroutine update_wake(wake, elems, sim_param)
+subroutine update_wake(wake, elems, octree, sim_param)
  type(t_wake), intent(inout), target :: wake
  type(t_pot_elem_p), intent(in) :: elems(:)
+ type(t_octree), intent(inout) :: octree
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: iw, ipan, ie, ip, np
@@ -875,10 +884,12 @@ subroutine update_wake(wake, elems, sim_param)
  type(t_pot_elem_p), allocatable :: pan_p_temp(:)
  real(wp), allocatable :: point_old(:,:,:)
  real(wp), allocatable :: points(:,:,:)
- real(wp), allocatable :: points_prt(:,:)
+ real(wp), allocatable, target :: points_prt(:,:)
+ real(wp), allocatable, target :: points_prt_fmm(:,:)
  !real(wp), allocatable :: points_end(:,:)
  logical :: increase_wake
  integer :: size_old
+ real(wp) :: err
  character(len=*), parameter :: this_sub_name='update_wake'
 
   wake%w_vel = 0.0_wp
@@ -1048,24 +1059,40 @@ subroutine update_wake(wake, elems, sim_param)
   !==>    Particles: evolve the position in time
 
   allocate(points_prt(3,wake%n_prt))
+  allocate(points_prt_fmm(3,wake%n_prt))
 
   !calculate the velocities at the points
-!$omp parallel do private(pos_p, vel_p, ip)
+  t0 = dust_time()
+!!!$omp parallel do private(pos_p, vel_p, ip)
   do ip = 1, wake%n_prt
-    pos_p = wake%part_p(ip)%p%cen
-    
-    !call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
+!    pos_p = wake%part_p(ip)%p%cen
 
-    !vel_p    = vel_p   +sim_param%u_inf
-    call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
+!    wake%part_p(ip)%p%npos => points_prt_fmm(:,ip)
+    wake%part_p(ip)%p%npos => points_prt(:,ip)
+
+!    call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
 
     !update the position
-    points_prt(:,ip) = wake%part_p(ip)%p%cen + vel_p*sim_param%dt
-
-    !TODO: Check if it went out of boundaries, then free the particle
+!    points_prt(:,ip) = wake%part_p(ip)%p%cen + vel_p*sim_param%dt
     
   enddo
-!$omp end parallel do
+!!!$omp end parallel do
+  t1 = dust_time()
+  write(msg,'(A,F9.3,A)') 'Direct particles calculation: ' , t1 - t0,' s.'
+  call printout(msg)
+
+  t0 = dust_time()
+  call sort_particles(wake%part_p, octree)
+  call calculate_multipole(wake%part_p, octree)
+  call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
+                       wake%end_vorts, sim_param)
+  t1 = dust_time()
+  write(msg,'(A,F9.3,A)') 'Multipoles calculation: ' , t1 - t0,' s.'
+  call printout(msg)
+
+  !Check the difference
+  err = norm2(points_prt-points_prt_fmm)/norm2(points_prt)
+  write(*,*) 'error',err
 
   !Assign the moved points, if they get otside the bounding box free the 
   !particles
@@ -1077,6 +1104,7 @@ subroutine update_wake(wake, elems, sim_param)
       wake%part_p(ip)%p%free = .true.
       wake%n_prt = wake%n_prt -1
     endif
+    nullify(wake%part_p(ip)%p%npos)
   enddo
 
   !==> Panels:  Increase the length of the wake, if it is necessary

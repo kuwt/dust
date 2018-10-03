@@ -121,7 +121,7 @@ add_executable(dust_post  ${PROJECT_SOURCE_DIR}/src/dust_post.f90)
 add_dependencies(dust_post dustlib)
 target_link_libraries(dust_post  dustlib ${linkedlibs})
 
-add_executable(dust_potential_test  ${PROJECT_SOURCE_DIR}/src/dust_potential_test.f90)
-add_dependencies(dust_potential_test dustlib)
-target_link_libraries(dust_potential_test dustlib ${linkedlibs})
+#add_executable(dust_potential_test  ${PROJECT_SOURCE_DIR}/src/dust_potential_test.f90)
+#add_dependencies(dust_potential_test dustlib)
+#target_link_libraries(dust_potential_test dustlib ${linkedlibs})
 

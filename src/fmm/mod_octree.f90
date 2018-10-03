@@ -48,6 +48,9 @@ use mod_sim_param, only: &
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
 
+use mod_aeroel, only: &
+  t_elem_p, t_pot_elem_p, c_elem
+
 use mod_vortpart, only: &
   t_vortpart, t_vortpart_p
 
@@ -58,7 +61,8 @@ use mod_multipole, only: &
 
 implicit none
 
-public :: initialize_octree, sort_particles, t_octree, perform_multipole
+public :: initialize_octree, sort_particles, t_octree, &
+          calculate_multipole, apply_multipole
 
 private
 
@@ -188,7 +192,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
 
  integer :: l, i,j,k, ic,jc,kc
  integer :: imax, jmax, kmax
- integer :: c, p, child
+ integer :: p, child
  integer :: indx(3)
 
   octree%xmin = origin
@@ -562,14 +566,13 @@ end subroutine sort_particles
 
 !----------------------------------------------------------------------
 
-subroutine perform_multipole(part,octree)
+subroutine calculate_multipole(part,octree)
  type(t_vortpart_p), intent(in), target :: part(:)
  type(t_octree), intent(inout) :: octree
 
- integer :: i, j, k, lv, l, child, il, ip, ine, ipp, m
+ integer :: i, j, k, lv, l, child, il
  integer :: imax, jmax, kmax, ll
  integer :: idx_diff(3)
- real(wp) :: Rnorm2, vel(3)
 
   ll = octree%nlevels
   !reset everything (might be done elsewhere)
@@ -674,53 +677,55 @@ subroutine perform_multipole(part,octree)
   write(msg,'(A,I0,A,F9.3,A)') 'Calculated L2L layer ',l,' in: ' , t1 - t0,' s.'
   call printout(msg)
   enddo
+end subroutine calculate_multipole
+
+!----------------------------------------------------------------------
+
+subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
+ type(t_vortpart_p), intent(in), target :: part(:)
+ type(t_octree), intent(inout) :: octree
+ type(t_pot_elem_p), intent(in) :: elem(:)
+ type(t_pot_elem_p), intent(in) :: wpan(:)
+ type(t_pot_elem_p), intent(in) :: wrin(:)
+ class(c_elem), intent(in) :: wvort(:)
+ type(t_sim_param), intent(in) :: sim_param
+
+ integer :: i, j, k, lv, ip, ipp, m, ie
+ real(wp) :: Rnorm2, vel(3), pos(3), v(3)
 
   !for all the leaves apply the local expansion and then local interactions 
-  !WARNING: this is all temporary due to the fact that we are just
-  !calculating the potential, will be changed when calculating the velocity,
-  !maybe moving it to the multipole module
   t0 = dust_time()
   do lv = 1, octree%nleaves
     !I am on a leaf, cycle on all the particles inside the leaf
     do ip = 1,octree%leaves(lv)%p%npart
       
       vel = 0.0_wp
+      pos = octree%leaves(lv)%p%cell_parts(ip)%p%cen
 
       !first apply the local multipole expansion
       do m = 1,size(octree%leaves(lv)%p%mp%b,2)
         vel = vel + &
           octree%leaves(lv)%p%mp%b(:,m)* &
-          product((octree%leaves(lv)%p%cell_parts(ip)%p%cen- &
+          product((pos- &
           octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
-
-        !octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) = &
-        !  octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) + &
-        !  octree%leaves(lv)%p%mp%b(1,m)* &
-        !  product((octree%leaves(lv)%p%cell_parts(ip)%p%cen- &
-        !  octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
       enddo
 
       !then interact with all the neighbouring cell particles
       do k=-1,1; do j=-1,1; do i=-1,1
-        !if(all((/i,j,k/).ne.0)) then
         if(associated(octree%leaves(lv)%p%neighbours(i,j,k)%p)) then
           do ipp = 1,octree%leaves(lv)%p%neighbours(i,j,k)%p%npart
 
             Rnorm2 = sum(( &
-            octree%leaves(lv)%p%cell_parts(ip)%p%cen - &
+            pos - &
             octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p%cen &
             )**2) + octree%delta**2 
 
             vel = vel - &
               octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p%mag/&
                                                (4.0_wp*pi*sqrt(Rnorm2)**3)* &
-              cross(octree%leaves(lv)%p%cell_parts(ip)%p%cen - &
+              cross(pos - &
             octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p%cen, &
             octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p%dir)
-
-            !octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) = &
-            !  octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) + &
-            !  octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p%mag/(4.0_wp*pi*sqrt(Rnorm2))
           enddo
         endif
       enddo; enddo; enddo
@@ -729,32 +734,52 @@ subroutine perform_multipole(part,octree)
       do ipp = 1,octree%leaves(lv)%p%npart
         if (ipp .ne. ip) then
           Rnorm2 = sum(( &
-          octree%leaves(lv)%p%cell_parts(ip)%p%cen - &
+          pos - &
           octree%leaves(lv)%p%cell_parts(ipp)%p%cen &
           )**2) + octree%delta**2 
 
           vel = vel - &
             octree%leaves(lv)%p%cell_parts(ipp)%p%mag/&
             (4.0_wp*pi*sqrt(Rnorm2)**3)*&
-            cross(octree%leaves(lv)%p%cell_parts(ip)%p%cen - &
+            cross(pos - &
           octree%leaves(lv)%p%cell_parts(ipp)%p%cen, &
           octree%leaves(lv)%p%cell_parts(ipp)%p%dir)
-
-            
-          !octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) = &
-          !  octree%leaves(lv)%p%cell_parts(ip)%p%dir(1) + &
-          !  octree%leaves(lv)%p%cell_parts(ipp)%p%mag/(4.0_wp*pi*sqrt(Rnorm2))
         endif
       enddo
 
-      octree%leaves(lv)%p%cell_parts(ip)%p%vel = vel
+      !Calculate the interactions with all the other elements
+      !calculate the influence of the solid bodies
+      do ie=1,size(elem)
+        call elem(ie)%p%compute_vel(pos, sim_param%u_inf, v)
+        vel = vel + v/(4*pi)
+      enddo
+
+      ! calculate the influence of the wake panels
+      do ie=1,size(wpan)
+        call wpan(ie)%p%compute_vel(pos, sim_param%u_inf, v)
+        vel = vel + v/(4*pi)
+      enddo
+
+      ! calculate the influence of the wake rings
+      do ie=1,size(wrin)
+        call wrin(ie)%p%compute_vel(pos, sim_param%u_inf, v)
+        vel = vel+ v/(4*pi)
+      enddo
+
+      !calculate the influence of the end vortex
+      do ie=1,size(wvort)
+        call wvort(ie)%compute_vel(pos, sim_param%u_inf, v)
+        vel = vel+ v/(4*pi)
+      enddo
+
+      octree%leaves(lv)%p%cell_parts(ip)%p%npos = pos + vel*sim_param%dt
     enddo
   enddo
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Calculated leaves interactions in: ' , t1 - t0,' s.'
   call printout(msg)
 
-end subroutine perform_multipole
+end subroutine apply_multipole
 
 
 !----------------------------------------------------------------------

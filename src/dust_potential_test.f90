@@ -116,7 +116,7 @@ use mod_dust_io, only: &
   save_status, load_solution, load_time
 
 use mod_octree, only: &
-  initialize_octree, sort_particles, t_octree, perform_multipole
+  initialize_octree, sort_particles, t_octree, calculate_multipole, apply_multipole
   
 use mod_vortpart, only: &
   t_vortpart, t_vortpart_p
@@ -394,7 +394,8 @@ call printout(message)
 call printout(nl//'====== Performing octree interactions ======')
 t0 = dust_time()
 call sort_particles(part_p, octree)
-call perform_multipole(part_p, octree)
+call calculate_multipole(part_p, octree)
+call apply_multipole(part_p, octree)
 
 
 t1 = dust_time()

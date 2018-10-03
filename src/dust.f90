@@ -472,8 +472,9 @@ endif
 !===========EXPERIMENTAL PART, OCTREE========
 call printout(nl//'====== Initializing Octree ======')
 t0 = dust_time()
-!call initialize_octree(BoxLength, NBox, OctreeOrigin, &
-!                       NOctreeLevels, MinOctreePart, multipole_deg, octree)
+call initialize_octree(BoxLength, NBox, OctreeOrigin, &
+                       NOctreeLevels, MinOctreePart, multipole_deg, &
+                       r_Rankine, octree)
 t1 = dust_time()
 if(debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
@@ -606,7 +607,7 @@ do it = 1,nstep
   ! (this needs to be done after output, in practice the update is for the
   !  next iteration)
   t0 = dust_time()
-  call update_wake(wake, elems_tot, sim_param)
+  call update_wake(wake, elems_tot, octree, sim_param)
   t1 = dust_time()
   if(debug_level .ge. 1) then
     write(message,'(A,F9.3,A)') 'Updated wake in: ' , t1 - t0,' s.'
@@ -617,15 +618,15 @@ do it = 1,nstep
   call update_geometry(geo, time, .false.)
   call prepare_wake(wake, geo, sim_param)
 
-  !== EXPERIMENTAL, OCTREE ==
-  write(*,*) 'Number of particles: ',size(wake%part_p)
-  t0 = dust_time()
- ! call sort_particles(wake%part_p, octree)
-  t1 = dust_time()
-  if(debug_level .ge. 1) then
-    write(message,'(A,F9.3,A)') 'Updated particles in octree in: ' , t1 - t0,' s.'
-    call printout(message)
-  endif
+  !!== EXPERIMENTAL, OCTREE ==
+  !write(*,*) 'Number of particles: ',size(wake%part_p)
+  !t0 = dust_time()
+ !! call sort_particles(wake%part_p, octree)
+  !t1 = dust_time()
+  !if(debug_level .ge. 1) then
+  !  write(message,'(A,F9.3,A)') 'Updated particles in octree in: ' , t1 - t0,' s.'
+  !  call printout(message)
+  !endif
 
 enddo
 
