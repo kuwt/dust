@@ -1059,7 +1059,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
   !==>    Particles: evolve the position in time
 
   allocate(points_prt(3,wake%n_prt))
-  allocate(points_prt_fmm(3,wake%n_prt))
+  !allocate(points_prt_fmm(3,wake%n_prt))
 
   !calculate the velocities at the points
   t0 = dust_time()
@@ -1091,8 +1091,8 @@ subroutine update_wake(wake, elems, octree, sim_param)
   call printout(msg)
 
   !Check the difference
-  err = norm2(points_prt-points_prt_fmm)/norm2(points_prt)
-  write(*,*) 'error',err
+  !err = norm2(points_prt-points_prt_fmm)/norm2(points_prt)
+  !write(*,*) 'error',err
 
   !Assign the moved points, if they get otside the bounding box free the 
   !particles
