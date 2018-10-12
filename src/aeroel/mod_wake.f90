@@ -885,6 +885,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
  real(wp), allocatable :: point_old(:,:,:)
  real(wp), allocatable :: points(:,:,:)
  real(wp), allocatable, target :: points_prt(:,:)
+ real(wp), allocatable, target :: alpha_prt(:,:)
  real(wp), allocatable, target :: points_prt_fmm(:,:)
  !real(wp), allocatable :: points_end(:,:)
  logical :: increase_wake
@@ -1059,27 +1060,18 @@ subroutine update_wake(wake, elems, octree, sim_param)
   !==>    Particles: evolve the position in time
 
   allocate(points_prt(3,wake%n_prt))
-  !allocate(points_prt_fmm(3,wake%n_prt))
+  allocate(alpha_prt(3,wake%n_prt))
 
   !calculate the velocities at the points
-  t0 = dust_time()
 !!!$omp parallel do private(pos_p, vel_p, ip)
   do ip = 1, wake%n_prt
-!    pos_p = wake%part_p(ip)%p%cen
 
-!    wake%part_p(ip)%p%npos => points_prt_fmm(:,ip)
-    wake%part_p(ip)%p%npos => points_prt(:,ip)
+    wake%part_p(ip)%p%npos   => points_prt(:,ip)
+    wake%part_p(ip)%p%nalpha => alpha_prt(:,ip)
 
-!    call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
-
-    !update the position
-!    points_prt(:,ip) = wake%part_p(ip)%p%cen + vel_p*sim_param%dt
     
   enddo
 !!!$omp end parallel do
-  t1 = dust_time()
-  write(msg,'(A,F9.3,A)') 'Direct particles calculation: ' , t1 - t0,' s.'
-  call printout(msg)
 
   t0 = dust_time()
   call sort_particles(wake%part_p, octree)
@@ -1100,6 +1092,10 @@ subroutine update_wake(wake, elems, octree, sim_param)
     if(all(points_prt(:,ip) .ge. wake%part_box_min) .and. &
        all(points_prt(:,ip) .le. wake%part_box_max)) then
       wake%part_p(ip)%p%cen = points_prt(:,ip)
+      wake%part_p(ip)%p%mag = norm2(alpha_prt(:,ip))
+      if(wake%part_p(ip)%p%mag .ne. 0.0_wp) &
+         wake%part_p(ip)%p%dir = alpha_prt(:,ip)/wake%part_p(ip)%p%mag
+
     else
       wake%part_p(ip)%p%free = .true.
       wake%n_prt = wake%n_prt -1

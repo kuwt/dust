@@ -228,7 +228,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
   !polynomial tools at the multipole degree
   call octree%pexp%set_degree(degree)
   !for the derivatives is needed 2*degree+1 degree
-  call octree%pexp_der%set_degree(2*degree+1)
+  call octree%pexp_der%set_degree(2*degree+2)
   
   !Count all the cells contained in the octree
   octree%ncells_tot = product(nbox)
@@ -695,7 +695,8 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: i, j, k, lv, ip, ipp, m, ie
- real(wp) :: Rnorm2, vel(3), pos(3), v(3)
+ real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3)
+ real(wp) :: grad(3,3)
 
   !for all the leaves apply the local expansion and then local interactions 
   t0 = dust_time()
@@ -705,32 +706,35 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
     do ip = 1,octree%leaves(lv)%p%npart
       
       vel = 0.0_wp
+      stretch = 0.0_wp
+      grad = 0.0_wp
       pos = octree%leaves(lv)%p%cell_parts(ip)%p%cen
+      alpha = octree%leaves(lv)%p%cell_parts(ip)%p%mag * &
+              octree%leaves(lv)%p%cell_parts(ip)%p%dir
 
       !first apply the local multipole expansion
       do m = 1,size(octree%leaves(lv)%p%mp%b,2)
+        !velocity
         vel = vel + &
           octree%leaves(lv)%p%mp%b(:,m)* &
-          product((pos- &
-          octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
+          product((pos-octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
+        !stretching
+        grad = grad + octree%leaves(lv)%p%mp%c(:,:,m)* &
+          product((pos-octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
       enddo
+        stretch = stretch + matmul(alpha, grad)
 
       !then interact with all the neighbouring cell particles
       do k=-1,1; do j=-1,1; do i=-1,1
         if(associated(octree%leaves(lv)%p%neighbours(i,j,k)%p)) then
           do ipp = 1,octree%leaves(lv)%p%neighbours(i,j,k)%p%npart
 
-            Rnorm2 = sum(( &
-            pos - &
-            octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p%cen &
-            )**2) + octree%delta**2 
-
-            vel = vel - &
-              octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p%mag/&
-                                               (4.0_wp*pi*sqrt(Rnorm2)**3)* &
-              cross(pos - &
-            octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p%cen, &
-            octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p%dir)
+            call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
+                 %compute_vel(pos, sim_param%u_inf, v)
+            vel = vel +v/(4.0_wp*pi)
+            call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
+                 %compute_stretch(pos, alpha, str)
+            stretch = stretch +str/(4.0_wp*pi)
           enddo
         endif
       enddo; enddo; enddo
@@ -738,17 +742,12 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
       !finally interact with the particles inside the cell 
       do ipp = 1,octree%leaves(lv)%p%npart
         if (ipp .ne. ip) then
-          Rnorm2 = sum(( &
-          pos - &
-          octree%leaves(lv)%p%cell_parts(ipp)%p%cen &
-          )**2) + octree%delta**2 
-
-          vel = vel - &
-            octree%leaves(lv)%p%cell_parts(ipp)%p%mag/&
-            (4.0_wp*pi*sqrt(Rnorm2)**3)*&
-            cross(pos - &
-          octree%leaves(lv)%p%cell_parts(ipp)%p%cen, &
-          octree%leaves(lv)%p%cell_parts(ipp)%p%dir)
+          call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_vel(pos, &
+                                                        sim_param%u_inf, v)
+          vel = vel +v/(4.0_wp*pi)
+          call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_stretch(pos, &
+                                                        alpha, str)
+          stretch = stretch +v/(4.0_wp*pi)
         endif
       enddo
 
@@ -777,7 +776,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
         vel = vel+ v/(4*pi)
       enddo
 
+      !evolve the position in time
       octree%leaves(lv)%p%cell_parts(ip)%p%npos = pos + vel*sim_param%dt
+      !evolve the intensity in time
+      octree%leaves(lv)%p%cell_parts(ip)%p%nalpha = alpha + &
+                                                    stretch*sim_param%dt
     enddo
   enddo
   t1 = dust_time()
