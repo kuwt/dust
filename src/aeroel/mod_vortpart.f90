@@ -76,10 +76,12 @@ type, extends(c_vort_elem) :: t_vortpart
   !> Orientation of the vorticity vector
   real(wp) :: dir(3)
   real(wp), pointer :: npos(:)
+  real(wp), pointer :: nalpha(:)
   logical :: free=.true.
 contains
 
   procedure, pass(this) :: compute_vel      => compute_vel_vortpart
+  procedure, pass(this) :: compute_stretch  => compute_stretch_vortpart  
   procedure, pass(this) :: calc_geo_data    => calc_geo_data_vortpart
 
 end type
@@ -110,7 +112,7 @@ end subroutine initialize_vortpart
 
 !----------------------------------------------------------------------
 
-!> Compute the velocity induced by a vortex line in a prescribed position
+!> Compute the velocity induced by a vortex particle in a prescribed position
 !!
 !! WARNING: the velocity calculated, to be consistent with the formulation of
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
@@ -124,23 +126,44 @@ subroutine compute_vel_vortpart (this, pos, uinf, vel)
  real(wp) :: vvort(3)
  real(wp) :: dist(3), distn
 
+
+  dist = pos-this%cen
+  !Rosenhead kernel regularized velocity
+  vvort =  cross(this%dir,dist) / (sqrt(sum(dist**2)+r_Rankine**2))**3
+  vel = vvort*this%mag
+
+
+end subroutine compute_vel_vortpart
+
+!----------------------------------------------------------------------
+
+!> Compute the vortex stretching induced by a vortex particle 
+!! in a prescribed position with a prescribed vorticity (i.e. another particle)
+!!
+!! WARNING: the calculated term, to be consistent with the formulation of
+!! the equations is multiplied by 4*pi, to obtain the actual velocity the
+!! result of the present subroutine MUST be DIVIDED by 4*pi
+subroutine compute_stretch_vortpart (this, pos, alpha, stretch)
+ class(t_vortpart), intent(in) :: this
+ real(wp), intent(in) :: pos(:)
+ real(wp), intent(in) :: alpha(3)
+ real(wp), intent(out) :: stretch(3)
+
+ real(wp) :: dist(3), distn
+
   !TODO: add far field approximations
 
   dist = pos-this%cen
-  distn = norm2(dist)
-  if ( distn .gt. r_Rankine ) then
+  distn = sqrt(sum(dist**2)+r_Rankine**2)
 
-    vvort =  cross(this%dir,dist) / distn**3
+  !stretch = -cross(alpha, this%dir*this%mag)/(distn)**3 &
+  !     +3.0_wp/(distn)**5 * cross(dist, this%mag*this%dir) * &
+  !     sum(alpha*dist)
 
-  else
+  stretch = -cross(this%dir*this%mag, alpha)/(distn)**3 &
+       +1.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
 
-    vvort =  cross(this%dir,dist)  / r_Rankine**3
-
-  end if
-
-    vel = vvort*this%mag
-
-end subroutine compute_vel_vortpart
+end subroutine compute_stretch_vortpart
 
 !----------------------------------------------------------------------
 

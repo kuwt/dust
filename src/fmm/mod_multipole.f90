@@ -33,7 +33,8 @@
 !!=====================================================================
 
 
-!> Module to handle the octree grid
+!> Module to handle the multipole and local expansions, and their 
+!! manipulation
 module mod_multipole
 
 use mod_param, only: &
@@ -64,20 +65,31 @@ private
 !> Type containing the multipole expansion relative to a single cell
 type :: t_multipole
 
+  !> Multipole expansion coefficients (velocity)
   real(wp), allocatable :: a(:,:)
 
+  !> Local expansion coefficients (velocity)
   real(wp), allocatable :: b(:,:)
 
+  !> Local expansion coefficients (gradient)
+  real(wp), allocatable :: c(:,:,:)
+
 contains
-
+  
+  !> Initialize the data
   procedure, pass(this) :: init => init_multipole
-
+  
+  !> Calculate the coefficients of the multipole in the leaf
   procedure, pass(this) :: leaf_M => leaf_M_multipole
 
+  !> Pass the multipole coefficients to the parents
   procedure, pass(this) :: M2M => M2M_multipole
 
+  !> Convert the multipole coefficients of the interacting cells into
+  !! local expansion coefficients
   procedure, pass(this) :: M2L => M2L_multipole
 
+  !> Inherit the local expansion coefficients from parents cells
   procedure, pass(this) :: L2L => L2L_multipole
 
 end type
@@ -86,8 +98,11 @@ end type
 
 !> Type containing the derivatives of kernel evalued at a certain distance
 type :: t_ker_der
-
+  
+  !> Store the derivatives of the kernel evalued between two points
   real(wp), allocatable :: D(:,:)
+
+  real(wp), allocatable :: Dc(:,:,:)
 
 contains
 
@@ -97,12 +112,20 @@ end type
 
 !----------------------------------------------------------------------
 
+!> Polynomial expansion tools
 type :: t_polyexp
-
+  
+  !> Maximum degree of the polynomial expansion
   integer :: degree
 
+  !> Number of monomials of the polynomial expansion
   integer :: n_mon
-
+  
+  !> Number of monomials, at all the different degrees
+  integer, allocatable :: n_mon_d(:)
+  
+  !> For a given set of degrees in the three dimensions returns the index
+  !! in the unrolled 
   integer, allocatable :: idx(:,:,:) 
   
   integer, allocatable :: pwr(:,:)
@@ -135,6 +158,7 @@ subroutine init_multipole(this, polyexp)
 
   allocate(this%a(3,polyexp%n_mon))
   allocate(this%b(3,polyexp%n_mon))
+  allocate(this%c(3,3,polyexp%n_mon))
 
 
 end subroutine
@@ -196,26 +220,40 @@ subroutine M2L_multipole(this, ker_der, pexp, pexp_der, multipol_int)
  type(t_polyexp), intent(in) :: pexp_der
  type(t_multipole), intent(in) :: multipol_int
 
- real(wp) :: sum1(3)
+ real(wp) :: sum_v(3), sum_g(3,3), mult
 
  integer :: n, m, idx(3), idx_der
-
+ 
+  !Subdivide all the degrees, for the first ones expand both the velocity
+  !and the gradient, for the last one only the velocity
 
   do m = 1, pexp%n_mon
-    sum1 = 0.0_wp
+    sum_g = 0.0_wp
+    sum_v = 0.0_wp
     do n = 1, pexp%n_mon
       idx = pexp%pwr(:,m)+pexp%pwr(:,n)
       idx_der = pexp_der%idx(idx(1),idx(2),idx(3))
-      !sum1 = sum1 +  ker_der%D(1,idx_der)*pexp_der%nfact(idx) &
-      !     /(pexp%nfact(pexp%pwr(:,m))*pexp%nfact(pexp%pwr(:,n))) * &
-      !     multipol_int%a(1,n)
-      sum1 = sum1 +  &
-      pexp_der%nfact(idx(1),idx(2),idx(3))/( &
-      pexp%nfact(pexp%pwr(1,m),pexp%pwr(2,m),pexp%pwr(3,m))*&
-      pexp%nfact(pexp%pwr(1,n),pexp%pwr(2,n),pexp%pwr(3,n))) * &
-       cross(ker_der%D(:,idx_der), multipol_int%a(:,n))
+
+      mult = pexp_der%nfact(idx(1),idx(2),idx(3))/( &
+                pexp%nfact(pexp%pwr(1,m),pexp%pwr(2,m),pexp%pwr(3,m))*&
+                pexp%nfact(pexp%pwr(1,n),pexp%pwr(2,n),pexp%pwr(3,n)))
+
+      sum_v = sum_v + mult * cross(ker_der%D(:,idx_der), multipol_int%a(:,n))
+      
+      sum_g(:,1) = sum_g(:,1) + mult * &
+                   cross(ker_der%Dc(:,1,idx_der), multipol_int%a(:,n))
+      sum_g(:,2) = sum_g(:,2) + mult * &
+                   cross(ker_der%Dc(:,2,idx_der), multipol_int%a(:,n))
+      sum_g(:,3) = sum_g(:,3) + mult * &
+                   cross(ker_der%Dc(:,3,idx_der), multipol_int%a(:,n))
+      !sum1 = sum1 +  &
+      !pexp_der%nfact(idx(1),idx(2),idx(3))/( &
+      !pexp%nfact(pexp%pwr(1,m),pexp%pwr(2,m),pexp%pwr(3,m))*&
+      !pexp%nfact(pexp%pwr(1,n),pexp%pwr(2,n),pexp%pwr(3,n))) * &
+      ! cross(ker_der%D(:,idx_der), multipol_int%a(:,n))
     enddo
-    this%b(:,m) = this%b(:,m) + real((-1)**(sum(pexp%pwr(:,m))),wp)*sum1
+    this%b(:,m) = this%b(:,m) + real((-1)**(sum(pexp%pwr(:,m))),wp)*sum_v
+    this%c(:,:,m) = this%c(:,:,m) + real((-1)**(sum(pexp%pwr(:,m))),wp)*sum_g
   enddo 
 
 end subroutine
@@ -231,16 +269,18 @@ subroutine L2L_multipole(this, cen, parent, parent_cen, pexp)
 
  integer :: m, idx(3), s
  integer :: is, js, ks
-
+ real(wp) :: mult
+  
   do m=1,size(this%b,2) 
     idx = pexp%pwr(:,m)
     do ks = idx(3),pexp%degree; do js = idx(2),pexp%degree-ks; do is = idx(1),pexp%degree-ks-js
       s = pexp%idx(is,js,ks)
 
-      this%b(:,m) = this%b(:,m) + &
-      pexp%nbinom((/is,js,ks/),idx)* &
-      product((cen-parent_cen)**((/is, js, ks/) - idx))*parent%b(:,s)
+      mult = pexp%nbinom((/is,js,ks/),idx)* &
+          product((cen-parent_cen)**((/is, js, ks/) - idx))
 
+      this%b(:,m) = this%b(:,m) + mult*parent%b(:,s)
+      this%c(:,:,m) = this%c(:,:,m) + mult*parent%c(:,:,s)
     enddo; enddo; enddo
   enddo
 
@@ -260,9 +300,11 @@ subroutine compute_der_ker(this,diff,delta,pexp)
  real(wp), allocatable :: bk(:)
 
 
-  allocate(this%D(3,pexp%n_mon))
+  allocate(this%D(3,pexp%n_mon_d(pexp%degree-1)))
+  allocate(this%Dc(3,3,pexp%n_mon_d(pexp%degree-2)))
   allocate(bk(pexp%n_mon))
   this%D = 0.0_wp
+  this%Dc = 0.0_wp
   bk = 0.0_wp
   Rnorm2 = sum(diff**2) + delta**2 
 
@@ -294,6 +336,12 @@ subroutine compute_der_ker(this,diff,delta,pexp)
     this%D(2,pexp%idx(i,j,k)) = - (1+j)*bk(pexp%idx(i,j+1,k))
     this%D(3,pexp%idx(i,j,k)) = - (1+k)*bk(pexp%idx(i,j,k+1))
   enddo; enddo; enddo
+
+  do k=0,pexp%degree-2;  do j=0,pexp%degree-2-k; do i=0,pexp%degree-2-j-k;
+    this%Dc(:,1,pexp%idx(i,j,k)) = - (1+i)*this%D(:,pexp%idx(i+1,j,k))
+    this%Dc(:,2,pexp%idx(i,j,k)) = - (1+j)*this%D(:,pexp%idx(i,j+1,k))
+    this%Dc(:,3,pexp%idx(i,j,k)) = - (1+k)*this%D(:,pexp%idx(i,j,k+1))
+  enddo; enddo; enddo
 end subroutine
 
 !----------------------------------------------------------------------
@@ -307,6 +355,7 @@ subroutine set_degree_polyexp(this, deg)
   this%degree = deg
 
   allocate(this%idx(0:deg,0:deg,0:deg))
+  allocate(this%n_mon_d(0:deg))
 
   ipol = 0
   do o = 0,deg
@@ -316,6 +365,7 @@ subroutine set_degree_polyexp(this, deg)
         ipol = ipol+1 
         this%idx(i,j,k) = ipol
   enddo; enddo;
+    this%n_mon_d(o) = ipol
   enddo
   
   this%n_mon = ipol
