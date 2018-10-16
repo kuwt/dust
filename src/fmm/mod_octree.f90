@@ -132,6 +132,9 @@ type :: t_cell_layer
   !> All the possible derivatives of the kernel among all the possible 
   !! different relative locations for interaction at the current level
   type(t_ker_der), allocatable :: ker_der(:,:,:)
+  
+  !length (positive and negative) of kernel derivatives in each direction
+  integer :: ker_der_len(3)
 
 end type
 
@@ -398,9 +401,30 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
   write(msg,'(A,F9.3,A)') 'Initialized interaction lists in: ' , t1 - t0,' s.'
   call printout(msg)
 
-  
+   
   !pre-build all the kernel derivatives for cell-cell interactions
-  do l=1,nlevels
+  !first level can have many cells, must be treated separately
+  
+  octree%layers(1)%ker_der_len = max(octree%nbox,(/3,3,3/))
+  allocate(octree%layers(1)%ker_der&
+       (-octree%layers(1)%ker_der_len(1):octree%layers(1)%ker_der_len(1),&
+        -octree%layers(1)%ker_der_len(2):octree%layers(1)%ker_der_len(2),&
+        -octree%layers(1)%ker_der_len(3):octree%layers(1)%ker_der_len(3)))
+
+  do k=-octree%layers(1)%ker_der_len(3),octree%layers(1)%ker_der_len(3) 
+  do j=-octree%layers(1)%ker_der_len(2),octree%layers(1)%ker_der_len(2) 
+  do i=-octree%layers(1)%ker_der_len(1),octree%layers(1)%ker_der_len(1)
+    if(any(abs((/i,j,k/)) .ge. 2)) then
+      call octree%layers(1)%ker_der(i,j,k)%&
+        compute_der(octree%layers(1)%cell_size*real((/-i,-j,-k/),wp), &
+        octree%delta, octree%pexp_der)
+    endif
+  enddo; enddo; enddo
+
+
+  ! In all the other levels there can't be more than +-3 cells of distance
+  ! in the interaction list
+  do l=2,nlevels
     allocate(octree%layers(l)%ker_der(-3:3,-3:3,-3:3))
     !cycle on all the possible interactions (interaction list cannot go farther
     !than +-3 cells in the same layer)
@@ -461,6 +485,9 @@ subroutine sort_particles(part,octree)
     
     !check in which cell at the lowest level it is located
     idx = ceiling((part(ip)%p%cen-octree%xmin)/csize)
+    !DEBUG
+    write(*,*) 'particle, center',ip,part(ip)%p%cen
+    write(*,*) 'index',idx
     !add the particle to the lowest level
     octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npart = &
                     octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npart + 1
@@ -471,6 +498,8 @@ subroutine sort_particles(part,octree)
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Sorted particles in: ' , t1 - t0,' s.'
   call printout(msg)
+  !DEBUG:
+  write(*,*) 'Sorted nr of particles:',size(part)
 
 
 
@@ -478,12 +507,17 @@ subroutine sort_particles(part,octree)
   !PROFILE
   t0 = dust_time()
   !Bottom level: just check if are leaves
+  !DEBUG:
+  write(*,*) 'Checking bottom level leaves'
   do k=1,octree%ncl(3,ll); do j=1,octree%ncl(2,ll); do i = 1,octree%ncl(1,ll)
-    if( octree%layers(ll)%lcells(i,j,k)%npart .ge. min_part_4_cell) then
+    if( (octree%layers(ll)%lcells(i,j,k)%npart .ge. min_part_4_cell) .or. &
+         ll .eq. 1) then !if last level is first, all are leaves
       octree%layers(ll)%lcells(i,j,k)%leaf = .true.
       !add to the leaves
       nl = nl+1
       octree%leaves(nl)%p => octree%layers(ll)%lcells(i,j,k)
+      !DEBUG:
+       write(*,*) 'level, ijk is a leaf',ll,i,j,k
     endif
   enddo; enddo; enddo !layer cells i,j,k
 
@@ -499,7 +533,7 @@ subroutine sort_particles(part,octree)
       got_leaves = .false.
       do child = 1,8
         if(octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf) &
-                                                            got_leaves = .true.
+                                                          got_leaves = .true.
         octree%layers(l)%lcells(i,j,k)%npart = &
               octree%layers(l)%lcells(i,j,k)%npart + &
               octree%layers(l)%lcells(i,j,k)%children(child)%p%npart
@@ -529,6 +563,16 @@ subroutine sort_particles(part,octree)
           do child = 1,8
             octree%layers(l)%lcells(i,j,k)%children(child)%p%active = .false.
           enddo
+          !then check if itself it is a leaf
+          if( (octree%layers(l)%lcells(i,j,k)%npart .ge. min_part_4_cell) &
+          .or. l .eq. 1) then !if last level is first, all are leaves
+            octree%layers(l)%lcells(i,j,k)%leaf = .true.
+            !add to the leaves
+            nl = nl+1
+            octree%leaves(nl)%p => octree%layers(l)%lcells(i,j,k)
+            !DEBUG:
+            write(*,*) 'level, ijk is a leaf',l,i,j,k
+          endif
         endif
 
       else
@@ -577,6 +621,7 @@ subroutine calculate_multipole(part,octree)
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
          octree%layers(l)%lcells(i,j,k)%mp%a = 0.0_wp
          octree%layers(l)%lcells(i,j,k)%mp%b = 0.0_wp
+         octree%layers(l)%lcells(i,j,k)%mp%c = 0.0_wp
     enddo; enddo; enddo !layer cells i,j,k
   enddo
 
@@ -697,13 +742,19 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
  integer :: i, j, k, lv, ip, ipp, m, ie
  real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3)
  real(wp) :: grad(3,3)
+ integer :: np
+  
+  np = 0
 
   !for all the leaves apply the local expansion and then local interactions 
   t0 = dust_time()
 !$omp parallel do private(lv, ip, vel, pos, m, i, j, k, ipp, Rnorm2, v)
   do lv = 1, octree%nleaves
     !I am on a leaf, cycle on all the particles inside the leaf
+    !DEBUG
+    !write(*,*) 'leaf',lv,'index',octree%leaves(lv)%p%cart_index
     do ip = 1,octree%leaves(lv)%p%npart
+      np = np + 1
       
       vel = 0.0_wp
       stretch = 0.0_wp
@@ -747,7 +798,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
           vel = vel +v/(4.0_wp*pi)
           call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_stretch(pos, &
                                                         alpha, str)
-          stretch = stretch +v/(4.0_wp*pi)
+          stretch = stretch +str/(4.0_wp*pi)
         endif
       enddo
 
@@ -775,18 +826,25 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
         call wvort(ie)%compute_vel(pos, sim_param%u_inf, v)
         vel = vel+ v/(4*pi)
       enddo
-
+      
+      !at last, add the free stream velocity
+      vel = vel + sim_param%u_inf
       !evolve the position in time
       octree%leaves(lv)%p%cell_parts(ip)%p%npos = pos + vel*sim_param%dt
       !evolve the intensity in time
       octree%leaves(lv)%p%cell_parts(ip)%p%nalpha = alpha + &
                                                     stretch*sim_param%dt
+      !DEBUG
+      write(*,*) 'leaf, particle, old position',lv,ip,pos
+      write(*,*) 'new position',octree%leaves(lv)%p%cell_parts(ip)%p%npos 
     enddo
   enddo
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Calculated leaves interactions in: ' , t1 - t0,' s.'
   call printout(msg)
-
+  
+  !DEBUG:
+  write(*,*) 'interacted nr particles',np
 end subroutine apply_multipole
 
 

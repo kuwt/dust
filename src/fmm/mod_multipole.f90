@@ -237,7 +237,7 @@ subroutine M2L_multipole(this, ker_der, pexp, pexp_der, multipol_int)
       mult = pexp_der%nfact(idx(1),idx(2),idx(3))/( &
                 pexp%nfact(pexp%pwr(1,m),pexp%pwr(2,m),pexp%pwr(3,m))*&
                 pexp%nfact(pexp%pwr(1,n),pexp%pwr(2,n),pexp%pwr(3,n)))
-
+      
       sum_v = sum_v + mult * cross(ker_der%D(:,idx_der), multipol_int%a(:,n))
       
       sum_g(:,1) = sum_g(:,1) + mult * &
