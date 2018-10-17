@@ -1092,9 +1092,9 @@ subroutine update_wake(wake, elems, octree, sim_param)
     if(all(points_prt(:,ip) .ge. wake%part_box_min) .and. &
        all(points_prt(:,ip) .le. wake%part_box_max)) then
       wake%part_p(ip)%p%cen = points_prt(:,ip)
-    !  wake%part_p(ip)%p%mag = norm2(alpha_prt(:,ip))
-    !  if(wake%part_p(ip)%p%mag .ne. 0.0_wp) &
-    !     wake%part_p(ip)%p%dir = alpha_prt(:,ip)/wake%part_p(ip)%p%mag
+      wake%part_p(ip)%p%mag = norm2(alpha_prt(:,ip))
+      if(wake%part_p(ip)%p%mag .ne. 0.0_wp) &
+         wake%part_p(ip)%p%dir = alpha_prt(:,ip)/wake%part_p(ip)%p%mag
     else
       wake%part_p(ip)%p%free = .true.
       wake%n_prt = wake%n_prt -1

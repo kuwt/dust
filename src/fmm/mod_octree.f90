@@ -485,9 +485,6 @@ subroutine sort_particles(part,octree)
     
     !check in which cell at the lowest level it is located
     idx = ceiling((part(ip)%p%cen-octree%xmin)/csize)
-    !DEBUG
-    write(*,*) 'particle, center',ip,part(ip)%p%cen
-    write(*,*) 'index',idx
     !add the particle to the lowest level
     octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npart = &
                     octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npart + 1
@@ -498,8 +495,6 @@ subroutine sort_particles(part,octree)
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Sorted particles in: ' , t1 - t0,' s.'
   call printout(msg)
-  !DEBUG:
-  write(*,*) 'Sorted nr of particles:',size(part)
 
 
 
@@ -507,8 +502,6 @@ subroutine sort_particles(part,octree)
   !PROFILE
   t0 = dust_time()
   !Bottom level: just check if are leaves
-  !DEBUG:
-  write(*,*) 'Checking bottom level leaves'
   do k=1,octree%ncl(3,ll); do j=1,octree%ncl(2,ll); do i = 1,octree%ncl(1,ll)
     if( (octree%layers(ll)%lcells(i,j,k)%npart .ge. min_part_4_cell) .or. &
          ll .eq. 1) then !if last level is first, all are leaves
@@ -516,8 +509,6 @@ subroutine sort_particles(part,octree)
       !add to the leaves
       nl = nl+1
       octree%leaves(nl)%p => octree%layers(ll)%lcells(i,j,k)
-      !DEBUG:
-       write(*,*) 'level, ijk is a leaf',ll,i,j,k
     endif
   enddo; enddo; enddo !layer cells i,j,k
 
@@ -570,8 +561,6 @@ subroutine sort_particles(part,octree)
             !add to the leaves
             nl = nl+1
             octree%leaves(nl)%p => octree%layers(l)%lcells(i,j,k)
-            !DEBUG:
-            write(*,*) 'level, ijk is a leaf',l,i,j,k
           endif
         endif
 
@@ -751,8 +740,6 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
 !$omp parallel do private(lv, ip, vel, pos, m, i, j, k, ipp, Rnorm2, v)
   do lv = 1, octree%nleaves
     !I am on a leaf, cycle on all the particles inside the leaf
-    !DEBUG
-    !write(*,*) 'leaf',lv,'index',octree%leaves(lv)%p%cart_index
     do ip = 1,octree%leaves(lv)%p%npart
       np = np + 1
       
@@ -834,17 +821,12 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
       !evolve the intensity in time
       octree%leaves(lv)%p%cell_parts(ip)%p%nalpha = alpha + &
                                                     stretch*sim_param%dt
-      !DEBUG
-      write(*,*) 'leaf, particle, old position',lv,ip,pos
-      write(*,*) 'new position',octree%leaves(lv)%p%cell_parts(ip)%p%npos 
     enddo
   enddo
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Calculated leaves interactions in: ' , t1 - t0,' s.'
   call printout(msg)
   
-  !DEBUG:
-  write(*,*) 'interacted nr particles',np
 end subroutine apply_multipole
 
 
