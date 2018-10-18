@@ -1,3 +1,4 @@
 *.swp
 *.o
 *.mod
+src/general/mod_version.f90

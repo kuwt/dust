@@ -114,7 +114,7 @@ use mod_dust_io, only: &
 
 use mod_octree, only: &
   initialize_octree, sort_particles, t_octree
-  
+ 
 
 implicit none
 
@@ -126,38 +126,20 @@ integer :: run_id(10)
 type(t_parse) :: prms
 character(len=*), parameter :: input_file_name_def = 'dust.in'
 character(len=max_char_len) :: input_file_name
-character(len=max_char_len) :: geo_file_name
 character(len=max_char_len) :: target_file
-character(len=max_char_len) :: ref_file_name
 character(len=extended_char_len) :: message
 
 !Simulation parameters
 type(t_sim_param) :: sim_param
 ! Asymptotic conditions
-real(wp) :: uinf(3)
-real(wp) :: rho , Pinf, a_inf , mu_inf  ! Re, Mach
 
 !Time parameters
-real(wp) :: tstart, tend, dt, time
+real(wp) :: time
 integer  :: it, nstep, nout
 real(wp) :: t_last_out, t_last_debug_out
 logical  :: time_2_out, time_2_debug_out
 logical  :: output_start
-real(wp) :: dt_out, dt_debug_out
-
-!Wake parameters
-!> Number of wake panels(/rings)
-integer :: n_wake_panels
-!> Number of wake particles
-integer :: n_wake_parts
-real(wp) :: part_box_min(3), part_box_max(3)
-real(wp) :: wake_pan_scaling , wake_pan_minvel
-logical  :: rigid_wake
-real(wp) :: rigid_wake_vel(3)
-character(len=max_char_len) :: rigid_wake_vel_str
-
-!doublet parameters
-real(wp) :: ff_ratio_dou, ff_ratio_sou, eps_dou, r_Rankine, r_cutoff
+real(wp) :: dt_debug_out
 
 !Main variables
 !> All the implicit elements, sorted first static then moving
@@ -183,8 +165,6 @@ type(t_wake) :: wake
 
 !> Timing vars
 real(t_realtime) :: t1 , t0, t00, t11, t22
-!> Level of debug output
-integer :: debug_level
 
 !Restart
 logical :: restart
@@ -194,21 +174,14 @@ logical :: reset_time
 
 !I/O prefixes
 character(len=max_char_len) :: frmt
-character(len=max_char_len) :: basename
 character(len=max_char_len) :: basename_debug
 
 real(wp) , allocatable :: res_old(:)
 
 integer :: i_el , i
 
-
-!octree stuff
+!octree parameters
 type(t_octree) :: octree
-real(wp) :: BoxLength
-integer :: NBox(3)
-real(wp) :: OctreeOrigin(3)
-integer :: NOctreeLevels, MinOctreePart
-integer :: multipole_deg
 
 
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
@@ -257,8 +230,6 @@ call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
                                                            '(/1.0, 0.0, 0.0/)')
 call prms%CreateRealOption( 'P_inf', "free stream pressure", '1.0')
 call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')
-! call prms%CreateRealOption( 'Re', "Reynolds number", '1000000.0')
-! call prms%CreateRealOption( 'Mach', "Mach number", '0.0')
 call prms%CreateRealOption( 'a_inf', "Speed of sound", '340.0')  ! m/s
 call prms%CreateRealOption( 'mu_inf', "Dynamic viscosity", '0.00001') ! kg/ms
 call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
@@ -289,7 +260,8 @@ call prms%CreateLogicalOption('rigid_wake','rigid wake?','F')
 call prms%CreateRealArrayOption( 'rigid_wake_vel', "rigid wake velocity" )
 
 
-!== Octree stuff == 
+!== Octree and multipole data == 
+call prms%CreateLogicalOption('FMM','Employ fast multipole method?','T')
 call prms%CreateRealOption('BoxLength','length of the octree box')
 call prms%CreateIntArrayOption('NBox','number of boxes in each direction')
 call prms%CreateRealArrayOption( 'OctreeOrigin', "rigid wake velocity" )
@@ -301,151 +273,128 @@ call prms%CreateIntOption('MultipoleDegree','multipole expansion degree')
 ! get the parameters and print them out
 call printout(nl//'====== Input parameters: ======')
 call prms%read_options(input_file_name, printout_val=.true.)
-tstart = getreal(prms, 'tstart')
-tend   = getreal(prms, 'tend')
-dt     = getreal(prms, 'dt')
-dt_out = getreal(prms,'dt_out')
+!timing
+sim_param%t0 = getreal(prms, 'tstart')
+sim_param%tend   = getreal(prms, 'tend')
+sim_param%dt     = getreal(prms, 'dt')
+sim_param%dt_out = getreal(prms,'dt_out')
 dt_debug_out = getreal(prms, 'dt_debug_out')
 output_start = getlogical(prms, 'output_start')
-
-Pinf = getreal(prms,'P_inf')
-rho  = getreal(prms,'rho_inf')
-uinf = getrealarray(prms, 'u_inf', 3)
-a_inf  = getreal(prms,'a_inf')
-mu_inf = getreal(prms,'mu_inf')
-! Re   = getreal(prms,'Re')
-! Mach = getreal(prms,'Mach')
-
-debug_level = getint(prms, 'debug_level')
-n_wake_panels = getint(prms, 'n_wake_panels')
-n_wake_parts = getint(prms, 'n_wake_particles')
-part_box_min = getrealarray(prms, 'particles_box_min',3)
-part_box_max = getrealarray(prms, 'particles_box_max',3)
-rigid_wake = getlogical(prms, 'rigid_wake')
-rigid_wake_vel = uinf   ! initialisation
-if ( rigid_wake ) then
+sim_param%debug_level = getint(prms, 'debug_level')
+!Reference values
+sim_param%P_inf = getreal(prms,'P_inf')
+sim_param%rho_inf  = getreal(prms,'rho_inf')
+sim_param%u_inf = getrealarray(prms, 'u_inf', 3)
+sim_param%a_inf  = getreal(prms,'a_inf')
+sim_param%mu_inf = getreal(prms,'mu_inf')
+!Wake parameters
+sim_param%n_wake_panels = getint(prms, 'n_wake_panels')
+sim_param%n_wake_particles = getint(prms, 'n_wake_particles')
+sim_param%particles_box_min = getrealarray(prms, 'particles_box_min',3)
+sim_param%particles_box_max = getrealarray(prms, 'particles_box_max',3)
+sim_param%rigid_wake = getlogical(prms, 'rigid_wake')
+sim_param%rigid_wake_vel = sim_param%u_inf   ! initialisation
+if ( sim_param%rigid_wake ) then
   if ( countoption(prms,'rigid_wake_vel') .eq. 1 ) then
-    rigid_wake_vel = getrealarray(prms, 'rigid_wake_vel',3)
+    sim_param%rigid_wake_vel = getrealarray(prms, 'rigid_wake_vel',3)
   else if ( countoption(prms,'rigid_wake_vel') .le. 0 ) then
     call warning('dust','dust','no rigid_wake_vel parameter set, &
          &with rigid_wake = T; rigid_wake_vel = u_inf')
-    rigid_wake_vel = uinf
-  else if ( countoption(prms,'rigid_wake_vel') .gt. 1 ) then
-    rigid_wake_vel = getrealarray(prms, 'rigid_wake_vel',3)
-    write(rigid_wake_vel_str,'(E12.4)') rigid_wake_vel
-    call warning('dust','dust','more than one rigid_wake_vel param, &
-         &set. The first value is used: '//trim(rigid_wake_vel_str))
+    sim_param%rigid_wake_vel = sim_param%u_inf
   end if
 end if
-
-wake_pan_scaling = getreal(prms,'ImplicitPanelScale')
-wake_pan_minvel  = getreal(prms,'ImplicitPanelMinVel')
-basename = getstr(prms,'basename')
+!Names
+sim_param%basename = getstr(prms,'basename')
 basename_debug = getstr(prms,'basename_debug')
-geo_file_name = getstr(prms,'GeometryFile')
-ref_file_name = getstr(prms,'ReferenceFile')
+sim_param%GeometryFile = getstr(prms,'GeometryFile')
+sim_param%ReferenceFile = getstr(prms,'ReferenceFile')
+!Method parameters
+sim_param%FarFieldRatioDoublet  = getreal(prms, 'FarFieldRatioDoublet')
+sim_param%FarFieldRatioSource  = getreal(prms, 'FarFieldRatioSource')
+sim_param%DoubletThreshold   = getreal(prms, 'DoubletThreshold')
+sim_param%RankineRad = getreal(prms, 'RankineRad')
+sim_param%CutoffRad  = getreal(prms, 'CutoffRad')
+sim_param%first_panel_scaling = getreal(prms,'ImplicitPanelScale')
+sim_param%min_vel_at_te  = getreal(prms,'ImplicitPanelMinVel')
+!Octree and FMM parameters
+sim_param%use_fmm = getlogical(prms, 'FMM')
+sim_param%BoxLength = getreal(prms, 'BoxLength')
+sim_param%NBox = getintarray(prms, 'NBox',3)
+sim_param%OctreeOrigin = getrealarray(prms, 'OctreeOrigin',3)
+sim_param%NOctreeLevels = getint(prms, 'NOctreeLevels')
+sim_param%MinOctreePart = getint(prms, 'MinOctreePart')
+sim_param%MultipoleDegree = getint(prms,'MultipoleDegree')
 
-ff_ratio_dou  = getreal(prms, 'FarFieldRatioDoublet')
-ff_ratio_sou  = getreal(prms, 'FarFieldRatioSource')
-eps_dou   = getreal(prms, 'DoubletThreshold')
-r_Rankine = getreal(prms, 'RankineRad')
-r_cutoff  = getreal(prms, 'CutoffRad')
 
-BoxLength = getreal(prms, 'BoxLength')
-NBox = getintarray(prms, 'NBox',3)
-OctreeOrigin = getrealarray(prms, 'OctreeOrigin',3)
-NOctreeLevels = getint(prms, 'NOctreeLevels')
-MinOctreePart = getint(prms, 'MinOctreePart')
-multipole_deg = getint(prms,'MultipoleDegree')
-
-
-!Octree stuff
 
 !-- Parameters Initializations --
-call initialize_doublet(ff_ratio_dou, eps_dou, r_Rankine, r_cutoff);
-call initialize_vortline(r_Rankine, r_cutoff);
-call initialize_vortpart(r_Rankine, r_cutoff);
-call initialize_surfpan(ff_ratio_sou);
-
+call initialize_doublet(sim_param%FarFieldRatioDoublet,sim_param%DoubletThreshold, sim_param%RankineRad, sim_param%CutoffRad);
+call initialize_vortline(sim_param%RankineRad, sim_param%CutoffRad);
+call initialize_vortpart(sim_param%RankineRad, sim_param%CutoffRad);
+call initialize_surfpan(sim_param%FarFieldRatioSource);
+!reset the numbering for output files
 nout = 0
+!Manage restart
 restart = getlogical(prms,'restart_from_file')
 if (restart) then
   reset_time = getlogical(prms,'reset_time')
   restart_file = getstr(prms,'restart_file')
   call printout('RESTART: restarting from file: '//trim(restart_file))
-  geo_file_name = restart_file(1:len(trim(restart_file))-11)//'geo.h5'
+  sim_param%GeometryFile = restart_file(1:len(trim(restart_file))-11)//'geo.h5'
 
   !restarting the same simulation, advance the numbers
-  if(restart_file(1:len(trim(restart_file))-12).eq.trim(basename)) then
+  if(restart_file(1:len(trim(restart_file))-12).eq.trim(sim_param%basename)) then
   read(restart_file(len(trim(restart_file))-6:len(trim(restart_file))-3),*) nout 
     call printout('Identified restart from the same simulation, keeping the&
     & previous output numbering')
     !avoid rewriting the same timestep
     output_start = .false.
   endif
-  if(.not. reset_time) call load_time(restart_file, tstart)
+  if(.not. reset_time) call load_time(restart_file, sim_param%t0)
 endif
 
-
-if (debug_level .ge. 3) then
-  write(message,*) 'Initial time tstart: ', tstart; call printout(message)
-  write(message,*) 'Final time tend:     ', tend; call printout(message)
-  write(message,*) 'Time step dt:        ', dt; call printout(message)
-  write(message,*) 'Output interval:     ', dt_out; call printout(message)
-  write(message,*) 'Debug output interval:', dt_out; call printout(message)
+!Printout the parameters
+if (sim_param%debug_level .ge. 3) then
+  write(message,*) 'Initial time tstart: ', sim_param%t0; call printout(message)
+  write(message,*) 'Final time tend:     ', sim_param%tend; call printout(message)
+  write(message,*) 'Time step dt:        ', sim_param%dt; call printout(message)
+  write(message,*) 'Output interval:     ', sim_param%dt_out; call printout(message)
   write(message,*) 'Output first step:   ', output_start; call printout(message)
-  write(message,*) 'Debug level:', debug_level; call printout(message)
-  write(message,*) 'Free stream velocity:', uinf; call printout(message)
-  write(message,*) 'Maximum wake panels:', n_wake_panels; call printout(message)
-  write(message,*) 'Results basename: ', trim(basename); call printout(message)
+  write(message,*) 'Debug level:', sim_param%debug_level; call printout(message)
+  write(message,*) 'Free stream velocity:', sim_param%u_inf; call printout(message)
+  write(message,*) 'Maximum wake panels:', sim_param%n_wake_panels; call printout(message)
+  write(message,*) 'Results basename: ', trim(sim_param%basename); call printout(message)
   write(message,*) 'Debug basename: ', trim(basename_debug); call printout(message)
 endif
 
 
 !---- Simulation parameters ----
-nstep = ceiling((tend-tstart)/dt) + 1 !(for the zero time step)
-sim_param%t0          = tstart
-sim_param%tfin        = tend
-sim_param%dt          = dt
+nstep = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1 !(for the zero time step)
+!sim_param%t0          = tstart
+!sim_param%tfin        = tend
+!sim_param%dt          = dt
 sim_param%n_timesteps = nstep
 allocate(sim_param%time_vec(sim_param%n_timesteps))
 sim_param%time_vec = (/ ( sim_param%t0 + &
          dble(i-1)*sim_param%dt, i=1,sim_param%n_timesteps ) /)
-allocate(sim_param%u_inf(3))
-sim_param%u_inf = uinf
-sim_param%P_inf = Pinf
-sim_param%rho_inf = rho
-sim_param%a_inf = a_inf
-sim_param%mu_inf = mu_inf
-! old, element depending for moving bodies, e.g. rotating blades +++++++
-! sim_param%Re    = Re
-! sim_param%Mach  = Mach
-sim_param%first_panel_scaling = wake_pan_scaling
-sim_param%min_vel_at_te       = wake_pan_minvel 
-sim_param%rigid_wake = rigid_wake
-allocate(sim_param%rigid_wake_vel(3))
-sim_param%rigid_wake_vel = rigid_wake_vel
-sim_param%debug_level = debug_level
-sim_param%basename = basename
 
 !------ Geometry creation ------
 call printout(nl//'====== Geometry Creation ======')
 t0 = dust_time()
-!call copy_geo(sim_param, geo_file_name, run_id)
 target_file = trim(sim_param%basename)//'_geo.h5'
-call create_geometry(geo_file_name, ref_file_name, input_file_name, geo, &
+call create_geometry(sim_param%GeometryFile, sim_param%ReferenceFile, input_file_name, geo, &
                      te, elems, elems_expl, elems_ad, elems_ll, &
                      elems_tot, airfoil_data, sim_param, target_file, run_id)
 
 t1 = dust_time()
-if(debug_level .ge. 1) then
+if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Created geometry in: ' , t1 - t0,' s.'
   call printout(message)
 endif
 
-if(debug_level .ge. 15) &
+if(sim_param%debug_level .ge. 15) &
       call debug_printout_geometry_minimal(elems, geo, basename_debug, 0)
-if(debug_level .ge. 15) &
+if(sim_param%debug_level .ge. 15) &
       call debug_ll_printout_geometry(elems_ll, geo, basename_debug, 0)
 
 !TODO: check whether to move these calls before, and precisely what they do
@@ -456,15 +405,17 @@ call finalizeParameters(prms)
 !------ Initialization ------
 call printout(nl//'====== Initializing Wake ======')
 
-call initialize_wake(wake, geo, te, n_wake_panels, n_wake_panels, &
-       n_wake_parts, part_box_min, part_box_max, sim_param)
+call initialize_wake(wake, geo, te, sim_param%n_wake_panels, &
+       sim_param%n_wake_panels, sim_param%n_wake_particles, &
+       sim_param%particles_box_min, &
+       sim_param%particles_box_max,  sim_param)
 
 call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
 call initialize_linsys(linsys, geo, elems, elems_expl, &
-                       wake,  uinf)
+                       wake,  sim_param%u_inf)
 t1 = dust_time()
-if(debug_level .ge. 1) then
+if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Initialized linear system in: ' , t1 - t0,' s.'
   call printout(message)
 endif
@@ -472,11 +423,12 @@ endif
 !===========EXPERIMENTAL PART, OCTREE========
 call printout(nl//'====== Initializing Octree ======')
 t0 = dust_time()
-call initialize_octree(BoxLength, NBox, OctreeOrigin, &
-                       NOctreeLevels, MinOctreePart, multipole_deg, &
-                       r_Rankine, octree)
+call initialize_octree(sim_param%BoxLength, sim_param%NBox, &
+                       sim_param%OctreeOrigin, sim_param%NOctreeLevels, &
+                       sim_param%MinOctreePart, sim_param%MultipoleDegree, &
+                       sim_param%RankineRad, octree)
 t1 = dust_time()
-if(debug_level .ge. 1) then
+if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
   call printout(message)
 endif
@@ -495,14 +447,14 @@ call printout(message)
 
 
 !====== Time Cycle ======
-time = tstart
+time = sim_param%t0
 t_last_out = time; t_last_debug_out = time
 
 allocate(res_old(size(elems))) ; res_old = 0.0_wp
 t11 = dust_time()
 do it = 1,nstep
 
-  if(debug_level .ge. 1) then
+  if(sim_param%debug_level .ge. 1) then
     write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
                                                          nstep, ' time: ', time
     call printout(message)
@@ -520,9 +472,9 @@ do it = 1,nstep
   call update_actdisk(elems_ad,linsys,sim_param)
 
 
-  if((debug_level .ge. 16).and.time_2_debug_out)&
+  if((sim_param%debug_level .ge. 16).and.time_2_debug_out)&
             call debug_printout_geometry(elems, geo, basename_debug, it)
-  if((debug_level .ge. 16).and.time_2_debug_out)&
+  if((sim_param%debug_level .ge. 16).and.time_2_debug_out)&
             call debug_ll_printout_geometry(elems_ll, geo, basename_debug, it)
 
 
@@ -531,15 +483,15 @@ do it = 1,nstep
   t0 = dust_time()
 
   call assemble_linsys(linsys, elems, elems_expl,  &
-                       wake, uinf)
+                       wake, sim_param%u_inf)
   t1 = dust_time()
 
-  if(debug_level .ge. 1) then
+  if(sim_param%debug_level .ge. 1) then
     write(message,'(A,F9.3,A)') 'Assembled linear system in: ' , t1 - t0,' s.'
     call printout(message)
   endif
 
-  if ((debug_level .ge. 50).and.time_2_debug_out) then
+  if ((sim_param%debug_level .ge. 50).and.time_2_debug_out) then
     write(frmt,'(I4.4)') it
     call dump_linsys(linsys, trim(basename_debug)//'A_'//trim(frmt)//'.dat', &
                              trim(basename_debug)//'b_'//trim(frmt)//'.dat' )
@@ -558,12 +510,12 @@ do it = 1,nstep
   end do
   res_old = linsys%res
 
-  if(debug_level .ge. 1) then
+  if(sim_param%debug_level .ge. 1) then
     write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
     call printout(message)
   endif
 
-  if (debug_level .ge. 20.and.time_2_debug_out) &
+  if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                       call debug_printout_result(linsys, basename_debug, it)
 
   !------ Update the explicit part ------  % v-----implicit elems: p,v
@@ -587,14 +539,14 @@ do it = 1,nstep
     call elems_ad(i_el)%p%compute_dforce(sim_param)
   end do
 
-  !if ((debug_level .ge. 10).and.time_2_debug_out) then
+  !if ((sim_param%debug_level .ge. 10).and.time_2_debug_out) then
   !  call debug_printout_loads(elems, basename_debug, it)
   !endif
 
   !------ Output the results  ------
   !Printout the wake
   !DISCONTINUED
-  !if((debug_level .ge. 17).and.time_2_debug_out)  &
+  !if((sim_param%debug_level .ge. 17).and.time_2_debug_out)  &
   !                    call debug_printout_wake(wake, basename_debug, it)
 
   !Print the results
@@ -609,12 +561,12 @@ do it = 1,nstep
   t0 = dust_time()
   call update_wake(wake, elems_tot, octree, sim_param)
   t1 = dust_time()
-  if(debug_level .ge. 1) then
+  if(sim_param%debug_level .ge. 1) then
     write(message,'(A,F9.3,A)') 'Updated wake in: ' , t1 - t0,' s.'
     call printout(message)
   endif
 
-  time = min(tend, time+dt)
+  time = min(sim_param%tend, time+sim_param%dt)
   call update_geometry(geo, time, .false.)
   call prepare_wake(wake, geo, sim_param)
 
@@ -623,7 +575,7 @@ do it = 1,nstep
   !t0 = dust_time()
  !! call sort_particles(wake%part_p, octree)
   !t1 = dust_time()
-  !if(debug_level .ge. 1) then
+  !if(sim_param%debug_level .ge. 1) then
   !  write(message,'(A,F9.3,A)') 'Updated particles in octree in: ' , t1 - t0,' s.'
   !  call printout(message)
   !endif
@@ -719,7 +671,7 @@ end subroutine copy_geo
 subroutine init_timestep(t)
  real(wp), intent(in) :: t
 
-  if (real(t-t_last_out) .ge. real(dt_out)) then
+  if (real(t-t_last_out) .ge. real(sim_param%dt_out)) then
     time_2_out = .true.
     t_last_out = t
   else
@@ -736,13 +688,13 @@ subroutine init_timestep(t)
   !If it is the last timestep output the solution, unless dt_out is set
   !longer than the whole execution, declaring implicitly that no output is 
   !required.
-  if((it .eq. nstep) .and. (dt_out .le. tend)) then
+  if((it .eq. nstep) .and. (sim_param%dt_out .le. sim_param%tend)) then
     time_2_out = .true.
     time_2_debug_out = .true.
   endif
  
   !if requested, print the output also at the first step (t0)
-  if ((t.eq.tstart) .and. output_start) then
+  if ((t.eq.sim_param%t0) .and. output_start) then
     t_last_out = t
     t_last_debug_out = t
     time_2_out = .true.
@@ -840,8 +792,8 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
   allocate(conn(4,size(elems))); conn = -666;
   ! surf_vel and vel_phi
   allocate( surf_vel(3,size(elems)), vel_phi(3,size(elems)) )
-  surf_vel = -666.6 ; vel_phi = -666.6 
- 
+  surf_vel = -666.6_wp ; vel_phi = -666.6_wp 
+
   do ie=1,size(elems)
     norm(:,ie) = elems(ie)%p%nor
     cent(:,ie) = elems(ie)%p%cen
@@ -935,10 +887,6 @@ subroutine debug_ll_printout_geometry(elems, geo, basename, it)
  integer, allocatable  :: el(:,:), conn(:,:)
  character(len=max_char_len) :: sit
  integer :: ie, iv
-
- ! surf_vel and vel_phi
- real(wp), allocatable :: surf_vel(:,:), vel_phi(:,:) 
- integer :: i_e
 
 
   allocate(norm(3,size(elems)), cent(3,size(elems)), velb(3,size(elems)))

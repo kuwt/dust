@@ -87,6 +87,9 @@ use mod_wake, only: &
 
 use mod_stringtools, only: &
   stricmp
+
+use mod_version, only: &
+  git_sha1, version
 !----------------------------------------------------------------------
 
 implicit none
@@ -129,6 +132,9 @@ subroutine save_status(geo, wake,  sim_params, it, time, run_id)
   call new_hdf5_file(trim(sim_params%basename)//'_res_'//trim(sit)//'.h5', &
                      floc)
   call write_hdf5_attr(run_id, 'run_id', floc)
+  call write_hdf5_attr(git_sha1, 'git_sha1', floc)
+  call write_hdf5_attr(version, 'version', floc)
+  call sim_params%save_param(floc)
   call write_hdf5(time,'time',floc)
 
   call new_hdf5_group(floc, 'Parameters', ploc)

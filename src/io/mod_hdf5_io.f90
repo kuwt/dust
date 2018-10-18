@@ -109,7 +109,12 @@ use mod_handling, only: &
  end interface
 
  interface write_hdf5_attr
-  module procedure write_1d_int_hdf5_attr
+  module procedure write_1d_int_hdf5_attr, &
+                   write_int_hdf5_attr, &
+                   write_1d_real_hdf5_attr, &
+                   write_real_hdf5_attr, &
+                   write_logical_hdf5_attr, &
+                   write_string_hdf5_attr
  end interface
 
  interface append_hdf5
@@ -1907,6 +1912,136 @@ end subroutine read_3d_int_hdf5_al
 ! ==== Attributes ====
 !-----------------------------------------------------------------------
 
+!> Write a single real value to an attribute
+!!
+subroutine write_real_hdf5_attr(outdata, outname, loc_id)
+ real(wp), intent(in)           :: outdata
+ character(len=*), intent(in)  :: outname
+ integer(HID_T), intent(in)    :: loc_id
+
+ integer(HID_T) :: dspace_id!, memspace_id
+ integer(HID_T) :: attr_id
+ !integer(HID_T) :: filetype_id, memtype_id
+ integer, parameter :: rank=1
+ integer(HSIZE_T) :: out_size(1)
+ character(len=*), parameter :: &
+    this_sub_name = 'write_real_hdf5_attr'
+ integer :: h5err
+ logical :: l_exists
+
+  !create a scalar dataspace
+  out_size(1) = 1
+  call h5Screate_f(H5S_SCALAR_F, dspace_id, h5err)
+
+  !check if the dataset on file exists
+  call h5Aexists_f(loc_id, trim(outname), l_exists, h5err)
+
+  if(.not.l_exists) then
+    !create the dataset on the file
+    call h5Acreate_f(loc_id, trim(outname), h5t_file_float, dspace_id, &
+                    attr_id, h5err)
+  else
+    call h5Aopen_f(loc_id, trim(outname), attr_id, h5err)
+  endif
+
+  !write
+  call h5Awrite_f(attr_id, h5t_mem_float, outdata, out_size, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                           'Problems writing attribute '//outname)
+
+  !release resources
+  call h5Aclose_f(attr_id, h5err)
+  call h5Sclose_f(dspace_id, h5err)
+end subroutine write_real_hdf5_attr
+
+!-----------------------------------------------------------------------
+
+!> Write a rank 1 array of reals to an attribute
+!!
+subroutine write_1d_real_hdf5_attr(outdata, outname, loc_id)
+ real(wp), intent(in)           :: outdata(:)
+ character(len=*), intent(in)  :: outname
+ integer(HID_T), intent(in)    :: loc_id
+
+ integer(HID_T) :: dspace_id!, memspace_id
+ integer(HID_T) :: attr_id
+ !integer(HID_T) :: filetype_id, memtype_id
+ integer, parameter :: rank=1
+ integer(HSIZE_T) :: out_size(1)
+ character(len=*), parameter :: &
+    this_sub_name = 'write_1d_real_hdf5_attr'
+ integer :: h5err
+ logical :: l_exists
+
+  !create a 1D dataspace
+  out_size(1) = int(size(outdata,1), h5sz)
+  call h5Screate_simple_f(rank, out_size, dspace_id, h5err)
+
+  !check if the dataset on file exists
+  call h5Aexists_f(loc_id, trim(outname), l_exists, h5err)
+
+  if(l_exists) then
+    call h5Adelete_f(loc_id, trim(outname), h5err) 
+  endif
+  !create the dataset on the file
+  call h5Acreate_f(loc_id, trim(outname), h5t_file_float, dspace_id, &
+                   attr_id, h5err)
+  !write
+  call h5Awrite_f(attr_id, h5t_mem_float, outdata, out_size, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                           'Problems writing attribute '//outname)
+
+  !release resources
+  call h5Aclose_f(attr_id, h5err)
+  call h5Sclose_f(dspace_id, h5err)
+end subroutine write_1d_real_hdf5_attr
+
+!-----------------------------------------------------------------------
+
+!> Write an integer to an attribute
+!!
+subroutine write_int_hdf5_attr(outdata, outname, loc_id)
+ integer, intent(in)           :: outdata
+ character(len=*), intent(in)  :: outname
+ integer(HID_T), intent(in)    :: loc_id
+
+ integer(HID_T) :: dspace_id!, memspace_id
+ integer(HID_T) :: attr_id
+ !integer(HID_T) :: filetype_id, memtype_id
+ integer, parameter :: rank=1
+ integer(HSIZE_T) :: out_size(1)
+ character(len=*), parameter :: &
+    this_sub_name = 'write_1d_int_hdf5'
+ integer :: h5err
+ logical :: l_exists
+
+  !create a scalar dataspace
+  out_size(1) = 1
+  call h5Screate_f(H5S_SCALAR_F, dspace_id, h5err)
+
+  !check if the dataset on file exists
+  call h5Aexists_f(loc_id, trim(outname), l_exists, h5err)
+
+  if(.not.l_exists) then
+    !create the dataset on the file
+    call h5Acreate_f(loc_id, trim(outname), h5t_file_int, dspace_id, &
+                    attr_id, h5err)
+  else
+    call h5Aopen_f(loc_id, trim(outname), attr_id, h5err)
+  endif
+
+  !write
+  call h5Awrite_f(attr_id, h5t_mem_int, outdata, out_size, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                           'Problems writing attribute '//outname)
+
+  !release resources
+  call h5Aclose_f(attr_id, h5err)
+  call h5Sclose_f(dspace_id, h5err)
+end subroutine write_int_hdf5_attr
+
+!-----------------------------------------------------------------------
+
 !> Write a rank 1 array of integers to an attribute
 !!
 subroutine write_1d_int_hdf5_attr(outdata, outname, loc_id)
@@ -1949,4 +2084,117 @@ end subroutine write_1d_int_hdf5_attr
 
 !-----------------------------------------------------------------------
 
+!> Write a string to an attribute
+!!
+subroutine write_string_hdf5_attr(outdata, outname, loc_id)
+ character(len=*), intent(in), target :: outdata
+ character(len=*), intent(in)         :: outname
+ integer(HID_T), intent(in)           :: loc_id
+
+ integer(HID_T) :: dspace_id!, memspace_id
+ integer(HID_T) :: attr_id
+ integer(HID_T) :: filetype_id, memtype_id
+ integer, parameter :: rank=1
+ integer(HSIZE_T) :: out_size(1)
+ character(len=*), parameter :: &
+    this_sub_name = 'write_string_hdf5_attr'
+ integer :: h5err
+ integer ::strlen
+ logical :: l_exists
+
+  strlen = len(outdata)
+  out_size(1) = 1
+
+  !create the string datatypes
+  call h5Tcopy_f(h5t_mem_char, memtype_id, h5err)
+  call h5Tset_size_f(memtype_id, int(strlen,HSIZE_T),h5err)
+  call h5Tcopy_f(h5t_file_char, filetype_id, h5err)
+  call h5Tset_size_f(filetype_id, int(strlen,HSIZE_T),h5err)
+
+  !create a (single) scalar dataspace
+  call h5Screate_f(H5S_SCALAR_F, dspace_id, h5err)
+
+  !check if the dataset on file exists
+  call h5Aexists_f(loc_id, trim(outname), l_exists, h5err)
+
+  if(l_exists) then
+    call h5Adelete_f(loc_id, trim(outname), h5err) 
+  endif
+  !create the dataset on the file
+  call h5Acreate_f(loc_id, trim(outname), filetype_id, dspace_id, &
+                   attr_id, h5err)
+  !write
+  call h5Awrite_f(attr_id, memtype_id, outdata, out_size, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                           'Problems writing attribute '//outname)
+
+  !release resources
+  call h5Aclose_f(attr_id, h5err)
+  call h5Sclose_f(dspace_id, h5err)
+  call h5Tclose_f(memtype_id, h5err)
+  call h5Tclose_f(filetype_id, h5err)
+end subroutine write_string_hdf5_attr
+
+!-----------------------------------------------------------------------
+
+
+!> Write a logical to an attribute
+!!
+!! WARNING: the hdf5 support for boolean data types is doubtful, so for the 
+!! moment a single character "T" or "F" is being printed
+subroutine write_logical_hdf5_attr(outdata, outname, loc_id)
+ logical, intent(in)                  :: outdata
+ character(len=*), intent(in)         :: outname
+ integer(HID_T), intent(in)           :: loc_id
+
+ character(len=1) :: strout
+ integer(HID_T) :: dspace_id!, memspace_id
+ integer(HID_T) :: attr_id
+ !integer(HID_T) :: filetype_id, memtype_id
+ integer, parameter :: rank=1
+ integer(HSIZE_T) :: out_size(1)
+ character(len=*), parameter :: &
+    this_sub_name = 'write_logical_hdf5_attr'
+ integer :: h5err
+ logical :: l_exists
+
+  out_size(1) = 1
+
+  if (outdata) then
+    strout = 'T'
+  else
+    strout = 'F'
+  endif
+
+  !create the string datatypes
+  !call h5Tcopy_f(h5t_mem_char, memtype_id, h5err)
+  !call h5Tset_size_f(memtype_id, int(strlen,HSIZE_T),h5err)
+  !call h5Tcopy_f(h5t_file_char, filetype_id, h5err)
+  !call h5Tset_size_f(filetype_id, int(strlen,HSIZE_T),h5err)
+
+  !create a (single) scalar dataspace
+  call h5Screate_f(H5S_SCALAR_F, dspace_id, h5err)
+
+  !check if the dataset on file exists
+  call h5Aexists_f(loc_id, trim(outname), l_exists, h5err)
+
+  if(l_exists) then
+    call h5Adelete_f(loc_id, trim(outname), h5err) 
+  endif
+  !create the dataset on the file
+  call h5Acreate_f(loc_id, trim(outname), h5t_file_char, dspace_id, &
+                   attr_id, h5err)
+  !write
+  call h5Awrite_f(attr_id, h5t_mem_char, strout, out_size, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                           'Problems writing attribute '//outname)
+
+  !release resources
+  call h5Aclose_f(attr_id, h5err)
+  call h5Sclose_f(dspace_id, h5err)
+  !call h5Tclose_f(memtype_id, h5err)
+  !call h5Tclose_f(filetype_id, h5err)
+end subroutine write_logical_hdf5_attr
+
+!-----------------------------------------------------------------------
 end module mod_hdf5_io

@@ -90,6 +90,15 @@ include_directories(${incldirs} ${CGNS_INC} ${HDF5_INCLUDE_DIRS})
 #set the link path
 link_directories(${CGNS_LIB} ${HDF5_LIBRARY_DIRS})
 
+#Generate the version
+execute_process(COMMAND
+  git describe --match=NeVeRmAtCh --always --abbrev=40 --dirty
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  OUTPUT_VARIABLE GIT_SHA1
+  ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+configure_file("${PROJECT_SOURCE_DIR}/src/general/mod_version.f90.in" 
+               "${PROJECT_SOURCE_DIR}/src/general/mod_version.f90")
 
 
 #add files
