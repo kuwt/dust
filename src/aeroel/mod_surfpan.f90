@@ -90,6 +90,11 @@ type, extends(c_impl_elem) :: t_surfpan
   real(wp), allocatable :: verp(:,:)
   real(wp)              :: surf_vel(3)
 
+  real(wp) :: h_bl      ! height of the surface (boundary??) layer
+  real(wp) :: al_free   ! ratio: shed vorticity / total vorticity
+  real(wp) :: surf_vort(3) ! free vorticity 
+  real(wp) :: free_vort(3) ! free vorticity 
+
 contains
 
   procedure, pass(this) :: build_row        => build_row_surfpan

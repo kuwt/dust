@@ -112,6 +112,9 @@ use mod_hdf5_io, only: &
 use mod_dust_io, only: &
   save_status, load_solution, load_time
 
+use mod_viscosity, only: &
+  viscosity_effects
+
 implicit none
 
 !run-id
@@ -530,7 +533,7 @@ do it = 1,nstep
   !------ Compute loads -------
   ! Implicit elements: vortex rings and 3d-panels
   do i_el = 1 , size(elems)
-    call elems(i_el)%p%compute_pres(sim_param)
+    call elems(i_el)%p%compute_pres(sim_param)     ! update surf_vel field too
     call elems(i_el)%p%compute_dforce(sim_param)
   end do
   ! Explicit elements:
@@ -557,6 +560,11 @@ do it = 1,nstep
     nout = nout+1
     call save_status(geo, wake, sim_param, nout, time, run_id)
   endif
+
+  !------ Viscous Effects and Flow Separations ------
+  ! some computation of surface quantities and vorticity to be released.
+  ! Free vortices will be introduced in prepare_wake(), some lines below
+  call viscosity_effects( geo , elems , te , sim_param )
 
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
