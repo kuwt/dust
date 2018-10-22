@@ -103,6 +103,8 @@ type t_sim_param
   real(wp) :: RankineRad
   !> Complete cutoff radius
   real(wp) :: CutoffRad
+  !> use the vortex stretching or not
+  logical :: use_vs
 
   !FMM parameters
   !> Employing the FMM method
@@ -175,6 +177,7 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%DoubletThreshold, 'DoubletThreshold', loc)
   call write_hdf5_attr(this%RankineRad, 'RankineRad', loc)
   call write_hdf5_attr(this%CutoffRad, 'CutoffRad', loc)
+  call write_hdf5_attr(this%use_vs, 'vortstretch', loc)
   call write_hdf5_attr(this%use_fmm, 'use_fmm', loc)
   if(this%use_fmm) then
     call write_hdf5_attr(this%BoxLength, 'BoxLength', loc)

@@ -877,20 +877,17 @@ subroutine update_wake(wake, elems, octree, sim_param)
  type(t_octree), intent(inout) :: octree
  type(t_sim_param), intent(in) :: sim_param
 
- integer :: iw, ipan, ie, ip, np
+ integer :: iw, ipan, ie, ip, np, iq
  integer :: id, ir
- !real(wp) :: dist(3) , vel_te(3)
  real(wp) :: pos_p(3), vel_p(3)
+ real(wp) :: str(3), stretch(3)
  type(t_pot_elem_p), allocatable :: pan_p_temp(:)
  real(wp), allocatable :: point_old(:,:,:)
  real(wp), allocatable :: points(:,:,:)
  real(wp), allocatable, target :: points_prt(:,:)
  real(wp), allocatable, target :: alpha_prt(:,:)
- real(wp), allocatable, target :: points_prt_fmm(:,:)
- !real(wp), allocatable :: points_end(:,:)
  logical :: increase_wake
  integer :: size_old
- real(wp) :: err
  character(len=*), parameter :: this_sub_name='update_wake'
 
   wake%w_vel = 0.0_wp
@@ -1068,19 +1065,50 @@ subroutine update_wake(wake, elems, octree, sim_param)
 
     wake%part_p(ip)%p%npos   => points_prt(:,ip)
     wake%part_p(ip)%p%nalpha => alpha_prt(:,ip)
+    
+    !If not using hte fast multipole, update particles position now
+    if (.not.sim_param%use_fmm) then
+      pos_p = wake%part_p(ip)%p%cen
+
+      call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
+
+      !update the position
+      points_prt(:,ip) = wake%part_p(ip)%p%cen + vel_p*sim_param%dt
+
+      !if using vortex stretching, calculate it now
+      if(sim_param%use_vs) then
+        stretch = 0.0_wp
+        do iq = 1, wake%n_prt
+        if (ip.ne.iq) then
+          call wake%part_p(iq)%p%compute_stretch(wake%part_p(ip)%p%cen, &
+               wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, str)
+          stretch = stretch + str/(4.0_wp*pi)
+        endif 
+        enddo
+        !do ie=1,size(wake%end_vorts)
+        !  call wake%end_vorts(ie)%compute_stretch(wake%part_p(ip)%p%cen, &
+        !             wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, str)
+        !  stretch = stretch + str/(4.0_wp*pi)
+        !enddo
+        alpha_prt(:,ip) = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
+                        stretch*sim_param%dt
+      endif
+    end if
 
     
   enddo
 !!!$omp end parallel do
-
-  t0 = dust_time()
-  call sort_particles(wake%part_p, octree)
-  call calculate_multipole(wake%part_p, octree)
-  call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
-                       wake%end_vorts, sim_param)
-  t1 = dust_time()
-  write(msg,'(A,F9.3,A)') 'Multipoles calculation: ' , t1 - t0,' s.'
-  call printout(msg)
+  
+  if (sim_param%use_fmm) then
+    t0 = dust_time()
+    call sort_particles(wake%part_p, octree)
+    call calculate_multipole(wake%part_p, octree)
+    call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
+                         wake%end_vorts, sim_param)
+    t1 = dust_time()
+    write(msg,'(A,F9.3,A)') 'Multipoles calculation: ' , t1 - t0,' s.'
+    call printout(msg)
+  endif
 
   !Check the difference
   !err = norm2(points_prt-points_prt_fmm)/norm2(points_prt)
@@ -1092,9 +1120,11 @@ subroutine update_wake(wake, elems, octree, sim_param)
     if(all(points_prt(:,ip) .ge. wake%part_box_min) .and. &
        all(points_prt(:,ip) .le. wake%part_box_max)) then
       wake%part_p(ip)%p%cen = points_prt(:,ip)
-      wake%part_p(ip)%p%mag = norm2(alpha_prt(:,ip))
-      if(wake%part_p(ip)%p%mag .ne. 0.0_wp) &
-         wake%part_p(ip)%p%dir = alpha_prt(:,ip)/wake%part_p(ip)%p%mag
+      if(sim_param%use_vs) then
+        wake%part_p(ip)%p%mag = norm2(alpha_prt(:,ip))
+        if(wake%part_p(ip)%p%mag .ne. 0.0_wp) &
+           wake%part_p(ip)%p%dir = alpha_prt(:,ip)/wake%part_p(ip)%p%mag
+      endif
     else
       wake%part_p(ip)%p%free = .true.
       wake%n_prt = wake%n_prt -1

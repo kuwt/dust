@@ -214,10 +214,12 @@ call prms%CreateStringOption('ReferenceFile','Reference frames file','no_set')
 
 ! output:
 call prms%CreateStringOption('basename','oputput basename','./')
-call prms%CreateStringOption('basename_debug','oputput basename for debug','./')
+call prms%CreateStringOption('basename_debug','oputput basename for debug', &
+                                                                         './')
 call prms%CreateLogicalOption( 'output_start', "output values at starting &
-                                                             & iteration", 'F')
-call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output','0')
+                                                          & iteration", 'F')
+call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output', &
+                                                                         '0')
 
 ! restart
 call prms%CreateLogicalOption('restart_from_file','restarting from file?','F')
@@ -227,7 +229,7 @@ call prms%CreateLogicalOption('reset_time','reset the time from previous &
 
 ! parameters:
 call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
-                                                           '(/1.0, 0.0, 0.0/)')
+                                                       '(/1.0, 0.0, 0.0/)')
 call prms%CreateRealOption( 'P_inf', "free stream pressure", '1.0')
 call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')
 call prms%CreateRealOption( 'a_inf', "Speed of sound", '340.0')  ! m/s
@@ -266,8 +268,10 @@ call prms%CreateRealOption('BoxLength','length of the octree box')
 call prms%CreateIntArrayOption('NBox','number of boxes in each direction')
 call prms%CreateRealArrayOption( 'OctreeOrigin', "rigid wake velocity" )
 call prms%CreateIntOption('NOctreeLevels','number of octree levels')
-call prms%CreateIntOption('MinOctreePart','minimum number of octree particles')
+call prms%CreateIntOption('MinOctreePart','minimum number of octree &
+                                                             &particles')
 call prms%CreateIntOption('MultipoleDegree','multipole expansion degree')
+call prms%CreateLogicalOption('Vortstretch','Employ vortex stretching','T')
 
 
 ! get the parameters and print them out
@@ -316,6 +320,7 @@ sim_param%RankineRad = getreal(prms, 'RankineRad')
 sim_param%CutoffRad  = getreal(prms, 'CutoffRad')
 sim_param%first_panel_scaling = getreal(prms,'ImplicitPanelScale')
 sim_param%min_vel_at_te  = getreal(prms,'ImplicitPanelMinVel')
+sim_param%use_vs = getlogical(prms, 'Vortstretch')
 !Octree and FMM parameters
 sim_param%use_fmm = getlogical(prms, 'FMM')
 sim_param%BoxLength = getreal(prms, 'BoxLength')
@@ -327,8 +332,11 @@ sim_param%MultipoleDegree = getint(prms,'MultipoleDegree')
 
 
 
+
 !-- Parameters Initializations --
-call initialize_doublet(sim_param%FarFieldRatioDoublet,sim_param%DoubletThreshold, sim_param%RankineRad, sim_param%CutoffRad);
+call initialize_doublet(sim_param%FarFieldRatioDoublet, &
+                        sim_param%DoubletThreshold, sim_param%RankineRad, &
+                        sim_param%CutoffRad);
 call initialize_vortline(sim_param%RankineRad, sim_param%CutoffRad);
 call initialize_vortpart(sim_param%RankineRad, sim_param%CutoffRad);
 call initialize_surfpan(sim_param%FarFieldRatioSource);
@@ -340,11 +348,14 @@ if (restart) then
   reset_time = getlogical(prms,'reset_time')
   restart_file = getstr(prms,'restart_file')
   call printout('RESTART: restarting from file: '//trim(restart_file))
-  sim_param%GeometryFile = restart_file(1:len(trim(restart_file))-11)//'geo.h5'
+  sim_param%GeometryFile = restart_file(1:len(trim(restart_file))-11)&
+                                                           &//'geo.h5'
 
   !restarting the same simulation, advance the numbers
-  if(restart_file(1:len(trim(restart_file))-12).eq.trim(sim_param%basename)) then
-  read(restart_file(len(trim(restart_file))-6:len(trim(restart_file))-3),*) nout 
+  if(restart_file(1:len(trim(restart_file))-12).eq. &
+                                               trim(sim_param%basename)) then
+  read(restart_file(len(trim(restart_file))-6:len(trim(restart_file))-3),*) &
+                                                                         nout 
     call printout('Identified restart from the same simulation, keeping the&
     & previous output numbering')
     !avoid rewriting the same timestep
@@ -369,10 +380,8 @@ endif
 
 
 !---- Simulation parameters ----
-nstep = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1 !(for the zero time step)
-!sim_param%t0          = tstart
-!sim_param%tfin        = tend
-!sim_param%dt          = dt
+nstep = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1 
+       !(+1 for the zero time step)
 sim_param%n_timesteps = nstep
 allocate(sim_param%time_vec(sim_param%n_timesteps))
 sim_param%time_vec = (/ ( sim_param%t0 + &
@@ -382,9 +391,10 @@ sim_param%time_vec = (/ ( sim_param%t0 + &
 call printout(nl//'====== Geometry Creation ======')
 t0 = dust_time()
 target_file = trim(sim_param%basename)//'_geo.h5'
-call create_geometry(sim_param%GeometryFile, sim_param%ReferenceFile, input_file_name, geo, &
-                     te, elems, elems_expl, elems_ad, elems_ll, &
-                     elems_tot, airfoil_data, sim_param, target_file, run_id)
+call create_geometry(sim_param%GeometryFile, sim_param%ReferenceFile, &
+                     input_file_name, geo, te, elems, elems_expl, elems_ad, &
+                     elems_ll, elems_tot, airfoil_data, sim_param, &
+                     target_file, run_id)
 
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
@@ -426,7 +436,7 @@ t0 = dust_time()
 call initialize_octree(sim_param%BoxLength, sim_param%NBox, &
                        sim_param%OctreeOrigin, sim_param%NOctreeLevels, &
                        sim_param%MinOctreePart, sim_param%MultipoleDegree, &
-                       sim_param%RankineRad, octree)
+                       sim_param%RankineRad, sim_param, octree)
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
@@ -456,7 +466,7 @@ do it = 1,nstep
 
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
-                                                         nstep, ' time: ', time
+                                                 nstep, ' time: ', time
     call printout(message)
     t22 = dust_time()
     write(message,'(A,F9.3,A)') 'Elapsed time: ',t22-t00
@@ -570,16 +580,6 @@ do it = 1,nstep
   call update_geometry(geo, time, .false.)
   call prepare_wake(wake, geo, sim_param)
 
-  !!== EXPERIMENTAL, OCTREE ==
-  !write(*,*) 'Number of particles: ',size(wake%part_p)
-  !t0 = dust_time()
- !! call sort_particles(wake%part_p, octree)
-  !t1 = dust_time()
-  !if(sim_param%debug_level .ge. 1) then
-  !  write(message,'(A,F9.3,A)') 'Updated particles in octree in: ' , t1 - t0,' s.'
-  !  call printout(message)
-  !endif
-
 enddo
 
 
@@ -603,9 +603,9 @@ call printout(nl//'<<<<<< DUST end <<<<<<'//nl)
 
 
 
-!------------------------------------------------------------------------------
+!----------------------------------------------------------------------
 contains
-!------------------------------------------------------------------------------
+!----------------------------------------------------------------------
 
 subroutine get_run_id (run_id)
  integer, intent(out) :: run_id(10)
@@ -628,7 +628,7 @@ subroutine get_run_id (run_id)
 
 end subroutine
 
-!------------------------------------------------------------------------------
+!---------------------------------------------------------------------_
 !DISCONTINUED: consider removing
 subroutine copy_geo(sim_param, geo_file, run_id)
  type(t_sim_param), intent(inout) :: sim_param
@@ -664,7 +664,7 @@ subroutine copy_geo(sim_param, geo_file, run_id)
 
 end subroutine copy_geo
 
-!------------------------------------------------------------------------------
+!----------------------------------------------------------------------
 
 !> Perform preliminary procedures each timestep, mainly chech if it is time
 !! to perform output or not
@@ -703,7 +703,7 @@ subroutine init_timestep(t)
 
 end subroutine init_timestep
 
-!------------------------------------------------------------------------------
+!----------------------------------------------------------------------
 !DISCONTINUED: substituted by the routines in dust_io and dust_post
 !subroutine output_status(elems_tot, geo, wake_panels, basename, it, t)
 ! type(t_elem_p),   intent(in) :: elems_tot(:)

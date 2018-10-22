@@ -56,7 +56,7 @@ use mod_vortpart, only: &
 
 implicit none
 
-public :: t_multipole, t_polyexp, t_ker_der
+public :: t_multipole, t_polyexp, t_ker_der, set_multipole_param
 
 private
 
@@ -79,6 +79,9 @@ contains
   !> Initialize the data
   procedure, pass(this) :: init => init_multipole
   
+  !> Reset the data
+  procedure, pass(this) :: reset => reset_multipole
+
   !> Calculate the coefficients of the multipole in the leaf
   procedure, pass(this) :: leaf_M => leaf_M_multipole
 
@@ -145,11 +148,21 @@ contains
 end type
 
 !----------------------------------------------------------------------
+
+logical :: multipole_use_vs
 character(len=*), parameter :: this_mod_name='mod_multipole'
 character(len=max_char_len) :: msg
 
 !----------------------------------------------------------------------
 contains
+!----------------------------------------------------------------------
+
+subroutine set_multipole_param(vortstretch)
+ logical, intent(in) :: vortstretch
+
+  multipole_use_vs = vortstretch
+end subroutine set_multipole_param
+
 !----------------------------------------------------------------------
 
 subroutine init_multipole(this, polyexp)
@@ -158,7 +171,19 @@ subroutine init_multipole(this, polyexp)
 
   allocate(this%a(3,polyexp%n_mon))
   allocate(this%b(3,polyexp%n_mon))
-  allocate(this%c(3,3,polyexp%n_mon))
+  if(multipole_use_vs) allocate(this%c(3,3,polyexp%n_mon))
+
+
+end subroutine
+
+!----------------------------------------------------------------------
+
+subroutine reset_multipole(this)
+ class(t_multipole) :: this
+
+  this%a = 0.0_wp
+  this%b = 0.0_wp
+  if(multipole_use_vs) this%c = 0.0_wp
 
 
 end subroutine
@@ -240,12 +265,20 @@ subroutine M2L_multipole(this, ker_der, pexp, pexp_der, multipol_int)
       
       sum_v = sum_v + mult * cross(ker_der%D(:,idx_der), multipol_int%a(:,n))
       
-      sum_g(:,1) = sum_g(:,1) + mult * &
-                   cross(ker_der%Dc(:,1,idx_der), multipol_int%a(:,n))
-      sum_g(:,2) = sum_g(:,2) + mult * &
-                   cross(ker_der%Dc(:,2,idx_der), multipol_int%a(:,n))
-      sum_g(:,3) = sum_g(:,3) + mult * &
-                   cross(ker_der%Dc(:,3,idx_der), multipol_int%a(:,n))
+      if(multipole_use_vs) then
+        !sum_g(:,1) = sum_g(:,1) + mult * &
+        !             cross(ker_der%Dc(:,1,idx_der), multipol_int%a(:,n))
+        !sum_g(:,2) = sum_g(:,2) + mult * &
+        !             cross(ker_der%Dc(:,2,idx_der), multipol_int%a(:,n))
+        !sum_g(:,3) = sum_g(:,3) + mult * &
+        !             cross(ker_der%Dc(:,3,idx_der), multipol_int%a(:,n))
+        sum_g(1,:) = sum_g(1,:) + mult * &
+                     cross(ker_der%Dc(1,:,idx_der), multipol_int%a(:,n))
+        sum_g(2,:) = sum_g(2,:) + mult * &
+                     cross(ker_der%Dc(2,:,idx_der), multipol_int%a(:,n))
+        sum_g(3,:) = sum_g(3,:) + mult * &
+                     cross(ker_der%Dc(3,:,idx_der), multipol_int%a(:,n))
+      endif
       !sum1 = sum1 +  &
       !pexp_der%nfact(idx(1),idx(2),idx(3))/( &
       !pexp%nfact(pexp%pwr(1,m),pexp%pwr(2,m),pexp%pwr(3,m))*&
@@ -253,7 +286,8 @@ subroutine M2L_multipole(this, ker_der, pexp, pexp_der, multipol_int)
       ! cross(ker_der%D(:,idx_der), multipol_int%a(:,n))
     enddo
     this%b(:,m) = this%b(:,m) + real((-1)**(sum(pexp%pwr(:,m))),wp)*sum_v
-    this%c(:,:,m) = this%c(:,:,m) + real((-1)**(sum(pexp%pwr(:,m))),wp)*sum_g
+    if(multipole_use_vs) &
+      this%c(:,:,m) = this%c(:,:,m) + real((-1)**(sum(pexp%pwr(:,m))),wp)*sum_g
   enddo 
 
 end subroutine
@@ -280,7 +314,7 @@ subroutine L2L_multipole(this, cen, parent, parent_cen, pexp)
           product((cen-parent_cen)**((/is, js, ks/) - idx))
 
       this%b(:,m) = this%b(:,m) + mult*parent%b(:,s)
-      this%c(:,:,m) = this%c(:,:,m) + mult*parent%c(:,:,s)
+      if(multipole_use_vs) this%c(:,:,m) = this%c(:,:,m) + mult*parent%c(:,:,s)
     enddo; enddo; enddo
   enddo
 
