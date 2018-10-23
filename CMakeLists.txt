@@ -90,6 +90,15 @@ include_directories(${incldirs} ${CGNS_INC} ${HDF5_INCLUDE_DIRS})
 #set the link path
 link_directories(${CGNS_LIB} ${HDF5_LIBRARY_DIRS})
 
+#Generate the version
+execute_process(COMMAND
+  git describe --match=NeVeRmAtCh --always --abbrev=40 --dirty
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  OUTPUT_VARIABLE GIT_SHA1
+  ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+configure_file("${PROJECT_SOURCE_DIR}/src/general/mod_version.f90.in" 
+               "${PROJECT_SOURCE_DIR}/src/general/mod_version.f90")
 
 
 #add files
@@ -100,7 +109,8 @@ file(GLOB_RECURSE sources ${PROJECT_SOURCE_DIR}/src/geo/*.f90
                           ${PROJECT_SOURCE_DIR}/src/io/*.f90
                           ${PROJECT_SOURCE_DIR}/src/post/*.f90
                           ${PROJECT_SOURCE_DIR}/src/options/*.f90 
-                          ${PROJECT_SOURCE_DIR}/src/viscosity/*.f90)
+                          ${PROJECT_SOURCE_DIR}/src/viscosity/*.f90
+                          ${PROJECT_SOURCE_DIR}/src/fmm/*.f90)
 
 
 #create a library
@@ -120,3 +130,8 @@ target_link_libraries(dust_pre  dustlib ${linkedlibs})
 add_executable(dust_post  ${PROJECT_SOURCE_DIR}/src/dust_post.f90)
 add_dependencies(dust_post dustlib)
 target_link_libraries(dust_post  dustlib ${linkedlibs})
+
+#add_executable(dust_potential_test  ${PROJECT_SOURCE_DIR}/src/dust_potential_test.f90)
+#add_dependencies(dust_potential_test dustlib)
+#target_link_libraries(dust_potential_test dustlib ${linkedlibs})
+
