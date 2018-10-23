@@ -57,9 +57,6 @@ use mod_math, only: &
 use mod_c81, only: &
   t_aero_tab, interp_aero_coeff
 
-!use mod_aero_elements, only: &
-!  c_elem, t_elem_p
-
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
@@ -75,8 +72,8 @@ public :: t_vortpart, t_vortpart_p, initialize_vortpart
 type, extends(c_vort_elem) :: t_vortpart
   !> Orientation of the vorticity vector
   real(wp) :: dir(3)
-  real(wp), pointer :: npos(:)
-  real(wp), pointer :: nalpha(:)
+  real(wp), pointer :: vel(:)
+  real(wp), pointer :: stretch(:)
   logical :: free=.true.
 contains
 

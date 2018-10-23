@@ -70,6 +70,8 @@ type t_sim_param
   real(wp) :: rho_inf
   !> Free stream velocity
   real(wp) :: u_inf(3)
+  !> Reference velocity (magnitude of u_inf unless specified)
+  real(wp) :: u_ref
   !> Free stream speed of sound
   real(wp) :: a_inf
   !> Free stream dynamic viscosity
@@ -161,6 +163,7 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%P_inf, 'P_inf', loc)
   call write_hdf5_attr(this%rho_inf, 'rho_inf', loc)
   call write_hdf5_attr(this%u_inf, 'u_inf', loc)
+  call write_hdf5_attr(this%u_ref, 'u_ref', loc)
   call write_hdf5_attr(this%a_inf, 'a_inf', loc)
   call write_hdf5_attr(this%mu_inf, 'mu_inf', loc)
   call write_hdf5_attr(this%first_panel_scaling, 'first_panel_scaling', loc)
