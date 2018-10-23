@@ -719,8 +719,9 @@ subroutine prepare_wake(wake, geo, sim_param)
              else
                wake%wake_parts(ip)%dir = el%free_vort
              endif
-             wake%wake_parts(ip)%cen = el%cen + el%nor * el%h_bl
-             exit
+             wake%wake_parts(ip)%cen = el%cen + el%nor * el%h_bl ! + & ! + ...
+!                   el % surf_vel * sim_param%dt
+             exit 
            endif
          enddo
          if (ip .gt. wake%nmax_prt) then
@@ -1204,7 +1205,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
   !err = norm2(points_prt-points_prt_fmm)/norm2(points_prt)
   !write(*,*) 'error',err
 
-  !Assign the moved points, if they get otside the bounding box free the 
+  !Assign the moved points, if they get outside the bounding box free the 
   !particles
   do ip = 1, wake%n_prt
     call avoid_collision(elems, wake, wake%part_p(ip)%p%cen, sim_param, vel_prt(:,ip))

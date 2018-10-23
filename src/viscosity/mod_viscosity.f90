@@ -103,14 +103,14 @@ subroutine viscosity_effects( geo , elems , te , sim_param )
  real(wp) :: edge_te(3)
 
  ! preliminary "fixed" parameters
- real(wp) , parameter :: h = 0.200_wp           
- real(wp) , parameter :: tol_velSep = 0.00_wp   
+ real(wp) , parameter :: h = 0.100_wp           
+ real(wp) , parameter :: tol_velSep = 0.0_wp   
 
 ! airfoil ------------------
 !   h = 0.025_wp   ! 0.05_wp   ! 0.1_wp   ! 0.025_wp
 !   tol_velSep = 0.20_wp
 ! cylinder, R = 1.0 --------
-!   h = 0.100_wp           
+!   h = 0.200_wp           
 !   tol_velSep = 0.00_wp   
 
 !write(*,*) 
@@ -164,7 +164,7 @@ subroutine viscosity_effects( geo , elems , te , sim_param )
                    cross( el % edge_vec(:,i_e) , el % nor ) * &
                  ( el % surf_vel + el_neigh%surf_vel ) ) * 0.5_wp
            OmV = OmV + &
-                   el % edge_vec(:,i_e) * ( &
+                   0.5_wp * el % edge_vec(:,i_e) * ( &
                                             el % mag - el_neigh % mag )
            end select
          else
@@ -190,8 +190,10 @@ subroutine viscosity_effects( geo , elems , te , sim_param )
        ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
        ! criterion for flow separation
        ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
-       if ( vc + vd .gt. tol_velSep ) then ! release free vorticity and
-                                           !   update the intensity of bounded vorticity 
+!      if ( vc + vd .gt. tol_velSep ) then ! release free vorticity and
+!                                          !   update the intensity of bounded vorticity 
+       if ( vc + vd .gt. tol_velSep * norm2(el%surf_vel) ) then ! release free vorticity and
+                                                                !   update the intensity of bounded vorticity 
 
          al_bound = el%h_bl / ( ( vc + vd ) * sim_param%dt + el%h_bl )
          al_free  = 1.0_wp - al_bound
