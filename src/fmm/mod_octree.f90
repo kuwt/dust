@@ -61,7 +61,7 @@ use mod_multipole, only: &
 
 implicit none
 
-public :: initialize_octree, sort_particles, t_octree, &
+public :: initialize_octree, destroy_octree, sort_particles, t_octree, &
           calculate_multipole, apply_multipole
 
 private
@@ -377,6 +377,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
     !cycle on the elements on the level
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
       !cycle on all the neighbours of the parent
+!DIR$ IVDEP
       do kc = -1,1; do jc = -1,1; do ic = -1,1
         if(associated(octree%layers(l)%lcells(i,j,k)%parent%p%&
                                                   neighbours(ic,jc,kc)%p)) then
@@ -619,7 +620,7 @@ subroutine calculate_multipole(part,octree)
   !For all the leaves, calculate the multipole coefficients
   !PROFILE
   t0 = dust_time()
-!$omp parallel do private(lv)
+!$omp parallel do private(lv) schedule(guided)
   do lv = 1, octree%nleaves
     call octree%leaves(lv)%p%mp%leaf_M(&
                octree%leaves(lv)%p%cen, &
@@ -670,7 +671,7 @@ subroutine calculate_multipole(part,octree)
   !PROFILE
   t0 = dust_time()
     !cycle on the elements on the level
-!$omp parallel do collapse(3) private(i,j,k,idx_diff)
+!$omp parallel do collapse(3) private(i,j,k,idx_diff) schedule(dynamic)
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
       if(octree%layers(l)%lcells(i,j,k)%active) then
          !if it is active perform M2L with all the interaction list
@@ -738,7 +739,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
 
   !for all the leaves apply the local expansion and then local interactions 
   t0 = dust_time()
-!$omp parallel do private(lv, ip, vel, pos, m, i, j, k, ipp, Rnorm2, v)
+!$omp parallel do private(lv, ip, vel, pos, m, i, j, k, ipp, Rnorm2, v) schedule(dynamic)
   do lv = 1, octree%nleaves
     !I am on a leaf, cycle on all the particles inside the leaf
     do ip = 1,octree%leaves(lv)%p%npart
@@ -833,6 +834,8 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
       endif
     enddo
   enddo
+!Don't ask me why, but without this pragra it is much faster!
+!!!!$omp end parallel do
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Calculated leaves interactions in: ' , t1 - t0,' s.'
   call printout(msg)

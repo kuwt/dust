@@ -113,7 +113,7 @@ use mod_dust_io, only: &
   save_status, load_solution, load_time
 
 use mod_octree, only: &
-  initialize_octree, sort_particles, t_octree
+  initialize_octree, destroy_octree, sort_particles, t_octree
  
 
 implicit none
@@ -590,6 +590,7 @@ deallocate( res_old )
 !------ Cleanup ------
 !call destroy_wake_panels(wake_panels)
 call destroy_wake(wake)
+call destroy_octree(octree)
 call destroy_linsys(linsys)
 call destroy_elements(geo)
 call destroy_geometry(geo, elems_tot)
