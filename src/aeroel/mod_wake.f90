@@ -711,8 +711,9 @@ subroutine prepare_wake(wake, geo, sim_param)
              else
                wake%wake_parts(ip)%dir = el%free_vort
              endif
-             wake%wake_parts(ip)%cen = el%cen + el%nor * el%h_bl
-             exit
+             wake%wake_parts(ip)%cen = el%cen + el%nor * el%h_bl ! + & ! + ...
+!                   el % surf_vel * sim_param%dt
+             exit 
            endif
          enddo
          if (ip .gt. wake%nmax_prt) then
@@ -1162,7 +1163,7 @@ subroutine update_wake(wake, elems, sim_param)
   enddo
 !$omp end parallel do
 
-  !Assign the moved points, if they get otside the bounding box free the 
+  !Assign the moved points, if they get outside the bounding box free the 
   !particles
   do ip = 1, wake%n_prt
     if(all(points_prt(:,ip) .ge. wake%part_box_min) .and. &
