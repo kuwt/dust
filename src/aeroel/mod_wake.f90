@@ -1060,7 +1060,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
   allocate(alpha_prt(3,wake%n_prt))
 
   !calculate the velocities at the points
-!!!$omp parallel do private(pos_p, vel_p, ip)
+!$omp parallel do private(pos_p, vel_p, ip)
   do ip = 1, wake%n_prt
 
     wake%part_p(ip)%p%npos   => points_prt(:,ip)
@@ -1071,6 +1071,9 @@ subroutine update_wake(wake, elems, octree, sim_param)
       pos_p = wake%part_p(ip)%p%cen
 
       call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
+
+    !experimental: treat velocity to avoid collisions
+    call avoid_collision(elems, wake, pos_p, sim_param, vel_p)
 
       !update the position
       points_prt(:,ip) = wake%part_p(ip)%p%cen + vel_p*sim_param%dt
@@ -1097,7 +1100,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
 
     
   enddo
-!!!$omp end parallel do
+!$omp end parallel do
   
   if (sim_param%use_fmm) then
     t0 = dust_time()
@@ -1299,5 +1302,41 @@ subroutine get_vel_rigid(this, elems, wake, pos, sim_param, vel)
 
 end subroutine get_vel_rigid
 !----------------------------------------------------------------------
+
+subroutine avoid_collision(elems, wake, pos, sim_param, vel)
+ type(t_pot_elem_p), intent(in) :: elems(:)
+ type(t_wake), intent(in) :: wake
+ real(wp), intent(in) :: pos(3)
+ type(t_sim_param), intent(in) :: sim_param
+ real(wp), intent(inout) :: vel(3)
+
+ integer :: ie
+ real(wp) :: v(3)
+ real(wp) :: dist(3), n(3)
+ real(wp) :: distn, distnor, damp, normvel
+ real(wp) :: damp_radius, cont
+
+damp_radius = 0.3
+cont = 0.9
+
+  !calculate the influence of the solid bodies
+  do ie=1,size(elems)
+    dist = pos-elems(ie)%p%cen
+    distn = norm2(dist)
+    if ((distn .lt. damp_radius)) then
+      distnor = sum(dist * elems(ie)%p%nor)
+      !n = dist/distn
+      n = elems(ie)%p%nor
+      normvel = max(sum(vel*n) , -cont*distnor/sim_param%dt)
+      !normvel = max(sum(vel*n) , 0.0_wp)
+      vel = vel - (sum(vel*n) - normvel) * n
+      !vel = vel - (sum(vel*n) + cont*distnor/sim_param%dt) * n
+      !vel = vel - sum(vel*n) * (1-damp) * n
+    endif
+  enddo
+
+
+
+end subroutine avoid_collision
 
 end module mod_wake
