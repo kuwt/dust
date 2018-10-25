@@ -80,9 +80,10 @@ type, extends(c_vort_elem) :: t_vortpart
   logical :: free=.true.
 contains
 
-  procedure, pass(this) :: compute_vel      => compute_vel_vortpart
-  procedure, pass(this) :: compute_stretch  => compute_stretch_vortpart  
-  procedure, pass(this) :: calc_geo_data    => calc_geo_data_vortpart
+  procedure, pass(this) :: compute_vel       => compute_vel_vortpart
+  procedure, pass(this) :: compute_stretch   => compute_stretch_vortpart  
+  procedure, pass(this) :: compute_diffusion => compute_diffusion_vortpart  
+  procedure, pass(this) :: calc_geo_data     => calc_geo_data_vortpart
 
 end type
 
@@ -167,36 +168,40 @@ end subroutine compute_stretch_vortpart
 
 !----------------------------------------------------------------------
 
-!!> Compute the vortex stretching induced by a vortex particle 
-!!! in a prescribed position with a prescribed vorticity (i.e. another particle)
-!!!
-!!! WARNING: the calculated term, to be consistent with the formulation of
-!!! the equations is multiplied by 4*pi, to obtain the actual velocity the
-!!! result of the present subroutine MUST be DIVIDED by 4*pi
-!subroutine compute_stretch_vortpart (this, pos, alpha, stretch)
-! class(t_vortpart), intent(in) :: this
-! real(wp), intent(in) :: pos(:)
-! real(wp), intent(in) :: alpha(3)
-! real(wp), intent(out) :: stretch(3)
-!
-! real(wp) :: dist(3), distn
-!
-!  !TODO: add far field approximations
-!
-!  dist = pos-this%cen
-!  distn = sqrt(sum(dist**2)+r_Rankine**2)
-!
-!  !stretch = -cross(alpha, this%dir*this%mag)/(distn)**3 &
-!  !     +3.0_wp/(distn)**5 * cross(dist, this%mag*this%dir) * &
-!  !     sum(alpha*dist)
-!
-!  stretch = -cross(this%dir*this%mag, alpha)/(distn)**3 &
-!       +1.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
-!
-!end subroutine compute_stretch_vortpart
+!> Compute the vorticity diffusion induced by a vortex particle 
+!! in a prescribed position with a prescribed vorticity (i.e. another particle)
+!!
+subroutine compute_diffusion_vortpart (this, pos, alpha, diff)
+ class(t_vortpart), intent(in) :: this
+ real(wp), intent(in) :: pos(:)
+ real(wp), intent(in) :: alpha(3)
+ real(wp), intent(out) :: diff(3)
+
+ real(wp) :: dist(3), distn
+ real(wp) :: volp, volq
+
+  dist = pos-this%cen
+  distn = norm2(dist)
+
+  volp = 4.0_wp/3.0_wp*pi*r_Rankine**3
+  volq = 4.0_wp/3.0_wp*pi*r_Rankine**3
+  diff = 1/(r_Rankine**2)*(volp*this%dir*this%mag - volq*alpha) &
+                                                *etaeps(distn,r_Rankine)
+
+end subroutine compute_diffusion_vortpart
 
 !----------------------------------------------------------------------
 
+function etaeps(dist, eps) result(eta)
+ real(wp), intent(in) :: dist
+ real(wp), intent(in) :: eps
+ real(wp) :: eta
+
+  eta = 105.0_wp/(8.0_wp*pi) / ((dist/eps)**2+1)**(9.0_wp/2.0_wp)
+  eta = eta/(eps**3)
+
+end function etaeps
+!----------------------------------------------------------------------
 subroutine calc_geo_data_vortpart(this, vert)
  class(t_vortpart), intent(inout) :: this
  real(wp), intent(in) :: vert(:)
@@ -205,6 +210,7 @@ subroutine calc_geo_data_vortpart(this, vert)
   this%cen = vert
 
 end subroutine calc_geo_data_vortpart
+
 !----------------------------------------------------------------------
 
 end module mod_vortpart

@@ -880,7 +880,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
  integer :: iw, ipan, ie, ip, np, iq
  integer :: id, ir
  real(wp) :: pos_p(3), vel_p(3)
- real(wp) :: str(3), stretch(3)
+ real(wp) :: str(3), stretch(3), diff(3), df(3)
  type(t_pot_elem_p), allocatable :: pan_p_temp(:)
  real(wp), allocatable :: point_old(:,:,:)
  real(wp), allocatable :: points(:,:,:)
@@ -1064,7 +1064,10 @@ subroutine update_wake(wake, elems, octree, sim_param)
   do ip = 1, wake%n_prt
 
     wake%part_p(ip)%p%npos   => points_prt(:,ip)
-    wake%part_p(ip)%p%nalpha => alpha_prt(:,ip)
+    if (sim_param%use_vs .or. sim_param%use_vd) then
+      wake%part_p(ip)%p%nalpha => alpha_prt(:,ip)
+      alpha_prt(:,ip) = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag
+    endif
     
     !If not using hte fast multipole, update particles position now
     if (.not.sim_param%use_fmm) then
@@ -1090,10 +1093,22 @@ subroutine update_wake(wake, elems, octree, sim_param)
         !             wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, str)
         !  stretch = stretch + str/(4.0_wp*pi)
         !enddo
-        alpha_prt(:,ip) = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
-                        stretch*sim_param%dt
-      endif
-    end if
+        alpha_prt(:,ip) = alpha_prt(:,ip) + stretch*sim_param%dt
+      endif !use_vs
+      !if using the vortex diffusion, calculate it now
+
+      if(sim_param%use_vd) then
+        diff = 0.0_wp
+        do iq = 1, wake%n_prt
+        if (ip.ne.iq) then
+          call wake%part_p(iq)%p%compute_diffusion(wake%part_p(ip)%p%cen, &
+               wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, df)
+          diff = diff + df*sim_param%nu_inf
+        endif 
+        enddo !iq
+        alpha_prt(:,ip) = alpha_prt(:,ip) + diff*sim_param%dt
+      endif !use_vd
+    end if !use_fmm
 
     
   enddo
@@ -1120,7 +1135,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
     if(all(points_prt(:,ip) .ge. wake%part_box_min) .and. &
        all(points_prt(:,ip) .le. wake%part_box_max)) then
       wake%part_p(ip)%p%cen = points_prt(:,ip)
-      if(sim_param%use_vs) then
+      if(sim_param%use_vs .or. sim_param%use_vd) then
         wake%part_p(ip)%p%mag = norm2(alpha_prt(:,ip))
         if(wake%part_p(ip)%p%mag .ne. 0.0_wp) &
            wake%part_p(ip)%p%dir = alpha_prt(:,ip)/wake%part_p(ip)%p%mag

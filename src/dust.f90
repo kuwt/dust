@@ -272,6 +272,7 @@ call prms%CreateIntOption('MinOctreePart','minimum number of octree &
                                                              &particles')
 call prms%CreateIntOption('MultipoleDegree','multipole expansion degree')
 call prms%CreateLogicalOption('Vortstretch','Employ vortex stretching','T')
+call prms%CreateLogicalOption('Diffusion','Employ vorticity diffusion','T')
 
 
 ! get the parameters and print them out
@@ -291,6 +292,7 @@ sim_param%rho_inf  = getreal(prms,'rho_inf')
 sim_param%u_inf = getrealarray(prms, 'u_inf', 3)
 sim_param%a_inf  = getreal(prms,'a_inf')
 sim_param%mu_inf = getreal(prms,'mu_inf')
+sim_param%nu_inf = sim_param%mu_inf/sim_param%rho_inf
 !Wake parameters
 sim_param%n_wake_panels = getint(prms, 'n_wake_panels')
 sim_param%n_wake_particles = getint(prms, 'n_wake_particles')
@@ -321,6 +323,7 @@ sim_param%CutoffRad  = getreal(prms, 'CutoffRad')
 sim_param%first_panel_scaling = getreal(prms,'ImplicitPanelScale')
 sim_param%min_vel_at_te  = getreal(prms,'ImplicitPanelMinVel')
 sim_param%use_vs = getlogical(prms, 'Vortstretch')
+sim_param%use_vd = getlogical(prms, 'Diffusion')
 !Octree and FMM parameters
 sim_param%use_fmm = getlogical(prms, 'FMM')
 sim_param%BoxLength = getreal(prms, 'BoxLength')
