@@ -103,6 +103,8 @@ type t_sim_param
   real(wp) :: DoubletThreshold
   !> Rankine Radius for vortices
   real(wp) :: RankineRad
+  !> Vortex Radius for vortex particles
+  real(wp) :: VortexRad
   !> Complete cutoff radius
   real(wp) :: CutoffRad
   !> use the vortex stretching or not
@@ -180,6 +182,7 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%FarFieldRatioSource, 'FarFieldRatioSource', loc)
   call write_hdf5_attr(this%DoubletThreshold, 'DoubletThreshold', loc)
   call write_hdf5_attr(this%RankineRad, 'RankineRad', loc)
+  call write_hdf5_attr(this%VortexRad, 'VortexRad', loc)
   call write_hdf5_attr(this%CutoffRad, 'CutoffRad', loc)
   call write_hdf5_attr(this%use_vs, 'vortstretch', loc)
   call write_hdf5_attr(this%use_vd, 'vortdiff', loc)

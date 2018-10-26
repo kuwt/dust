@@ -95,7 +95,7 @@ end type
 
 character(len=*), parameter :: this_mod_name='mod_vortpart'
 
-real(wp) :: r_Rankine
+real(wp) :: r_Vortex
 real(wp) :: r_cutoff
 
 !----------------------------------------------------------------------
@@ -103,10 +103,10 @@ contains
 !----------------------------------------------------------------------
 
 !> Initialize vortex line 
-subroutine initialize_vortpart(r_Rankine_in, r_cutoff_in)
- real(wp), intent(in) :: r_Rankine_in, r_cutoff_in
+subroutine initialize_vortpart(r_Vortex_in, r_cutoff_in)
+ real(wp), intent(in) :: r_Vortex_in, r_cutoff_in
 
-  r_Rankine = r_Rankine_in
+  r_Vortex = r_Vortex_in
   r_cutoff  = r_cutoff_in
 
 end subroutine initialize_vortpart
@@ -130,7 +130,7 @@ subroutine compute_vel_vortpart (this, pos, uinf, vel)
 
   dist = pos-this%cen
   !Rosenhead kernel regularized velocity
-  vvort =  cross(this%dir,dist) / (sqrt(sum(dist**2)+r_Rankine**2))**3
+  vvort =  cross(this%dir,dist) / (sqrt(sum(dist**2)+r_Vortex**2))**3
   vel = vvort*this%mag
 
 
@@ -155,7 +155,7 @@ subroutine compute_stretch_vortpart (this, pos, alpha, stretch)
   !TODO: add far field approximations
 
   dist = pos-this%cen
-  distn = sqrt(sum(dist**2)+r_Rankine**2)
+  distn = sqrt(sum(dist**2)+r_Vortex**2)
 
   !stretch = -cross(alpha, this%dir*this%mag)/(distn)**3 &
   !     +3.0_wp/(distn)**5 * cross(dist, this%mag*this%dir) * &
@@ -183,10 +183,10 @@ subroutine compute_diffusion_vortpart (this, pos, alpha, diff)
   dist = pos-this%cen
   distn = norm2(dist)
 
-  volp = 4.0_wp/3.0_wp*pi*r_Rankine**3
-  volq = 4.0_wp/3.0_wp*pi*r_Rankine**3
-  diff = 1/(r_Rankine**2)*(volp*this%dir*this%mag - volq*alpha) &
-                                                *etaeps(distn,r_Rankine)
+  volp = 4.0_wp/3.0_wp*pi*r_Vortex**3
+  volq = 4.0_wp/3.0_wp*pi*r_Vortex**3
+  diff = 1/(r_Vortex**2)*(volp*this%dir*this%mag - volq*alpha) &
+                                                *etaeps(distn,r_Vortex)
 
 end subroutine compute_diffusion_vortpart
 

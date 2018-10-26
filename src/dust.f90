@@ -255,6 +255,8 @@ call prms%CreateRealOption( 'DoubletThreshold', &
       "Thresold for considering the point in plane in doublets", '1.0e-6')
 call prms%CreateRealOption( 'RankineRad', &
       "Radius of Rankine correction for vortex induction near core", '0.1')
+call prms%CreateRealOption( 'VortexRad', &
+      "Radius of vortex core, for particles", '0.1')
 call prms%CreateRealOption( 'CutoffRad', &
       "Radius of complete cutoff  for vortex induction near core", '0.001')
 
@@ -319,6 +321,7 @@ sim_param%FarFieldRatioDoublet  = getreal(prms, 'FarFieldRatioDoublet')
 sim_param%FarFieldRatioSource  = getreal(prms, 'FarFieldRatioSource')
 sim_param%DoubletThreshold   = getreal(prms, 'DoubletThreshold')
 sim_param%RankineRad = getreal(prms, 'RankineRad')
+sim_param%VortexRad = getreal(prms, 'VortexRad')
 sim_param%CutoffRad  = getreal(prms, 'CutoffRad')
 sim_param%first_panel_scaling = getreal(prms,'ImplicitPanelScale')
 sim_param%min_vel_at_te  = getreal(prms,'ImplicitPanelMinVel')
@@ -341,7 +344,7 @@ call initialize_doublet(sim_param%FarFieldRatioDoublet, &
                         sim_param%DoubletThreshold, sim_param%RankineRad, &
                         sim_param%CutoffRad);
 call initialize_vortline(sim_param%RankineRad, sim_param%CutoffRad);
-call initialize_vortpart(sim_param%RankineRad, sim_param%CutoffRad);
+call initialize_vortpart(sim_param%VortexRad, sim_param%CutoffRad);
 call initialize_surfpan(sim_param%FarFieldRatioSource);
 !reset the numbering for output files
 nout = 0
