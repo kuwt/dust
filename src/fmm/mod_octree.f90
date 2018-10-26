@@ -780,6 +780,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
                  %compute_stretch(pos, alpha, str)
               stretch = stretch +str/(4.0_wp*pi)
             endif
+            if(sim_param%use_vd) then
+              call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
+                 %compute_diffusion(pos, alpha, str)
+              stretch = stretch +str*sim_param%nu_inf
+            endif
           enddo
         endif
       enddo; enddo; enddo
@@ -795,6 +800,13 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
                                                           alpha, str)
             stretch = stretch +str/(4.0_wp*pi)
           endif
+
+          if(sim_param%use_vd) then
+            call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_diffusion(pos, &
+                                                          alpha, str)
+            stretch = stretch + str*sim_param%nu_inf
+          endif
+
         endif
       enddo
 
@@ -828,7 +840,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
       octree%leaves(lv)%p%cell_parts(ip)%p%vel = vel
 
       !evolve the position in time
-      if(sim_param%use_vs) then
+      if(sim_param%use_vs .or. sim_param%use_vd) then
         !evolve the intensity in time
         octree%leaves(lv)%p%cell_parts(ip)%p%stretch = stretch
       endif

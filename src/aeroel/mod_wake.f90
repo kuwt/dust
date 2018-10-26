@@ -1092,8 +1092,8 @@ subroutine update_wake(wake, elems, octree, sim_param)
         !enddo
         vortevol_prt(:,ip) = vortevol_prt(:,ip) + stretch
       endif !use_vs
-      !if using the vortex diffusion, calculate it now
 
+      !if using the vortex diffusion, calculate it now
       if(sim_param%use_vd) then
         diff = 0.0_wp
         do iq = 1, wake%n_prt
