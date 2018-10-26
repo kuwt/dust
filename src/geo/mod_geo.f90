@@ -211,15 +211,22 @@ type :: t_geo
 
  !> Number of surface panel elements
  integer :: nSurfPan
-
  !> Number of vortex ring elements
  integer :: nVortLatt
-
  !> Number of lifting line elements
  integer :: nLiftLin
-
  !> Number of Actuator disk elements
  integer :: nActDisk
+
+ ! Only for implicit elements (for slicing)
+ !> Global id of surface panel elements
+ integer, allocatable :: idSurfPan(:)
+ !> Global id of vortex ring elements
+ integer, allocatable :: idVortLatt(:)
+!!> Global id of lifting line elements
+!integer, allocatable :: idLiftLin(:)
+!!> Global id of actuator disk elements
+!integer, allocatable :: idActDisk(:)
 
  !> Number of statical implicit elements
  integer :: nstatic_impl
@@ -331,6 +338,8 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
  type(t_expl_elem_p), allocatable :: temp_static_e(:), temp_moving_e(:)
  integer(h5loc) :: floc
 
+ integer :: iSurfPan, iVortLatt
+ 
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name='create_geometry'
 
@@ -441,7 +450,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
     write(msg,'(A,I9)') '  number of moving elements:   ' , &
                                             geo%nmoving_impl + geo%nmoving_expl
     call printout(msg)
-    write(msg,'(A,I9)') '  number of surface panels:    ' ,geo%nsurfpan
+    write(msg,'(A,I9)') '  number of surface panels:    ' ,geo%nSurfpan
     call printout(msg)
     write(msg,'(A,I9)') '  number of vortex lattices:   ' ,geo%nVortLatt
     call printout(msg)
@@ -522,6 +531,20 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   !Update the indexing since we re-ordered the vector
   do i = 1,geo%nelem_impl
     elems_impl(i)%p%id = i
+  end do
+
+  ! Save global indices of implicit elements for slicing
+  allocate(geo%idSurfPan(geo%nSurfPan),geo%idVortLatt(geo%nVortLatt))
+  iSurfPan = 0 ; iVortLatt = 0
+  do i = 1,geo%nelem_impl
+    select type( el => elems_impl(i)%p ); class is(t_surfpan)
+      iSurfPan = iSurfPan + 1
+      geo%idSurfPan(iSurfPan) = el%id
+    end select
+    select type( el => elems_impl(i)%p ); class is(t_vortlatt)
+      iVortLatt= iVortLatt + 1
+      geo%idVortLatt(iVortLatt) = el%id
+    end select
   end do
 
   !Now re-order the explicit elements

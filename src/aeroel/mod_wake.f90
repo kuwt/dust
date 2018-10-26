@@ -719,8 +719,8 @@ subroutine prepare_wake(wake, geo, sim_param)
              else
                wake%wake_parts(ip)%dir = el%free_vort
              endif
-             wake%wake_parts(ip)%cen = el%cen + el%nor * el%h_bl ! + & ! + ...
-!                   el % surf_vel * sim_param%dt
+             wake%wake_parts(ip)%cen = el%cen + el%nor * el%h_bl + & ! + ...
+                    el % surf_vel * sim_param%dt
              exit 
            endif
          enddo
@@ -1208,27 +1208,30 @@ subroutine update_wake(wake, elems, octree, sim_param)
   !Assign the moved points, if they get outside the bounding box free the 
   !particles
   do ip = 1, wake%n_prt
-    call avoid_collision(elems, wake, wake%part_p(ip)%p%cen, sim_param, vel_prt(:,ip))
-    pos_p = wake%part_p(ip)%p%cen + vel_prt(:,ip)*sim_param%dt
-    if(all(pos_p .ge. wake%part_box_min) .and. &
-       all(pos_p .le. wake%part_box_max)) then
-      !wake%part_p(ip)%p%cen = points_prt(:,ip)
-      wake%part_p(ip)%p%cen = pos_p
-      if(sim_param%use_vs) then
-        alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
-                        stretch_prt(:,ip)*sim_param%dt
-        wake%part_p(ip)%p%mag = norm2(alpha_p)
-        if(wake%part_p(ip)%p%mag .ne. 0.0_wp) &
-           wake%part_p(ip)%p%dir = alpha_p/wake%part_p(ip)%p%mag
+!   call avoid_collision(elems, wake, wake%part_p(ip)%p%cen, sim_param, vel_prt(:,ip)) ! OLD
+    call avoid_collision(elems, wake, wake%part_p(ip)%p, sim_param, vel_prt(:,ip))
+    if(.not.(wake%part_p(ip)%p%free)) then
+      pos_p = wake%part_p(ip)%p%cen + vel_prt(:,ip)*sim_param%dt
+      if(all(pos_p .ge. wake%part_box_min) .and. &
+         all(pos_p .le. wake%part_box_max)) then
+        !wake%part_p(ip)%p%cen = points_prt(:,ip)
+        wake%part_p(ip)%p%cen = pos_p
+        if(sim_param%use_vs) then
+          alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
+                          stretch_prt(:,ip)*sim_param%dt
+          wake%part_p(ip)%p%mag = norm2(alpha_p)
+          if(wake%part_p(ip)%p%mag .ne. 0.0_wp) &
+             wake%part_p(ip)%p%dir = alpha_p/wake%part_p(ip)%p%mag
+        endif
+      else
+        wake%part_p(ip)%p%free = .true.
+        wake%n_prt = wake%n_prt -1
       endif
-    else
-      wake%part_p(ip)%p%free = .true.
-      wake%n_prt = wake%n_prt -1
     endif
-      !nullify(wake%part_p(ip)%p%npos)
-      nullify(wake%part_p(ip)%p%vel)
-      if(sim_param%use_vs) nullify(wake%part_p(ip)%p%stretch)
-    enddo
+    !nullify(wake%part_p(ip)%p%npos)
+    nullify(wake%part_p(ip)%p%vel)
+    if(sim_param%use_vs) nullify(wake%part_p(ip)%p%stretch)
+  enddo
 
   !==> Panels:  Increase the length of the wake, if it is necessary
   !if (wake%pan_wake_len .lt. wake%nmax_pan) then
@@ -1398,15 +1401,22 @@ subroutine get_vel_rigid(this, elems, wake, pos, sim_param, vel)
 end subroutine get_vel_rigid
 !----------------------------------------------------------------------
 
-subroutine avoid_collision(elems, wake, pos, sim_param, vel)
+! subroutine avoid_collision(elems, wake, pos, sim_param, vel)
+!type(t_pot_elem_p), intent(in) :: elems(:)
+!type(t_wake), intent(in) :: wake
+!real(wp), intent(in) :: pos(3)
+!type(t_sim_param), intent(in) :: sim_param
+!real(wp), intent(inout) :: vel(3)
+
+subroutine avoid_collision(elems, wake, vort_part , sim_param, vel)
  type(t_pot_elem_p), intent(in) :: elems(:)
- type(t_wake), intent(in) :: wake
- real(wp), intent(in) :: pos(3)
+ type(t_wake), intent(inout) :: wake
+ type(t_vortpart), intent(inout) :: vort_part
  type(t_sim_param), intent(in) :: sim_param
  real(wp), intent(inout) :: vel(3)
 
  integer :: ie
- real(wp) :: v(3)
+ real(wp) :: pos(3) , v(3)
  real(wp) :: dist(3), n(3)
  real(wp) :: distn, distnor, damp, normvel
  real(wp) :: damp_radius, cont
@@ -1414,10 +1424,11 @@ subroutine avoid_collision(elems, wake, pos, sim_param, vel)
 !damp_radius = 0.3
 cont = 1.0
 
+  pos = vort_part%cen
   !calculate the influence of the solid bodies
   do ie=1,size(elems)
     dist = pos-elems(ie)%p%cen
-    damp_radius = sim_param%dt*sim_param%u_ref !+ max(elems(ie)%p%edge_len)
+    damp_radius = sim_param%dt*sim_param%u_ref*0.1_wp !+ max(elems(ie)%p%edge_len)
     distn = norm2(dist)
     if ((distn .lt. damp_radius)) then
       distnor = sum(dist * elems(ie)%p%nor)
@@ -1428,6 +1439,15 @@ cont = 1.0
       vel = vel - (sum(vel*n) - normvel) * n
       !vel = vel - (sum(vel*n) + cont*distnor/sim_param%dt) * n
       !vel = vel - sum(vel*n) * (1-damp) * n
+
+      ! brute-force vortex particle elimination algorithm ----
+      vort_part%free = .true.
+      wake%n_prt = wake%n_prt -1
+      return
+      ! brute-force vortex particle elimination algorithm ----
+
+      
+
     endif
   enddo
 

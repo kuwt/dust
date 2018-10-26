@@ -65,6 +65,12 @@ type :: t_linsys
 
  !> Linear system right hand side
  real(wp), allocatable :: b(:)
+
+ !> Linear system matrix (for pressure integral equation)
+ real(wp), allocatable :: A_pres(:,:)
+ 
+ !> Linear system right hand side (for pressure integral equation)
+ real(wp), allocatable :: b_pres(:)
  
  !> Static part of the right hand side
  !!

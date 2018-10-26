@@ -108,6 +108,8 @@ contains
   procedure, pass(this) :: compute_dforce   => compute_dforce_surfpan
   procedure, pass(this) :: calc_geo_data    => calc_geo_data_surfpan
   procedure, pass(this) :: get_vort_vel     => get_vort_vel_surfpan
+  procedure, pass(this) :: correct_pressure_kutta => &
+                           correct_pressure_kutta_surfpan
 
   procedure, pass(this) :: create_local_velocity_stencil => &
                            create_local_velocity_stencil_surfpan
@@ -476,6 +478,47 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, uinf, &
   end do
 
 end subroutine add_wake_surfpan
+
+!----------------------------------------------------------------------
+
+subroutine correct_pressure_kutta_surfpan(this, wake_elems, impl_wake_ind, &
+                 linsys, uinf, ie,ista, iend)
+
+ class(t_surfpan), intent(inout) :: this
+ type(t_pot_elem_p), intent(in)      :: wake_elems(:)
+ integer, intent(in)             :: impl_wake_ind(:,:)
+ type(t_linsys), intent(inout)   :: linsys
+ real(wp), intent(in)            :: uinf(:)
+ integer, intent(in)             :: ie
+ integer, intent(in)             :: ista
+ integer, intent(in)             :: iend
+
+ integer :: j1, ind1, ind2
+ real(wp) :: a, b
+ integer :: n_impl
+
+  !Count the number of implicit wake contributions
+  n_impl = size(impl_wake_ind,2)
+
+  !Add the contribution of the implicit wake panels to the linear system
+  !Implicitly we assume that the first set of wake panels are the implicit
+  !ones since are at the beginning of the list
+  do j1 = 1 , n_impl
+    ind1 = impl_wake_ind(1,j1); ind2 = impl_wake_ind(2,j1)
+    if ((ind1.ge.ista .and. ind1.le.iend) .and. &
+        (ind2.ge.ista .and. ind2.le.iend)) then
+
+      !todo: find a more elegant solution to avoid i=j
+      call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
+
+      linsys%A_pres(ie,ind1) = linsys%A_pres(ie,ind1) - a
+      linsys%A_pres(ie,ind2) = linsys%A_pres(ie,ind2) + a
+
+    endif
+
+  end do
+
+end subroutine correct_pressure_kutta_surfpan
 
 !----------------------------------------------------------------------
 

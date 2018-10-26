@@ -485,6 +485,7 @@ subroutine sort_particles(part,octree)
   !PROFILE
   t0 = dust_time()
   !cycle on all the particles
+  write(*,*) ' +++++ shape(part) : ' , shape(part)
   do ip=1,size(part)
     
     !check in which cell at the lowest level it is located

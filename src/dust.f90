@@ -83,7 +83,8 @@ use mod_linsys_vars, only: &
 
 use mod_linsys, only: &
   initialize_linsys, assemble_linsys, solve_linsys, destroy_linsys, &
-  dump_linsys
+  dump_linsys , &
+  solve_linsys_pressure
 
 use mod_basic_io, only: &
   read_mesh_basic, write_basic
@@ -185,6 +186,16 @@ integer :: i_el , i
 !octree parameters
 type(t_octree) :: octree
 
+! pres_IE +++++
+!result of the integral equation for pressure
+real(wp), allocatable :: surfpan_H_IE(:)
+! TODO:
+! in linsys/mod_linsys.f90:
+! - remove Kutta condition from linsys%A_pres
+! - add forcing terms to linsys%b_pres
+! in dust.f90:
+! - redistribute pressure to the surfpan elems only
+! - adjust ALL the things
 
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
 t00 = dust_time()
@@ -436,7 +447,7 @@ call initialize_wake(wake, geo, te, sim_param%n_wake_panels, &
 call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
 call initialize_linsys(linsys, geo, elems, elems_expl, &
-                       wake,  sim_param%u_inf)
+                       wake, sim_param ) ! sim_param%u_inf)
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Initialized linear system in: ' , t1 - t0,' s.'
@@ -505,8 +516,10 @@ do it = 1,nstep
   !call prepare_wake(wake, geo, sim_param)
   t0 = dust_time()
 
-  call assemble_linsys(linsys, elems, elems_expl,  &
-                       wake, sim_param%u_inf)
+! call assemble_linsys(linsys, elems, elems_expl,  &
+!                      wake, sim_param%u_inf)
+  call assemble_linsys(linsys, geo, elems, elems_expl,  &
+                       wake, sim_param)
   t1 = dust_time()
 
   if(sim_param%debug_level .ge. 1) then
@@ -547,6 +560,11 @@ do it = 1,nstep
             (/ wake%pan_p, wake%rin_p/), wake%vort_p, sim_param, airfoil_data)
   end if
 
+  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
+  ! pres_IE +++++
+  call solve_linsys_pressure(linsys,surfpan_H_IE)
+  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
+
   !------ Compute loads -------
   ! Implicit elements: vortex rings and 3d-panels
   do i_el = 1 , size(elems)
@@ -561,6 +579,36 @@ do it = 1,nstep
     call elems_ad(i_el)%p%compute_pres(sim_param)
     call elems_ad(i_el)%p%compute_dforce(sim_param)
   end do
+
+! check -----
+  do i_el = 1 , geo%nSurfPan
+    write(*,*) surfpan_H_IE(i_el)
+  end do
+
+  if ( it .eq. 3 )  stop
+! check -----
+
+  ! pres_IE +++++
+  do i_el = 1 , geo%nSurfPan
+    select type ( el => elems(i_el)%p ) ; class is ( t_surfpan )
+     elems(i_el)%p%pres = &
+      surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp
+    end select
+  end do
+  
+! ! check -----
+! do i_el = 1 , geo%nSurfPan
+!   select type ( el => elems(i_el)%p ) ; class is ( t_surfpan )
+!    write(*,*) el%pres , &
+!     surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp
+!   end select
+! end do
+! ! check -----
+
+! if ( it .eq. 3 ) stop
+
+  ! pres_IE +++++
+
 
   !if ((sim_param%debug_level .ge. 10).and.time_2_debug_out) then
   !  call debug_printout_loads(elems, basename_debug, it)
@@ -600,6 +648,8 @@ do it = 1,nstep
 
 enddo
 
+! pres_IE +++++
+deallocate( surfpan_H_IE )
 
 deallocate( res_old )
 !===== End Time Cycle ======

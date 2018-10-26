@@ -104,7 +104,7 @@ subroutine viscosity_effects( geo , elems , te , sim_param )
 
  ! preliminary "fixed" parameters
  real(wp) , parameter :: h = 0.100_wp           
- real(wp) , parameter :: tol_velSep = 0.0_wp   
+ real(wp) , parameter :: tol_velSep = 0.5_wp   
 
 ! airfoil ------------------
 !   h = 0.025_wp   ! 0.05_wp   ! 0.1_wp   ! 0.025_wp
