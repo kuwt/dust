@@ -230,6 +230,7 @@ call prms%CreateLogicalOption('reset_time','reset the time from previous &
 ! parameters:
 call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
                                                        '(/1.0, 0.0, 0.0/)')
+call prms%CreateRealArrayOption( 'u_ref', "reference velocity")
 call prms%CreateRealOption( 'P_inf', "free stream pressure", '1.0')
 call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')
 call prms%CreateRealOption( 'a_inf', "Speed of sound", '340.0')  ! m/s
@@ -275,6 +276,8 @@ call prms%CreateIntOption('MinOctreePart','minimum number of octree &
 call prms%CreateIntOption('MultipoleDegree','multipole expansion degree')
 call prms%CreateLogicalOption('Vortstretch','Employ vortex stretching','T')
 call prms%CreateLogicalOption('Diffusion','Employ vorticity diffusion','T')
+call prms%CreateLogicalOption('PenetrationAvoidance','Employ penetration &
+                                                              & avoidance','F')
 
 
 ! get the parameters and print them out
@@ -292,6 +295,16 @@ sim_param%debug_level = getint(prms, 'debug_level')
 sim_param%P_inf = getreal(prms,'P_inf')
 sim_param%rho_inf  = getreal(prms,'rho_inf')
 sim_param%u_inf = getrealarray(prms, 'u_inf', 3)
+if ( countoption(prms,'u_ref') .gt. 0 ) then
+  sim_param%u_ref = getreal(prms, 'u_ref')
+else
+  sim_param%u_ref = norm2(sim_param%u_inf)
+  if (sim_param%u_ref .le. 0.0_wp) then
+    call error('dust','dust','No reference velocity u_ref provided but &
+    &zero free stream velocity. Provide a non-zero reference velocity. &
+    &Stopping now before producing invalid results')
+  endif
+end if
 sim_param%a_inf  = getreal(prms,'a_inf')
 sim_param%mu_inf = getreal(prms,'mu_inf')
 sim_param%nu_inf = sim_param%mu_inf/sim_param%rho_inf
@@ -327,6 +340,7 @@ sim_param%first_panel_scaling = getreal(prms,'ImplicitPanelScale')
 sim_param%min_vel_at_te  = getreal(prms,'ImplicitPanelMinVel')
 sim_param%use_vs = getlogical(prms, 'Vortstretch')
 sim_param%use_vd = getlogical(prms, 'Diffusion')
+sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
 !Octree and FMM parameters
 sim_param%use_fmm = getlogical(prms, 'FMM')
 sim_param%BoxLength = getreal(prms, 'BoxLength')

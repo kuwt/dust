@@ -879,13 +879,14 @@ subroutine update_wake(wake, elems, octree, sim_param)
 
  integer :: iw, ipan, ie, ip, np, iq
  integer :: id, ir
- real(wp) :: pos_p(3), vel_p(3)
- real(wp) :: str(3), stretch(3), diff(3), df(3)
+ real(wp) :: pos_p(3), vel_p(3), alpha_p(3)
+ real(wp) :: str(3), stretch(3)
+ real(wp) :: df(3), diff(3)
  type(t_pot_elem_p), allocatable :: pan_p_temp(:)
  real(wp), allocatable :: point_old(:,:,:)
  real(wp), allocatable :: points(:,:,:)
- real(wp), allocatable, target :: points_prt(:,:)
- real(wp), allocatable, target :: alpha_prt(:,:)
+ real(wp), allocatable, target :: vel_prt(:,:)
+ real(wp), allocatable, target :: vortevol_prt(:,:)
  logical :: increase_wake
  integer :: size_old
  character(len=*), parameter :: this_sub_name='update_wake'
@@ -1004,9 +1005,6 @@ subroutine update_wake(wake, elems, octree, sim_param)
       pos_p = points(:,ip,ir)
       vel_p = 0.0_wp
 
-      !call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
-
-      !vel_p    = vel_p   +sim_param%u_inf
       call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
 
       !update the position in time
@@ -1056,27 +1054,26 @@ subroutine update_wake(wake, elems, octree, sim_param)
 
   !==>    Particles: evolve the position in time
 
-  allocate(points_prt(3,wake%n_prt))
-  allocate(alpha_prt(3,wake%n_prt))
+  allocate(vel_prt(3,wake%n_prt))
+  allocate(vortevol_prt(3,wake%n_prt))
+  vortevol_prt = 0.0_wp
 
   !calculate the velocities at the points
-!!!$omp parallel do private(pos_p, vel_p, ip)
+!$omp parallel do private(pos_p, vel_p, ip)
   do ip = 1, wake%n_prt
 
-    wake%part_p(ip)%p%npos   => points_prt(:,ip)
+    wake%part_p(ip)%p%vel   => vel_prt(:,ip)
     if (sim_param%use_vs .or. sim_param%use_vd) then
-      wake%part_p(ip)%p%nalpha => alpha_prt(:,ip)
-      alpha_prt(:,ip) = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag
+      wake%part_p(ip)%p%stretch => vortevol_prt(:,ip)
     endif
     
-    !If not using hte fast multipole, update particles position now
+    !If not using the fast multipole, update particles position now
     if (.not.sim_param%use_fmm) then
       pos_p = wake%part_p(ip)%p%cen
 
       call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
 
-      !update the position
-      points_prt(:,ip) = wake%part_p(ip)%p%cen + vel_p*sim_param%dt
+      vel_prt(:,ip) = vel_p
 
       !if using vortex stretching, calculate it now
       if(sim_param%use_vs) then
@@ -1093,7 +1090,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
         !             wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, str)
         !  stretch = stretch + str/(4.0_wp*pi)
         !enddo
-        alpha_prt(:,ip) = alpha_prt(:,ip) + stretch*sim_param%dt
+        vortevol_prt(:,ip) = vortevol_prt(:,ip) + stretch
       endif !use_vs
       !if using the vortex diffusion, calculate it now
 
@@ -1106,13 +1103,13 @@ subroutine update_wake(wake, elems, octree, sim_param)
           diff = diff + df*sim_param%nu_inf
         endif 
         enddo !iq
-        alpha_prt(:,ip) = alpha_prt(:,ip) + diff*sim_param%dt
+        vortevol_prt(:,ip) = vortevol_prt(:,ip) + diff
       endif !use_vd
     end if !use_fmm
 
     
   enddo
-!!!$omp end parallel do
+!$omp end parallel do
   
   if (sim_param%use_fmm) then
     t0 = dust_time()
@@ -1132,19 +1129,29 @@ subroutine update_wake(wake, elems, octree, sim_param)
   !Assign the moved points, if they get otside the bounding box free the 
   !particles
   do ip = 1, wake%n_prt
-    if(all(points_prt(:,ip) .ge. wake%part_box_min) .and. &
-       all(points_prt(:,ip) .le. wake%part_box_max)) then
-      wake%part_p(ip)%p%cen = points_prt(:,ip)
-      if(sim_param%use_vs .or. sim_param%use_vd) then
-        wake%part_p(ip)%p%mag = norm2(alpha_prt(:,ip))
-        if(wake%part_p(ip)%p%mag .ne. 0.0_wp) &
-           wake%part_p(ip)%p%dir = alpha_prt(:,ip)/wake%part_p(ip)%p%mag
+    if(sim_param%use_pa) call avoid_collision(elems, wake, &
+                           wake%part_p(ip)%p, sim_param, vel_prt(:,ip))
+    if(.not. wake%part_p(ip)%p%free) then
+      pos_p = wake%part_p(ip)%p%cen + vel_prt(:,ip)*sim_param%dt
+      if(all(pos_p .ge. wake%part_box_min) .and. &
+         all(pos_p .le. wake%part_box_max)) then
+        !wake%part_p(ip)%p%cen = points_prt(:,ip)
+        wake%part_p(ip)%p%cen = pos_p
+        if(sim_param%use_vs .or. sim_param%use_vd) then
+          alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
+                          vortevol_prt(:,ip)*sim_param%dt
+          wake%part_p(ip)%p%mag = norm2(alpha_p)
+          if(wake%part_p(ip)%p%mag .ne. 0.0_wp) &
+             wake%part_p(ip)%p%dir = alpha_p/wake%part_p(ip)%p%mag
+        endif
+      else
+        wake%part_p(ip)%p%free = .true.
+        wake%n_prt = wake%n_prt -1
       endif
-    else
-      wake%part_p(ip)%p%free = .true.
-      wake%n_prt = wake%n_prt -1
     endif
-    nullify(wake%part_p(ip)%p%npos)
+      !nullify(wake%part_p(ip)%p%npos)
+      nullify(wake%part_p(ip)%p%vel)
+      if(sim_param%use_vs) nullify(wake%part_p(ip)%p%stretch)
   enddo
 
   !==> Panels:  Increase the length of the wake, if it is necessary
@@ -1314,5 +1321,51 @@ subroutine get_vel_rigid(this, elems, wake, pos, sim_param, vel)
 
 end subroutine get_vel_rigid
 !----------------------------------------------------------------------
+
+subroutine avoid_collision(elems, wake, part, sim_param, vel)
+ type(t_pot_elem_p), intent(in) :: elems(:)
+ type(t_wake), intent(inout) :: wake
+ !real(wp), intent(in) :: pos(3)
+ type(t_vortpart), intent(inout) :: part
+ type(t_sim_param), intent(in) :: sim_param
+ real(wp), intent(inout) :: vel(3)
+
+ integer :: ie
+ real(wp) :: v(3)
+ real(wp) :: dist(3), n(3)
+ real(wp) :: pos(3)
+ real(wp) :: distn, distnor, damp, normvel
+ real(wp) :: damp_radius, cont
+
+  !damp_radius = 0.3
+  cont = 0.9
+  pos = part%cen
+
+
+  !calculate the influence of the solid bodies
+  do ie=1,size(elems)
+    dist = pos-elems(ie)%p%cen
+    damp_radius = sim_param%dt*sim_param%u_ref + maxval(elems(ie)%p%edge_len)
+    distn = norm2(dist)
+    if ((distn .lt. damp_radius)) then
+      distnor = sum(dist * elems(ie)%p%nor)
+      if (abs(distnor) .lt. 0.03_wp*minval(elems(ie)%p%edge_len)) then
+        part%free = .true.
+        wake%n_prt = wake%n_prt -1
+        return
+      endif
+      !n = dist/distn
+      n = elems(ie)%p%nor
+      normvel = max(sum(vel*n) , -cont*distnor/sim_param%dt)
+      !normvel = max(sum(vel*n) , 0.0_wp)
+      vel = vel - (sum(vel*n) - normvel) * n
+      !vel = vel - (sum(vel*n) + cont*distnor/sim_param%dt) * n
+      !vel = vel - sum(vel*n) * (1-damp) * n
+    endif
+  enddo
+
+
+
+end subroutine avoid_collision
 
 end module mod_wake

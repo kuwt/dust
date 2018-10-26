@@ -70,6 +70,8 @@ type t_sim_param
   real(wp) :: rho_inf
   !> Free stream velocity
   real(wp) :: u_inf(3)
+  !> Reference velocity (magnitude of u_inf unless specified)
+  real(wp) :: u_ref
   !> Free stream speed of sound
   real(wp) :: a_inf
   !> Free stream dynamic viscosity
@@ -111,6 +113,8 @@ type t_sim_param
   logical :: use_vs
   !> use the vorticity diffusion or not
   logical :: use_vd
+  !> use the penetration avoidance
+  logical :: use_pa
 
   !FMM parameters
   !> Employing the FMM method
@@ -167,6 +171,7 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%P_inf, 'P_inf', loc)
   call write_hdf5_attr(this%rho_inf, 'rho_inf', loc)
   call write_hdf5_attr(this%u_inf, 'u_inf', loc)
+  call write_hdf5_attr(this%u_ref, 'u_ref', loc)
   call write_hdf5_attr(this%a_inf, 'a_inf', loc)
   call write_hdf5_attr(this%mu_inf, 'mu_inf', loc)
   call write_hdf5_attr(this%first_panel_scaling, 'first_panel_scaling', loc)
@@ -186,6 +191,7 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%CutoffRad, 'CutoffRad', loc)
   call write_hdf5_attr(this%use_vs, 'vortstretch', loc)
   call write_hdf5_attr(this%use_vd, 'vortdiff', loc)
+  call write_hdf5_attr(this%use_pa, 'PenetrationAvoidance', loc)
   call write_hdf5_attr(this%use_fmm, 'use_fmm', loc)
   if(this%use_fmm) then
     call write_hdf5_attr(this%BoxLength, 'BoxLength', loc)

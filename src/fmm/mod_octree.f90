@@ -825,12 +825,12 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
       
       !at last, add the free stream velocity
       vel = vel + sim_param%u_inf
+      octree%leaves(lv)%p%cell_parts(ip)%p%vel = vel
+
       !evolve the position in time
-      octree%leaves(lv)%p%cell_parts(ip)%p%npos = pos + vel*sim_param%dt
       if(sim_param%use_vs) then
         !evolve the intensity in time
-        octree%leaves(lv)%p%cell_parts(ip)%p%nalpha = alpha + &
-                                                    stretch*sim_param%dt
+        octree%leaves(lv)%p%cell_parts(ip)%p%stretch = stretch
       endif
     enddo
   enddo
