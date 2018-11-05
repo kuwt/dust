@@ -1059,7 +1059,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
   vortevol_prt = 0.0_wp
 
   !calculate the velocities at the points
-!$omp parallel do private(pos_p, vel_p, ip)
+!$omp parallel do private(pos_p, vel_p, ip, iq,  stretch, diff, df, str)
   do ip = 1, wake%n_prt
 
     wake%part_p(ip)%p%vel   => vel_prt(:,ip)
