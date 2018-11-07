@@ -215,7 +215,8 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
  type(t_sim_param), intent(in) :: sim_param
  type(t_octree), intent(out), target :: octree
 
- integer :: l, i,j,k, ic,jc,kc
+ type(t_cell_p) :: inter_list(208) !all the possible interactions
+ integer :: l, i,j,k, ic,jc,kc, ip_list
  integer :: imax, jmax, kmax
  integer :: p, child
  integer :: indx(3)
@@ -377,6 +378,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
     !cycle on the elements on the level
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
       !cycle on all the neighbours of the parent
+      ip_list = 0
 !DIR$ IVDEP
       do kc = -1,1; do jc = -1,1; do ic = -1,1
         if(associated(octree%layers(l)%lcells(i,j,k)%parent%p%&
@@ -390,13 +392,21 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
                                                                    .gt.1)) then
               !If the parent neighbour child is not a neighbour =) 
               !push it in the interaction list
-              call push_ptr(octree%layers(l)%lcells(i,j,k)%interaction_list, &
-                     octree%layers(l)%lcells(i,j,k)%parent%p%&
-                     neighbours(ic,jc,kc)%p%children(child)%p)
+              !call push_ptr(octree%layers(l)%lcells(i,j,k)%interaction_list, &
+              !       octree%layers(l)%lcells(i,j,k)%parent%p%&
+              !       neighbours(ic,jc,kc)%p%children(child)%p)
+              ip_list = ip_list + 1
+              inter_list(ip_list)%p => octree%layers(l)%lcells(i,j,k)%parent%p%&
+                     neighbours(ic,jc,kc)%p%children(child)%p
+
             endif
           enddo !child
         endif
       enddo; enddo; enddo !parents neighbours ic,jc,kc
+        
+
+        call push_ptr(octree%layers(l)%lcells(i,j,k)%interaction_list, &
+               inter_list(1:ip_list))
 
     enddo; enddo; enddo !layer cells i,j,k
   enddo
