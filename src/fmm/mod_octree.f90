@@ -215,7 +215,8 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
  type(t_sim_param), intent(in) :: sim_param
  type(t_octree), intent(out), target :: octree
 
- integer :: l, i,j,k, ic,jc,kc
+ type(t_cell_p) :: inter_list(208) !all the possible interactions
+ integer :: l, i,j,k, ic,jc,kc, ip_list
  integer :: imax, jmax, kmax
  integer :: p, child
  integer :: indx(3)
@@ -377,6 +378,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
     !cycle on the elements on the level
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
       !cycle on all the neighbours of the parent
+      ip_list = 0
 !DIR$ IVDEP
       do kc = -1,1; do jc = -1,1; do ic = -1,1
         if(associated(octree%layers(l)%lcells(i,j,k)%parent%p%&
@@ -390,13 +392,21 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
                                                                    .gt.1)) then
               !If the parent neighbour child is not a neighbour =) 
               !push it in the interaction list
-              call push_ptr(octree%layers(l)%lcells(i,j,k)%interaction_list, &
-                     octree%layers(l)%lcells(i,j,k)%parent%p%&
-                     neighbours(ic,jc,kc)%p%children(child)%p)
+              !call push_ptr(octree%layers(l)%lcells(i,j,k)%interaction_list, &
+              !       octree%layers(l)%lcells(i,j,k)%parent%p%&
+              !       neighbours(ic,jc,kc)%p%children(child)%p)
+              ip_list = ip_list + 1
+              inter_list(ip_list)%p => octree%layers(l)%lcells(i,j,k)%parent%p%&
+                     neighbours(ic,jc,kc)%p%children(child)%p
+
             endif
           enddo !child
         endif
       enddo; enddo; enddo !parents neighbours ic,jc,kc
+        
+
+        call push_ptr(octree%layers(l)%lcells(i,j,k)%interaction_list, &
+               inter_list(1:ip_list))
 
     enddo; enddo; enddo !layer cells i,j,k
   enddo
@@ -734,17 +744,13 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
  integer :: i, j, k, lv, ip, ipp, m, ie
  real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3)
  real(wp) :: grad(3,3)
- integer :: np
-  
-  np = 0
 
   !for all the leaves apply the local expansion and then local interactions 
   t0 = dust_time()
-!$omp parallel do private(lv, ip, vel, pos, m, i, j, k, ipp, Rnorm2, v) schedule(dynamic)
+!$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, v, stretch, str, grad, alpha) schedule(dynamic)
   do lv = 1, octree%nleaves
     !I am on a leaf, cycle on all the particles inside the leaf
     do ip = 1,octree%leaves(lv)%p%npart
-      np = np + 1
       
       vel = 0.0_wp
       stretch = 0.0_wp
@@ -781,6 +787,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
                  %compute_stretch(pos, alpha, str)
               stretch = stretch +str/(4.0_wp*pi)
             endif
+            if(sim_param%use_vd) then
+              call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
+                 %compute_diffusion(pos, alpha, str)
+              stretch = stretch +str*sim_param%nu_inf
+            endif
           enddo
         endif
       enddo; enddo; enddo
@@ -796,6 +807,13 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
                                                           alpha, str)
             stretch = stretch +str/(4.0_wp*pi)
           endif
+
+          if(sim_param%use_vd) then
+            call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_diffusion(pos, &
+                                                          alpha, str)
+            stretch = stretch + str*sim_param%nu_inf
+          endif
+
         endif
       enddo
 
@@ -829,7 +847,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
       octree%leaves(lv)%p%cell_parts(ip)%p%vel = vel
 
       !evolve the position in time
-      if(sim_param%use_vs) then
+      if(sim_param%use_vs .or. sim_param%use_vd) then
         !evolve the intensity in time
         octree%leaves(lv)%p%cell_parts(ip)%p%stretch = stretch
       endif

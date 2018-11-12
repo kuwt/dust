@@ -76,6 +76,8 @@ type t_sim_param
   real(wp) :: a_inf
   !> Free stream dynamic viscosity
   real(wp) :: mu_inf
+  !> Free stream kinematic viscosity
+  real(wp) :: nu_inf
 
   !Wake
   !> Scaling of the first implicit panel
@@ -103,10 +105,16 @@ type t_sim_param
   real(wp) :: DoubletThreshold
   !> Rankine Radius for vortices
   real(wp) :: RankineRad
+  !> Vortex Radius for vortex particles
+  real(wp) :: VortexRad
   !> Complete cutoff radius
   real(wp) :: CutoffRad
   !> use the vortex stretching or not
   logical :: use_vs
+  !> use the vorticity diffusion or not
+  logical :: use_vd
+  !> use the penetration avoidance
+  logical :: use_pa
 
   !FMM parameters
   !> Employing the FMM method
@@ -179,8 +187,11 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%FarFieldRatioSource, 'FarFieldRatioSource', loc)
   call write_hdf5_attr(this%DoubletThreshold, 'DoubletThreshold', loc)
   call write_hdf5_attr(this%RankineRad, 'RankineRad', loc)
+  call write_hdf5_attr(this%VortexRad, 'VortexRad', loc)
   call write_hdf5_attr(this%CutoffRad, 'CutoffRad', loc)
   call write_hdf5_attr(this%use_vs, 'vortstretch', loc)
+  call write_hdf5_attr(this%use_vd, 'vortdiff', loc)
+  call write_hdf5_attr(this%use_pa, 'PenetrationAvoidance', loc)
   call write_hdf5_attr(this%use_fmm, 'use_fmm', loc)
   if(this%use_fmm) then
     call write_hdf5_attr(this%BoxLength, 'BoxLength', loc)
