@@ -189,9 +189,6 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
   
   ! rhs: ....
   linsys%b_pres = 4*pi * ( Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp )
-  write(*,*) ' H_inf = ' , &
-        Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp 
-
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++
 
 end subroutine initialize_linsys
@@ -288,8 +285,6 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
   
   ! rhs: ....
   linsys%b_pres = 4*pi * ( Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp )
-  write(*,*) ' H_inf = ' , &
-        Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp 
 
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++
 
@@ -332,9 +327,6 @@ subroutine solve_linsys(linsys)
                   INFO
     call error(this_sub_name, this_mod_name, trim(msg))
   end if
-
-  !elapsed_time = DBLE( count2 - count1 ) / DBLE( count_rate1 )
-  !write(*,*) ' done. Elapsed time : ' , elapsed_time 
 
   deallocate(A_tmp,IPIV) 
 
@@ -383,9 +375,6 @@ subroutine solve_linsys_pressure(linsys,res)
                   INFO
     call error(this_sub_name, this_mod_name, trim(msg))
   end if
-
-  !elapsed_time = DBLE( count2 - count1 ) / DBLE( count_rate1 )
-  !write(*,*) ' done. Elapsed time : ' , elapsed_time 
 
   deallocate(A_tmp,IPIV) 
 

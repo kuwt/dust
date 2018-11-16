@@ -475,6 +475,7 @@ subroutine sort_particles(part,octree)
  integer :: l, i,j,k, child
  integer :: imax, jmax, kmax, ll, nl
  logical :: got_leaves
+ character(len=*), parameter :: this_sub_name = 'sort_particles'
  
   ll = octree%nlevels
   csize = octree%layers(ll)%cell_size
@@ -495,11 +496,16 @@ subroutine sort_particles(part,octree)
   !PROFILE
   t0 = dust_time()
   !cycle on all the particles
-  write(*,*) ' +++++ shape(part) : ' , shape(part)
   do ip=1,size(part)
-    
     !check in which cell at the lowest level it is located
     idx = ceiling((part(ip)%p%cen-octree%xmin)/csize)
+
+    !check that we are not sorting things outside the octree
+    if(any(idx.le.0).or.any(idx.gt.shape(octree%layers(ll)%lcells))) then
+      call error(this_sub_name, this_mod_name, 'Sorted particle resulted &
+                                                &outside the octree box') 
+    endif
+
     !add the particle to the lowest level
     octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npart = &
                     octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npart + 1

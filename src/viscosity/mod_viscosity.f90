@@ -104,7 +104,8 @@ subroutine viscosity_effects( geo , elems , te , sim_param )
 
  ! preliminary "fixed" parameters
  real(wp) , parameter :: h = 0.100_wp           
- real(wp) , parameter :: tol_velSep = 0.5_wp   
+ !real(wp) , parameter :: tol_velSep = 0.5_wp   
+ real(wp) , parameter :: tol_velSep = 0.0_wp   
 
 ! airfoil ------------------
 !   h = 0.025_wp   ! 0.05_wp   ! 0.1_wp   ! 0.025_wp
@@ -198,13 +199,6 @@ subroutine viscosity_effects( geo , elems , te , sim_param )
          al_bound = el%h_bl / ( ( vc + vd ) * sim_param%dt + el%h_bl )
          al_free  = 1.0_wp - al_bound
 
-! debug -----        
-!        write(*,*) ' el. i_elem : ' , i_elem , ' ,   vc :' , vc
-!        write(*,*) '   OmV : ' , OmV , ' , al_free : ' , al_free
-!        write(*,*) '   surf_vel : ' , el%surf_vel  
-!        write(*,*) '   nor      : ' , el%nor       
-! debug -----        
-
        end if
        ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
        ! criterion for flow separation
@@ -234,7 +228,7 @@ subroutine viscosity_effects( geo , elems , te , sim_param )
  write(*,*) ' ne_te : ' , ne_te
 ! debug -----
  do ie_te = 1 , ne_te
-
+   if(associated(te%e(2,ie_te)%p)) then
    ie1 = te%e(1,ie_te)%p%id 
    ie2 = te%e(2,ie_te)%p%id
 
@@ -256,6 +250,7 @@ subroutine viscosity_effects( geo , elems , te , sim_param )
 
    end select  
    end select  
+   endif
  
  end do
  ! -------------------------

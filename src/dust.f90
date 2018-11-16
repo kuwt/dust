@@ -291,6 +291,8 @@ call prms%CreateLogicalOption('Vortstretch','Employ vortex stretching','T')
 call prms%CreateLogicalOption('Diffusion','Employ vorticity diffusion','T')
 call prms%CreateLogicalOption('PenetrationAvoidance','Employ penetration &
                                                               & avoidance','F')
+call prms%CreateLogicalOption('ViscosityEffects','Simulate viscosity &
+                                                              & effects','F')
 
 
 ! get the parameters and print them out
@@ -354,6 +356,7 @@ sim_param%min_vel_at_te  = getreal(prms,'ImplicitPanelMinVel')
 sim_param%use_vs = getlogical(prms, 'Vortstretch')
 sim_param%use_vd = getlogical(prms, 'Diffusion')
 sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
+sim_param%use_ve = getlogical(prms, 'ViscosityEffects')
 !Octree and FMM parameters
 sim_param%use_fmm = getlogical(prms, 'FMM')
 sim_param%BoxLength = getreal(prms, 'BoxLength')
@@ -589,14 +592,6 @@ do it = 1,nstep
     call elems_ad(i_el)%p%compute_dforce(sim_param)
   end do
 
-! check -----
-  do i_el = 1 , geo%nSurfPan
-    write(*,*) surfpan_H_IE(i_el)
-  end do
-
-  if ( it .eq. 3 )  stop
-! check -----
-
   ! pres_IE +++++
   do i_el = 1 , geo%nSurfPan
     select type ( el => elems(i_el)%p ) ; class is ( t_surfpan )
@@ -604,30 +599,6 @@ do it = 1,nstep
       surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp
     end select
   end do
-  
-! ! check -----
-! do i_el = 1 , geo%nSurfPan
-!   select type ( el => elems(i_el)%p ) ; class is ( t_surfpan )
-!    write(*,*) el%pres , &
-!     surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp
-!   end select
-! end do
-! ! check -----
-
-! if ( it .eq. 3 ) stop
-
-  ! pres_IE +++++
-
-
-  !if ((sim_param%debug_level .ge. 10).and.time_2_debug_out) then
-  !  call debug_printout_loads(elems, basename_debug, it)
-  !endif
-
-  !------ Output the results  ------
-  !Printout the wake
-  !DISCONTINUED
-  !if((sim_param%debug_level .ge. 17).and.time_2_debug_out)  &
-  !                    call debug_printout_wake(wake, basename_debug, it)
 
   !Print the results
   if(time_2_out)  then
@@ -638,7 +609,7 @@ do it = 1,nstep
   !------ Viscous Effects and Flow Separations ------
   ! some computation of surface quantities and vorticity to be released.
   ! Free vortices will be introduced in prepare_wake(), some lines below
-  call viscosity_effects( geo , elems , te , sim_param )
+  if(sim_param%use_ve) call viscosity_effects( geo , elems , te , sim_param )
 
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the

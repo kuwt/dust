@@ -93,8 +93,6 @@ procedure, pass(this) :: calc_geo_data    => calc_geo_data_vortlatt
 procedure, pass(this) :: get_vort_vel     => get_vort_vel_vortlatt
 end type
 
-!   procedure, pass(this) :: correct_pressure_kutta => &
-!                            correct_pressure_kutta_surfpan
 
 character(len=*), parameter :: this_mod_name='mod_vortlatt'
 

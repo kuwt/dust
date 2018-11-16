@@ -679,84 +679,64 @@ subroutine prepare_wake(wake, geo, sim_param)
   endif
 
 
-  ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   ! Treat flow separations 
-  ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  if(sim_param%use_ve) then
+    do i_comp = 1 , size( geo%components)! ***** loop #1 over components *****
 
-! debug -----
-! write(*,*) ' shape(wake%wake_parts) : ' , shape(wake%wake_parts)
-! debug -----
-  do i_comp = 1 , size( geo%components)     ! ***** loop #1 over components *****
+     if ( k .lt. 1 ) k = 1
 
-   if ( k .lt. 1 ) k = 1
+     ! flow separation allowed only for surfpan elements -----
+      if ( trim( geo%components(i_comp)%comp_el_type ) .eq. 'p' ) then
 
-!  write(*,*) ' ********** 1 '
-   ! flow separation allowed only for surfpan elements -----
-   if ( trim( geo%components(i_comp)%comp_el_type ) .eq. 'p' ) then
+        n_elem = size( geo%components(i_comp)%el )
 
-!    write(*,*) ' ********** 2 '
-     n_elem = size( geo%components(i_comp)%el )
+        do i_elem = 1 , n_elem     ! ***** loop #2 over elements   *****
 
-     do i_elem = 1 , n_elem     ! ***** loop #2 over elements   *****
+          select type( el => geo%components(i_comp)%el(i_elem) ) 
+          type is (t_surfpan)
 
-       select type( el => geo%components(i_comp)%el(i_elem) ) ; type is (t_surfpan)
-!      write(*,*) '  i_elem : ' , i_elem , ' el % al_free ' , el % al_free
+          ! flow separation
+          if ( el % al_free .gt. 0.0_wp ) then 
+            pos_p = el%cen + el%nor * el%h_bl + & 
+                       el % surf_vel * sim_param%dt
 
-       ! flow separation
-       if ( el % al_free .gt. 0.0_wp ) then 
+            if(all(pos_p .ge. wake%part_box_min) .and. &
+               all(pos_p .le. wake%part_box_max)) then
+              !Add the particle
+              do ip = k, size(wake%wake_parts)
 
-         !Add the particle
-         do ip = k, size(wake%wake_parts)
-
-           if (wake%wake_parts(ip)%free) then
-             
-             wake%wake_parts(ip)%free = .false.
-             k = ip+1
-             wake%n_prt = wake%n_prt+1
-             wake%wake_parts(ip)%mag = norm2(el%free_vort)
-             if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
-               wake%wake_parts(ip)%dir = el%free_vort/wake%wake_parts(ip)%mag
-             else
-               wake%wake_parts(ip)%dir = el%free_vort
-             endif
-             wake%wake_parts(ip)%cen = el%cen + el%nor * el%h_bl + & ! + ...
-                    el % surf_vel * sim_param%dt
-             exit 
-           endif
-         enddo
-         if (ip .gt. wake%nmax_prt) then
-           write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
-             wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
-             &restarting with a higher number of maximum wake particles'
-         call error(this_sub_name, this_mod_name, trim(msg))
-         endif
-
-! debug -----
-!      write(*,*) ' i_elem : ' , i_elem
-!      write(*,*) '  mag , dir : ' , wake%wake_parts(ip)%mag , '   ' , wake%wake_parts(ip)%dir
-!      write(*,*) '  cen       : ' , wake%wake_parts(ip)%cen
-! debug -----
-
-       end if
-
-       end select
-
-     end do     ! ***** loop #2 over elements   *****
-
-   end if
-
-  end do     ! ***** loop #1 over components *****
-
-  ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  ! Treat flow separations 
-  ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-! <<<<<<<<<<<<<<
-! debug -----
-! write(*,*) ' shape(wake%part_p) : ' , shape(wake%part_p)
-! stop
-! debug -----
-! <<<<<<<<<<<<<<
+                if (wake%wake_parts(ip)%free) then
+                  
+                  wake%wake_parts(ip)%free = .false.
+                  k = ip+1
+                  wake%n_prt = wake%n_prt+1
+                  wake%wake_parts(ip)%mag = norm2(el%free_vort)
+                  if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
+                    wake%wake_parts(ip)%dir = el%free_vort/wake%wake_parts(ip)%mag
+                  else
+                    wake%wake_parts(ip)%dir = el%free_vort
+                  endif
+                  !wake%wake_parts(ip)%cen = el%cen + el%nor * el%h_bl + & 
+                  !       el % surf_vel * sim_param%dt
+                  wake%wake_parts(ip)%cen = pos_p
+                  exit 
+                endif
+              enddo
+              if (ip .gt. wake%nmax_prt) then
+                write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
+                  wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
+                  &restarting with a higher number of maximum wake particles'
+              call error(this_sub_name, this_mod_name, trim(msg))
+              endif
+            endif !particle in box
+          end if !generate the particle
+          end select!select panels
+        end do ! ***** loop #2 over elements   *****
+      end if !if is a 3dp
+    end do ! ***** loop #1 over components *****
+  endif !calculate the viscous particles detachment
 
   ! Recreate sturctures and pointers, if full
   if(wake%full_panels .or. wake%full_rings .or. (wake%n_prt.gt.0) ) then
@@ -1430,33 +1410,49 @@ subroutine avoid_collision(elems, wake, part, sim_param, vel)
  real(wp) :: dist(3), n(3)
  real(wp) :: pos(3)
  real(wp) :: distn, distnor, damp, normvel
- real(wp) :: damp_radius, cont
+ real(wp) :: damp_radius, cont, rad_mult, k
 
-!damp_radius = 0.3
-cont = 0.9
-pos = part%cen
+ !damp_radius = 0.3
+ cont = 0.95
+ !cont = 1.0
+ rad_mult = 1.3
+ pos = part%cen
+ k = 0.85
+ 
 
-
-  pos = vort_part%cen
   !calculate the influence of the solid bodies
   do ie=1,size(elems)
     dist = pos-elems(ie)%p%cen
-    damp_radius = sim_param%dt*sim_param%u_ref + maxval(elems(ie)%p%edge_len)
+    damp_radius = sim_param%dt*sim_param%u_ref*rad_mult + &
+                                          maxval(elems(ie)%p%edge_len)/2.0_wp
     distn = norm2(dist)
+    !if it is in the check radius perform calculations
     if ((distn .lt. damp_radius)) then
+      n = elems(ie)%p%nor
+      normvel = sum(vel*n) 
       distnor = sum(dist * elems(ie)%p%nor)
-      if (abs(distnor) .lt. 0.03_wp*minval(elems(ie)%p%edge_len)) then
+      if(normvel .lt. -k*distnor/sim_param%dt) then
+        !normvel = -distnor/sim_param%dt*(1 - &
+        !                         1/(-normvel*sim_param%dt/8.0_wp/distnor+1)**8)
+        normvel = -distnor/sim_param%dt*(1.0-k)*(1.0 - &
+                 1.0/(-(normvel+k*distnor/sim_param%dt)* &
+                 sim_param%dt/8.0_wp/distnor/(1-k) + 1.0)**8)
+        !normvel = max(normvel,-distnor/sim_param%dt)
+      endif
+      if(normvel .lt. -cont*distnor/sim_param%dt) then
         part%free = .true.
         wake%n_prt = wake%n_prt -1
         return
       endif
-      !n = dist/distn
-      n = elems(ie)%p%nor
-      normvel = max(sum(vel*n) , -cont*distnor/sim_param%dt)
-      !normvel = max(sum(vel*n) , 0.0_wp)
       vel = vel - (sum(vel*n) - normvel) * n
       !vel = vel - (sum(vel*n) + cont*distnor/sim_param%dt) * n
       !vel = vel - sum(vel*n) * (1-damp) * n
+      !distnor = sum(dist * elems(ie)%p%nor)
+      !if (abs(distnor) .lt. 0.03_wp*minval(elems(ie)%p%edge_len)) then
+      !  part%free = .true.
+      !  wake%n_prt = wake%n_prt -1
+      !  return
+      !endif
     endif
   enddo
 
