@@ -133,6 +133,12 @@ type t_sim_param
     integer :: MinOctreePart
     !> Multipole expansion degree
     integer :: MultipoleDegree
+    !> Use dynamic levels
+    logical :: use_dyn_layers
+      !> Maximum number of octree levels
+      integer :: NMaxOctreeLevels
+      !> Time ratio that triggers the increase of levels
+      real(wp) :: LeavesTimeRatio
 
 
   !Handling parameters:
@@ -203,6 +209,11 @@ subroutine save_sim_param(this, loc)
     call write_hdf5_attr(this%NOctreeLevels, 'NOctreeLevels', loc)
     call write_hdf5_attr(this%MinOctreePart, 'MinOctreePart', loc)
     call write_hdf5_attr(this%MultipoleDegree, 'MultipoleDegree', loc)
+    call write_hdf5_attr(this%use_dyn_layers, 'use_dyn_layers', loc)
+    if(this%use_dyn_layers) then
+      call write_hdf5_attr(this%NMaxOctreeLevels, 'NMaxOctreeLevels', loc)
+      call write_hdf5_attr(this%LeavesTimeRatio, 'LeavesTimeRatio', loc)
+    endif
   endif
   call write_hdf5_attr(this%debug_level, 'debug_level', loc)
   call write_hdf5_attr(this%dt_out, 'dt_out', loc)

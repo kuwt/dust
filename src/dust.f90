@@ -287,6 +287,13 @@ call prms%CreateIntOption('NOctreeLevels','number of octree levels')
 call prms%CreateIntOption('MinOctreePart','minimum number of octree &
                                                              &particles')
 call prms%CreateIntOption('MultipoleDegree','multipole expansion degree')
+call prms%CreateLogicalOption('DynLayers','Use dynamic layers','F')
+call prms%CreateIntOption('NMaxOctreeLevels','maximum number &
+                                                          &of octree levels')
+call prms%CreateRealOption('LeavesTimeRatio','Ratio that triggers the &
+                                          &increase of the number of levels')
+
+! models options
 call prms%CreateLogicalOption('Vortstretch','Employ vortex stretching','T')
 call prms%CreateLogicalOption('Diffusion','Employ vorticity diffusion','T')
 call prms%CreateLogicalOption('PenetrationAvoidance','Employ penetration &
@@ -366,6 +373,13 @@ sim_param%NOctreeLevels = getint(prms, 'NOctreeLevels')
 sim_param%MinOctreePart = getint(prms, 'MinOctreePart')
 sim_param%MultipoleDegree = getint(prms,'MultipoleDegree')
 
+sim_param%use_dyn_layers = getlogical(prms,'DynLayers')
+if(sim_param%use_dyn_layers) then
+  sim_param%NMaxOctreeLevels = getint(prms, 'NMaxOctreeLevels')
+  sim_param%LeavesTimeRatio = getreal(prms, 'LeavesTimeRatio')
+else
+  sim_param%NMaxOctreeLevels = sim_param%NOctreeLevels
+endif
 
 
 
