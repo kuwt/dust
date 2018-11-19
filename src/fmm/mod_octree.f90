@@ -339,10 +339,10 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
       ! speed, so things are allocated to zero here)
       allocate(octree%layers(l)%lcells(i,j,k)%cell_parts(0))
       octree%layers(l)%lcells(i,j,k)%npart = 0
-      octree%layers(l)%lcells(i,j,k)%active = .true.
+      octree%layers(l)%lcells(i,j,k)%active = .false.
       octree%layers(l)%lcells(i,j,k)%leaf = .false.
       allocate(octree%layers(l)%lcells(i,j,k)%interaction_list(0) )
-      call octree%layers(l)%lcells(i,j,k)%mp%init(octree%pexp)
+      !call octree%layers(l)%lcells(i,j,k)%mp%init(octree%pexp)
 
     enddo; enddo; enddo !layer cells i,j,k
   enddo
@@ -473,7 +473,7 @@ subroutine sort_particles(part,octree)
  integer :: idx(3)
  real(wp) :: csize
  integer :: l, i,j,k, child
- integer :: imax, jmax, kmax, ll, nl
+ integer :: ll, nl
  logical :: got_leaves
  
   ll = octree%nlevels
@@ -519,10 +519,9 @@ subroutine sort_particles(part,octree)
   do k=1,octree%ncl(3,ll); do j=1,octree%ncl(2,ll); do i = 1,octree%ncl(1,ll)
     if( (octree%layers(ll)%lcells(i,j,k)%npart .ge. min_part_4_cell) .or. &
          ll .eq. 1) then !if last level is first, all are leaves
-      octree%layers(ll)%lcells(i,j,k)%leaf = .true.
-      !add to the leaves
-      nl = nl+1
-      octree%leaves(nl)%p => octree%layers(ll)%lcells(i,j,k)
+      !mark as leaf
+      call set_leaf(octree%layers(ll)%lcells(i,j,k), octree%leaves, nl, &
+                                                             octree%pexp)
     endif
   enddo; enddo; enddo !layer cells i,j,k
 
@@ -555,26 +554,22 @@ subroutine sort_particles(part,octree)
           !set the current cell and all the branch upwards as branch
           do child = 1,8
             if(.not. octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf) then
-              octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf = .true.
-              nl = nl+1
-              octree%leaves(nl)%p => &
-                               octree%layers(l)%lcells(i,j,k)%children(child)%p
+              call set_leaf(octree%layers(l)%lcells(i,j,k)%children(child)%p, &
+                        octree%leaves, nl, octree%pexp)
             endif
           enddo
-          call set_branch(octree%layers(l)%lcells(i,j,k))
+          call set_branch(octree%layers(l)%lcells(i,j,k), octree%pexp)
         else
           !None of the children are leaves. Particles have alerady been 
           !inherited, just flag the rest inactive
           do child = 1,8
-            octree%layers(l)%lcells(i,j,k)%children(child)%p%active = .false.
+            call set_inactive(octree%layers(l)%lcells(i,j,k)%children(child)%p)
           enddo
           !then check if itself it is a leaf
           if( (octree%layers(l)%lcells(i,j,k)%npart .ge. min_part_4_cell) &
           .or. l .eq. 1) then !if last level is first, all are leaves
-            octree%layers(l)%lcells(i,j,k)%leaf = .true.
-            !add to the leaves
-            nl = nl+1
-            octree%leaves(nl)%p => octree%layers(l)%lcells(i,j,k)
+            call set_leaf(octree%layers(l)%lcells(i,j,k), &
+                        octree%leaves, nl, octree%pexp)
           endif
         endif
 
@@ -585,10 +580,8 @@ subroutine sort_particles(part,octree)
         do child = 1,8
           if( .not. octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf &
       .and. .not. octree%layers(l)%lcells(i,j,k)%children(child)%p%branch) then
-            octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf = .true.
-            nl = nl+1
-            octree%leaves(nl)%p => &
-                               octree%layers(l)%lcells(i,j,k)%children(child)%p
+            call set_leaf(octree%layers(l)%lcells(i,j,k)%children(child)%p, &
+                        octree%leaves, nl, octree%pexp)
           endif
         enddo !child
       endif
@@ -614,17 +607,18 @@ subroutine calculate_multipole(part,octree)
  type(t_octree), intent(inout) :: octree
 
  integer :: i, j, k, lv, l, child, il
- integer :: imax, jmax, kmax, ll
+ integer :: ll
  integer :: idx_diff(3)
 
   ll = octree%nlevels
   !reset multipole data (might be done elsewhere)
-  do l = ll,1,-1
-    !cycle on the elements on the level
-    do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
-         call octree%layers(l)%lcells(i,j,k)%mp%reset
-    enddo; enddo; enddo !layer cells i,j,k
-  enddo
+  ! amended: now the multipole data is reset when assigned leafs/branches
+  !do l = ll,1,-1
+  !  !cycle on the elements on the level
+  !  do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
+  !       call octree%layers(l)%lcells(i,j,k)%mp%reset
+  !  enddo; enddo; enddo !layer cells i,j,k
+  !enddo
 
 
   !For all the leaves, calculate the multipole coefficients
@@ -681,18 +675,20 @@ subroutine calculate_multipole(part,octree)
   !PROFILE
   t0 = dust_time()
     !cycle on the elements on the level
-!$omp parallel do collapse(3) private(i,j,k,idx_diff) schedule(dynamic)
+!$omp parallel do collapse(3) private(i,j,k,il,idx_diff) schedule(dynamic)
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
       if(octree%layers(l)%lcells(i,j,k)%active) then
          !if it is active perform M2L with all the interaction list
         do il = 1,size(octree%layers(l)%lcells(i,j,k)%interaction_list)
           idx_diff = octree%layers(l)%lcells(i,j,k)%interaction_list(il)%p%cart_index -&
                   (/i,j,k/)
+          if(octree%layers(l)%lcells(i,j,k)%interaction_list(il)%p%active) then
           call octree%layers(l)%lcells(i,j,k)%mp%M2L(&
                octree%layers(l)%ker_der(idx_diff(1),idx_diff(2),idx_diff(3)), &
                octree%pexp, &
                octree%pexp_der, &
                octree%layers(l)%lcells(i,j,k)%interaction_list(il)%p%mp)
+          endif
         enddo !il 
       endif
     enddo; enddo; enddo !layer cells i,j,k
@@ -704,17 +700,19 @@ subroutine calculate_multipole(part,octree)
 
   !PROFILE
   t0 = dust_time()
-!$omp parallel do collapse(3) private(i,j,k,child)
+!$omp parallel do collapse(3) private(i,j,k,child) schedule(dynamic)
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
       if(octree%layers(l)%lcells(i,j,k)%active .and. l.lt.ll) then
         !if active and not in the bottom layer, bring down the local expansion
         ! to the children
         do child = 1,8
-          call octree%layers(l)%lcells(i,j,k)%children(child)%p%mp%L2L(&
-               octree%layers(l)%lcells(i,j,k)%children(child)%p%cen, &
-               octree%layers(l)%lcells(i,j,k)%mp, &
-               octree%layers(l)%lcells(i,j,k)%cen, &
-               octree%pexp )
+          if(octree%layers(l)%lcells(i,j,k)%children(child)%p%active) then
+            call octree%layers(l)%lcells(i,j,k)%children(child)%p%mp%L2L(&
+                 octree%layers(l)%lcells(i,j,k)%children(child)%p%cen, &
+                 octree%layers(l)%lcells(i,j,k)%mp, &
+                 octree%layers(l)%lcells(i,j,k)%cen, &
+                 octree%pexp )
+          endif
         enddo 
       endif
     enddo; enddo; enddo !layer cells i,j,k
@@ -924,38 +922,79 @@ end subroutine apply_multipole
 
 !----------------------------------------------------------------------
 
-!> Set a whole branch inactive under a leaf. 
+!> Set a cell leaf
 !!
-!! Used to set a whole branch below a leaf inactive. When called with 
-!! leaf=.true. the present cell is set as leaf, and all the branch 
-!! underneath is set to inactive (children and all descendants)
-recursive subroutine set_leaf(cell,leaf)
- type(t_cell), intent(inout) :: cell
- logical :: leaf
-
- integer :: i 
+!! A cell is set as leaf, and if necessary the multipole data is
+!! allocated. In all cases the multipole data is reset.
+!! Note: leaves are not a dynamic vector, are allocated as a whole and
+!! then only the first one are employed. This means that to set a leaf 
+!! in the correct position an increasing index is necessary, and must be
+!! passed with intent(inout)
+recursive subroutine set_leaf(cell,leaves,il,pexp)
+ type(t_cell), intent(inout), target :: cell
+ type(t_cell_p), intent(inout) :: leaves(:)
+ integer, intent(inout) :: il
+ type(t_polyexp), intent(in) :: pexp
   
-  if (.not.leaf) cell%active = .false.
- 
-  do i=1,8
-    if(associated(cell%children(i)%p)) then
-      !call set_inactive_tree(cell%children(i)%p, leaf=.false.)
-      call set_leaf(cell%children(i)%p, .false.)
-    endif
-  enddo
+  !I is a leaf
+  cell%leaf = .true.
+
+  il = il+1
+  leaves(il)%p => cell
+
+  if(.not. cell%active) then
+    !If it was not active, set active and allocate data
+    cell%active = .true.
+    call cell%mp%init(pexp)
+  else
+    !If it was alerady active, just reset the data
+    call cell%mp%reset
+  endif
 
 end subroutine set_leaf
 
 !----------------------------------------------------------------------
 
-recursive subroutine set_branch(cell)
+!> Set a cell and all the upward branch branch
+!!
+!! Recursively set all the upward branch as branch, allocating
+!! the multipole data when necessary, resetting it to zero in any case
+recursive subroutine set_branch(cell,pexp)
  type(t_cell), intent(inout) :: cell
+ type(t_polyexp), intent(in) :: pexp
 
- cell%branch = .true.
+  cell%branch = .true.
 
- if(associated(cell%parent%p)) call set_branch(cell%parent%p)
+  if(.not. cell%active) then
+    !If it was not active, set active and allocate data
+    cell%active = .true.
+    call cell%mp%init(pexp)
+  else
+    !If it was alerady active, just reset the data
+    call cell%mp%reset
+  endif
+
+  if(associated(cell%parent%p)) call set_branch(cell%parent%p, pexp)
 
 end subroutine set_branch
+
+!----------------------------------------------------------------------
+
+!> Set a cell inactive
+!!
+!! Everything is set to false and the multipole data are deallocated
+recursive subroutine set_inactive(cell)
+ type(t_cell), intent(inout) :: cell
+
+  cell%branch = .false.
+  cell%leaf = .false.
+
+  if(cell%active) then
+    cell%active = .false.
+    call cell%mp%destroy
+  endif
+
+end subroutine set_inactive
 
 !----------------------------------------------------------------------
 
@@ -1068,13 +1107,17 @@ end subroutine push_part_ptr_vec
 !----------------------------------------------------------------------
 
 !> Reset the particles stored inside the cell
+!!
+!! The number of particles, the particles pointers and the brach/leaves
+!! flags are re-set. Activity flag is kept since it marks whether the 
+!! multipole data are allocated or not, will be set during sorting
 subroutine reset_cell(cell)
  type(t_cell), intent(inout) :: cell
 
  deallocate(cell%cell_parts)
  allocate(cell%cell_parts(0))
  cell%npart = 0
- cell%active = .true.
+ !cell%active = .true.
  cell%branch = .false.
  cell%leaf = .false.
 
