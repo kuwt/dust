@@ -174,6 +174,8 @@ type(t_expl_elem_p), allocatable :: elems_ll(:)
 type(t_expl_elem_p), allocatable :: elems_ad(:)
 !> All the elements (panels+ll)
 type(t_pot_elem_p), allocatable :: elems_tot(:)
+type(t_pot_elem_p), allocatable :: nothing(:)
+type(t_surfpan), allocatable :: nothing2(:)
 !> Geometry
 type(t_geo) :: geo
 !> Trailing edge
@@ -327,7 +329,7 @@ call finalizeParameters(prms)
 call printout(nl//'====== Initializing Octree ======')
 t0 = dust_time()
 call initialize_octree(BoxLength, NBox, OctreeOrigin, &
-                       NOctreeLevels, MinOctreePart, MultipoleDegree, r_Rankine, octree)
+                       NOctreeLevels, MinOctreePart, MultipoleDegree, r_Rankine, sim_param, octree)
 t1 = dust_time()
 write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
 call printout(message)
@@ -395,7 +397,9 @@ call printout(nl//'====== Performing octree interactions ======')
 t0 = dust_time()
 call sort_particles(part_p, octree)
 call calculate_multipole(part_p, octree)
-call apply_multipole(part_p, octree)
+allocate(nothing(0),nothing2(0))
+call apply_multipole(part_p, octree, nothing, nothing, nothing, &
+                         nothing2, sim_param)
 
 
 t1 = dust_time()
