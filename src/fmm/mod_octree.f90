@@ -94,6 +94,9 @@ type :: t_cell
   !> Pointers to the neighbouring cells
   type(t_cell_p) :: neighbours(-1:1,-1:1,-1:1)
 
+  !> Pointers to far leaf neighbours
+  type(t_cell_p), allocatable :: leaf_neigh(:)
+
   !> Pointers to the cells in the interaction list
   !! (i.e. child of the parent siblings which are not neighbouring)
   type(t_cell_p), allocatable :: interaction_list(:)
@@ -338,6 +341,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
       ! however rely on de-allocating and re-allocating without check for
       ! speed, so things are allocated to zero here)
       allocate(octree%layers(l)%lcells(i,j,k)%cell_parts(0))
+      allocate(octree%layers(l)%lcells(i,j,k)%leaf_neigh(0))
       octree%layers(l)%lcells(i,j,k)%npart = 0
       octree%layers(l)%lcells(i,j,k)%active = .false.
       octree%layers(l)%lcells(i,j,k)%leaf = .false.
@@ -472,12 +476,18 @@ subroutine sort_particles(part,octree)
  integer :: ip
  integer :: idx(3)
  real(wp) :: csize
- integer :: l, i,j,k, child
+ integer :: l, i,j,k, child, ic, jc, kc
  integer :: ll, nl
  logical :: got_leaves
  
+ !DEBUG
+ integer, allocatable :: lvs_lvl(:)
+
   ll = octree%nlevels
   csize = octree%layers(ll)%cell_size
+
+  !DEBUG
+  allocate(lvs_lvl(ll)); lvs_lvl = 0
   
   !set all the cells to empty
   do l = 1,ll
@@ -522,13 +532,14 @@ subroutine sort_particles(part,octree)
       !mark as leaf
       call set_leaf(octree%layers(ll)%lcells(i,j,k), octree%leaves, nl, &
                                                              octree%pexp)
+      !DEBUG
+      lvs_lvl(ll) = lvs_lvl(ll) + 1
     endif
   enddo; enddo; enddo !layer cells i,j,k
 
 
   !From the second to last level upwards
   do l = ll-1,1,-1
-    t0 = dust_time()
     !cycle on the elements on the level
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
 
@@ -556,6 +567,8 @@ subroutine sort_particles(part,octree)
             if(.not. octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf) then
               call set_leaf(octree%layers(l)%lcells(i,j,k)%children(child)%p, &
                         octree%leaves, nl, octree%pexp)
+            !DEBUG
+            lvs_lvl(l+1) = lvs_lvl(l+1) + 1
             endif
           enddo
           call set_branch(octree%layers(l)%lcells(i,j,k), octree%pexp)
@@ -570,6 +583,8 @@ subroutine sort_particles(part,octree)
           .or. l .eq. 1) then !if last level is first, all are leaves
             call set_leaf(octree%layers(l)%lcells(i,j,k), &
                         octree%leaves, nl, octree%pexp)
+            !DEBUG
+            lvs_lvl(l) = lvs_lvl(l) + 1
           endif
         endif
 
@@ -582,19 +597,48 @@ subroutine sort_particles(part,octree)
       .and. .not. octree%layers(l)%lcells(i,j,k)%children(child)%p%branch) then
             call set_leaf(octree%layers(l)%lcells(i,j,k)%children(child)%p, &
                         octree%leaves, nl, octree%pexp)
+            !DEBUG
+            lvs_lvl(l+1) = lvs_lvl(l+1) + 1
           endif
         enddo !child
       endif
 
     enddo; enddo; enddo !layer cells i,j,k
   enddo
-
+  
+  !Last dive down the levels to set the leaf neighbours
+  do l = 2,ll
+    !cycle on the elements on the level
+    do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
+    if(octree%layers(l)%lcells(i,j,k)%active) then
+      !1) get the leaf neighbours from the parent if it exists
+      !if(associated(octree%layers(l)%lcells(i,j,k)%parent%p)) then
+        call push_ptr(octree%layers(l)%lcells(i,j,k)%leaf_neigh, &
+                      octree%layers(l)%lcells(i,j,k)%parent%p%leaf_neigh)
+      !endif
+      !2) If one of my parent neighbours is a leaf, push it into my leaf neigh
+      do kc = -1,1; do jc = -1,1; do ic = -1,1
+        if(associated(octree%layers(l)%lcells(i,j,k)%parent%p%&
+                                              neighbours(ic,jc,kc)%p)) then
+        if(octree%layers(l)%lcells(i,j,k)%parent%p%&
+                                          neighbours(ic,jc,kc)%p%leaf) then
+          call push_ptr(octree%layers(l)%lcells(i,j,k)%leaf_neigh, &
+            octree%layers(l)%lcells(i,j,k)%parent%p%neighbours(ic,jc,kc)%p)
+        endif
+        endif
+      enddo; enddo; enddo !neighbour cells ic,jc,kc
+    endif !active
+    enddo; enddo; enddo !layer cells i,j,k
+  enddo
   !PROFILE
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Checked leaves  in: ' , t1 - t0,' s.'
   call printout(msg)
 
   octree%nleaves = nl
+
+  !DEBUG:
+  write(*,*) 'leaves at levels',lvs_lvl
 
 end subroutine sort_particles
 
@@ -738,7 +782,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
  class(c_elem), intent(in) :: wvort(:)
  type(t_sim_param), intent(in) :: sim_param
 
- integer :: i, j, k, lv, ip, ipp, m, ie
+ integer :: i, j, k, lv, ip, ipp, m, ie, iln
  real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3)
  real(wp) :: grad(3,3)
 
@@ -774,6 +818,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
       !then interact with all the neighbouring cell particles
       do k=-1,1; do j=-1,1; do i=-1,1
         if(associated(octree%leaves(lv)%p%neighbours(i,j,k)%p)) then
+        if(octree%leaves(lv)%p%neighbours(i,j,k)%p%active) then
           do ipp = 1,octree%leaves(lv)%p%neighbours(i,j,k)%p%npart
 
             call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
@@ -791,7 +836,28 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
             endif
           enddo
         endif
+        endif
       enddo; enddo; enddo
+
+      !interact with the leaf neighbours
+      do iln = 1,size(octree%leaves(lv)%p%leaf_neigh)
+       do ipp = 1,octree%leaves(lv)%p%leaf_neigh(iln)%p%npart
+
+         call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
+              %compute_vel(pos, sim_param%u_inf, v)
+         vel = vel +v/(4.0_wp*pi)
+         if(sim_param%use_vs) then
+           call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
+              %compute_stretch(pos, alpha, str)
+           stretch = stretch +str/(4.0_wp*pi)
+         endif
+         if(sim_param%use_vd) then
+           call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
+              %compute_diffusion(pos, alpha, str)
+           stretch = stretch +str*sim_param%nu_inf
+         endif
+       enddo
+      enddo
 
       !finally interact with the particles inside the cell 
       do ipp = 1,octree%leaves(lv)%p%npart
@@ -1116,6 +1182,8 @@ subroutine reset_cell(cell)
 
  deallocate(cell%cell_parts)
  allocate(cell%cell_parts(0))
+ deallocate(cell%leaf_neigh)
+ allocate(cell%leaf_neigh(0))
  cell%npart = 0
  !cell%active = .true.
  cell%branch = .false.
