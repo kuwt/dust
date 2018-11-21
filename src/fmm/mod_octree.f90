@@ -198,6 +198,7 @@ end interface
 character(len=*), parameter :: this_mod_name='mod_octree'
 character(len=max_char_len) :: msg
 real(t_realtime) :: t1 , t0
+real(t_realtime) :: t11, t00
 
 integer :: min_part_4_cell
 
@@ -480,31 +481,32 @@ subroutine sort_particles(part,octree)
  integer :: ll, nl
  logical :: got_leaves
  
- !DEBUG
- integer, allocatable :: lvs_lvl(:)
+  !PROFILE
+  t0 = dust_time()
 
   ll = octree%nlevels
   csize = octree%layers(ll)%cell_size
 
-  !DEBUG
-  allocate(lvs_lvl(ll)); lvs_lvl = 0
   
   !set all the cells to empty
   do l = 1,ll
     !cycle on the elements on the level
+!$omp parallel do collapse(3) private(i,j,k) schedule(dynamic)
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
       call reset_cell(octree%layers(l)%lcells(i,j,k))
     enddo; enddo; enddo !layer cells i,j,k
+!$omp end parallel do
   enddo
   
   !to stay on the safe side, nullify all the leaves pointers
+!$omp parallel do private(l)
   do l=1,size(octree%leaves)
     nullify(octree%leaves(l)%p)
   enddo
+!$omp end parallel do
   
-  !PROFILE
-  t0 = dust_time()
   !cycle on all the particles
+  !TODO: make this parallel too, but pay attention to the race conditions
   do ip=1,size(part)
     
     !check in which cell at the lowest level it is located
@@ -515,16 +517,9 @@ subroutine sort_particles(part,octree)
     call push_ptr(octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%cell_parts,part(ip)%p)
 
   enddo
-  !PROFILE
-  t1 = dust_time()
-  write(msg,'(A,F9.3,A)') 'Sorted particles in: ' , t1 - t0,' s.'
-  call printout(msg)
-
 
 
   nl = 0
-  !PROFILE
-  t0 = dust_time()
   !Bottom level: just check if are leaves
   do k=1,octree%ncl(3,ll); do j=1,octree%ncl(2,ll); do i = 1,octree%ncl(1,ll)
     if( (octree%layers(ll)%lcells(i,j,k)%npart .ge. min_part_4_cell) .or. &
@@ -532,8 +527,6 @@ subroutine sort_particles(part,octree)
       !mark as leaf
       call set_leaf(octree%layers(ll)%lcells(i,j,k), octree%leaves, nl, &
                                                              octree%pexp)
-      !DEBUG
-      lvs_lvl(ll) = lvs_lvl(ll) + 1
     endif
   enddo; enddo; enddo !layer cells i,j,k
 
@@ -567,8 +560,6 @@ subroutine sort_particles(part,octree)
             if(.not. octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf) then
               call set_leaf(octree%layers(l)%lcells(i,j,k)%children(child)%p, &
                         octree%leaves, nl, octree%pexp)
-            !DEBUG
-            lvs_lvl(l+1) = lvs_lvl(l+1) + 1
             endif
           enddo
           call set_branch(octree%layers(l)%lcells(i,j,k), octree%pexp)
@@ -583,8 +574,6 @@ subroutine sort_particles(part,octree)
           .or. l .eq. 1) then !if last level is first, all are leaves
             call set_leaf(octree%layers(l)%lcells(i,j,k), &
                         octree%leaves, nl, octree%pexp)
-            !DEBUG
-            lvs_lvl(l) = lvs_lvl(l) + 1
           endif
         endif
 
@@ -597,8 +586,6 @@ subroutine sort_particles(part,octree)
       .and. .not. octree%layers(l)%lcells(i,j,k)%children(child)%p%branch) then
             call set_leaf(octree%layers(l)%lcells(i,j,k)%children(child)%p, &
                         octree%leaves, nl, octree%pexp)
-            !DEBUG
-            lvs_lvl(l+1) = lvs_lvl(l+1) + 1
           endif
         enddo !child
       endif
@@ -630,16 +617,13 @@ subroutine sort_particles(part,octree)
     endif !active
     enddo; enddo; enddo !layer cells i,j,k
   enddo
-  !PROFILE
-  t1 = dust_time()
-  write(msg,'(A,F9.3,A)') 'Checked leaves  in: ' , t1 - t0,' s.'
-  call printout(msg)
 
   octree%nleaves = nl
 
-  !DEBUG:
-  write(*,*) 'leaves at levels',lvs_lvl
-
+  !PROFILE
+  t1 = dust_time()
+  write(msg,'(A,F9.3,A)') 'Sorted particles in: ' , t1 - t0,' s.'
+  call printout(msg)
 end subroutine sort_particles
 
 
@@ -685,10 +669,11 @@ subroutine calculate_multipole(part,octree)
   !layer by layer (except the last, in which are only leaves or inactive)
   !perform multipole to multipole
   !PROFILE
-  t0 = dust_time()
+  t00 = dust_time()
   do l = ll-1,1,-1
     !cycle on the elements on the level
-
+    !PROFILE
+    t0 = dust_time()
 !$omp parallel do collapse(3) private(i,j,k,child)
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
       if(octree%layers(l)%lcells(i,j,k)%active .and. &
@@ -766,6 +751,10 @@ subroutine calculate_multipole(part,octree)
   write(msg,'(A,I0,A,F9.3,A)') 'Calculated L2L layer ',l,' in: ' , t1 - t0,' s.'
   call printout(msg)
   enddo !l
+  !PROFILE
+  t11 = dust_time()
+  write(msg,'(A,F9.3,A)') 'Calculated Multipole in all layers in: ' , t11 - t00,' s.'
+  call printout(msg)
 
 end subroutine calculate_multipole
 

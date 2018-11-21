@@ -922,7 +922,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
   !if(wake%pan_wake_len .lt. wake%nmax_pan) np = np + 1
   if(.not.wake%full_panels) np = np + 1
 
-!$omp parallel do collapse(2) private(pos_p, vel_p, ie, ipan, iw)
+!$omp parallel do collapse(2) private(pos_p, vel_p, ie, ipan, iw) schedule(dynamic)
   do ipan = 3,np
     do iw = 1,wake%n_pan_points
       pos_p = point_old(:,iw,ipan-1)
@@ -948,6 +948,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
     if(.not.allocated(points_end)) allocate(points_end(3,wake%n_pan_points)) 
 
     ! create another row of points
+!$omp parallel do private(iw, pos_p, vel_p) schedule(dynamic)
     do iw = 1,wake%n_pan_points
       pos_p = point_old(:,iw,wake%pan_wake_len+1)
       vel_p = 0.0_wp
@@ -960,6 +961,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
       !update the position in time
       points_end(:,iw) = pos_p + vel_p*sim_param%dt
     enddo
+!$omp end parallel do
   endif
   
 
