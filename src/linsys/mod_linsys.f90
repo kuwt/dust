@@ -72,7 +72,7 @@ use mod_wake, only: t_wake
 implicit none
 
 public :: initialize_linsys, assemble_linsys, solve_linsys, &
-          destroy_linsys , dump_linsys, &
+          destroy_linsys , dump_linsys, dump_linsys_pres, &
           solve_linsys_pressure
 
 private
@@ -140,6 +140,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
   linsys%b_static = 0.0_wp
   linsys%res_expl = 0.0_wp
 
+
   !Build the static part of the system, saving also the static part of the 
   ! rhs
   do ie = 1,linsys%nstatic
@@ -174,23 +175,46 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
 
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++
   !Allocate matrix and rhs for pressure integral equation
+  allocate( linsys%idSurfPan(geo%nSurfPan) )           ; linsys%idSurfPan    = geo%idSurfPan
+  allocate( linsys%idSurfPanG2L(geo%nSurfPan) )        ; linsys%idSurfPanG2L = geo%idSurfPanG2L
   allocate( linsys%A_pres(geo%nSurfPan,geo%nSurfPan) ) ; linsys%A_pres = 0.0_wp
   allocate( linsys%b_pres(geo%nSurfPan) )              ; linsys%b_pres = 0.0_wp
+  allocate( linsys%b_matrix_pres_debug(geo%nSurfPan,geo%nSurfPan) ) ; linsys%b_matrix_pres_debug = 0.0_wp
 
-  ! Slicing --------------------
-  linsys%A_pres = linsys%A( geo%idSurfPan , geo%idSurfPan )
-  ! Remove Kutta condtion ------
-  do ie = 1 , geo%nSurfpan
-    select type( el => elems(geo%idSurfPan(ie))%p ) ; class is(t_surfpan)
-      call el%correct_pressure_kutta( &
-            (/wake%pan_p, wake%rin_p/), wake%pan_gen_elems_id, linsys,uinf,ie,1,ntot)
-    end select
-  end do
-  
-  ! rhs: ....
-  linsys%b_pres = 4*pi * ( Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp )
-  write(*,*) ' H_inf = ' , &
-        Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp 
+  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++
+  allocate( linsys%b_static_pres(geo%nstatic_SurfPan,geo%nstatic_SurfPan) ) 
+  linsys%b_static_pres = linsys%b_static( & 
+         geo%idSurfPan(1:geo%nstatic_SurfPan), &
+         geo%idSurfPan(1:geo%nstatic_SurfPan) )
+
+  ! for DEBUG only ( TO BE DELETED )
+  linsys%b_matrix_pres_debug( geo%idSurfPan(1:geo%nstatic_SurfPan), &
+                              geo%idSurfPan(1:geo%nstatic_SurfPan) ) = &
+             linsys%b_static( geo%idSurfPan(1:geo%nstatic_SurfPan), &
+                              geo%idSurfPan(1:geo%nstatic_SurfPan) )
+
+  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++
+
+! +++++++++++ !!!!!!!!! It should be useless here !!!!!!!!! ++++++++++ !
+!                                                                      !
+! Slicing in assemble_linsys() only                                    !
+!                                                                      !
+! +++++++++++ !!!!!!!!! It should be useless here !!!!!!!!! ++++++++++ !
+! ! Slicing --------------------
+! linsys%A_pres = linsys%A( geo%idSurfPan , geo%idSurfPan )
+! ! Remove Kutta condtion ------
+! do ie = 1 , geo%nSurfpan
+!   select type( el => elems(geo%idSurfPan(ie))%p ) ; class is(t_surfpan)
+!     call el%correct_pressure_kutta( &
+!           (/wake%pan_p, wake%rin_p/), wake%pan_gen_elems_id, linsys,uinf,ie,1,ntot)
+!   end select
+! end do
+! 
+! ! rhs: ....
+! linsys%b_pres = 4*pi * ( Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp )
+! write(*,*) ' H_inf = ' , &
+!       Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp 
+! !!!!!!!!! It should be useless here !!!!!!!!!
 
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++
 
@@ -262,7 +286,6 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
 !$omp do
   do ie = nst+1,ntot
 
-
     call elems(ie)%p%build_row(elems,linsys,uinf,ie,1,ntot)
 
     !call elems(ie)%p%add_wake((/wake_elems%pan_p, wake_rings%pan_p/), wake_elems%gen_elems_id, linsys,uinf,ie,1,ntot)
@@ -287,9 +310,18 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
   end do
   
   ! rhs: ....
-  linsys%b_pres = 4*pi * ( Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp )
-  write(*,*) ' H_inf = ' , &
-        Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp 
+  ! debug -----
+! write(*,*) '           b_motion                    b_infty '
+! do ie = 1 , geo%nSurfPan
+!   write(*,*) ie , '  ' , linsys%b_pres(ie) , '  ' , &
+!                          4*pi * ( Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp )
+! end do
+! write(*,*)
+! ! debug -----
+  linsys%b_pres = linsys%b_pres + &
+                    4*pi * ( Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp ) ! H_inf
+! write(*,*) ' H_inf = ' , &
+!       Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp 
 
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++
 
@@ -436,6 +468,45 @@ subroutine dump_linsys(linsys , filen_A , filen_b )
  close(fid)
 
 end subroutine dump_linsys
+
+!----------------------------------------------------------------------
+
+!> Dump the matrix and rhs of the linear system to file
+!!
+!! TODO: consider moving these functionalities to the i/o modules
+subroutine dump_linsys_pres(linsys , filen_A , filen_b , filen_b_debug )
+ type(t_linsys), intent(in) :: linsys
+ character(len=*) , intent(in) :: filen_A , filen_b
+ character(len=*) , optional , intent(in) :: filen_b_debug
+
+ integer :: fid
+ integer :: i1 
+
+
+ fid = 23
+ open(unit=fid, file=trim(adjustl(filen_A)) )
+ do i1 = 1 , size(linsys%A_pres,1)
+  write(fid,*) linsys%A_pres(i1,:)
+ end do
+ close(fid)
+ 
+ fid = 24
+ open(unit=fid, file=trim(adjustl(filen_b)) )
+ do i1 = 1 , size(linsys%b_pres,1)
+  write(fid,*) linsys%b_pres(i1)
+ end do
+ close(fid)
+
+ if ( present( filen_b_debug ) ) then
+   fid = 24
+   open(unit=fid, file=trim(adjustl(filen_b_debug)) )
+   do i1 = 1 , size(linsys%b_matrix_pres_debug,1)
+    write(fid,*) linsys%b_matrix_pres_debug(i1,:)
+   end do
+   close(fid)
+ end if
+
+end subroutine dump_linsys_pres
 
 !----------------------------------------------------------------------
 

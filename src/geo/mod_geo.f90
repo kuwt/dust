@@ -32,7 +32,6 @@
 !!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
 !!=====================================================================
 
-
 !> Module to treat the geometry of the solid bodies
 
 module mod_geometry
@@ -227,11 +226,16 @@ type :: t_geo
 !integer, allocatable :: idLiftLin(:)
 !!> Global id of actuator disk elements
 !integer, allocatable :: idActDisk(:)
+ !> Surfpan id of global surface panel elements (G2L: global to local)
+ integer, allocatable :: idSurfPanG2L(:)
 
  !> Number of statical implicit elements
  integer :: nstatic_impl
  !> Number of moving implicit elements
  integer :: nmoving_impl
+
+ !> Number of statical surfpan elements (for slicing)
+ integer :: nstatic_SurfPan
 
  !> Number of static or moving lifting lines
  integer :: nstatic_expl, nmoving_expl
@@ -366,8 +370,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   call load_components(geo, trim(geo_file_name), trim(target_file), &
                        sim_param, te)
 
-  
-
   call import_aero_tab(geo,airfoil_data)
 
   ! Initialisation
@@ -377,6 +379,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   geo%nmoving_impl = 0
   geo%nstatic_expl = 0
   geo%nmoving_expl = 0
+  geo%nstatic_SurfPan = 0
   geo%nSurfPan   = 0
   geo%nVortLatt  = 0
   geo%nLiftLin   = 0
@@ -391,6 +394,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
         geo%nmoving_impl = geo%nmoving_impl + geo%components(i_comp)%nelems
       else
         geo%nstatic_impl = geo%nstatic_impl + geo%components(i_comp)%nelems
+        geo%nstatic_SurfPan = geo%nstatic_SurfPan + geo%components(i_comp)%nelems
       endif
       geo%nSurfPan = geo%nSurfPan + geo%components(i_comp)%nelems
       geo%nelem_impl = geo%nelem_impl + geo%components(i_comp)%nelems
@@ -458,6 +462,14 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
     call printout(msg)
     write(msg,'(A,I9)') '  number of actuator disks:    ' ,geo%nActDisk
     call printout(msg)
+
+    ! Surfpan for slicing -----
+    write(*,*)
+    write(msg,'(A,I9)') '  number of surface panels       :    ' ,geo%nSurfPan
+    call printout(msg)
+    write(msg,'(A,I9)') '  number of static surface panels:    ' ,geo%nstatic_SurfPan
+    call printout(msg)
+    write(*,*)
   endif
 
   !Create the vector of pointers to all the elements
@@ -535,11 +547,13 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
 
   ! Save global indices of implicit elements for slicing
   allocate(geo%idSurfPan(geo%nSurfPan),geo%idVortLatt(geo%nVortLatt))
+  allocate(geo%idSurfPanG2L(geo%nelem_impl)) ; geo%idSurfPanG2L = 0
   iSurfPan = 0 ; iVortLatt = 0
   do i = 1,geo%nelem_impl
     select type( el => elems_impl(i)%p ); class is(t_surfpan)
       iSurfPan = iSurfPan + 1
       geo%idSurfPan(iSurfPan) = el%id
+      geo%idSurfPanG2L(i    ) = iSurfPan
     end select
     select type( el => elems_impl(i)%p ); class is(t_vortlatt)
       iVortLatt= iVortLatt + 1
@@ -571,6 +585,32 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   end do
 
   call create_strip_connectivity(geo)
+
+
+  ! debug
+  write(*,*) ' mod_geo l.590 ' 
+  write(*,*) ' size(elems_impl) : ' , size(elems_impl)
+  write(*,*) ' elems_impl(1)%p%id  : ' , elems_impl(1)%p%id 
+  write(*,*) ' elems_impl(1)%p%nor : ' , elems_impl(1)%p%nor
+
+! do i = 1 , elems_impl(1)%p%n_ver
+!   write(*,*) ' associated(elems_impl(1)%p%neigh(i)%p): ' , &
+!                associated(elems_impl(1)%p%neigh(i)%p)
+!   if ( associated(elems_impl(1)%p%neigh(i)%p) ) then
+!     write(*,*) ' elems_impl(1)%p%nor : ' , elems_impl(1)%p%neigh(i)%p%id 
+!     write(*,*) ' elems_impl(1)%p%nor : ' , elems_impl(1)%p%neigh(i)%p%nor
+!   end if
+! end do
+! stop
+! write(*,*) ' mod_geo l.590 ' 
+
+  ! Initialisation of the field surf_vel to zero (for surfpan only)
+  do i=1,geo%nelem_impl
+    select type(el=>elems_impl(i)%p) ; class is(t_surfpan)
+      el%surf_vel = 0.0_wp
+      call el%create_local_velocity_stencil()
+    end select
+  end do
   
 end subroutine create_geometry
 
@@ -950,6 +990,7 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
 
       enddo
 
+      write(*,*) ' after neigh '
 
       geo%components(i_comp)%nSurfPan = 0; geo%components(i_comp)%nVortRin = 0;
       if(comp_el_type(1:1) .eq. 'p') &
@@ -1090,6 +1131,17 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
     call close_hdf5_group(gloc_out)
     call close_hdf5_file(floc_out)
   endif
+
+  ! define comp_id for all the elems
+  do i_comp = 1 , size(geo%components)
+    do i1 = 1 , size(geo%components(i_comp)%el)
+      geo%components(i_comp)%el(i1)%comp_id = i_comp
+    end do
+  end do
+
+
+  write(*,*) ' at the end of load_components '
+
 
 end subroutine load_components
 
@@ -1265,11 +1317,13 @@ subroutine calc_geo_data_pan(elem,vert)
   elem%tang(:,1) = tanl / norm2(tanl)
   elem%tang(:,2) = cross( elem%nor, elem%tang(:,1)  )
 
-  select type(elem)
-  type is(t_surfpan)
-  do is = 1 , nsides
-  end do
-  end select
+! >>>>> USELESS LOOP: did we forget something?? Realised on 2018.11.14
+!  select type(elem)
+!  type is(t_surfpan)
+!  do is = 1 , nsides
+!  end do
+!  end select
+! <<<<< USELESS LOOP: did we forget something??
 
   ! vector connecting two consecutive vertices:
   ! edge_vec(:,1) =  ver(:,2) - ver(:,1)
@@ -1643,14 +1697,16 @@ subroutine update_geometry(geo, t, update_static)
         !                   geo%refs(comp%ref_id)%of_g)
         call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
       enddo
-!     !in the first pass compute also the velocity stencil for surfpans
-!     if(update_static) then
-        select type(els=>comp%el); class is(t_surfpan)
-        do ie = 1,size(els)
-          call els(ie)%create_local_velocity_stencil()
-        enddo
-        end select
-!     endif
+
+! 2018.11.15 Moved outside, at the end of create_geometry
+! !     !in the first pass compute also the velocity stencil for surfpans
+! !     if(update_static) then
+!         select type(els=>comp%el); class is(t_surfpan)
+!         do ie = 1,size(els)
+!           call els(ie)%create_local_velocity_stencil()
+!         enddo
+!         end select
+! !     endif
 
 
       do ie = 1,size(comp%el)

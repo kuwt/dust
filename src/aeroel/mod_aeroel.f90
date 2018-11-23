@@ -103,7 +103,7 @@ end type c_elem
 type, abstract, extends(c_elem) :: c_pot_elem
 
   !> id of the component to which it belongs
-  !integer :: comp_id
+  integer :: comp_id
 
   !> Id of the element, TODO consider removing this
   integer :: id

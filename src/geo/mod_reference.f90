@@ -165,6 +165,9 @@ type :: t_ref
   !> Total frame rotation rate with respect to the base reference
   real(wp) :: G_g(3,3)
 
+  !> Angular velocity in the root base reference 
+  real(wp) :: angVel_g(3)
+
   !> General motion arrays
 ! type(t_motion) :: motion
   !> Position of the origin w.r.t. the position of the pole (at t = 0)
@@ -1327,7 +1330,7 @@ end subroutine check_references
 !! the base reference, to obtain the transformation of the present frame with 
 !! respect to the base frame. Then it is passed to all the children to 
 !! update their data
-recursive subroutine reference_update_ref(this,refs,t,R,of,G,f)
+recursive subroutine reference_update_ref(this,refs,t,R,of,G,f,angVel)
  class(t_ref), intent(inout) :: this
  type(t_ref), intent(inout) :: refs(0:)
  real(wp), intent(in) :: t
@@ -1335,15 +1338,16 @@ recursive subroutine reference_update_ref(this,refs,t,R,of,G,f)
  real(wp), intent(in) :: of(:)
  real(wp), intent(in) :: G(:,:)
  real(wp), intent(in) :: f(:)
+ real(wp), intent(in) :: angVel(:)
 
  real(wp) :: R_loc(3,3), of_loc(3)
- real(wp) :: G_loc(3,3), f_loc(3)
+ real(wp) :: G_loc(3,3), f_loc(3) , angVel_loc(3)
  integer :: i1
   
 
   !Update the local transformation with respect to the parent 
   
-  call this%update_self(t,R, of,  R_loc, of_loc, G_loc, f_loc)
+  call this%update_self(t,R, of,  R_loc, of_loc, G_loc, f_loc, angVel_loc)
 
   !Update the transformation with respect to the base system
   this%R_g  = matmul( R , R_loc )
@@ -1352,7 +1356,7 @@ recursive subroutine reference_update_ref(this,refs,t,R,of,G,f)
   this%G_g = G + matmul(R, G_loc)
   this%f_g = f + matmul(R, f_loc)
   
-
+  this%angVel_g = angVel + matmul(R, angVel_loc)
 
   
   !For all the reference children call the same updating subroutine, passing
@@ -1360,7 +1364,8 @@ recursive subroutine reference_update_ref(this,refs,t,R,of,G,f)
   do i1 = 1 , this%n_chil
  
     call refs(this%chil_id(i1))%update_ref(refs, t, this%R_g, this%of_g, &
-                                                       this%G_g, this%f_g) 
+                                                    this%G_g, this%f_g, &
+                                                    this%angVel_g ) 
  
   end do 
 
@@ -1376,7 +1381,7 @@ end subroutine reference_update_ref
 !! frame is not moving, or it is some pre-defined motion law. At the moment 
 !! just a constant rotation around a pole and an axis is implemented
 subroutine reference_update_self(this, t, R_par, of_par, R_loc, of_loc, &
-                                                                 G_loc, f_loc)
+                                                         G_loc,  f_loc, angVel_loc)
  class(t_ref), intent(inout) :: this
  real(wp), intent(in)        :: t
  real(wp), intent(in)        :: R_par(:,:)
@@ -1385,6 +1390,7 @@ subroutine reference_update_self(this, t, R_par, of_par, R_loc, of_loc, &
  real(wp), intent(out)       :: of_loc(:)
  real(wp), intent(out)       :: G_loc(:,:)
  real(wp), intent(out)       :: f_loc(:)
+ real(wp), intent(out)       :: angVel_loc(:)
 
  real(wp) :: Psi , Omega
  real(wp), allocatable :: xPole(:) , vPole(:)
@@ -1401,6 +1407,7 @@ subroutine reference_update_self(this, t, R_par, of_par, R_loc, of_loc, &
     of_loc = this%orig
     G_loc = 0.0_wp
     f_loc = 0.0_wp
+    angVel_loc = 0.0_wp
 
   else
 
@@ -1427,6 +1434,8 @@ subroutine reference_update_self(this, t, R_par, of_par, R_loc, of_loc, &
     f_loc = matmul(Omega_vec,(-matmul(transpose(R_par),of_par)- xPole))  + &
                       vPole
 
+    AngVel_loc = Omega*this%axis 
+
   endif
 
 end subroutine reference_update_self
@@ -1439,7 +1448,7 @@ subroutine update_all_references(refs, t)
  type(t_ref), intent(inout) :: refs(0:)
  real(wp), intent(in) :: t
 
- real(wp) :: of(3), R(3,3), G(3,3), f(3)
+ real(wp) :: of(3), R(3,3), G(3,3), f(3) , angVel(3)
  
  !Give to the first reference identity/null data to start the traversing
  of = (/0.0_wp, 0.0_wp, 0.0_wp/)
@@ -1450,8 +1459,9 @@ subroutine update_all_references(refs, t)
  G  = reshape((/0.0_wp, 0.0_wp, 0.0_wp, &
                 0.0_wp, 0.0_wp, 0.0_wp, &
                 0.0_wp, 0.0_wp, 0.0_wp /),(/3,3/))
+ angVel = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
 
- call refs(0)%update_ref(refs, t, R, of, G, f)
+ call refs(0)%update_ref(refs, t, R, of, G, f,angVel)
 
 end subroutine update_all_references
 

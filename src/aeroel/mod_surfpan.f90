@@ -90,6 +90,12 @@ type, extends(c_impl_elem) :: t_surfpan
   real(wp), allocatable :: verp(:,:)
   real(wp)              :: surf_vel(3)
 
+  !> surface quantities for Bernoulli integral equation
+  real(wp) :: dUn_dt
+  real(wp) :: dn_dt(3)
+  real(wp) :: bernoulli_source
+
+  !> boundary layer and flow separation
   real(wp) :: h_bl      ! height of the surface (boundary??) layer
   real(wp) :: al_free   ! ratio: shed vorticity / total vorticity
   real(wp) :: surf_vort(3) ! free vorticity 
@@ -335,20 +341,35 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
  integer, intent(in)             :: ie
  integer, intent(in)             :: ista, iend
 
- integer :: j1
+ integer :: j1 , ipres
  real(wp) :: b1
 
+! RHS for \phi equation --------------------------
   linsys%b(ie) = 0.0_wp
   !Components not moving, no body velocity in the boundary condition
   !linsys%b(ie) = sum(linsys%b_static(:,ie) * (-uinf))
-  
+! RHS for Bernoulli polynomial equation ----------
+  ipres = linsys%idSurfPanG2L(ie) 
+  linsys%b_pres(ipres) = 0.0_wp
+
+  ! Static part ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  ! + \phi equation ------------------------------ 
   do j1 = 1,ista-1
 
     linsys%b(ie) = linsys%b(ie) + &
-           linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-uinf-this%uvort))
+           linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-uinf-elems(j1)%p%uvort))
   enddo
 
+  ! + Bernoulli polynomial equation --------------
+  do j1 = 1,size(linsys%b_static_pres,1)
+    select type( el => elems(linsys%idSurfPan(j1))%p ) ; class is(t_surfpan)
+      linsys%b_pres( ipres ) = &
+               linsys%b_pres( ipres ) + &
+               linsys%b_static_pres( ipres , j1 ) * el%bernoulli_source
+    end select
+  end do
 
+  ! Moving part ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   ! ista and iend will be the end of the unknowns vector, containing
   ! the moving elements
   do j1 = ista , iend
@@ -357,11 +378,26 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
     call elems(j1)%p%compute_pot( linsys%A(ie,j1), b1, &
                                   this%cen, ie, j1 )
 
+    ! + \phi equation ----------------------------
     !Add the contribution to the rhs with the
     linsys%b(ie) = linsys%b(ie) &
-                   + b1* sum(elems(j1)%p%nor*(elems(j1)%p%ub-uinf-this%uvort))
+                   + b1* sum(elems(j1)%p%nor*(elems(j1)%p%ub-uinf-elems(j1)%p%uvort))
+
+    ! + Bernoulli polynomial equation ------------
+    !Add the contribution to the rhs
+    select type( el => elems(linsys%idSurfPan(j1))%p ) ; class is(t_surfpan)
+      linsys%b_pres( ipres ) = &
+               linsys%b_pres( ipres ) + &
+               b1* el%bernoulli_source 
+
+      ! for DEBUG only ( TO BE DELETED )
+      linsys%b_matrix_pres_debug( ipres , linsys%idSurfPanG2L(j1) ) = b1
+
+    end select
+
 
   end do
+
 
 end subroutine build_row_surfpan
 
@@ -511,8 +547,10 @@ subroutine correct_pressure_kutta_surfpan(this, wake_elems, impl_wake_ind, &
       !todo: find a more elegant solution to avoid i=j
       call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
 
-      linsys%A_pres(ie,ind1) = linsys%A_pres(ie,ind1) - a
-      linsys%A_pres(ie,ind2) = linsys%A_pres(ie,ind2) + a
+      linsys%A_pres(ie,linsys%idSurfPanG2L(ind1)) = &
+                       linsys%A_pres(ie,linsys%idSurfPanG2L(ind1)) - a
+      linsys%A_pres(ie,linsys%idSurfPanG2L(ind2)) = & 
+                       linsys%A_pres(ie,linsys%idSurfPanG2L(ind2)) + a
 
     endif
 
@@ -757,6 +795,8 @@ subroutine create_local_velocity_stencil_surfpan (this)
 
  real(wp) :: bubble_surf
  integer  :: i_v
+
+ real(wp) :: n_vect(3)
         
   if ( .not. allocated(this%pot_vel_stencil) ) then
     allocate(this%pot_vel_stencil(3,this%n_ver) )
@@ -785,13 +825,37 @@ subroutine create_local_velocity_stencil_surfpan (this)
 
   ! method #2: w/o averaging on neighbouring elements ; 0.5 factor added
   bubble_surf = this%area
-
+ 
   do i_v = 1 , this%n_ver
-
+ 
     this%pot_vel_stencil(:,i_v) = &
      0.5_wp * cross( this%edge_vec(:,i_v) , this%nor )
-
+ 
   end do
+
+!   ! method #3: w/o averaging on neighbouring elements ; 0.5 factor added ;
+!   ! taking into account curvature !!!
+!   bubble_surf = this%area
+! 
+!   do i_v = 1 , this%n_ver
+! 
+! !   write(*,*) ' this%id ' , this%id
+! !   write(*,*) ' this%nor' , this%nor
+!     if ( associated(this%neigh(i_v)%p) ) then
+! !     write(*,*) ' shape(this%neigh(i_v)) : ' , shape(this%neigh(i_v))
+!       n_vect = 0.5_wp * ( this%nor + this%neigh(i_v)%p%nor )
+!       n_vect = n_vect / norm2(n_vect)
+!     else
+!       n_vect = this%nor 
+!     end if
+!     this%pot_vel_stencil(:,i_v) = &
+!      0.5_wp * cross( this%edge_vec(:,i_v) , n_vect )
+! 
+!     this%pot_vel_stencil(:,i_v) = &
+!                       this%pot_vel_stencil(:,i_v) &
+!      - this%nor * sum(this%pot_vel_stencil(:,i_v)*this%nor)
+! 
+!   end do
 
   this%pot_vel_stencil = this%pot_vel_stencil / bubble_surf
 

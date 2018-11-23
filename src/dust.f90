@@ -38,7 +38,7 @@
 program dust
 
 use mod_param, only: &
-  wp, nl, max_char_len, extended_char_len
+  wp, nl, max_char_len, extended_char_len , pi
 
 use mod_sim_param, only: &
   t_sim_param
@@ -83,7 +83,7 @@ use mod_linsys_vars, only: &
 
 use mod_linsys, only: &
   initialize_linsys, assemble_linsys, solve_linsys, destroy_linsys, &
-  dump_linsys , &
+  dump_linsys , dump_linsys_pres , &
   solve_linsys_pressure
 
 use mod_basic_io, only: &
@@ -180,8 +180,10 @@ character(len=max_char_len) :: frmt
 character(len=max_char_len) :: basename_debug
 
 real(wp) , allocatable :: res_old(:)
+real(wp) , allocatable :: surf_vel_SurfPan_old(:,:)
+real(wp) , allocatable ::      nor_SurfPan_old(:,:)
 
-integer :: i_el , i
+integer :: i_el , i , i_e
 
 !octree parameters
 type(t_octree) :: octree
@@ -189,6 +191,7 @@ type(t_octree) :: octree
 ! pres_IE +++++
 !result of the integral equation for pressure
 real(wp), allocatable :: surfpan_H_IE(:)
+real(wp), allocatable :: b_unsteady_debug(:)
 ! TODO:
 ! in linsys/mod_linsys.f90:
 ! - remove Kutta condition from linsys%A_pres
@@ -196,6 +199,13 @@ real(wp), allocatable :: surfpan_H_IE(:)
 ! in dust.f90:
 ! - redistribute pressure to the surfpan elems only
 ! - adjust ALL the things
+!
+real(wp) :: GradS_Un(3)
+real(wp) :: DivS_U
+! debug ----
+integer :: i_comp , fid
+character(len=max_char_len) :: str_comp 
+! debug ----
 
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
 t00 = dust_time()
@@ -420,6 +430,23 @@ call create_geometry(sim_param%GeometryFile, sim_param%ReferenceFile, &
                      elems_ll, elems_tot, airfoil_data, sim_param, &
                      target_file, run_id)
 
+! debug -----
+! do it = 1 , geo%nelem_impl
+!   select type(el=>elems(it)%p) ; class is(t_surfpan)
+!     write(*,*) geo%idSurfPanG2L(it) , '    ' , el%surf_vel
+!   end select
+! end do
+! write(*,*) ' shape(geo%idSurfPanG2L) : ' , shape(geo%idSurfPanG2L)
+! do it = 1 , maxval(shape(geo%idSurfPanG2L))
+!   write(*,*) geo%idSurfPanG2L(it) 
+! end do
+! write(*,*) ' stop in dust.f90 around l.432 '
+! stop
+! ! write(*,*) ' geo%nstatic_impl    : ' , geo%nstatic_impl
+! ! write(*,*) ' geo%nstatic_SurfPan : ' , geo%nstatic_SurfPan
+! ! stop
+! debug -----
+
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Created geometry in: ' , t1 - t0,' s.'
@@ -448,11 +475,27 @@ call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
 call initialize_linsys(linsys, geo, elems, elems_expl, &
                        wake, sim_param ) ! sim_param%u_inf)
+
+! debug ---------------
+! write(*,*) ' shape(b_static     ) : ' , shape(linsys%b_static     )
+! write(*,*) ' shape(b_static_pres) : ' , shape(linsys%b_static_pres)
+! write(*,*) ' max(b_static     (:,:)) : ' , maxval(linsys%b_static(1:geo%nstatic_Surfpan,1:geo%nstatic_Surfpan)) 
+! write(*,*) ' max(b_static_pres(:,:)) : ' , maxval(linsys%b_static_pres)
+! write(*,*) ' max(diff(b_static(:,:)-b_static_pres)) : ' , & 
+!     maxval(linsys%b_static(1:geo%nstatic_Surfpan,1:geo%nstatic_Surfpan) - &
+!            linsys%b_static_pres(:,:) )
+! stop
+! debug ---------------
+
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Initialized linear system in: ' , t1 - t0,' s.'
   call printout(message)
 endif
+
+! debug Angular velocity -------
+write(*,*) ' size(geo%components) : ' , size(geo%components)
+! debug Angular velocity -------
 
 !===========EXPERIMENTAL PART, OCTREE========
 call printout(nl//'====== Initializing Octree ======')
@@ -484,9 +527,110 @@ call printout(message)
 time = sim_param%t0
 t_last_out = time; t_last_debug_out = time
 
+! debug Angular velocity -------
+! do i_comp = 1 , size(geo%components)
+!   fid = 50+i_comp
+!   write(str_comp,'(I4.4)') i_comp
+!   open(unit=fid,file='./angVel'//trim(str_comp))
+! end do
+! debug Angular velocity -------
+
+allocate(surf_vel_SurfPan_old(geo%nSurfpan,3)) ; surf_vel_SurfPan_old = 0.0_wp
+allocate(     nor_SurfPan_old(geo%nSurfpan,3)) ;      nor_SurfPan_old = 0.0_wp
+
 allocate(res_old(size(elems))) ; res_old = 0.0_wp
+
 t11 = dust_time()
+
 do it = 1,nstep
+
+  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
+  ! compute the time derivative of the normal component of the velocity on 
+  !  surfpan to be used in the source rhs of the Bernoulli integral equation.
+  ! surf_vel_SurfPan_old saved at the end of the time step (for surfpan only)
+  ! write(*,*) ' debug l.545 dust.f90 '
+  do i_el = 1 , geo%nSurfPan
+
+    select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
+
+      el%dUn_dt = 0.0_wp 
+!            sum( el%nor * ( el%ub - & 
+!            surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) ) / sim_param%dt
+      el%dn_dt  = 0.0_wp 
+!                 ( el%nor - nor_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) &
+!                                                                   / sim_param%dt
+!     write(*,*) el%dUn_dt      ! debug ---
+
+      ! Compute GradS_Un
+      GradS_Un = 0.0_wp
+      do i_e = 1 , el%n_ver
+        select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
+          if ( associated(el_neigh) ) then !  .and. &
+            GradS_Un = GradS_Un + &
+               el%pot_vel_stencil(:,i_e) * ( &
+                  sum(el%nor* (el_neigh%surf_vel - el%surf_vel) ) )                 ! <<<<< OK ?
+!                 sum(el%neigh(i_e)%p%ub*el%neigh(i_e)%p%nor) - sum(el%ub*el%nor) ) ! << WRONG !
+!              this%pot_vel_stencil(:,i_e) * (this%neigh(i_e)%p%mag - this%mag)
+          else  
+            GradS_Un = GradS_Un + &
+               el%pot_vel_stencil(:,i_e) * ( &
+                  sum(el%nor* ( - 2.0_wp * el%surf_vel) ) )                 ! <<<<< OK ?
+          end if
+        end select
+      end do
+!     GradS_Un = GradS_Un - el%nor * sum(el%nor*GradS_Un) ! tangential projection
+
+      ! Compute DivS_U
+      DivS_U = 0.0_wp
+      do i_e = 1 , el%n_ver
+        select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
+          if ( associated(el_neigh) ) then !  .and. &
+            DivS_U = DivS_U + &
+               sum(   el%pot_vel_stencil(:,i_e) * &
+                    ( el_neigh%surf_vel - el%surf_vel )   )
+          else  
+            DivS_U = DivS_U + &
+               sum(   el%pot_vel_stencil(:,i_e) * &
+                    ( - 2.0_wp * el%surf_vel ) )
+          end if
+        end select
+      end do  
+
+      ! Compute "source intensity" of Bernoulli equations
+      el%bernoulli_source = + el%dUn_dt & !    n . DU/Dt 
+         - sum( GradS_Un * ( el%ub ))   & !  - GradS_Un . el%ub 
+         + DivS_U * sum(el%ub*el%nor)     !  + Un * Div_S U
+! debug -----
+!     write(*,*) sum( GradS_Un * ( el%ub ) ) , &  ! sum( GradS_Un * ( el%surf_vel - el%ub ) ) , &
+!                DivS_U * sum(el%ub*el%nor) 
+
+!     ! check UHLMAN's EQN -----
+!     ! The integral of the Uhlman's equation taking into account the convective
+!     ! contribution to the unsteady term can be written as an equivalent integral
+!     ! of the form \int_S { n.\gradG -U_b . U }. This term could enter the 
+!     ! unknwon through the influence coefficient matrix.
+!     ! As a test, the source term is set to zero
+!     el%bernoulli_source = 0.0_wp
+!     ! and the unknown becomes B - Ub.U ( see l. 727 )
+!     ! check UHLMAN's EQN -----
+!
+!     !debug -----
+!     write(*,*) el%id ,  el%dUn_dt                                , '    ' , &
+!                         sum(GradS_Un * ( el%surf_vel - el%ub ) ) , '    ' , &
+!                         DivS_U * sum(el%ub*el%nor)
+!     write(*,'(3F12.6,A,F12.6,A,2F12.6,A,6F12.6)') GradS_Un , '    ' , DivS_U , '    ' , &
+!         sum(GradS_Un * ( el%surf_vel - el%ub ) ) , DivS_U * sum(el%ub*el%nor) , &
+!         '       ' , GradS_Un , el%dn_dt 
+!     !debug -----
+
+    end select
+  end do
+
+! debug -----
+! write(*,*) ' GradS_Un . surfvel , Un . DivS_U +++++++++++ '
+! debug -----
+
+  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
 
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
@@ -511,12 +655,11 @@ do it = 1,nstep
   if((sim_param%debug_level .ge. 16).and.time_2_debug_out)&
             call debug_ll_printout_geometry(elems_ll, geo, basename_debug, it)
 
-
   !------ Assemble the system ------
   !call prepare_wake(wake, geo, sim_param)
   t0 = dust_time()
 
-! call assemble_linsys(linsys, elems, elems_expl,  &
+! call assemble_linsys(linsys, elems, elems_expl,  &     ! old subroutine
 !                      wake, sim_param%u_inf)
   call assemble_linsys(linsys, geo, elems, elems_expl,  &
                        wake, sim_param)
@@ -531,7 +674,49 @@ do it = 1,nstep
     write(frmt,'(I4.4)') it
     call dump_linsys(linsys, trim(basename_debug)//'A_'//trim(frmt)//'.dat', &
                              trim(basename_debug)//'b_'//trim(frmt)//'.dat' )
+    call dump_linsys_pres(linsys, trim(basename_debug)//'Apres_'//trim(frmt)//'.dat', &
+                                  trim(basename_debug)//'bpres_'//trim(frmt)//'.dat', &
+                                  trim(basename_debug)//'Bmatpres_'//trim(frmt)//'.dat' )
   endif
+
+  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
+  !                                                                            !
+  !------ Solve the linsys for Bernoulli polynomial ------                     !
+  ! only for it > 1   <---- TODO: assess the effects of timestepping on loads  !
+  !                                                                            !
+  ! debug -----
+  if (.not.(allocated(b_unsteady_debug))) allocate(b_unsteady_debug(geo%nSurfPan))
+  do i = 1 , geo%nSurfPan 
+    select type ( el => elems(geo%idSurfPan(i))%p ) ; class is ( t_surfpan )
+     b_unsteady_debug(i) = sum(el%ub* el%surf_vel)
+    end select
+  end do
+  b_unsteady_debug = matmul(linsys%A_pres,b_unsteady_debug)
+
+! ! dump rhs and results -------
+! write(str_comp,'(I4.4)') it
+! open(unit=21,file='./file_debug/rhs'//trim(str_comp)//'.dat')
+      
+  if ( it .gt. 1 ) then                                                        !
+    call solve_linsys_pressure(linsys,surfpan_H_IE)                            !
+  end if                                                                       !
+
+! ! dump rhs and results -------
+! if ( it .gt. 1 ) then
+!   do i = 1 , geo%nSurfPan
+!     select type ( el => elems(geo%idSurfPan(i))%p ) ; class is ( t_surfpan )
+!     write(21,*) linsys%b_pres(i), linsys%b_pres(i) & 
+!      - 4*pi * ( sim_param%P_inf + &
+!        0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf) ** 2.0_wp ) , '     ' , & 
+!        surfpan_H_IE(i) ,  &
+!        surfpan_H_IE(i) - 0.5 * sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp
+!     end select
+!   end do
+! end if
+! close(21)
+  ! debug -----
+  !                                                                            !
+  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
 
   !------ Solve the system ------
   t0 = dust_time()
@@ -560,10 +745,7 @@ do it = 1,nstep
             (/ wake%pan_p, wake%rin_p/), wake%vort_p, sim_param, airfoil_data)
   end if
 
-  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
-  ! pres_IE +++++
-  call solve_linsys_pressure(linsys,surfpan_H_IE)
-  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
+! write(*,*) ' #1 '
 
   !------ Compute loads -------
   ! Implicit elements: vortex rings and 3d-panels
@@ -580,30 +762,44 @@ do it = 1,nstep
     call elems_ad(i_el)%p%compute_dforce(sim_param)
   end do
 
-! check -----
-  do i_el = 1 , geo%nSurfPan
-    write(*,*) surfpan_H_IE(i_el)
-  end do
+! write(*,*) ' #2 '
 
-  if ( it .eq. 3 )  stop
-! check -----
+! debug Bernoulli polynomial -----
+! do i_el = 1 , geo%nSurfPan
+!   write(*,*) surfpan_H_IE(i_el)
+! end do
+! debug Bernoulli polynomial -----
 
   ! pres_IE +++++
-  do i_el = 1 , geo%nSurfPan
-    select type ( el => elems(i_el)%p ) ; class is ( t_surfpan )
-     elems(i_el)%p%pres = &
-      surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp
-    end select
-  end do
+! write(*,*) '   Ptot , Pdin , P ,  surf_vel '
+! write(*,*) ' i_el , surfpan H , pres '
+  if ( it .gt. 1 ) then
+    do i_el = 1 , geo%nSurfPan
+      select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
+       ! check UHLMAN's EQN -----
+       el%pres = &
+        surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp 
+!      el%pres = &
+!       surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp + &
+!          sim_param%rho_inf * sum(el%surf_vel*el%ub)
+       ! check UHLMAN's EQN -----
+!      ! debug -----
+!      write(*,*) i_el , surfpan_H_IE(i_el) , el%pres
+!      write(*,'(I5,3F12.6,A,3F12.6)') i_el ,  surfpan_H_IE(i_el)  , & 
+!                0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp , &
+!                el%pres , '      ' , el%surf_vel
+!      ! debug -----
+      end select
+    end do
+  else
+    do i_el = 1 , geo%nSurfPan
+      select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
+       el%pres = 0.0_wp
+      end select
+    end do
+  end if
   
-! ! check -----
-! do i_el = 1 , geo%nSurfPan
-!   select type ( el => elems(i_el)%p ) ; class is ( t_surfpan )
-!    write(*,*) el%pres , &
-!     surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp
-!   end select
-! end do
-! ! check -----
+! write(*,*) ' #3 '
 
 ! if ( it .eq. 3 ) stop
 
@@ -642,11 +838,51 @@ do it = 1,nstep
     call printout(message)
   endif
 
+  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
+  ! save old velocity on the surfpan (before updating the geom, few lines below)
+  do i_el = 1 , geo%nSurfPan
+    select type ( el => elems(i_el)%p ) ; class is ( t_surfpan )
+      surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) = el%ub   ! el%surf_vel
+           nor_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) = el%nor  ! el%surf_vel
+    end select
+  end do
+  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
+
   time = min(sim_param%tend, time+sim_param%dt)
   call update_geometry(geo, time, .false.)
   call prepare_wake(wake, geo, sim_param)
 
+!   ! debug Angular velocity -------
+!   do i_comp = 1 , size(geo%components) 
+!     fid = 50+i_comp
+! !   write(str_comp,'(I4.4)') i_comp
+! !   open(unit=fid,file='./angVel'//trim(str_comp))
+! !   write(*,*) geo%refs%angVel_g
+!     write(fid,*) geo%refs(geo%components(i_comp)%ref_id)%angVel_g
+!     write(*,*) geo%refs(geo%components(i_comp)%ref_id)%angVel_g
+!   end do
+!   ! debug Angular velocity -------
+
+  ! debug b_static_pres
+  if ( it .eq. 2 ) then
+    write(*,*) ' allocated(linsys%b_static_pres) : ' , allocated(linsys%b_static_pres)
+    write(*,*) ' shape(    linsys%b_static_pres) : ' , shape(    linsys%b_static_pres)
+    if ( maxval(shape(linsys%b_static_pres)) .gt. 0 ) then
+      do i_el = 1 , 10
+        write(*,'(10F12.6)') linsys%b_static_pres(i_el,1:10)
+      end do
+      write(*,*) ' stop in dust.f90 l.800'
+    end if
+  end if
+  ! debug b_static_pres
+
 enddo
+
+! ! debug Angular velocity -------
+! do i_comp = 1 , size(geo%components) 
+!   close(fid)
+! end do
+! ! debug Angular velocity -------
 
 ! pres_IE +++++
 deallocate( surfpan_H_IE )
