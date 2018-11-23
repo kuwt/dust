@@ -338,7 +338,7 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
   do j1 = 1,ista-1
 
     linsys%b(ie) = linsys%b(ie) + &
-           linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-uinf-this%uvort))
+          linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-uinf-elems(j1)%uvort))
   enddo
 
 
@@ -352,7 +352,7 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
 
     !Add the contribution to the rhs with the
     linsys%b(ie) = linsys%b(ie) &
-                   + b1* sum(elems(j1)%p%nor*(elems(j1)%p%ub-uinf-this%uvort))
+              + b1* sum(elems(j1)%p%nor*(elems(j1)%p%ub-uinf-elems(j1)%uvort))
 
   end do
 
