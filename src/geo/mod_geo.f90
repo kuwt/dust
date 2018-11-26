@@ -385,6 +385,9 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   geo%nLiftLin   = 0
   geo%nActDisk   = 0
 
+! debug ----
+  write(*,*) ' n.components : ' , size(geo%components)
+
   ! count the elements
   do i_comp = 1,size(geo%components)
 
@@ -728,10 +731,15 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
   
   !TODO check this
   n_comp_write = n_comp
+  
+! debug ----
+  write(*,*) ' n_comp_input ' , n_comp_input 
 
   i_comp = 1
   do i_comp_input = 1,n_comp_input
 
+    ! debug ----
+    write(*,*) ' Comp',i_comp_input
     write(cname,'(A,I3.3)') 'Comp',i_comp_input
     call open_hdf5_group(gloc,trim(cname),cloc)
 
@@ -740,6 +748,12 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
 
     call read_hdf5(ref_tag,'RefTag',cloc)
 
+    ! debug ----
+    write(*,*) ' ref_tag : ' , trim(ref_tag)
+    do iref = 0,ubound(geo%refs,1)
+      write(*,*) 'geo%refs(',iref,')%tag : ' , trim(geo%refs(iref)%tag) , &
+                 '  multiple : ', geo%refs(iref)%multiple
+    end do
     !Look for the reference frame of the component
     ref_id = -1
     do iref = 0,ubound(geo%refs,1)
@@ -748,6 +762,8 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
         ref_id = iref
       endif
     enddo
+    ! debug
+    write(*,*) 'ref_id : ',ref_id
     !if not found the reference
     if (ref_id .lt. 0) then
       write(msg,'(A,I2,A,A,A)') 'For component ',i_comp, &

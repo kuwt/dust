@@ -352,6 +352,11 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
   ipres = linsys%idSurfPanG2L(ie) 
   linsys%b_pres(ipres) = 0.0_wp
 
+  ! debug -----
+! write(*,*) ' ie , this%id , ipres ' , ie , this%id , ipres
+! write(*,*) ' stop in mod_surfpan.f90 at l. 357 '
+! stop
+
   ! Static part ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   ! + \phi equation ------------------------------ 
   do j1 = 1,ista-1
@@ -385,12 +390,14 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
 
     ! + Bernoulli polynomial equation ------------
     !Add the contribution to the rhs
-    select type( el => elems(linsys%idSurfPan(j1))%p ) ; class is(t_surfpan)
+    
+    select type( el => elems(j1)%p ) ; class is(t_surfpan)
       linsys%b_pres( ipres ) = &
                linsys%b_pres( ipres ) + &
                b1* el%bernoulli_source 
 
       ! for DEBUG only ( TO BE DELETED )
+!     write(*,*) ' ipres , j1 , linsys%idSurfPanG2L(j1) ' , ipres , j1 , linsys%idSurfPanG2L(j1)  
       linsys%b_matrix_pres_debug( ipres , linsys%idSurfPanG2L(j1) ) = b1
 
     end select
@@ -517,6 +524,10 @@ end subroutine add_wake_surfpan
 
 !----------------------------------------------------------------------
 
+! Remove Kutta contribution to obtain the matrix of Bernoulli lin.sys. from
+! the matrix of the \phi lin.sys.
+! This routine removes the extra terms added in add_wake_surfpan.
+! -> OBS: the input IE is already the panel id in the surfpan numeration
 subroutine correct_pressure_kutta_surfpan(this, wake_elems, impl_wake_ind, &
                  linsys, uinf, ie,ista, iend)
 
@@ -536,7 +547,7 @@ subroutine correct_pressure_kutta_surfpan(this, wake_elems, impl_wake_ind, &
   !Count the number of implicit wake contributions
   n_impl = size(impl_wake_ind,2)
 
-  !Add the contribution of the implicit wake panels to the linear system
+  !Remove the contribution of the implicit wake panels to the linear system
   !Implicitly we assume that the first set of wake panels are the implicit
   !ones since are at the beginning of the list
   do j1 = 1 , n_impl
@@ -544,13 +555,20 @@ subroutine correct_pressure_kutta_surfpan(this, wake_elems, impl_wake_ind, &
     if ((ind1.ge.ista .and. ind1.le.iend) .and. &
         (ind2.ge.ista .and. ind2.le.iend)) then
 
-      !todo: find a more elegant solution to avoid i=j
-      call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
+      ! in linsys%idSurfPanG2L, an element is different from zero if it identifies
+      ! a surfpan elements. We need to remove only the TE contribution of wake elements
+      ! originating from surfpan elements
 
-      linsys%A_pres(ie,linsys%idSurfPanG2L(ind1)) = &
-                       linsys%A_pres(ie,linsys%idSurfPanG2L(ind1)) - a
-      linsys%A_pres(ie,linsys%idSurfPanG2L(ind2)) = & 
-                       linsys%A_pres(ie,linsys%idSurfPanG2L(ind2)) + a
+!     if ( ( linsys%idSurfPanG2L(ind1) .ne. 0 ) .and. &
+!          ( linsys%idSurfPanG2L(ind2) .ne. 0 )         ) then
+        !todo: find a more elegant solution to avoid i=j
+        call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
+  
+        linsys%A_pres(ie,linsys%idSurfPanG2L(ind1)) = &
+                         linsys%A_pres(ie,linsys%idSurfPanG2L(ind1)) - a
+        linsys%A_pres(ie,linsys%idSurfPanG2L(ind2)) = & 
+                         linsys%A_pres(ie,linsys%idSurfPanG2L(ind2)) + a
+!     endif
 
     endif
 

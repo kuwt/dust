@@ -403,6 +403,7 @@ subroutine build_references(refs, reference_file, sim_param)
                             0.0_wp, 1.0_wp, 0.0_wp, &
                             0.0_wp, 0.0_wp, 1.0_wp/),(/3,3/))
   refs(0)%self_moving = .false.
+  refs(0)%multiple = .false.
   refs(0)%moving = .false.
   refs(0)%of_g = (/0.0_wp, 0.0_wp, 0.0_wp/)
   refs(0)%R_g = reshape((/1.0_wp, 0.0_wp, 0.0_wp, &
@@ -554,9 +555,12 @@ subroutine build_references(refs, reference_file, sim_param)
           !        &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
           !end if
 
+          allocate(pol_pos0(3))
           pol_pos0 = getrealarray(sbprms_pol,'Position_0',3)
 
           ! Read the integer id for the user defined functions 0:constant,1:sin              
+          allocate(pol_fun_int(3), pol_vec(3), pol_ome(3), &
+                   pol_pha(3), pol_off(3))
           pol_fun_int = getintarray(sbprms_pol,'Function',3)
           pol_amp = getreal(sbprms_pol,'Amplitude')
           pol_vec = getrealarray(sbprms_pol,'Vector',3)
@@ -650,6 +654,8 @@ subroutine build_references(refs, reference_file, sim_param)
      
           end select
 
+          deallocate(pol_fun_int, pol_vec, pol_ome, pol_pha, pol_off, pol_pos0)
+
         case default
           write(ref_tag_str,'(I5)') refs(iref)%tag
           call error(this_sub_name, this_mod_name, 'Undefined "Input" field &
@@ -681,7 +687,7 @@ subroutine build_references(refs, reference_file, sim_param)
           !        &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
           !end if
 
-          refs(iref)%axis = getrealarray(sbprms_rot,'Axis',3)
+          refs(iref)%axis = getrealarray(sbprms_rot,'Axis',3)  ! %axis is not allocatable
           rot_pos0 = getreal(sbprms_rot,'Psi_0')
 
           ! Input type : from_file , simple_function
@@ -797,7 +803,7 @@ subroutine build_references(refs, reference_file, sim_param)
           !        &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
           !end if
 
-          refs(iref)%axis = getrealarray(sbprms_rot,'Axis',3)
+          refs(iref)%axis = getrealarray(sbprms_rot,'Axis',3) ! %axis is not allocatable
           !rot_pos0 = getreal(sbprms_rot,'Psi_0')
 
           ! Input type : from_file , simple_function

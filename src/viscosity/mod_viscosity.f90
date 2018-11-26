@@ -225,43 +225,43 @@ subroutine viscosity_effects( geo , elems , te , sim_param )
 
  end do     ! ***** loop #1 over components *****
 
-! <<<<<<<<<<<<<<<<<<<<<<<<<<<<
- ! -------------------------
- ! te correction 
- ! -------------------------
- ne_te = size(te%e,2)
-! debug -----
- write(*,*) ' ne_te : ' , ne_te
-! debug -----
- do ie_te = 1 , ne_te
-
-   ie1 = te%e(1,ie_te)%p%id 
-   ie2 = te%e(2,ie_te)%p%id
-
-   select type( el1 => elems(ie1)%p ) ; type is (t_surfpan)
-   select type( el2 => elems(ie2)%p ) ; type is (t_surfpan)
-
-     edge_te = 0.5_wp * ( geo%points( :,te%i( 1,te%ii(2,ie_te) ) ) + &
-                          geo%points( :,te%i( 2,te%ii(2,ie_te) ) ) - &
-                          geo%points( :,te%i( 1,te%ii(1,ie_te) ) ) - &
-                          geo%points( :,te%i( 2,te%ii(1,ie_te) ) )  )
-     ! correction of panel ie1 ----
-     el1%surf_vort = el1%surf_vort - el1%mag * edge_te 
-     el1%free_vort = el1%al_free * el1%surf_vort
-  
-     ! correction of panel ie2 ----
-     el2%surf_vort = el2%surf_vort + el2%mag * edge_te
-!        el2%mag * ( te%rr(:,te%ii(1,ie_te)) - te%rr(:,te%ii(1,ie_te)) )
-     el2%free_vort = el2%al_free * el2%surf_vort
-
-   end select  
-   end select  
- 
- end do
- ! -------------------------
- ! te correction 
- ! -------------------------
-! <<<<<<<<<<<<<<<<<<<<<<<<<<<<
+! ! <<<<<<<<<<<<<<<<<<<<<<<<<<<<
+!  ! -------------------------
+!  ! te correction 
+!  ! -------------------------
+!  ne_te = size(te%e,2)
+! ! debug -----
+!  write(*,*) ' ne_te : ' , ne_te
+! ! debug -----
+!  do ie_te = 1 , ne_te
+! 
+!    ie1 = te%e(1,ie_te)%p%id 
+!    ie2 = te%e(2,ie_te)%p%id
+! 
+!    select type( el1 => elems(ie1)%p ) ; type is (t_surfpan)
+!    select type( el2 => elems(ie2)%p ) ; type is (t_surfpan)
+! 
+!      edge_te = 0.5_wp * ( geo%points( :,te%i( 1,te%ii(2,ie_te) ) ) + &
+!                           geo%points( :,te%i( 2,te%ii(2,ie_te) ) ) - &
+!                           geo%points( :,te%i( 1,te%ii(1,ie_te) ) ) - &
+!                           geo%points( :,te%i( 2,te%ii(1,ie_te) ) )  )
+!      ! correction of panel ie1 ----
+!      el1%surf_vort = el1%surf_vort - el1%mag * edge_te 
+!      el1%free_vort = el1%al_free * el1%surf_vort
+!   
+!      ! correction of panel ie2 ----
+!      el2%surf_vort = el2%surf_vort + el2%mag * edge_te
+! !        el2%mag * ( te%rr(:,te%ii(1,ie_te)) - te%rr(:,te%ii(1,ie_te)) )
+!      el2%free_vort = el2%al_free * el2%surf_vort
+! 
+!    end select  
+!    end select  
+!  
+!  end do
+!  ! -------------------------
+!  ! te correction 
+!  ! -------------------------
+! ! <<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 !write(*,*)
 !write(*,*) ' ---- Viscosity effects : END ----- ' 

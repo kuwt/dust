@@ -191,7 +191,7 @@ type(t_octree) :: octree
 ! pres_IE +++++
 !result of the integral equation for pressure
 real(wp), allocatable :: surfpan_H_IE(:)
-real(wp), allocatable :: b_unsteady_debug(:)
+!real(wp), allocatable :: b_unsteady_debug(:)
 ! TODO:
 ! in linsys/mod_linsys.f90:
 ! - remove Kutta condition from linsys%A_pres
@@ -542,6 +542,14 @@ allocate(res_old(size(elems))) ; res_old = 0.0_wp
 
 t11 = dust_time()
 
+! debug ----
+! do i = 1 , size(geo%idSurfPanG2L)
+!   write(*,*) i , ': ' , geo%idSurfPanG2L(i)
+! end do
+! write(*,*) ' stop in dust.f90 at l.549 '
+! stop
+! debug ----
+
 do it = 1,nstep
 
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
@@ -549,6 +557,11 @@ do it = 1,nstep
   !  surfpan to be used in the source rhs of the Bernoulli integral equation.
   ! surf_vel_SurfPan_old saved at the end of the time step (for surfpan only)
   ! write(*,*) ' debug l.545 dust.f90 '
+
+  ! debug ----
+  write(str_comp,'(I4.4)') it
+  open(unit=21,file='./file_debug/grad_div_'//trim(str_comp)//'.dat')
+
   do i_el = 1 , geo%nSurfPan
 
     select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
@@ -561,45 +574,72 @@ do it = 1,nstep
 !                                                                   / sim_param%dt
 !     write(*,*) el%dUn_dt      ! debug ---
 
+!     ! debug ----
+!     if ( ( i_el .le. 3 ) .or. ( ( i_el .ge. 41 ) .and. ( i_el .le. 43 ) ) ) then
+!       write(*,*) ' stencil of elem n. ' , i_el 
+!       do i = 1 , el%n_ver
+!         write(*,*) el%pot_vel_stencil(:,i)
+!       end do
+!       write(*,*)
+!     end if
+!     ! debug ----
+
       ! Compute GradS_Un
       GradS_Un = 0.0_wp
       do i_e = 1 , el%n_ver
-        select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
-          if ( associated(el_neigh) ) then !  .and. &
+!       write(*,*) ' id(',i_e,') , id(',i_el,') : , ' , el%id , associated(el%neigh(i_e)%p)
+        if ( associated(el%neigh(i_e)%p) ) then !  .and. &
+          select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
+!           write(*,*) ' associated , i_el , i_neigh : ' , i_el , i_e 
             GradS_Un = GradS_Un + &
                el%pot_vel_stencil(:,i_e) * ( &
                   sum(el%nor* (el_neigh%surf_vel - el%surf_vel) ) )                 ! <<<<< OK ?
 !                 sum(el%neigh(i_e)%p%ub*el%neigh(i_e)%p%nor) - sum(el%ub*el%nor) ) ! << WRONG !
 !              this%pot_vel_stencil(:,i_e) * (this%neigh(i_e)%p%mag - this%mag)
-          else  
+          end select
+        else
+!         ! debug ----
+!         write(*,*) ' .not. associated , i_el , i_neigh : ' , i_el , i_e 
+!         write(*,*) ' non-associated in GRAD '
+!         ! debug ----
+!         select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
             GradS_Un = GradS_Un + &
                el%pot_vel_stencil(:,i_e) * ( &
                   sum(el%nor* ( - 2.0_wp * el%surf_vel) ) )                 ! <<<<< OK ?
-          end if
-        end select
+!         end select
+        end if
       end do
 !     GradS_Un = GradS_Un - el%nor * sum(el%nor*GradS_Un) ! tangential projection
 
       ! Compute DivS_U
       DivS_U = 0.0_wp
       do i_e = 1 , el%n_ver
-        select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
-          if ( associated(el_neigh) ) then !  .and. &
+        if ( associated(el%neigh(i_e)%p) ) then !  .and. &
+          select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
             DivS_U = DivS_U + &
                sum(   el%pot_vel_stencil(:,i_e) * &
                     ( el_neigh%surf_vel - el%surf_vel )   )
-          else  
+          end select
+        else  
+!         select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
+!           write(*,*) ' non-associated in DIV '
             DivS_U = DivS_U + &
                sum(   el%pot_vel_stencil(:,i_e) * &
                     ( - 2.0_wp * el%surf_vel ) )
-          end if
-        end select
+!         end select
+        end if
       end do  
 
       ! Compute "source intensity" of Bernoulli equations
       el%bernoulli_source = + el%dUn_dt & !    n . DU/Dt 
          - sum( GradS_Un * ( el%ub ))   & !  - GradS_Un . el%ub 
          + DivS_U * sum(el%ub*el%nor)     !  + Un * Div_S U
+
+! debug -----
+!     write(*,*) ' stop in dust.f90 l.614. '
+!     stop      
+      write(21,*) GradS_Un , '         ' , &  
+                 DivS_U 
 ! debug -----
 !     write(*,*) sum( GradS_Un * ( el%ub ) ) , &  ! sum( GradS_Un * ( el%surf_vel - el%ub ) ) , &
 !                DivS_U * sum(el%ub*el%nor) 
@@ -625,6 +665,8 @@ do it = 1,nstep
 
     end select
   end do
+
+  close(21)
 
 ! debug -----
 ! write(*,*) ' GradS_Un . surfvel , Un . DivS_U +++++++++++ '
@@ -684,36 +726,35 @@ do it = 1,nstep
   !------ Solve the linsys for Bernoulli polynomial ------                     !
   ! only for it > 1   <---- TODO: assess the effects of timestepping on loads  !
   !                                                                            !
-  ! debug -----
-  if (.not.(allocated(b_unsteady_debug))) allocate(b_unsteady_debug(geo%nSurfPan))
-  do i = 1 , geo%nSurfPan 
-    select type ( el => elems(geo%idSurfPan(i))%p ) ; class is ( t_surfpan )
-     b_unsteady_debug(i) = sum(el%ub* el%surf_vel)
-    end select
-  end do
-  b_unsteady_debug = matmul(linsys%A_pres,b_unsteady_debug)
+! ! debug -----
+! if (.not.(allocated(b_unsteady_debug))) allocate(b_unsteady_debug(geo%nSurfPan))
+! do i = 1 , geo%nSurfPan 
+!   select type ( el => elems(geo%idSurfPan(i))%p ) ; class is ( t_surfpan )
+!    b_unsteady_debug(i) = sum(el%ub* el%surf_vel)
+!   end select
+! end do
+! b_unsteady_debug = matmul(linsys%A_pres,b_unsteady_debug)
 
-! ! dump rhs and results -------
-! write(str_comp,'(I4.4)') it
-! open(unit=21,file='./file_debug/rhs'//trim(str_comp)//'.dat')
       
   if ( it .gt. 1 ) then                                                        !
     call solve_linsys_pressure(linsys,surfpan_H_IE)                            !
   end if                                                                       !
 
-! ! dump rhs and results -------
-! if ( it .gt. 1 ) then
-!   do i = 1 , geo%nSurfPan
-!     select type ( el => elems(geo%idSurfPan(i))%p ) ; class is ( t_surfpan )
-!     write(21,*) linsys%b_pres(i), linsys%b_pres(i) & 
-!      - 4*pi * ( sim_param%P_inf + &
-!        0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf) ** 2.0_wp ) , '     ' , & 
-!        surfpan_H_IE(i) ,  &
-!        surfpan_H_IE(i) - 0.5 * sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp
-!     end select
-!   end do
-! end if
-! close(21)
+  ! dump rhs and results -------
+  write(str_comp,'(I4.4)') it
+  open(unit=21,file='./file_debug/rhs'//trim(str_comp)//'.dat')
+  if ( it .gt. 1 ) then
+    do i = 1 , geo%nSurfPan
+      select type ( el => elems(geo%idSurfPan(i))%p ) ; class is ( t_surfpan )
+      write(21,*) linsys%b_pres(i), linsys%b_pres(i) & 
+       - 4*pi * ( sim_param%P_inf + &
+         0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf) ** 2.0_wp ) , '     ' , & 
+         surfpan_H_IE(i) ,  &
+         surfpan_H_IE(i) - 0.5 * sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp
+      end select
+    end do
+  end if
+  close(21)
   ! debug -----
   !                                                                            !
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
@@ -791,6 +832,8 @@ do it = 1,nstep
 !      ! debug -----
       end select
     end do
+    
+
   else
     do i_el = 1 , geo%nSurfPan
       select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
@@ -798,10 +841,6 @@ do it = 1,nstep
       end select
     end do
   end if
-  
-! write(*,*) ' #3 '
-
-! if ( it .eq. 3 ) stop
 
   ! pres_IE +++++
 
@@ -863,18 +902,18 @@ do it = 1,nstep
 !   end do
 !   ! debug Angular velocity -------
 
-  ! debug b_static_pres
-  if ( it .eq. 2 ) then
-    write(*,*) ' allocated(linsys%b_static_pres) : ' , allocated(linsys%b_static_pres)
-    write(*,*) ' shape(    linsys%b_static_pres) : ' , shape(    linsys%b_static_pres)
-    if ( maxval(shape(linsys%b_static_pres)) .gt. 0 ) then
-      do i_el = 1 , 10
-        write(*,'(10F12.6)') linsys%b_static_pres(i_el,1:10)
-      end do
-      write(*,*) ' stop in dust.f90 l.800'
-    end if
-  end if
-  ! debug b_static_pres
+! ! debug b_static_pres
+! if ( it .eq. 2 ) then
+!   write(*,*) ' allocated(linsys%b_static_pres) : ' , allocated(linsys%b_static_pres)
+!   write(*,*) ' shape(    linsys%b_static_pres) : ' , shape(    linsys%b_static_pres)
+!   if ( maxval(shape(linsys%b_static_pres)) .gt. 0 ) then
+!     do i_el = 1 , 10
+!       write(*,'(10F12.6)') linsys%b_static_pres(i_el,1:10)
+!     end do
+!     write(*,*) ' stop in dust.f90 l.800'
+!   end if
+! end if
+! ! debug b_static_pres
 
 enddo
 
