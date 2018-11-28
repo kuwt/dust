@@ -858,9 +858,21 @@ subroutine load_wake(filename, wake)
   
   deallocate(vppoints, vpvort)
   
-
-
   call close_hdf5_file(floc)
+
+
+  if(wake%pan_wake_len .eq. wake%nmax_pan) wake%full_panels=.true.
+  !If the wake is full, attach the end vortex
+  if (wake%full_panels) then
+    do iw = 1,wake%n_pan_stripes
+      wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag
+      p1 = wake%i_start_points(1,iw)
+      p2 = wake%i_start_points(2,iw)
+      call wake%end_vorts(iw)%calc_geo_data( &
+          reshape((/wake%pan_w_points(:,p1,wake%pan_wake_len+1),  &
+                    wake%pan_w_points(:,p2,wake%pan_wake_len+1)/), (/3,2/)))
+    enddo
+  endif
 end subroutine load_wake
 
 
