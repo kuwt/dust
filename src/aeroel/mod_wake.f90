@@ -160,6 +160,8 @@ type :: t_wake
  !> Points of the wake, in a structured way
  !! (3 x n_pan_points x npan+1)
  real(wp), allocatable :: pan_w_points(:,:,:)
+ !! (3 x n_pan_points x npan+1)
+ real(wp), allocatable :: pan_w_vel(:,:,:)
 
  !> Relative velocity ( u_inf - ub ) of the nodes at the TE
  !! (3 x n_pan_points)
@@ -310,6 +312,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, &
   allocate(wake%pan_neigh(2,wake%n_pan_stripes))
   allocate(wake%pan_neigh_o(2,wake%n_pan_stripes))
   allocate(wake%pan_w_points(3,wake%n_pan_points,npan+1))
+  allocate(wake%pan_w_vel(   3,wake%n_pan_points,npan+1))
   allocate(wake%w_vel(3,wake%n_pan_points,npan+1))
   allocate(wake%wake_panels(wake%n_pan_stripes,npan))
   allocate(wake%end_vorts(wake%n_pan_stripes))
@@ -411,6 +414,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, &
   wake%w_start_points = 0.5_wp * (geo%points(:,wake%pan_gen_points(1,:)) + &
                                   geo%points(:,wake%pan_gen_points(2,:)))
   wake%pan_w_points(:,:,1) = wake%w_start_points
+  wake%pan_w_vel(   :,:,:) = 0.0_wp 
 
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1,wake%n_pan_points
@@ -799,6 +803,8 @@ subroutine prepare_wake(wake, geo, sim_param)
       call wake%end_vorts(iw)%calc_geo_data( &
           reshape((/wake%pan_w_points(:,p1,wake%pan_wake_len+1),  &
                     wake%pan_w_points(:,p2,wake%pan_wake_len+1)/), (/3,2/)))
+      wake%end_vorts(iw)%ver_vel(:,1) = wake%pan_w_vel(:,p1,wake%pan_wake_len+1) 
+      wake%end_vorts(iw)%ver_vel(:,2) = wake%pan_w_vel(:,p2,wake%pan_wake_len+1) 
     enddo
   endif
 
@@ -1032,6 +1038,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
       call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
 
       !update the position in time
+      wake%pan_w_vel(   :,iw,ipan) = vel_p
       wake%pan_w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + vel_p*sim_param%dt
     enddo
   enddo
@@ -1149,14 +1156,17 @@ subroutine update_wake(wake, elems, octree, sim_param)
 
   !==>    Particles: evolve the position in time
 
-  allocate(vel_prt(3,wake%n_prt))
+! allocate(vel_prt(3,wake%n_prt))                       ! *****(old) allocate(vel_prt(3,wake%n_prt))
   allocate(stretch_prt(3,wake%n_prt))
+
+  if ( allocated(wake%prt_vel) ) deallocate(wake%prt_vel)
+  allocate(wake%prt_vel(3,wake%n_prt)) 
 
   !calculate the velocities at the points
 !$omp parallel do private(pos_p, vel_p, ip)
   do ip = 1, wake%n_prt
 
-    wake%part_p(ip)%p%vel   => vel_prt(:,ip)
+    wake%part_p(ip)%p%vel   => wake%prt_vel(:,ip)       ! *****(old) vel_prt(:,ip)
     wake%part_p(ip)%p%stretch => stretch_prt(:,ip)
     
     !If not using the fast multipole, update particles position now
@@ -1165,7 +1175,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
 
       call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
 
-      vel_prt(:,ip) = vel_p
+      wake%prt_vel(:,ip) = vel_p                        ! *****(old) vel_prt(:,ip) = vel_p
 
       !if using vortex stretching, calculate it now
       if(sim_param%use_vs) then
@@ -1208,10 +1218,10 @@ subroutine update_wake(wake, elems, octree, sim_param)
   !Assign the moved points, if they get outside the bounding box free the 
   !particles
   do ip = 1, wake%n_prt
-!   call avoid_collision(elems, wake, wake%part_p(ip)%p%cen, sim_param, vel_prt(:,ip)) ! OLD
-    call avoid_collision(elems, wake, wake%part_p(ip)%p, sim_param, vel_prt(:,ip))
+!   call avoid_collision(elems, wake, wake%part_p(ip)%p%cen, sim_param, vel_prt(:,ip))  ! OLD
+    call avoid_collision(elems, wake, wake%part_p(ip)%p, sim_param, wake%prt_vel(:,ip)) ! *****(old) vel_prt(:,ip))
     if(.not.(wake%part_p(ip)%p%free)) then
-      pos_p = wake%part_p(ip)%p%cen + vel_prt(:,ip)*sim_param%dt
+      pos_p = wake%part_p(ip)%p%cen + wake%prt_vel(:,ip)*sim_param%dt                   ! *****(old) vel_prt(:,ip)*sim_param%dt
       if(all(pos_p .ge. wake%part_box_min) .and. &
          all(pos_p .le. wake%part_box_max)) then
         !wake%part_p(ip)%p%cen = points_prt(:,ip)

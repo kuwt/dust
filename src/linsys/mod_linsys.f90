@@ -41,9 +41,11 @@ module mod_linsys
 use mod_param, only: &
   wp, nl, max_char_len, pi
 
-
 use mod_sim_param, only: &
   t_sim_param
+
+use mod_math, only: &
+  cross
 
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
@@ -243,10 +245,10 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
  type(t_wake), intent(in) ::  wake
 !real(wp), intent(in) :: uinf(:)
  type(t_sim_param) :: sim_param 
- real(wp) :: uinf(3)
+ real(wp) :: uinf(3) , dist(3) , dist2(3)
  real(wp) :: rhoinf , Pinf
 
- integer :: ie, nst, ntot
+ integer :: ie, nst, ntot , iw , iw2
  integer :: iete , ind1 , ind2 , ista , iend
  real(wp) :: a , b
 
@@ -318,10 +320,68 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
 ! end do
 ! write(*,*)
 ! ! debug -----
+
+  ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !
+  ! Assemble the RHS of the linear system for the Bernoulli polynomial     !
+  ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !
+  ! RHS = B_infty +                                 (a) far field
+  !       + \oint_{Sb} { G ( du/dt - ... ) } +      (b) time-dependent
+  !       +  \int_{V } { DG . \omega x U } +        (c) rotational
+  !       +  \int_{Sb} { viscous terms }            (d) viscous
+   
+  ! RHS assembled as the sum of:
+  ! (b) time-dependent source contribution: computed and assembled in the
+  !     %build_row routines above
+  ! do nothing here
+  ! (c) rotational effects (up to now, ignoring ring wakes)
+  write(*,*) ' wake%n_prt : ' , wake%n_prt
+  do ie = 1 , geo%nSurfpan
+    ! (c.1) particles ( part_p )
+    if ( allocated( wake%part_p ) ) then
+      do iw = 1 , size( wake%part_p )
+        if  ( associated( wake%part_p(iw)%p ) ) then
+          dist = wake%part_p(iw)%p%cen - elems( geo%idSurfpan(ie) )%p%cen 
+          linsys%b_pres(ie) = linsys%b_pres(ie) + &
+            sum( dist * cross( wake%part_p(iw)%p%dir , wake%prt_vel(:,iw) ) ) * &
+                 wake%part_p(iw)%p%mag / ( norm2(dist)**3.0_wp )
+        end if
+      end do 
+    end if
+    ! (c.2) line elements ( end_vorts )
+    do iw = 1 , wake%n_pan_stripes
+      if( associated( wake%end_vorts(iw)%mag ) ) then
+        dist  = wake%end_vorts(iw)%ver(:,1) - elems( geo%idSurfpan(ie) )%p%cen 
+        dist2 = wake%end_vorts(iw)%ver(:,2) - elems( geo%idSurfpan(ie) )%p%cen
+        linsys%b_pres(ie) = linsys%b_pres(ie) - &
+          0.5_wp * wake%end_vorts(iw)%mag * sum( wake%end_vorts(iw)%edge_vec * &
+               ( cross(dist , wake%end_vorts(iw)%ver_vel(:,1) ) /(norm2(dist )**3.0_wp) + &
+                 cross(dist2, wake%end_vorts(iw)%ver_vel(:,2) ) /(norm2(dist2)**3.0_wp) ) )  
+      end if
+    end do
+    ! (c.3) constant surface doublets = vortex rings ( wake_panels )
+    do iw = 1 , wake%pan_wake_len
+      do iw2 = 1 , wake%n_pan_stripes 
+         
+      end do
+    end do
+    ! (c.4) rings from actuator disks
+    ! TODO: ...
+
+    ! (d) viscous effects
+    ! TODO: to be implemented
+
+  end do
+  ! (a) far field contribution
   linsys%b_pres = linsys%b_pres + &
                     4*pi * ( Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp ) ! H_inf
+  ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !
+  ! END Assemble the RHS of the linear system for the Bernoulli polynomial !
+  ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !
+
+! debug ----
 ! write(*,*) ' H_inf = ' , &
 !       Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp 
+! debug ----
 
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++
 
