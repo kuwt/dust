@@ -143,7 +143,7 @@ real(wp), allocatable :: vars(:,:)
 real(wp), allocatable :: ave_vars(:,:) 
 integer :: i_var_v , i_var_p , i_var_w
 
-integer :: ip , ipp, ic , ie , i1 , it
+integer :: ip , ipp, ic , ie , i1 , it, itave
 
 character(len=max_char_len) :: str_a , var_name 
 character(len=max_char_len) :: filename
@@ -291,7 +291,9 @@ endif
 
 write(*,'(A,I0,A,I0,A,I0)') nl//' it_start,it_end,an_step : ' , &
   an_start , ' , ' , an_end , ' , ' , an_step
+itave = 0
 do it = an_start, an_end, an_step ! Time history
+  itave = itave + 1
 
   ! Show timing, since this analysis is quite slow
   write(*,'(A,I0,A,I0)') ' it : ' , it , ' / ' , &
@@ -356,6 +358,7 @@ do it = an_start, an_end, an_step ! Time history
        
         ! + u_inf
         vel_probe = vel_probe + u_inf
+
         
       end if
 
@@ -387,8 +390,8 @@ do it = an_start, an_end, an_step ! Time history
 
   ! Output or average +++++++++++++++++++++++++++++++++++++++++++++++++
   if (average) then
-    ave_vars = ave_vars*(real(it-1,wp)/real(it,wp)) + &
-                   vars/real(it,wp)
+    ave_vars = ave_vars*(real(itave-1,wp)/real(itave,wp)) + &
+                   vars/real(itave,wp)
 
   else
     select case (trim(out_frmt))
