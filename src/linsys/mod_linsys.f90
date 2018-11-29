@@ -248,9 +248,11 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
  real(wp) :: uinf(3) , dist(3) , dist2(3)
  real(wp) :: rhoinf , Pinf
 
- integer :: ie, nst, ntot , iw , iw2
+ integer :: ie, nst, ntot 
  integer :: iete , ind1 , ind2 , ista , iend
  real(wp) :: a , b
+ integer :: ip , iw , is , inext , p1 , p2
+ integer :: ipp(4) , iww(4)
 
  ! Free-stream conditions
  uinf   = sim_param%u_inf
@@ -359,9 +361,40 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
       end if
     end do
     ! (c.3) constant surface doublets = vortex rings ( wake_panels )
-    do iw = 1 , wake%pan_wake_len
-      do iw2 = 1 , wake%n_pan_stripes 
-         
+    do ip = 1 , wake%pan_wake_len
+      do iw = 1 , wake%n_pan_stripes
+
+        p1 = wake%i_start_points(1,iw) 
+        p2 = wake%i_start_points(2,iw)
+
+        ipp = (/ ip , ip , ip+1, ip+1 /)
+        iww = (/ p1 , p2 , p2  , p1   /)
+
+        do is = 1 , wake%wake_panels(iw,ip)%n_ver ! do is = 1 , 4 
+!         ! debug ----
+!         if ( ( ie .eq. 1 ) .and. ( iw .eq. 1 ) .and. ( iw2 .eq. 1 ) ) then
+!           write(*,*) ' wake%wake_panels(1,1)%ver(:,:) : ' 
+!           write(*,*) wake%wake_panels(1,1)%ver(1,:)
+!           write(*,*) wake%wake_panels(1,1)%ver(2,:)
+!           write(*,*) wake%wake_panels(1,1)%ver(3,:)
+!         end if
+!         ! debug ----
+          
+          inext = mod(is,wake%wake_panels(iw,ip)%n_ver) + 1 
+          dist  = wake%wake_panels(iw,ip)%ver(:,is   ) - elems( geo%idSurfpan(ie) )%p%cen 
+          dist2 = wake%wake_panels(iw,ip)%ver(:,inext) - elems( geo%idSurfpan(ie) )%p%cen
+          
+          linsys%b_pres(ie) = linsys%b_pres(ie) - &
+            0.5_wp * wake%wake_panels(iw,ip)%mag * sum( wake%wake_panels(iw,ip)%edge_vec(:,is) * &
+                 ( cross(dist , wake%pan_w_vel(:,iww(is   ),ipp(is   )) ) /(norm2(dist )**3.0_wp) + &
+                   cross(dist2, wake%pan_w_vel(:,iww(inext),ipp(inext)) ) /(norm2(dist2)**3.0_wp) ) )   
+!           0.5_wp * wake%end_vorts(iw)%mag * sum( wake%wake_panels(iw2,iw)%edge_vec(:,is) * &
+!                ( cross(dist , wake%wake_panels(iw2,iw)%ver_vel(:,is   ) ) /(norm2(dist )**3.0_wp) + &
+!                  cross(dist2, wake%wake_panels(iw2,iw)%ver_vel(:,inext) ) /(norm2(dist2)**3.0_wp) ) )  
+!                ( cross(dist , wake%pan_w_vel(:,iw2  , ) ) /(norm2(dist )**3.0_wp) + &
+!                  cross(dist2, wake%pan_w_vel(:,iw2+1, ) ) /(norm2(dist2)**3.0_wp) ) )  
+          
+        end do 
       end do
     end do
     ! (c.4) rings from actuator disks

@@ -160,7 +160,7 @@ type :: t_wake
  !> Points of the wake, in a structured way
  !! (3 x n_pan_points x npan+1)
  real(wp), allocatable :: pan_w_points(:,:,:)
- !! (3 x n_pan_points x npan+1)
+ !! (3 x n_pan_points x npan+1) !!!! now used for rotational effects on pressure !!!!
  real(wp), allocatable :: pan_w_vel(:,:,:)
 
  !> Relative velocity ( u_inf - ub ) of the nodes at the TE
@@ -174,6 +174,10 @@ type :: t_wake
 
  !> elements of the panels
  type(t_vortlatt), allocatable :: wake_panels(:,:)
+
+!!> Velocity of the vertices of the panels (associated to the panels info)
+!!> and not collected in the array pan_w_vel(:,:,:)
+!real(wp), allocatable :: wake_panels_vel(:,:,:)
 
  !> Ring elements
  type(t_actdisk), allocatable :: wake_rings(:,:)
@@ -210,7 +214,7 @@ type :: t_wake
  !> Magnitude of particles vorticity
  real(wp), allocatable :: prt_ivort(:)
 
- !> Velocity of the particles (consider removing)
+ !> Velocity of the particles !!!! now used for rotational effects on pressure !!!!
  real(wp), allocatable :: prt_vel(:,:)
 
  !> Wake particles pointer
@@ -314,9 +318,14 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, &
   allocate(wake%pan_w_points(3,wake%n_pan_points,npan+1))
   allocate(wake%pan_w_vel(   3,wake%n_pan_points,npan+1))
   allocate(wake%w_vel(3,wake%n_pan_points,npan+1))
-  allocate(wake%wake_panels(wake%n_pan_stripes,npan))
+  allocate(wake%wake_panels(     wake%n_pan_stripes,npan))
   allocate(wake%end_vorts(wake%n_pan_stripes))
   allocate(wake%pan_idou(wake%n_pan_stripes,npan))
+
+! ! allocate and initialize the array containing the velocity of the nodes
+! ! of panel wake elements 
+! allocate(wake%wake_panels_vel(wake%n_pan_points*(npan+1), 4      , 3))
+! wake%wake_panels_vel = 0.0_wp
 
   !ring wake: count the number of actuator disks and points
   nad = 0; npt = 0;
@@ -803,7 +812,7 @@ subroutine prepare_wake(wake, geo, sim_param)
       call wake%end_vorts(iw)%calc_geo_data( &
           reshape((/wake%pan_w_points(:,p1,wake%pan_wake_len+1),  &
                     wake%pan_w_points(:,p2,wake%pan_wake_len+1)/), (/3,2/)))
-      wake%end_vorts(iw)%ver_vel(:,1) = wake%pan_w_vel(:,p1,wake%pan_wake_len+1) 
+      wake%end_vorts(iw)%ver_vel(:,1) = wake%pan_w_vel(:,p1,wake%pan_wake_len+1)
       wake%end_vorts(iw)%ver_vel(:,2) = wake%pan_w_vel(:,p2,wake%pan_wake_len+1) 
     enddo
   endif
