@@ -254,6 +254,10 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
  integer :: ip , iw , is , inext , p1 , p2
  integer :: ipp(4) , iww(4)
 
+ ! debug ----
+ real(wp) :: min_dist , max_p_mag , max_p_vel
+ ! debug ----
+
  ! Free-stream conditions
  uinf   = sim_param%u_inf
  Pinf   = sim_param%P_inf
@@ -336,7 +340,14 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
   !     %build_row routines above
   ! do nothing here
   ! (c) rotational effects (up to now, ignoring ring wakes)
+
+  ! debug ----
   write(*,*) ' wake%n_prt : ' , wake%n_prt
+  write(*,*) ' geo%nSurfpan : ' , geo%nSurfpan
+  write(*,*) ' shape( wake%part_p ) : ' , shape( wake%part_p )
+  ! debug ---- 
+  min_dist = 100.0_wp
+ 
   do ie = 1 , geo%nSurfpan
     ! (c.1) particles ( part_p )
     if ( allocated( wake%part_p ) ) then
@@ -346,57 +357,62 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
           linsys%b_pres(ie) = linsys%b_pres(ie) + &
             sum( dist * cross( wake%part_p(iw)%p%dir , wake%prt_vel(:,iw) ) ) * &
                  wake%part_p(iw)%p%mag / ( norm2(dist)**3.0_wp )
+
+          ! debug ----
+          if ( norm2(dist) .lt. min_dist ) min_dist = norm2(dist)
+          ! debug ----
+
         end if
       end do 
     end if
-    ! (c.2) line elements ( end_vorts )
-    do iw = 1 , wake%n_pan_stripes
-      if( associated( wake%end_vorts(iw)%mag ) ) then
-        dist  = wake%end_vorts(iw)%ver(:,1) - elems( geo%idSurfpan(ie) )%p%cen 
-        dist2 = wake%end_vorts(iw)%ver(:,2) - elems( geo%idSurfpan(ie) )%p%cen
-        linsys%b_pres(ie) = linsys%b_pres(ie) - &
-          0.5_wp * wake%end_vorts(iw)%mag * sum( wake%end_vorts(iw)%edge_vec * &
-               ( cross(dist , wake%end_vorts(iw)%ver_vel(:,1) ) /(norm2(dist )**3.0_wp) + &
-                 cross(dist2, wake%end_vorts(iw)%ver_vel(:,2) ) /(norm2(dist2)**3.0_wp) ) )  
-      end if
-    end do
-    ! (c.3) constant surface doublets = vortex rings ( wake_panels )
-    do ip = 1 , wake%pan_wake_len
-      do iw = 1 , wake%n_pan_stripes
+ !   ! (c.2) line elements ( end_vorts )
+ !   do iw = 1 , wake%n_pan_stripes
+ !     if( associated( wake%end_vorts(iw)%mag ) ) then
+ !       dist  = wake%end_vorts(iw)%ver(:,1) - elems( geo%idSurfpan(ie) )%p%cen 
+ !       dist2 = wake%end_vorts(iw)%ver(:,2) - elems( geo%idSurfpan(ie) )%p%cen
+ !       linsys%b_pres(ie) = linsys%b_pres(ie) - &
+ !         0.5_wp * wake%end_vorts(iw)%mag * sum( wake%end_vorts(iw)%edge_vec * &
+ !              ( cross(dist , wake%end_vorts(iw)%ver_vel(:,1) ) /(norm2(dist )**3.0_wp) + &
+ !                cross(dist2, wake%end_vorts(iw)%ver_vel(:,2) ) /(norm2(dist2)**3.0_wp) ) )  
+ !     end if
+ !   end do
+ !   ! (c.3) constant surface doublets = vortex rings ( wake_panels )
+ !   do ip = 1 , wake%pan_wake_len
+ !     do iw = 1 , wake%n_pan_stripes
 
-        p1 = wake%i_start_points(1,iw) 
-        p2 = wake%i_start_points(2,iw)
+ !       p1 = wake%i_start_points(1,iw) 
+ !       p2 = wake%i_start_points(2,iw)
 
-        ipp = (/ ip , ip , ip+1, ip+1 /)
-        iww = (/ p1 , p2 , p2  , p1   /)
+ !       ipp = (/ ip , ip , ip+1, ip+1 /)
+ !       iww = (/ p1 , p2 , p2  , p1   /)
 
-        do is = 1 , wake%wake_panels(iw,ip)%n_ver ! do is = 1 , 4 
-!         ! debug ----
-!         if ( ( ie .eq. 1 ) .and. ( iw .eq. 1 ) .and. ( iw2 .eq. 1 ) ) then
-!           write(*,*) ' wake%wake_panels(1,1)%ver(:,:) : ' 
-!           write(*,*) wake%wake_panels(1,1)%ver(1,:)
-!           write(*,*) wake%wake_panels(1,1)%ver(2,:)
-!           write(*,*) wake%wake_panels(1,1)%ver(3,:)
-!         end if
-!         ! debug ----
-          
-          inext = mod(is,wake%wake_panels(iw,ip)%n_ver) + 1 
-          dist  = wake%wake_panels(iw,ip)%ver(:,is   ) - elems( geo%idSurfpan(ie) )%p%cen 
-          dist2 = wake%wake_panels(iw,ip)%ver(:,inext) - elems( geo%idSurfpan(ie) )%p%cen
-          
-          linsys%b_pres(ie) = linsys%b_pres(ie) - &
-            0.5_wp * wake%wake_panels(iw,ip)%mag * sum( wake%wake_panels(iw,ip)%edge_vec(:,is) * &
-                 ( cross(dist , wake%pan_w_vel(:,iww(is   ),ipp(is   )) ) /(norm2(dist )**3.0_wp) + &
-                   cross(dist2, wake%pan_w_vel(:,iww(inext),ipp(inext)) ) /(norm2(dist2)**3.0_wp) ) )   
-!           0.5_wp * wake%end_vorts(iw)%mag * sum( wake%wake_panels(iw2,iw)%edge_vec(:,is) * &
-!                ( cross(dist , wake%wake_panels(iw2,iw)%ver_vel(:,is   ) ) /(norm2(dist )**3.0_wp) + &
-!                  cross(dist2, wake%wake_panels(iw2,iw)%ver_vel(:,inext) ) /(norm2(dist2)**3.0_wp) ) )  
-!                ( cross(dist , wake%pan_w_vel(:,iw2  , ) ) /(norm2(dist )**3.0_wp) + &
-!                  cross(dist2, wake%pan_w_vel(:,iw2+1, ) ) /(norm2(dist2)**3.0_wp) ) )  
-          
-        end do 
-      end do
-    end do
+ !       do is = 1 , wake%wake_panels(iw,ip)%n_ver ! do is = 1 , 4 
+!!         ! debug ----
+!!         if ( ( ie .eq. 1 ) .and. ( iw .eq. 1 ) .and. ( iw2 .eq. 1 ) ) then
+!!           write(*,*) ' wake%wake_panels(1,1)%ver(:,:) : ' 
+!!           write(*,*) wake%wake_panels(1,1)%ver(1,:)
+!!           write(*,*) wake%wake_panels(1,1)%ver(2,:)
+!!           write(*,*) wake%wake_panels(1,1)%ver(3,:)
+!!         end if
+!!         ! debug ----
+ !         
+ !         inext = mod(is,wake%wake_panels(iw,ip)%n_ver) + 1 
+ !         dist  = wake%wake_panels(iw,ip)%ver(:,is   ) - elems( geo%idSurfpan(ie) )%p%cen 
+ !         dist2 = wake%wake_panels(iw,ip)%ver(:,inext) - elems( geo%idSurfpan(ie) )%p%cen
+ !         
+ !         linsys%b_pres(ie) = linsys%b_pres(ie) - &
+ !           0.5_wp * wake%wake_panels(iw,ip)%mag * sum( wake%wake_panels(iw,ip)%edge_vec(:,is) * &
+ !                ( cross(dist , wake%pan_w_vel(:,iww(is   ),ipp(is   )) ) /(norm2(dist )**3.0_wp) + &
+ !                  cross(dist2, wake%pan_w_vel(:,iww(inext),ipp(inext)) ) /(norm2(dist2)**3.0_wp) ) )   
+!!           0.5_wp * wake%end_vorts(iw)%mag * sum( wake%wake_panels(iw2,iw)%edge_vec(:,is) * &
+!!                ( cross(dist , wake%wake_panels(iw2,iw)%ver_vel(:,is   ) ) /(norm2(dist )**3.0_wp) + &
+!!                  cross(dist2, wake%wake_panels(iw2,iw)%ver_vel(:,inext) ) /(norm2(dist2)**3.0_wp) ) )  
+!!                ( cross(dist , wake%pan_w_vel(:,iw2  , ) ) /(norm2(dist )**3.0_wp) + &
+!!                  cross(dist2, wake%pan_w_vel(:,iw2+1, ) ) /(norm2(dist2)**3.0_wp) ) )  
+ !         
+ !       end do 
+ !     end do
+ !   end do
     ! (c.4) rings from actuator disks
     ! TODO: ...
 
@@ -404,6 +420,22 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
     ! TODO: to be implemented
 
   end do
+
+  ! debug ----
+  max_p_mag = 0.0_wp
+  max_p_vel = 0.0_wp
+  write(*,*) ' shape(wake%prt_vel) : ' , shape(wake%prt_vel)
+  write(*,*) ' shape(wake%part_p ) : ' , shape(wake%part_p )
+  do iw = 1 , size(wake%part_p)
+    if ( abs(wake%part_p(iw)%p%mag) .gt. max_p_mag ) max_p_mag = abs(wake%part_p(iw)%p%mag)
+    if ( norm2(wake%prt_vel(:,iw)) .gt. max_p_vel ) max_p_vel = norm2(wake%prt_vel(:,iw))
+  end do
+ 
+  write(*,*) ' min_dist = ' , min_dist
+  write(*,*) ' max_p_mag= ' , max_p_mag
+  write(*,*) ' max_p_vel= ' , max_p_vel
+  ! debug ----
+
   ! (a) far field contribution
   linsys%b_pres = linsys%b_pres + &
                     4*pi * ( Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp ) ! H_inf

@@ -827,7 +827,7 @@ subroutine load_wake(filename, wake)
  type(t_wake), intent(inout), target :: wake
 
  integer(h5loc) :: floc, gloc
- real(wp), allocatable :: wpoints(:,:,:), wvort(:,:)
+ real(wp), allocatable :: wpoints(:,:,:), wvels(:,:,:), wvort(:,:)
  real(wp), allocatable :: vppoints(:,:), vpvort(:,:)
  integer, allocatable :: start_points(:,:)
  integer, allocatable :: conn_pe(:)
@@ -842,6 +842,7 @@ subroutine load_wake(filename, wake)
   call open_hdf5_group(floc, 'PanelWake', gloc)
 
   call read_hdf5_al(wpoints,'WakePoints',gloc)
+  call read_hdf5_al(wvels  ,'WakeVels'  ,gloc)
   call read_hdf5_al(start_points,'StartPoints',gloc)
   call read_hdf5_al(wvort,'WakeVort',gloc)
 
@@ -858,6 +859,7 @@ subroutine load_wake(filename, wake)
 
   !store points position and doublets intensity
   wake%pan_w_points(:,:,1:wake%pan_wake_len+1) = wpoints(:,:,1:wake%pan_wake_len+1)
+  wake%pan_w_vel(   :,:,1:wake%pan_wake_len+1) = wvels(  :,:,1:wake%pan_wake_len+1)
   wake%pan_idou(:,1:wake%pan_wake_len) = wvort(:,1:wake%pan_wake_len)
 
   deallocate(wake%pan_p)
@@ -878,7 +880,7 @@ subroutine load_wake(filename, wake)
   enddo
 
 
-  deallocate(wpoints, wvort, start_points)
+  deallocate(wpoints, wvels, wvort, start_points)
 
   !=== Rings ===
   !Read the past results
@@ -932,6 +934,9 @@ subroutine load_wake(filename, wake)
   !=== Particles ===
   call open_hdf5_group(floc, 'ParticleWake', gloc)
   call read_hdf5_al(vppoints,'WakePoints',gloc)
+  if ( check_dset_hdf5('WakeVels',gloc) ) then
+    call read_hdf5_al(wake%prt_vel,'WakeVels',gloc) ! <<<< restart with Bernoulli integral equation
+  end if
   call read_hdf5_al(vpvort,'WakeVort',gloc)
   call read_hdf5(wake%last_pan_idou,'LastPanIdou',gloc)
   call close_hdf5_group(gloc)
@@ -1169,7 +1174,8 @@ subroutine update_wake(wake, elems, octree, sim_param)
   allocate(stretch_prt(3,wake%n_prt))
 
   if ( allocated(wake%prt_vel) ) deallocate(wake%prt_vel)
-  allocate(wake%prt_vel(3,wake%n_prt)) 
+  allocate(wake%prt_vel(3,wake%n_prt))
+  write(*,*) ' after allocation of wake%prt_vel , shape(wake_prt_vel) : ' , shape(wake%prt_vel) 
 
   !calculate the velocities at the points
 !$omp parallel do private(pos_p, vel_p, ip)

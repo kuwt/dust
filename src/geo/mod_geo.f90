@@ -85,7 +85,8 @@ use mod_math, only: &
   cross
 
 use mod_reference, only: &
-  t_ref, build_references, update_all_references, destroy_references
+  t_ref, build_references, update_all_references, destroy_references, &
+  update_relative_initial_conditions
 
 use mod_hdf5_io, only: &
    h5loc, &
@@ -357,6 +358,13 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
     ref_file_name = trim(in_file_name)
   endif
   call build_references(geo%refs, trim(ref_file_name), sim_param)
+
+  ! If rstart_from_file, set the right initial conditions!
+  ! -> Correction needed for motion defined through its velocity
+  if ( sim_param%restart_from_file ) then
+    call update_relative_initial_conditions(sim_param%restart_file, sim_param%ReferenceFile, geo%refs) 
+  end if 
+
 
   !Create the output geometry file (if it is not restarting with the same name)
   if(trim(geo_file_name).ne.trim(target_file)) then

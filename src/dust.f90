@@ -111,7 +111,7 @@ use mod_hdf5_io, only: &
   write_hdf5, write_hdf5_attr, read_hdf5, read_hdf5_al, append_hdf5
 
 use mod_dust_io, only: &
-  save_status, load_solution, load_time
+  save_status, load_solution, load_time 
 
 use mod_viscosity, only: &
   viscosity_effects
@@ -246,7 +246,7 @@ call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output', &
 
 ! restart
 call prms%CreateLogicalOption('restart_from_file','restarting from file?','F')
-call prms%CreatestringOption('restart_file','restart file name')
+call prms%CreateStringOption('restart_file','restart file name')
 call prms%CreateLogicalOption('reset_time','reset the time from previous &
                                &execution?','F')
 
@@ -284,7 +284,6 @@ call prms%CreateRealOption( 'CutoffRad', &
 
 call prms%CreateLogicalOption('rigid_wake','rigid wake?','F')
 call prms%CreateRealArrayOption( 'rigid_wake_vel', "rigid wake velocity" )
-
 
 !== Octree and multipole data == 
 call prms%CreateLogicalOption('FMM','Employ fast multipole method?','T')
@@ -365,8 +364,6 @@ sim_param%MinOctreePart = getint(prms, 'MinOctreePart')
 sim_param%MultipoleDegree = getint(prms,'MultipoleDegree')
 
 
-
-
 !-- Parameters Initializations --
 call initialize_doublet(sim_param%FarFieldRatioDoublet, &
                         sim_param%DoubletThreshold, sim_param%RankineRad, &
@@ -376,9 +373,11 @@ call initialize_vortpart(sim_param%RankineRad, sim_param%CutoffRad);
 call initialize_surfpan(sim_param%FarFieldRatioSource);
 !reset the numbering for output files
 nout = 0
+
 !Manage restart
 restart = getlogical(prms,'restart_from_file')
 if (restart) then
+
   reset_time = getlogical(prms,'reset_time')
   restart_file = getstr(prms,'restart_file')
   call printout('RESTART: restarting from file: '//trim(restart_file))
@@ -396,7 +395,20 @@ if (restart) then
     output_start = .false.
   endif
   if(.not. reset_time) call load_time(restart_file, sim_param%t0)
+
+  ! sim_param structure
+  sim_param%restart_from_file = restart
+  sim_param%restart_file = restart_file 
+  sim_param%reset_time = reset_time
+
 endif
+
+! Check that tend .gt. tinit
+if ( sim_param%tend .le. sim_param%t0 ) then
+    call error('dust','','sim_param%tend .le. sim_param%t0. Check your input&
+    & file and restart options. STOP')
+end if
+
 
 !Printout the parameters
 if (sim_param%debug_level .ge. 3) then
@@ -511,10 +523,16 @@ if(sim_param%debug_level .ge. 1) then
 endif
 !============================================
 
+! Restart --------------
 !------ Reloading ------
 if (restart) then
  call load_solution(restart_file, geo%components, geo%refs)
  call load_wake(restart_file, wake)
+
+! Moved to mod_geo.f90/create_geometry()
+!! Update the initial relative position of the ref.sys.
+!call update_relative_initial_conditions(restart_file, sim_param%ReferenceFile, geo%refs) 
+
 endif
 
 t22 = dust_time()
@@ -551,6 +569,10 @@ t11 = dust_time()
 ! debug ----
 
 do it = 1,nstep
+
+   write(*,*) ' shape(wake%prt_vel) ' , shape(wake%prt_vel)
+   write(*,*) ' wake%n_prt ' , wake%n_prt
+   write(*,*) ' === it = ', it,' ========== '
 
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
   ! compute the time derivative of the normal component of the velocity on 
