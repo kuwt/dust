@@ -626,6 +626,7 @@ subroutine prepare_wake(wake, geo, sim_param)
           
           wake%wake_parts(ip)%free = .false.
           k = ip+1
+
           wake%n_prt = wake%n_prt+1
           wake%wake_parts(ip)%mag = norm2(partvec)
           if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
@@ -634,6 +635,23 @@ subroutine prepare_wake(wake, geo, sim_param)
             wake%wake_parts(ip)%dir = partvec
           endif
           wake%wake_parts(ip)%cen = pos_p
+
+!         ! debug ----
+!         write(*,*) ' p1 , p2 , wake%nmax_pan + 1 : ' ,  p1 , p2 , wake%nmax_pan + 1     
+!         write(*,*) ' pos_p                       : ' ,  pos_p
+!         write(*,*) ' shape(wake%pan_w_points) : ' , shape(wake%pan_w_points)
+!         write(*,*) ' shape(wake%pan_w_vel   ) : ' , shape(wake%pan_w_vel)
+!         write(*,*)
+!         write(*,*) ' wake%wake_parts(ip)%cen : ' , wake%wake_parts(ip)%cen 
+!         write(*,*) ' ip , shape(wake%wake_parts) : ' , ip , '   ' , shape(wake%wake_parts)
+!         write(*,*)
+!         ! debug ----
+
+          wake%wake_parts(ip)%vel = 0.5_wp * ( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
+                                               wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
+
+!         write(*,*) ' wake%wake_parts(ip)%vel : ' , wake%wake_parts(ip)%vel 
+
           exit
         endif
       enddo
@@ -696,9 +714,9 @@ subroutine prepare_wake(wake, geo, sim_param)
   ! Treat flow separations 
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-! debug -----
+! ! debug -----
 ! write(*,*) ' shape(wake%wake_parts) : ' , shape(wake%wake_parts)
-! debug -----
+! ! debug -----
   do i_comp = 1 , size( geo%components)     ! ***** loop #1 over components *****
 
    if ( k .lt. 1 ) k = 1
@@ -734,6 +752,10 @@ subroutine prepare_wake(wake, geo, sim_param)
              endif
              wake%wake_parts(ip)%cen = el%cen + el%nor * el%h_bl + & ! + ...
                     el % surf_vel * sim_param%dt
+
+             wake%wake_parts(ip)%vel = el % surf_vel 
+                                       
+
              exit 
            endif
          enddo
@@ -744,11 +766,11 @@ subroutine prepare_wake(wake, geo, sim_param)
          call error(this_sub_name, this_mod_name, trim(msg))
          endif
 
-! debug -----
+! ! debug -----
 !      write(*,*) ' i_elem : ' , i_elem
 !      write(*,*) '  mag , dir : ' , wake%wake_parts(ip)%mag , '   ' , wake%wake_parts(ip)%dir
 !      write(*,*) '  cen       : ' , wake%wake_parts(ip)%cen
-! debug -----
+! ! debug -----
 
        end if
 
@@ -765,10 +787,10 @@ subroutine prepare_wake(wake, geo, sim_param)
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ! <<<<<<<<<<<<<<
-! debug -----
+! ! debug -----
 ! write(*,*) ' shape(wake%part_p) : ' , shape(wake%part_p)
 ! stop
-! debug -----
+! ! debug -----
 ! <<<<<<<<<<<<<<
 
   ! Recreate sturctures and pointers, if full
@@ -828,7 +850,7 @@ subroutine load_wake(filename, wake)
 
  integer(h5loc) :: floc, gloc
  real(wp), allocatable :: wpoints(:,:,:), wvels(:,:,:), wvort(:,:)
- real(wp), allocatable :: vppoints(:,:), vpvort(:,:)
+ real(wp), allocatable :: vppoints(:,:), vpvort(:,:) , vpvels(:,:)
  integer, allocatable :: start_points(:,:)
  integer, allocatable :: conn_pe(:)
  integer :: ipan, iw, p1, p2, ipt
@@ -871,14 +893,13 @@ subroutine load_wake(filename, wake)
       p1 = wake%i_start_points(1,iw)
       p2 = wake%i_start_points(2,iw)
       call wake%wake_panels(iw,ipan)%calc_geo_data( &
-           reshape((/wake%pan_w_points(:,p1,ipan),   wake%pan_w_points(:,p2,ipan), &
-                    wake%pan_w_points(:,p2,ipan+1), wake%pan_w_points(:,p1,ipan+1)/),&
+           reshape((/wake%pan_w_points(:,p1,ipan)  , wake%pan_w_points(:,p2,ipan), &
+                     wake%pan_w_points(:,p2,ipan+1), wake%pan_w_points(:,p1,ipan+1)/),&
                                                                      (/3,4/)))
       wake%pan_p(ipt)%p => wake%wake_panels(iw,ipan)
       ipt = ipt + 1
     enddo
   enddo
-
 
   deallocate(wpoints, wvels, wvort, start_points)
 
@@ -935,7 +956,7 @@ subroutine load_wake(filename, wake)
   call open_hdf5_group(floc, 'ParticleWake', gloc)
   call read_hdf5_al(vppoints,'WakePoints',gloc)
   if ( check_dset_hdf5('WakeVels',gloc) ) then
-    call read_hdf5_al(wake%prt_vel,'WakeVels',gloc) ! <<<< restart with Bernoulli integral equation
+    call read_hdf5_al(vpvels,'WakeVels',gloc) ! <<<< restart with Bernoulli integral equation
   end if
   call read_hdf5_al(vpvort,'WakeVort',gloc)
   call read_hdf5(wake%last_pan_idou,'LastPanIdou',gloc)
@@ -961,6 +982,7 @@ subroutine load_wake(filename, wake)
 
   do ip = 1,wake%n_prt
     wake%wake_parts(ip)%cen = vppoints(:,ip)
+    wake%wake_parts(ip)%vel = vpvels(:,ip)
     wake%wake_parts(ip)%mag = norm2(vpvort(:,ip))
     if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
       wake%wake_parts(ip)%dir = vpvort(:,ip)/wake%wake_parts(ip)%mag
@@ -972,11 +994,11 @@ subroutine load_wake(filename, wake)
     wake%vort_p(ip)%p => wake%wake_parts(ip)
   enddo
   
-  deallocate(vppoints, vpvort)
+  deallocate(vppoints, vpvort, vpvels)
   
 
-
   call close_hdf5_file(floc)
+
 end subroutine load_wake
 
 
@@ -1175,13 +1197,15 @@ subroutine update_wake(wake, elems, octree, sim_param)
 
   if ( allocated(wake%prt_vel) ) deallocate(wake%prt_vel)
   allocate(wake%prt_vel(3,wake%n_prt))
-  write(*,*) ' after allocation of wake%prt_vel , shape(wake_prt_vel) : ' , shape(wake%prt_vel) 
+
+! ! debug ----
+! write(*,*) ' after allocation of wake%prt_vel , shape(wake_prt_vel) : ' , shape(wake%prt_vel) 
+! ! debug ----
 
   !calculate the velocities at the points
 !$omp parallel do private(pos_p, vel_p, ip)
   do ip = 1, wake%n_prt
 
-    wake%part_p(ip)%p%vel   => wake%prt_vel(:,ip)       ! *****(old) vel_prt(:,ip)
     wake%part_p(ip)%p%stretch => stretch_prt(:,ip)
     
     !If not using the fast multipole, update particles position now
@@ -1190,7 +1214,8 @@ subroutine update_wake(wake, elems, octree, sim_param)
 
       call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
 
-      wake%prt_vel(:,ip) = vel_p                        ! *****(old) vel_prt(:,ip) = vel_p
+      wake%prt_vel(:,ip) = vel_p                            ! *****(old) vel_prt(:,ip) = vel_p
+      wake%part_p(ip)%p%vel     =  wake%prt_vel(:,ip)       ! *****(old) vel_prt(:,ip)
 
       !if using vortex stretching, calculate it now
       if(sim_param%use_vs) then
@@ -1207,7 +1232,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
         !             wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, str)
         !  stretch = stretch + str/(4.0_wp*pi)
         !enddo
-         stretch_prt(:,ip) = stretch
+        stretch_prt(:,ip) = stretch
       endif
     end if
 
@@ -1254,7 +1279,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
       endif
     endif
     !nullify(wake%part_p(ip)%p%npos)
-    nullify(wake%part_p(ip)%p%vel)
+    !nullify(wake%part_p(ip)%p%vel)
     if(sim_param%use_vs) nullify(wake%part_p(ip)%p%stretch)
   enddo
 

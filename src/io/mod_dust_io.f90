@@ -130,7 +130,7 @@ subroutine save_status(geo, wake,  sim_params, it, time, run_id)
  integer :: ie, ne
  real(wp), allocatable :: vort(:), cp(:) , pres(:)
  real(wp), allocatable :: dforce(:,:) 
- real(wp), allocatable :: points_w(:,:,:), cent(:,:,:)
+ real(wp), allocatable :: points_w(:,:,:), cent(:,:,:) , vel_w(:,:,:)
  real(wp), allocatable :: vort_v(:,:)
  integer, allocatable :: conn_pe(:)
  integer :: ir, id, ip, np
@@ -199,16 +199,16 @@ subroutine save_status(geo, wake,  sim_params, it, time, run_id)
   !call write_hdf5(wake_pan%i_start_points,'StartPoints',gloc1)
   !call write_hdf5(wake_pan%idou(:,1:wake_pan%wake_len),'WakeVort',gloc1)
   call write_hdf5(wake%pan_w_points(:,:,1:wake%pan_wake_len+1),'WakePoints',gloc1 )
-  ! debug ----
-  write(*,*) ' shape(wake%pan_w_points(   :,:,:))                     : ' , &
-               shape(wake%pan_w_points(   :,:,:))
-  write(*,*) ' shape(wake%pan_w_points(   :,:,1:wake%pan_wake_len+1)) : ' , &
-               shape(wake%pan_w_points(   :,:,1:wake%pan_wake_len+1))
-  write(*,*) ' shape(wake%pan_w_vel(   :,:,:))                        : ' , &
-               shape(wake%pan_w_vel(   :,:,:))
-  write(*,*) ' shape(wake%pan_w_vel(   :,:,1:wake%pan_wake_len+1))    : ' , &
-               shape(wake%pan_w_vel(   :,:,1:wake%pan_wake_len+1))
-  ! debug ----
+! ! debug ----
+! write(*,*) ' shape(wake%pan_w_points(   :,:,:))                     : ' , &
+!              shape(wake%pan_w_points(   :,:,:))
+! write(*,*) ' shape(wake%pan_w_points(   :,:,1:wake%pan_wake_len+1)) : ' , &
+!              shape(wake%pan_w_points(   :,:,1:wake%pan_wake_len+1))
+! write(*,*) ' shape(wake%pan_w_vel(   :,:,:))                        : ' , &
+!              shape(wake%pan_w_vel(   :,:,:))
+! write(*,*) ' shape(wake%pan_w_vel(   :,:,1:wake%pan_wake_len+1))    : ' , &
+!              shape(wake%pan_w_vel(   :,:,1:wake%pan_wake_len+1))
+! ! debug ----
   call write_hdf5(wake%pan_w_vel(   :,:,1:wake%pan_wake_len+1),'WakeVels'  ,gloc1 ) ! <<<< restart with Bernoulli integral equation
   call write_hdf5(wake%i_start_points,'StartPoints',gloc1)
   call write_hdf5(wake%pan_idou(:,1:wake%pan_wake_len),'WakeVort',gloc1)
@@ -241,26 +241,19 @@ subroutine save_status(geo, wake,  sim_params, it, time, run_id)
   call new_hdf5_group(floc, 'ParticleWake', gloc1)
   allocate(points_w(3,wake%n_prt,1))
   allocate(vort_v(3,wake%n_prt))
+  allocate(vel_w(3,wake%n_prt,1))
   do ip = 1, wake%n_prt
     points_w(:,ip,1) = wake%part_p(ip)%p%cen
+    vel_w(:,ip,1) = wake%part_p(ip)%p%vel
     vort_v(:,ip) = wake%part_p(ip)%p%dir * wake%part_p(ip)%p%mag
   enddo
   call write_hdf5(points_w(:,:,1),'WakePoints',gloc1)
-  ! debug ----
-  write(*,*) ' allocated(wake%prt_vel) : ' , &
-               allocated(wake%prt_vel)
-  if ( allocated(wake%prt_vel) ) then
-    write(*,*) ' shape(wake%prt_vel) : ' , &
-                 shape(wake%prt_vel)
-  end if
-  ! debug ----
-  if ( allocated(wake%prt_vel) ) then ! <<<< restart with Bernoulli integral equation
-    call write_hdf5(wake%prt_vel   ,'WakeVels'  ,gloc1)
-  end if
+  call write_hdf5(   vel_w(:,:,1),'WakeVels'  ,gloc1)
+  
   call write_hdf5(vort_v,'WakeVort',gloc1)
   call write_hdf5(wake%last_pan_idou,'LastPanIdou',gloc1)
   call close_hdf5_group(gloc1)
-  deallocate(points_w, vort_v)
+  deallocate(points_w, vort_v, vel_w)
 
   ! 3) %%%% References
   ! save the whole list of references
@@ -386,11 +379,11 @@ subroutine check_ref(gloc, floc, ref)
   call read_hdf5(R,'R',ref_loc)
   call read_hdf5(of,'Offset',ref_loc)
 
-  ! debug ----
-  write(*,*) ' offset : read vs computed '
-  write(*,*) real(of) , '     ' , real(ref%of_g)
+! ! debug ----
+! write(*,*) ' offset : read vs computed '
+! write(*,*) real(of) , '     ' , real(ref%of_g)
+! ! debug ----
 
-  ! debug ----
   if ((.not. all(real(R) .eq. real(ref%R_g))) .or. &
       (.not. all(real(of) .eq. real(ref%of_g))) ) then
     call warning(this_sub_name, this_mod_name, 'Mismatching initial position &
