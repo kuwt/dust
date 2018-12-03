@@ -599,28 +599,31 @@ subroutine prepare_wake(wake, geo, sim_param)
 
       !pos_p = (points_end(:,p1)+points_end(:,p2))/2.0_wp
 
-      !Add the particle
-      do ip = k, size(wake%wake_parts)
-        if (wake%wake_parts(ip)%free) then
-          
-          wake%wake_parts(ip)%free = .false.
-          k = ip+1
-          wake%n_prt = wake%n_prt+1
-          wake%wake_parts(ip)%mag = norm2(partvec)
-          if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
-            wake%wake_parts(ip)%dir = partvec/wake%wake_parts(ip)%mag
-          else
-            wake%wake_parts(ip)%dir = partvec
+      !Add the particle (if it is in the box)
+      if(all(pos_p .ge. wake%part_box_min) .and. &
+         all(pos_p .le. wake%part_box_max)) then
+        do ip = k, size(wake%wake_parts)
+          if (wake%wake_parts(ip)%free) then
+            
+            wake%wake_parts(ip)%free = .false.
+            k = ip+1
+            wake%n_prt = wake%n_prt+1
+            wake%wake_parts(ip)%mag = norm2(partvec)
+            if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
+              wake%wake_parts(ip)%dir = partvec/wake%wake_parts(ip)%mag
+            else
+              wake%wake_parts(ip)%dir = partvec
+            endif
+            wake%wake_parts(ip)%cen = pos_p
+            exit
           endif
-          wake%wake_parts(ip)%cen = pos_p
-          exit
+        enddo
+        if (ip .gt. wake%nmax_prt) then
+          write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
+            wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
+            &restarting with a higher number of maximum wake particles'
+        call error(this_sub_name, this_mod_name, trim(msg))
         endif
-      enddo
-      if (ip .gt. wake%nmax_prt) then
-        write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
-          wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
-          &restarting with a higher number of maximum wake particles'
-      call error(this_sub_name, this_mod_name, trim(msg))
       endif
       
     enddo
@@ -643,27 +646,30 @@ subroutine prepare_wake(wake, geo, sim_param)
         pos_p = (points_end_ring(:,p1)+points_end_ring(:,p2))/2.0_wp
 
         !Add the particle
-        do ip = k, size(wake%wake_parts)
-          if (wake%wake_parts(ip)%free) then
-            
-            wake%wake_parts(ip)%free = .false.
-            k = ip+1
-            wake%n_prt = wake%n_prt+1
-            wake%wake_parts(ip)%mag = norm2(partvec)
-            if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
-              wake%wake_parts(ip)%dir = partvec/wake%wake_parts(ip)%mag
-            else
-              wake%wake_parts(ip)%dir = partvec
+        if(all(pos_p .ge. wake%part_box_min) .and. &
+           all(pos_p .le. wake%part_box_max)) then
+          do ip = k, size(wake%wake_parts)
+            if (wake%wake_parts(ip)%free) then
+              
+              wake%wake_parts(ip)%free = .false.
+              k = ip+1
+              wake%n_prt = wake%n_prt+1
+              wake%wake_parts(ip)%mag = norm2(partvec)
+              if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
+                wake%wake_parts(ip)%dir = partvec/wake%wake_parts(ip)%mag
+              else
+                wake%wake_parts(ip)%dir = partvec
+              endif
+              wake%wake_parts(ip)%cen = pos_p
+              exit
             endif
-            wake%wake_parts(ip)%cen = pos_p
-            exit
+          enddo  !ip
+          if (ip .gt. wake%nmax_prt) then
+            write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
+              wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
+              &restarting with a higher number of maximum wake particles'
+          call error(this_sub_name, this_mod_name, trim(msg))
           endif
-        enddo  !ip
-        if (ip .gt. wake%nmax_prt) then
-          write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
-            wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
-            &restarting with a higher number of maximum wake particles'
-        call error(this_sub_name, this_mod_name, trim(msg))
         endif
       enddo !is
       nprev = nprev + wake%wake_rings(id,wake%rin_wake_len)%n_ver
@@ -890,7 +896,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: iw, ipan, ie, ip, np, iq
- integer :: id, ir
+ integer :: id, ir, n_part
  real(wp) :: pos_p(3), vel_p(3), alpha_p(3)
  real(wp) :: str(3), stretch(3)
  real(wp) :: df(3), diff(3)
@@ -1142,7 +1148,8 @@ subroutine update_wake(wake, elems, octree, sim_param)
 
   !Assign the moved points, if they get otside the bounding box free the 
   !particles
-  do ip = 1, wake%n_prt
+  n_part = wake%n_prt
+  do ip = 1, n_part
     if(sim_param%use_pa) call avoid_collision(elems, wake, &
                            wake%part_p(ip)%p, sim_param, vel_prt(:,ip))
     if(.not. wake%part_p(ip)%p%free) then
