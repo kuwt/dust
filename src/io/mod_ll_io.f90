@@ -110,7 +110,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   ! Global parameters
   call pmesh_prs%CreateStringOption('ElType', &
                 'element type (temporary) p panel v vortex ring')
-  call pmesh_prs%CreateLogicalOption('mesh_reflection', &
+  call pmesh_prs%CreateLogicalOption('mesh_symmetry', &
                 'symmetry yes/no','F' )
 ! !!! USELESS !!! for LIFTING LINE components !!!!!!!!!!!!
 ! call pmesh_prs%CreateIntOption('nelem_chord',&
@@ -166,7 +166,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   nelem_chord     = 1          !  getint(pmesh_prs,'nelem_chord')   !!! USELESS !!!
   nelem_chord_tot = 1          !  getint(pmesh_prs,'nelem_chord')   !!! USELESS !!!
   ElType  = getstr(pmesh_prs,'ElType')
-  symmetry= getlogical(pmesh_prs,'mesh_reflection')
+  symmetry= getlogical(pmesh_prs,'mesh_symmetry')
    
   nSections = countoption(pmesh_prs,'chord')
   nRegions  = countoption(pmesh_prs,'span')
