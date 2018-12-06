@@ -1160,20 +1160,8 @@ subroutine prepare_geometry(geo)
  class(c_pot_elem), pointer :: elem
  character(len=*), parameter :: this_sub_name = 'prepare_geometry'
 
- ! debug ----
- integer :: id 
- ! debug ----
 
  do i_comp = 1,size(geo%components)
-
-   ! debug ----
-   write(*,*) ' i_comp : ' , i_comp
-   write(*,*) ' shape(geo%components(i_comp)%el) : ' , shape(geo%components(i_comp)%el)
-   write(*,*) ' shape(geo%components(i_comp)%normalised_coord_e) : ' , &
-                shape(geo%components(i_comp)%normalised_coord_e)
-   write(*,*) ' shape(geo%components(i_comp)%i_airfoil_e) : ' , &
-                shape(geo%components(i_comp)%i_airfoil_e)
-   ! debug ----
 
    do ie = 1,size(geo%components(i_comp)%el)
      elem => geo%components(i_comp)%el(ie)
