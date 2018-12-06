@@ -132,8 +132,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  character(len=max_char_len) :: comp_el_type
  character :: ElType
  character(len=max_char_len) :: mesh_file_type
- logical :: mesh_reflection
- real(wp) :: reflection_point(3), reflection_normal(3)
+ logical :: mesh_symmetry , mesh_mirror
+ real(wp) :: symmetry_point(3), symmetry_normal(3)
+ real(wp) ::   mirror_point(3),   mirror_normal(3)
  character(len=max_char_len) :: comp_name
  integer(h5loc) :: comp_loc , geo_loc , te_loc
 
@@ -182,15 +183,24 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   !reference frame
   !call geo_prs%CreateStringOption('Reference_Tag',&
   !                                 'reference frame tag of the component','0')
-  !reflections
-  call geo_prs%CreateLogicalOption('mesh_reflection',&
+  !symmtery
+  call geo_prs%CreateLogicalOption('mesh_symmetry',&
                'Has all the file a custom reference frame', 'F')
-  call geo_prs%CreateRealArrayOption('reflection_point', &
-               'Center point of reflection plane, (x, y, z)', &
+  call geo_prs%CreateRealArrayOption('symmetry_point', &
+               'Center point of symmetry plane, (x, y, z)', &
                '(/0.0, 0.0, 0.0/)')
-  call geo_prs%CreateRealArrayOption('reflection_normal', &
-               'Normal of reflection plane, (xn, yn, zn)', &
-               '(/0.0, 0.0, 1.0/)')
+  call geo_prs%CreateRealArrayOption('symmetry_normal', &
+               'Normal of symmetry plane, (xn, yn, zn)', &
+               '(/0.0, 1.0, 0.0/)')
+  !mirroring
+  call geo_prs%CreateLogicalOption('mesh_mirror',&
+               'Has all the file a custom reference frame', 'F')
+  call geo_prs%CreateRealArrayOption('mirror_point', &
+               'Center point of mirror plane, (x, y, z)', &
+               '(/0.0, 0.0, 0.0/)')
+  call geo_prs%CreateRealArrayOption('mirror_normal', &
+               'Normal of mirror plane, (xn, yn, zn)', &
+               '(/1.0, 0.0, 0.0/)')
   
   call geo_prs%CreateRealOption('traction', &
                'Traction of the rotor')
@@ -229,9 +239,13 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   mesh_file_type = getstr(geo_prs,'MeshFileType')
   !ref_tag        = getstr(geo_prs,'Reference_Tag')
 
-  mesh_reflection   = getlogical(geo_prs, 'mesh_reflection')
-  reflection_point  = getrealarray(geo_prs, 'reflection_point',3)
-  reflection_normal = getrealarray(geo_prs, 'reflection_normal',3)
+  mesh_symmetry   = getlogical(geo_prs, 'mesh_symmetry')
+  symmetry_point  = getrealarray(geo_prs, 'symmetry_point',3)
+  symmetry_normal = getrealarray(geo_prs, 'symmetry_normal',3)
+
+  mesh_mirror   = getlogical(geo_prs, 'mesh_mirror')
+  mirror_point  = getrealarray(geo_prs, 'mirror_point',3)
+  mirror_normal = getrealarray(geo_prs, 'mirror_normal',3)
 
   comp_el_type = getstr(geo_prs,'ElType')
   ElType = comp_el_type(1:1)
@@ -389,6 +403,13 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       ! nelems_span_tot will be overwritten if symmetry is required (around l.220)
       nelems_span_tot =   nelems_span
 
+      ! correction of the following list, if symmetry is required ---------
+      if ( mesh_symmetry ) then
+        call symmetry_update_ll_lists( nelem_span_list , &
+                       theta_p , chord_p , i_airfoil_e , normalised_coord_e )
+      end if
+      ! -------------------------------------------------------------------
+
       call write_hdf5(airfoil_list   ,'airfoil_list'   ,geo_loc)
       call write_hdf5(nelem_span_list,'nelem_span_list',geo_loc)
       call write_hdf5(theta_p,'theta_p',geo_loc)
@@ -409,26 +430,28 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   end select
 
-  ! reflect the mesh (if requested)
-  write(*,*) 'mesh_reflection' , mesh_reflection
-  if ( mesh_reflection ) then
+  ! ==== SYMMETRY ==== only half of the component has been defined 
+  write(*,*) 'mesh_symmetry   : ' , mesh_symmetry
+  write(*,*) 'symmetry_point  : ' , symmetry_point
+  write(*,*) 'symmetry_normal : ' , symmetry_normal
+  if ( mesh_symmetry ) then
     select case (trim(mesh_file_type))
       case('cgns', 'basic' )  ! TODO: check basic
-        call reflect_mesh(ee, rr, reflection_point, reflection_normal)
+        call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
       case('parametric')
-!! !       if ( ElType .ne. 'l' ) then
-          call reflect_mesh_structured(ee, rr,  &
+!! !    if ( ElType .ne. 'l' ) then
+        call symmetry_mesh_structured(ee, rr,  &
                                        npoints_chord_tot , nelems_span , &
-                                       reflection_point, reflection_normal)
+                                       symmetry_point, symmetry_normal)
           nelems_span_tot = 2*nelems_span
 
 !! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !!
 !! Same routines used for all parametric elements: p,v,l        !!
 !! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !!
 !! !       else ! LIFTING LINE element
-!! !         call reflect_mesh_structured(ee, rr,  &
+!! !         call symmetry_mesh_structured(ee, rr,  &
 !! !                                      npoints_chord_tot , nelems_span , &
-!! !                                      reflection_point, reflection_normal)
+!! !                                      symmetry_point, symmetry_normal)
 !! !         nelems_span_tot = 2*nelems_span
 !! !       end if
       case default
@@ -447,6 +470,26 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   end if
 
+  ! ==== MIRROR ==== the component is mirrored w.r.t. the defined point and plane 
+  write(*,*) 'mesh_mirror   : ' , mesh_mirror  
+  write(*,*) 'mirror_point  : ' , mirror_point
+  write(*,*) 'mirror_normal : ' , mirror_normal
+  if ( mesh_mirror ) then
+
+    select case (trim(mesh_file_type))
+      case('cgns', 'basic' )  ! TODO: check basic
+        call mirror_mesh(ee, rr, mirror_point, mirror_normal)
+      case('parametric')
+!! !     if ( ElType .ne. 'l' ) then
+        call mirror_mesh_structured(ee, rr,  &
+                                       npoints_chord_tot , nelems_span , &
+                                       mirror_point, mirror_normal)
+      case default
+       call error(this_sub_name, this_mod_name,&
+             'Symmetry routines not implemented for this kind of input.')
+    end select
+
+  end if
 
   call write_hdf5(rr,'rr',geo_loc)
   call write_hdf5(ee,'ee',geo_loc)
@@ -512,7 +555,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 !!       else
 !!         call build_connectivity_parametric( trim(mesh_file) , ee ,     &
 !!                       ElType , npoints_chord_tot , nelems_span_tot , &
-!!                       mesh_reflection , neigh )
+!!                       mesh_symmetry , neigh )
 !!         call build_te_parametric( ee , rr , ElType ,  &
 !!            npoints_chord_tot , nelems_span_tot , &
 !!            e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
@@ -551,13 +594,20 @@ end subroutine build_component
 
 !----------------------------------------------------------------------
 
+!----------------------------------------------------------------------
+!----------------------------------------------------------------------
+! routines : symmetry_mesh                 , 
+!            symmetry_mesh_structured      ,
+!----------------------------------------------------------------------
+!----------------------------------------------------------------------
+
 !> Subroutine used to double the mesh by reflecting it along a simmetry 
 !! plane
 !!
 !! Given a plane defined by a center point and a normal vector, the mesh 
 !! is doubled: all the points are reflected and new mirrored elements 
 !! introduced. The elements and points arrays are doubled. 
-subroutine reflect_mesh(ee, rr, cent, norm)
+subroutine symmetry_mesh(ee, rr, cent, norm)
  integer, allocatable, intent(inout) :: ee(:,:)
  real(wp), allocatable, intent(inout) :: rr(:,:)
  real(wp), intent(in) :: cent(3), norm(3)
@@ -567,6 +617,8 @@ subroutine reflect_mesh(ee, rr, cent, norm)
  real(wp), allocatable :: rr_temp(:,:)
  integer :: ip, np, ne
  integer :: ie, iv, nv
+
+ character(len=*), parameter :: this_sub_name = 'symmetry_mesh'
 
   ne = size(ee,2); np = size(rr,2)
   
@@ -603,7 +655,7 @@ subroutine reflect_mesh(ee, rr, cent, norm)
   call move_alloc(rr_temp, rr)
   call move_alloc(ee_temp, ee)
 
-end subroutine reflect_mesh
+end subroutine symmetry_mesh
 
 !----------------------------------------------------------------------
 
@@ -613,7 +665,7 @@ end subroutine reflect_mesh
 !! Given a plane defined by a center point and a normal vector, the mesh 
 !! is doubled: all the points are reflected and new mirrored elements 
 !! introduced. The elements and points arrays are doubled.
-subroutine reflect_mesh_structured( ee, rr, &
+subroutine symmetry_mesh_structured( ee, rr, &
               npoints_chord_tot , nelems_span , cent, norm )
  integer, allocatable, intent(inout) :: ee(:,:)
  real(wp), allocatable, intent(inout) :: rr(:,:)
@@ -632,7 +684,7 @@ subroutine reflect_mesh_structured( ee, rr, &
  real(wp), parameter :: eps = 1e-6_wp ! TODO: move it as an input
  integer :: imabs, i1, nsew
 
- character(len=*), parameter :: this_sub_name = 'reflect_mesh_structured'
+ character(len=*), parameter :: this_sub_name = 'symmetry_mesh_structured'
 
  ! some checks ---------------------------------
  mabs = 0.0_wp
@@ -747,7 +799,142 @@ subroutine reflect_mesh_structured( ee, rr, &
 
   if ( allocated(ee_temp) )  deallocate(ee_temp)
 
-end subroutine reflect_mesh_structured
+end subroutine symmetry_mesh_structured
+
+!----------------------------------------------------------------------
+!----------------------------------------------------------------------
+! routines : mirror_mesh                   , 
+!            mirror_mesh_structured        ,
+!----------------------------------------------------------------------
+!----------------------------------------------------------------------
+
+subroutine mirror_mesh(ee, rr, cent, norm)
+ integer, allocatable, intent(inout) :: ee(:,:)
+ real(wp), allocatable, intent(inout) :: rr(:,:)
+ real(wp), intent(in) :: cent(3), norm(3)
+
+ real(wp) :: n(3), d, l
+ integer, allocatable :: ee_temp(:,:)
+ real(wp), allocatable :: rr_temp(:,:)
+ integer :: ip, np, ne
+ integer :: ie, iv, nv
+
+ character(len=*), parameter :: this_sub_name = 'mirror_mesh'
+
+  ne = size(ee,2); np = size(rr,2)
+  
+  ! enlarge size
+  allocate(ee_temp(size(ee,1),ne)) ; ee_temp = 0  
+  allocate(rr_temp(size(rr,1),np)) ; rr_temp = rr
+ 
+  !second part of the elements: index incremented, need to rearrange the 
+  !connectivity to preserve the normal
+  do ie = 1,ne
+    nv = count(ee(:,ie).ne.0)
+    ee_temp(1,ie) = ee(1,ie)
+    do iv = 2,nv
+      ee_temp(iv,ie) = ee(nv-iv+2,ie)
+    enddo
+  enddo
+ 
+  !calculate normal unit vector and distance from origin
+  n = norm/norm2(norm) 
+  l = sum(cent * n)
+ 
+  !now reflect the points
+  do ip=1,np
+    d = sum( rr(:,ip) * n) - l 
+    rr_temp(:,ip) = rr_temp(:,ip) - 2*d*n
+  enddo
+
+  !move alloc back to the original vectors
+  call move_alloc(rr_temp, rr)
+  call move_alloc(ee_temp, ee)
+
+
+end subroutine mirror_mesh
+
+!----------------------------------------------------------------------
+
+subroutine mirror_mesh_structured( ee, rr, &
+              npoints_chord_tot , nelems_span , cent, norm )
+ integer, allocatable, intent(inout) :: ee(:,:)
+ real(wp), allocatable, intent(inout) :: rr(:,:)
+ real(wp), intent(in) :: cent(3), norm(3)
+ integer , intent(in) :: npoints_chord_tot , nelems_span ! <- unused input
+
+ integer :: nelems_chord
+ real(wp) :: n(3), d, l
+ integer , allocatable :: ee_temp(:,:) , ee_sort(:,:)
+ real(wp), allocatable :: rr_temp(:,:)
+ integer :: ip, np, ne
+ integer :: ie, nv
+ ! some checks  and warnings -----
+ real(wp) :: mabs  , m
+ real(wp) :: minmaxPn 
+ real(wp), parameter :: eps = 1e-6_wp ! TODO: move it as an input
+ integer :: imabs, i1, nsew
+
+ character(len=*), parameter :: this_sub_name = 'mirror_mesh_structured'
+
+ ! no check on sewing: the component is only mirrored,
+ ! and the user must be carefully define it
+
+  ne = size(ee,2); np = size(rr,2)
+  
+  ! enlarge size
+  allocate(ee_temp(size(ee,1),ne))
+  allocate(rr_temp(size(rr,1),np))
+
+  !first part equal
+  ee_temp(:,1:ne) = 0 
+  rr_temp(:,1:np) = rr
+  
+  !second part of the elements: index incremented, need to rearrange the 
+  !connectivity to preserve the normal
+  do ie = 1,ne
+    nv = count(ee(:,ie).ne.0)
+    ! Quad elements only for structured meshes
+    ee_temp(1,ie) = ee(2,ie)
+    ee_temp(2,ie) = ee(1,ie)
+    ee_temp(3,ie) = ee(4,ie)
+    ee_temp(4,ie) = ee(3,ie)
+  enddo
+! ! correct the first elements ----- 
+! ee_temp(1,ne+(/(i1,i1=1,npoints_chord_tot-1)/)) = (/(i1,i1=1,npoints_chord_tot-1)/)
+! ee_temp(4,ne+(/(i1,i1=1,npoints_chord_tot-1)/)) = (/(i1,i1=2,npoints_chord_tot  )/)
+ 
+  !calculate normal unit vector and distance from origin
+  n = norm/norm2(norm) 
+  l = sum(cent * n)
+ 
+  !now reflect the points
+  do ip=1,np  
+    d = sum( rr(:,ip) * n) - l 
+    rr_temp(:,ip) = rr_temp(:,ip) - 2*d*n
+  enddo
+
+  ! sort ee array  
+  nelems_chord = npoints_chord_tot-1
+  allocate(ee_sort(size(ee_temp,1),size(ee_temp,2)) ) ; ee_sort = 0
+  do i1 = 1 , nelems_span
+    ee_sort(:,1+(i1-1)*nelems_chord:i1*nelems_chord) = &
+       ee_temp(:,ne-i1*nelems_chord+1:ne-(i1-1)*nelems_chord)
+  end do
+! do i1 = 1 , nelems_span
+!   ee_sort(:,1+(i1-1)*nelems_chord+ne:i1*nelems_chord+ne) = &
+!      ee_temp(:,1+(i1-1)*nelems_chord:i1*nelems_chord)
+! end do
+
+! !move alloc back to the original vectors
+  call move_alloc(rr_temp, rr)
+  call move_alloc(ee_sort, ee)
+
+
+  if ( allocated(ee_temp) )  deallocate(ee_temp)
+
+
+end subroutine mirror_mesh_structured
 
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
@@ -1413,6 +1600,71 @@ subroutine build_te_parametric ( ee , rr , ElType , &
 
 
 end subroutine build_te_parametric
+
+!----------------------------------------------------------------------
+subroutine symmetry_update_ll_lists ( nelem_span_list , &
+                 theta_p , chord_p , i_airfoil_e , normalised_coord_e )
+
+ integer , allocatable , intent(inout) :: nelem_span_list(:)
+ integer , allocatable , intent(inout) :: i_airfoil_e(:,:)
+ real(wp), allocatable , intent(inout) :: normalised_coord_e(:,:)
+ real(wp), allocatable , intent(inout) :: theta_p(:) , chord_p(:)
+
+ integer , allocatable :: nelem_span_list_tmp(:)
+ integer , allocatable :: i_airfoil_e_tmp(:,:)
+ real(wp), allocatable :: normalised_coord_e_tmp(:,:)
+ real(wp), allocatable :: theta_p_tmp(:) , chord_p_tmp(:)
+
+ integer :: nelem_span_section
+ integer :: nelem
+ integer :: npts   ! nelem + 1 
+
+ integer :: i , siz
+
+ ! Update dimensions ---------- 
+ nelem_span_section = size(nelem_span_list) * 2 
+ nelem = size(i_airfoil_e,2) * 2 
+ npts  = size(i_airfoil_e,2) * 2 + 1 
+
+ ! Fill temporary arrays ------
+ allocate(nelem_span_list_tmp( nelem_span_section ))
+ siz = size(nelem_span_list)
+ do i = 1 , siz 
+   nelem_span_list_tmp( siz+i   ) = nelem_span_list(i)
+   nelem_span_list_tmp( siz-i+1 ) = nelem_span_list(i)
+ end do 
+
+ allocate(i_airfoil_e_tmp( 2, nelem ))
+ siz = size(i_airfoil_e,2)
+ do i = 1 , siz
+   i_airfoil_e_tmp( 1:2 , siz+i   ) = i_airfoil_e( 1:2    , i )
+   i_airfoil_e_tmp( 1:2 , siz-i+1 ) = i_airfoil_e( 2:1:-1 , i )
+ end do
+
+ allocate(normalised_coord_e_tmp( 2, nelem ))
+ siz = size(normalised_coord_e,2)
+ do i = 1 , siz
+   normalised_coord_e_tmp( 1:2 , siz+i   ) = normalised_coord_e( 1:2    , i )
+   normalised_coord_e_tmp( 1:2 , siz-i+1 ) = 1.0_wp - normalised_coord_e( 2:1:-1 , i )
+ end do
+
+ allocate(theta_p_tmp( npts ))
+ allocate(chord_p_tmp( npts ))
+ siz = size(theta_p)
+ theta_p_tmp( siz ) = theta_p(1) ; chord_p_tmp( siz ) = chord_p(1)
+ do i = 2 , siz
+   theta_p_tmp( siz+i-1 ) = theta_p( i ) ; chord_p_tmp( siz+i-1 ) = chord_p( i )
+   theta_p_tmp( siz-i+1 ) = theta_p( i ) ; chord_p_tmp( siz-i+1 ) = chord_p( i )
+ end do
+
+ ! Move_alloc to the original arrays -------------------------
+ call move_alloc(    nelem_span_list_tmp ,     nelem_span_list ) 
+ call move_alloc(        i_airfoil_e_tmp ,         i_airfoil_e )
+ call move_alloc( normalised_coord_e_tmp ,  normalised_coord_e )
+ call move_alloc(            theta_p_tmp ,             theta_p )
+ call move_alloc(            chord_p_tmp ,             chord_p )
+
+end subroutine symmetry_update_ll_lists 
 
 !----------------------------------------------------------------------
 ! subroutines :
