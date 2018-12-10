@@ -1338,6 +1338,8 @@ subroutine check_references(refs)
  type(t_ref), intent(inout) :: refs(0:)
 
  !TODO:TODO:TODO:
+ !TODO:TODO:TODO:
+ !TODO:TODO:TODO:
  !check that the orientation is orthogonal
 
  !chech that the orientation is unitarian, otherwise normalize
@@ -1424,10 +1426,6 @@ subroutine reference_update_self(this, t, R_par, of_par, R_loc, of_loc, &
  real(wp) :: R_01_t(3,3)   , R_10_0(3,3)
  real(wp) :: Omega_vec(3,3)
 
- ! debug ----
- integer :: i
- ! debug ----
-
  character(len=*), parameter :: this_sub_name = 'reference_update_self'
 
   if (.not.this%self_moving) then 
@@ -1441,18 +1439,6 @@ subroutine reference_update_self(this, t, R_par, of_par, R_loc, of_loc, &
     angVel_loc = 0.0_wp
 
   else
-
-!   ! debug ----
-!   write(*,*) ' this%tag : ' , trim(this%tag)
-!   write(*,*) ' this%rot_tim , this%rot_pos , this%rot_vel : '
-!   do i = 1 , size(this%rot_tim)
-!     write(*,*) this%rot_tim(i) , '  ' , this%rot_pos(i) , '  ' , this%rot_vel(i)
-!   end do 
-!   write(*,*) ' this%pol_tim , this%pol_pos , this%pol_vel : ' 
-!   do i = 1 , size(this%rot_tim)
-!     write(*,*) this%rot_tim(i) , '  ' , this%pol_pos(:,i) , '  ' , this%pol_vel(:,i)
-!   end do 
-!   ! debug ----
 
     ! Actual rotation angle
     call linear_interp( this%rot_pos, this%rot_tim , t , Psi )
@@ -1560,7 +1546,7 @@ subroutine update_relative_initial_conditions (restart_file, ref_file , refs )
  real(wp) :: relative_pos_0(3)
  real(wp) :: relative_rot_0
 
- integer :: iref , nref , idref
+ integer :: iref
  integer :: i , it , nref_ref_in
 
  character(len=*), parameter :: this_sub_name = 'update_relative_initial_conditions'

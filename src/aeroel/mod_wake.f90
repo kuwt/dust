@@ -629,8 +629,9 @@ subroutine prepare_wake(wake, geo, sim_param)
             endif
             wake%wake_parts(ip)%cen = pos_p
 
-          	wake%wake_parts(ip)%vel = 0.5_wp * ( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
-                                               wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
+            wake%wake_parts(ip)%vel = 0.5_wp * &
+                             ( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
+                               wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
             exit
           endif
         enddo
@@ -995,7 +996,6 @@ subroutine update_wake(wake, elems, octree, sim_param)
  type(t_pot_elem_p), allocatable :: pan_p_temp(:)
  real(wp), allocatable :: point_old(:,:,:)
  real(wp), allocatable :: points(:,:,:)
- real(wp), allocatable, target :: vel_prt(:,:)
  real(wp), allocatable, target :: vortevol_prt(:,:)
  logical :: increase_wake
  integer :: size_old
@@ -1450,18 +1450,17 @@ subroutine avoid_collision(elems, wake, part, sim_param, vel)
  real(wp), intent(inout) :: vel(3)
 
  integer :: ie
- real(wp) :: v(3)
  real(wp) :: dist(3), n(3)
  real(wp) :: pos(3)
- real(wp) :: distn, distnor, damp, normvel
+ real(wp) :: distn, distnor, normvel
  real(wp) :: damp_radius, cont, rad_mult, k
 
  !damp_radius = 0.3
- cont = 0.95
+ cont = 0.95_wp
  !cont = 1.0
- rad_mult = 1.3
+ rad_mult = 1.3_wp
  pos = part%cen
- k = 0.85
+ k = 0.85_wp
  
 
   !calculate the influence of the solid bodies

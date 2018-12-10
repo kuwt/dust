@@ -523,8 +523,8 @@ subroutine naca5digits(airfoil_name, nelem_chord,&
 
  real(wp), allocatable :: points_upper(:,:), points_lower(:,:)
 
- integer :: mm, pp, ss, iPoint, L, Q, P
- real(wp) :: m,s, xa, ml, theta, thickness, mult, r, k1
+ integer :: ss, iPoint, L, Q, P
+ real(wp) :: s, xa, ml, theta, thickness, mult, r, k1
  character :: str1
  character(len=2) :: str2
  integer :: ierr

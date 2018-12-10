@@ -110,7 +110,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
  real(wp) :: uinf(3)
  real(wp) :: rhoinf , Pinf
 
- integer :: ie , ie2 , ntot
+ integer :: ie, ntot
  
 
   ! Free-stream conditions
@@ -249,14 +249,8 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
  real(wp) :: rhoinf , Pinf
 
  integer :: ie, nst, ntot 
- integer :: iete , ind1 , ind2 , ista , iend
- real(wp) :: a , b
  integer :: ip , iw , is , inext , p1 , p2
  integer :: ipp(4) , iww(4)
-
-  ! debug ----
-  real(wp) :: min_dist , max_p_mag , max_p_vel
-  ! debug ----
 
  ! Free-stream conditions
  uinf   = sim_param%u_inf
@@ -334,7 +328,6 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
   !     %build_row routines above
   ! do nothing here
   ! (c) rotational effects (up to now, ignoring ring wakes)
-  min_dist = 100.0_wp
  
   do ie = 1 , geo%nSurfpan
     ! (c.1) particles ( part_p )

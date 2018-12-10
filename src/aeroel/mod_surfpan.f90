@@ -791,7 +791,7 @@ subroutine create_local_velocity_stencil_surfpan (this)
  real(wp) :: bubble_surf
  integer  :: i_v
 
- real(wp) :: n_vect(3)
+ !real(wp) :: n_vect(3)
         
   if ( .not. allocated(this%pot_vel_stencil) ) then
     allocate(this%pot_vel_stencil(3,this%n_ver) )

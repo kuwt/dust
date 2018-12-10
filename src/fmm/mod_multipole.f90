@@ -154,7 +154,7 @@ end type
 
 logical :: multipole_use_vs
 character(len=*), parameter :: this_mod_name='mod_multipole'
-character(len=max_char_len) :: msg
+!character(len=max_char_len) :: msg
 
 !----------------------------------------------------------------------
 contains
@@ -246,7 +246,7 @@ subroutine M2M_multipole(this, cen, child, child_cen, pexp)
       s = pexp%idx(is,js,ks)
 
       this%a(:,m) = this%a(:,m) + &
-      pexp%nbinom(idx,(/is,js,ks/))* &
+      real(pexp%nbinom(idx,(/is,js,ks/)),wp)* &
       product((child_cen-cen)**(idx-(/is, js, ks/)))*child%a(:,s)
 
     enddo; enddo; enddo
@@ -277,9 +277,9 @@ subroutine M2L_multipole(this, ker_der, pexp, pexp_der, multipol_int)
       idx = pexp%pwr(:,m)+pexp%pwr(:,n)
       idx_der = pexp_der%idx(idx(1),idx(2),idx(3))
 
-      mult = pexp_der%nfact(idx(1),idx(2),idx(3))/( &
+      mult = real(pexp_der%nfact(idx(1),idx(2),idx(3)),wp)/real( &
                 pexp%nfact(pexp%pwr(1,m),pexp%pwr(2,m),pexp%pwr(3,m))*&
-                pexp%nfact(pexp%pwr(1,n),pexp%pwr(2,n),pexp%pwr(3,n)))
+                pexp%nfact(pexp%pwr(1,n),pexp%pwr(2,n),pexp%pwr(3,n)),wp)
       
       sum_v = sum_v + mult * cross(ker_der%D(:,idx_der), multipol_int%a(:,n))
       
@@ -328,7 +328,7 @@ subroutine L2L_multipole(this, cen, parent, parent_cen, pexp)
     do ks = idx(3),pexp%degree; do js = idx(2),pexp%degree-ks; do is = idx(1),pexp%degree-ks-js
       s = pexp%idx(is,js,ks)
 
-      mult = pexp%nbinom((/is,js,ks/),idx)* &
+      mult = real(pexp%nbinom((/is,js,ks/),idx),wp)* &
           product((cen-parent_cen)**((/is, js, ks/) - idx))
 
       this%b(:,m) = this%b(:,m) + mult*parent%b(:,s)
@@ -454,7 +454,7 @@ function nbinom_polyexp(this, m, s) result(nbinom)
  integer, intent(in) :: m(3), s(3)
 
  integer :: nbinom
- integer :: i, d
+ integer :: d
 
   nbinom = 1
   do d=1,3
@@ -473,7 +473,7 @@ function nfact_polyexp(this, m) result(nfact)
  integer, intent(in) :: m(3)
 
  integer :: nfact
- integer :: i, d
+ integer :: d
 
   nfact = 1
   do d=1,3

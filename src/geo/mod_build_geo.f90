@@ -461,9 +461,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   end if
 
   if ( trim(mesh_file_type) .eq. 'parametric' ) then
-    !DEBUG
-    write(*,*) ' +++ nelems_span_tot : ' , nelems_span_tot
-    write(*,*) ' +++ nelems_chor_tot : ' , npoints_chord_tot - 1
     !write HDF5 fields
     call write_hdf5(  nelems_span_tot  ,'parametric_nelems_span',geo_loc)
     call write_hdf5(npoints_chord_tot-1,'parametric_nelems_chor',geo_loc)
@@ -870,10 +867,8 @@ subroutine mirror_mesh_structured( ee, rr, &
  integer :: ip, np, ne
  integer :: ie, nv
  ! some checks  and warnings -----
- real(wp) :: mabs  , m
- real(wp) :: minmaxPn 
  real(wp), parameter :: eps = 1e-6_wp ! TODO: move it as an input
- integer :: imabs, i1, nsew
+ integer :: i1
 
  character(len=*), parameter :: this_sub_name = 'mirror_mesh_structured'
 
@@ -994,12 +989,6 @@ subroutine build_connectivity_general ( ee , neigh )
                neigh(iv1,ie1) = ie2
                neigh(iv2,ie2) = ie1
              else
-               ! debug -----         
-               write(*,*) ' elements ie1 , ie2 ' , ie1 , ie2 
-               write(*,*) ' vertices ie1 :     ' , ee(:,ie1) 
-               write(*,*) ' vertices ie2 :     ' , ee(:,ie2) 
-               write(*,*) ' vert1 , vert2:     ' , vert1 , vert2
-               ! debug -----          
                call error(this_sub_name, this_mod_name, &
                  'Neighbouring elements with opposed normal orientation,&
                  &this is not allowed. Stop')
@@ -1456,9 +1445,6 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
      if ( te_proj_logical ) then
        t_te(:,i_n) = t_te(:,i_n) - sum(t_te(:,i_n)*side_dir) * side_dir
      end if
-
-     !debug
-     write(*,*) ' proj_te normal : ' , t_te(:,i_n)
 
    elseif ( trim(te_proj_dir) .eq. 'parallel' ) then
    

@@ -122,7 +122,7 @@ subroutine compute_vel_vortpart (this, pos, uinf, vel)
  real(wp), intent(out) :: vel(3)
 
  real(wp) :: vvort(3)
- real(wp) :: dist(3), distn
+ real(wp) :: dist(3)!, distn
 
 
   dist = pos-this%cen
