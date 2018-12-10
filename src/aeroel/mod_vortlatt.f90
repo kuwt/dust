@@ -93,8 +93,6 @@ procedure, pass(this) :: calc_geo_data    => calc_geo_data_vortlatt
 procedure, pass(this) :: get_vort_vel     => get_vort_vel_vortlatt
 end type
 
-!   procedure, pass(this) :: correct_pressure_kutta => &
-!                            correct_pressure_kutta_surfpan
 
 character(len=*), parameter :: this_mod_name='mod_vortlatt'
 
@@ -473,12 +471,6 @@ subroutine calc_geo_data_vortlatt(this, vert)
     nor = cross( this%ver(:,3) - this%ver(:,2) , &
                  this%ver(:,1) - this%ver(:,2)     )
   end if
-
-! !debug
-! write(*,*) ' nsides : ' , nsides, ' this%vert :'
-! do is = 1 , nsides
-!   write(*,*) this%ver(:,is)
-! end do
 
   this%area = 0.5_wp * norm2(nor)
   this%nor = nor / norm2(nor)

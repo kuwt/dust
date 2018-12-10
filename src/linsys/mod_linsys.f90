@@ -318,14 +318,6 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
   end do
   
   ! rhs: ....
-  ! debug -----
-! write(*,*) '           b_motion                    b_infty '
-! do ie = 1 , geo%nSurfPan
-!   write(*,*) ie , '  ' , linsys%b_pres(ie) , '  ' , &
-!                          4*pi * ( Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp )
-! end do
-! write(*,*)
-! ! debug -----
 
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !
   ! Assemble the RHS of the linear system for the Bernoulli polynomial     !
@@ -340,12 +332,6 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
   !     %build_row routines above
   ! do nothing here
   ! (c) rotational effects (up to now, ignoring ring wakes)
-
-! ! debug ----
-! write(*,*) ' wake%n_prt : ' , wake%n_prt
-! write(*,*) ' geo%nSurfpan : ' , geo%nSurfpan
-! write(*,*) ' shape( wake%part_p ) : ' , shape( wake%part_p )
-  ! debug ---- 
   min_dist = 100.0_wp
  
   do ie = 1 , geo%nSurfpan
@@ -358,35 +344,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
  
           linsys%b_pres(ie) = linsys%b_pres(ie) + &
             sum( dist * cross( wake%part_p(iw)%p%dir , wake%part_p(iw)%p%vel ) ) * &
-                 wake%part_p(iw)%p%mag / ( norm2(dist)**3.0_wp )
-
-!         ! debug ----
-!         if ( isnan(linsys%b_pres(ie)) ) then
-!           write(*,*)
-!           write(*,*) ' ie , iw , shape(wake%part_p) : ' , ie , iw , '   ' , shape(wake%part_p)
-!           write(*,*) ' wake%part_p(iw)%p%cen : ' , wake%part_p(iw)%p%cen
-!           write(*,*) ' geo%idSurfpan(ie) : ' , geo%idSurfpan(ie)
-!           write(*,*) ' elems( geo%idSurfpan(ie) )%p%cen : ', elems( geo%idSurfpan(ie) )%p%cen 
-!           write(*,*) ' dist : ' , dist
-!           write(*,*) ' wake%part_p(iw)%p%dir : ' , wake%part_p(iw)%p%dir
-!           write(*,*) ' wake%part_p(iw)%p%mag : ' , wake%part_p(iw)%p%mag
-!           write(*,*) ' associated(wake%part_p(iw)%p) : ' , associated(wake%part_p(iw)%p)
-!           write(*,*) ' wake%part_p(iw)%p%vel : ' , wake%part_p(iw)%p%vel
-!           write(*,*) ' wake%part_p(iw)%p%vel * 2.0_wp : ' , wake%part_p(iw)%p%vel * 2.0_wp
-!           write(*,*)
-!           write(*,*) ' stop mod_linsys.f90 l.373 ' 
-!           stop
-!         end if 
-!         ! debug ----
-!         ! old ----
-!         linsys%b_pres(ie) = linsys%b_pres(ie) + &
-!           sum( dist * cross( wake%part_p(iw)%p%dir , wake%prt_vel(:,iw) ) ) * &
-!                wake%part_p(iw)%p%mag / ( norm2(dist)**3.0_wp )
-!         ! old ----
-
-!         ! debug ----
-!         if ( norm2(dist) .lt. min_dist ) min_dist = norm2(dist)
-!         ! debug ----
+                 wake%part_p(iw)%p%mag / ( norm2(dist)**3.0_wp ) 
 
         end if
       end do 
@@ -413,14 +371,6 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
         iww = (/ p1 , p2 , p2  , p1   /)
  
         do is = 1 , wake%wake_panels(iw,ip)%n_ver ! do is = 1 , 4 
-!         ! debug ----
-!         if ( ( ie .eq. 1 ) .and. ( iw .eq. 1 ) .and. ( iw2 .eq. 1 ) ) then
-!           write(*,*) ' wake%wake_panels(1,1)%ver(:,:) : ' 
-!           write(*,*) wake%wake_panels(1,1)%ver(1,:)
-!           write(*,*) wake%wake_panels(1,1)%ver(2,:)
-!           write(*,*) wake%wake_panels(1,1)%ver(3,:)
-!         end if
-!         ! debug ----
           
           inext = mod(is,wake%wake_panels(iw,ip)%n_ver) + 1 
           dist  = wake%wake_panels(iw,ip)%ver(:,is   ) - elems( geo%idSurfpan(ie) )%p%cen 
@@ -449,32 +399,12 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
 
   end do
 
-! ! debug ----
-  max_p_mag = 0.0_wp
-  max_p_vel = 0.0_wp
-! write(*,*) ' shape(wake%prt_vel) : ' , shape(wake%prt_vel)
-  write(*,*) ' shape(wake%part_p ) : ' , shape(wake%part_p )
-  do iw = 1 , size(wake%part_p)
-    if ( abs(wake%part_p(iw)%p%mag) .gt. max_p_mag ) max_p_mag = abs(wake%part_p(iw)%p%mag)
-    if ( norm2(wake%part_p(iw)%p%vel) .gt. max_p_vel ) max_p_vel = norm2(wake%part_p(iw)%p%vel)
-  end do
- 
-  write(*,*) ' min_dist = ' , min_dist
-  write(*,*) ' max_p_mag= ' , max_p_mag
-  write(*,*) ' max_p_vel= ' , max_p_vel
-! ! debug ----
-
   ! (a) far field contribution
   linsys%b_pres = linsys%b_pres + &
                     4*pi * ( Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp ) ! H_inf
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !
   ! END Assemble the RHS of the linear system for the Bernoulli polynomial !
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !
-
-! debug ----
-! write(*,*) ' H_inf = ' , &
-!       Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp 
-! debug ----
 
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++
 
@@ -517,9 +447,6 @@ subroutine solve_linsys(linsys)
                   INFO
     call error(this_sub_name, this_mod_name, trim(msg))
   end if
-
-  !elapsed_time = DBLE( count2 - count1 ) / DBLE( count_rate1 )
-  !write(*,*) ' done. Elapsed time : ' , elapsed_time 
 
   deallocate(A_tmp,IPIV) 
 
@@ -568,9 +495,6 @@ subroutine solve_linsys_pressure(linsys,res)
                   INFO
     call error(this_sub_name, this_mod_name, trim(msg))
   end if
-
-  !elapsed_time = DBLE( count2 - count1 ) / DBLE( count_rate1 )
-  !write(*,*) ' done. Elapsed time : ' , elapsed_time 
 
   deallocate(A_tmp,IPIV) 
 

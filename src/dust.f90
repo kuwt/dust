@@ -279,6 +279,8 @@ call prms%CreateRealOption( 'DoubletThreshold', &
       "Thresold for considering the point in plane in doublets", '1.0e-6')
 call prms%CreateRealOption( 'RankineRad', &
       "Radius of Rankine correction for vortex induction near core", '0.1')
+call prms%CreateRealOption( 'VortexRad', &
+      "Radius of vortex core, for particles", '0.1')
 call prms%CreateRealOption( 'CutoffRad', &
       "Radius of complete cutoff  for vortex induction near core", '0.001')
 
@@ -294,7 +296,19 @@ call prms%CreateIntOption('NOctreeLevels','number of octree levels')
 call prms%CreateIntOption('MinOctreePart','minimum number of octree &
                                                              &particles')
 call prms%CreateIntOption('MultipoleDegree','multipole expansion degree')
+call prms%CreateLogicalOption('DynLayers','Use dynamic layers','F')
+call prms%CreateIntOption('NMaxOctreeLevels','maximum number &
+                                                          &of octree levels')
+call prms%CreateRealOption('LeavesTimeRatio','Ratio that triggers the &
+                                          &increase of the number of levels')
+
+! models options
 call prms%CreateLogicalOption('Vortstretch','Employ vortex stretching','T')
+call prms%CreateLogicalOption('Diffusion','Employ vorticity diffusion','T')
+call prms%CreateLogicalOption('PenetrationAvoidance','Employ penetration &
+                                                              & avoidance','F')
+call prms%CreateLogicalOption('ViscosityEffects','Simulate viscosity &
+                                                              & effects','F')
 
 
 ! get the parameters and print them out
@@ -324,6 +338,7 @@ else
 end if
 sim_param%a_inf  = getreal(prms,'a_inf')
 sim_param%mu_inf = getreal(prms,'mu_inf')
+sim_param%nu_inf = sim_param%mu_inf/sim_param%rho_inf
 !Wake parameters
 sim_param%n_wake_panels = getint(prms, 'n_wake_panels')
 sim_param%n_wake_particles = getint(prms, 'n_wake_particles')
@@ -350,10 +365,14 @@ sim_param%FarFieldRatioDoublet  = getreal(prms, 'FarFieldRatioDoublet')
 sim_param%FarFieldRatioSource  = getreal(prms, 'FarFieldRatioSource')
 sim_param%DoubletThreshold   = getreal(prms, 'DoubletThreshold')
 sim_param%RankineRad = getreal(prms, 'RankineRad')
+sim_param%VortexRad = getreal(prms, 'VortexRad')
 sim_param%CutoffRad  = getreal(prms, 'CutoffRad')
 sim_param%first_panel_scaling = getreal(prms,'ImplicitPanelScale')
 sim_param%min_vel_at_te  = getreal(prms,'ImplicitPanelMinVel')
 sim_param%use_vs = getlogical(prms, 'Vortstretch')
+sim_param%use_vd = getlogical(prms, 'Diffusion')
+sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
+sim_param%use_ve = getlogical(prms, 'ViscosityEffects')
 !Octree and FMM parameters
 sim_param%use_fmm = getlogical(prms, 'FMM')
 sim_param%BoxLength = getreal(prms, 'BoxLength')
@@ -363,13 +382,20 @@ sim_param%NOctreeLevels = getint(prms, 'NOctreeLevels')
 sim_param%MinOctreePart = getint(prms, 'MinOctreePart')
 sim_param%MultipoleDegree = getint(prms,'MultipoleDegree')
 
+sim_param%use_dyn_layers = getlogical(prms,'DynLayers')
+if(sim_param%use_dyn_layers) then
+  sim_param%NMaxOctreeLevels = getint(prms, 'NMaxOctreeLevels')
+  sim_param%LeavesTimeRatio = getreal(prms, 'LeavesTimeRatio')
+else
+  sim_param%NMaxOctreeLevels = sim_param%NOctreeLevels
+endif
 
 !-- Parameters Initializations --
 call initialize_doublet(sim_param%FarFieldRatioDoublet, &
                         sim_param%DoubletThreshold, sim_param%RankineRad, &
                         sim_param%CutoffRad);
 call initialize_vortline(sim_param%RankineRad, sim_param%CutoffRad);
-call initialize_vortpart(sim_param%RankineRad, sim_param%CutoffRad);
+call initialize_vortpart(sim_param%VortexRad, sim_param%CutoffRad);
 call initialize_surfpan(sim_param%FarFieldRatioSource);
 !reset the numbering for output files
 nout = 0
@@ -442,23 +468,6 @@ call create_geometry(sim_param%GeometryFile, sim_param%ReferenceFile, &
                      elems_ll, elems_tot, airfoil_data, sim_param, &
                      target_file, run_id)
 
-! debug -----
-! do it = 1 , geo%nelem_impl
-!   select type(el=>elems(it)%p) ; class is(t_surfpan)
-!     write(*,*) geo%idSurfPanG2L(it) , '    ' , el%surf_vel
-!   end select
-! end do
-! write(*,*) ' shape(geo%idSurfPanG2L) : ' , shape(geo%idSurfPanG2L)
-! do it = 1 , maxval(shape(geo%idSurfPanG2L))
-!   write(*,*) geo%idSurfPanG2L(it) 
-! end do
-! write(*,*) ' stop in dust.f90 around l.432 '
-! stop
-! ! write(*,*) ' geo%nstatic_impl    : ' , geo%nstatic_impl
-! ! write(*,*) ' geo%nstatic_SurfPan : ' , geo%nstatic_SurfPan
-! ! stop
-! debug -----
-
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Created geometry in: ' , t1 - t0,' s.'
@@ -487,27 +496,11 @@ call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
 call initialize_linsys(linsys, geo, elems, elems_expl, &
                        wake, sim_param ) ! sim_param%u_inf)
-
-! debug ---------------
-! write(*,*) ' shape(b_static     ) : ' , shape(linsys%b_static     )
-! write(*,*) ' shape(b_static_pres) : ' , shape(linsys%b_static_pres)
-! write(*,*) ' max(b_static     (:,:)) : ' , maxval(linsys%b_static(1:geo%nstatic_Surfpan,1:geo%nstatic_Surfpan)) 
-! write(*,*) ' max(b_static_pres(:,:)) : ' , maxval(linsys%b_static_pres)
-! write(*,*) ' max(diff(b_static(:,:)-b_static_pres)) : ' , & 
-!     maxval(linsys%b_static(1:geo%nstatic_Surfpan,1:geo%nstatic_Surfpan) - &
-!            linsys%b_static_pres(:,:) )
-! stop
-! debug ---------------
-
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Initialized linear system in: ' , t1 - t0,' s.'
   call printout(message)
 endif
-
-! debug Angular velocity -------
-write(*,*) ' size(geo%components) : ' , size(geo%components)
-! debug Angular velocity -------
 
 !===========EXPERIMENTAL PART, OCTREE========
 call printout(nl//'====== Initializing Octree ======')
@@ -545,44 +538,18 @@ call printout(message)
 time = sim_param%t0
 t_last_out = time; t_last_debug_out = time
 
-! debug Angular velocity -------
-! do i_comp = 1 , size(geo%components)
-!   fid = 50+i_comp
-!   write(str_comp,'(I4.4)') i_comp
-!   open(unit=fid,file='./angVel'//trim(str_comp))
-! end do
-! debug Angular velocity -------
-
 allocate(surf_vel_SurfPan_old(geo%nSurfpan,3)) ; surf_vel_SurfPan_old = 0.0_wp
 allocate(     nor_SurfPan_old(geo%nSurfpan,3)) ;      nor_SurfPan_old = 0.0_wp
 
 allocate(res_old(size(elems))) ; res_old = 0.0_wp
 
 t11 = dust_time()
-
-! debug ----
-! do i = 1 , size(geo%idSurfPanG2L)
-!   write(*,*) i , ': ' , geo%idSurfPanG2L(i)
-! end do
-! write(*,*) ' stop in dust.f90 at l.549 '
-! stop
-! debug ----
-
 do it = 1,nstep
-
-   write(*,*) ' shape(wake%prt_vel) ' , shape(wake%prt_vel)
-   write(*,*) ' wake%n_prt ' , wake%n_prt
-   write(*,*) ' === it = ', it,' ========== '
 
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
   ! compute the time derivative of the normal component of the velocity on 
   !  surfpan to be used in the source rhs of the Bernoulli integral equation.
   ! surf_vel_SurfPan_old saved at the end of the time step (for surfpan only)
-  ! write(*,*) ' debug l.545 dust.f90 '
-
-  ! debug ----
-  write(str_comp,'(I4.4)') it
-  open(unit=21,file='./file_debug/grad_div_'//trim(str_comp)//'.dat')
 
   do i_el = 1 , geo%nSurfPan
 
@@ -594,25 +561,13 @@ do it = 1,nstep
       el%dn_dt  = 0.0_wp 
 !                 ( el%nor - nor_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) &
 !                                                                   / sim_param%dt
-!     write(*,*) el%dUn_dt      ! debug ---
 
-!     ! debug ----
-!     if ( ( i_el .le. 3 ) .or. ( ( i_el .ge. 41 ) .and. ( i_el .le. 43 ) ) ) then
-!       write(*,*) ' stencil of elem n. ' , i_el 
-!       do i = 1 , el%n_ver
-!         write(*,*) el%pot_vel_stencil(:,i)
-!       end do
-!       write(*,*)
-!     end if
-!     ! debug ----
 
       ! Compute GradS_Un
       GradS_Un = 0.0_wp
       do i_e = 1 , el%n_ver
-!       write(*,*) ' id(',i_e,') , id(',i_el,') : , ' , el%id , associated(el%neigh(i_e)%p)
         if ( associated(el%neigh(i_e)%p) ) then !  .and. &
           select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
-!           write(*,*) ' associated , i_el , i_neigh : ' , i_el , i_e 
             GradS_Un = GradS_Un + &
                el%pot_vel_stencil(:,i_e) * ( &
                   sum(el%nor* (el_neigh%surf_vel - el%surf_vel) ) )                 ! <<<<< OK ?
@@ -620,10 +575,6 @@ do it = 1,nstep
 !              this%pot_vel_stencil(:,i_e) * (this%neigh(i_e)%p%mag - this%mag)
           end select
         else
-!         ! debug ----
-!         write(*,*) ' .not. associated , i_el , i_neigh : ' , i_el , i_e 
-!         write(*,*) ' non-associated in GRAD '
-!         ! debug ----
 !         select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
             GradS_Un = GradS_Un + &
                el%pot_vel_stencil(:,i_e) * ( &
@@ -644,7 +595,6 @@ do it = 1,nstep
           end select
         else  
 !         select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
-!           write(*,*) ' non-associated in DIV '
             DivS_U = DivS_U + &
                sum(   el%pot_vel_stencil(:,i_e) * &
                     ( - 2.0_wp * el%surf_vel ) )
@@ -657,42 +607,8 @@ do it = 1,nstep
          - sum( GradS_Un * ( el%ub ))   & !  - GradS_Un . el%ub 
          + DivS_U * sum(el%ub*el%nor)     !  + Un * Div_S U
 
-! debug -----
-!     write(*,*) ' stop in dust.f90 l.614. '
-!     stop      
-      write(21,*) GradS_Un , '         ' , &  
-                 DivS_U 
-! debug -----
-!     write(*,*) sum( GradS_Un * ( el%ub ) ) , &  ! sum( GradS_Un * ( el%surf_vel - el%ub ) ) , &
-!                DivS_U * sum(el%ub*el%nor) 
-
-!     ! check UHLMAN's EQN -----
-!     ! The integral of the Uhlman's equation taking into account the convective
-!     ! contribution to the unsteady term can be written as an equivalent integral
-!     ! of the form \int_S { n.\gradG -U_b . U }. This term could enter the 
-!     ! unknwon through the influence coefficient matrix.
-!     ! As a test, the source term is set to zero
-!     el%bernoulli_source = 0.0_wp
-!     ! and the unknown becomes B - Ub.U ( see l. 727 )
-!     ! check UHLMAN's EQN -----
-!
-!     !debug -----
-!     write(*,*) el%id ,  el%dUn_dt                                , '    ' , &
-!                         sum(GradS_Un * ( el%surf_vel - el%ub ) ) , '    ' , &
-!                         DivS_U * sum(el%ub*el%nor)
-!     write(*,'(3F12.6,A,F12.6,A,2F12.6,A,6F12.6)') GradS_Un , '    ' , DivS_U , '    ' , &
-!         sum(GradS_Un * ( el%surf_vel - el%ub ) ) , DivS_U * sum(el%ub*el%nor) , &
-!         '       ' , GradS_Un , el%dn_dt 
-!     !debug -----
-
     end select
   end do
-
-  close(21)
-
-! debug -----
-! write(*,*) ' GradS_Un . surfvel , Un . DivS_U +++++++++++ '
-! debug -----
 
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -747,38 +663,13 @@ do it = 1,nstep
   !                                                                            !
   !------ Solve the linsys for Bernoulli polynomial ------                     !
   ! only for it > 1   <---- TODO: assess the effects of timestepping on loads  !
-  !                                                                            !
-! ! debug -----
-! if (.not.(allocated(b_unsteady_debug))) allocate(b_unsteady_debug(geo%nSurfPan))
-! do i = 1 , geo%nSurfPan 
-!   select type ( el => elems(geo%idSurfPan(i))%p ) ; class is ( t_surfpan )
-!    b_unsteady_debug(i) = sum(el%ub* el%surf_vel)
-!   end select
-! end do
-! b_unsteady_debug = matmul(linsys%A_pres,b_unsteady_debug)
+  !                                                                            
 
       
   if ( it .gt. 1 ) then                                                        !
     call solve_linsys_pressure(linsys,surfpan_H_IE)                            !
   end if                                                                       !
 
-  ! dump rhs and results -------
-  write(str_comp,'(I4.4)') it
-  open(unit=21,file='./file_debug/rhs'//trim(str_comp)//'.dat')
-  if ( it .gt. 1 ) then
-    do i = 1 , geo%nSurfPan
-      select type ( el => elems(geo%idSurfPan(i))%p ) ; class is ( t_surfpan )
-      write(21,*) linsys%b_pres(i), linsys%b_pres(i) & 
-       - 4*pi * ( sim_param%P_inf + &
-         0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf) ** 2.0_wp ) , '     ' , & 
-         surfpan_H_IE(i) ,  &
-         surfpan_H_IE(i) - 0.5 * sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp
-      end select
-    end do
-  end if
-  close(21)
-  ! debug -----
-  !                                                                            !
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
 
   !------ Solve the system ------
@@ -808,7 +699,6 @@ do it = 1,nstep
             (/ wake%pan_p, wake%rin_p/), wake%vort_p, sim_param, airfoil_data)
   end if
 
-! write(*,*) ' #1 '
 
   !------ Compute loads -------
   ! Implicit elements: vortex rings and 3d-panels
@@ -825,17 +715,7 @@ do it = 1,nstep
     call elems_ad(i_el)%p%compute_dforce(sim_param)
   end do
 
-! write(*,*) ' #2 '
-
-! debug Bernoulli polynomial -----
-! do i_el = 1 , geo%nSurfPan
-!   write(*,*) surfpan_H_IE(i_el)
-! end do
-! debug Bernoulli polynomial -----
-
   ! pres_IE +++++
-! write(*,*) '   Ptot , Pdin , P ,  surf_vel '
-! write(*,*) ' i_el , surfpan H , pres '
   if ( it .gt. 1 ) then
     do i_el = 1 , geo%nSurfPan
       select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
@@ -846,12 +726,6 @@ do it = 1,nstep
 !       surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp + &
 !          sim_param%rho_inf * sum(el%surf_vel*el%ub)
        ! check UHLMAN's EQN -----
-!      ! debug -----
-!      write(*,*) i_el , surfpan_H_IE(i_el) , el%pres
-!      write(*,'(I5,3F12.6,A,3F12.6)') i_el ,  surfpan_H_IE(i_el)  , & 
-!                0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp , &
-!                el%pres , '      ' , el%surf_vel
-!      ! debug -----
       end select
     end do
     
@@ -866,17 +740,6 @@ do it = 1,nstep
 
   ! pres_IE +++++
 
-
-  !if ((sim_param%debug_level .ge. 10).and.time_2_debug_out) then
-  !  call debug_printout_loads(elems, basename_debug, it)
-  !endif
-
-  !------ Output the results  ------
-  !Printout the wake
-  !DISCONTINUED
-  !if((sim_param%debug_level .ge. 17).and.time_2_debug_out)  &
-  !                    call debug_printout_wake(wake, basename_debug, it)
-
   !Print the results
   if(time_2_out)  then
     nout = nout+1
@@ -886,7 +749,7 @@ do it = 1,nstep
   !------ Viscous Effects and Flow Separations ------
   ! some computation of surface quantities and vorticity to be released.
   ! Free vortices will be introduced in prepare_wake(), some lines below
-  call viscosity_effects( geo , elems , te , sim_param )
+  if(sim_param%use_ve) call viscosity_effects( geo , elems , te , sim_param )
 
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
@@ -913,37 +776,7 @@ do it = 1,nstep
   call update_geometry(geo, time, .false.)
   call prepare_wake(wake, geo, sim_param)
 
-!   ! debug Angular velocity -------
-!   do i_comp = 1 , size(geo%components) 
-!     fid = 50+i_comp
-! !   write(str_comp,'(I4.4)') i_comp
-! !   open(unit=fid,file='./angVel'//trim(str_comp))
-! !   write(*,*) geo%refs%angVel_g
-!     write(fid,*) geo%refs(geo%components(i_comp)%ref_id)%angVel_g
-!     write(*,*) geo%refs(geo%components(i_comp)%ref_id)%angVel_g
-!   end do
-!   ! debug Angular velocity -------
-
-! ! debug b_static_pres
-! if ( it .eq. 2 ) then
-!   write(*,*) ' allocated(linsys%b_static_pres) : ' , allocated(linsys%b_static_pres)
-!   write(*,*) ' shape(    linsys%b_static_pres) : ' , shape(    linsys%b_static_pres)
-!   if ( maxval(shape(linsys%b_static_pres)) .gt. 0 ) then
-!     do i_el = 1 , 10
-!       write(*,'(10F12.6)') linsys%b_static_pres(i_el,1:10)
-!     end do
-!     write(*,*) ' stop in dust.f90 l.800'
-!   end if
-! end if
-! ! debug b_static_pres
-
 enddo
-
-! ! debug Angular velocity -------
-! do i_comp = 1 , size(geo%components) 
-!   close(fid)
-! end do
-! ! debug Angular velocity -------
 
 ! pres_IE +++++
 deallocate( surfpan_H_IE )

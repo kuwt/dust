@@ -160,6 +160,7 @@ type :: t_wake
  !> Points of the wake, in a structured way
  !! (3 x n_pan_points x npan+1)
  real(wp), allocatable :: pan_w_points(:,:,:)
+ !> Velocities of the wake panels
  !! (3 x n_pan_points x npan+1) !!!! now used for rotational effects on pressure !!!!
  real(wp), allocatable :: pan_w_vel(:,:,:)
 
@@ -174,10 +175,6 @@ type :: t_wake
 
  !> elements of the panels
  type(t_vortlatt), allocatable :: wake_panels(:,:)
-
-!!> Velocity of the vertices of the panels (associated to the panels info)
-!!> and not collected in the array pan_w_vel(:,:,:)
-!real(wp), allocatable :: wake_panels_vel(:,:,:)
 
  !> Ring elements
  type(t_actdisk), allocatable :: wake_rings(:,:)
@@ -215,7 +212,7 @@ type :: t_wake
  real(wp), allocatable :: prt_ivort(:)
 
  !> Velocity of the particles !!!! now used for rotational effects on pressure !!!!
- real(wp), allocatable :: prt_vel(:,:)
+ !real(wp), allocatable :: prt_vel(:,:)
 
  !> Wake particles pointer
  type(t_vortpart_p), allocatable :: part_p(:)
@@ -318,14 +315,9 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, &
   allocate(wake%pan_w_points(3,wake%n_pan_points,npan+1))
   allocate(wake%pan_w_vel(   3,wake%n_pan_points,npan+1))
   allocate(wake%w_vel(3,wake%n_pan_points,npan+1))
-  allocate(wake%wake_panels(     wake%n_pan_stripes,npan))
+  allocate(wake%wake_panels(wake%n_pan_stripes,npan))
   allocate(wake%end_vorts(wake%n_pan_stripes))
   allocate(wake%pan_idou(wake%n_pan_stripes,npan))
-
-! ! allocate and initialize the array containing the velocity of the nodes
-! ! of panel wake elements 
-! allocate(wake%wake_panels_vel(wake%n_pan_points*(npan+1), 4      , 3))
-! wake%wake_panels_vel = 0.0_wp
 
   !ring wake: count the number of actuator disks and points
   nad = 0; npt = 0;
@@ -626,7 +618,6 @@ subroutine prepare_wake(wake, geo, sim_param)
           
           wake%wake_parts(ip)%free = .false.
           k = ip+1
-
           wake%n_prt = wake%n_prt+1
           wake%wake_parts(ip)%mag = norm2(partvec)
           if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
@@ -636,22 +627,8 @@ subroutine prepare_wake(wake, geo, sim_param)
           endif
           wake%wake_parts(ip)%cen = pos_p
 
-!         ! debug ----
-!         write(*,*) ' p1 , p2 , wake%nmax_pan + 1 : ' ,  p1 , p2 , wake%nmax_pan + 1     
-!         write(*,*) ' pos_p                       : ' ,  pos_p
-!         write(*,*) ' shape(wake%pan_w_points) : ' , shape(wake%pan_w_points)
-!         write(*,*) ' shape(wake%pan_w_vel   ) : ' , shape(wake%pan_w_vel)
-!         write(*,*)
-!         write(*,*) ' wake%wake_parts(ip)%cen : ' , wake%wake_parts(ip)%cen 
-!         write(*,*) ' ip , shape(wake%wake_parts) : ' , ip , '   ' , shape(wake%wake_parts)
-!         write(*,*)
-!         ! debug ----
-
           wake%wake_parts(ip)%vel = 0.5_wp * ( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
                                                wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
-
-!         write(*,*) ' wake%wake_parts(ip)%vel : ' , wake%wake_parts(ip)%vel 
-
           exit
         endif
       enddo
@@ -710,88 +687,65 @@ subroutine prepare_wake(wake, geo, sim_param)
   endif
 
 
-  ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   ! Treat flow separations 
-  ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  if(sim_param%use_ve) then
+    do i_comp = 1 , size( geo%components)! ***** loop #1 over components *****
 
-! ! debug -----
-! write(*,*) ' shape(wake%wake_parts) : ' , shape(wake%wake_parts)
-! ! debug -----
-  do i_comp = 1 , size( geo%components)     ! ***** loop #1 over components *****
+     if ( k .lt. 1 ) k = 1
 
-   if ( k .lt. 1 ) k = 1
+     ! flow separation allowed only for surfpan elements -----
+      if ( trim( geo%components(i_comp)%comp_el_type ) .eq. 'p' ) then
 
-!  write(*,*) ' ********** 1 '
-   ! flow separation allowed only for surfpan elements -----
-   if ( trim( geo%components(i_comp)%comp_el_type ) .eq. 'p' ) then
+        n_elem = size( geo%components(i_comp)%el )
 
-!    write(*,*) ' ********** 2 '
-     n_elem = size( geo%components(i_comp)%el )
+        do i_elem = 1 , n_elem     ! ***** loop #2 over elements   *****
 
-     do i_elem = 1 , n_elem     ! ***** loop #2 over elements   *****
+          select type( el => geo%components(i_comp)%el(i_elem) ) 
+          type is (t_surfpan)
 
-       select type( el => geo%components(i_comp)%el(i_elem) ) ; type is (t_surfpan)
-!      write(*,*) '  i_elem : ' , i_elem , ' el % al_free ' , el % al_free
+          ! flow separation
+          if ( el % al_free .gt. 0.0_wp ) then 
+            pos_p = el%cen + el%nor * el%h_bl + & 
+                       el % surf_vel * sim_param%dt
 
-       ! flow separation
-       if ( el % al_free .gt. 0.0_wp ) then 
+            if(all(pos_p .ge. wake%part_box_min) .and. &
+               all(pos_p .le. wake%part_box_max)) then
+              !Add the particle
+              do ip = k, size(wake%wake_parts)
 
-         !Add the particle
-         do ip = k, size(wake%wake_parts)
-
-           if (wake%wake_parts(ip)%free) then
-             
-             wake%wake_parts(ip)%free = .false.
-             k = ip+1
-             wake%n_prt = wake%n_prt+1
-             wake%wake_parts(ip)%mag = norm2(el%free_vort)
-             if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
-               wake%wake_parts(ip)%dir = el%free_vort/wake%wake_parts(ip)%mag
-             else
-               wake%wake_parts(ip)%dir = el%free_vort
-             endif
-             wake%wake_parts(ip)%cen = el%cen + el%nor * el%h_bl + & ! + ...
-                    el % surf_vel * sim_param%dt
-
-             wake%wake_parts(ip)%vel = el % surf_vel 
-                                       
-
-             exit 
-           endif
-         enddo
-         if (ip .gt. wake%nmax_prt) then
-           write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
-             wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
-             &restarting with a higher number of maximum wake particles'
-         call error(this_sub_name, this_mod_name, trim(msg))
-         endif
-
-! ! debug -----
-!      write(*,*) ' i_elem : ' , i_elem
-!      write(*,*) '  mag , dir : ' , wake%wake_parts(ip)%mag , '   ' , wake%wake_parts(ip)%dir
-!      write(*,*) '  cen       : ' , wake%wake_parts(ip)%cen
-! ! debug -----
-
-       end if
-
-       end select
-
-     end do     ! ***** loop #2 over elements   *****
-
-   end if
-
-  end do     ! ***** loop #1 over components *****
-
-  ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  ! Treat flow separations 
-  ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-! <<<<<<<<<<<<<<
-! ! debug -----
-! write(*,*) ' shape(wake%part_p) : ' , shape(wake%part_p)
-! stop
-! ! debug -----
-! <<<<<<<<<<<<<<
+                if (wake%wake_parts(ip)%free) then
+                  
+                  wake%wake_parts(ip)%free = .false.
+                  k = ip+1
+                  wake%n_prt = wake%n_prt+1
+                  wake%wake_parts(ip)%mag = norm2(el%free_vort)
+                  if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
+                    wake%wake_parts(ip)%dir = el%free_vort/wake%wake_parts(ip)%mag
+                  else
+                    wake%wake_parts(ip)%dir = el%free_vort
+                  endif
+                  !wake%wake_parts(ip)%cen = el%cen + el%nor * el%h_bl + & 
+                  !       el % surf_vel * sim_param%dt
+                  wake%wake_parts(ip)%cen = pos_p
+                  wake%wake_parts(ip)%vel = el % surf_vel
+                  exit 
+                endif
+              enddo
+              if (ip .gt. wake%nmax_prt) then
+                write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
+                  wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
+                  &restarting with a higher number of maximum wake particles'
+              call error(this_sub_name, this_mod_name, trim(msg))
+              endif
+            endif !particle in box
+          end if !generate the particle
+          end select!select panels
+        end do ! ***** loop #2 over elements   *****
+      end if !if is a 3dp
+    end do ! ***** loop #1 over components *****
+  endif !calculate the viscous particles detachment
 
   ! Recreate sturctures and pointers, if full
   if(wake%full_panels .or. wake%full_rings .or. (wake%n_prt.gt.0) ) then
@@ -893,8 +847,8 @@ subroutine load_wake(filename, wake)
       p1 = wake%i_start_points(1,iw)
       p2 = wake%i_start_points(2,iw)
       call wake%wake_panels(iw,ipan)%calc_geo_data( &
-           reshape((/wake%pan_w_points(:,p1,ipan)  , wake%pan_w_points(:,p2,ipan), &
-                     wake%pan_w_points(:,p2,ipan+1), wake%pan_w_points(:,p1,ipan+1)/),&
+           reshape((/wake%pan_w_points(:,p1,ipan),   wake%pan_w_points(:,p2,ipan), &
+                    wake%pan_w_points(:,p2,ipan+1), wake%pan_w_points(:,p1,ipan+1)/),&
                                                                      (/3,4/)))
       wake%pan_p(ipt)%p => wake%wake_panels(iw,ipan)
       ipt = ipt + 1
@@ -1019,11 +973,12 @@ subroutine update_wake(wake, elems, octree, sim_param)
  integer :: id, ir
  real(wp) :: pos_p(3), vel_p(3), alpha_p(3)
  real(wp) :: str(3), stretch(3)
+ real(wp) :: df(3), diff(3)
  type(t_pot_elem_p), allocatable :: pan_p_temp(:)
  real(wp), allocatable :: point_old(:,:,:)
  real(wp), allocatable :: points(:,:,:)
  real(wp), allocatable, target :: vel_prt(:,:)
- real(wp), allocatable, target :: stretch_prt(:,:)
+ real(wp), allocatable, target :: vortevol_prt(:,:)
  logical :: increase_wake
  integer :: size_old
  character(len=*), parameter :: this_sub_name='update_wake'
@@ -1192,21 +1147,20 @@ subroutine update_wake(wake, elems, octree, sim_param)
 
   !==>    Particles: evolve the position in time
 
-! allocate(vel_prt(3,wake%n_prt))                       ! *****(old) allocate(vel_prt(3,wake%n_prt))
-  allocate(stretch_prt(3,wake%n_prt))
+  allocate(vortevol_prt(3,wake%n_prt))
+  vortevol_prt = 0.0_wp
 
-  if ( allocated(wake%prt_vel) ) deallocate(wake%prt_vel)
-  allocate(wake%prt_vel(3,wake%n_prt))
+  !if ( allocated(wake%prt_vel) ) deallocate(wake%prt_vel)
+  !allocate(wake%prt_vel(3,wake%n_prt))
 
-! ! debug ----
-! write(*,*) ' after allocation of wake%prt_vel , shape(wake_prt_vel) : ' , shape(wake%prt_vel) 
-! ! debug ----
 
   !calculate the velocities at the points
-!$omp parallel do private(pos_p, vel_p, ip)
+!$omp parallel do private(pos_p, vel_p, ip, iq,  stretch, diff, df, str)
   do ip = 1, wake%n_prt
 
-    wake%part_p(ip)%p%stretch => stretch_prt(:,ip)
+    if (sim_param%use_vs .or. sim_param%use_vd) then
+      wake%part_p(ip)%p%stretch => vortevol_prt(:,ip)
+    endif
     
     !If not using the fast multipole, update particles position now
     if (.not.sim_param%use_fmm) then
@@ -1214,8 +1168,9 @@ subroutine update_wake(wake, elems, octree, sim_param)
 
       call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
 
-      wake%prt_vel(:,ip) = vel_p                            ! *****(old) vel_prt(:,ip) = vel_p
-      wake%part_p(ip)%p%vel     =  wake%prt_vel(:,ip)       ! *****(old) vel_prt(:,ip)
+      !wake%prt_vel(:,ip) = vel_p                            ! *****(old) vel_prt(:,ip) = vel_p
+      !wake%part_p(ip)%p%vel     =  wake%prt_vel(:,ip)       ! *****(old) vel_prt(:,ip)
+      wake%part_p(ip)%p%vel     =  vel_p
 
       !if using vortex stretching, calculate it now
       if(sim_param%use_vs) then
@@ -1232,9 +1187,22 @@ subroutine update_wake(wake, elems, octree, sim_param)
         !             wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, str)
         !  stretch = stretch + str/(4.0_wp*pi)
         !enddo
-        stretch_prt(:,ip) = stretch
-      endif
-    end if
+        vortevol_prt(:,ip) = vortevol_prt(:,ip) + stretch
+      endif !use_vs
+
+      !if using the vortex diffusion, calculate it now
+      if(sim_param%use_vd) then
+        diff = 0.0_wp
+        do iq = 1, wake%n_prt
+        if (ip.ne.iq) then
+          call wake%part_p(iq)%p%compute_diffusion(wake%part_p(ip)%p%cen, &
+               wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, df)
+          diff = diff + df*sim_param%nu_inf
+        endif 
+        enddo !iq
+        vortevol_prt(:,ip) = vortevol_prt(:,ip) + diff
+      endif !use_vd
+    end if !use_fmm
 
     
   enddo
@@ -1258,17 +1226,19 @@ subroutine update_wake(wake, elems, octree, sim_param)
   !Assign the moved points, if they get outside the bounding box free the 
   !particles
   do ip = 1, wake%n_prt
-!   call avoid_collision(elems, wake, wake%part_p(ip)%p%cen, sim_param, vel_prt(:,ip))  ! OLD
-    call avoid_collision(elems, wake, wake%part_p(ip)%p, sim_param, wake%prt_vel(:,ip)) ! *****(old) vel_prt(:,ip))
-    if(.not.(wake%part_p(ip)%p%free)) then
-      pos_p = wake%part_p(ip)%p%cen + wake%prt_vel(:,ip)*sim_param%dt                   ! *****(old) vel_prt(:,ip)*sim_param%dt
+    if(sim_param%use_pa) call avoid_collision(elems, wake, &
+                        wake%part_p(ip)%p, sim_param, wake%part_p(ip)%p%vel)
+                           !wake%part_p(ip)%p, sim_param, wake%prt_vel(:,ip))
+    if(.not. wake%part_p(ip)%p%free) then
+      !pos_p = wake%part_p(ip)%p%cen + wake%prt_vel(:,ip)*sim_param%dt
+      pos_p = wake%part_p(ip)%p%cen + wake%part_p(ip)%p%vel*sim_param%dt
       if(all(pos_p .ge. wake%part_box_min) .and. &
          all(pos_p .le. wake%part_box_max)) then
         !wake%part_p(ip)%p%cen = points_prt(:,ip)
         wake%part_p(ip)%p%cen = pos_p
-        if(sim_param%use_vs) then
+        if(sim_param%use_vs .or. sim_param%use_vd) then
           alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
-                          stretch_prt(:,ip)*sim_param%dt
+                          vortevol_prt(:,ip)*sim_param%dt
           wake%part_p(ip)%p%mag = norm2(alpha_p)
           if(wake%part_p(ip)%p%mag .ne. 0.0_wp) &
              wake%part_p(ip)%p%dir = alpha_p/wake%part_p(ip)%p%mag
@@ -1451,53 +1421,61 @@ subroutine get_vel_rigid(this, elems, wake, pos, sim_param, vel)
 end subroutine get_vel_rigid
 !----------------------------------------------------------------------
 
-! subroutine avoid_collision(elems, wake, pos, sim_param, vel)
-!type(t_pot_elem_p), intent(in) :: elems(:)
-!type(t_wake), intent(in) :: wake
-!real(wp), intent(in) :: pos(3)
-!type(t_sim_param), intent(in) :: sim_param
-!real(wp), intent(inout) :: vel(3)
-
-subroutine avoid_collision(elems, wake, vort_part , sim_param, vel)
+subroutine avoid_collision(elems, wake, part, sim_param, vel)
  type(t_pot_elem_p), intent(in) :: elems(:)
  type(t_wake), intent(inout) :: wake
- type(t_vortpart), intent(inout) :: vort_part
+ type(t_vortpart), intent(inout) :: part
  type(t_sim_param), intent(in) :: sim_param
  real(wp), intent(inout) :: vel(3)
 
  integer :: ie
- real(wp) :: pos(3) , v(3)
+ real(wp) :: v(3)
  real(wp) :: dist(3), n(3)
+ real(wp) :: pos(3)
  real(wp) :: distn, distnor, damp, normvel
- real(wp) :: damp_radius, cont
+ real(wp) :: damp_radius, cont, rad_mult, k
 
-!damp_radius = 0.3
-cont = 1.0
+ !damp_radius = 0.3
+ cont = 0.95
+ !cont = 1.0
+ rad_mult = 1.3
+ pos = part%cen
+ k = 0.85
+ 
 
-  pos = vort_part%cen
   !calculate the influence of the solid bodies
   do ie=1,size(elems)
     dist = pos-elems(ie)%p%cen
-    damp_radius = sim_param%dt*sim_param%u_ref*0.1_wp !+ max(elems(ie)%p%edge_len)
+    damp_radius = sim_param%dt*sim_param%u_ref*rad_mult + &
+                                          maxval(elems(ie)%p%edge_len)/2.0_wp
     distn = norm2(dist)
+    !if it is in the check radius perform calculations
     if ((distn .lt. damp_radius)) then
-      distnor = sum(dist * elems(ie)%p%nor)
-      !n = dist/distn
       n = elems(ie)%p%nor
-      normvel = max(sum(vel*n) , -cont*distnor/sim_param%dt)
-      !normvel = max(sum(vel*n) , 0.0_wp)
+      normvel = sum(vel*n) 
+      distnor = sum(dist * elems(ie)%p%nor)
+      if(normvel .lt. -k*distnor/sim_param%dt) then
+        !normvel = -distnor/sim_param%dt*(1 - &
+        !                         1/(-normvel*sim_param%dt/8.0_wp/distnor+1)**8)
+        normvel = -distnor/sim_param%dt*(1.0-k)*(1.0 - &
+                 1.0/(-(normvel+k*distnor/sim_param%dt)* &
+                 sim_param%dt/8.0_wp/distnor/(1-k) + 1.0)**8)
+        !normvel = max(normvel,-distnor/sim_param%dt)
+      endif
+      if(normvel .lt. -cont*distnor/sim_param%dt) then
+        part%free = .true.
+        wake%n_prt = wake%n_prt -1
+        return
+      endif
       vel = vel - (sum(vel*n) - normvel) * n
       !vel = vel - (sum(vel*n) + cont*distnor/sim_param%dt) * n
       !vel = vel - sum(vel*n) * (1-damp) * n
-
-      ! brute-force vortex particle elimination algorithm ----
-      vort_part%free = .true.
-      wake%n_prt = wake%n_prt -1
-      return
-      ! brute-force vortex particle elimination algorithm ----
-
-      
-
+      !distnor = sum(dist * elems(ie)%p%nor)
+      !if (abs(distnor) .lt. 0.03_wp*minval(elems(ie)%p%edge_len)) then
+      !  part%free = .true.
+      !  wake%n_prt = wake%n_prt -1
+      !  return
+      !endif
     endif
   enddo
 

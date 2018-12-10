@@ -352,17 +352,12 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
   ipres = linsys%idSurfPanG2L(ie) 
   linsys%b_pres(ipres) = 0.0_wp
 
-  ! debug -----
-! write(*,*) ' ie , this%id , ipres ' , ie , this%id , ipres
-! write(*,*) ' stop in mod_surfpan.f90 at l. 357 '
-! stop
-
   ! Static part ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   ! + \phi equation ------------------------------ 
   do j1 = 1,ista-1
 
     linsys%b(ie) = linsys%b(ie) + &
-           linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-uinf-elems(j1)%p%uvort))
+           linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-uinf-this%uvort))
   enddo
 
   ! + Bernoulli polynomial equation --------------
@@ -386,7 +381,7 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
     ! + \phi equation ----------------------------
     !Add the contribution to the rhs with the
     linsys%b(ie) = linsys%b(ie) &
-                   + b1* sum(elems(j1)%p%nor*(elems(j1)%p%ub-uinf-elems(j1)%p%uvort))
+                   + b1* sum(elems(j1)%p%nor*(elems(j1)%p%ub-uinf-this%uvort))
 
     ! + Bernoulli polynomial equation ------------
     !Add the contribution to the rhs
@@ -739,9 +734,6 @@ subroutine compute_pres_surfpan(this, sim_param)
   vel_phi = vel_phi_t +  &
         sum(this%nor*(this%ub-sim_param%u_inf-this%uvort)) * this%nor 
 
-! ! debug
-! vel_phi = 0.0_wp
-
   ! velocity, U = u_t \hat{t} + u_n \hat{n} + U_inf ----------
   this%surf_vel = sim_param%u_inf + vel_phi + this%uvort
 ! old and wrong
@@ -765,21 +757,6 @@ subroutine compute_pres_surfpan(this, sim_param)
     - 0.5_wp * sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp  &
              + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
              + sim_param%rho_inf * this%didou_dt
-
-!   ! debug
-!   if ( this%id .eq. 1 ) then
-!     write(*,*)  ' this%nor : ' , this%nor 
-!     write(*,*)  ' this%uvort:' , this%uvort
-!     write(*,*)  ' vel_phi  : ' , vel_phi
-!     write(*,*)  ' sim_param%u_inf : ' , sim_param%u_inf
-!     write(*,*)  ' this%surf_vel   : ' , this%surf_vel 
-!     write(*,*)  ' this%surf_vel-sim_param%u_inf : ' , this%surf_vel-sim_param%u_inf
-!     write(*,*)  ' sum(this%surf_vel*this%nor) : ' , sum(this%surf_vel*this%nor) 
-!     write(*,*)  ' sum(this%ub      *this%nor) : ' , sum(this%ub      *this%nor) 
-!     write(*,*)  ' this%pres : ' , this%pres 
-! !   write(*,*)
-!   end if
-
 
 end subroutine compute_pres_surfpan
 

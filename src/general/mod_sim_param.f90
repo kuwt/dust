@@ -76,6 +76,8 @@ type t_sim_param
   real(wp) :: a_inf
   !> Free stream dynamic viscosity
   real(wp) :: mu_inf
+  !> Free stream kinematic viscosity
+  real(wp) :: nu_inf
 
   !Wake
   !> Scaling of the first implicit panel
@@ -103,10 +105,18 @@ type t_sim_param
   real(wp) :: DoubletThreshold
   !> Rankine Radius for vortices
   real(wp) :: RankineRad
+  !> Vortex Radius for vortex particles
+  real(wp) :: VortexRad
   !> Complete cutoff radius
   real(wp) :: CutoffRad
   !> use the vortex stretching or not
   logical :: use_vs
+  !> use the vorticity diffusion or not
+  logical :: use_vd
+  !> use the penetration avoidance
+  logical :: use_pa
+  !> simulate viscosity effects or not
+  logical :: use_ve
 
   !FMM parameters
   !> Employing the FMM method
@@ -123,6 +133,12 @@ type t_sim_param
     integer :: MinOctreePart
     !> Multipole expansion degree
     integer :: MultipoleDegree
+    !> Use dynamic levels
+    logical :: use_dyn_layers
+      !> Maximum number of octree levels
+      integer :: NMaxOctreeLevels
+      !> Time ratio that triggers the increase of levels
+      real(wp) :: LeavesTimeRatio
 
 
   !Handling parameters:
@@ -179,8 +195,12 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%FarFieldRatioSource, 'FarFieldRatioSource', loc)
   call write_hdf5_attr(this%DoubletThreshold, 'DoubletThreshold', loc)
   call write_hdf5_attr(this%RankineRad, 'RankineRad', loc)
+  call write_hdf5_attr(this%VortexRad, 'VortexRad', loc)
   call write_hdf5_attr(this%CutoffRad, 'CutoffRad', loc)
   call write_hdf5_attr(this%use_vs, 'vortstretch', loc)
+  call write_hdf5_attr(this%use_vd, 'vortdiff', loc)
+  call write_hdf5_attr(this%use_pa, 'PenetrationAvoidance', loc)
+  call write_hdf5_attr(this%use_ve, 'ViscosityEffects', loc)
   call write_hdf5_attr(this%use_fmm, 'use_fmm', loc)
   if(this%use_fmm) then
     call write_hdf5_attr(this%BoxLength, 'BoxLength', loc)
@@ -189,6 +209,11 @@ subroutine save_sim_param(this, loc)
     call write_hdf5_attr(this%NOctreeLevels, 'NOctreeLevels', loc)
     call write_hdf5_attr(this%MinOctreePart, 'MinOctreePart', loc)
     call write_hdf5_attr(this%MultipoleDegree, 'MultipoleDegree', loc)
+    call write_hdf5_attr(this%use_dyn_layers, 'use_dyn_layers', loc)
+    if(this%use_dyn_layers) then
+      call write_hdf5_attr(this%NMaxOctreeLevels, 'NMaxOctreeLevels', loc)
+      call write_hdf5_attr(this%LeavesTimeRatio, 'LeavesTimeRatio', loc)
+    endif
   endif
   call write_hdf5_attr(this%debug_level, 'debug_level', loc)
   call write_hdf5_attr(this%dt_out, 'dt_out', loc)

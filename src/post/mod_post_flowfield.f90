@@ -93,9 +93,9 @@ contains
 
 ! ---------------------------------------------------------------------- 
 
-subroutine post_flowfield( sbprms , basename , data_basename , an_name , ia , &
-                            out_frmt , components_names , all_comp , &
-                            an_start , an_end , an_step )
+subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
+                            out_frmt, components_names, all_comp, &
+                            an_start, an_end, an_step, average )
 type(t_parse), pointer :: sbprms
 character(len=*) , intent(in) :: basename
 character(len=*) , intent(in) :: data_basename
@@ -105,6 +105,7 @@ character(len=*) , intent(in) :: out_frmt
 character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
 logical , intent(inout) :: all_comp
 integer , intent(in) :: an_start , an_end , an_step
+logical, intent(in) :: average
 
 type(t_geo_component), allocatable  :: comps(:)
 integer , parameter :: n_max_vars = 3 !vel,p,vort, ! TODO: 4 with cp
@@ -139,6 +140,7 @@ real(wp) :: dxbox , dybox , dzbox
 real(wp), allocatable :: box_vel(:,:) , box_p(:) , box_vort(:,:)
 integer :: ix , iy , iz
 real(wp), allocatable :: vars(:,:) 
+real(wp), allocatable :: ave_vars(:,:) 
 integer :: i_var_v , i_var_p , i_var_w
 
 integer :: ip , ic , ie , i1 , it
@@ -282,6 +284,10 @@ end if
 !  sum(vars_n): # of scalar fields to be plotted
 !  product(nxyz) # of points where the vars are plotted 
 allocate(vars(sum(vars_n),product(nxyz))) ; vars = 0.0_wp 
+if(average) then
+ allocate(ave_vars(sum(vars_n),product(nxyz)))
+ ave_vars = 0.0_wp
+endif
 
 write(*,'(A,I0,A,I0,A,I0)') nl//' it_start,it_end,an_step : ' , &
   an_start , ' , ' , an_end , ' , ' , an_step
@@ -374,19 +380,69 @@ do it = an_start, an_end, an_step ! Time history
    end do  ! y-coord
   end do  ! z-coord
 
-  ! Output +++++++++++++++++++++++++++++++++++++++++++++++++
 
+
+  ! Output or average +++++++++++++++++++++++++++++++++++++++++++++++++
+  if (average) then
+    ave_vars = ave_vars*(real(it-1,wp)/real(it,wp)) + &
+                   vars/real(it,wp)
+
+  else
+    select case (trim(out_frmt))
+
+    case ('vtk')
+      write(filename,'(A,I4.4,A)') trim(basename)//'_'//&
+                               trim(an_name)//'_',it,'.vtr'
+      call vtr_write ( filename , xbox , ybox , zbox , &
+                       vars_n(1:i_var) , var_names(1:i_var) , &
+                       vars ) 
+    case('tecplot')
+     write(filename,'(A,I4.4,A)') trim(basename)//'_'//&
+                              trim(an_name)//'_',it,'.plt'
+     i_var = 0
+     deallocate(var_names)
+     allocate(var_names(7))
+     if(probe_vel) then
+       var_names(i_var + 1) = 'ux'
+       var_names(i_var + 2) = 'uy'
+       var_names(i_var + 3) = 'uz'
+       i_var = i_var + 3
+     endif
+     if(probe_p) then
+       var_names(i_var + 1) = 'p'
+       i_var = i_var + 1
+     endif
+     if(probe_vort) then
+       var_names(i_var + 1) = 'omx'
+       var_names(i_var + 2) = 'omy'
+       var_names(i_var + 3) = 'omz'
+       i_var = i_var + 3
+     endif
+
+     call tec_out_box(filename, t, xbox, ybox, zbox, &
+                      vars, var_names(1:i_var))
+
+    case default
+      call error('dust_post','','Unknown format '//trim(out_frmt)//&
+                 ' for flowfield output. Choose: vtk or tecplot.')
+    end select
+  endif !average or not
+
+end do  ! Time loop
+
+!output if average
+if (average) then
   select case (trim(out_frmt))
 
   case ('vtk')
-    write(filename,'(A,I4.4,A)') trim(basename)//'_'//&
-                             trim(an_name)//'_',it,'.vtr'
+    write(filename,'(A)') trim(basename)//'_'//&
+                             trim(an_name)//'_ave.vtr'
     call vtr_write ( filename , xbox , ybox , zbox , &
                      vars_n(1:i_var) , var_names(1:i_var) , &
-                     vars ) 
+                     ave_vars ) 
   case('tecplot')
-   write(filename,'(A,I4.4,A)') trim(basename)//'_'//&
-                            trim(an_name)//'_',it,'.plt'
+   write(filename,'(A)') trim(basename)//'_'//&
+                            trim(an_name)//'_ave.plt'
    i_var = 0
    deallocate(var_names)
    allocate(var_names(7))
@@ -408,14 +464,14 @@ do it = an_start, an_end, an_step ! Time history
    endif
 
    call tec_out_box(filename, t, xbox, ybox, zbox, &
-                    vars, var_names(1:i_var))
+                    ave_vars, var_names(1:i_var))
 
   case default
     call error('dust_post','','Unknown format '//trim(out_frmt)//&
                ' for flowfield output. Choose: vtk or tecplot.')
   end select
 
-end do  ! Time loop
+endif
 
 
 

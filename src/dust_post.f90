@@ -136,7 +136,7 @@ character(len=*), parameter :: input_file_name_def = 'dust_post.in'
 character(len=max_char_len) :: input_file_name
 
 !doublet parameters
-real(wp) :: ff_ratio_dou, ff_ratio_sou, eps_dou, r_Rankine, r_cutoff
+real(wp) :: ff_ratio_dou, ff_ratio_sou, eps_dou, r_Rankine, r_Vortex, r_cutoff
 
 !Geometry parameters
 type(t_parse) :: prms
@@ -177,6 +177,8 @@ call prms%CreateRealOption( 'DoubletThreshold', &
       "Thresold for considering the point in plane in doublets", '1.0e-6')
 call prms%CreateRealOption( 'RankineRad', &
       "Radius of Rankine correction for vortex induction near core", '0.1')
+call prms%CreateRealOption( 'VortexRad', &
+      "Radius of vortex core, for particles", '0.1')
 call prms%CreateRealOption( 'CutoffRad', &
       "Radius of complete cutoff  for vortex induction near core", '0.001')
 
@@ -246,12 +248,13 @@ ff_ratio_dou  = getreal(prms, 'FarFieldRatioDoublet')
 ff_ratio_sou  = getreal(prms, 'FarFieldRatioSource')
 eps_dou   = getreal(prms, 'DoubletThreshold')
 r_Rankine = getreal(prms, 'RankineRad')
+r_Vortex  = getreal(prms, 'VortexRad')
 r_cutoff  = getreal(prms, 'CutoffRad')
 
 call initialize_doublet(ff_ratio_dou, eps_dou, r_Rankine, r_cutoff);
 call initialize_surfpan(ff_ratio_sou)
 call initialize_vortline(r_Rankine, r_cutoff)
-call initialize_vortpart(r_Rankine, r_cutoff)
+call initialize_vortpart(r_Vortex, r_cutoff)
 
 n_analyses = countoption(prms,'Analysis')
 
@@ -318,7 +321,7 @@ do ia = 1,n_analyses
 
     call post_flowfield ( sbprms , basename , data_basename , an_name , ia , &
                           out_frmt , components_names , all_comp , &
-                          an_start , an_end , an_step )
+                          an_start , an_end , an_step, average)
 
    !///////////////  Sectional Loads  \\\\\\\\\\\\\\\
    case('sectional_loads')
