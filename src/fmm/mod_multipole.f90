@@ -82,6 +82,9 @@ contains
   !> Reset the data
   procedure, pass(this) :: reset => reset_multipole
 
+  !> Destroy (deallocate) the data
+  procedure, pass(this) :: destroy => destroy_multipole
+
   !> Calculate the coefficients of the multipole in the leaf
   procedure, pass(this) :: leaf_M => leaf_M_multipole
 
@@ -169,9 +172,12 @@ subroutine init_multipole(this, polyexp)
  class(t_multipole) :: this
  type(t_polyexp), intent(in) :: polyexp
 
-  allocate(this%a(3,polyexp%n_mon))
-  allocate(this%b(3,polyexp%n_mon))
-  if(multipole_use_vs) allocate(this%c(3,3,polyexp%n_mon))
+  allocate(this%a(3,polyexp%n_mon)); this%a = 0.0_wp
+  allocate(this%b(3,polyexp%n_mon)); this%b = 0.0_wp
+  if(multipole_use_vs)  then
+    allocate(this%c(3,3,polyexp%n_mon))
+    this%c = 0.0_wp
+  endif
 
 
 end subroutine
@@ -184,6 +190,18 @@ subroutine reset_multipole(this)
   this%a = 0.0_wp
   this%b = 0.0_wp
   if(multipole_use_vs) this%c = 0.0_wp
+
+
+end subroutine
+
+!----------------------------------------------------------------------
+
+subroutine destroy_multipole(this)
+ class(t_multipole) :: this
+
+  deallocate(this%a)
+  deallocate(this%b)
+  if(multipole_use_vs) deallocate(this%c)
 
 
 end subroutine

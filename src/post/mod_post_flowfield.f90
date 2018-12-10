@@ -143,7 +143,7 @@ real(wp), allocatable :: vars(:,:)
 real(wp), allocatable :: ave_vars(:,:) 
 integer :: i_var_v , i_var_p , i_var_w
 
-integer :: ip , ic , ie , i1 , it
+integer :: ip , ipp, ic , ie , i1 , it, itave
 
 character(len=max_char_len) :: str_a , var_name 
 character(len=max_char_len) :: filename
@@ -291,7 +291,9 @@ endif
 
 write(*,'(A,I0,A,I0,A,I0)') nl//' it_start,it_end,an_step : ' , &
   an_start , ' , ' , an_end , ' , ' , an_step
+itave = 0
 do it = an_start, an_end, an_step ! Time history
+  itave = itave + 1
 
   ! Show timing, since this analysis is quite slow
   write(*,'(A,I0,A,I0)') ' it : ' , it , ' / ' , &
@@ -323,12 +325,14 @@ do it = an_start, an_end, an_step ! Time history
   call close_hdf5_file(floc)
 
   ! Compute fields to be plotted +++++++++++++++++++++++++++++
-  ip = 0
+!  ip = 0
+!$omp parallel do collapse(3) private(iz,iy,ix,vel_probe, pres_probe, vort_probe, ic, ie, v, ipp)
   ! Loop over the nodes of the box
   do iz = 1 , size(zbox)  ! z-coord
    do iy = 1 , size(ybox)  ! y-coord
     do ix = 1 , size(xbox)  ! x-coord
-     ip = ip + 1
+!     ip = ip + 1
+     ipp = ix + (iy-1)*size(xbox) + (iz-1)*size(xbox)*size(ybox)
 
       if ( probe_vel .or. probe_p ) then 
 
@@ -354,11 +358,12 @@ do it = an_start, an_end, an_step ! Time history
        
         ! + u_inf
         vel_probe = vel_probe + u_inf
+
         
       end if
 
       if ( probe_vel ) then
-        vars(1:3,ip) = vel_probe
+        vars(1:3,ipp) = vel_probe
       end if
 
       if ( probe_p ) then
@@ -367,7 +372,7 @@ do it = an_start, an_end, an_step ! Time history
         !TODO: add:
         ! - add the unsteady term: -rho*dphi/dt
         pres_probe = P_inf + 0.5_wp*rho*norm2(u_inf)**2 - 0.5_wp*rho*norm2(vel_probe)**2
-        vars(i_var_v+1,ip) = pres_probe 
+        vars(i_var_v+1,ipp) = pres_probe 
          
       end if
 
@@ -379,13 +384,14 @@ do it = an_start, an_end, an_step ! Time history
     end do  ! x-coord
    end do  ! y-coord
   end do  ! z-coord
+!$omp end parallel do
 
 
 
   ! Output or average +++++++++++++++++++++++++++++++++++++++++++++++++
   if (average) then
-    ave_vars = ave_vars*(real(it-1,wp)/real(it,wp)) + &
-                   vars/real(it,wp)
+    ave_vars = ave_vars*(real(itave-1,wp)/real(itave,wp)) + &
+                   vars/real(itave,wp)
 
   else
     select case (trim(out_frmt))

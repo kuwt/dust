@@ -612,35 +612,38 @@ subroutine prepare_wake(wake, geo, sim_param)
 
       !pos_p = (points_end(:,p1)+points_end(:,p2))/2.0_wp
 
-      !Add the particle
-      do ip = k, size(wake%wake_parts)
-        if (wake%wake_parts(ip)%free) then
-          
-          wake%wake_parts(ip)%free = .false.
-          k = ip+1
-          wake%n_prt = wake%n_prt+1
-          wake%wake_parts(ip)%mag = norm2(partvec)
-          if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
-            wake%wake_parts(ip)%dir = partvec/wake%wake_parts(ip)%mag
-          else
-            wake%wake_parts(ip)%dir = partvec
-          endif
-          wake%wake_parts(ip)%cen = pos_p
+      !Add the particle (if it is in the box)
+      if(all(pos_p .ge. wake%part_box_min) .and. &
+         all(pos_p .le. wake%part_box_max)) then
+        do ip = k, size(wake%wake_parts)
+          if (wake%wake_parts(ip)%free) then
+            
+            wake%wake_parts(ip)%free = .false.
+            k = ip+1
+            wake%n_prt = wake%n_prt+1
+            wake%wake_parts(ip)%mag = norm2(partvec)
+            if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
+              wake%wake_parts(ip)%dir = partvec/wake%wake_parts(ip)%mag
+            else
+              wake%wake_parts(ip)%dir = partvec
+            endif
+            wake%wake_parts(ip)%cen = pos_p
 
-          wake%wake_parts(ip)%vel = 0.5_wp * ( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
+          	wake%wake_parts(ip)%vel = 0.5_wp * ( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
                                                wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
-          exit
-        endif
-      enddo
-      if (ip .gt. wake%nmax_prt) then
-        write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
-          wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
-          &restarting with a higher number of maximum wake particles'
-      call error(this_sub_name, this_mod_name, trim(msg))
-      endif
+            exit
+          endif
+        enddo
+        if (ip .gt. wake%nmax_prt) then
+          write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
+            wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
+            &restarting with a higher number of maximum wake particles'
+        call error(this_sub_name, this_mod_name, trim(msg))
+        endif !max number of particles
+      endif !inside the box
       
-    enddo
-  endif
+    enddo !iw
+  endif !full wake 
 
   if(wake%full_rings) then
     k = 1
@@ -659,27 +662,30 @@ subroutine prepare_wake(wake, geo, sim_param)
         pos_p = (points_end_ring(:,p1)+points_end_ring(:,p2))/2.0_wp
 
         !Add the particle
-        do ip = k, size(wake%wake_parts)
-          if (wake%wake_parts(ip)%free) then
-            
-            wake%wake_parts(ip)%free = .false.
-            k = ip+1
-            wake%n_prt = wake%n_prt+1
-            wake%wake_parts(ip)%mag = norm2(partvec)
-            if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
-              wake%wake_parts(ip)%dir = partvec/wake%wake_parts(ip)%mag
-            else
-              wake%wake_parts(ip)%dir = partvec
+        if(all(pos_p .ge. wake%part_box_min) .and. &
+           all(pos_p .le. wake%part_box_max)) then
+          do ip = k, size(wake%wake_parts)
+            if (wake%wake_parts(ip)%free) then
+              
+              wake%wake_parts(ip)%free = .false.
+              k = ip+1
+              wake%n_prt = wake%n_prt+1
+              wake%wake_parts(ip)%mag = norm2(partvec)
+              if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
+                wake%wake_parts(ip)%dir = partvec/wake%wake_parts(ip)%mag
+              else
+                wake%wake_parts(ip)%dir = partvec
+              endif
+              wake%wake_parts(ip)%cen = pos_p
+              exit
             endif
-            wake%wake_parts(ip)%cen = pos_p
-            exit
+          enddo  !ip
+          if (ip .gt. wake%nmax_prt) then
+            write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
+              wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
+              &restarting with a higher number of maximum wake particles'
+          call error(this_sub_name, this_mod_name, trim(msg))
           endif
-        enddo  !ip
-        if (ip .gt. wake%nmax_prt) then
-          write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
-            wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
-            &restarting with a higher number of maximum wake particles'
-        call error(this_sub_name, this_mod_name, trim(msg))
         endif
       enddo !is
       nprev = nprev + wake%wake_rings(id,wake%rin_wake_len)%n_ver
@@ -950,9 +956,21 @@ subroutine load_wake(filename, wake)
   
   deallocate(vppoints, vpvort, vpvels)
   
-
   call close_hdf5_file(floc)
 
+
+  if(wake%pan_wake_len .eq. wake%nmax_pan) wake%full_panels=.true.
+  !If the wake is full, attach the end vortex
+  if (wake%full_panels) then
+    do iw = 1,wake%n_pan_stripes
+      wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag
+      p1 = wake%i_start_points(1,iw)
+      p2 = wake%i_start_points(2,iw)
+      call wake%end_vorts(iw)%calc_geo_data( &
+          reshape((/wake%pan_w_points(:,p1,wake%pan_wake_len+1),  &
+                    wake%pan_w_points(:,p2,wake%pan_wake_len+1)/), (/3,2/)))
+    enddo
+  endif
 end subroutine load_wake
 
 
@@ -970,7 +988,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: iw, ipan, ie, ip, np, iq
- integer :: id, ir
+ integer :: id, ir, n_part
  real(wp) :: pos_p(3), vel_p(3), alpha_p(3)
  real(wp) :: str(3), stretch(3)
  real(wp) :: df(3), diff(3)
@@ -1014,7 +1032,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
   !if(wake%pan_wake_len .lt. wake%nmax_pan) np = np + 1
   if(.not.wake%full_panels) np = np + 1
 
-!$omp parallel do collapse(2) private(pos_p, vel_p, ie, ipan, iw)
+!$omp parallel do collapse(2) private(pos_p, vel_p, ie, ipan, iw) schedule(dynamic)
   do ipan = 3,np
     do iw = 1,wake%n_pan_points
       pos_p = point_old(:,iw,ipan-1)
@@ -1041,6 +1059,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
     if(.not.allocated(points_end)) allocate(points_end(3,wake%n_pan_points)) 
 
     ! create another row of points
+!$omp parallel do private(iw, pos_p, vel_p) schedule(dynamic)
     do iw = 1,wake%n_pan_points
       pos_p = point_old(:,iw,wake%pan_wake_len+1)
       vel_p = 0.0_wp
@@ -1053,6 +1072,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
       !update the position in time
       points_end(:,iw) = pos_p + vel_p*sim_param%dt
     enddo
+!$omp end parallel do
   endif
   
 
@@ -1225,7 +1245,8 @@ subroutine update_wake(wake, elems, octree, sim_param)
 
   !Assign the moved points, if they get outside the bounding box free the 
   !particles
-  do ip = 1, wake%n_prt
+  n_part = wake%n_prt
+  do ip = 1, n_part
     if(sim_param%use_pa) call avoid_collision(elems, wake, &
                         wake%part_p(ip)%p, sim_param, wake%part_p(ip)%p%vel)
                            !wake%part_p(ip)%p, sim_param, wake%prt_vel(:,ip))

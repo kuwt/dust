@@ -129,6 +129,16 @@ subroutine compute_vel_vortpart (this, pos, uinf, vel)
   !Rosenhead kernel regularized velocity
   vvort =  cross(this%dir,dist) / (sqrt(sum(dist**2)+r_Vortex**2))**3
   vel = vvort*this%mag
+  
+  !Rankine velocity
+  !distn = norm2(dist)
+  !if ( distn .gt. r_Vortex ) then
+  !  vvort =  cross(this%dir,dist) / distn**3
+  !else
+  !  vvort =  cross(this%dir,dist)  / r_Vortex**3
+  !end if
+  !vel = vvort*this%mag
+
 
 
 end subroutine compute_vel_vortpart

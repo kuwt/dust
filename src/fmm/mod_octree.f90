@@ -94,6 +94,9 @@ type :: t_cell
   !> Pointers to the neighbouring cells
   type(t_cell_p) :: neighbours(-1:1,-1:1,-1:1)
 
+  !> Pointers to far leaf neighbours
+  type(t_cell_p), allocatable :: leaf_neigh(:)
+
   !> Pointers to the cells in the interaction list
   !! (i.e. child of the parent siblings which are not neighbouring)
   type(t_cell_p), allocatable :: interaction_list(:)
@@ -201,6 +204,7 @@ end interface
 character(len=*), parameter :: this_mod_name='mod_octree'
 character(len=max_char_len) :: msg
 real(t_realtime) :: t1 , t0
+real(t_realtime) :: t11, t00
 
 integer :: min_part_4_cell
 
@@ -348,11 +352,12 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
       ! however rely on de-allocating and re-allocating without check for
       ! speed, so things are allocated to zero here)
       allocate(octree%layers(l)%lcells(i,j,k)%cell_parts(0))
+      allocate(octree%layers(l)%lcells(i,j,k)%leaf_neigh(0))
       octree%layers(l)%lcells(i,j,k)%npart = 0
-      octree%layers(l)%lcells(i,j,k)%active = .true.
+      octree%layers(l)%lcells(i,j,k)%active = .false.
       octree%layers(l)%lcells(i,j,k)%leaf = .false.
       allocate(octree%layers(l)%lcells(i,j,k)%interaction_list(0) )
-      call octree%layers(l)%lcells(i,j,k)%mp%init(octree%pexp)
+      !call octree%layers(l)%lcells(i,j,k)%mp%init(octree%pexp)
 
     enddo; enddo; enddo !layer cells i,j,k
   enddo
@@ -660,30 +665,37 @@ subroutine sort_particles(part,octree)
  integer :: ip
  integer :: idx(3)
  real(wp) :: csize
- integer :: l, i,j,k, child
+ integer :: l, i,j,k, child, ic, jc, kc
  integer :: ll, nl
  logical :: got_leaves
  character(len=*), parameter :: this_sub_name = 'sort_particles'
  
+  !PROFILE
+  t0 = dust_time()
+
   ll = octree%nlevels
   csize = octree%layers(ll)%cell_size
+
   
   !set all the cells to empty
   do l = 1,ll
     !cycle on the elements on the level
+!$omp parallel do collapse(3) private(i,j,k) schedule(dynamic)
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
       call reset_cell(octree%layers(l)%lcells(i,j,k))
     enddo; enddo; enddo !layer cells i,j,k
+!$omp end parallel do
   enddo
   
   !to stay on the safe side, nullify all the leaves pointers
+!$omp parallel do private(l)
   do l=1,size(octree%leaves)
     nullify(octree%leaves(l)%p)
   enddo
+!$omp end parallel do
   
-  !PROFILE
-  t0 = dust_time()
   !cycle on all the particles
+  !TODO: make this parallel too, but pay attention to the race conditions
   do ip=1,size(part)
     !check in which cell at the lowest level it is located
     idx = ceiling((part(ip)%p%cen-octree%xmin)/csize)
@@ -700,31 +712,22 @@ subroutine sort_particles(part,octree)
     call push_ptr(octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%cell_parts,part(ip)%p)
 
   enddo
-  !PROFILE
-  t1 = dust_time()
-  write(msg,'(A,F9.3,A)') 'Sorted particles in: ' , t1 - t0,' s.'
-  call printout(msg)
-
 
 
   nl = 0
-  !PROFILE
-  t0 = dust_time()
   !Bottom level: just check if are leaves
   do k=1,octree%ncl(3,ll); do j=1,octree%ncl(2,ll); do i = 1,octree%ncl(1,ll)
     if( (octree%layers(ll)%lcells(i,j,k)%npart .ge. min_part_4_cell) .or. &
          ll .eq. 1) then !if last level is first, all are leaves
-      octree%layers(ll)%lcells(i,j,k)%leaf = .true.
-      !add to the leaves
-      nl = nl+1
-      octree%leaves(nl)%p => octree%layers(ll)%lcells(i,j,k)
+      !mark as leaf
+      call set_leaf(octree%layers(ll)%lcells(i,j,k), octree%leaves, nl, &
+                                                             octree%pexp)
     endif
   enddo; enddo; enddo !layer cells i,j,k
 
 
   !From the second to last level upwards
   do l = ll-1,1,-1
-    t0 = dust_time()
     !cycle on the elements on the level
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
 
@@ -750,26 +753,22 @@ subroutine sort_particles(part,octree)
           !set the current cell and all the branch upwards as branch
           do child = 1,8
             if(.not. octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf) then
-              octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf = .true.
-              nl = nl+1
-              octree%leaves(nl)%p => &
-                               octree%layers(l)%lcells(i,j,k)%children(child)%p
+              call set_leaf(octree%layers(l)%lcells(i,j,k)%children(child)%p, &
+                        octree%leaves, nl, octree%pexp)
             endif
           enddo
-          call set_branch(octree%layers(l)%lcells(i,j,k))
+          call set_branch(octree%layers(l)%lcells(i,j,k), octree%pexp)
         else
           !None of the children are leaves. Particles have alerady been 
           !inherited, just flag the rest inactive
           do child = 1,8
-            octree%layers(l)%lcells(i,j,k)%children(child)%p%active = .false.
+            call set_inactive(octree%layers(l)%lcells(i,j,k)%children(child)%p)
           enddo
           !then check if itself it is a leaf
           if( (octree%layers(l)%lcells(i,j,k)%npart .ge. min_part_4_cell) &
           .or. l .eq. 1) then !if last level is first, all are leaves
-            octree%layers(l)%lcells(i,j,k)%leaf = .true.
-            !add to the leaves
-            nl = nl+1
-            octree%leaves(nl)%p => octree%layers(l)%lcells(i,j,k)
+            call set_leaf(octree%layers(l)%lcells(i,j,k), &
+                        octree%leaves, nl, octree%pexp)
           endif
         endif
 
@@ -780,24 +779,46 @@ subroutine sort_particles(part,octree)
         do child = 1,8
           if( .not. octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf &
       .and. .not. octree%layers(l)%lcells(i,j,k)%children(child)%p%branch) then
-            octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf = .true.
-            nl = nl+1
-            octree%leaves(nl)%p => &
-                               octree%layers(l)%lcells(i,j,k)%children(child)%p
+            call set_leaf(octree%layers(l)%lcells(i,j,k)%children(child)%p, &
+                        octree%leaves, nl, octree%pexp)
           endif
         enddo !child
       endif
 
     enddo; enddo; enddo !layer cells i,j,k
   enddo
-
-  !PROFILE
-  t1 = dust_time()
-  write(msg,'(A,F9.3,A)') 'Checked leaves  in: ' , t1 - t0,' s.'
-  call printout(msg)
+  
+  !Last dive down the levels to set the leaf neighbours
+  do l = 2,ll
+    !cycle on the elements on the level
+    do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
+    if(octree%layers(l)%lcells(i,j,k)%active) then
+      !1) get the leaf neighbours from the parent if it exists
+      !if(associated(octree%layers(l)%lcells(i,j,k)%parent%p)) then
+        call push_ptr(octree%layers(l)%lcells(i,j,k)%leaf_neigh, &
+                      octree%layers(l)%lcells(i,j,k)%parent%p%leaf_neigh)
+      !endif
+      !2) If one of my parent neighbours is a leaf, push it into my leaf neigh
+      do kc = -1,1; do jc = -1,1; do ic = -1,1
+        if(associated(octree%layers(l)%lcells(i,j,k)%parent%p%&
+                                              neighbours(ic,jc,kc)%p)) then
+        if(octree%layers(l)%lcells(i,j,k)%parent%p%&
+                                          neighbours(ic,jc,kc)%p%leaf) then
+          call push_ptr(octree%layers(l)%lcells(i,j,k)%leaf_neigh, &
+            octree%layers(l)%lcells(i,j,k)%parent%p%neighbours(ic,jc,kc)%p)
+        endif
+        endif
+      enddo; enddo; enddo !neighbour cells ic,jc,kc
+    endif !active
+    enddo; enddo; enddo !layer cells i,j,k
+  enddo
 
   octree%nleaves = nl
 
+  !PROFILE
+  t1 = dust_time()
+  write(msg,'(A,F9.3,A)') 'Sorted particles in: ' , t1 - t0,' s.'
+  call printout(msg)
 end subroutine sort_particles
 
 
@@ -816,12 +837,13 @@ subroutine calculate_multipole(part,octree)
   tsta = dust_time()
   ll = octree%nlevels
   !reset multipole data (might be done elsewhere)
-  do l = ll,1,-1
-    !cycle on the elements on the level
-    do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
-         call octree%layers(l)%lcells(i,j,k)%mp%reset
-    enddo; enddo; enddo !layer cells i,j,k
-  enddo
+  ! amended: now the multipole data is reset when assigned leafs/branches
+  !do l = ll,1,-1
+  !  !cycle on the elements on the level
+  !  do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
+  !       call octree%layers(l)%lcells(i,j,k)%mp%reset
+  !  enddo; enddo; enddo !layer cells i,j,k
+  !enddo
 
 
   !For all the leaves, calculate the multipole coefficients
@@ -844,10 +866,11 @@ subroutine calculate_multipole(part,octree)
   !layer by layer (except the last, in which are only leaves or inactive)
   !perform multipole to multipole
   !PROFILE
-  t0 = dust_time()
+  t00 = dust_time()
   do l = ll-1,1,-1
     !cycle on the elements on the level
-
+    !PROFILE
+    t0 = dust_time()
 !$omp parallel do collapse(3) private(i,j,k,child)
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
       if(octree%layers(l)%lcells(i,j,k)%active .and. &
@@ -878,18 +901,20 @@ subroutine calculate_multipole(part,octree)
   !PROFILE
   t0 = dust_time()
     !cycle on the elements on the level
-!$omp parallel do collapse(3) private(i,j,k,idx_diff) schedule(dynamic)
+!$omp parallel do collapse(3) private(i,j,k,il,idx_diff) schedule(dynamic)
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
       if(octree%layers(l)%lcells(i,j,k)%active) then
          !if it is active perform M2L with all the interaction list
         do il = 1,size(octree%layers(l)%lcells(i,j,k)%interaction_list)
           idx_diff = octree%layers(l)%lcells(i,j,k)%interaction_list(il)%p%cart_index -&
                   (/i,j,k/)
+          if(octree%layers(l)%lcells(i,j,k)%interaction_list(il)%p%active) then
           call octree%layers(l)%lcells(i,j,k)%mp%M2L(&
                octree%layers(l)%ker_der(idx_diff(1),idx_diff(2),idx_diff(3)), &
                octree%pexp, &
                octree%pexp_der, &
                octree%layers(l)%lcells(i,j,k)%interaction_list(il)%p%mp)
+          endif
         enddo !il 
       endif
     enddo; enddo; enddo !layer cells i,j,k
@@ -901,17 +926,19 @@ subroutine calculate_multipole(part,octree)
 
   !PROFILE
   t0 = dust_time()
-!$omp parallel do collapse(3) private(i,j,k,child)
+!$omp parallel do collapse(3) private(i,j,k,child) schedule(dynamic)
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
       if(octree%layers(l)%lcells(i,j,k)%active .and. l.lt.ll) then
         !if active and not in the bottom layer, bring down the local expansion
         ! to the children
         do child = 1,8
-          call octree%layers(l)%lcells(i,j,k)%children(child)%p%mp%L2L(&
-               octree%layers(l)%lcells(i,j,k)%children(child)%p%cen, &
-               octree%layers(l)%lcells(i,j,k)%mp, &
-               octree%layers(l)%lcells(i,j,k)%cen, &
-               octree%pexp )
+          if(octree%layers(l)%lcells(i,j,k)%children(child)%p%active) then
+            call octree%layers(l)%lcells(i,j,k)%children(child)%p%mp%L2L(&
+                 octree%layers(l)%lcells(i,j,k)%children(child)%p%cen, &
+                 octree%layers(l)%lcells(i,j,k)%mp, &
+                 octree%layers(l)%lcells(i,j,k)%cen, &
+                 octree%pexp )
+          endif
         enddo 
       endif
     enddo; enddo; enddo !layer cells i,j,k
@@ -923,6 +950,10 @@ subroutine calculate_multipole(part,octree)
   enddo !l
   tend = dust_time()
   octree%t_mp = tend-tsta
+  !PROFILE
+  t11 = dust_time()
+  write(msg,'(A,F9.3,A)') 'Calculated Multipole in all layers in: ' , t11 - t00,' s.'
+  call printout(msg)
 
 end subroutine calculate_multipole
 
@@ -939,7 +970,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
  class(c_elem), intent(in) :: wvort(:)
  type(t_sim_param), intent(in) :: sim_param
 
- integer :: i, j, k, lv, ip, ipp, m, ie
+ integer :: i, j, k, lv, ip, ipp, m, ie, iln
  real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3)
  real(wp) :: grad(3,3)
  real(t_realtime) :: tsta , tend
@@ -977,6 +1008,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
       !then interact with all the neighbouring cell particles
       do k=-1,1; do j=-1,1; do i=-1,1
         if(associated(octree%leaves(lv)%p%neighbours(i,j,k)%p)) then
+        if(octree%leaves(lv)%p%neighbours(i,j,k)%p%active) then
           do ipp = 1,octree%leaves(lv)%p%neighbours(i,j,k)%p%npart
 
             call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
@@ -994,7 +1026,28 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
             endif
           enddo
         endif
+        endif
       enddo; enddo; enddo
+
+      !interact with the leaf neighbours
+      do iln = 1,size(octree%leaves(lv)%p%leaf_neigh)
+       do ipp = 1,octree%leaves(lv)%p%leaf_neigh(iln)%p%npart
+
+         call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
+              %compute_vel(pos, sim_param%u_inf, v)
+         vel = vel +v/(4.0_wp*pi)
+         if(sim_param%use_vs) then
+           call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
+              %compute_stretch(pos, alpha, str)
+           stretch = stretch +str/(4.0_wp*pi)
+         endif
+         if(sim_param%use_vd) then
+           call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
+              %compute_diffusion(pos, alpha, str)
+           stretch = stretch +str*sim_param%nu_inf
+         endif
+       enddo
+      enddo
 
       !finally interact with the particles inside the cell 
       do ipp = 1,octree%leaves(lv)%p%npart
@@ -1070,39 +1123,141 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
 end subroutine apply_multipole
 
 !----------------------------------------------------------------------
-! DISCONTINUED
-!> Set a whole branch inactive under a leaf. 
-!!
-!! Used to set a whole branch below a leaf inactive. When called with 
-!! leaf=.true. the present cell is set as leaf, and all the branch 
-!! underneath is set to inactive (children and all descendants)
-!!recursive subroutine set_leaf(cell,leaf)
+
+!! DISCONTINUED
+!!!> Check the quantity of particles in a cell
+!!!!
+!!!! If there are too few particles, these are bound together and applied to
+!!!! the parent
+!!recursive subroutine check_cell_content(cell, leaves)
 !! type(t_cell), intent(inout) :: cell
-!! logical :: leaf
-!!
-!! integer :: i 
-!!  
-!!  if (.not.leaf) cell%active = .false.
+!! type(t_cell_p), allocatable, intent(inout) :: leaves(:)
 !! 
-!!  do i=1,8
-!!    if(associated(cell%children(i)%p)) then
-!!      !call set_inactive_tree(cell%children(i)%p, leaf=.false.)
-!!      call set_leaf(cell%children(i)%p, .false.)
-!!    endif
-!!  enddo
+!! integer :: sib
+!! logical :: enough
+!!  
 !!
-!!end subroutine set_leaf
+!!  if(cell%npart .ge. min_part_4_cell) then
+!!    ! Enough particles, since we started from the bottom, it is a leaf, set
+!!    ! it as leaf and cut out the descendant
+!!    call set_leaf(cell,.true.)  
+!!    call push_ptr(leaves, cell)
+!!
+!!  else
+!!    !Not enough particles in this cell
+!!    enough = .false.
+!!    !We have to check that all the siblings have not enough particles
+!!    !oviously only if the cell has siblings, otherwise is top level and
+!!    !it will be a leaf anyway
+!!    if(associated(cell%parent%p)) then
+!!      do sib = 1,8
+!!        if(cell%parent%p%children(sib)%p%npart .ge. min_part_4_cell) then
+!!          enough = .true. 
+!!        endif
+!!      enddo
+!!    else
+!!      !it does not have a parent, it is top level, force to be a leaf
+!!      enough = .true.
+!!    endif
+!!
+!!    if (.not. enough) then
+!!      !all the siblings have not enough particles,  all are going to be 
+!!      ! set inactive, push the pointers to particles to the parent
+!!      do sib = 1,8
+!!        !TODO: for some reasons the generic does not work here
+!!        call push_ptr(cell%parent%p%cell_parts, cell%parent%p%children(sib)%p%cell_parts)
+!!      enddo
+!!      !escalate this call upwards
+!!      call check_cell_content(cell%parent%p, leaves)
+!!
+!!    else
+!!      !the present cell has not enough particles, however the siblings
+!!      !do, so the present cell becomes a leaf anyway
+!!      call set_leaf(cell,.true.)  
+!!      call push_ptr(leaves, cell)
+!!
+!!    endif
+!!
+!!
+!!  endif
+!!
+!!end subroutine check_cell_content
 
 !----------------------------------------------------------------------
 
-recursive subroutine set_branch(cell)
+!> Set a cell leaf
+!!
+!! A cell is set as leaf, and if necessary the multipole data is
+!! allocated. In all cases the multipole data is reset.
+!! Note: leaves are not a dynamic vector, are allocated as a whole and
+!! then only the first one are employed. This means that to set a leaf 
+!! in the correct position an increasing index is necessary, and must be
+!! passed with intent(inout)
+recursive subroutine set_leaf(cell,leaves,il,pexp)
+ type(t_cell), intent(inout), target :: cell
+ type(t_cell_p), intent(inout) :: leaves(:)
+ integer, intent(inout) :: il
+ type(t_polyexp), intent(in) :: pexp
+  
+  !I is a leaf
+  cell%leaf = .true.
+
+  il = il+1
+  leaves(il)%p => cell
+
+  if(.not. cell%active) then
+    !If it was not active, set active and allocate data
+    cell%active = .true.
+    call cell%mp%init(pexp)
+  else
+    !If it was alerady active, just reset the data
+    call cell%mp%reset
+  endif
+
+end subroutine set_leaf
+
+!----------------------------------------------------------------------
+
+!> Set a cell and all the upward branch branch
+!!
+!! Recursively set all the upward branch as branch, allocating
+!! the multipole data when necessary, resetting it to zero in any case
+recursive subroutine set_branch(cell,pexp)
  type(t_cell), intent(inout) :: cell
+ type(t_polyexp), intent(in) :: pexp
 
- cell%branch = .true.
+  cell%branch = .true.
 
- if(associated(cell%parent%p)) call set_branch(cell%parent%p)
+  if(.not. cell%active) then
+    !If it was not active, set active and allocate data
+    cell%active = .true.
+    call cell%mp%init(pexp)
+  else
+    !If it was alerady active, just reset the data
+    call cell%mp%reset
+  endif
+
+  if(associated(cell%parent%p)) call set_branch(cell%parent%p, pexp)
 
 end subroutine set_branch
+
+!----------------------------------------------------------------------
+
+!> Set a cell inactive
+!!
+!! Everything is set to false and the multipole data are deallocated
+recursive subroutine set_inactive(cell)
+ type(t_cell), intent(inout) :: cell
+
+  cell%branch = .false.
+  cell%leaf = .false.
+
+  if(cell%active) then
+    cell%active = .false.
+    call cell%mp%destroy
+  endif
+
+end subroutine set_inactive
 
 !----------------------------------------------------------------------
 
@@ -1216,13 +1371,19 @@ end subroutine push_part_ptr_vec
 !----------------------------------------------------------------------
 
 !> Reset the particles stored inside the cell
+!!
+!! The number of particles, the particles pointers and the brach/leaves
+!! flags are re-set. Activity flag is kept since it marks whether the 
+!! multipole data are allocated or not, will be set during sorting
 subroutine reset_cell(cell)
  type(t_cell), intent(inout) :: cell
 
  deallocate(cell%cell_parts)
  allocate(cell%cell_parts(0))
+ deallocate(cell%leaf_neigh)
+ allocate(cell%leaf_neigh(0))
  cell%npart = 0
- cell%active = .true.
+ !cell%active = .true.
  cell%branch = .false.
  cell%leaf = .false.
 

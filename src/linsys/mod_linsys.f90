@@ -266,6 +266,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
  nst = linsys%nstatic
  ntot = linsys%rank
  !calculate the vortex induced velocity
+ !$omp parallel do private(ie) schedule(dynamic)
  do ie =1,linsys%rank
 
    !call elems(ie)%p%get_vort_vel(wake_elems%end_vorts, uinf)
@@ -273,10 +274,11 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
    call elems(ie)%p%get_vort_vel(wake%vort_p, uinf)
 
  enddo
+ !$omp end parallel do
 
   !First all the static ones (passing as start and end only the dynamic part)
 !$omp parallel private(ie) firstprivate(nst, ntot)
-!$omp do
+!$omp do schedule(dynamic)
   do ie = 1,nst
 
     call elems(ie)%p%build_row(elems,linsys,uinf,ie,nst+1,ntot)
