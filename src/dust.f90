@@ -666,7 +666,7 @@ do it = 1,nstep
   !                                                                            
 
       
-  if ( it .gt. 1 ) then                                                        !
+  if ( it .gt. 1 .and. geo%nSurfPan .gt. 0 ) then                                                        !
     call solve_linsys_pressure(linsys,surfpan_H_IE)                            !
   end if                                                                       !
 
@@ -779,7 +779,7 @@ do it = 1,nstep
 enddo
 
 ! pres_IE +++++
-deallocate( surfpan_H_IE )
+ if(allocated(surfpan_H_IE)) deallocate( surfpan_H_IE )
 
 deallocate( res_old )
 !===== End Time Cycle ======
