@@ -3,9 +3,12 @@ MeshFileType = parametric
 ElType = v
 !ElType = p
 
-mesh_reflection = F
-reflection_point = (/0.0,0.0,0.0/)
-reflection_normal = (/0.0,1.0,0.0/)
+mesh_mirror = F
+mirror_point = (/0.0,0.0,0.0/)
+mirror_normal = (/0.0,1.0,0.0/)
+mesh_symmetry = F
+symmetry_point = (/0.0,0.0,0.0/)
+symmetry_normal = (/0.0,1.0,0.0/)
 
 nelem_chord = 5
 type_chord = uniform   ! uniform  cosineLE  cosineTE
