@@ -427,8 +427,18 @@ endif
 
 ! Check that tend .gt. tinit
 if ( sim_param%tend .le. sim_param%t0 ) then
+    write(*,*) nl//' ==== In dust.in ==== '
+    write(*,*) ' restart_simulation : ' , sim_param%restart_from_file
+    write(*,*) ' restart_file : ' , trim(sim_param%restart_file)
+    write(*,*) ' reset_time : ' , sim_param%reset_time
+    write(*,*) ' tend   : ' , sim_param%tend 
+    if ( sim_param%restart_from_file .and. ( .not. sim_param%reset_time ) ) then
+      write(*,*) ' tstart read from restart file : ' , sim_param%t0 
+    else
+      write(*,*) ' tstart read from dust.in file : ' , sim_param%t0 
+    end if
     call error('dust','','sim_param%tend .le. sim_param%t0. Check your input&
-    & file and restart options. STOP')
+    & file and restart options. STOP.')
 end if
 
 

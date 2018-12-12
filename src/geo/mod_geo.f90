@@ -85,8 +85,8 @@ use mod_math, only: &
   cross
 
 use mod_reference, only: &
-  t_ref, build_references, update_all_references, destroy_references, &
-  update_relative_initial_conditions
+  t_ref, build_references, update_all_references, destroy_references   ! , &
+! update_relative_initial_conditions
 
 use mod_hdf5_io, only: &
    h5loc, &
@@ -359,12 +359,16 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   endif
   call build_references(geo%refs, trim(ref_file_name), sim_param)
 
-  ! If rstart_from_file, set the right initial conditions!
-  ! -> Correction needed for motion defined through its velocity
-  if ( sim_param%restart_from_file ) then
-    call update_relative_initial_conditions(sim_param%restart_file, sim_param%ReferenceFile, geo%refs) 
-  end if 
-
+! -----------------------------------------------------------------------------------------
+! The following lines were needed when the motion was defined w.r.t. the initial
+! time of the simulation, tstart, and not w.r.t. 0, as they are defined now
+! 
+! ! If rstart_from_file, set the right initial conditions!
+! ! -> Correction needed for motion defined through its velocity
+! if ( sim_param%restart_from_file .and. sim_param%reset_time ) then
+!   call update_relative_initial_conditions(sim_param%restart_file, sim_param%ReferenceFile, geo%refs) 
+! end if 
+! -----------------------------------------------------------------------------------------
 
   !Create the output geometry file (if it is not restarting with the same name)
   if(trim(geo_file_name).ne.trim(target_file)) then
@@ -598,12 +602,11 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   call create_strip_connectivity(geo)
 
 
-  ! debug
-  write(*,*) ' mod_geo l.590 ' 
-  write(*,*) ' size(elems_impl) : ' , size(elems_impl)
-  write(*,*) ' elems_impl(1)%p%id  : ' , elems_impl(1)%p%id 
-  write(*,*) ' elems_impl(1)%p%nor : ' , elems_impl(1)%p%nor
-
+! ! debug -----
+! write(*,*) ' mod_geo l.590 ' 
+! write(*,*) ' size(elems_impl) : ' , size(elems_impl)
+! write(*,*) ' elems_impl(1)%p%id  : ' , elems_impl(1)%p%id 
+! write(*,*) ' elems_impl(1)%p%nor : ' , elems_impl(1)%p%nor
 ! do i = 1 , elems_impl(1)%p%n_ver
 !   write(*,*) ' associated(elems_impl(1)%p%neigh(i)%p): ' , &
 !                associated(elems_impl(1)%p%neigh(i)%p)
@@ -614,6 +617,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
 ! end do
 ! stop
 ! write(*,*) ' mod_geo l.590 ' 
+! ! debug -----
 
   ! Initialisation of the field surf_vel to zero (for surfpan only)
   do i=1,geo%nelem_impl
@@ -697,6 +701,11 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
   ! be present, including the multiples. Due to pointers pointing to
   ! allocatables the components array cannot be expanded later
   n_comp_input = n_comp
+
+! ! debug ----
+! write(*,*) ' in load_components(). n_comp = ' , n_comp
+! ! debug ----
+
   do i_comp_input = 1,n_comp_input
     write(cname,'(A,I3.3)') 'Comp',i_comp_input
     call open_hdf5_group(gloc,trim(cname),cloc)
