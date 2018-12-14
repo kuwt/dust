@@ -40,7 +40,7 @@ use mod_param, only: &
 
 implicit none
 
-public :: cross , linear_interp
+public :: cross , linear_interp , compute_qr
 
 private
 
@@ -150,6 +150,79 @@ subroutine linear_interp_array( val_arr , t_vec , t , val )
   end do
 
 end subroutine linear_interp_array
+
+! ----------------------------------------------------------------------
+
+subroutine compute_qr ( A , Q , R )
+  real(wp) , intent(inout) ::  A(:,:) 
+  real(wp) , allocatable , intent(inout) :: Q(:,:) , R(:,:)
+ 
+  integer :: m , n , i_m , i_n
+ 
+  ! lapack dgeqrf routine ----
+  real(wp) , allocatable :: tau(:) , work(:)
+  integer :: lwork , info 
+ 
+  ! tmp matrices to get Q matrix -----
+  real(wp) , allocatable :: H(:,:) , v(:,:) , eye(:,:)
+ 
+ 
+  ! input check and warnings
+  if ( allocated(Q) ) then
+    write(*,*) ' Warning. In compute_qr(), Q was already allocated.'
+    write(*,*) ' Deallocated and re-allocated. '
+    deallocate(Q)
+  end if
+  if ( allocated(R) ) then
+    write(*,*) ' Warning. In compute_qr(), Q was already allocated.'
+    write(*,*) ' Deallocated and re-allocated. '
+    deallocate(R)
+  end if
+ 
+  ! 
+  m = size(A,1)
+  n = size(A,2)
+ 
+  ! qr factorisation of matrix B
+  allocate(   tau(min(m,n)) ) ;    tau = 0.0_wp
+  allocate(  work(    n   ) ) ;   work = 0.0_wp
+  lwork = n       ! <-- its size should be .ge. n*nb
+                  ! with nb = optimal blocksize (???)
+! ! debug ----
+! write(*,*) ' In compute_qr(), A : ' 
+! do i_m = 1 , size(A,1) ; write(*,*) '  ' , A(i_m,:) ; end do
+! ! debug ----
+
+  call dgeqrf( m , n , A , m , tau , work , lwork , info )
+
+! ! debug ----
+! write(*,*) ' In compute_qr(), after calling dgeqrf(). A : ' 
+! do i_m = 1 , size(A,1) ; write(*,*) '  ' , A(i_m,:) ; end do
+! ! debug ----
+ 
+  ! build Q , R matrices
+  ! allocataion and initialisation to 0.0 (useless for Q)
+  allocate( Q(m,m) , R(m,n) ) ; R = 0.0_wp
+ 
+  ! R upper triangular matrix (initialised to zero!)
+  do i_m = 1 , m
+    R( i_m , i_m : size(A,2) ) = A( i_m , i_m : size(A,2) )
+  end do
+ 
+  ! Q square unitary matrix 
+  allocate( H(m,m) , v(m,1) ) ! ; H = 0.0_wp  ; v(:,1) = 0.0_wp
+  allocate( eye(m,m) ) ; eye = 0.0_wp ; do i_m = 1,m ; eye(i_m,i_m) = 1.0_wp ; end do
+  Q = eye ! Initialisation
+  do i_m = 1 , min(m,n)
+    v(:,1) = 0.0_wp ; v(i_m,1) = 1.0_wp ; v(i_m+1:m,1) = A(i_m+1:m,i_m) ;
+    H = eye - tau(i_m) * matmul( v , transpose(v) )
+    Q = matmul( Q , H ) 
+  end do
+ 
+  deallocate(H,v,eye) 
+  deallocate(tau,work)
+
+end subroutine compute_qr
 
 ! ----------------------------------------------------------------------
 

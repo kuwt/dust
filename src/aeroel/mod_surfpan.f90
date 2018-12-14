@@ -65,7 +65,7 @@ use mod_sim_param, only: &
   t_sim_param
 
 use mod_math, only: &
-  cross
+  cross , compute_qr
 
 !----------------------------------------------------------------------
 
@@ -89,6 +89,9 @@ type, extends(c_impl_elem) :: t_surfpan
   real(wp), allocatable :: cosTi(:) , sinTi(:)
   real(wp), allocatable :: verp(:,:)
   real(wp)              :: surf_vel(3)
+  !> stencil for the Constrained Hermite Taylor Series 
+  ! Least Square computation of derivatives
+  real(wp), allocatable ::   chtls_stencil(:,:)
 
   !> surface quantities for Bernoulli integral equation
   real(wp) :: dUn_dt
@@ -119,6 +122,8 @@ contains
 
   procedure, pass(this) :: create_local_velocity_stencil => &
                            create_local_velocity_stencil_surfpan
+  procedure, pass(this) :: create_chtls_stencil => &
+                           create_chtls_stencil_surfpan
 
 end type
 
@@ -704,42 +709,73 @@ end subroutine compute_vel_surfpan
 !----------------------------------------------------------------------
 
 !> Compute an approximate value of the mean pressure on the actual element
-!!
+! TODO: move the velocity update outside this routine, in a dedicated routine
 subroutine compute_pres_surfpan(this, sim_param)
   class(t_surfpan), intent(inout) :: this
   !type(t_elem_p),   intent(in)    :: elems(:)
   type(t_sim_param), intent(in)   :: sim_param
 
   real(wp) :: vel_phi_t(3) , vel_phi(3)
+  real(wp) :: f(5)
 
-  integer :: i_e
-  
-  ! perturbation velocity, u ---------------------------------
-  ! Compute velocity from the potential (mu = -phi), exploiting the stencil
-  ! contained in pot_vel_stencil.
-  ! ''Tangential component'' from the surface stencil
-  !   Normal component       from the boundary conditions U.n = b.n
+  integer :: i_e , n_neigh
 
-  ! tangential part
-  vel_phi_t = 0.0_wp
+! This routine contains the velocity update as well. TODO, move to a dedicated routine
+! Two methods have been implemented for surface velocity computation:
+! 1. stencil relying on a FV approx of the surface: pot_vel_stencil
+! 2. stencil relying on a CHTLS* method
+! *CHTLS: Constrained Hermite Taylor series Least Square method 
+
+!   ! 1. FV approx 
+!   ! perturbation velocity, u ---------------------------------
+!   ! Compute velocity from the potential (mu = -phi), exploiting the stencil
+!   ! contained in pot_vel_stencil.
+!   ! ''Tangential component'' from the surface stencil
+!   !   Normal component       from the boundary conditions U.n = b.n
+! 
+!   ! tangential part
+!   vel_phi_t = 0.0_wp
+!   do i_e = 1 , this%n_ver
+!     if ( associated(this%neigh(i_e)%p) ) then !  .and. &
+!       vel_phi_t = vel_phi_t + &
+!         this%pot_vel_stencil(:,i_e) * (this%neigh(i_e)%p%mag - this%mag)
+!     end if
+!   end do
+! 
+! ! vel_phi_t  = - vel_phi_t    ! mu = - phi
+!   vel_phi_t = - vel_phi_t + sum(vel_phi_t*this%nor) * this%nor
+!   vel_phi = vel_phi_t +  &
+!         sum(this%nor*(this%ub-sim_param%u_inf-this%uvort)) * this%nor 
+! 
+!   ! velocity, U = u_t \hat{t} + u_n \hat{n} + U_inf ----------
+!   this%surf_vel = sim_param%u_inf + vel_phi + this%uvort
+! ! old and wrong
+! ! this%surf_vel = vel_phi - sum(vel_phi*this%nor)*this%nor + &
+! !      this%nor * sum(this%nor * (-sim_param%u_inf-this%uvort+this%ub) ) + &
+! !            sim_param%u_inf + this%uvort
+
+  ! 2. CHTLS method
+  n_neigh = 0
   do i_e = 1 , this%n_ver
-    if ( associated(this%neigh(i_e)%p) ) then !  .and. &
-      vel_phi_t = vel_phi_t + &
-        this%pot_vel_stencil(:,i_e) * (this%neigh(i_e)%p%mag - this%mag)
+    if ( associated(this%neigh(i_e)%p) ) then
+      n_neigh = n_neigh + 1
+      f(n_neigh) = - ( this%neigh(i_e)%p%mag - this%mag )
     end if
   end do
+  f(n_neigh+1) = sum(this%nor * (-sim_param%u_inf - this%uvort + this%ub) )
 
-! vel_phi_t  = - vel_phi_t    ! mu = - phi
-  vel_phi_t = - vel_phi_t + sum(vel_phi_t*this%nor) * this%nor
-  vel_phi = vel_phi_t +  &
-        sum(this%nor*(this%ub-sim_param%u_inf-this%uvort)) * this%nor 
+! ! debug ----
+! write(*,*) ' shape(this%chtls_stencil) , n_neigh+1 ' , &
+!              shape(this%chtls_stencil) , n_neigh+1 
+! write(*,*) ' this%chtls_stencil , f : this%id ' , this%id
+! do i_e = 1 , size(this%chtls_stencil,1) 
+!    write(*,*) this%chtls_stencil(i_e,:)
+! end do
+! write(*,*) f(1:n_neigh+1)
 
-  ! velocity, U = u_t \hat{t} + u_n \hat{n} + U_inf ----------
+! ! debug ----
+  vel_phi = matmul( this%chtls_stencil , f(1:n_neigh+1) )
   this%surf_vel = sim_param%u_inf + vel_phi + this%uvort
-! old and wrong
-! this%surf_vel = vel_phi - sum(vel_phi*this%nor)*this%nor + &
-!      this%nor * sum(this%nor * (-sim_param%u_inf-this%uvort+this%ub) ) + &
-!            sim_param%u_inf + this%uvort
 
   ! pressure -------------------------------------------------
   ! unsteady problems  : P = P_inf + 0.5*rho_inf*V_inf^2
@@ -855,6 +891,125 @@ subroutine create_local_velocity_stencil_surfpan (this)
   this%pot_vel_stencil = this%pot_vel_stencil / bubble_surf
 
 end subroutine create_local_velocity_stencil_surfpan
+
+!----------------------------------------------------------------------
+!> create stencil in the "local" reference system. The components of the 
+!  velocity vector in the "global" ref.sys. are obtained with the rotation 
+!  matrix of the "local" reference system
+subroutine create_chtls_stencil_surfpan( this , elems )
+  class(t_surfpan), intent(inout) :: this
+  type(t_pot_elem_p), intent(in) :: elems(:)
+ 
+  real(wp), allocatable :: A(:,:) , B(:,:) , W(:,:) , V(:,:) , Vcheck(:,:)
+  real(wp) :: dx(3)
+  real(wp), allocatable :: C(:,:) , CQ(:,:) 
+  real(wp), allocatable :: Cls_tilde(:,:) , iCls_tilde(:,:) , chtls_tmp(:,:)
+  real(wp) :: det_cls
+  real(wp) :: r1
+ 
+  real(wp), allocatable :: Q(:,:) , R(:,:)
+ 
+  integer :: n_neigh
+  integer :: i_n , i_nn
+ 
+ 
+  ! # of neighbouring elements
+  n_neigh = 0 
+  do i_n = 1 , this%n_ver
+    if ( associated(this%neigh(i_n)%p) ) then ! the neighbouring element exists
+      n_neigh = n_neigh + 1
+    end if
+  end do
+ 
+  ! arrays A (differences), B (constraints), W (weights) -----------
+  allocate( A(n_neigh,3) , W(n_neigh+1,n_neigh+1) ) ; W = 0.0_wp
+  allocate( B(1,3) ) ; B(1,:) = this%nor
+  i_n = 0
+  do i_nn = 1 , this%n_ver
+    if ( associated(this%neigh(i_nn)%p) ) then ! the neighbouring element exists
+      i_n = i_n + 1
+      dx = this%neigh(i_nn)%p%cen - this%cen
+      A(i_n, : ) = dx 
+      W(i_n,i_n) = 1.0_wp / norm2(dx)
+    end if
+  end do
+  W(n_neigh+1,n_neigh+1) = sum( W ) / n_neigh
+ 
+  allocate( V(3,1) ) ; V(:,1) = B(1,:)
+
+! ! debug ----
+! write(*,*)
+! write(*,*) ' In create_chtls_stencil_surfpan, before calling compute_qr(). '
+! write(*,*) ' V : ' , V 
+! do i_n = 1 , size(V,1) ; write(*,*) '  ' , V(i_n,:) ; end do
+! ! debug ----
+ 
+  call compute_qr( V , Q , R ) 
+ 
+  allocate(         C(n_neigh+1,3) ) ; C(1:n_neigh,:) = A ; C(n_neigh+1,:) = B(1,:)
+  allocate(        CQ(n_neigh+1,3) ) ; CQ = matmul( C , Q )
+  allocate( Cls_tilde(        2,2) ) ; allocate( iCls_tilde(2,2) )
+  Cls_tilde = matmul( transpose(CQ(:,2:3)) , matmul( W , CQ(:,2:3) ) )
+
+! ! debug ---- 
+! write(*,*) ' A             , el%id : ' , this%id 
+! do i_n = 1 , size(A,1) ; write(*,*) '  ' , A(i_n,:) ; end do
+! write(*,*) ' B                     : ' 
+! do i_n = 1 , size(B,1) ; write(*,*) '  ' , B(i_n,:) ; end do
+! ! debug ---- 
+
+ 
+  ! inverse Cls ----
+  det_cls = Cls_tilde(1,1) * Cls_tilde(2,2) - Cls_tilde(1,2) * Cls_tilde(2,1) 
+  iCls_tilde(1,1) =  Cls_tilde(2,2) / det_cls ; iCls_tilde(1,2) = -Cls_tilde(1,2) / det_cls 
+  iCls_tilde(2,1) = -Cls_tilde(2,1) / det_cls ; iCls_tilde(2,2) =  Cls_tilde(1,1) / det_cls 
+ 
+  if ( .not. allocated(this%chtls_stencil) ) then
+    allocate(this%chtls_stencil( 3 , n_neigh + 1 ) ) ; this%chtls_stencil = 0.0_wp
+  end if
+ 
+  r1 = R(1,1) 
+  allocate(chtls_tmp( 3 , n_neigh + 1 )) ; chtls_tmp = 0.0_wp
+  chtls_tmp(  1,n_neigh + 1 ) = 1.0_wp / R(1,1) 
+  chtls_tmp(2:3,1 : n_neigh ) = matmul( iCls_tilde , &
+        matmul(transpose(CQ(1:n_neigh,2:3)), W(1:n_neigh,1:n_neigh) ) )
+  chtls_tmp(2:3, n_neigh+1:n_neigh+1 ) = matmul( iCls_tilde , &
+        matmul(transpose(CQ( n_neigh+1:n_neigh+1,2:3)), W(n_neigh+1:n_neigh+1, n_neigh+1:n_neigh+1) ) &
+      - matmul( matmul( transpose(CQ(1:n_neigh+1,2:3)), W(1:n_neigh+1,1:n_neigh+1) ) , & 
+                CQ(1:n_neigh+1,1:1) / r1 )  ) 
+ 
+  this%chtls_stencil = matmul( Q , chtls_tmp )
+
+! ! debug ---- 
+! write(*,*) ' chtls_stencil , el%id : ' , this%id 
+! do i_n = 1 , size(this%chtls_stencil,1) ; write(*,*) '  ' , this%chtls_stencil(i_n,:) ; end do
+! write(*,*) ' chtls_tmp             : ' 
+! do i_n = 1 , size( chtls_tmp,1 ) ; write(*,*) '  ' ,      chtls_tmp(    i_n,:) ; end do
+! ! debug ---- 
+ 
+! ! debug ----
+! write(*,*)
+! write(*,*) ' V : ' 
+! do i_n = 1 , size(V,1) ; write(*,*) '  ' , V(i_n,:) ; end do
+! write(*,*) ' V = Q*R . Q : '
+! do i_n = 1 , size(Q,1) ; write(*,*) '  ' , Q(i_n,:) ; end do
+! write(*,*) ' V = Q*R . R : '
+! do i_n = 1 , size(R,1) ; write(*,*) '  ' , R(i_n,:) ; end do
+! write(*,*)
+! 
+! allocate(Vcheck(size(V,1),size(V,2)))
+! Vcheck = matmul( Q , R )
+! write(*,*) ' V_check : '
+! do i_n = 1 , size(Vcheck,1) ; write(*,*) '  ' , Vcheck(i_n,:) ; end do
+! 
+! write(*,*) ' stop in aeroel/mod_surfpan.f90/create_chtls_stencil_surfpan() around l.920 '
+! stop
+! ! debug ----
+ 
+  deallocate(C,CQ,Cls_tilde,iCls_tilde,chtls_tmp)
+  deallocate(A,B,V,W,Q,R)
+
+end subroutine create_chtls_stencil_surfpan
 
 !----------------------------------------------------------------------
 

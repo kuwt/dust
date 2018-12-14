@@ -624,6 +624,9 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
     select type(el=>elems_impl(i)%p) ; class is(t_surfpan)
       el%surf_vel = 0.0_wp
       call el%create_local_velocity_stencil()
+      ! chtls stencil
+      call el%create_chtls_stencil(elems_tot)
+
     end select
   end do
   
