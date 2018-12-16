@@ -76,16 +76,28 @@ use mod_hdf5_io, only: &
 use mod_math, only: &
    cross  
 
+!----------------------------------------------------------------------
+
 implicit none
 
 public :: build_geometry
 
 private
 
+!----------------------------------------------------------------------
+
+character(len=max_char_len) :: msg
 character(len=*), parameter :: this_mod_name = 'mod_build_geo'
+
+!----------------------------------------------------------------------
 
 contains 
 
+!----------------------------------------------------------------------
+
+!> Builds the whole geometry from the inputs provided
+!!
+!! Namely calls build_component() for each component
 subroutine build_geometry(geo_files, ref_tags, comp_names, output_file, & 
                           global_tol_sew , global_inner_prod_te )
  character(len=*), intent(in) :: geo_files(:)
@@ -115,6 +127,11 @@ end subroutine build_geometry
 
 !-----------------------------------------------------------------------
 
+!> Builds a single geometrical component
+!!
+!! The subroutine reads the input in the input file for the specific 
+!! component, then builds the component by either loading the mesh
+!! from the mesh file or generating a parametric component
 subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                            global_tol_sew , global_inner_prod_te)
  integer(h5loc), intent(in)   :: gloc
@@ -180,12 +197,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   !element types
   call geo_prs%CreateStringOption('ElType', &
               'element type (temporary) p:panel, v:vortex ring, l:lifting line')
-  !reference frame
-  !call geo_prs%CreateStringOption('Reference_Tag',&
-  !                                 'reference frame tag of the component','0')
   !symmtery
   call geo_prs%CreateLogicalOption('mesh_symmetry',&
-               'Has all the file a custom reference frame', 'F')
+               'Reflect and double the geometry?', 'F')
   call geo_prs%CreateRealArrayOption('symmetry_point', &
                'Center point of symmetry plane, (x, y, z)', &
                '(/0.0, 0.0, 0.0/)')
@@ -194,7 +208,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                '(/0.0, 1.0, 0.0/)')
   !mirroring
   call geo_prs%CreateLogicalOption('mesh_mirror',&
-               'Has all the file a custom reference frame', 'F')
+               'Reflect and discard the original geometry', 'F')
   call geo_prs%CreateRealArrayOption('mirror_point', &
                'Center point of mirror plane, (x, y, z)', &
                '(/0.0, 0.0, 0.0/)')
@@ -202,6 +216,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                'Normal of mirror plane, (xn, yn, zn)', &
                '(/1.0, 0.0, 0.0/)')
   
+  !Parameters for the actuator disks
   call geo_prs%CreateRealOption('traction', &
                'Traction of the rotor')
   call geo_prs%CreateRealOption('Radius', &
@@ -343,7 +358,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   call write_hdf5(mesh_file_type,'CompInput',comp_loc)
   call write_hdf5(ref_tag,'RefTag',comp_loc)
 
-! call new_hdf5_group(file_loc, 'Components', group_loc)
   call write_hdf5(trim(comp_el_type),'ElType',comp_loc)
 
   call new_hdf5_group(comp_loc, 'Geometry', geo_loc)
@@ -431,9 +445,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   end select
 
   ! ==== SYMMETRY ==== only half of the component has been defined 
-  write(*,*) 'mesh_symmetry   : ' , mesh_symmetry
-  write(*,*) 'symmetry_point  : ' , symmetry_point
-  write(*,*) 'symmetry_normal : ' , symmetry_normal
   if ( mesh_symmetry ) then
     select case (trim(mesh_file_type))
       case('cgns', 'basic' )  ! TODO: check basic
@@ -461,9 +472,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   end if
 
   if ( trim(mesh_file_type) .eq. 'parametric' ) then
-    !DEBUG
-    write(*,*) ' +++ nelems_span_tot : ' , nelems_span_tot
-    write(*,*) ' +++ nelems_chor_tot : ' , npoints_chord_tot - 1
     !write HDF5 fields
     call write_hdf5(  nelems_span_tot  ,'parametric_nelems_span',geo_loc)
     call write_hdf5(npoints_chord_tot-1,'parametric_nelems_chor',geo_loc)
@@ -471,16 +479,12 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   end if
 
   ! ==== MIRROR ==== the component is mirrored w.r.t. the defined point and plane 
-  write(*,*) 'mesh_mirror   : ' , mesh_mirror  
-  write(*,*) 'mirror_point  : ' , mirror_point
-  write(*,*) 'mirror_normal : ' , mirror_normal
   if ( mesh_mirror ) then
 
     select case (trim(mesh_file_type))
       case('cgns', 'basic' )  ! TODO: check basic
         call mirror_mesh(ee, rr, mirror_point, mirror_normal)
       case('parametric')
-!! !     if ( ElType .ne. 'l' ) then
         call mirror_mesh_structured(ee, rr,  &
                                        npoints_chord_tot , nelems_span , &
                                        mirror_point, mirror_normal)
@@ -514,6 +518,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         write(*,*) '  defined as ''basic'' with ''vortex ring'' elements:'
         write(*,*) '  be sure to your input files comply with the conventions '
         write(*,*) '  of parameteric component structures.'//nl
+        !TODO: IMPORTANT: what should be the behaviour here?
         call build_te_parametric( ee , rr , ElType ,  &
            npoints_chord_tot , nelems_span_tot , &
            e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
@@ -594,13 +599,6 @@ end subroutine build_component
 
 !----------------------------------------------------------------------
 
-!----------------------------------------------------------------------
-!----------------------------------------------------------------------
-! routines : symmetry_mesh                 , 
-!            symmetry_mesh_structured      ,
-!----------------------------------------------------------------------
-!----------------------------------------------------------------------
-
 !> Subroutine used to double the mesh by reflecting it along a simmetry 
 !! plane
 !!
@@ -660,7 +658,7 @@ end subroutine symmetry_mesh
 !----------------------------------------------------------------------
 
 !> Subroutine used to double the mesh by reflecting it along a simmetry 
-!! plane
+!! plane for a parametric component.
 !!
 !! Given a plane defined by a center point and a normal vector, the mesh 
 !! is doubled: all the points are reflected and new mirrored elements 
@@ -702,12 +700,9 @@ subroutine symmetry_mesh_structured( ee, rr, &
      end if
    end do
    if ( minmaxPn .gt. eps ) then
-!    write(*,*) ' warning: discontinuous component '
      call error(this_sub_name, this_mod_name, 'Discontinuous component.')
    else if ( minmaxPn .lt. -eps ) then
      call error(this_sub_name, this_mod_name, 'Body compenetration.')
-   else
-     write(*,*) ' sewing ' 
    end if
  else if ( m .lt. 0.0_wp ) then
    minmaxPn = sum( (rr(:,1)-cent)*norm )
@@ -717,12 +712,9 @@ subroutine symmetry_mesh_structured( ee, rr, &
      end if
    end do
    if ( minmaxPn .lt. -eps ) then
-!    write(*,*) ' warning: discontinuous component '
      call error(this_sub_name, this_mod_name, 'Discontinuous component.')
    else if ( minmaxPn .gt. eps ) then
      call error(this_sub_name, this_mod_name, 'Body compenetration.')
-   else
-     write(*,*) ' sewing ' 
    end if
  end if
 
@@ -735,14 +727,11 @@ subroutine symmetry_mesh_structured( ee, rr, &
  end do
 
  if ( nsew .ne. npoints_chord_tot ) then
-   write(*,*) ' rr. size : ' , size(rr,1) , size(rr,2)
-   write(*,*) ' npoints_chord_tot ' , npoints_chord_tot
-   write(*,*) ' nsew = ' , nsew
-   call error(this_sub_name, this_mod_name, 'Wrong sewing of the first section')
- else
-   write(*,*) ' nsew = ' , nsew
+   write(msg,'(A,I0,A,I0,A)') 'Wrong sewing of parametric component during &
+         &symmetry reflection. Only ',nsew,' out of ',npoints_chord_tot,&
+         'effectively sewed'
+   call error(this_sub_name, this_mod_name, msg)
  end if
- ! some checks ---------------------------------
 
 
   ne = size(ee,2); np = size(rr,2)
@@ -802,12 +791,14 @@ subroutine symmetry_mesh_structured( ee, rr, &
 end subroutine symmetry_mesh_structured
 
 !----------------------------------------------------------------------
-!----------------------------------------------------------------------
-! routines : mirror_mesh                   , 
-!            mirror_mesh_structured        ,
-!----------------------------------------------------------------------
-!----------------------------------------------------------------------
 
+!> Subroutine used to reflect the mesh along a simmetry 
+!! plane.
+!!
+!! Given a plane defined by a center point and a normal vector, the mesh 
+!! is reflected: all the points are reflected and new mirrored elements 
+!! introduced. However the original mesh is not preserved and just
+!! overwritten.
 subroutine mirror_mesh(ee, rr, cent, norm)
  integer, allocatable, intent(inout) :: ee(:,:)
  real(wp), allocatable, intent(inout) :: rr(:,:)
@@ -856,6 +847,13 @@ end subroutine mirror_mesh
 
 !----------------------------------------------------------------------
 
+!> Subroutine used to reflect the mesh along a simmetry 
+!! plane for parametric components.
+!!
+!! Given a plane defined by a center point and a normal vector, the mesh 
+!! is reflected: all the points are reflected and new mirrored elements 
+!! introduced. However the original mesh is not preserved and just
+!! overwritten.
 subroutine mirror_mesh_structured( ee, rr, &
               npoints_chord_tot , nelems_span , cent, norm )
  integer, allocatable, intent(inout) :: ee(:,:)
@@ -870,15 +868,13 @@ subroutine mirror_mesh_structured( ee, rr, &
  integer :: ip, np, ne
  integer :: ie, nv
  ! some checks  and warnings -----
- real(wp) :: mabs  , m
- real(wp) :: minmaxPn 
  real(wp), parameter :: eps = 1e-6_wp ! TODO: move it as an input
- integer :: imabs, i1, nsew
+ integer :: i1
 
  character(len=*), parameter :: this_sub_name = 'mirror_mesh_structured'
 
- ! no check on sewing: the component is only mirrored,
- ! and the user must be carefully define it
+  ! no check on sewing: the component is only mirrored,
+  ! and the user must be carefully define it
 
   ne = size(ee,2); np = size(rr,2)
   
@@ -900,9 +896,6 @@ subroutine mirror_mesh_structured( ee, rr, &
     ee_temp(3,ie) = ee(4,ie)
     ee_temp(4,ie) = ee(3,ie)
   enddo
-! ! correct the first elements ----- 
-! ee_temp(1,ne+(/(i1,i1=1,npoints_chord_tot-1)/)) = (/(i1,i1=1,npoints_chord_tot-1)/)
-! ee_temp(4,ne+(/(i1,i1=1,npoints_chord_tot-1)/)) = (/(i1,i1=2,npoints_chord_tot  )/)
  
   !calculate normal unit vector and distance from origin
   n = norm/norm2(norm) 
@@ -921,10 +914,6 @@ subroutine mirror_mesh_structured( ee, rr, &
     ee_sort(:,1+(i1-1)*nelems_chord:i1*nelems_chord) = &
        ee_temp(:,ne-i1*nelems_chord+1:ne-(i1-1)*nelems_chord)
   end do
-! do i1 = 1 , nelems_span
-!   ee_sort(:,1+(i1-1)*nelems_chord+ne:i1*nelems_chord+ne) = &
-!      ee_temp(:,1+(i1-1)*nelems_chord:i1*nelems_chord)
-! end do
 
 ! !move alloc back to the original vectors
   call move_alloc(rr_temp, rr)
@@ -937,15 +926,12 @@ subroutine mirror_mesh_structured( ee, rr, &
 end subroutine mirror_mesh_structured
 
 !----------------------------------------------------------------------
-!----------------------------------------------------------------------
-! routines : build_connectivity            , 
-!            build_te                      ,
-!            create_local_velocity_stencil ,
-!            create_strip_connectivity
-! for ('cgns','basic') and ('parametric')
-!----------------------------------------------------------------------
-!----------------------------------------------------------------------
-! TODO : connectivity is lost at the symmetry plane ---> fix it
+
+!> Build the connectivity of the elemens, general version
+!!
+!! Builds the neighbours connectivity of general elements, i.e. not
+!! parametrically generated
+!! TODO : connectivity is lost at the symmetry plane ---> fix it
 subroutine build_connectivity_general ( ee , neigh )
 
  integer, allocatable, intent(in)  :: ee(:,:)
@@ -963,9 +949,10 @@ subroutine build_connectivity_general ( ee , neigh )
  nverts = 4
  
  if ( size(ee,1) .ne. nverts ) then
-   write(*,*) ' In build_connectivity_general(), wrong size(ee,1).'
-   write(*,*) '  size(ee,1)=',size(ee,1),' .ne. 4. Stop.'
-   stop
+   call error(this_sub_name, this_mod_name, 'Wrong size of the mesh&
+        & connectivity. All the connectivity should be provided with &
+        & 4 numbers with leading zeros for elements with fewer sides &
+        &(i.e. triangles)')
  end if
  
  allocate( neigh(size(ee,1),size(ee,2)) ) ; neigh = 0
@@ -994,12 +981,6 @@ subroutine build_connectivity_general ( ee , neigh )
                neigh(iv1,ie1) = ie2
                neigh(iv2,ie2) = ie1
              else
-               ! debug -----         
-               write(*,*) ' elements ie1 , ie2 ' , ie1 , ie2 
-               write(*,*) ' vertices ie1 :     ' , ee(:,ie1) 
-               write(*,*) ' vertices ie2 :     ' , ee(:,ie2) 
-               write(*,*) ' vert1 , vert2:     ' , vert1 , vert2
-               ! debug -----          
                call error(this_sub_name, this_mod_name, &
                  'Neighbouring elements with opposed normal orientation,&
                  &this is not allowed. Stop')
@@ -1013,16 +994,16 @@ subroutine build_connectivity_general ( ee , neigh )
    end do
  end do
 
- write(*,*) this_mod_name , ':' ,this_sub_name ,' ... ' , 'done.'
-
-
 end subroutine build_connectivity_general
 
 !----------------------------------------------------------------------
-!> Parameteric definition of the component.
-!! Quad elements allowed only
 
-! WARNING: no fairing at the wing tip is allowed (up to now)
+!> Build the connectivity of the elements, parametric version
+!!
+!! Build the neighbours connectivity of the elements, for parametrically
+!! generated quadrilateral elements
+!!
+!! WARNING: no fairing at the wing tip is allowed (up to now)
 subroutine build_connectivity_parametric ( ee , & 
                  npoints_chord_tot , nelems_span , neigh )
 
@@ -1060,11 +1041,17 @@ end subroutine build_connectivity_parametric
 
 !----------------------------------------------------------------------
 
+!> Detects the trailing edge and generates the relevant structures,
+!! general version
+!!
+!! calls different subroutines to merge the neighbouring nodes (for
+!! open trailing edges), build an updated connectivity, then 
+!! generate all the trailing edge structures
 subroutine build_te_general ( ee , rr , ElType , &
                  tol_sewing , inner_prod_thresh ,  &
                  te_proj_logical , te_proj_dir , te_proj_vec , &
                  e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
-                                                          !te as an output
+                                                      !te as an output
  integer   , intent(in) :: ee(:,:)
  real(wp)  , intent(in) :: rr(:,:)
  character , intent(in) :: ElType
@@ -1079,7 +1066,6 @@ subroutine build_te_general ( ee , rr , ElType , &
  integer , allocatable :: neigh_te(:,:) , o_te(:,:)
  real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
 
- ! merge ------
 !! 1e-0 for nasa-crm , 3e-3_wp for naca0012      !!! old, hardcoded params
 !real(wp),   parameter :: tol_sewing = 1e-3_wp   !!! now tol_sewing is an input 
 !!real(wp),   parameter :: tol_sewing = 1e-0_wp  !!!
@@ -1094,21 +1080,18 @@ subroutine build_te_general ( ee , rr , ElType , &
        'element type for a cgns file can only be panel. ElType = ''p'' ' )
  end if
 
- write(*,*) ' In ' , this_sub_name
 
  call merge_nodes_general ( rr , ee , tol_sewing , rr_m , ee_m , i_m  ) 
 
- write(*,*) '   merge_nodes_general ... done.'
 
  call build_connectivity_general ( ee_m , neigh_m )
 
- write(*,*) '   build_connectivity_general ... done.'
 
 
  call find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &  
                 te_proj_logical , te_proj_dir , te_proj_vec , &
                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
-                                                         !te as an output
+                                                       !te as an output
 
 
 contains
@@ -1171,7 +1154,10 @@ subroutine merge_nodes_general ( ri , ei , tol , rr , ee , im )
       end if
     end do
   end do
-  write(*,*) ' n_merge : ' , n_merge
+  write(msg,'(A,I0,A)') 'During merging of nodes for trailing edge &
+        &detection ',n_merge,' nodes were found close enough to be &
+        &merged'
+  call printout(msg)
   
   allocate(im(2,n_merge)) ; im = im_tmp(:,1:n_merge)
   
@@ -1184,7 +1170,7 @@ end subroutine merge_nodes_general
 subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , & 
                 te_proj_logical , te_proj_dir , te_proj_vec ,  & 
                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
-                                                         !te as an output
+                                                      !te as an output
 
  real(wp), intent(in) :: rr(:,:)
  integer , intent(in) :: ee(:,:) , neigh_m(:,:)
@@ -1214,12 +1200,6 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
  real(wp) :: t_te_len
  integer  :: t_te_nelem
 
-!real(wp), parameter :: inner_prod_thresh = - 0.5d0 ! old hardcoded, now an input
-
-!real(wp), dimension(3) , parameter :: u_rel = (/ 1.0_wp , 0.0_wp , 0.0_wp /) 
-!                                               ! hard-coded parameter ... 
-!real(wp), dimension(3) , parameter :: side_dir = (/ 0.0_wp , 1.0_wp , 0.0_wp /) 
-!                                                ! hard-coded parameter ...
  real(wp) , dimension(3) :: side_dir 
  ! TODO: read as an input of the component
 
@@ -1368,8 +1348,10 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
  allocate(ii_te(2,ne_te)) ; ii_te = ii_te_tmp(:,1:ne_te)
 
  
- write(*,*) ' n.edges at the te : ' , ne_te
- write(*,*) ' n.nodes at the te : ' , nn_te
+ write(msg,'(A,I0,A,I0,A)') 'Trailing edge detection completed, found &
+       &',ne_te,' elements at the trailing edge, with ',nn_te,' nodes &
+       &on the trailing edge' 
+ call printout(msg)
 
  deallocate( e_te_tmp, i_te_tmp, rr_te_tmp, ii_te_tmp )
 
@@ -1439,7 +1421,6 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
 ! **** vec1 = vec1 / norm2(vec1)
 ! ****
 ! **** ! projection ****
-! **** write(*,*) ' vec1 ' , vec1
 ! **** t_te(:,i_n) = t_te(:,i_n) - sum(t_te(:,i_n)*vec1) * vec1
 ! **** ! <<<<<<<<<<
 
@@ -1456,9 +1437,6 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
      if ( te_proj_logical ) then
        t_te(:,i_n) = t_te(:,i_n) - sum(t_te(:,i_n)*side_dir) * side_dir
      end if
-
-     !debug
-     write(*,*) ' proj_te normal : ' , t_te(:,i_n)
 
    elseif ( trim(te_proj_dir) .eq. 'parallel' ) then
    
@@ -1485,6 +1463,11 @@ end subroutine build_te_general
 
 !----------------------------------------------------------------------
 
+!> Detects the trailing edge and generates the relevant structures,
+!! for parametric elements
+!!
+!! Finds the trailing edge and fills relevant structures based on the 
+!! structure of parametric components
 subroutine build_te_parametric ( ee , rr , ElType , &
                 npoints_chord_tot , nelems_span , &
                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
@@ -1602,6 +1585,8 @@ subroutine build_te_parametric ( ee , rr , ElType , &
 end subroutine build_te_parametric
 
 !----------------------------------------------------------------------
+
+!> Updates lifting lines fields in case of symmetry
 subroutine symmetry_update_ll_lists ( nelem_span_list , &
                  theta_p , chord_p , i_airfoil_e , normalised_coord_e )
 
@@ -1667,16 +1652,5 @@ subroutine symmetry_update_ll_lists ( nelem_span_list , &
 end subroutine symmetry_update_ll_lists 
 
 !----------------------------------------------------------------------
-! subroutines :
-!   create_local_velocity_stencil_...      ... = general, parametric
-!   create_strip_connectivity_...
-
-
-
-
-
-!----------------------------------------------------------------------
-
-
 
 end module mod_build_geo
