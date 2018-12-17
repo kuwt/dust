@@ -710,13 +710,14 @@ end subroutine compute_vel_surfpan
 
 !> Compute an approximate value of the mean pressure on the actual element
 ! TODO: move the velocity update outside this routine, in a dedicated routine
-subroutine compute_pres_surfpan(this, sim_param)
-  class(t_surfpan), intent(inout) :: this
+subroutine compute_pres_surfpan(this, R_g, sim_param)
+  class(t_surfpan) , intent(inout) :: this
+  real(wp)         , intent(in)    :: R_g(3,3)
+  type(t_sim_param), intent(in)    :: sim_param
   !type(t_elem_p),   intent(in)    :: elems(:)
-  type(t_sim_param), intent(in)   :: sim_param
 
   real(wp) :: vel_phi_t(3) , vel_phi(3)
-  real(wp) :: f(5)
+  real(wp) :: f(5)    ! <- max n_ver of a surfpan = 4 ; +1 for the constraint eqn
 
   integer :: i_e , n_neigh
 
@@ -772,9 +773,16 @@ subroutine compute_pres_surfpan(this, sim_param)
 !    write(*,*) this%chtls_stencil(i_e,:)
 ! end do
 ! write(*,*) f(1:n_neigh+1)
-
 ! ! debug ----
+
   vel_phi = matmul( this%chtls_stencil , f(1:n_neigh+1) )
+  ! Rotation of the result =====================================
+  ! - The stencil is computed in the local ref.sys. at the beginning of the code
+  ! - The velocity is computed at each timestep
+  vel_phi = matmul( R_g , vel_phi )
+  ! Rotation of the result =====================================
+
+  ! vel = u_inf + vel_phi + vel_rot
   this%surf_vel = sim_param%u_inf + vel_phi + this%uvort
 
   ! pressure -------------------------------------------------

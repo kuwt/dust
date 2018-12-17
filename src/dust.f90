@@ -561,12 +561,14 @@ do it = 1,nstep
 
     select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
 
-      el%dUn_dt = 0.0_wp 
-!            sum( el%nor * ( el%ub - & 
-!            surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) ) / sim_param%dt
-      el%dn_dt  = 0.0_wp 
-!                 ( el%nor - nor_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) &
-!                                                                   / sim_param%dt
+!       el%dUn_dt = 0.0_wp 
+! !            sum( el%nor * ( el%ub - & 
+! !            surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) ) / sim_param%dt
+!       el%dn_dt  = 0.0_wp 
+! !                 ( el%nor - nor_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) &
+! !                                                                   / sim_param%dt
+      el%dUn_dt = sum( el%nor * ( el%ub - & 
+             surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) ) / sim_param%dt
 
 
       ! Compute GradS_Un
@@ -709,7 +711,9 @@ do it = 1,nstep
   !------ Compute loads -------
   ! Implicit elements: vortex rings and 3d-panels
   do i_el = 1 , size(elems)
-    call elems(i_el)%p%compute_pres(sim_param)     ! update surf_vel field too
+    call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
+             geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g, &
+             sim_param )
     call elems(i_el)%p%compute_dforce(sim_param)
   end do
   ! Explicit elements:
@@ -717,7 +721,10 @@ do it = 1,nstep
   ! - actdisk: avg delta_pressure and force computed here,
   !            to include thier effects in postpro (e.g. integral loads)
   do i_el = 1 , size(elems_ad)
-    call elems_ad(i_el)%p%compute_pres(sim_param)
+!   call elems_ad(i_el)%p%compute_pres(sim_param)
+    call elems_ad(i_el)%p%compute_pres( &     ! update surf_vel field too
+             geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g, &
+             sim_param )
     call elems_ad(i_el)%p%compute_dforce(sim_param)
   end do
 

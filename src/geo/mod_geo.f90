@@ -348,6 +348,8 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name='create_geometry'
 
+ real(wp) :: t0 , t1
+
   tstart = sim_param%t0
 
   !build the reference frames
@@ -620,15 +622,17 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
 ! ! debug -----
 
   ! Initialisation of the field surf_vel to zero (for surfpan only)
+! t0 = dust_time()  
   do i=1,geo%nelem_impl
     select type(el=>elems_impl(i)%p) ; class is(t_surfpan)
       el%surf_vel = 0.0_wp
       call el%create_local_velocity_stencil()
       ! chtls stencil
       call el%create_chtls_stencil(elems_tot)
-
     end select
   end do
+! t1 = dust_time()
+! write(*,*) ' stencil created in : ' , t1-t0 , 's' 
   
 end subroutine create_geometry
 
