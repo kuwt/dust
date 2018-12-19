@@ -103,7 +103,7 @@ end type c_elem
 type, abstract, extends(c_elem) :: c_pot_elem
 
   !> id of the component to which it belongs
-  !integer :: comp_id
+  integer :: comp_id
 
   !> Id of the element, TODO consider removing this
   integer :: id
@@ -425,12 +425,13 @@ end interface
 
 !> Compute an approximation of the pressure acting on the acutal element
 abstract interface
-  subroutine i_compute_pres (this, sim_param)
+  subroutine i_compute_pres (this, R_g, sim_param)
     import :: c_pot_elem , t_elem_p , wp ,t_sim_param
     implicit none
     class(c_pot_elem), intent(inout) :: this
+    real(wp)         , intent(in)    :: R_g(3,3)
+    type(t_sim_param), intent(in)    :: sim_param
     !type(t_elem_p), intent(in)   :: elems(:)
-    type(t_sim_param), intent(in):: sim_param
   end subroutine
 end interface
 

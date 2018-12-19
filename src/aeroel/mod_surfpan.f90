@@ -65,7 +65,7 @@ use mod_sim_param, only: &
   t_sim_param
 
 use mod_math, only: &
-  cross
+  cross , compute_qr
 
 !----------------------------------------------------------------------
 
@@ -89,6 +89,20 @@ type, extends(c_impl_elem) :: t_surfpan
   real(wp), allocatable :: cosTi(:) , sinTi(:)
   real(wp), allocatable :: verp(:,:)
   real(wp)              :: surf_vel(3)
+  !> stencil for the Constrained Hermite Taylor Series 
+  ! Least Square computation of derivatives
+  real(wp), allocatable ::   chtls_stencil(:,:)
+
+  !> surface quantities for Bernoulli integral equation
+  real(wp) :: dUn_dt
+  real(wp) :: dn_dt(3)
+  real(wp) :: bernoulli_source
+
+  !> boundary layer and flow separation
+  real(wp) :: h_bl      ! height of the surface (boundary??) layer
+  real(wp) :: al_free   ! ratio: shed vorticity / total vorticity
+  real(wp) :: surf_vort(3) ! free vorticity 
+  real(wp) :: free_vort(3) ! free vorticity 
 
 contains
 
@@ -103,9 +117,13 @@ contains
   procedure, pass(this) :: compute_dforce   => compute_dforce_surfpan
   procedure, pass(this) :: calc_geo_data    => calc_geo_data_surfpan
   procedure, pass(this) :: get_vort_vel     => get_vort_vel_surfpan
+  procedure, pass(this) :: correct_pressure_kutta => &
+                           correct_pressure_kutta_surfpan
 
   procedure, pass(this) :: create_local_velocity_stencil => &
                            create_local_velocity_stencil_surfpan
+  procedure, pass(this) :: create_chtls_stencil => &
+                           create_chtls_stencil_surfpan
 
 end type
 
@@ -328,20 +346,35 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
  integer, intent(in)             :: ie
  integer, intent(in)             :: ista, iend
 
- integer :: j1
+ integer :: j1 , ipres
  real(wp) :: b1
 
+! RHS for \phi equation --------------------------
   linsys%b(ie) = 0.0_wp
   !Components not moving, no body velocity in the boundary condition
   !linsys%b(ie) = sum(linsys%b_static(:,ie) * (-uinf))
-  
+! RHS for Bernoulli polynomial equation ----------
+  ipres = linsys%idSurfPanG2L(ie) 
+  linsys%b_pres(ipres) = 0.0_wp
+
+  ! Static part ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  ! + \phi equation ------------------------------
   do j1 = 1,ista-1
 
     linsys%b(ie) = linsys%b(ie) + &
-           linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-uinf-this%uvort))
+          linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-uinf-elems(j1)%p%uvort))
   enddo
 
+  ! + Bernoulli polynomial equation --------------
+  do j1 = 1, min(ista-1 , size(linsys%b_static_pres,1))
+    select type( el => elems(linsys%idSurfPan(j1))%p ) ; class is(t_surfpan)
+      linsys%b_pres( ipres ) = &
+               linsys%b_pres( ipres ) + &
+               linsys%b_static_pres( ipres , j1 ) * el%bernoulli_source
+    end select
+  end do
 
+  ! Moving part ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   ! ista and iend will be the end of the unknowns vector, containing
   ! the moving elements
   do j1 = ista , iend
@@ -350,11 +383,28 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
     call elems(j1)%p%compute_pot( linsys%A(ie,j1), b1, &
                                   this%cen, ie, j1 )
 
+    ! + \phi equation ----------------------------
     !Add the contribution to the rhs with the
     linsys%b(ie) = linsys%b(ie) &
-                   + b1* sum(elems(j1)%p%nor*(elems(j1)%p%ub-uinf-this%uvort))
+              + b1* sum(elems(j1)%p%nor*(elems(j1)%p%ub-uinf-elems(j1)%p%uvort))
+
+    ! + Bernoulli polynomial equation ------------
+    !Add the contribution to the rhs
+    
+    select type( el => elems(j1)%p ) ; class is(t_surfpan)
+      linsys%b_pres( ipres ) = &
+               linsys%b_pres( ipres ) + &
+               b1* el%bernoulli_source 
+
+      ! for DEBUG only ( TO BE DELETED )
+!     write(*,*) ' ipres , j1 , linsys%idSurfPanG2L(j1) ' , ipres , j1 , linsys%idSurfPanG2L(j1)  
+      linsys%b_matrix_pres_debug( ipres , linsys%idSurfPanG2L(j1) ) = b1
+
+    end select
+
 
   end do
+
 
 end subroutine build_row_surfpan
 
@@ -471,6 +521,60 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, uinf, &
   end do
 
 end subroutine add_wake_surfpan
+
+!----------------------------------------------------------------------
+
+! Remove Kutta contribution to obtain the matrix of Bernoulli lin.sys. from
+! the matrix of the \phi lin.sys.
+! This routine removes the extra terms added in add_wake_surfpan.
+! -> OBS: the input IE is already the panel id in the surfpan numeration
+subroutine correct_pressure_kutta_surfpan(this, wake_elems, impl_wake_ind, &
+                 linsys, uinf, ie,ista, iend)
+
+ class(t_surfpan), intent(inout) :: this
+ type(t_pot_elem_p), intent(in)      :: wake_elems(:)
+ integer, intent(in)             :: impl_wake_ind(:,:)
+ type(t_linsys), intent(inout)   :: linsys
+ real(wp), intent(in)            :: uinf(:)
+ integer, intent(in)             :: ie
+ integer, intent(in)             :: ista
+ integer, intent(in)             :: iend
+
+ integer :: j1, ind1, ind2
+ real(wp) :: a, b
+ integer :: n_impl
+
+  !Count the number of implicit wake contributions
+  n_impl = size(impl_wake_ind,2)
+
+  !Remove the contribution of the implicit wake panels to the linear system
+  !Implicitly we assume that the first set of wake panels are the implicit
+  !ones since are at the beginning of the list
+  do j1 = 1 , n_impl
+    ind1 = impl_wake_ind(1,j1); ind2 = impl_wake_ind(2,j1)
+    if ((ind1.ge.ista .and. ind1.le.iend) .and. &
+        (ind2.ge.ista .and. ind2.le.iend)) then
+
+      ! in linsys%idSurfPanG2L, an element is different from zero if it identifies
+      ! a surfpan elements. We need to remove only the TE contribution of wake elements
+      ! originating from surfpan elements
+
+!     if ( ( linsys%idSurfPanG2L(ind1) .ne. 0 ) .and. &
+!          ( linsys%idSurfPanG2L(ind2) .ne. 0 )         ) then
+        !todo: find a more elegant solution to avoid i=j
+        call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
+  
+        linsys%A_pres(ie,linsys%idSurfPanG2L(ind1)) = &
+                         linsys%A_pres(ie,linsys%idSurfPanG2L(ind1)) - a
+        linsys%A_pres(ie,linsys%idSurfPanG2L(ind2)) = & 
+                         linsys%A_pres(ie,linsys%idSurfPanG2L(ind2)) + a
+!     endif
+
+    endif
+
+  end do
+
+end subroutine correct_pressure_kutta_surfpan
 
 !----------------------------------------------------------------------
 
@@ -605,45 +709,73 @@ end subroutine compute_vel_surfpan
 !----------------------------------------------------------------------
 
 !> Compute an approximate value of the mean pressure on the actual element
-!!
-subroutine compute_pres_surfpan(this, sim_param)
-  class(t_surfpan), intent(inout) :: this
+! TODO: move the velocity update outside this routine, in a dedicated routine
+subroutine compute_pres_surfpan(this, R_g, sim_param)
+  class(t_surfpan) , intent(inout) :: this
+  real(wp)         , intent(in)    :: R_g(3,3)
+  type(t_sim_param), intent(in)    :: sim_param
   !type(t_elem_p),   intent(in)    :: elems(:)
-  type(t_sim_param), intent(in)   :: sim_param
 
-  real(wp) :: vel_phi_t(3) , vel_phi(3)
+  real(wp) :: vel_phi(3)
+  real(wp) :: f(5)    ! <- max n_ver of a surfpan = 4 ; +1 for the constraint eqn
 
-  integer :: i_e
-  
-  ! perturbation velocity, u ---------------------------------
-  ! Compute velocity from the potential (mu = -phi), exploiting the stencil
-  ! contained in pot_vel_stencil.
-  ! ''Tangential component'' from the surface stencil
-  !   Normal component       from the boundary conditions U.n = b.n
+  integer :: i_e , n_neigh
 
-  ! tangential part
-  vel_phi_t = 0.0_wp
+! This routine contains the velocity update as well. TODO, move to a dedicated routine
+! Two methods have been implemented for surface velocity computation:
+! 1. stencil relying on a FV approx of the surface: pot_vel_stencil
+! 2. stencil relying on a CHTLS* method
+! *CHTLS: Constrained Hermite Taylor series Least Square method 
+
+!   ! 1. FV approx 
+!   ! perturbation velocity, u ---------------------------------
+!   ! Compute velocity from the potential (mu = -phi), exploiting the stencil
+!   ! contained in pot_vel_stencil.
+!   ! ''Tangential component'' from the surface stencil
+!   !   Normal component       from the boundary conditions U.n = b.n
+! 
+!   ! tangential part
+!   vel_phi_t = 0.0_wp
+!   do i_e = 1 , this%n_ver
+!     if ( associated(this%neigh(i_e)%p) ) then !  .and. &
+!       vel_phi_t = vel_phi_t + &
+!         this%pot_vel_stencil(:,i_e) * (this%neigh(i_e)%p%mag - this%mag)
+!     end if
+!   end do
+! 
+! ! vel_phi_t = - vel_phi_t    ! mu = - phi
+!   vel_phi_t = matmul( R_g , vel_phi_t ) ! transpose(R_g) ???
+!   vel_phi_t = - vel_phi_t + sum(vel_phi_t*this%nor) * this%nor
+!   vel_phi = vel_phi_t +  &
+!         sum(this%nor*(this%ub-sim_param%u_inf-this%uvort)) * this%nor 
+! 
+!   ! velocity, U = u_t \hat{t} + u_n \hat{n} + U_inf ----------
+!   this%surf_vel = sim_param%u_inf + vel_phi + this%uvort
+! ! old and wrong
+! ! this%surf_vel = vel_phi - sum(vel_phi*this%nor)*this%nor + &
+! !      this%nor * sum(this%nor * (-sim_param%u_inf-this%uvort+this%ub) ) + &
+! !            sim_param%u_inf + this%uvort
+
+  ! 2. CHTLS method
+  n_neigh = 0 ; f = 0.0_wp
   do i_e = 1 , this%n_ver
-    if ( associated(this%neigh(i_e)%p) ) then !  .and. &
-      vel_phi_t = vel_phi_t + &
-        this%pot_vel_stencil(:,i_e) * (this%neigh(i_e)%p%mag - this%mag)
+    if ( associated(this%neigh(i_e)%p) ) then
+      n_neigh = n_neigh + 1
+      f(n_neigh) = - ( this%neigh(i_e)%p%mag - this%mag )
     end if
   end do
+  f(n_neigh+1) = sum(this%nor * (-sim_param%u_inf - this%uvort + this%ub) )
 
-! vel_phi_t  = - vel_phi_t    ! mu = - phi
-  vel_phi_t = - vel_phi_t + sum(vel_phi_t*this%nor) * this%nor
-  vel_phi = vel_phi_t +  &
-        sum(this%nor*(this%ub-sim_param%u_inf-this%uvort)) * this%nor 
+  vel_phi = matmul( this%chtls_stencil , f(1:n_neigh+1) )
 
-! ! debug
-! vel_phi = 0.0_wp
+  ! Rotation of the result =====================================
+  ! - The stencil is computed in the local ref.sys. at the beginning of the code
+  ! - The velocity is computed at each timestep
+  vel_phi = matmul( R_g , vel_phi ) ! transpose(R_g) ???
+  ! Rotation of the result =====================================
 
-  ! velocity, U = u_t \hat{t} + u_n \hat{n} + U_inf ----------
+  ! vel = u_inf + vel_phi + vel_rot
   this%surf_vel = sim_param%u_inf + vel_phi + this%uvort
-! old and wrong
-! this%surf_vel = vel_phi - sum(vel_phi*this%nor)*this%nor + &
-!      this%nor * sum(this%nor * (-sim_param%u_inf-this%uvort+this%ub) ) + &
-!            sim_param%u_inf + this%uvort
 
   ! pressure -------------------------------------------------
   ! unsteady problems  : P = P_inf + 0.5*rho_inf*V_inf^2
@@ -661,21 +793,6 @@ subroutine compute_pres_surfpan(this, sim_param)
     - 0.5_wp * sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp  &
              + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
              + sim_param%rho_inf * this%didou_dt
-
-!   ! debug
-!   if ( this%id .eq. 1 ) then
-!     write(*,*)  ' this%nor : ' , this%nor 
-!     write(*,*)  ' this%uvort:' , this%uvort
-!     write(*,*)  ' vel_phi  : ' , vel_phi
-!     write(*,*)  ' sim_param%u_inf : ' , sim_param%u_inf
-!     write(*,*)  ' this%surf_vel   : ' , this%surf_vel 
-!     write(*,*)  ' this%surf_vel-sim_param%u_inf : ' , this%surf_vel-sim_param%u_inf
-!     write(*,*)  ' sum(this%surf_vel*this%nor) : ' , sum(this%surf_vel*this%nor) 
-!     write(*,*)  ' sum(this%ub      *this%nor) : ' , sum(this%ub      *this%nor) 
-!     write(*,*)  ' this%pres : ' , this%pres 
-! !   write(*,*)
-!   end if
-
 
 end subroutine compute_pres_surfpan
 
@@ -704,11 +821,15 @@ end subroutine compute_dforce_surfpan
 !!  in the local frame, associated with the component. In order to obtain
 !!  the components of the velcoity in the base frame, the global rotation
 !!  matrix is needed.
-subroutine create_local_velocity_stencil_surfpan (this)
- class(t_surfpan), intent(inout) :: this
+subroutine create_local_velocity_stencil_surfpan ( this , R_g )
+  class(t_surfpan)  , intent(inout) :: this
+! type(t_pot_elem_p), intent(in)    :: elems(:)
+  real(wp)          , intent(in)    :: R_g(3,3)
 
  real(wp) :: bubble_surf
  integer  :: i_v
+
+ !real(wp) :: n_vect(3)
         
   if ( .not. allocated(this%pot_vel_stencil) ) then
     allocate(this%pot_vel_stencil(3,this%n_ver) )
@@ -737,17 +858,132 @@ subroutine create_local_velocity_stencil_surfpan (this)
 
   ! method #2: w/o averaging on neighbouring elements ; 0.5 factor added
   bubble_surf = this%area
-
+ 
   do i_v = 1 , this%n_ver
-
+ 
     this%pot_vel_stencil(:,i_v) = &
      0.5_wp * cross( this%edge_vec(:,i_v) , this%nor )
-
+ 
   end do
+
+!   ! method #3: w/o averaging on neighbouring elements ; 0.5 factor added ;
+!   ! taking into account curvature !!!
+!   bubble_surf = this%area
+! 
+!   do i_v = 1 , this%n_ver
+! 
+! !   write(*,*) ' this%id ' , this%id
+! !   write(*,*) ' this%nor' , this%nor
+!     if ( associated(this%neigh(i_v)%p) ) then
+! !     write(*,*) ' shape(this%neigh(i_v)) : ' , shape(this%neigh(i_v))
+!       n_vect = 0.5_wp * ( this%nor + this%neigh(i_v)%p%nor )
+!       n_vect = n_vect / norm2(n_vect)
+!     else
+!       n_vect = this%nor 
+!     end if
+!     this%pot_vel_stencil(:,i_v) = &
+!      0.5_wp * cross( this%edge_vec(:,i_v) , n_vect )
+! 
+!     this%pot_vel_stencil(:,i_v) = &
+!                       this%pot_vel_stencil(:,i_v) &
+!      - this%nor * sum(this%pot_vel_stencil(:,i_v)*this%nor)
+! 
+!   end do
 
   this%pot_vel_stencil = this%pot_vel_stencil / bubble_surf
 
+  ! chtls stencil need to be defined in the local ref.sys.
+  ! it is built in the global ref.sys. at the first timestep 
+  !  -> rotation is needed
+  this%pot_vel_stencil = matmul( transpose(R_g) , this%pot_vel_stencil )
+
 end subroutine create_local_velocity_stencil_surfpan
+
+!----------------------------------------------------------------------
+!> create stencil in the "local" reference system. The components of the 
+!  velocity vector in the "global" ref.sys. are obtained with the rotation 
+!  matrix of the "local" reference system
+subroutine create_chtls_stencil_surfpan( this , R_g )
+  class(t_surfpan)  , intent(inout) :: this
+! type(t_pot_elem_p), intent(in)    :: elems(:)
+  real(wp)          , intent(in)    :: R_g(3,3)
+ 
+  real(wp), allocatable :: A(:,:) , B(:,:) , W(:,:) , V(:,:)
+  real(wp) :: dx(3)
+  real(wp), allocatable :: C(:,:) , CQ(:,:) 
+  real(wp), allocatable :: Cls_tilde(:,:) , iCls_tilde(:,:) , chtls_tmp(:,:)
+  real(wp) :: det_cls
+  real(wp) :: r1
+ 
+  real(wp), allocatable :: Q(:,:) , R(:,:)
+ 
+  integer :: n_neigh
+  integer :: i_n , i_nn
+ 
+ 
+  ! # of neighbouring elements
+  n_neigh = 0 
+  do i_n = 1 , this%n_ver
+    if ( associated(this%neigh(i_n)%p) ) then ! the neighbouring element exists
+      n_neigh = n_neigh + 1
+    end if
+  end do
+ 
+  ! arrays A (differences), B (constraints), W (weights) -----------
+  allocate( A(n_neigh,3) , W(n_neigh+1,n_neigh+1) ) ; W = 0.0_wp
+  allocate( B(1,3) ) ; B(1,:) = this%nor
+  i_n = 0
+  do i_nn = 1 , this%n_ver
+    if ( associated(this%neigh(i_nn)%p) ) then ! the neighbouring element exists
+      i_n = i_n + 1
+      dx = this%neigh(i_nn)%p%cen - this%cen
+      A(i_n, : ) = dx 
+      W(i_n,i_n) = 1.0_wp / norm2(dx)
+    end if
+  end do
+  W(n_neigh+1,n_neigh+1) = sum( W ) / real(n_neigh,wp)
+ 
+  allocate( V(3,1) ) ; V(:,1) = B(1,:)
+ 
+  call compute_qr( V , Q , R ) 
+ 
+  allocate(         C(n_neigh+1,3) ) ; C(1:n_neigh,:) = A ; C(n_neigh+1,:) = B(1,:)
+  allocate(        CQ(n_neigh+1,3) ) ; CQ = matmul( C , Q )
+  allocate( Cls_tilde(        2,2) ) ; allocate( iCls_tilde(2,2) )
+  Cls_tilde = matmul( transpose(CQ(:,2:3)) , matmul( W , CQ(:,2:3) ) )
+
+ 
+  ! inverse Cls ----
+  det_cls = Cls_tilde(1,1) * Cls_tilde(2,2) - Cls_tilde(1,2) * Cls_tilde(2,1) 
+  iCls_tilde(1,1) =  Cls_tilde(2,2) / det_cls ; iCls_tilde(1,2) = -Cls_tilde(1,2) / det_cls 
+  iCls_tilde(2,1) = -Cls_tilde(2,1) / det_cls ; iCls_tilde(2,2) =  Cls_tilde(1,1) / det_cls 
+ 
+  if ( .not. allocated(this%chtls_stencil) ) then
+    allocate(this%chtls_stencil( 3 , n_neigh + 1 ) ) ; this%chtls_stencil = 0.0_wp
+  end if
+ 
+  r1 = R(1,1) 
+  allocate(chtls_tmp( 3 , n_neigh + 1 )) ; chtls_tmp = 0.0_wp
+  chtls_tmp(  1,n_neigh + 1 ) = 1.0_wp / R(1,1) 
+  chtls_tmp(2:3,1 : n_neigh ) = matmul( iCls_tilde , &
+        matmul(transpose(CQ(1:n_neigh,2:3)), W(1:n_neigh,1:n_neigh) ) )
+  chtls_tmp(2:3, n_neigh+1:n_neigh+1 ) = matmul( iCls_tilde , &
+        matmul(transpose(CQ( n_neigh+1:n_neigh+1,2:3)), W(n_neigh+1:n_neigh+1, n_neigh+1:n_neigh+1) ) &
+      - matmul( matmul( transpose(CQ(1:n_neigh+1,2:3)), W(1:n_neigh+1,1:n_neigh+1) ) , & 
+                CQ(1:n_neigh+1,1:1) / r1 )  ) 
+ 
+  this%chtls_stencil = matmul( Q , chtls_tmp )
+
+  ! chtls stencil need to be defined in the local ref.sys.
+  ! it is built in the global ref.sys. at the first timestep 
+  !  -> rotation is needed
+  this%chtls_stencil = matmul( transpose(R_g) , this%chtls_stencil )
+
+
+  deallocate(C,CQ,Cls_tilde,iCls_tilde,chtls_tmp)
+  deallocate(A,B,V,W,Q,R)
+
+end subroutine create_chtls_stencil_surfpan
 
 !----------------------------------------------------------------------
 

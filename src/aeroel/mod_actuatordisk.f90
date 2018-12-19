@@ -195,10 +195,11 @@ end subroutine compute_cp_actdisk
 
 !> The computation of the pressure in the actuator disk is not meant to
 !! happen, loads are retrieved from the tables
-subroutine compute_pres_actdisk (this, sim_param)
- class(t_actdisk), intent(inout) :: this
+subroutine compute_pres_actdisk (this, R_g, sim_param)
+ class(t_actdisk) , intent(inout) :: this
+ real(wp)         , intent(in)    :: R_g(3,3)
+ type(t_sim_param), intent(in)    :: sim_param
  !type(t_elem_p), intent(in) :: elems(:)
- type(t_sim_param), intent(in) :: sim_param
 
  character(len=*), parameter      :: this_sub_name='compute_pres_actdisk'
 

@@ -32,7 +32,6 @@
 !!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
 !!=====================================================================
 
-
 !> Module to treat the geometry of the solid bodies
 
 module mod_geometry
@@ -86,7 +85,8 @@ use mod_math, only: &
   cross
 
 use mod_reference, only: &
-  t_ref, build_references, update_all_references, destroy_references
+  t_ref, build_references, update_all_references, destroy_references   ! , &
+! update_relative_initial_conditions
 
 use mod_hdf5_io, only: &
    h5loc, &
@@ -211,20 +211,32 @@ type :: t_geo
 
  !> Number of surface panel elements
  integer :: nSurfPan
-
  !> Number of vortex ring elements
  integer :: nVortLatt
-
  !> Number of lifting line elements
  integer :: nLiftLin
-
  !> Number of Actuator disk elements
  integer :: nActDisk
+
+ ! Only for implicit elements (for slicing)
+ !> Global id of surface panel elements
+ integer, allocatable :: idSurfPan(:)
+ !> Global id of vortex ring elements
+ integer, allocatable :: idVortLatt(:)
+!!> Global id of lifting line elements
+!integer, allocatable :: idLiftLin(:)
+!!> Global id of actuator disk elements
+!integer, allocatable :: idActDisk(:)
+ !> Surfpan id of global surface panel elements (G2L: global to local)
+ integer, allocatable :: idSurfPanG2L(:)
 
  !> Number of statical implicit elements
  integer :: nstatic_impl
  !> Number of moving implicit elements
  integer :: nmoving_impl
+
+ !> Number of statical surfpan elements (for slicing)
+ integer :: nstatic_SurfPan
 
  !> Number of static or moving lifting lines
  integer :: nstatic_expl, nmoving_expl
@@ -331,6 +343,8 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
  type(t_expl_elem_p), allocatable :: temp_static_e(:), temp_moving_e(:)
  integer(h5loc) :: floc
 
+ integer :: iSurfPan, iVortLatt
+ 
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name='create_geometry'
 
@@ -345,6 +359,17 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   endif
   call build_references(geo%refs, trim(ref_file_name), sim_param)
 
+! -----------------------------------------------------------------------------------------
+! The following lines were needed when the motion was defined w.r.t. the initial
+! time of the simulation, tstart, and not w.r.t. 0, as they are defined now
+! 
+! ! If rstart_from_file, set the right initial conditions!
+! ! -> Correction needed for motion defined through its velocity
+! if ( sim_param%restart_from_file .and. sim_param%reset_time ) then
+!   call update_relative_initial_conditions(sim_param%restart_file, sim_param%ReferenceFile, geo%refs) 
+! end if 
+! -----------------------------------------------------------------------------------------
+
   !Create the output geometry file (if it is not restarting with the same name)
   if(trim(geo_file_name).ne.trim(target_file)) then
     call new_hdf5_file(trim(target_file), floc)
@@ -357,8 +382,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   call load_components(geo, trim(geo_file_name), trim(target_file), &
                        sim_param, te)
 
-  
-
   call import_aero_tab(geo,airfoil_data)
 
   ! Initialisation
@@ -368,6 +391,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   geo%nmoving_impl = 0
   geo%nstatic_expl = 0
   geo%nmoving_expl = 0
+  geo%nstatic_SurfPan = 0
   geo%nSurfPan   = 0
   geo%nVortLatt  = 0
   geo%nLiftLin   = 0
@@ -382,6 +406,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
         geo%nmoving_impl = geo%nmoving_impl + geo%components(i_comp)%nelems
       else
         geo%nstatic_impl = geo%nstatic_impl + geo%components(i_comp)%nelems
+        geo%nstatic_SurfPan = geo%nstatic_SurfPan + geo%components(i_comp)%nelems
       endif
       geo%nSurfPan = geo%nSurfPan + geo%components(i_comp)%nelems
       geo%nelem_impl = geo%nelem_impl + geo%components(i_comp)%nelems
@@ -441,7 +466,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
     write(msg,'(A,I9)') '  number of moving elements:   ' , &
                                             geo%nmoving_impl + geo%nmoving_expl
     call printout(msg)
-    write(msg,'(A,I9)') '  number of surface panels:    ' ,geo%nsurfpan
+    write(msg,'(A,I9)') '  number of surface panels:    ' ,geo%nSurfpan
     call printout(msg)
     write(msg,'(A,I9)') '  number of vortex lattices:   ' ,geo%nVortLatt
     call printout(msg)
@@ -449,6 +474,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
     call printout(msg)
     write(msg,'(A,I9)') '  number of actuator disks:    ' ,geo%nActDisk
     call printout(msg)
+
   endif
 
   !Create the vector of pointers to all the elements
@@ -524,6 +550,22 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
     elems_impl(i)%p%id = i
   end do
 
+  ! Save global indices of implicit elements for slicing
+  allocate(geo%idSurfPan(geo%nSurfPan),geo%idVortLatt(geo%nVortLatt))
+  allocate(geo%idSurfPanG2L(geo%nelem_impl)) ; geo%idSurfPanG2L = 0
+  iSurfPan = 0 ; iVortLatt = 0
+  do i = 1,geo%nelem_impl
+    select type( el => elems_impl(i)%p ); class is(t_surfpan)
+      iSurfPan = iSurfPan + 1
+      geo%idSurfPan(iSurfPan) = el%id
+      geo%idSurfPanG2L(i    ) = iSurfPan
+    end select
+    select type( el => elems_impl(i)%p ); class is(t_vortlatt)
+      iVortLatt= iVortLatt + 1
+      geo%idVortLatt(iVortLatt) = el%id
+    end select
+  end do
+
   !Now re-order the explicit elements
   allocate(temp_static_e(geo%nstatic_expl), temp_moving_e(geo%nmoving_expl))
   is = 0; im = 0;
@@ -548,6 +590,18 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   end do
 
   call create_strip_connectivity(geo)
+
+  ! Initialisation of the field surf_vel to zero (for surfpan only)
+  do i=1,geo%nelem_impl
+    select type(el=>elems_impl(i)%p) ; class is(t_surfpan)
+      el%surf_vel = 0.0_wp
+      call el%create_local_velocity_stencil( &    ! elems_tot, &
+              geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
+      ! chtls stencil
+      call el%create_chtls_stencil( &             ! elems_tot, &
+              geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
+    end select
+  end do
   
 end subroutine create_geometry
 
@@ -623,6 +677,7 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
   ! be present, including the multiples. Due to pointers pointing to
   ! allocatables the components array cannot be expanded later
   n_comp_input = n_comp
+
   do i_comp_input = 1,n_comp_input
     write(cname,'(A,I3.3)') 'Comp',i_comp_input
     call open_hdf5_group(gloc,trim(cname),cloc)
@@ -665,6 +720,7 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
   
   !TODO check this
   n_comp_write = n_comp
+  
 
   i_comp = 1
   do i_comp_input = 1,n_comp_input
@@ -927,7 +983,6 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
 
       enddo
 
-
       geo%components(i_comp)%nSurfPan = 0; geo%components(i_comp)%nVortRin = 0;
       if(comp_el_type(1:1) .eq. 'p') &
                                   geo%components(i_comp)%nSurfPan = size(ee,2)
@@ -1067,6 +1122,13 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
     call close_hdf5_group(gloc_out)
     call close_hdf5_file(floc_out)
   endif
+
+  ! define comp_id for all the elems
+  do i_comp = 1 , size(geo%components)
+    do i1 = 1 , size(geo%components(i_comp)%el)
+      geo%components(i_comp)%el(i1)%comp_id = i_comp
+    end do
+  end do
 
 end subroutine load_components
 
@@ -1245,11 +1307,13 @@ subroutine calc_geo_data_pan(elem,vert)
   elem%tang(:,1) = tanl / norm2(tanl)
   elem%tang(:,2) = cross( elem%nor, elem%tang(:,1)  )
 
-  select type(elem)
-  type is(t_surfpan)
-  do is = 1 , nsides
-  end do
-  end select
+! >>>>> USELESS LOOP: did we forget something?? Realised on 2018.11.14
+!  select type(elem)
+!  type is(t_surfpan)
+!  do is = 1 , nsides
+!  end do
+!  end select
+! <<<<< USELESS LOOP: did we forget something??
 
   ! vector connecting two consecutive vertices:
   ! edge_vec(:,1) =  ver(:,2) - ver(:,1)
@@ -1549,8 +1613,10 @@ subroutine create_strip_connectivity(geo)
 
     ! allocate and fill comp%strip_elem array
     if ( mod(n_el,n_s) .ne. 0 ) then
-      call error(this_sub_name, this_mod_name, ' mod(n_elem,n_s) .ne. 0. &
-         & Wrong input file for vortlatt component.')
+      call error(this_sub_name, this_mod_name, ' The number of elements of&
+         & a parametric element is not an exact multiple of the number of&
+         & spanwise stripes. There is something wrong in the geometry input&
+         & file')
     end if
     n_c = n_el / n_s  ! integer division to find number of chord panels
 
@@ -1563,8 +1629,6 @@ subroutine create_strip_connectivity(geo)
         end do
       end do
     end do
-
-! elseif ( el_type .eq. 'v' ) do_nothing
 
   end if
 
@@ -1623,14 +1687,16 @@ subroutine update_geometry(geo, t, update_static)
         !                   geo%refs(comp%ref_id)%of_g)
         call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
       enddo
-!     !in the first pass compute also the velocity stencil for surfpans
-!     if(update_static) then
-        select type(els=>comp%el); class is(t_surfpan)
-        do ie = 1,size(els)
-          call els(ie)%create_local_velocity_stencil()
-        enddo
-        end select
-!     endif
+
+! 2018.11.15 Moved outside, at the end of create_geometry
+! !     !in the first pass compute also the velocity stencil for surfpans
+! !     if(update_static) then
+!         select type(els=>comp%el); class is(t_surfpan)
+!         do ie = 1,size(els)
+!           call els(ie)%create_local_velocity_stencil()
+!         enddo
+!         end select
+! !     endif
 
 
       do ie = 1,size(comp%el)

@@ -19,7 +19,7 @@ However it can be easily built with the following procedure:
     mkdir install
 
   *configure the installation
-    ./configure --prefix=./install --enable-fortran
+    ./configure --prefix=/absolute/path/to/install --enable-fortran
 
   *build & install
     make

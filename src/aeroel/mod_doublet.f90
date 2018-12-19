@@ -185,7 +185,6 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
  real(wp) :: ai    , hi
  real(wp) :: R1 , R2
 
- real(wp), parameter :: ff_ratio = 10.0_wp
  real(wp) :: radius_v(3)
  real(wp) :: radius , rati
 
