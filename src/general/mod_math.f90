@@ -159,7 +159,7 @@ subroutine compute_qr ( A , Q , R )
  real(wp) , intent(inout) ::  A(:,:) 
  real(wp) , allocatable , intent(inout) :: Q(:,:) , R(:,:)
  
- integer :: m , n , i_m , i_n
+ integer :: m , n , i_m
  
  ! lapack dgeqrf routine ----
  real(wp) , allocatable :: tau(:) , work(:)

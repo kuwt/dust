@@ -716,7 +716,7 @@ subroutine compute_pres_surfpan(this, R_g, sim_param)
   type(t_sim_param), intent(in)    :: sim_param
   !type(t_elem_p),   intent(in)    :: elems(:)
 
-  real(wp) :: vel_phi_t(3) , vel_phi(3)
+  real(wp) :: vel_phi(3)
   real(wp) :: f(5)    ! <- max n_ver of a surfpan = 4 ; +1 for the constraint eqn
 
   integer :: i_e , n_neigh
@@ -908,7 +908,7 @@ subroutine create_chtls_stencil_surfpan( this , R_g )
 ! type(t_pot_elem_p), intent(in)    :: elems(:)
   real(wp)          , intent(in)    :: R_g(3,3)
  
-  real(wp), allocatable :: A(:,:) , B(:,:) , W(:,:) , V(:,:) , Vcheck(:,:)
+  real(wp), allocatable :: A(:,:) , B(:,:) , W(:,:) , V(:,:)
   real(wp) :: dx(3)
   real(wp), allocatable :: C(:,:) , CQ(:,:) 
   real(wp), allocatable :: Cls_tilde(:,:) , iCls_tilde(:,:) , chtls_tmp(:,:)
@@ -941,16 +941,9 @@ subroutine create_chtls_stencil_surfpan( this , R_g )
       W(i_n,i_n) = 1.0_wp / norm2(dx)
     end if
   end do
-  W(n_neigh+1,n_neigh+1) = sum( W ) / n_neigh
+  W(n_neigh+1,n_neigh+1) = sum( W ) / real(n_neigh,wp)
  
   allocate( V(3,1) ) ; V(:,1) = B(1,:)
-
-! ! debug ----
-! write(*,*)
-! write(*,*) ' In create_chtls_stencil_surfpan, before calling compute_qr(). '
-! write(*,*) ' V : ' , V 
-! do i_n = 1 , size(V,1) ; write(*,*) '  ' , V(i_n,:) ; end do
-! ! debug ----
  
   call compute_qr( V , Q , R ) 
  
@@ -958,13 +951,6 @@ subroutine create_chtls_stencil_surfpan( this , R_g )
   allocate(        CQ(n_neigh+1,3) ) ; CQ = matmul( C , Q )
   allocate( Cls_tilde(        2,2) ) ; allocate( iCls_tilde(2,2) )
   Cls_tilde = matmul( transpose(CQ(:,2:3)) , matmul( W , CQ(:,2:3) ) )
-
-! ! debug ---- 
-! write(*,*) ' A             , el%id : ' , this%id 
-! do i_n = 1 , size(A,1) ; write(*,*) '  ' , A(i_n,:) ; end do
-! write(*,*) ' B                     : ' 
-! do i_n = 1 , size(B,1) ; write(*,*) '  ' , B(i_n,:) ; end do
-! ! debug ---- 
 
  
   ! inverse Cls ----

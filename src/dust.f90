@@ -203,11 +203,6 @@ real(wp), allocatable :: surfpan_H_IE(:)
 real(wp) :: GradS_Un(3)
 real(wp) :: DivS_U
 
-! debug ----
-integer :: i_deb
-real(wp) :: mat_tmp(3,5)
-! debug ----
-
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
 t00 = dust_time()
 

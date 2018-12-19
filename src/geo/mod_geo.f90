@@ -348,8 +348,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name='create_geometry'
 
- real(wp) :: t0 , t1
-
   tstart = sim_param%t0
 
   !build the reference frames
