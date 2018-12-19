@@ -543,7 +543,7 @@ subroutine printValue(this,maxValueLen)
     end if
     write(UNIT_StdOut,"(A3)",advance='no') "(/ "
     do i=1,size(this%value)
-      write(UNIT_StdOut,"(L)",advance='no') this%value(i)
+      write(UNIT_StdOut,"(L1)",advance='no') this%value(i)
       if (i.ne.size(this%value)) then
         write(UNIT_StdOut,"(A2)",advance='no') ", "
       end if
@@ -769,7 +769,6 @@ subroutine parse(this, rest_in)
     call error(this_sub_name, this_mod_name, 'Unknown option class, this should&
     &have never happened, a team of professionals is on the way to eliminate &
     &the evidence')
-    stop
   end select
   if(stat.gt.0)then
     call error(this_sub_name, this_mod_name, 'Error while parsing the option "'&

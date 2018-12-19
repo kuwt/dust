@@ -1143,15 +1143,6 @@ subroutine build_references(refs, reference_file, sim_param)
              hinge_cyAm(i_dof) = hinge_cyAm(i_dof) * pi / 180.0_wp
              hinge_cyPh(i_dof) = hinge_cyPh(i_dof) * pi / 180.0_wp
 
-             !CHECK
-             write(*,*) ' i_dof : ' , i_dof
-             write(*,*) ' Hinge_Type   : ' , trim(hinge_type(i_dof))
-             write(*,*) ' Hinge_Offset : ' , hinge_offs(i_dof,:)
-             write(*,*) ' Collective   : ' , hinge_coll(i_dof)
-             write(*,*) ' Cyclic_Ampl  : ' , hinge_cyAm(i_dof)
-             write(*,*) ' Cyclic_Phas  : ' , hinge_cyPh(i_dof)
-             write(*,*)
-
            end do
          end if
 

@@ -399,9 +399,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   geo%nLiftLin   = 0
   geo%nActDisk   = 0
 
-! debug ----
-  write(*,*) ' n.components : ' , size(geo%components)
-
   ! count the elements
   do i_comp = 1,size(geo%components)
 
@@ -480,13 +477,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
     write(msg,'(A,I9)') '  number of actuator disks:    ' ,geo%nActDisk
     call printout(msg)
 
-    ! Surfpan for slicing -----
-    write(*,*)
-    write(msg,'(A,I9)') '  number of surface panels       :    ' ,geo%nSurfPan
-    call printout(msg)
-    write(msg,'(A,I9)') '  number of static surface panels:    ' ,geo%nstatic_SurfPan
-    call printout(msg)
-    write(*,*)
   endif
 
   !Create the vector of pointers to all the elements
@@ -603,26 +593,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
 
   call create_strip_connectivity(geo)
 
-
-! ! debug -----
-! write(*,*) ' mod_geo l.590 ' 
-! write(*,*) ' size(elems_impl) : ' , size(elems_impl)
-! write(*,*) ' elems_impl(1)%p%id  : ' , elems_impl(1)%p%id 
-! write(*,*) ' elems_impl(1)%p%nor : ' , elems_impl(1)%p%nor
-! do i = 1 , elems_impl(1)%p%n_ver
-!   write(*,*) ' associated(elems_impl(1)%p%neigh(i)%p): ' , &
-!                associated(elems_impl(1)%p%neigh(i)%p)
-!   if ( associated(elems_impl(1)%p%neigh(i)%p) ) then
-!     write(*,*) ' elems_impl(1)%p%nor : ' , elems_impl(1)%p%neigh(i)%p%id 
-!     write(*,*) ' elems_impl(1)%p%nor : ' , elems_impl(1)%p%neigh(i)%p%nor
-!   end if
-! end do
-! stop
-! write(*,*) ' mod_geo l.590 ' 
-! ! debug -----
-
   ! Initialisation of the field surf_vel to zero (for surfpan only)
-! t0 = dust_time()  
   do i=1,geo%nelem_impl
     select type(el=>elems_impl(i)%p) ; class is(t_surfpan)
       el%surf_vel = 0.0_wp
@@ -633,8 +604,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
               geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
     end select
   end do
-! t1 = dust_time()
-! write(*,*) ' stencil created in : ' , t1-t0 , 's' 
   
 end subroutine create_geometry
 
@@ -711,10 +680,6 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
   ! allocatables the components array cannot be expanded later
   n_comp_input = n_comp
 
-! ! debug ----
-! write(*,*) ' in load_components(). n_comp = ' , n_comp
-! ! debug ----
-
   do i_comp_input = 1,n_comp_input
     write(cname,'(A,I3.3)') 'Comp',i_comp_input
     call open_hdf5_group(gloc,trim(cname),cloc)
@@ -758,14 +723,10 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
   !TODO check this
   n_comp_write = n_comp
   
-! debug ----
-  write(*,*) ' n_comp_input ' , n_comp_input 
 
   i_comp = 1
   do i_comp_input = 1,n_comp_input
 
-    ! debug ----
-    write(*,*) ' Comp',i_comp_input
     write(cname,'(A,I3.3)') 'Comp',i_comp_input
     call open_hdf5_group(gloc,trim(cname),cloc)
 
@@ -774,12 +735,6 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
 
     call read_hdf5(ref_tag,'RefTag',cloc)
 
-    ! debug ----
-    write(*,*) ' ref_tag : ' , trim(ref_tag)
-    do iref = 0,ubound(geo%refs,1)
-      write(*,*) 'geo%refs(',iref,')%tag : ' , trim(geo%refs(iref)%tag) , &
-                 '  multiple : ', geo%refs(iref)%multiple
-    end do
     !Look for the reference frame of the component
     ref_id = -1
     do iref = 0,ubound(geo%refs,1)
@@ -788,8 +743,6 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
         ref_id = iref
       endif
     enddo
-    ! debug
-    write(*,*) 'ref_id : ',ref_id
     !if not found the reference
     if (ref_id .lt. 0) then
       write(msg,'(A,I2,A,A,A)') 'For component ',i_comp, &
@@ -1032,8 +985,6 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
 
       enddo
 
-      write(*,*) ' after neigh '
-
       geo%components(i_comp)%nSurfPan = 0; geo%components(i_comp)%nVortRin = 0;
       if(comp_el_type(1:1) .eq. 'p') &
                                   geo%components(i_comp)%nSurfPan = size(ee,2)
@@ -1180,10 +1131,6 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
       geo%components(i_comp)%el(i1)%comp_id = i_comp
     end do
   end do
-
-
-  write(*,*) ' at the end of load_components '
-
 
 end subroutine load_components
 
@@ -1668,8 +1615,10 @@ subroutine create_strip_connectivity(geo)
 
     ! allocate and fill comp%strip_elem array
     if ( mod(n_el,n_s) .ne. 0 ) then
-      call error(this_sub_name, this_mod_name, ' mod(n_elem,n_s) .ne. 0. &
-         & Wrong input file for vortlatt component.')
+      call error(this_sub_name, this_mod_name, ' The number of elements of&
+         & a parametric element is not an exact multiple of the number of&
+         & spanwise stripes. There is something wrong in the geometry input&
+         & file')
     end if
     n_c = n_el / n_s  ! integer division to find number of chord panels
 
@@ -1682,8 +1631,6 @@ subroutine create_strip_connectivity(geo)
         end do
       end do
     end do
-
-! elseif ( el_type .eq. 'v' ) do_nothing
 
   end if
 

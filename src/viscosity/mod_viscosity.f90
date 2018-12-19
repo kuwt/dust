@@ -224,9 +224,6 @@ subroutine viscosity_effects( geo , elems , te , sim_param )
  ! te correction 
  ! -------------------------
  ne_te = size(te%e,2)
-! debug -----
- write(*,*) ' ne_te : ' , ne_te
-! debug -----
  do ie_te = 1 , ne_te
    if(associated(te%e(2,ie_te)%p)) then
    ie1 = te%e(1,ie_te)%p%id 
@@ -257,16 +254,6 @@ subroutine viscosity_effects( geo , elems , te , sim_param )
  ! te correction 
  ! -------------------------
 ! <<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-!write(*,*)
-!write(*,*) ' ---- Viscosity effects : END ----- ' 
-!write(*,*)
-
-! debug -----
-!write(*,*) ' stop in mod_viscosity at the end of viscosity_effects() ' 
-!write(*,*)
-!stop
-! debug -----
 
 end subroutine viscosity_effects
 

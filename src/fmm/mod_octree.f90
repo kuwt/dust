@@ -495,15 +495,6 @@ subroutine add_layer(octree)
   !extend leaves vector
   !TODO: check a way to do it less ugly with move allocs
   !allocate(leaves_temp(product(octree%nbox)*8**(octree%nlevels-1)))
-  !DEBUG
-  !write(*,*) 'gigi il troione',size(octree%leaves),size(leaves_temp)
-  !do il = 1,size(octree%leaves)
-  !  !DEBUG
-  !  write(*,*) 'tumamma',il
-  !  write(*,*) 'disonesta',octree%leaves(il)%p%active
-  !  write(*,*) 'bottana',leaves_temp(il)%p%active
-  !  leaves_temp(il)%p = octree%leaves(il)%p
-  !enddo
   deallocate(octree%leaves)
   allocate(octree%leaves(product(octree%nbox)*8**(octree%nlevels-1)))
   !do il = 1,size(octree%leaves)

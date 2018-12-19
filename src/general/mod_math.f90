@@ -38,6 +38,9 @@ module mod_math
 use mod_param, only: &
   wp
 
+use mod_handling, only: &
+  error, warning
+
 implicit none
 
 public :: cross , linear_interp , compute_qr
@@ -48,6 +51,8 @@ interface linear_interp
   module procedure linear_interp_vector, &
                    linear_interp_array
 end interface linear_interp
+
+character(len=*), parameter :: this_mod_name='mod_math'
 
 contains
 
@@ -72,22 +77,23 @@ subroutine linear_interp_vector( val_vec , t_vec , t , val )
   real(wp) , intent(out) :: val
 
   integer :: it , nt
+  character(len=*), parameter :: this_sub_name='linear_interp_vector'
 
   nt = size(t_vec)
   ! Check dimensions -----
   if ( size(val_vec) .ne. nt ) then
-    write(*,*) ' ERROR: wrong sizes: size(val_vec) .ne. size(t_vec).'
-    stop
+    call error(this_sub_name, this_mod_name, 'Different sizes for x and y &
+                                  &data vector provided for interpolation')
   end if
 
   ! Check if t \in [ minval(t_vec) , maxval(t_vec) ]
   if ( t .lt. minval(t_vec) ) then
-    write(*,*) ' ERROR: t .lt. t_vec ' 
+    call error(this_sub_name, this_mod_name, 'x value requested to be &
+          &interpolated is lower than the minimum of the interpolation data')
   end if
   if ( t .gt. maxval(t_vec) ) then
-    write(*,*) ' ERROR: t .gt. t_vec ' 
-    write(*,*) ' t             = ' , t 
-    write(*,*) ' maxval(t_vec) = ' , maxval(t_vec)
+    call error(this_sub_name, this_mod_name, 'x value requested to be &
+          &interpolated is higher than the minimum of the interpolation data')
   end if
 
   do it = 1 , nt-1 
@@ -112,30 +118,26 @@ subroutine linear_interp_array( val_arr , t_vec , t , val )
   real(wp) , allocatable , intent(out) :: val(:)
 
   integer :: it , nt 
+  character(len=*), parameter :: this_sub_name='linear_interp_array'
 
   nt = size(t_vec)
   allocate(val(size(val_arr,1)))
 
-! check ----
-! write(*,*) ' size(val_arr) : ' , size(val_arr,1) , size(val_arr,2)
-! write(*,*) ' nt            : ' , nt
-! write(*,*) ' tv : ' 
-! check ----
 
   ! Check dimensions -----
   if ( size(val_arr,2) .ne. nt ) then
-    write(*,*) ' ERROR: wrong sizes: size(val_vec,2) .ne. size(t_vec).'
-    stop
+    call error(this_sub_name, this_mod_name, 'Different sizes for x and y &
+                                  &data vector provided for interpolation')
   end if
 
   ! Check if t \in [ minval(t_vec) , maxval(t_vec) ]
   if ( t .lt. minval(t_vec) ) then
-    write(*,*) ' ERROR: t .lt. t_vec ' 
+    call error(this_sub_name, this_mod_name, 'x value requested to be &
+          &interpolated is lower than the minimum of the interpolation data')
   end if
   if ( t .gt. maxval(t_vec) ) then
-    write(*,*) ' ERROR: t .gt. t_vec '
-    write(*,*) ' t             = ' , t 
-    write(*,*) ' maxval(t_vec) = ' , maxval(t_vec)
+    call error(this_sub_name, this_mod_name, 'x value requested to be &
+          &interpolated is higher than the minimum of the interpolation data')
   end if
   
   do it = 1 , nt-1 
@@ -154,28 +156,30 @@ end subroutine linear_interp_array
 ! ----------------------------------------------------------------------
 
 subroutine compute_qr ( A , Q , R )
-  real(wp) , intent(inout) ::  A(:,:) 
-  real(wp) , allocatable , intent(inout) :: Q(:,:) , R(:,:)
+ real(wp) , intent(inout) ::  A(:,:) 
+ real(wp) , allocatable , intent(inout) :: Q(:,:) , R(:,:)
  
-  integer :: m , n , i_m , i_n
+ integer :: m , n , i_m , i_n
  
-  ! lapack dgeqrf routine ----
-  real(wp) , allocatable :: tau(:) , work(:)
-  integer :: lwork , info 
+ ! lapack dgeqrf routine ----
+ real(wp) , allocatable :: tau(:) , work(:)
+ integer :: lwork , info 
  
-  ! tmp matrices to get Q matrix -----
-  real(wp) , allocatable :: H(:,:) , v(:,:) , eye(:,:)
+ ! tmp matrices to get Q matrix -----
+ real(wp) , allocatable :: H(:,:) , v(:,:) , eye(:,:)
+
+ character(len=*), parameter :: this_sub_name='compute_qr'
  
  
   ! input check and warnings
   if ( allocated(Q) ) then
-    write(*,*) ' Warning. In compute_qr(), Q was already allocated.'
-    write(*,*) ' Deallocated and re-allocated. '
+    call warning(this_sub_name, this_mod_name, ' Q was already allocated.&
+                                           & Deallocated and re-allocated')
     deallocate(Q)
   end if
   if ( allocated(R) ) then
-    write(*,*) ' Warning. In compute_qr(), Q was already allocated.'
-    write(*,*) ' Deallocated and re-allocated. '
+    call warning(this_sub_name, this_mod_name, ' R was already allocated.&
+                                           & Deallocated and re-allocated')
     deallocate(R)
   end if
  
@@ -188,17 +192,8 @@ subroutine compute_qr ( A , Q , R )
   allocate(  work(    n   ) ) ;   work = 0.0_wp
   lwork = n       ! <-- its size should be .ge. n*nb
                   ! with nb = optimal blocksize (???)
-! ! debug ----
-! write(*,*) ' In compute_qr(), A : ' 
-! do i_m = 1 , size(A,1) ; write(*,*) '  ' , A(i_m,:) ; end do
-! ! debug ----
 
   call dgeqrf( m , n , A , m , tau , work , lwork , info )
-
-! ! debug ----
-! write(*,*) ' In compute_qr(), after calling dgeqrf(). A : ' 
-! do i_m = 1 , size(A,1) ; write(*,*) '  ' , A(i_m,:) ; end do
-! ! debug ----
  
   ! build Q , R matrices
   ! allocataion and initialisation to 0.0 (useless for Q)

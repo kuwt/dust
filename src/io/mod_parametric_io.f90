@@ -374,6 +374,8 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   real(wp), allocatable :: points_mean_line(:,:)
   real(wp) :: twist_rad
 
+  character(len=*), parameter :: this_sub_name='define_section'
+
 !  character(len=4) :: char_ini4 , char_fin4
 
   integer :: i1
@@ -418,9 +420,9 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
     end if
  
   else
-    write(*,*) ' only 4-digit and some 5-digit NACA airfoils implemented. '
-    write(*,*) ' -> Provide the coordinates of the airfoil as a .dat file '
-    write(*,*) ' Stop. ' ; write(*,*) ; stop 
+    call error(this_sub_name, this_mod_name, ' only 4-digit and some 5-digit &
+      &NACA airfoils implemented. Provide the coordinates of the airfoil as&
+      & a .dat file ')
   end if
 
 
