@@ -358,7 +358,7 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
   linsys%b_pres(ipres) = 0.0_wp
 
   ! Static part ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  ! + \phi equation ------------------------------ 
+  ! + \phi equation ------------------------------
   do j1 = 1,ista-1
 
     linsys%b(ie) = linsys%b(ie) + &
@@ -366,7 +366,7 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
   enddo
 
   ! + Bernoulli polynomial equation --------------
-  do j1 = 1,size(linsys%b_static_pres,1)
+  do j1 = 1, min(ista-1 , size(linsys%b_static_pres,1))
     select type( el => elems(linsys%idSurfPan(j1))%p ) ; class is(t_surfpan)
       linsys%b_pres( ipres ) = &
                linsys%b_pres( ipres ) + &
@@ -743,7 +743,8 @@ subroutine compute_pres_surfpan(this, R_g, sim_param)
 !     end if
 !   end do
 ! 
-! ! vel_phi_t  = - vel_phi_t    ! mu = - phi
+! ! vel_phi_t = - vel_phi_t    ! mu = - phi
+!   vel_phi_t = matmul( R_g , vel_phi_t ) ! transpose(R_g) ???
 !   vel_phi_t = - vel_phi_t + sum(vel_phi_t*this%nor) * this%nor
 !   vel_phi = vel_phi_t +  &
 !         sum(this%nor*(this%ub-sim_param%u_inf-this%uvort)) * this%nor 
@@ -756,7 +757,7 @@ subroutine compute_pres_surfpan(this, R_g, sim_param)
 ! !            sim_param%u_inf + this%uvort
 
   ! 2. CHTLS method
-  n_neigh = 0
+  n_neigh = 0 ; f = 0.0_wp
   do i_e = 1 , this%n_ver
     if ( associated(this%neigh(i_e)%p) ) then
       n_neigh = n_neigh + 1
@@ -765,21 +766,12 @@ subroutine compute_pres_surfpan(this, R_g, sim_param)
   end do
   f(n_neigh+1) = sum(this%nor * (-sim_param%u_inf - this%uvort + this%ub) )
 
-! ! debug ----
-! write(*,*) ' shape(this%chtls_stencil) , n_neigh+1 ' , &
-!              shape(this%chtls_stencil) , n_neigh+1 
-! write(*,*) ' this%chtls_stencil , f : this%id ' , this%id
-! do i_e = 1 , size(this%chtls_stencil,1) 
-!    write(*,*) this%chtls_stencil(i_e,:)
-! end do
-! write(*,*) f(1:n_neigh+1)
-! ! debug ----
-
   vel_phi = matmul( this%chtls_stencil , f(1:n_neigh+1) )
+
   ! Rotation of the result =====================================
   ! - The stencil is computed in the local ref.sys. at the beginning of the code
   ! - The velocity is computed at each timestep
-  vel_phi = matmul( R_g , vel_phi )
+  vel_phi = matmul( R_g , vel_phi ) ! transpose(R_g) ???
   ! Rotation of the result =====================================
 
   ! vel = u_inf + vel_phi + vel_rot
@@ -829,8 +821,10 @@ end subroutine compute_dforce_surfpan
 !!  in the local frame, associated with the component. In order to obtain
 !!  the components of the velcoity in the base frame, the global rotation
 !!  matrix is needed.
-subroutine create_local_velocity_stencil_surfpan (this)
- class(t_surfpan), intent(inout) :: this
+subroutine create_local_velocity_stencil_surfpan ( this , R_g )
+  class(t_surfpan)  , intent(inout) :: this
+! type(t_pot_elem_p), intent(in)    :: elems(:)
+  real(wp)          , intent(in)    :: R_g(3,3)
 
  real(wp) :: bubble_surf
  integer  :: i_v
@@ -898,15 +892,21 @@ subroutine create_local_velocity_stencil_surfpan (this)
 
   this%pot_vel_stencil = this%pot_vel_stencil / bubble_surf
 
+  ! chtls stencil need to be defined in the local ref.sys.
+  ! it is built in the global ref.sys. at the first timestep 
+  !  -> rotation is needed
+  this%pot_vel_stencil = matmul( transpose(R_g) , this%pot_vel_stencil )
+
 end subroutine create_local_velocity_stencil_surfpan
 
 !----------------------------------------------------------------------
 !> create stencil in the "local" reference system. The components of the 
 !  velocity vector in the "global" ref.sys. are obtained with the rotation 
 !  matrix of the "local" reference system
-subroutine create_chtls_stencil_surfpan( this , elems )
-  class(t_surfpan), intent(inout) :: this
-  type(t_pot_elem_p), intent(in) :: elems(:)
+subroutine create_chtls_stencil_surfpan( this , R_g )
+  class(t_surfpan)  , intent(inout) :: this
+! type(t_pot_elem_p), intent(in)    :: elems(:)
+  real(wp)          , intent(in)    :: R_g(3,3)
  
   real(wp), allocatable :: A(:,:) , B(:,:) , W(:,:) , V(:,:) , Vcheck(:,:)
   real(wp) :: dx(3)
@@ -988,32 +988,12 @@ subroutine create_chtls_stencil_surfpan( this , elems )
  
   this%chtls_stencil = matmul( Q , chtls_tmp )
 
-! ! debug ---- 
-! write(*,*) ' chtls_stencil , el%id : ' , this%id 
-! do i_n = 1 , size(this%chtls_stencil,1) ; write(*,*) '  ' , this%chtls_stencil(i_n,:) ; end do
-! write(*,*) ' chtls_tmp             : ' 
-! do i_n = 1 , size( chtls_tmp,1 ) ; write(*,*) '  ' ,      chtls_tmp(    i_n,:) ; end do
-! ! debug ---- 
- 
-! ! debug ----
-! write(*,*)
-! write(*,*) ' V : ' 
-! do i_n = 1 , size(V,1) ; write(*,*) '  ' , V(i_n,:) ; end do
-! write(*,*) ' V = Q*R . Q : '
-! do i_n = 1 , size(Q,1) ; write(*,*) '  ' , Q(i_n,:) ; end do
-! write(*,*) ' V = Q*R . R : '
-! do i_n = 1 , size(R,1) ; write(*,*) '  ' , R(i_n,:) ; end do
-! write(*,*)
-! 
-! allocate(Vcheck(size(V,1),size(V,2)))
-! Vcheck = matmul( Q , R )
-! write(*,*) ' V_check : '
-! do i_n = 1 , size(Vcheck,1) ; write(*,*) '  ' , Vcheck(i_n,:) ; end do
-! 
-! write(*,*) ' stop in aeroel/mod_surfpan.f90/create_chtls_stencil_surfpan() around l.920 '
-! stop
-! ! debug ----
- 
+  ! chtls stencil need to be defined in the local ref.sys.
+  ! it is built in the global ref.sys. at the first timestep 
+  !  -> rotation is needed
+  this%chtls_stencil = matmul( transpose(R_g) , this%chtls_stencil )
+
+
   deallocate(C,CQ,Cls_tilde,iCls_tilde,chtls_tmp)
   deallocate(A,B,V,W,Q,R)
 

@@ -203,6 +203,11 @@ real(wp), allocatable :: surfpan_H_IE(:)
 real(wp) :: GradS_Un(3)
 real(wp) :: DivS_U
 
+! debug ----
+integer :: i_deb
+real(wp) :: mat_tmp(3,5)
+! debug ----
+
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
 t00 = dust_time()
 
@@ -561,14 +566,15 @@ do it = 1,nstep
 
     select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
 
-!       el%dUn_dt = 0.0_wp 
-! !            sum( el%nor * ( el%ub - & 
-! !            surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) ) / sim_param%dt
-!       el%dn_dt  = 0.0_wp 
-! !                 ( el%nor - nor_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) &
-! !                                                                   / sim_param%dt
       el%dUn_dt = sum( el%nor * ( el%ub - & 
              surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) ) / sim_param%dt
+
+      if ( i_el .eq. 570 ) then
+        write(*,*) ' elem(',i_el,'%pot_vel_stencil : '
+        do i_e = 1 , size(el%pot_vel_stencil,1)
+          write(*,*) el%pot_vel_stencil(i_e,:)
+        end do
+      end if
 
 
       ! Compute GradS_Un
@@ -577,16 +583,16 @@ do it = 1,nstep
         if ( associated(el%neigh(i_e)%p) ) then !  .and. &
           select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
             GradS_Un = GradS_Un + &
-               el%pot_vel_stencil(:,i_e) * ( &
-                  sum(el%nor* (el_neigh%surf_vel - el%surf_vel) ) )                 ! <<<<< OK ?
-!                 sum(el%neigh(i_e)%p%ub*el%neigh(i_e)%p%nor) - sum(el%ub*el%nor) ) ! << WRONG !
-!              this%pot_vel_stencil(:,i_e) * (this%neigh(i_e)%p%mag - this%mag)
+              matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g , &
+                el%pot_vel_stencil(:,i_e) * ( &
+                  sum(el%nor* (el_neigh%surf_vel - el%surf_vel) ) ) )
           end select
         else
 !         select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
             GradS_Un = GradS_Un + &
+              matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g , &
                el%pot_vel_stencil(:,i_e) * ( &
-                  sum(el%nor* ( - 2.0_wp * el%surf_vel) ) )                 ! <<<<< OK ?
+                  sum(el%nor* ( - 2.0_wp * el%surf_vel) ) ) )
 !         end select
         end if
       end do
@@ -598,14 +604,18 @@ do it = 1,nstep
         if ( associated(el%neigh(i_e)%p) ) then !  .and. &
           select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
             DivS_U = DivS_U + &
-               sum(   el%pot_vel_stencil(:,i_e) * &
+               sum( &
+                 matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g ,   &
+                                                            el%pot_vel_stencil(:,i_e) ) * &
                     ( el_neigh%surf_vel - el%surf_vel )   )
           end select
         else  
 !         select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
             DivS_U = DivS_U + &
-               sum(   el%pot_vel_stencil(:,i_e) * &
-                    ( - 2.0_wp * el%surf_vel ) )
+              sum( &
+                matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g ,   & 
+                                                           el%pot_vel_stencil(:,i_e) ) * &
+                   ( - 2.0_wp * el%surf_vel ) )
 !         end select
         end if
       end do  
@@ -723,7 +733,7 @@ do it = 1,nstep
   do i_el = 1 , size(elems_ad)
 !   call elems_ad(i_el)%p%compute_pres(sim_param)
     call elems_ad(i_el)%p%compute_pres( &     ! update surf_vel field too
-             geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g, &
+             geo%refs( geo%components(elems_ad(i_el)%p%comp_id)%ref_id )%R_g, &
              sim_param )
     call elems_ad(i_el)%p%compute_dforce(sim_param)
   end do
@@ -998,6 +1008,9 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
  real(wp), allocatable :: surf_vel(:,:), vel_phi(:,:) 
  integer :: i_e
 
+ ! chtls
+ real(wp) :: f(5)
+ integer :: n_neigh
 
   allocate(norm(3,size(elems)), cent(3,size(elems)), velb(3,size(elems)))
   allocate(el(4,size(elems))); el = 0
@@ -1023,15 +1036,29 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
     select type( el => elems(ie)%p )
      class is(t_surfpan) 
       surf_vel(:,ie) = el%surf_vel   ! elems(ie)%p%surf_vel
-      
+
+!     ! 1. FVM approx --------      
+!     vel_phi(:,ie) = 0.0_wp
+!     do i_e = 1 , el%n_ver    ! elems(ie)%p%n_ver
+!       if ( associated(el%neigh(i_e)%p) ) then !  .and. &
+!         vel_phi(:,ie) = vel_phi(:,ie) + &
+!           el%pot_vel_stencil(:,i_e) * (el%neigh(i_e)%p%mag - el%mag)
+!       end if
+!     end do
+!     vel_phi(:,ie)  = - vel_phi(:,ie)
+
+      ! 2. CHTLS method ------      
       vel_phi(:,ie) = 0.0_wp
-      do i_e = 1 , el%n_ver    ! elems(ie)%p%n_ver
-        if ( associated(el%neigh(i_e)%p) ) then !  .and. &
-          vel_phi(:,ie) = vel_phi(:,ie) + &
-            el%pot_vel_stencil(:,i_e) * (el%neigh(i_e)%p%mag - el%mag)
+      f = 0.0_wp ; n_neigh = 0
+      do i_e = 1 , el%n_ver
+        if ( associated(el%neigh(i_e)%p) ) then
+          n_neigh = n_neigh + 1
+          f(n_neigh) = - ( el%neigh(i_e)%p%mag - el%mag )
         end if
       end do
-      vel_phi(:,ie)  = - vel_phi(:,ie)
+      f(n_neigh+1) = sum(el%nor * (-sim_param%u_inf - el%uvort + el%ub) )
+      vel_phi(:,ie) = matmul( el%chtls_stencil , f(1:n_neigh+1) )
+
  
     end select
   

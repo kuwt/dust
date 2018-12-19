@@ -626,9 +626,11 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   do i=1,geo%nelem_impl
     select type(el=>elems_impl(i)%p) ; class is(t_surfpan)
       el%surf_vel = 0.0_wp
-      call el%create_local_velocity_stencil()
+      call el%create_local_velocity_stencil( &    ! elems_tot, &
+              geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
       ! chtls stencil
-      call el%create_chtls_stencil(elems_tot)
+      call el%create_chtls_stencil( &             ! elems_tot, &
+              geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
     end select
   end do
 ! t1 = dust_time()
