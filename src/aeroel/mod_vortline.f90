@@ -74,6 +74,7 @@ public :: t_vortline, initialize_vortline
 
 type, extends(c_vort_elem) :: t_vortline
   real(wp) :: ver(3,2)
+  real(wp) :: ver_vel(3,2)
   real(wp) :: edge_vec(3)
   real(wp) :: edge_uni(3)
   real(wp) :: edge_len

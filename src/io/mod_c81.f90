@@ -43,6 +43,9 @@ module mod_c81
 use mod_param, only: &
   wp, max_char_len
 
+use mod_handling, only: &
+  error, warning
+
 implicit none
 
 !-----------------------------------
@@ -100,6 +103,8 @@ end type t_aero_tab
 
 !-----------------------------------
 
+character(len=*), parameter :: this_mod_name='mod_c81'
+
 contains
 
 !-----------------------------------
@@ -137,15 +142,9 @@ subroutine read_c81_table ( filen , coeff )
     read(fid,'(A)') line
       iblnk = index(line,' ') 
       string = trim(adjustl(line(iblnk:)))
-      !DEBUG
-      write(*,*) 'iblnk:', iblnk
-      write(*,*) 'string:', trim(string)
       read(string,'(6I2)') cl2 , cl1 , cd2 , cd1 , cm2 , cm1
     cp1 = (/ cl1 , cd1 , cm1 /)
     cp2 = (/ cl2 , cd2 , cm2 /)
-    write(*,*) ' table_dim = ' , cp2(1) , cp1(1) , &
-                                 cp2(2) , cp1(2) , &
-                                 cp2(3) , cp1(3)
 
     ! Reynolds number
     coeff%aero_coeff(iRe)%Re = Re
@@ -215,12 +214,9 @@ subroutine interp_aero_coeff ( airfoil_data ,  &
   
    ! Some checks ----
    if ( nRe .eq. 1 ) then
-    !write(*,*) ' WARNING: aerodynamic coeffs defined for one value of Re only.'
-    !write(*,*) '          It is assumed that aero coeffs do not depend on Re. '
 
     call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(1)%coeff , &
                                                  aero_par(1:2) , coeff1 )
-!   write(*,'(A,3F10.5)') ' coeff. 1 : ' , coeff1
 
     if ( .not. allocated(coeff_airfoil) ) then
       allocate(coeff_airfoil(2,size(coeff1)))
@@ -231,18 +227,10 @@ subroutine interp_aero_coeff ( airfoil_data ,  &
    else  
    ! Some checks ----
     if ( reyn .lt. airfoil_data(id_a)%aero_coeff(1)%Re ) then
-     !write(*,*) ' WARNING: Reynolds number below the minimum Re defined.       '
-     !write(*,*) ' Re          : ' , reyn
-     !write(*,*) ' min(Re_tab) : ' , airfoil_data(id_a)%aero_coeff(1)%Re 
-     !write(*,*) '       -> Extrapolation. '
      reyn1 = airfoil_data(id_a)%aero_coeff(1)%Re
      reyn2 = airfoil_data(id_a)%aero_coeff(2)%Re
      irey  = 1
     else if ( reyn .gt. airfoil_data(id_a)%aero_coeff(nRe)%Re ) then
-     !write(*,*) ' WARNING: Reynolds number above the maximum Re defined.       '
-     !write(*,*) ' Re          : ' , reyn
-     !write(*,*) ' max(Re_tab) : ' , airfoil_data(id_a)%aero_coeff(nRe)%Re 
-     !write(*,*) '       -> Extrapolation. '
      reyn1 = airfoil_data(id_a)%aero_coeff(nRe-1)%Re
      reyn2 = airfoil_data(id_a)%aero_coeff(nRe)%Re
      irey  = nRe-1
@@ -250,7 +238,6 @@ subroutine interp_aero_coeff ( airfoil_data ,  &
 
      irey  = 1
      reyn1 = airfoil_data(id_a)%aero_coeff(irey)%Re
-!    write(*,*) ' irey , nRe , reyn , reyn1 ' , irey , nRe ,  reyn , reyn1
      do while ( ( reyn .ge. reyn1 ) .and. ( irey .lt. nRe ) )
       irey = irey + 1
       reyn1 = airfoil_data(id_a)%aero_coeff(irey)%Re 
@@ -261,18 +248,11 @@ subroutine interp_aero_coeff ( airfoil_data ,  &
     end if
     ! Some checks ----
 
-!   ! DEBUG
-!   write(*,*) ' irey          : ' , irey
-!   write(*,*) ' reyn1 , reyn2 : ' , reyn1 , reyn2
-!   write(*,*) ' aero_par(1:2) : ' , aero_par(1:2)
-!   ! DEBUG
     
     call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(irey)%coeff , &
                                                  aero_par(1:2) , coeff1 )
     call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(irey+1)%coeff , &
                                                  aero_par(1:2) , coeff2 )
-!   write(*,'(A,3F10.5)') ' coeff. 1 : ' , coeff1
-!   write(*,'(A,3F10.5)') ' coeff. 2 : ' , coeff2
 
     if ( .not. allocated(coeff_airfoil) ) then
       allocate(coeff_airfoil(2,size(coeff1)))
@@ -302,22 +282,22 @@ subroutine interp2d_aero_coeff ( aero_coeff , x , c )
  real(wp), intent(in)  :: x(:)
  real(wp), allocatable , intent(out) :: c(:)
 
-!real(wp), allocatable :: x1(:) , x2(:)
  integer  :: n1 , n2 , nc
  real(wp) :: csi1 , csi2
  real(wp) :: phi1 , phi2 , phi3 , phi4
 
  integer :: ic , i1 , i2
 
+ character(len=*), parameter :: this_sub_name='interp2d_aero_coeff'
+
  nc = size(aero_coeff)
-!write(*,*) ' nc : ' , nc
 
  allocate(c(nc)) ; c = 0.0_wp
 
  ! only 2d parameters are allowed (al,M)
  if ( size(x) .ne. 2 ) then 
-   write(*,*) ' Error in interp2d. '
-   write(*,*) ' size(x) .ne. 2. STOP. ' ; stop
+   call error(this_sub_name, this_mod_name, 'Attempting to 2D interpolate&
+   & data with more dimensions')
  end if
 
  ! Do it once ...
@@ -363,10 +343,6 @@ subroutine interp2d_aero_coeff ( aero_coeff , x , c )
    do while ( (aero_coeff(ic)%par2(i2) .le. x(2)) ) 
      i2 = i2 + 1 
    end do
-
-!  ! DEBUG
-!  write(*,*) i1 , i2
-!  ! DEBUG
   
    csi1 = 2.0_wp * ( x(1) - 0.5_wp*(aero_coeff(ic)%par1(i1-1)+aero_coeff(ic)%par1(i1)) ) / &
          (aero_coeff(ic)%par1(i1)-aero_coeff(ic)%par1(i1-1))

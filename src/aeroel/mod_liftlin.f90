@@ -203,10 +203,11 @@ end subroutine compute_cp_liftlin
 
 !> The computation of the pressure in the lifting line is not meant to
 !! happen, loads are retrieved from the tables
-subroutine compute_pres_liftlin (this, sim_param)
- class(t_liftlin), intent(inout) :: this
+subroutine compute_pres_liftlin (this, R_g, sim_param)
+ class(t_liftlin) , intent(inout) :: this
+ real(wp)         , intent(in)    :: R_g(3,3)
+ type(t_sim_param), intent(in)    :: sim_param
  !type(t_elem_p), intent(in) :: elems(:)
- type(t_sim_param), intent(in) :: sim_param
 
  character(len=*), parameter      :: this_sub_name='compute_pres_liftlin'
 

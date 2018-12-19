@@ -65,6 +65,12 @@ type :: t_linsys
 
  !> Linear system right hand side
  real(wp), allocatable :: b(:)
+
+ !> Linear system matrix (for pressure integral equation)
+ real(wp), allocatable :: A_pres(:,:)
+ 
+ !> Linear system right hand side (for pressure integral equation)
+ real(wp), allocatable :: b_pres(:)
  
  !> Static part of the right hand side
  !!
@@ -74,7 +80,13 @@ type :: t_linsys
  !! finally the contribution of the moving panels is added 
  real(wp), allocatable :: b_static(:,:)
 
+ !> static part for integral equation (for pressure integral equation)
+ real(wp), allocatable :: b_static_pres(:,:) ! not strictly required
+ ! OSS -> b_static_pres = b_static(1:idSurfPan_static , 1:idSurfPan_static )
+ ! OSS    with idSurfPan_static = idSurfPan(1:nstatic_SurfPan)
 
+ !> for DEBUG only ( TO BE DELETED )
+ real(wp), allocatable :: b_matrix_pres_debug(:,:) 
 
  !> Static part of the lifting line contribution
  !!
@@ -109,6 +121,15 @@ type :: t_linsys
 
  !> Number of explicit elements
  integer :: n_expl
+
+
+
+ !> Global id of surface panel elements ( copy of the structure in geo )
+ integer, allocatable :: idSurfPan(:)
+
+ !> Global id of surface panel elements ( copy of the structure in geo )
+ integer, allocatable :: idSurfPanG2L(:)
+
 
 end type t_linsys
 

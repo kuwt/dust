@@ -121,7 +121,7 @@ subroutine build_row_vortlatt(this, elems, linsys, uinf, ie, ista, iend)
     do j1 = 1,ista-1
   
       linsys%b(ie) = linsys%b(ie) +  &
-             linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-uinf-this%uvort))
+          linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-uinf-elems(j1)%p%uvort))
     enddo
   
   ! ista and iend will be the end of the unknowns vector, containing
@@ -134,12 +134,12 @@ subroutine build_row_vortlatt(this, elems, linsys, uinf, ie, ista, iend)
     if (ie .eq. j1) then
       !diagonal, we are certainly employing vortrin, enforce the b.c. on ie
       linsys%b(ie) = linsys%b(ie) + &
-                     b1*sum(elems(ie)%p%nor*(elems(ie)%p%ub-uinf-this%uvort))
+                b1*sum(elems(ie)%p%nor*(elems(ie)%p%ub-uinf-elems(j1)%p%uvort))
     else
       ! off-diagonal: if it is a vortrin b1 is zero, if it is a surfpan
       ! enforce the boundary condition on it (j1)
       linsys%b(ie) = linsys%b(ie) + &
-                     b1*sum(elems(j1)%p%nor*(elems(j1)%p%ub-uinf-this%uvort))
+                b1*sum(elems(j1)%p%nor*(elems(j1)%p%ub-uinf-elems(j1)%p%uvort))
     endif
   
   end do
@@ -392,10 +392,11 @@ end subroutine compute_vel_vortlatt
 !!  s.t. vec{dforce} = pres * vec{n}  ( since vec{n} = vec{n_upper} )
 !!
 !! see compute_dforce_vortlatt
-subroutine compute_pres_vortlatt(this, sim_param)
-class(t_vortlatt), intent(inout) :: this
+subroutine compute_pres_vortlatt(this, R_g, sim_param)
+  class(t_vortlatt), intent(inout) :: this
+  real(wp)         , intent(in)    :: R_g(3,3)
+  type(t_sim_param), intent(in)    :: sim_param
 !type(t_elem_p), intent(in) :: elems(:)
-type(t_sim_param), intent(in) :: sim_param
 
 integer  :: i_stripe
 
@@ -471,12 +472,6 @@ subroutine calc_geo_data_vortlatt(this, vert)
     nor = cross( this%ver(:,3) - this%ver(:,2) , &
                  this%ver(:,1) - this%ver(:,2)     )
   end if
-
-! !debug
-! write(*,*) ' nsides : ' , nsides, ' this%vert :'
-! do is = 1 , nsides
-!   write(*,*) this%ver(:,is)
-! end do
 
   this%area = 0.5_wp * norm2(nor)
   this%nor = nor / norm2(nor)
