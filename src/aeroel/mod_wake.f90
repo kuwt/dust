@@ -1230,12 +1230,14 @@ subroutine update_wake(wake, elems, octree, sim_param)
   
   if (sim_param%use_fmm) then
     t0 = dust_time()
-    call sort_particles(wake%part_p, octree)
+    call sort_particles(wake%part_p, wake%n_prt, octree)
     call calculate_multipole(wake%part_p, octree)
     call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
                          wake%end_vorts, sim_param)
     t1 = dust_time()
     write(msg,'(A,F9.3,A)') 'Multipoles calculation: ' , t1 - t0,' s.'
+    call printout(msg)
+    write(msg,'(A,I0)') 'Number of particles: ' , wake%n_prt
     call printout(msg)
   endif
 
