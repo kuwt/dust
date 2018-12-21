@@ -557,20 +557,14 @@ do it = 1,nstep
   !  surfpan to be used in the source rhs of the Bernoulli integral equation.
   ! surf_vel_SurfPan_old saved at the end of the time step (for surfpan only)
 
+
   do i_el = 1 , geo%nSurfPan
 
     select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
 
       el%dUn_dt = sum( el%nor * ( el%ub - & 
-             surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) ) / sim_param%dt
-
-      if ( i_el .eq. 570 ) then
-        write(*,*) ' elem(',i_el,'%pot_vel_stencil : '
-        do i_e = 1 , size(el%pot_vel_stencil,1)
-          write(*,*) el%pot_vel_stencil(i_e,:)
-        end do
-      end if
-
+             surf_vel_SurfPan_old( i_el , : ) ) ) / sim_param%dt
+!            surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) ) / sim_param%dt ! <<< mod-2018-12-21
 
       ! Compute GradS_Un
       GradS_Un = 0.0_wp
