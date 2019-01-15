@@ -249,7 +249,7 @@ call prms%CreateLogicalOption('reset_time','reset the time from previous &
 ! parameters:
 call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
                                                        '(/1.0, 0.0, 0.0/)')
-call prms%CreateRealArrayOption( 'u_ref', "reference velocity")
+call prms%CreateRealOption( 'u_ref', "reference velocity")
 call prms%CreateRealOption( 'P_inf', "free stream pressure", '1.0')
 call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')
 call prms%CreateRealOption( 'a_inf', "Speed of sound", '340.0')  ! m/s
