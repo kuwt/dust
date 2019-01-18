@@ -371,19 +371,21 @@ sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
 sim_param%use_ve = getlogical(prms, 'ViscosityEffects')
 !Octree and FMM parameters
 sim_param%use_fmm = getlogical(prms, 'FMM')
-sim_param%BoxLength = getreal(prms, 'BoxLength')
-sim_param%NBox = getintarray(prms, 'NBox',3)
-sim_param%OctreeOrigin = getrealarray(prms, 'OctreeOrigin',3)
-sim_param%NOctreeLevels = getint(prms, 'NOctreeLevels')
-sim_param%MinOctreePart = getint(prms, 'MinOctreePart')
-sim_param%MultipoleDegree = getint(prms,'MultipoleDegree')
-
-sim_param%use_dyn_layers = getlogical(prms,'DynLayers')
-if(sim_param%use_dyn_layers) then
-  sim_param%NMaxOctreeLevels = getint(prms, 'NMaxOctreeLevels')
-  sim_param%LeavesTimeRatio = getreal(prms, 'LeavesTimeRatio')
-else
-  sim_param%NMaxOctreeLevels = sim_param%NOctreeLevels
+if(sim_param%use_fmm) then
+  sim_param%BoxLength = getreal(prms, 'BoxLength')
+  sim_param%NBox = getintarray(prms, 'NBox',3)
+  sim_param%OctreeOrigin = getrealarray(prms, 'OctreeOrigin',3)
+  sim_param%NOctreeLevels = getint(prms, 'NOctreeLevels')
+  sim_param%MinOctreePart = getint(prms, 'MinOctreePart')
+  sim_param%MultipoleDegree = getint(prms,'MultipoleDegree')
+  
+  sim_param%use_dyn_layers = getlogical(prms,'DynLayers')
+  if(sim_param%use_dyn_layers) then
+    sim_param%NMaxOctreeLevels = getint(prms, 'NMaxOctreeLevels')
+    sim_param%LeavesTimeRatio = getreal(prms, 'LeavesTimeRatio')
+  else
+    sim_param%NMaxOctreeLevels = sim_param%NOctreeLevels
+  endif
 endif
 
 !-- Parameters Initializations --
@@ -508,19 +510,19 @@ if(sim_param%debug_level .ge. 1) then
   call printout(message)
 endif
 
-!===========EXPERIMENTAL PART, OCTREE========
-call printout(nl//'====== Initializing Octree ======')
-t0 = dust_time()
-call initialize_octree(sim_param%BoxLength, sim_param%NBox, &
-                       sim_param%OctreeOrigin, sim_param%NOctreeLevels, &
-                       sim_param%MinOctreePart, sim_param%MultipoleDegree, &
-                       sim_param%RankineRad, sim_param, octree)
-t1 = dust_time()
-if(sim_param%debug_level .ge. 1) then
-  write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
-  call printout(message)
+if(sim_param%use_fmm) then
+  call printout(nl//'====== Initializing Octree ======')
+  t0 = dust_time()
+  call initialize_octree(sim_param%BoxLength, sim_param%NBox, &
+                         sim_param%OctreeOrigin, sim_param%NOctreeLevels, &
+                         sim_param%MinOctreePart, sim_param%MultipoleDegree, &
+                         sim_param%RankineRad, sim_param, octree)
+  t1 = dust_time()
+  if(sim_param%debug_level .ge. 1) then
+    write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
+    call printout(message)
+  endif
 endif
-!============================================
 
 ! Restart --------------
 !------ Reloading ------
@@ -786,6 +788,7 @@ do it = 1,nstep
 
   time = min(sim_param%tend, time+sim_param%dt)
   call update_geometry(geo, time, .false.)
+  !call prepare_wake(wake, geo, elems_tot, sim_param)
   call prepare_wake(wake, geo, sim_param)
 
 enddo
