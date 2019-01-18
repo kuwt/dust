@@ -1,0 +1,17 @@
+! Components -------------------
+
+CompName = Fuselage
+GeoFile = robin-helo.in 
+RefTag = Root
+
+CompName = Rotor
+GeoFile = ll_blade_robin_refined.in 
+RefTag = Hub 
+
+! General parameters -----------
+! TolSewing = 1.0
+! InnerProductTe = -0.5
+
+! .hdf5 geometry file ----------
+FileName = ./geo_input.h5 
+

@@ -249,7 +249,7 @@ call prms%CreateLogicalOption('reset_time','reset the time from previous &
 ! parameters:
 call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
                                                        '(/1.0, 0.0, 0.0/)')
-call prms%CreateRealArrayOption( 'u_ref', "reference velocity")
+call prms%CreateRealOption( 'u_ref', "reference velocity")
 call prms%CreateRealOption( 'P_inf', "free stream pressure", '1.0')
 call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')
 call prms%CreateRealOption( 'a_inf', "Speed of sound", '340.0')  ! m/s
@@ -371,19 +371,21 @@ sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
 sim_param%use_ve = getlogical(prms, 'ViscosityEffects')
 !Octree and FMM parameters
 sim_param%use_fmm = getlogical(prms, 'FMM')
-sim_param%BoxLength = getreal(prms, 'BoxLength')
-sim_param%NBox = getintarray(prms, 'NBox',3)
-sim_param%OctreeOrigin = getrealarray(prms, 'OctreeOrigin',3)
-sim_param%NOctreeLevels = getint(prms, 'NOctreeLevels')
-sim_param%MinOctreePart = getint(prms, 'MinOctreePart')
-sim_param%MultipoleDegree = getint(prms,'MultipoleDegree')
-
-sim_param%use_dyn_layers = getlogical(prms,'DynLayers')
-if(sim_param%use_dyn_layers) then
-  sim_param%NMaxOctreeLevels = getint(prms, 'NMaxOctreeLevels')
-  sim_param%LeavesTimeRatio = getreal(prms, 'LeavesTimeRatio')
-else
-  sim_param%NMaxOctreeLevels = sim_param%NOctreeLevels
+if(sim_param%use_fmm) then
+  sim_param%BoxLength = getreal(prms, 'BoxLength')
+  sim_param%NBox = getintarray(prms, 'NBox',3)
+  sim_param%OctreeOrigin = getrealarray(prms, 'OctreeOrigin',3)
+  sim_param%NOctreeLevels = getint(prms, 'NOctreeLevels')
+  sim_param%MinOctreePart = getint(prms, 'MinOctreePart')
+  sim_param%MultipoleDegree = getint(prms,'MultipoleDegree')
+  
+  sim_param%use_dyn_layers = getlogical(prms,'DynLayers')
+  if(sim_param%use_dyn_layers) then
+    sim_param%NMaxOctreeLevels = getint(prms, 'NMaxOctreeLevels')
+    sim_param%LeavesTimeRatio = getreal(prms, 'LeavesTimeRatio')
+  else
+    sim_param%NMaxOctreeLevels = sim_param%NOctreeLevels
+  endif
 endif
 
 !-- Parameters Initializations --
@@ -508,19 +510,19 @@ if(sim_param%debug_level .ge. 1) then
   call printout(message)
 endif
 
-!===========EXPERIMENTAL PART, OCTREE========
-call printout(nl//'====== Initializing Octree ======')
-t0 = dust_time()
-call initialize_octree(sim_param%BoxLength, sim_param%NBox, &
-                       sim_param%OctreeOrigin, sim_param%NOctreeLevels, &
-                       sim_param%MinOctreePart, sim_param%MultipoleDegree, &
-                       sim_param%RankineRad, sim_param, octree)
-t1 = dust_time()
-if(sim_param%debug_level .ge. 1) then
-  write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
-  call printout(message)
+if(sim_param%use_fmm) then
+  call printout(nl//'====== Initializing Octree ======')
+  t0 = dust_time()
+  call initialize_octree(sim_param%BoxLength, sim_param%NBox, &
+                         sim_param%OctreeOrigin, sim_param%NOctreeLevels, &
+                         sim_param%MinOctreePart, sim_param%MultipoleDegree, &
+                         sim_param%RankineRad, sim_param, octree)
+  t1 = dust_time()
+  if(sim_param%debug_level .ge. 1) then
+    write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
+    call printout(message)
+  endif
 endif
-!============================================
 
 ! Restart --------------
 !------ Reloading ------
@@ -557,20 +559,14 @@ do it = 1,nstep
   !  surfpan to be used in the source rhs of the Bernoulli integral equation.
   ! surf_vel_SurfPan_old saved at the end of the time step (for surfpan only)
 
+
   do i_el = 1 , geo%nSurfPan
 
     select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
 
       el%dUn_dt = sum( el%nor * ( el%ub - & 
-             surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) ) / sim_param%dt
-
-      if ( i_el .eq. 570 ) then
-        write(*,*) ' elem(',i_el,'%pot_vel_stencil : '
-        do i_e = 1 , size(el%pot_vel_stencil,1)
-          write(*,*) el%pot_vel_stencil(i_e,:)
-        end do
-      end if
-
+             surf_vel_SurfPan_old( i_el , : ) ) ) / sim_param%dt
+!            surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) ) / sim_param%dt ! <<< mod-2018-12-21
 
       ! Compute GradS_Un
       GradS_Un = 0.0_wp
@@ -792,6 +788,7 @@ do it = 1,nstep
 
   time = min(sim_param%tend, time+sim_param%dt)
   call update_geometry(geo, time, .false.)
+  !call prepare_wake(wake, geo, elems_tot, sim_param)
   call prepare_wake(wake, geo, sim_param)
 
 enddo
