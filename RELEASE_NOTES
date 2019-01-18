@@ -1,3 +1,33 @@
+0.5.1-a
+
+* Minor bugfixes
+* Updated and extended examples
+
+0.5.0-a
+
+* Introduced Fast Multipole for particles evolution
+* Introduced vortex stretching and diffusion for vortex particles intensity evolution
+* Completely new calculation of pressure based on Poisson solution
+* Introduced vorticity effects: separation simulation
+
+
+0.4.1-a
+
+* Added the possibility of defining wings and blades mirrored
+
+0.4.0-a
+
+* Some minor features introduced
+* Extensive bug fixing
+
+0.3.0-a
+
+* Added the generation and advection of vortex particles
+* Added postprocessing of such particles
+* Added postprocessing features, averaging etc.
+* Bug fixes
+
+
 0.2.1-a
 
 * Extended models for multiple geometries (i.e. rotors)
