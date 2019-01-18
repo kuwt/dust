@@ -1,0 +1,51 @@
+data_basename = ./Output/robin
+basename =     ./Postpro/robin
+
+Analysis = {
+
+Type = viz  
+Name = viz        ! appears in the filename
+StartRes = 1
+EndRes   = 41
+StepRes  = 1
+Format = vtk
+!Format = tecplot
+
+Wake = T
+
+Component = Rotor 
+Component = Fuselage 
+
+Variable = vorticity 
+Variable = pressure  
+!Variable = cp
+
+}
+
+Analysis = {
+
+Type = integral_loads
+Name = loads_rotor_abs
+StartRes = 1 
+EndRes   = 41  
+StepRes  = 1
+Format   = dat
+
+Component = Rotor   
+Reference_Tag = 0
+
+}
+
+Analysis = {
+
+Type = integral_loads
+Name = loads_rotor_shaft
+StartRes = 1 
+EndRes   = 41
+StepRes  = 1
+Format   = dat
+
+Component = Rotor   
+Reference_Tag = Gimbal
+
+}

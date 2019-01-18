@@ -1,0 +1,61 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Reference_Tag = Root
+Parent_Tag = 0
+Origin = (/0.0, 0.0, 0.0/)
+Orientation = (/1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0/)
+Multiple = F
+Moving = F
+
+! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Reference_Tag = Gimbal
+Parent_Tag = Root
+Origin = (/0.690, 0.0, 0.184/)
+!Orientation = (/0.833,0.0,0.5, 0.0,1.0,0.0, -0.5,0.0,0.833/)
+Orientation = (/0.9986,0.0,0.0523, 0.0,1.0,0.0, -0.0523,0.0,0.9986/)
+!Orientation = (/1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0/)
+Multiple = F
+Moving = F
+
+! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Reference_Tag = Hub
+Parent_Tag = Gimbal
+Origin = (/0.0, 0.0, 0.090/)
+Orientation = (/1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0/)
+Multiple = T
+Moving = F
+
+Multiplicity = {
+  MultType = rotor
+  N_Blades = 4
+  Rot_Axis = (/0.0, 0.0, 1.0/)
+  Rot_Rate = 209.0   !167.5 aw r=1.1
+  Psi_0 = 45.0
+  !Psi_0 = 0.0
+  Hub_Offset = 0.049
+
+  N_dofs = 3
+  Dof = {
+    Hinge_Type = Flap
+    Hinge_Offset = (/ 0.0 , 0.0 , 0.0 /)
+    Collective  =  1.7     ! deg
+    Cyclic_Ampl =  0.0     ! deg
+    Cyclic_Phas =  0.0     ! deg
+  }
+  Dof = {
+    Hinge_Type = Lag
+    Hinge_Offset = (/ 0.0 , 0.0 , 0.0 /)
+    Collective  =  0.0     ! deg
+    Cyclic_Ampl =  0.0     ! deg
+    Cyclic_Phas =  0.0     ! deg
+  }
+  Dof = {
+    Hinge_Type = Pitch
+    Hinge_Offset = (/ 0.0 , 0.0 , 0.0 /)
+    Collective  = 6.86 
+    Cyclic_Ampl =  3.81
+    Cyclic_Phas =  -59.1
+  }
+
+}
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+

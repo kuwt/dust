@@ -247,6 +247,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
  type(t_sim_param) :: sim_param 
  real(wp) :: uinf(3) , dist(3) , dist2(3)
  real(wp) :: rhoinf , Pinf
+ real(wp) :: elcen(3)
 
  integer :: ie, nst, ntot 
  integer :: ip , iw , is , inext , p1 , p2
@@ -306,12 +307,14 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
   ! Slicing --------------------
   linsys%A_pres = linsys%A( geo%idSurfPan , geo%idSurfPan )
   ! Remove Kutta condtion ------
+!$omp parallel do private(ie)
   do ie = 1 , geo%nSurfpan
     select type( el => elems(geo%idSurfPan(ie))%p ) ; class is(t_surfpan)
       call el%correct_pressure_kutta( &
             (/wake%pan_p, wake%rin_p/), wake%pan_gen_elems_id, linsys,uinf,ie,1,ntot)
     end select
   end do
+!$omp end parallel do
   
   ! rhs: ....
 
@@ -328,27 +331,34 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
   !     %build_row routines above
   ! do nothing here
   ! (c) rotational effects (up to now, ignoring ring wakes)
- 
+!$omp parallel do private(ie, iw, dist, elcen) schedule(dynamic) 
   do ie = 1 , geo%nSurfpan
+    elcen = elems( geo%idSurfpan(ie) )%p%cen
     ! (c.1) particles ( part_p )
     if ( allocated( wake%part_p ) ) then
       do iw = 1 , size( wake%part_p )
         if  ( .not. ( wake%part_p(iw)%p%free ) ) then
 
-          dist = wake%part_p(iw)%p%cen - elems( geo%idSurfpan(ie) )%p%cen
- 
+          dist = wake%part_p(iw)%p%cen - elcen
           linsys%b_pres(ie) = linsys%b_pres(ie) + &
             sum( dist * cross( wake%part_p(iw)%p%dir , wake%part_p(iw)%p%vel ) ) * &
-                 wake%part_p(iw)%p%mag / ( norm2(dist)**3.0_wp ) 
-
+                 wake%part_p(iw)%p%mag / ( (sqrt(sum(dist**2)+sim_param%VortexRad**2))**3.0_wp ) 
+                 !wake%part_p(iw)%p%mag / ( norm2(dist)**3.0_wp ) 
+                 !EXPERIMENTAL: adding vortex rosenhead regularization
         end if
       end do 
     end if
+  enddo
+!$omp end parallel do
+
+!$omp parallel do private(ie, iw, dist, dist2, p1, p2, ipp, iww,ip, is, inext, elcen) schedule(dynamic) 
+  do ie = 1 , geo%nSurfpan
+    elcen = elems( geo%idSurfpan(ie) )%p%cen
     ! (c.2) line elements ( end_vorts )
     do iw = 1 , wake%n_pan_stripes
       if( associated( wake%end_vorts(iw)%mag ) ) then
-        dist  = wake%end_vorts(iw)%ver(:,1) - elems( geo%idSurfpan(ie) )%p%cen 
-        dist2 = wake%end_vorts(iw)%ver(:,2) - elems( geo%idSurfpan(ie) )%p%cen
+        dist  = wake%end_vorts(iw)%ver(:,1) - elcen 
+        dist2 = wake%end_vorts(iw)%ver(:,2) - elcen
         linsys%b_pres(ie) = linsys%b_pres(ie) - &
           0.5_wp * wake%end_vorts(iw)%mag * sum( wake%end_vorts(iw)%edge_vec * &
                ( cross(dist , wake%end_vorts(iw)%ver_vel(:,1) ) /(norm2(dist )**3.0_wp) + &
@@ -368,8 +378,8 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
         do is = 1 , wake%wake_panels(iw,ip)%n_ver ! do is = 1 , 4 
           
           inext = mod(is,wake%wake_panels(iw,ip)%n_ver) + 1 
-          dist  = wake%wake_panels(iw,ip)%ver(:,is   ) - elems( geo%idSurfpan(ie) )%p%cen 
-          dist2 = wake%wake_panels(iw,ip)%ver(:,inext) - elems( geo%idSurfpan(ie) )%p%cen
+          dist  = wake%wake_panels(iw,ip)%ver(:,is   ) - elcen 
+          dist2 = wake%wake_panels(iw,ip)%ver(:,inext) - elcen
           
           linsys%b_pres(ie) = linsys%b_pres(ie) - &
             0.5_wp * wake%wake_panels(iw,ip)%mag * sum( wake%wake_panels(iw,ip)%edge_vec(:,is) * &
@@ -393,6 +403,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
     ! TODO: to be implemented
 
   end do
+!!!$omp end parallel do
 
   ! (a) far field contribution
   linsys%b_pres = linsys%b_pres + &
