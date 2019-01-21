@@ -788,8 +788,7 @@ do it = 1,nstep
 
   time = min(sim_param%tend, time+sim_param%dt)
   call update_geometry(geo, time, .false.)
-  !call prepare_wake(wake, geo, elems_tot, sim_param)
-  call prepare_wake(wake, geo, sim_param)
+  call prepare_wake(wake, geo, elems_tot, sim_param)
 
 enddo
 
