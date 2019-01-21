@@ -652,10 +652,11 @@ end subroutine
 !----------------------------------------------------------------------
 
 !> Sort particles inside the octree grid
-subroutine sort_particles(part, n_prt, octree)
+subroutine sort_particles(part, n_prt, octree, sim_param)
  type(t_vortpart_p), intent(in), target :: part(:)
  integer, intent(inout) :: n_prt
  type(t_octree), intent(inout), target :: octree
+ type(t_sim_param), intent(in) :: sim_param
 
  integer :: ip
  integer :: idx(3)
@@ -715,44 +716,46 @@ subroutine sort_particles(part, n_prt, octree)
 
   enddo
 
-  !On the bottom level remove the too small particles
-  do k=1,octree%ncl(3,ll); do j=1,octree%ncl(2,ll); do i = 1,octree%ncl(1,ll)
-    nprt = octree%layers(ll)%lcells(i,j,k)%npart
-    octree%layers(ll)%lcells(i,j,k)%ave_vortmag =  &
-      octree%layers(ll)%lcells(i,j,k)%ave_vortmag/real(nprt,wp)
+  if(sim_param%use_pr) then
+    !On the bottom level remove the too small particles
+    do k=1,octree%ncl(3,ll); do j=1,octree%ncl(2,ll); do i = 1,octree%ncl(1,ll)
+      nprt = octree%layers(ll)%lcells(i,j,k)%npart
+      octree%layers(ll)%lcells(i,j,k)%ave_vortmag =  &
+        octree%layers(ll)%lcells(i,j,k)%ave_vortmag/real(nprt,wp)
 
-    do ip=1,nprt
-      if(octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag .lt. &
-         1.0_wp/3.0_wp*octree%layers(ll)%lcells(i,j,k)%ave_vortmag) then
-        !the particle is significantly smaller than the average in the cell
-        !free
-        octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%free = .true.
-        octree%layers(ll)%lcells(i,j,k)%npart = &
-                                  octree%layers(ll)%lcells(i,j,k)%npart - 1
-        !lower also the global counter
-        n_prt = n_prt -1
+      do ip=1,nprt
+        if(octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag .lt. &
+           1.0_wp/3.0_wp*octree%layers(ll)%lcells(i,j,k)%ave_vortmag) then
+          !the particle is significantly smaller than the average in the cell
+          !free
+          octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%free = .true.
+          octree%layers(ll)%lcells(i,j,k)%npart = &
+                                    octree%layers(ll)%lcells(i,j,k)%npart - 1
+          !lower also the global counter
+          n_prt = n_prt -1
 
-        !redistribute it
-        nprt2 = octree%layers(ll)%lcells(i,j,k)%npart
-        redistr = (octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag * &
-                octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%dir) / nprt2
-        do iq=1,nprt
-            if(.not. octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%free) then
-              vort =  octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%mag*&
-                      octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%dir
-              vort = vort + redistr
-              octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%mag = norm2(vort)
-              if(norm2(vort) .gt. 0.0_wp) then
-                octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%dir = &
-                                                 vort/norm2(vort)
-              else
-                octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%dir = 0.0_wp
+          !redistribute it
+          nprt2 = octree%layers(ll)%lcells(i,j,k)%npart
+          redistr = (octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag * &
+                  octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%dir) / nprt2
+          do iq=1,nprt
+              if(.not. octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%free) then
+                vort =  octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%mag*&
+                        octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%dir
+                vort = vort + redistr
+                octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%mag = norm2(vort)
+                if(norm2(vort) .gt. 0.0_wp) then
+                  octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%dir = &
+                                                   vort/norm2(vort)
+                else
+                  octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%dir = 0.0_wp
+                endif
               endif
-            endif
-        enddo
-      endif
-    enddo
-  enddo; enddo; enddo !layer cells i,j,k
+          enddo
+        endif
+      enddo
+    enddo; enddo; enddo !layer cells i,j,k
+  endif
 
   nl = 0
   !Bottom level: just check if are leaves
@@ -1011,7 +1014,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: i, j, k, lv, ip, ipp, m, ie, iln
- real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3)
+ real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3), dir(3)
  real(wp) :: grad(3,3)
  real(t_realtime) :: tsta , tend
 
@@ -1030,6 +1033,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
       pos = octree%leaves(lv)%p%cell_parts(ip)%p%cen
       alpha = octree%leaves(lv)%p%cell_parts(ip)%p%mag * &
               octree%leaves(lv)%p%cell_parts(ip)%p%dir
+      dir = octree%leaves(lv)%p%cell_parts(ip)%p%dir
 
       !first apply the local multipole expansion
       do m = 1,size(octree%leaves(lv)%p%mp%b,2)
@@ -1043,7 +1047,10 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
              product((pos-octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
         endif
       enddo
-      if(sim_param%use_vs) stretch = stretch + matmul(alpha, grad)
+      if(sim_param%use_vs)  then
+        str = matmul(alpha, grad)
+        stretch = stretch + str - sum(str*dir)*dir !remove the parallel comp.
+      endif
       !if(sim_param%use_vs) stretch = stretch + matmul(transpose(grad),alpha)
 
       !then interact with all the neighbouring cell particles
@@ -1058,7 +1065,8 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
             if(sim_param%use_vs) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
                  %compute_stretch(pos, alpha, str)
-              stretch = stretch +str/(4.0_wp*pi)
+              stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+              !removed the parallel component
             endif
             if(sim_param%use_vd) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
@@ -1080,7 +1088,8 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
          if(sim_param%use_vs) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
               %compute_stretch(pos, alpha, str)
-           stretch = stretch +str/(4.0_wp*pi)
+           stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+              !removed the parallel component
          endif
          if(sim_param%use_vd) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
@@ -1099,7 +1108,8 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
           if(sim_param%use_vs) then
             call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_stretch(pos, &
                                                           alpha, str)
-            stretch = stretch +str/(4.0_wp*pi)
+            stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+              !removed the parallel component
           endif
 
           if(sim_param%use_vd) then

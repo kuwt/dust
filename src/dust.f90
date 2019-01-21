@@ -305,6 +305,8 @@ call prms%CreateLogicalOption('PenetrationAvoidance','Employ penetration &
                                                               & avoidance','F')
 call prms%CreateLogicalOption('ViscosityEffects','Simulate viscosity &
                                                               & effects','F')
+call prms%CreateLogicalOption('ParticlesRedistribution','Employ particles &
+                                                        &redistribution','F')
 
 
 ! get the parameters and print them out
@@ -386,6 +388,8 @@ if(sim_param%use_fmm) then
   else
     sim_param%NMaxOctreeLevels = sim_param%NOctreeLevels
   endif
+
+  sim_param%use_pr = getlogical(prms, 'ParticlesRedistribution')
 endif
 
 !-- Parameters Initializations --

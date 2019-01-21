@@ -1199,7 +1199,10 @@ subroutine update_wake(wake, elems, octree, sim_param)
         if (ip.ne.iq) then
           call wake%part_p(iq)%p%compute_stretch(wake%part_p(ip)%p%cen, &
                wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, str)
-          stretch = stretch + str/(4.0_wp*pi)
+          !stretch = stretch + str/(4.0_wp*pi)
+           stretch = stretch +(str - &
+           sum(str*wake%part_p(ip)%p%dir)*wake%part_p(ip)%p%dir)/(4.0_wp*pi)
+          !removed the parallel component
         endif 
         enddo
         !do ie=1,size(wake%end_vorts)
@@ -1230,7 +1233,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
   
   if (sim_param%use_fmm) then
     t0 = dust_time()
-    call sort_particles(wake%part_p, wake%n_prt, octree)
+    call sort_particles(wake%part_p, wake%n_prt, octree, sim_param)
     call calculate_multipole(wake%part_p, octree)
     call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
                          wake%end_vorts, sim_param)
