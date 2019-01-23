@@ -307,14 +307,12 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
   ! Slicing --------------------
   linsys%A_pres = linsys%A( geo%idSurfPan , geo%idSurfPan )
   ! Remove Kutta condtion ------
-!$omp parallel do private(ie)
   do ie = 1 , geo%nSurfpan
     select type( el => elems(geo%idSurfPan(ie))%p ) ; class is(t_surfpan)
       call el%correct_pressure_kutta( &
             (/wake%pan_p, wake%rin_p/), wake%pan_gen_elems_id, linsys,uinf,ie,1,ntot)
     end select
   end do
-!$omp end parallel do
   
   ! rhs: ....
 
@@ -403,7 +401,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
     ! TODO: to be implemented
 
   end do
-!!!$omp end parallel do
+!$omp end parallel do
 
   ! (a) far field contribution
   linsys%b_pres = linsys%b_pres + &
