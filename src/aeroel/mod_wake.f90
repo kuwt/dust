@@ -572,6 +572,7 @@ subroutine prepare_wake(wake, geo, elems, sim_param)
   !==> Particles: update the position and intensity in time, avoid penetration
   !               and chech if remain into the boundaries
   n_part = wake%n_prt
+!$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p)
   do ip = 1, n_part
     if(sim_param%use_pa) call avoid_collision(elems, wake, &
                         wake%part_p(ip)%p, sim_param, wake%part_p(ip)%p%vel)
@@ -592,13 +593,16 @@ subroutine prepare_wake(wake, geo, elems, sim_param)
         endif
       else
         wake%part_p(ip)%p%free = .true.
+!$omp   atomic update
         wake%n_prt = wake%n_prt -1
+!$omp   end atomic
       endif
     endif
     !nullify(wake%part_p(ip)%p%npos)
     !nullify(wake%part_p(ip)%p%vel)
     if(sim_param%use_vs) nullify(wake%part_p(ip)%p%stretch)
   enddo
+!$omp end parallel do
   deallocate(wake%prt_vortevol)
 
   !==> Particles: if the panel wake is at the end, create a particle
@@ -1619,7 +1623,9 @@ subroutine avoid_collision(elems, wake, part, sim_param, vel)
           normvel .lt. 0.0_wp ) then
         write(*,*) 'particle eaten by BL'
         part%free = .true.
+!$omp   atomic update
         wake%n_prt = wake%n_prt -1
+!$omp   end atomic
         return
       endif
       
@@ -1644,7 +1650,9 @@ subroutine avoid_collision(elems, wake, part, sim_param, vel)
           else
             write(*,*) 'particle eaten by motion'
             part%free = .true.
+!$omp       atomic update
             wake%n_prt = wake%n_prt -1
+!$omp       end atomic
             return
           endif
       endif

@@ -246,7 +246,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
 !real(wp), intent(in) :: uinf(:)
  type(t_sim_param) :: sim_param 
  real(wp) :: uinf(3) , dist(3) , dist2(3)
- real(wp) :: rhoinf , Pinf
+ real(wp) :: rhoinf , Pinf, pupd, mag
  real(wp) :: elcen(3)
 
  integer :: ie, nst, ntot 
@@ -261,7 +261,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
  nst = linsys%nstatic
  ntot = linsys%rank
  !calculate the vortex induced velocity
- !$omp parallel do private(ie) schedule(dynamic)
+ !$omp parallel do private(ie) schedule(dynamic,2)
  do ie =1,linsys%rank
 
    !call elems(ie)%p%get_vort_vel(wake_elems%end_vorts, uinf)
@@ -331,7 +331,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
   !     %build_row routines above
   ! do nothing here
   ! (c) rotational effects (up to now, ignoring ring wakes)
-!$omp parallel do private(ie, iw, dist, elcen) schedule(dynamic) 
+!$omp parallel do private(ie, iw, dist, elcen) schedule(dynamic,32) 
   do ie = 1 , geo%nSurfpan
     elcen = elems( geo%idSurfpan(ie) )%p%cen
     ! (c.1) particles ( part_p )
@@ -351,7 +351,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
   enddo
 !$omp end parallel do
 
-!$omp parallel do private(ie, iw, dist, dist2, p1, p2, ipp, iww,ip, is, inext, elcen) schedule(dynamic) 
+!$omp parallel do private(ie, iw, dist, dist2, p1, p2, ipp, iww,ip, is, inext, elcen) schedule(dynamic, 64) 
   do ie = 1 , geo%nSurfpan
     elcen = elems( geo%idSurfpan(ie) )%p%cen
     ! (c.2) line elements ( end_vorts )

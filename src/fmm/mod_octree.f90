@@ -944,7 +944,7 @@ subroutine calculate_multipole(part,octree)
   !PROFILE
   t0 = dust_time()
     !cycle on the elements on the level
-!$omp parallel do collapse(3) private(i,j,k,il,idx_diff) schedule(dynamic)
+!$omp parallel do collapse(3) private(i,j,k,il,idx_diff) schedule(dynamic,16)
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
       if(octree%layers(l)%lcells(i,j,k)%active) then
          !if it is active perform M2L with all the interaction list
@@ -1021,7 +1021,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
   tsta = dust_time()
   !for all the leaves apply the local expansion and then local interactions 
   t0 = dust_time()
-!$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, v, stretch, str, grad, alpha) schedule(dynamic)
+!$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, v, stretch, str, grad, alpha, dir) schedule(dynamic)
   do lv = 1, octree%nleaves
     !I am on a leaf, cycle on all the particles inside the leaf
     do ip = 1,octree%leaves(lv)%p%npart
@@ -1159,7 +1159,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
     enddo
   enddo
 !Don't ask me why, but without this pragra it is much faster!
-!!!!$omp end parallel do
+!$omp end parallel do
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Calculated leaves interactions in: ' , t1 - t0,' s.'
   call printout(msg)
