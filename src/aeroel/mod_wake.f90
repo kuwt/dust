@@ -519,7 +519,7 @@ subroutine prepare_wake(wake, geo, elems, sim_param)
  integer :: p1, p2
  integer :: ip, iw, ipan, id, is, nprev
  real(wp) :: dist(3) , vel_te(3), pos_p(3)
- real(wp) :: dir(3), partvec(3), ave, alpha_p(3)
+ real(wp) :: dir(3), partvec(3), ave, alpha_p(3), alpha_p_n
  integer :: ir, k, n_part
 
  ! flow separation variables
@@ -587,9 +587,12 @@ subroutine prepare_wake(wake, geo, elems, sim_param)
         if(sim_param%use_vs .or. sim_param%use_vd) then
           alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
                           wake%prt_vortevol(:,ip)*sim_param%dt
-          wake%part_p(ip)%p%mag = norm2(alpha_p)
-          if(wake%part_p(ip)%p%mag .ne. 0.0_wp) &
-             wake%part_p(ip)%p%dir = alpha_p/wake%part_p(ip)%p%mag
+          alpha_p_n = norm2(alpha_p)
+          if(alpha_p_n .le. wake%part_p(ip)%p%mag) then
+            wake%part_p(ip)%p%mag = alpha_p_n
+          endif
+          if(alpha_p_n .ne. 0.0_wp) &
+             wake%part_p(ip)%p%dir = alpha_p/alpha_p_n
         endif
       else
         wake%part_p(ip)%p%free = .true.
@@ -1589,11 +1592,12 @@ subroutine avoid_collision(elems, wake, part, sim_param, vel)
  real(wp) :: dist1(3), dist2(3), dist12(3), n(3)
  real(wp) :: pos1(3), pos2(3)
  real(wp) :: distn, dist1_nor, dist1_tan, dist2_nor, dist2_tan
- real(wp) :: normvel, normvel_corr, tanvel(3)
+ real(wp) :: normvel, normvel_corr, tanvel(3), dt_part
  real(wp) :: check_radius, rad_mult, elrad_mult, r2d2, elrad, tol, blthick
 
  rad_mult = 1000_wp
- elrad_mult = 1.0_wp
+ !rad_mult = 2.0_wp
+ elrad_mult = 2.0_wp
  blthick = 0.001_wp
  tol = 0.005_wp
  r2d2 = sqrt(2.0_wp)/2.0_wp
@@ -1616,45 +1620,43 @@ subroutine avoid_collision(elems, wake, part, sim_param, vel)
       dist1_tan = norm2(dist1-(n*dist1_nor))
       normvel = sum(vel*n) 
 
-      if (dist1_nor .lt. 0.0_wp) cycle
+      if (dist1_nor .lt. 0.0_wp .or. normvel.ge.0.0_wp) cycle
 
-      if (dist1_tan .lt. elrad_mult*elrad .and. &
-          dist1_nor .lt. blthick  .and. &
-          normvel .lt. 0.0_wp ) then
-        write(*,*) 'particle eaten by BL'
-        part%free = .true.
-!$omp   atomic update
-        wake%n_prt = wake%n_prt -1
-!$omp   end atomic
-        return
-      endif
-      
-      pos2  = part%cen+vel*sim_param%dt
-      dist2 = pos2 - (elems(ie)%p%cen+elems(ie)%p%ub*sim_param%dt) 
-      dist2_nor = sum(dist2 * n)
-      dist2_tan = norm2(dist2-(n*dist2_nor))
+      !if (dist1_tan .lt. elrad_mult*elrad .and. &
+      !    dist1_nor .lt. blthick  .and. &
+      !    normvel .lt. 0.0_wp ) then
+      !  write(*,*) 'particle eaten by BL'
+      !  part%free = .true.
+!!$omp !  atomic update
+      !  wake%n_prt = wake%n_prt -1
+!!$omp !  end atomic
+      !  return
+      !endif
+      dt_part = -dist1_nor/normvel
+      if(dt_part .le. sim_param%dt) then
+        pos2  = part%cen+vel*dt_part
+        dist2 = pos2 - (elems(ie)%p%cen+elems(ie)%p%ub*dt_part) 
+        dist2_nor = sum(dist2 * n)
+        dist2_tan = norm2(dist2-(n*dist2_nor))
 
-      if (dist2_tan .lt. elrad_mult*elrad .and. &
-          dist2_nor .lt. 0.0_wp) then
+        if (dist2_tan .lt. elrad_mult*elrad) then
 
-          !try to correct the velocity, otherwise free
-          dist12 = pos1 -(elems(ie)%p%cen + &
-                          elems(ie)%p%ub*sim_param%dt + n*tol)
-          normvel_corr = sum(dist12*n)/sim_param%dt
-          if (normvel_corr .lt. 0.0_wp) then
-            write(*,*) 'correcting vel'
-            tanvel  = vel -normvel*n
-            tanvel = tanvel * sqrt(1+(normvel**2-normvel_corr**2)/sum(tanvel**2))
-            !vel = vel + n * (normvel_corr - normvel)
-            vel = normvel_corr*n + tanvel
-          else
-            write(*,*) 'particle eaten by motion'
-            part%free = .true.
-!$omp       atomic update
-            wake%n_prt = wake%n_prt -1
-!$omp       end atomic
-            return
-          endif
+            normvel_corr = dist2_nor*(1-tol)/sim_param%dt
+            !if (normvel_corr .lt. 0.0_wp) then
+              !write(*,*) 'correcting vel'
+              tanvel  = vel -normvel*n
+              tanvel = tanvel * sqrt(1+(normvel**2-normvel_corr**2)/sum(tanvel**2))
+              !vel = vel + n * (normvel_corr - normvel)
+              vel = normvel_corr*n + tanvel
+            !else
+            !  write(*,*) 'particle eaten by motion'
+            !  part%free = .true.
+!!$omp       !  atomic update
+            !  wake%n_prt = wake%n_prt -1
+!!$omp       !  end atomic
+            !  return
+            !endif
+        endif
       endif
 
     endif
