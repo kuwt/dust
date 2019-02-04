@@ -163,13 +163,21 @@ subroutine compute_stretch_vortpart (this, pos, alpha, stretch)
 
   dist = pos-this%cen
   distn = sqrt(sum(dist**2)+r_Vortex**2)
-
+  !"original"
   !stretch = -cross(alpha, this%dir*this%mag)/(distn)**3 &
   !     +3.0_wp/(distn)**5 * cross(dist, this%mag*this%dir) * &
   !     sum(alpha*dist)
+  !"original" fixed sign
+  !stretch = -cross(alpha, this%dir*this%mag)/(distn)**3 &
+  !     -3.0_wp/(distn)**5 * cross(dist, this%mag*this%dir) * &
+  !     sum(alpha*dist)
+  !"transpose"
+  !stretch = -cross(this%dir*this%mag, alpha)/(distn)**3 &
+  !     +1.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
 
   stretch = -cross(this%dir*this%mag, alpha)/(distn)**3 &
-       +1.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
+       +3.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
+
 
 end subroutine compute_stretch_vortpart
 
