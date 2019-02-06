@@ -89,7 +89,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
  character(len=max_char_len), allocatable :: type_span_list(:)
  integer :: n_type_span
  ! Sections 1. 2.
- real(wp), allocatable :: xySection1(:,:) , xySection2(:,:)
+ real(wp), allocatable :: xySection1(:,:) , xySection2(:,:) , xyAirfoil2(:,:)
  real(wp), allocatable :: rrSection1(:,:) , rrSection2(:,:)
  real(wp) :: dx_ref , dy_ref , dz_ref
  integer :: ista , iend
@@ -99,6 +99,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
  real(wp), allocatable :: chord_fraction(:), span_fraction(:)
  character(len=max_char_len) :: type_chord
  integer :: i1  
+
+ integer :: i_first , iSec
+ real(wp) :: dy_actual_airfoils , dy_sections , csi
 
  character(len=*), parameter :: this_sub_name = 'read_mesh_parametric'
 
@@ -263,6 +266,17 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   dy_ref = ref_point(2)       ! 0.0_wp
   dz_ref = ref_point(3)       ! 0.0_wp
 
+  ! === new-2019-02-06 ===
+  ! check airfoil_list input ----
+  if ( trim(airfoil_list(1)) .eq. 'interp' ) then
+    call error(this_sub_name, this_mod_name, 'The first "airfoil"&
+          & cannot be set as "interp".')
+  end if
+  if ( trim(airfoil_list(nSections)) .eq. 'interp' ) then
+    call error(this_sub_name, this_mod_name, 'The last "airfoil"&
+          & cannot be set as "interp".')
+  end if
+  ! === new-2019-02-06 ===
 
   ista = 1 ; iend = npoint_chord_tot
   ! Loop over regions
@@ -276,6 +290,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       rrSection1 = rrSection2
     else                        ! build points
       write(*,*) ' nelem_chord_tot ' , nelem_chord_tot
+
       call define_section( chord_list(iRegion), trim(adjustl(airfoil_list(iRegion))), &
                            twist_list(iRegion), ElType, nelem_chord,              &
                            type_chord , chord_fraction, ref_chord_fraction,       &
@@ -293,10 +308,47 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
     end if
 
-    call define_section( chord_list(iRegion+1), trim(adjustl(airfoil_list(iRegion+1))), &
-                         twist_list(iRegion+1), ElType, nelem_chord,                  &
-                         type_chord , chord_fraction, ref_chord_fraction,       &
-                         ref_point, xySection2 )
+    ! === new-2019-02-06 ===
+    ! now, it is possible to define the airfoils on some of the sections only.
+    !  When the shape of the airfoil is not defined on a section, it is interpolated
+    if ( trim(adjustl(airfoil_list(iRegion+1))) .ne. 'interp' ) then  ! read the field 'airfoil'
+      call define_section( chord_list(iRegion+1), trim(adjustl(airfoil_list(iRegion+1))), &
+                           twist_list(iRegion+1), ElType, nelem_chord,                    &
+                           type_chord , chord_fraction, ref_chord_fraction,               &
+                           ref_point, xySection2 )
+    else ! interpolation
+       
+      do iSec = iRegion + 1 , nRegions+1
+        if ( airfoil_list(iSec) .ne. 'interp' ) then
+          dy_actual_airfoils = sum( abs(span_list(iRegion:iSec-1)) ) 
+        exit
+        end if
+      end do
+      dy_sections = abs(span_list(iRegion))
+      csi = dy_sections / dy_actual_airfoils ! adimensional "coord" for interpolation
+
+!     write(*,*) ' iSec : ' , iSec
+      call define_section( chord_list(iRegion+1), trim(adjustl(airfoil_list(iSec))), &
+                           twist_list(iRegion+1), ElType, nelem_chord,               &
+                           type_chord , chord_fraction, ref_chord_fraction,          &
+                           ref_point, xyAirfoil2 )
+
+      ! Compute the coordinates xySection2(), after removing the offset
+      if ( .not. allocated(xySection2) ) &
+                  allocate(xySection2(size(xyAirfoil2,1),size(xyAirfoil2,2)))
+
+!     write(*,*) ' csi : ' , csi
+      xySection2(1,:) = ( rrSection1(1,:) - dx_ref ) * (1-csi) + xyAirfoil2(1,:) * csi 
+      xySection2(2,:) = ( rrSection1(3,:) - dz_ref ) * (1-csi) + xyAirfoil2(2,:) * csi 
+
+! ! debug -----
+!       do i1 = 1 , size(xySection2,2)
+!         write(*,*) xySection2(:,i1)
+!       end do
+! ! debug -----
+
+    end if
+
 
     if ( abs( sweep_list(iRegion) ) .gt. 60.0d0 ) then
       write(*,*) ' WARNING. abs( sweep_list(iRegion) ) .gt. 60.0d0. '
@@ -349,6 +401,10 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
   enddo
 
+  ! lots of deallocation missing causing memory leakage =(
+  if ( allocated(xySection1) ) deallocate(xySection1)
+  if ( allocated(xySection2) ) deallocate(xySection2)
+  ! ...
 
   ! optional output ----
   npoints_chord_tot = npoint_chord_tot

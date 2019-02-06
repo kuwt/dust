@@ -1667,10 +1667,14 @@ subroutine symmetry_update_ll_lists ( nelem_span_list , &
 
  integer :: i , siz
 
- ! Update dimensions ---------- 
+ ! Update dimensions ----------
+ nelem = sum(nelem_span_list) 
+ npts  = nelem + 1 
  nelem_span_section = size(nelem_span_list) * 2 
- nelem = size(i_airfoil_e,2) * 2 
- npts  = size(i_airfoil_e,2) * 2 + 1 
+! === old-2019-02-06 === !
+! nelem = size(i_airfoil_e,2) * 2 
+! npts  = size(i_airfoil_e,2) * 2 + 1 
+! === old-2019-02-06 === !
 
  ! Fill temporary arrays ------
  allocate(nelem_span_list_tmp( nelem_span_section ))
@@ -1680,14 +1684,20 @@ subroutine symmetry_update_ll_lists ( nelem_span_list , &
    nelem_span_list_tmp( siz-i+1 ) = nelem_span_list(i)
  end do 
 
- allocate(i_airfoil_e_tmp( 2, nelem ))
+! === old-2019-02-06 === !
+! allocate(i_airfoil_e_tmp( 2, nelem ))
+! === old-2019-02-06 === !
+ allocate(i_airfoil_e_tmp( 2, 2*size(i_airfoil_e,2) ))
  siz = size(i_airfoil_e,2)
  do i = 1 , siz
    i_airfoil_e_tmp( 1:2 , siz+i   ) = i_airfoil_e( 1:2    , i )
    i_airfoil_e_tmp( 1:2 , siz-i+1 ) = i_airfoil_e( 2:1:-1 , i )
  end do
 
- allocate(normalised_coord_e_tmp( 2, nelem ))
+! === old-2019-02-06 === !
+! allocate(normalised_coord_e_tmp( 2, nelem ))
+! === old-2019-02-06 === !
+ allocate(normalised_coord_e_tmp( 2, 2*size(normalised_coord_e,2) ))
  siz = size(normalised_coord_e,2)
  do i = 1 , siz
    normalised_coord_e_tmp( 1:2 , siz+i   ) = normalised_coord_e( 1:2    , i )
