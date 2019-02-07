@@ -172,11 +172,11 @@ subroutine compute_stretch_vortpart (this, pos, alpha, stretch)
   !     -3.0_wp/(distn)**5 * cross(dist, this%mag*this%dir) * &
   !     sum(alpha*dist)
   !"transpose"
-  !stretch = -cross(this%dir*this%mag, alpha)/(distn)**3 &
-  !     +1.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
-
   stretch = -cross(this%dir*this%mag, alpha)/(distn)**3 &
-       +3.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
+       +1.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
+
+  !stretch = -cross(this%dir*this%mag, alpha)/(distn)**3 &
+  !     +3.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
 
 
 end subroutine compute_stretch_vortpart

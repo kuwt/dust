@@ -1048,8 +1048,8 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
         endif
       enddo
       if(sim_param%use_vs)  then
-        !str = matmul(alpha, grad)
-        str = matmul(alpha, transpose(grad))
+        str = matmul(alpha, grad)
+        !str = matmul(alpha, transpose(grad))
         stretch = stretch + str - sum(str*dir)*dir !remove the parallel comp.
       endif
       !if(sim_param%use_vs) stretch = stretch + matmul(transpose(grad),alpha)
