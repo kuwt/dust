@@ -981,6 +981,11 @@ subroutine build_connectivity_general ( ee , neigh )
                neigh(iv1,ie1) = ie2
                neigh(iv2,ie2) = ie1
              else
+               write(*,*) ' error : '
+               write(*,*) ' elem1 : ' , ie1
+               write(*,*) ' ee(:,elem1) : ' , ee(:,ie1)
+               write(*,*) ' elem2 : ' , ie2
+               write(*,*) ' ee(:,elem2) : ' , ee(:,ie2)
                call error(this_sub_name, this_mod_name, &
                  'Neighbouring elements with opposed normal orientation,&
                  &this is not allowed. Stop')
@@ -1083,10 +1088,7 @@ subroutine build_te_general ( ee , rr , ElType , &
 
  call merge_nodes_general ( rr , ee , tol_sewing , rr_m , ee_m , i_m  ) 
 
-
  call build_connectivity_general ( ee_m , neigh_m )
-
-
 
  call find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &  
                 te_proj_logical , te_proj_dir , te_proj_vec , &
@@ -1106,11 +1108,12 @@ subroutine merge_nodes_general ( ri , ei , tol , rr , ee , im )
  integer , allocatable , intent(out) :: ee(:,:) , im(:,:)
  
  integer , allocatable :: im_tmp(:,:)
- integer :: nSides1
+ integer :: nSides1 , nSides2
  integer :: n_nodes , n_elems
  integer :: n_merge
  
- integer :: i1 , i2 , i_e , i_v 
+ integer :: i1 , i2 , i_e1 , i_e2 , i_v1 , i_v2
+ integer :: ind1 , inext2 , iprev2 , i_n1
  
  character(len=*), parameter :: this_sub_name = 'merge_nodes_general'
 
@@ -1124,40 +1127,98 @@ subroutine merge_nodes_general ( ri , ei , tol , rr , ee , im )
   
   n_merge = 0
   do i1 = 1 , n_nodes
-  
+ 
     do i2 = i1 + 1 , n_nodes 
-    
-      if ( norm2(ri(:,i2)-ri(:,i1)) .lt. tol ) then
-  
-        n_merge = n_merge + 1
-        rr(:,i1) = 0.5_wp * (ri(:,i1)+ri(:,i2))
-        rr(:,i2) = rr(:,i1)
-      
-        do i_e = 1 , size(ei,2)
+
+      if ( norm2(ri(:,i2)-ri(:,i1)) .lt. tol ) then ! check if two nodes are very close
+
+        do i_e2 = 1 , size(ei,2)
           
-          ! 0 assumed to be possible only in ei(4,:)
-          nSides1 = count( ei(:,i_e) .ne. 0 ) 
+          ! 0 elem. assumed to be possible only in ei(4,:)
+          nSides2 = count( ei(:,i_e2) .ne. 0 ) 
         
-          do i_v = 1 , nSides1
-            ! avoid merging nodes belonging to the same element
-            if ( ei(i_v,i_e) .eq. i2 ) then
-              if ( all(ee(:,i_e) .ne. i1 ) ) then
-        
-                ee(i_v,i_e) = i1
-  
-                im_tmp(:,n_merge) = (/ i1 , i2 /)
+          do i_v2 = 1 , nSides2
+            if ( ei(i_v2,i_e2) .eq. i2 ) then ! find elems2 where i2 belongs to
+
+              ! avoid merging nodes belonging to the same element
+              if ( all(ei(:,i_e2) .ne. i1 ) ) then
+
+                inext2 = mod(i_v2,nSides2) + 1 
+                iprev2 = mod(i_v2+nSides2-2,nSides2) + 1 
+! ! debug ----
+!               write(*,*) ' ====== n_merge : ' , n_merge 
+!               write(*,*) ' iprev2 , i_v2 , inext2 '
+!               write(*,*)   iprev2 , i_v2 , inext2
+! ! debug ----
+
+                ! find the elem i_e2 where i2 belongs to, and
+                !  find if there is another couple of nodes to be sewed (in another iter.)
+                do i_e1 = 1 , size(ei,2) ! find elems1 where i1 belongs to 
+                  nSides1 = count( ei(:,i_e1) .ne. 0 )
+                  
+                  do i_v1 = 1 , nSides1
+                    if ( ei(i_v1,i_e1) .eq. i1 ) then ! find elems1 where i1 belongs to
+
+                      do i_n1 = 1 , nSides1-1
+
+                        ind1 = mod( i_v1 + i_n1 - 1 , nSides1 ) + 1
+                        
+                        if ( ( ( norm2( ri(:,ei(ind1  ,i_e1))   - &
+                                        ri(:,ei(inext2,i_e2)) ) .lt. tol ) .or. &
+                               ( norm2( ri(:,ei(ind1  ,i_e1))   - & 
+                                        ri(:,ei(iprev2,i_e2)) ) .lt. tol ) ) .and. &
+                             ( all( ei(:,i_e1) .ne. ei(i_v2,i_e2) ) ) ) then 
+!                            ( ( ei(ind1,i_e1) .ne. ei(inext2,i_e2) ) .and. & 
+!                              ( ei(ind1,i_e1) .ne. ei(iprev2,i_e2) ) ) ) then 
+ 
+                             n_merge = n_merge + 1
+                             rr(:,i1) = 0.5_wp * (ri(:,i1)+ri(:,i2))
+                             rr(:,i2) = rr(:,i1)
+      
+                             ee(i_v2,i_e2) = i1
+                             im_tmp(:,n_merge) = (/ i1 , i2 /)
+
+! ! debug -----
+!                            write(*,*) ' +++++++++++++++++++++++ merge=true ' , n_merge
+!                            write(*,*) ' ei(:',i_e2,') : ' , ei(:,i_e2)
+!                            write(*,*) ' ei(:',i_e1,') : ' , ei(:,i_e1)
+!
+!                            write(*,*) ' ei(i_v2,',i_e2,') : ' , ei(i_v2,i_e2) 
+!                            write(*,*) ' ei(i_v1,',i_e1,') : ' , ei(i_v1,i_e1)
+!                            write(*,*)
+!                            
+!                            write(*,*) ' ei(',ind1  ,',',i_e1,') : ' , ei(ind1  ,i_e1)
+!                            write(*,*) ' ei(',iprev2,',',i_e2,') : ' , ei(iprev2,i_e2)
+!                            write(*,*) ' ei(',inext2,',',i_e2,') : ' , ei(inext2,i_e2)
+!                            write(*,*)
+! ! debug -----
+ 
+                        end if
+
+                      end do
+
+                    end if
+                  end do
+                
+                end do
         
               end if
+
             end if
           end do
+
         end do
+
       end if
     end do
   end do
-  write(msg,'(A,I0,A)') 'During merging of nodes for trailing edge &
-        &detection ',n_merge,' nodes were found close enough to be &
-        &merged'
-  call printout(msg)
+
+! ! Misleading message: the number n_merge could be not so easy to be interpreted ---
+! write(msg,'(A,I0,A)') 'During merging of nodes for trailing edge &
+!       &detection ',n_merge,' nodes were found close enough to be &
+!       &merged'
+! call printout(msg)
+! ! Misleading message: the number n_merge could be not so easy to be interpreted ---
   
   allocate(im(2,n_merge)) ; im = im_tmp(:,1:n_merge)
   
@@ -1606,10 +1667,14 @@ subroutine symmetry_update_ll_lists ( nelem_span_list , &
 
  integer :: i , siz
 
- ! Update dimensions ---------- 
+ ! Update dimensions ----------
+ nelem = sum(nelem_span_list) 
+ npts  = nelem + 1 
  nelem_span_section = size(nelem_span_list) * 2 
- nelem = size(i_airfoil_e,2) * 2 
- npts  = size(i_airfoil_e,2) * 2 + 1 
+! === old-2019-02-06 === !
+! nelem = size(i_airfoil_e,2) * 2 
+! npts  = size(i_airfoil_e,2) * 2 + 1 
+! === old-2019-02-06 === !
 
  ! Fill temporary arrays ------
  allocate(nelem_span_list_tmp( nelem_span_section ))
@@ -1619,14 +1684,20 @@ subroutine symmetry_update_ll_lists ( nelem_span_list , &
    nelem_span_list_tmp( siz-i+1 ) = nelem_span_list(i)
  end do 
 
- allocate(i_airfoil_e_tmp( 2, nelem ))
+! === old-2019-02-06 === !
+! allocate(i_airfoil_e_tmp( 2, nelem ))
+! === old-2019-02-06 === !
+ allocate(i_airfoil_e_tmp( 2, 2*size(i_airfoil_e,2) ))
  siz = size(i_airfoil_e,2)
  do i = 1 , siz
    i_airfoil_e_tmp( 1:2 , siz+i   ) = i_airfoil_e( 1:2    , i )
    i_airfoil_e_tmp( 1:2 , siz-i+1 ) = i_airfoil_e( 2:1:-1 , i )
  end do
 
- allocate(normalised_coord_e_tmp( 2, nelem ))
+! === old-2019-02-06 === !
+! allocate(normalised_coord_e_tmp( 2, nelem ))
+! === old-2019-02-06 === !
+ allocate(normalised_coord_e_tmp( 2, 2*size(normalised_coord_e,2) ))
  siz = size(normalised_coord_e,2)
  do i = 1 , siz
    normalised_coord_e_tmp( 1:2 , siz+i   ) = normalised_coord_e( 1:2    , i )

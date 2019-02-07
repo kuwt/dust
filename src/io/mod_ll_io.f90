@@ -63,15 +63,16 @@ contains
 !----------------------------------------------------------------------
 
 subroutine read_mesh_ll(mesh_file,ee,rr, &
-                        airfoil_list   , nelem_span_list   , &
-                        i_airfoil_e    , normalised_coord_e, &
-                           npoints_chord_tot,nelem_span_tot, &
+                        airfoil_list_actual, nelem_span_list, &
+                        i_airfoil_e , normalised_coord_e    , &
+                        npoints_chord_tot , nelem_span_tot  , &
                                             chord_p,theta_p)
 
  character(len=*), intent(in) :: mesh_file
  integer  , allocatable, intent(out) :: ee(:,:) 
  real(wp) , allocatable, intent(out) :: rr(:,:) 
- character(len=max_char_len), allocatable , intent(out) :: airfoil_list(:)
+ character(len=max_char_len), allocatable , intent(out) :: airfoil_list_actual(:)
+ character(len=max_char_len), allocatable               :: airfoil_list(:)
  integer  , allocatable, intent(out) :: nelem_span_list(:)
  integer  , allocatable, intent(out) :: i_airfoil_e(:,:)
  real(wp) , allocatable, intent(out) :: normalised_coord_e(:,:)
@@ -82,8 +83,8 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
  integer :: nelem_chord, nelem_chord_tot ! , nelem_span_tot <--- moved as an output
  integer :: npoint_chord_tot, npoint_span_tot
- integer :: nRegions, nSections , rr_size , ee_size 
- integer :: iRegion , iSection , iSpan , iChord , iElement , iPoint 
+ integer :: nRegions, nSections, nAirfoils, rr_size , ee_size 
+ integer :: iRegion , iSection , iAirfoil , Span , iChord , iElement , iPoint 
  real(wp):: ref_chord_fraction
  real(wp), allocatable :: ref_point(:)
  ! data read from file
@@ -102,6 +103,8 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 !real(wp) :: th1 , th2 , ch1 , ch2 
  real(wp) :: dx_ref , dy_ref , dz_ref
  integer :: ista , iend , ich
+
+ integer :: i_aero1, i_aero2, iSpan, i
 
  character(len=*), parameter :: this_sub_name = 'read_mesh_parametric'
 
@@ -220,11 +223,13 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   allocate(chord_list  (nSections))  ; chord_list = 0.0d0
   allocate(twist_list  (nSections))  ; twist_list = 0.0d0
   allocate(airfoil_list(nSections)) 
+
   do iSection= 1,nSections
     chord_list(iSection)   = getreal(pmesh_prs,'chord')
     twist_list(iSection)   = getreal(pmesh_prs,'twist')
     airfoil_list(iSection) = getstr(pmesh_prs,'airfoil')
   enddo
+
 
   npoint_chord_tot = nelem_chord_tot + 1
   npoint_span_tot  = nelem_span_tot  + 1
@@ -248,6 +253,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   allocate(rr   (3,rr_size)) ; rr      = 0.0_wp
   allocate(chord_p(npoint_span_tot)) ; chord_p = 0.0_wp
   allocate(theta_p(npoint_span_tot)) ; theta_p = 0.0_wp
+
   allocate(i_airfoil_e       (2,nelem_span_tot)) ; i_airfoil_e        = 0
   allocate(normalised_coord_e(2,nelem_span_tot)) ; normalised_coord_e = 0.0_wp
 ! old
@@ -286,8 +292,12 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
       chord_p(ich) = chord_list(1)
       theta_p(ich) = twist_list(1)
 
-      i_airfoil_e(1,ich) = iRegion 
-      i_airfoil_e(2,ich) = iRegion+1
+! The following lines should not have existed even before 2019-02-06:
+! fields overwritten at the end of the outer do loop
+! === old-2019-02-06 === !
+!      i_airfoil_e(1,ich) = iRegion 
+!      i_airfoil_e(2,ich) = iRegion+1
+! === old-2019-02-06 === !
 
       ! Update rr
       rr(:,ista:iend) = rrSection1
@@ -358,20 +368,98 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
               & type_span must be equal to uniform, cosine, cosineIB, cosineOB.')
       end if 
 
-      ! airfoil file and non-dimensional coordinate between two sections
-      i_airfoil_e( 1,ich-1) = iRegion 
-      i_airfoil_e( 2,ich-1) = iRegion+1
-!     normalised_coord_e(2,ich-1) = ( rr(2,ista) - rrSection1(2,iRegion) ) / &
-!                        ( rrSection2(2,iRegion) - rrSection1(2,iRegion) )
-      normalised_coord_e(2,ich-1) = ( rr(2,ista) - rrSection1(2,1) ) / &
-                         ( rrSection2(2,1) - rrSection1(2,1) )
-      if ( iSpan .ne. 1 ) then ! else = 0.0_wp
-        normalised_coord_e(1,ich-1) = normalised_coord_e(2,ich-2)
-      end if
+! ===
+! Moved outside this loop (see below), to allow the specification of aerodynamic
+! characteristic on some sections only
+! ===
+!       ! airfoil file and non-dimensional coordinate between two sections
+!       i_airfoil_e( 1,ich-1) = iRegion 
+!       i_airfoil_e( 2,ich-1) = iRegion+1
+! !     normalised_coord_e(2,ich-1) = ( rr(2,ista) - rrSection1(2,iRegion) ) / &
+! !                        ( rrSection2(2,iRegion) - rrSection1(2,iRegion) )
+!       normalised_coord_e(2,ich-1) = ( rr(2,ista) - rrSection1(2,1) ) / &
+!                          ( rrSection2(2,1) - rrSection1(2,1) )
+!       if ( iSpan .ne. 1 ) then ! else = 0.0_wp
+!         normalised_coord_e(1,ich-1) = normalised_coord_e(2,ich-2)
+!       end if
+! ===
 
     end do
   
   end do
+
+
+! === new-2019-02-06 ===
+! Save the fields related to the definition of actual airfoils
+! airfoil_list(i) may be equal to 'interp' --> no def. of airfoil on the i-th section
+!                                              --> inteprolation
+  ! Check airfoil_list()
+  if ( trim(airfoil_list(1)) .eq. 'interp' ) then
+    call error(this_sub_name, this_mod_name, 'The first "airfoil"&
+          & cannot be set as "interp".')
+  end if
+  if ( trim(airfoil_list(nSections)) .eq. 'interp' ) then
+    call error(this_sub_name, this_mod_name, 'The last "airfoil"&
+          & cannot be set as "interp".')
+  end if
+
+  nAirfoils = 0
+  do i = 1 , nSections
+    if ( trim(airfoil_list(i)) .ne. 'interp' ) nAirfoils = nAirfoils + 1 
+  end do
+
+  allocate(airfoil_list_actual(nAirfoils))
+  iAirfoil = 0
+  do i = 1 , nSections
+    if ( trim(airfoil_list(i)) .ne. 'interp' ) then
+      iAirfoil = iAirfoil + 1
+      airfoil_list_actual(iAirfoil) = trim(airfoil_list(i))
+    end if
+  end do
+
+  i_aero2 = 1 ; ista = 1 ; iAirfoil = 0
+  do iAirfoil = 1 , nAirfoils - 1
+
+    i_aero1 = i_aero2
+    do i = i_aero1 + 1 , nSections
+      if ( airfoil_list(i) .ne. 'interp' ) then
+        i_aero2 = i
+        exit
+      end if
+    end do
+
+    iend = sum(nelem_span_list(1:i_aero2-1))
+
+! ! debug ----
+!     write(*,*) ' i_aero1 , i_aero2 : ' , i_aero1 , i_aero2
+!     write(*,*) ' iAirfoil , iAirfoil+1 : ' , iAirfoil , iAirfoil+1
+!     write(*,*) ' ista , iend : ' , ista , iend
+! ! debug ----
+    do iSpan = ista , iend 
+      i_airfoil_e(1, iSpan) = iAirfoil 
+      i_airfoil_e(2, iSpan) = iAirfoil+1 
+
+      normalised_coord_e(2,iSpan) = ( rr(2,(iSpan+1)*2) - rr(2,ista*2) ) / &
+                                    ( rr(2,iend *2+1) - rr(2,ista*2) )
+      if ( iSpan .ne. ista ) then ! else = 0.0_wp
+        normalised_coord_e(1,iSpan) = normalised_coord_e(2,iSpan-1)
+      end if
+
+    end do
+
+    ista = iend + 1
+
+  end do
+
+! ! debug -----
+!   write(*,*)
+!   do i = 1 , size(i_airfoil_e,2)
+!     write(*,*) ' i, i_airfoil_e(:,i) , normalised_coord_e(:,i) : ' , &
+!                  i, i_airfoil_e(:,i) , normalised_coord_e(:,i)
+!   end do
+!   write(*,*)
+! ! debug -----
+! === new-2019-02-06 ===
 
 
   ! optional output ----
