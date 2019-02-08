@@ -1590,23 +1590,32 @@ subroutine avoid_collision(elems, wake, part, sim_param, vel)
 
  integer :: ie
  real(wp) :: dist1(3), dist2(3), dist12(3), n(3)
- real(wp) :: pos1(3), pos2(3), relvel(3)
+ real(wp) :: pos1(3), pos2(3), relvel(3), newvel(3), nveldiff
  real(wp) :: distn, dist1_nor, dist1_tan, dist2_nor, dist2_tan
  real(wp) :: normvel, normvel_corr, tanvel(3), dt_part, tanvel2
  real(wp) :: check_radius, rad_mult, elrad_mult, r2d2, elrad, tol, blthick
+ 
+  !Multiplication factor for the check radius
+  rad_mult = 1000_wp
+  !rad_mult = 2.0_wp
+ 
+  !Multiplication factor for the element radius
+  elrad_mult = 2.0_wp
+ 
+  blthick = 0.001_wp
+ 
+  !tolerance for the minimum wall distance
+  tol = 0.005_wp
 
- rad_mult = 1000_wp
- !rad_mult = 2.0_wp
- elrad_mult = 2.0_wp
- blthick = 0.001_wp
- tol = 0.005_wp
- r2d2 = sqrt(2.0_wp)/2.0_wp
-
- pos1 = part%cen
-
+  r2d2 = sqrt(2.0_wp)/2.0_wp
+  
+  !starting position
+  pos1 = part%cen
+  
+  !Cycle on all the elements
   do ie=1,size(elems)
-
-    !dist = pos-elems(ie)%p%cen
+    
+    !Get the position of the particle with respect to the element
     dist1 = pos1-(elems(ie)%p%cen)
     elrad = maxval(elems(ie)%p%edge_len)*r2d2
     check_radius = sim_param%dt*sim_param%u_ref*rad_mult + elrad
@@ -1615,36 +1624,57 @@ subroutine avoid_collision(elems, wake, part, sim_param, vel)
     !if it is in the check radius perform calculations
     if ((distn .lt. check_radius) ) then
 
+      !use the relative velocity to take into account also the element 
+      !movement
       relvel = vel - elems(ie)%p%ub
       n = elems(ie)%p%nor
       dist1_nor = sum(dist1 * n)
       dist1_tan = norm2(dist1-(n*dist1_nor))
       normvel = sum(relvel*n) 
-
+      
+      !If it is on the opposite side of the element, or it is moving away, 
+      !do not perform any modification
       if (dist1_nor .lt. 0.0_wp .or. normvel.ge.0.0_wp) cycle
-
+      
+      !get the time at which the particle hits the surface
       dt_part = -dist1_nor/normvel
+      !if it is lower than the timestep (i.e. the particles hits the surface 
+      !within next step) start the correction
       if(dt_part .le. sim_param%dt) then
+        
+        !Get the position at the time in which the particle hits the 
+        !surface plane
         pos2  = part%cen+relvel*dt_part
         dist2 = pos2 - elems(ie)%p%cen
         dist2_nor = sum(dist2 * n)
         dist2_tan = norm2(dist2-(n*dist2_nor))
-
-
+        
+        !If when the particle hits the surface plane it is within the 
+        !considered element radius, keep on correcting (otherwise it is not
+        !passing from the considered element)
         if (dist2_tan .lt. elrad_mult*elrad) then
+          
+          !correct the normal velocity to avoid penetration
           normvel_corr = -dist1_nor*(1-tol)/sim_param%dt
            
           ! should be 
           ! vel = relvel + (normvel_corr-normvel)*n + elems(ie)%p%ub
           ! but simplifying
-          vel = vel + (normvel_corr-normvel)*n
+          newvel = vel + (normvel_corr-normvel)*n
+          !already without the element motion
 
-              !tanvel  = vel -normvel*n
-              !tanvel2 = sum(tanvel**2)
-              !if (tanvel2 .gt. 1.0e-12_wp) then
-              !  tanvel = tanvel * sqrt(1+(normvel**2-normvel_corr**2)/tanvel2)
-              !endif
-              !vel = normvel_corr*n + tanvel
+          !fix the tangential velocity to keep the magnitude constant
+          normvel_corr = sum(newvel*n)
+          normvel  = sum(vel*n)
+          tanvel   = vel - normvel*n
+          tanvel2  = sum(tanvel**2)
+          nveldiff = normvel**2-normvel_corr**2+tanvel2
+          if(tanvel2.gt.0.0_wp .and. normvel_corr*normvel.ge.0.0_wp .and. &
+                                                 nveldiff.ge.0.0_wp) then
+            tanvel = tanvel * (sqrt(nveldiff)/sqrt(tanvel2) )
+          endif
+          !reconstruct the velocity 
+          vel = tanvel + normvel_corr*n
         endif
       endif
 
