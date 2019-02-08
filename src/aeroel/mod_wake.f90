@@ -1590,9 +1590,9 @@ subroutine avoid_collision(elems, wake, part, sim_param, vel)
 
  integer :: ie
  real(wp) :: dist1(3), dist2(3), dist12(3), n(3)
- real(wp) :: pos1(3), pos2(3)
+ real(wp) :: pos1(3), pos2(3), relvel(3)
  real(wp) :: distn, dist1_nor, dist1_tan, dist2_nor, dist2_tan
- real(wp) :: normvel, normvel_corr, tanvel(3), dt_part
+ real(wp) :: normvel, normvel_corr, tanvel(3), dt_part, tanvel2
  real(wp) :: check_radius, rad_mult, elrad_mult, r2d2, elrad, tol, blthick
 
  rad_mult = 1000_wp
@@ -1615,47 +1615,36 @@ subroutine avoid_collision(elems, wake, part, sim_param, vel)
     !if it is in the check radius perform calculations
     if ((distn .lt. check_radius) ) then
 
+      relvel = vel - elems(ie)%p%ub
       n = elems(ie)%p%nor
       dist1_nor = sum(dist1 * n)
       dist1_tan = norm2(dist1-(n*dist1_nor))
-      normvel = sum(vel*n) 
+      normvel = sum(relvel*n) 
 
       if (dist1_nor .lt. 0.0_wp .or. normvel.ge.0.0_wp) cycle
 
-      !if (dist1_tan .lt. elrad_mult*elrad .and. &
-      !    dist1_nor .lt. blthick  .and. &
-      !    normvel .lt. 0.0_wp ) then
-      !  write(*,*) 'particle eaten by BL'
-      !  part%free = .true.
-!!$omp !  atomic update
-      !  wake%n_prt = wake%n_prt -1
-!!$omp !  end atomic
-      !  return
-      !endif
       dt_part = -dist1_nor/normvel
       if(dt_part .le. sim_param%dt) then
-        pos2  = part%cen+vel*dt_part
-        dist2 = pos2 - (elems(ie)%p%cen+elems(ie)%p%ub*dt_part) 
+        pos2  = part%cen+relvel*dt_part
+        dist2 = pos2 - elems(ie)%p%cen
         dist2_nor = sum(dist2 * n)
         dist2_tan = norm2(dist2-(n*dist2_nor))
 
-        if (dist2_tan .lt. elrad_mult*elrad) then
 
-            normvel_corr = dist2_nor*(1-tol)/sim_param%dt
-            !if (normvel_corr .lt. 0.0_wp) then
-              !write(*,*) 'correcting vel'
-              tanvel  = vel -normvel*n
-              tanvel = tanvel * sqrt(1+(normvel**2-normvel_corr**2)/sum(tanvel**2))
-              !vel = vel + n * (normvel_corr - normvel)
-              vel = normvel_corr*n + tanvel
-            !else
-            !  write(*,*) 'particle eaten by motion'
-            !  part%free = .true.
-!!$omp       !  atomic update
-            !  wake%n_prt = wake%n_prt -1
-!!$omp       !  end atomic
-            !  return
-            !endif
+        if (dist2_tan .lt. elrad_mult*elrad) then
+          normvel_corr = -dist1_nor*(1-tol)/sim_param%dt
+           
+          ! should be 
+          ! vel = relvel + (normvel_corr-normvel)*n + elems(ie)%p%ub
+          ! but simplifying
+          vel = vel + (normvel_corr-normvel)*n
+
+              !tanvel  = vel -normvel*n
+              !tanvel2 = sum(tanvel**2)
+              !if (tanvel2 .gt. 1.0e-12_wp) then
+              !  tanvel = tanvel * sqrt(1+(normvel**2-normvel_corr**2)/tanvel2)
+              !endif
+              !vel = normvel_corr*n + tanvel
         endif
       endif
 
