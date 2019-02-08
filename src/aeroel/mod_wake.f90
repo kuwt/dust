@@ -572,7 +572,7 @@ subroutine prepare_wake(wake, geo, elems, sim_param)
   !==> Particles: update the position and intensity in time, avoid penetration
   !               and chech if remain into the boundaries
   n_part = wake%n_prt
-!$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p)
+!$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n)
   do ip = 1, n_part
     if(sim_param%use_pa) call avoid_collision(elems, wake, &
                         wake%part_p(ip)%p, sim_param, wake%part_p(ip)%p%vel)
@@ -596,9 +596,9 @@ subroutine prepare_wake(wake, geo, elems, sim_param)
         endif
       else
         wake%part_p(ip)%p%free = .true.
-!$omp   atomic update
+!$omp atomic update
         wake%n_prt = wake%n_prt -1
-!$omp   end atomic
+!$omp end atomic
       endif
     endif
     !nullify(wake%part_p(ip)%p%npos)
@@ -1154,7 +1154,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
   !calculate the velocities at the old positions of the points and then
   !update the positions
 
-!$omp parallel do private(pos_p, vel_p, ip)
+!$omp parallel do private(pos_p, vel_p, ip, ir)
   do ip = 1,size(points,2)
     do ir = 1,size(points,3)
       pos_p = points(:,ip,ir)
