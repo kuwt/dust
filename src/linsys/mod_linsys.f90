@@ -338,10 +338,11 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
         if  ( .not. ( wake%part_p(iw)%p%free ) ) then
 
           dist = wake%part_p(iw)%p%cen - elcen
-          linsys%b_pres(ie) = linsys%b_pres(ie) + &
+          linsys%b_pres(ie) = linsys%b_pres(ie) + & 
             sum( dist * cross( wake%part_p(iw)%p%dir , wake%part_p(iw)%p%vel ) ) * &
                  wake%part_p(iw)%p%mag / ( (sqrt(sum(dist**2)+sim_param%VortexRad**2))**3.0_wp ) 
-                 !wake%part_p(iw)%p%mag / ( norm2(dist)**3.0_wp ) 
+! singular  >>>  wake%part_p(iw)%p%mag / ( norm2(dist)**3.0_wp ) 
+! Rosenhead >>>  wake%part_p(iw)%p%mag / ( (sqrt(sum(dist**2)+sim_param%VortexRad**2))**3.0_wp ) 
                  !EXPERIMENTAL: adding vortex rosenhead regularization
         end if
       end do 

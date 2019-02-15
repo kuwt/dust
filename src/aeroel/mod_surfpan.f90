@@ -938,7 +938,8 @@ subroutine create_chtls_stencil_surfpan( this , R_g )
       i_n = i_n + 1
       dx = this%neigh(i_nn)%p%cen - this%cen
       A(i_n, : ) = dx 
-      W(i_n,i_n) = 1.0_wp / norm2(dx)
+      W(i_n,i_n) = 1.0_wp / norm2(dx) * &
+               max( 0.0_wp , abs( sum( this%nor * this%neigh(i_nn)%p%nor ) ) )
     end if
   end do
   W(n_neigh+1,n_neigh+1) = sum( W ) / real(n_neigh,wp)
