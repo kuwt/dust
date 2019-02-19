@@ -47,7 +47,7 @@ use mod_handling, only: &
 use mod_stringtools, only: &
   IsInList, StripSpaces
 
-use cgns
+ use cgns
 
 !----------------------------------------------------------------------
 
