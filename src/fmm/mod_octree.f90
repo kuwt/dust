@@ -119,6 +119,9 @@ type :: t_cell
   !> Multipole data relative to the cell
   type(t_multipole) :: mp
 
+  !> Average vorticity magniture
+  real(wp) :: ave_vortmag
+
 end type
 
 !----------------------------------------------------------------------
@@ -649,9 +652,11 @@ end subroutine
 !----------------------------------------------------------------------
 
 !> Sort particles inside the octree grid
-subroutine sort_particles(part,octree)
+subroutine sort_particles(part, n_prt, octree, sim_param)
  type(t_vortpart_p), intent(in), target :: part(:)
+ integer, intent(inout) :: n_prt
  type(t_octree), intent(inout), target :: octree
+ type(t_sim_param), intent(in) :: sim_param
 
  integer :: ip
  integer :: idx(3)
@@ -659,6 +664,8 @@ subroutine sort_particles(part,octree)
  integer :: l, i,j,k, child, ic, jc, kc
  integer :: ll, nl
  logical :: got_leaves
+ integer :: nprt, nprt2, iq
+ real(wp) :: redistr(3), vort(3)
  character(len=*), parameter :: this_sub_name = 'sort_particles'
  
   !PROFILE
@@ -701,9 +708,54 @@ subroutine sort_particles(part,octree)
     octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npart = &
                     octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npart + 1
     call push_ptr(octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%cell_parts,part(ip)%p)
+    octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%ave_vortmag =  &
+      octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%ave_vortmag + &
+      part(ip)%p%mag
+
+
 
   enddo
 
+  if(sim_param%use_pr) then
+    !On the bottom level remove the too small particles
+    do k=1,octree%ncl(3,ll); do j=1,octree%ncl(2,ll); do i = 1,octree%ncl(1,ll)
+      nprt = octree%layers(ll)%lcells(i,j,k)%npart
+      octree%layers(ll)%lcells(i,j,k)%ave_vortmag =  &
+        octree%layers(ll)%lcells(i,j,k)%ave_vortmag/real(nprt,wp)
+
+      do ip=1,nprt
+        if(octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag .lt. &
+           1.0_wp/3.0_wp*octree%layers(ll)%lcells(i,j,k)%ave_vortmag) then
+          !the particle is significantly smaller than the average in the cell
+          !free
+          octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%free = .true.
+          octree%layers(ll)%lcells(i,j,k)%npart = &
+                                    octree%layers(ll)%lcells(i,j,k)%npart - 1
+          !lower also the global counter
+          n_prt = n_prt -1
+
+          !redistribute it
+          nprt2 = octree%layers(ll)%lcells(i,j,k)%npart
+          redistr = (octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag * &
+                  octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%dir) / nprt2
+          do iq=1,nprt
+              if(.not. octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%free) then
+                vort =  octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%mag*&
+                        octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%dir
+                vort = vort + redistr
+                octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%mag = norm2(vort)
+                if(norm2(vort) .gt. 0.0_wp) then
+                  octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%dir = &
+                                                   vort/norm2(vort)
+                else
+                  octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%dir = 0.0_wp
+                endif
+              endif
+          enddo
+        endif
+      enddo
+    enddo; enddo; enddo !layer cells i,j,k
+  endif
 
   nl = 0
   !Bottom level: just check if are leaves
@@ -892,7 +944,7 @@ subroutine calculate_multipole(part,octree)
   !PROFILE
   t0 = dust_time()
     !cycle on the elements on the level
-!$omp parallel do collapse(3) private(i,j,k,il,idx_diff) schedule(dynamic)
+!$omp parallel do collapse(3) private(i,j,k,il,idx_diff) schedule(dynamic,16)
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
       if(octree%layers(l)%lcells(i,j,k)%active) then
          !if it is active perform M2L with all the interaction list
@@ -962,17 +1014,18 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: i, j, k, lv, ip, ipp, m, ie, iln
- real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3)
+ real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3), dir(3)
  real(wp) :: grad(3,3)
  real(t_realtime) :: tsta , tend
 
   tsta = dust_time()
   !for all the leaves apply the local expansion and then local interactions 
   t0 = dust_time()
-!$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, v, stretch, str, grad, alpha) schedule(dynamic)
+!$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, v, stretch, str, grad, alpha, dir) schedule(dynamic)
   do lv = 1, octree%nleaves
     !I am on a leaf, cycle on all the particles inside the leaf
     do ip = 1,octree%leaves(lv)%p%npart
+    if(.not. octree%leaves(lv)%p%cell_parts(ip)%p%free) then
       
       vel = 0.0_wp
       stretch = 0.0_wp
@@ -980,6 +1033,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
       pos = octree%leaves(lv)%p%cell_parts(ip)%p%cen
       alpha = octree%leaves(lv)%p%cell_parts(ip)%p%mag * &
               octree%leaves(lv)%p%cell_parts(ip)%p%dir
+      dir = octree%leaves(lv)%p%cell_parts(ip)%p%dir
 
       !first apply the local multipole expansion
       do m = 1,size(octree%leaves(lv)%p%mp%b,2)
@@ -993,7 +1047,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
              product((pos-octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
         endif
       enddo
-      if(sim_param%use_vs) stretch = stretch + matmul(alpha, grad)
+      if(sim_param%use_vs)  then
+        str = matmul(alpha, grad)
+        !str = matmul(alpha, transpose(grad))
+        stretch = stretch + str - sum(str*dir)*dir !remove the parallel comp.
+      endif
       !if(sim_param%use_vs) stretch = stretch + matmul(transpose(grad),alpha)
 
       !then interact with all the neighbouring cell particles
@@ -1008,7 +1066,8 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
             if(sim_param%use_vs) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
                  %compute_stretch(pos, alpha, str)
-              stretch = stretch +str/(4.0_wp*pi)
+              stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+              !removed the parallel component
             endif
             if(sim_param%use_vd) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
@@ -1030,7 +1089,8 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
          if(sim_param%use_vs) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
               %compute_stretch(pos, alpha, str)
-           stretch = stretch +str/(4.0_wp*pi)
+           stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+              !removed the parallel component
          endif
          if(sim_param%use_vd) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
@@ -1049,7 +1109,8 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
           if(sim_param%use_vs) then
             call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_stretch(pos, &
                                                           alpha, str)
-            stretch = stretch +str/(4.0_wp*pi)
+            stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+              !removed the parallel component
           endif
 
           if(sim_param%use_vd) then
@@ -1095,10 +1156,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
         !evolve the intensity in time
         octree%leaves(lv)%p%cell_parts(ip)%p%stretch = stretch
       endif
+    endif
     enddo
   enddo
 !Don't ask me why, but without this pragra it is much faster!
-!!!!$omp end parallel do
+!$omp end parallel do
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Calculated leaves interactions in: ' , t1 - t0,' s.'
   call printout(msg)
@@ -1377,6 +1439,7 @@ subroutine reset_cell(cell)
  !cell%active = .true.
  cell%branch = .false.
  cell%leaf = .false.
+ cell%ave_vortmag = 0.0_wp
 
 end subroutine reset_cell
 

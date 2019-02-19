@@ -219,9 +219,11 @@ subroutine leaf_M_multipole(this, cen, parts, pexp)
   this%a = 0.0_wp
   do m=1,size(this%a,2) 
     do i=1,size(parts)
-      this%a(:,m) = this%a(:,m) + &
-      parts(i)%p%mag*product((parts(i)%p%cen-cen)**pexp%pwr(:,m))* &
-      parts(i)%p%dir
+      if(.not. parts(i)%p%free) then
+        this%a(:,m) = this%a(:,m) + &
+        parts(i)%p%mag*product((parts(i)%p%cen-cen)**pexp%pwr(:,m))* &
+        parts(i)%p%dir
+      endif
     enddo
   enddo
 

@@ -139,6 +139,8 @@ type t_sim_param
       integer :: NMaxOctreeLevels
       !> Time ratio that triggers the increase of levels
       real(wp) :: LeavesTimeRatio
+    !> use particles redistribution
+    logical :: use_pr
 
 
   !Handling parameters:
@@ -214,6 +216,7 @@ subroutine save_sim_param(this, loc)
       call write_hdf5_attr(this%NMaxOctreeLevels, 'NMaxOctreeLevels', loc)
       call write_hdf5_attr(this%LeavesTimeRatio, 'LeavesTimeRatio', loc)
     endif
+    call write_hdf5_attr(this%use_pr, 'ParticlesRedistribution', loc)
   endif
   call write_hdf5_attr(this%debug_level, 'debug_level', loc)
   call write_hdf5_attr(this%dt_out, 'dt_out', loc)

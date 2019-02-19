@@ -246,7 +246,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
 !real(wp), intent(in) :: uinf(:)
  type(t_sim_param) :: sim_param 
  real(wp) :: uinf(3) , dist(3) , dist2(3)
- real(wp) :: rhoinf , Pinf
+ real(wp) :: rhoinf , Pinf, pupd, mag
  real(wp) :: elcen(3)
 
  integer :: ie, nst, ntot 
@@ -261,7 +261,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
  nst = linsys%nstatic
  ntot = linsys%rank
  !calculate the vortex induced velocity
- !$omp parallel do private(ie) schedule(dynamic)
+ !$omp parallel do private(ie) schedule(dynamic,2)
  do ie =1,linsys%rank
 
    !call elems(ie)%p%get_vort_vel(wake_elems%end_vorts, uinf)
@@ -307,14 +307,12 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
   ! Slicing --------------------
   linsys%A_pres = linsys%A( geo%idSurfPan , geo%idSurfPan )
   ! Remove Kutta condtion ------
-!$omp parallel do private(ie)
   do ie = 1 , geo%nSurfpan
     select type( el => elems(geo%idSurfPan(ie))%p ) ; class is(t_surfpan)
       call el%correct_pressure_kutta( &
             (/wake%pan_p, wake%rin_p/), wake%pan_gen_elems_id, linsys,uinf,ie,1,ntot)
     end select
   end do
-!$omp end parallel do
   
   ! rhs: ....
 
@@ -331,7 +329,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
   !     %build_row routines above
   ! do nothing here
   ! (c) rotational effects (up to now, ignoring ring wakes)
-!$omp parallel do private(ie, iw, dist, elcen) schedule(dynamic) 
+!$omp parallel do private(ie, iw, dist, elcen) schedule(dynamic,32) 
   do ie = 1 , geo%nSurfpan
     elcen = elems( geo%idSurfpan(ie) )%p%cen
     ! (c.1) particles ( part_p )
@@ -340,10 +338,11 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
         if  ( .not. ( wake%part_p(iw)%p%free ) ) then
 
           dist = wake%part_p(iw)%p%cen - elcen
-          linsys%b_pres(ie) = linsys%b_pres(ie) + &
+          linsys%b_pres(ie) = linsys%b_pres(ie) + & 
             sum( dist * cross( wake%part_p(iw)%p%dir , wake%part_p(iw)%p%vel ) ) * &
                  wake%part_p(iw)%p%mag / ( (sqrt(sum(dist**2)+sim_param%VortexRad**2))**3.0_wp ) 
-                 !wake%part_p(iw)%p%mag / ( norm2(dist)**3.0_wp ) 
+! singular  >>>  wake%part_p(iw)%p%mag / ( norm2(dist)**3.0_wp ) 
+! Rosenhead >>>  wake%part_p(iw)%p%mag / ( (sqrt(sum(dist**2)+sim_param%VortexRad**2))**3.0_wp ) 
                  !EXPERIMENTAL: adding vortex rosenhead regularization
         end if
       end do 
@@ -351,7 +350,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
   enddo
 !$omp end parallel do
 
-!$omp parallel do private(ie, iw, dist, dist2, p1, p2, ipp, iww,ip, is, inext, elcen) schedule(dynamic) 
+!$omp parallel do private(ie, iw, dist, dist2, p1, p2, ipp, iww,ip, is, inext, elcen) schedule(dynamic, 64) 
   do ie = 1 , geo%nSurfpan
     elcen = elems( geo%idSurfpan(ie) )%p%cen
     ! (c.2) line elements ( end_vorts )
@@ -403,7 +402,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
     ! TODO: to be implemented
 
   end do
-!!!$omp end parallel do
+!$omp end parallel do
 
   ! (a) far field contribution
   linsys%b_pres = linsys%b_pres + &
