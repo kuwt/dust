@@ -192,6 +192,8 @@ call sbprms%CreateIntOption('StepRes', 'Result stride of the analysis')
 call sbprms%CreateLogicalOption('Average', 'Perform time averaging','F')
 call sbprms%CreateLogicalOption('Wake', 'Output also the wake for &
                                 &visualization','T')
+call sbprms%CreateLogicalOption('SeparateWake', 'Output the wake in a separate &
+                                &way','F')
 call sbprms%CreateStringOption('Format','Output format')
 call sbprms%CreateStringOption('Component','Component to analyse', &
                                multiple=.true.)
