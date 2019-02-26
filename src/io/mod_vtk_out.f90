@@ -947,7 +947,7 @@ subroutine vtk_out_viz (out_filename, &
     slen = len(trim(out_filename))
 
     ! == File for the panel wake
-    open(fu,file=trim(out_filename(1:slen-4)//'_wpan.vtu'), &
+    open(fu,file=trim(out_filename(1:slen-9)//'_wpan'//out_filename(slen-8:slen)), &
           status='replace',access='stream',iostat=ierr)
     
     buffer = '<?xml version="1.0"?>'//lf; write(fu) trim(buffer)
@@ -1077,7 +1077,7 @@ subroutine vtk_out_viz (out_filename, &
     close(fu,iostat=ierr)
     
     ! === Particles file
-    open(fu,file=trim(out_filename(1:slen-4)//'_wpart.vtu'), &
+    open(fu,file=trim(out_filename(1:slen-9)//'_wpart'//out_filename(slen-8:slen)), &
           status='replace',access='stream',iostat=ierr)
     
     buffer = '<?xml version="1.0"?>'//lf; write(fu) trim(buffer)

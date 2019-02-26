@@ -261,7 +261,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     
     if(.not. average) then
       ! Output filename
-      write(filename,'(A,I4.4)') trim(basename)//'_'//trim(an_name)//'_',it
+      write(filename,'(A,I4.4)') trim(basename)//'_'//trim(an_name)//'-',it
       
       if (out_wake) then
         
