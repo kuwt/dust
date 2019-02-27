@@ -41,7 +41,7 @@ use mod_param, only: &
   wp, nl, max_char_len, extended_char_len , pi
 
 use mod_sim_param, only: &
-  t_sim_param
+  t_sim_param, sim_param
 
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
@@ -133,7 +133,7 @@ character(len=max_char_len) :: target_file
 character(len=extended_char_len) :: message
 
 !Simulation parameters
-type(t_sim_param) :: sim_param
+!type(t_sim_param) :: sim_param
 ! Asymptotic conditions
 
 !Time parameters
@@ -433,18 +433,11 @@ endif
 
 ! Check that tend .gt. tinit
 if ( sim_param%tend .le. sim_param%t0 ) then
-    write(*,*) nl//' ==== In dust.in ==== '
-    write(*,*) ' restart_simulation : ' , sim_param%restart_from_file
-    write(*,*) ' restart_file : ' , trim(sim_param%restart_file)
-    write(*,*) ' reset_time : ' , sim_param%reset_time
-    write(*,*) ' tend   : ' , sim_param%tend 
-    if ( sim_param%restart_from_file .and. ( .not. sim_param%reset_time ) ) then
-      write(*,*) ' tstart read from restart file : ' , sim_param%t0 
-    else
-      write(*,*) ' tstart read from dust.in file : ' , sim_param%t0 
-    end if
-    call error('dust','','sim_param%tend .le. sim_param%t0. Check your input&
-    & file and restart options. STOP.')
+    write(message,*) 'The end time of the simulation',sim_param%tend,'is&
+                     & lower or equal to the start time',sim_param%t0,'.&
+                     & Remembver that when restarting without resetting the&
+                     & time the start time is taken from the restart result!'
+    call error('dust','',message)
 end if
 
 
@@ -492,7 +485,7 @@ if(sim_param%debug_level .ge. 15) &
       call debug_ll_printout_geometry(elems_ll, geo, basename_debug, 0)
 
 !TODO: check whether to move these calls before, and precisely what they do
-call ignoredParameters(prms)
+if(sim_param%debug_level .ge. 7) call ignoredParameters(prms)
 call finalizeParameters(prms)
 
 
@@ -541,12 +534,15 @@ if (restart) then
 endif
 
 t22 = dust_time()
-write(message,'(A,F9.3,A)') nl//'------ Completed all preliminary operations &
+if(sim_param%debug_level .ge. 1) then
+  write(message,'(A,F9.3,A)') nl//'------ Completed all preliminary operations &
                              &in: ' , t22 - t00,' s.'
-call printout(message)
+  call printout(message)
+endif
 
 
 !====== Time Cycle ======
+call printout(nl//'////////// Performing Computations //////////')
 time = sim_param%t0
 t_last_out = time; t_last_debug_out = time
 
@@ -627,10 +623,10 @@ do it = 1,nstep
 
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
-                                                 nstep, ' time: ', time
+                                        nstep, ' simulation time: ', time
     call printout(message)
     t22 = dust_time()
-    write(message,'(A,F9.3,A)') 'Elapsed time: ',t22-t00
+    write(message,'(A,F9.3,A)') 'Elapsed wall time: ',t22-t00
     call printout(message)
   endif
 
@@ -795,6 +791,7 @@ do it = 1,nstep
   call prepare_wake(wake, geo, elems_tot, sim_param)
 
 enddo
+call printout(nl//'\\\\\\\\\\  Computations Finished \\\\\\\\\\')
 
 ! pres_IE +++++
  if(allocated(surfpan_H_IE)) deallocate( surfpan_H_IE )
@@ -814,8 +811,10 @@ call destroy_geometry(geo, elems_tot)
 call destroy_hdf5()
 
 t22 = dust_time()
-write(message,'(A,F9.3,A)') 'Completed all computations in ',t22-t00,' s'
-call printout(message)
+if(sim_param%debug_level .ge. 1) then
+  write(message,'(A,F9.3,A)') 'Completed all computations in ',t22-t00,' s'
+  call printout(message)
+endif
 call printout(nl//'<<<<<< DUST end <<<<<<'//nl)
 
 

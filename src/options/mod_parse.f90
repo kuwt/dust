@@ -118,6 +118,9 @@ use MOD_StringTools, only: &
 use mod_param, only: &
   wp, max_char_len
 
+use mod_sim_param, only: &
+  sim_param
+
 use mod_handling, only: &
   error, warning, info, unit_stdout, printout
 
@@ -959,7 +962,7 @@ subroutine IgnoredParameters(prms)
   if (prms_ignored) then
     current => prms%firstLink
     !call set_formatting("bright red")
-    write(UNIT_StdOut,'(100("!"))')
+    write(UNIT_StdOut,'(72("!"))')
     write(UNIT_StdOut,*) "warning: The following parameters were set in the &
     &input file, but are not currently employed :"
     do while (associated(current))
@@ -968,7 +971,7 @@ subroutine IgnoredParameters(prms)
       end if
       current => current%next
     end do
-    write(UNIT_StdOut,'(100("!"))')
+    write(UNIT_StdOut,'(72("!"))')
     !call clear_formatting()
   endif
 end subroutine IgnoredParameters

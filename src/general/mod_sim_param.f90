@@ -46,7 +46,7 @@ use mod_hdf5_io, only: &
 
 implicit none
 
-public :: t_sim_param
+public :: t_sim_param, sim_param
 
 private
 
@@ -166,6 +166,8 @@ contains
   procedure, pass(this) :: save_param => save_sim_param
 
 end type t_sim_param
+
+type(t_sim_param) :: sim_param
 
 !----------------------------------------------------------------------
 contains

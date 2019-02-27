@@ -40,7 +40,7 @@ use mod_param, only: &
   wp, max_char_len, nl, prev_tri, next_tri, prev_qua, next_qua
 
 use mod_sim_param, only: &
-  t_sim_param
+  t_sim_param, sim_param
 
 use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption &
@@ -669,6 +669,7 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
   rewrite_geo = .true.
   if(trim(in_file).eq.trim(out_file)) rewrite_geo = .false.
 
+  call printout('Reading geometry from file "'//trim(in_file)//'"')
   call open_hdf5_file(trim(in_file),floc)
   call open_hdf5_group(floc,'Components',gloc)
   call read_hdf5(n_comp,'NComponents',gloc)
@@ -1605,8 +1606,9 @@ subroutine create_strip_connectivity(geo)
                       comp%el(i_el)%ver(:,1) - comp%el(i_el)%ver(:,3) ) * &
                comp%el(i_el)%nor )
 
-     if ( abs( h2 - comp%el(i_el)%dy ) .gt. 1e-4 ) then
-       write(*,*) ' WARNING: non parallel stripe edges (rough check) '
+     if ( abs( h2 - comp%el(i_el)%dy ) .gt. 1e-4 .and. &
+          sim_param%debug_level .ge. 7) then
+       call warning(this_sub_name, this_mod_name, 'non parallel stripe edges (rough check)')
      end if
 
     end do
