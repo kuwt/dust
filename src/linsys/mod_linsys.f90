@@ -74,7 +74,7 @@ use mod_wake, only: t_wake
 implicit none
 
 public :: initialize_linsys, assemble_linsys, solve_linsys, &
-          destroy_linsys , dump_linsys, dump_linsys_pres, &
+          destroy_linsys , dump_linsys, &
           solve_linsys_pressure
 
 private
@@ -550,45 +550,6 @@ subroutine dump_linsys(linsys , filen_A , filen_b )
  close(fid)
 
 end subroutine dump_linsys
-
-!----------------------------------------------------------------------
-
-!> Dump the matrix and rhs of the linear system to file
-!!
-!! TODO: consider moving these functionalities to the i/o modules
-subroutine dump_linsys_pres(linsys , filen_A , filen_b , filen_b_debug )
- type(t_linsys), intent(in) :: linsys
- character(len=*) , intent(in) :: filen_A , filen_b
- character(len=*) , optional , intent(in) :: filen_b_debug
-
- integer :: fid
- integer :: i1 
-
-
- fid = 23
- open(unit=fid, file=trim(adjustl(filen_A)) )
- do i1 = 1 , size(linsys%A_pres,1)
-  write(fid,*) linsys%A_pres(i1,:)
- end do
- close(fid)
- 
- fid = 24
- open(unit=fid, file=trim(adjustl(filen_b)) )
- do i1 = 1 , size(linsys%b_pres,1)
-  write(fid,*) linsys%b_pres(i1)
- end do
- close(fid)
-
- if ( present( filen_b_debug ) ) then
-   fid = 24
-   open(unit=fid, file=trim(adjustl(filen_b_debug)) )
-   do i1 = 1 , size(linsys%b_matrix_pres_debug,1)
-    write(fid,*) linsys%b_matrix_pres_debug(i1,:)
-   end do
-   close(fid)
- end if
-
-end subroutine dump_linsys_pres
 
 !----------------------------------------------------------------------
 

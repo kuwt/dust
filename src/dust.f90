@@ -83,8 +83,11 @@ use mod_linsys_vars, only: &
 
 use mod_linsys, only: &
   initialize_linsys, assemble_linsys, solve_linsys, destroy_linsys, &
-  dump_linsys , dump_linsys_pres , &
+  dump_linsys ,  &
   solve_linsys_pressure
+
+use mod_pressure_equation, only: &
+  dump_linsys_pres, press_normvel_der
 
 use mod_basic_io, only: &
   read_mesh_basic, write_basic
@@ -554,72 +557,73 @@ allocate(res_old(size(elems))) ; res_old = 0.0_wp
 t11 = dust_time()
 do it = 1,nstep
 
-  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
-  ! compute the time derivative of the normal component of the velocity on 
-  !  surfpan to be used in the source rhs of the Bernoulli integral equation.
-  ! surf_vel_SurfPan_old saved at the end of the time step (for surfpan only)
+  call press_normvel_der(geo, elems, surf_vel_SurfPan_old)
+  !!! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
+  !!! compute the time derivative of the normal component of the velocity on 
+  !!!  surfpan to be used in the source rhs of the Bernoulli integral equation.
+  !!! surf_vel_SurfPan_old saved at the end of the time step (for surfpan only)
 
 
-  do i_el = 1 , geo%nSurfPan
+  !!do i_el = 1 , geo%nSurfPan
 
-    select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
+  !!  select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
 
-      el%dUn_dt = sum( el%nor * ( el%ub - & 
-             surf_vel_SurfPan_old( i_el , : ) ) ) / sim_param%dt
-!            surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) ) / sim_param%dt ! <<< mod-2018-12-21
+  !!    el%dUn_dt = sum( el%nor * ( el%ub - & 
+  !!           surf_vel_SurfPan_old( i_el , : ) ) ) / sim_param%dt
+! !!           surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) ) / sim_param%dt ! <<< mod-2018-12-21
 
-      ! Compute GradS_Un
-      GradS_Un = 0.0_wp
-      do i_e = 1 , el%n_ver
-        if ( associated(el%neigh(i_e)%p) ) then !  .and. &
-          select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
-            GradS_Un = GradS_Un + &
-              matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g , &
-                el%pot_vel_stencil(:,i_e) * ( &
-                  sum(el%nor* (el_neigh%surf_vel - el%surf_vel) ) ) )
-          end select
-        else
-!         select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
-            GradS_Un = GradS_Un + &
-              matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g , &
-               el%pot_vel_stencil(:,i_e) * ( &
-                  sum(el%nor* ( - 2.0_wp * el%surf_vel) ) ) )
-!         end select
-        end if
-      end do
-!     GradS_Un = GradS_Un - el%nor * sum(el%nor*GradS_Un) ! tangential projection
+  !!    ! Compute GradS_Un
+  !!    GradS_Un = 0.0_wp
+  !!    do i_e = 1 , el%n_ver
+  !!      if ( associated(el%neigh(i_e)%p) ) then !  .and. &
+  !!        select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
+  !!          GradS_Un = GradS_Un + &
+  !!            matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g , &
+  !!              el%pot_vel_stencil(:,i_e) * ( &
+  !!                sum(el%nor* (el_neigh%surf_vel - el%surf_vel) ) ) )
+  !!        end select
+  !!      else
+! !!        select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
+  !!          GradS_Un = GradS_Un + &
+  !!            matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g , &
+  !!             el%pot_vel_stencil(:,i_e) * ( &
+  !!                sum(el%nor* ( - 2.0_wp * el%surf_vel) ) ) )
+! !!        end select
+  !!      end if
+  !!    end do
+! !!    GradS_Un = GradS_Un - el%nor * sum(el%nor*GradS_Un) ! tangential projection
 
-      ! Compute DivS_U
-      DivS_U = 0.0_wp
-      do i_e = 1 , el%n_ver
-        if ( associated(el%neigh(i_e)%p) ) then !  .and. &
-          select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
-            DivS_U = DivS_U + &
-               sum( &
-                 matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g ,   &
-                                                            el%pot_vel_stencil(:,i_e) ) * &
-                    ( el_neigh%surf_vel - el%surf_vel )   )
-          end select
-        else  
-!         select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
-            DivS_U = DivS_U + &
-              sum( &
-                matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g ,   & 
-                                                           el%pot_vel_stencil(:,i_e) ) * &
-                   ( - 2.0_wp * el%surf_vel ) )
-!         end select
-        end if
-      end do  
+  !!    ! Compute DivS_U
+  !!    DivS_U = 0.0_wp
+  !!    do i_e = 1 , el%n_ver
+  !!      if ( associated(el%neigh(i_e)%p) ) then !  .and. &
+  !!        select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
+  !!          DivS_U = DivS_U + &
+  !!             sum( &
+  !!               matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g ,   &
+  !!                                                          el%pot_vel_stencil(:,i_e) ) * &
+  !!                  ( el_neigh%surf_vel - el%surf_vel )   )
+  !!        end select
+  !!      else  
+! !!        select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
+  !!          DivS_U = DivS_U + &
+  !!            sum( &
+  !!              matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g ,   & 
+  !!                                                         el%pot_vel_stencil(:,i_e) ) * &
+  !!                 ( - 2.0_wp * el%surf_vel ) )
+! !!        end select
+  !!      end if
+  !!    end do  
 
-      ! Compute "source intensity" of Bernoulli equations
-      el%bernoulli_source = + el%dUn_dt & !    n . DU/Dt 
-         - sum( GradS_Un * ( el%ub ))   & !  - GradS_Un . el%ub 
-         + DivS_U * sum(el%ub*el%nor)     !  + Un * Div_S U
+  !!    ! Compute "source intensity" of Bernoulli equations
+  !!    el%bernoulli_source = + el%dUn_dt & !    n . DU/Dt 
+  !!       - sum( GradS_Un * ( el%ub ))   & !  - GradS_Un . el%ub 
+  !!       + DivS_U * sum(el%ub*el%nor)     !  + Un * Div_S U
 
-    end select
-  end do
+  !!  end select
+  !!end do
 
-  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
+  !!! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
 
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
