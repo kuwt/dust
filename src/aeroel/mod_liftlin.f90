@@ -541,9 +541,14 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   enddo
 
-  write(*,*) ' a_v '
-  write(*,*) a_v*180.0_wp/pi
- 
+  write(*,*) ' ll_old , ll , a_v[deg] '
+  do i_l = 1 , nll
+    write(*,*) ll_mag(i_l) , elems_ll(i_l)%p%mag , a_v(i_l)*180.0_wp/pi
+  end do
+
+! write(*,*) ' a_v '
+! write(*,*) a_v*180.0_wp/pi
+
   ! Loads computation ------------
   do i_l = 1,size(elems_ll)
    select type(el => elems_ll(i_l)%p)
@@ -571,10 +576,9 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     write(msg,*) 'diff',diff; call printout(trim(msg))
     write(msg,*) 'diff/max_mag_ll:',diff/max_mag_ll; call printout(trim(msg))
   endif
- 
 
-  if  ( it .gt. 001 ) then
   ! === Newton's algorithm to assign u_rel.n = 0 ===
+  if  ( it .gt. 001 ) then
   ! dclvec set in the previous part of the algorithm
   clvec = c_m(:,1)                  ! from previous algorithm / initial guess
   alvec = a_v(:)*180.0_wp/pi        ! from previous algorithm / initial guess
@@ -622,7 +626,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       call error(this_sub_name, this_mod_name, trim(msg))
     end if
 
-    alvec = alvec + 0.50_wp * d_al
+    alvec = alvec + 0.25_wp * d_al
 
     do i_l = 1 , nll
 !     write(*,*) ' i_l , al , ma , re : ' , &
@@ -630,7 +634,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       select type( el=>elems_ll(i_l)%p ) ; type is (t_liftlin)
         call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil, &
                       (/alvec(i_l), ma_v(i_l), re_v(i_l)/) , aero_coeff , dclda )
-      end select 
+      end select
+      c_m(i_l,:)  = aero_coeff     ! overwrite ! 
       clvec( i_l) = aero_coeff(1)
       dclvec(i_l) = dclda
     end do
@@ -645,6 +650,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   write(*,*) ' alvec: '
   write(*,*)   alvec   
+
+  a_v = alvec * pi/180.0 ! overwrite
 
   ! Loads computation ------------
   do i_l = 1,size(elems_ll)
@@ -668,6 +675,11 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     el%dmom = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
                    el%chord * el%area * c_m(i_l,3)
     end select
+  end do
+
+  write(*,*) ' ll , alvec ' 
+  do i_l = 1 , nll
+    write(*,*) elems_ll(i_l)%p%mag , alvec(i_l)
   end do
 
 ! stop
@@ -705,6 +717,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
 ! newton ---
   deallocate( Amat , bvec , fvec , clvec , dclvec )
+! missing deallocate ...
 ! newton ---
 
   deallocate(dou_temp, vel_w)
