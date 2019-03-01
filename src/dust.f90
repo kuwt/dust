@@ -709,7 +709,7 @@ do it = 1,nstep
   !------ Update the explicit part ------  % v-----implicit elems: p,v
   if ( size(elems_ll) .gt. 0 ) then
     call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
-            (/ wake%pan_p, wake%rin_p/), wake%vort_p, sim_param, airfoil_data)
+            (/ wake%pan_p, wake%rin_p/), wake%vort_p, sim_param, airfoil_data, it)
   end if
 
 
