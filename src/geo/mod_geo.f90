@@ -1690,7 +1690,7 @@ subroutine update_geometry(geo, t, update_static)
  real(wp), intent(in) :: t
  logical, intent(in) :: update_static
 
- integer :: i_comp, ie
+ integer :: i_comp, ie , ip
 
  !update all the references
  call update_all_references(geo%refs,t)
@@ -1707,6 +1707,7 @@ subroutine update_geometry(geo, t, update_static)
         !comp%el(ie)%ver = move_points(comp%loc_points(:,comp%el(ie)%i_ver), &
         !                   geo%refs(comp%ref_id)%R_g, &
         !                   geo%refs(comp%ref_id)%of_g)
+
         call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
       enddo
 

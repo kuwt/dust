@@ -379,6 +379,9 @@ subroutine interp_aero_coeff ( airfoil_data ,  &
       ! --- Reynolds effects with semi-empirical laws ---
       irey = 1
       k_fact = ( reyn / airfoil_data(id_a)%aero_coeff(irey)%Re ) ** n_fact
+!     k_fact = 1.0_wp
+!     write(*,*) ' reyn , Re1 , k_fact : ' , &
+!                  reyn , airfoil_data(id_a)%aero_coeff(irey)%Re , k_fact
 
       ! ! debug ----
       ! write(*,*) ' k_fact : ' , k_fact
@@ -423,6 +426,9 @@ subroutine interp_aero_coeff ( airfoil_data ,  &
       ! --- Reynolds effects with semi-empirical laws ---
       irey = nRe
       k_fact = ( reyn / airfoil_data(id_a)%aero_coeff(irey)%Re ) ** n_fact
+!     k_fact = 1.0_wp
+!     write(*,*) ' reyn , Re1 , k_fact : ' , &
+!                  reyn , airfoil_data(id_a)%aero_coeff(irey)%Re , k_fact
 
       ! aero_par taking into account the Reynolds effect:
       ! --- find al(cl=0), for the desired mach number ---

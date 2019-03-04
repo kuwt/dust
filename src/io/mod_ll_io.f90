@@ -108,7 +108,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
  character(len=*), parameter :: this_sub_name = 'read_mesh_parametric'
 
- 
+
   !Prepare all the parameters to be read in the file
   ! Global parameters
   call pmesh_prs%CreateStringOption('ElType', &
@@ -220,8 +220,8 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
          &n_type_span .ne. nRegions. Stop.')
   end if
 
-  allocate(chord_list  (nSections))  ; chord_list = 0.0d0
-  allocate(twist_list  (nSections))  ; twist_list = 0.0d0
+  allocate(chord_list  (nSections))  ; chord_list = 0.0_wp
+  allocate(twist_list  (nSections))  ; twist_list = 0.0_wp
   allocate(airfoil_list(nSections)) 
 
   do iSection= 1,nSections
@@ -387,7 +387,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     end do
   
   end do
-
 
 ! === new-2019-02-06 ===
 ! Save the fields related to the definition of actual airfoils
