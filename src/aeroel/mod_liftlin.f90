@@ -577,8 +577,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     write(msg,*) 'diff/max_mag_ll:',diff/max_mag_ll; call printout(trim(msg))
   endif
 
-  ! === Newton's algorithm to assign u_rel.n = 0 ===
-  if  ( it .gt. 001 ) then
+!   ! === Newton's algorithm to assign u_rel.n = 0 ===
+!   if  ( it .gt. 001 ) then
   ! dclvec set in the previous part of the algorithm
   clvec = c_m(:,1)                  ! from previous algorithm / initial guess
   alvec = a_v(:)*180.0_wp/pi        ! from previous algorithm / initial guess
@@ -591,103 +591,104 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 ! end do
 ! ! debug ----
 
-  write(*,*) ' === Before Newton''s iterations ==='
-  write(*,*) '     norm2(res) : ' , norm2(fvec)
+  write(*,*) ' === Before Newton''s iterations === '
+  write(*,*) '      norm2(res)  : ' ,      norm2(fvec)
+  write(*,*) ' maxval(abs(res)) : ' , maxval(abs(fvec)) 
 
-  allocate(Amat_newton(nll,nll)) ! ; Amat_newton = Amat ! since dgsev destroys the input mat
-  allocate(d_al(nll))            ! ; d_al = 0.0_wp
-  allocate(ipiv(nll))            ! needed by dgesv
-
-  newton_it = 1
-  do while( ( norm2(fvec) .gt. newton_tol ) .and. &
-            ( newton_it .lt. newton_maxit ) )
-
-    ! fill Amat_newton ----
-    do ik = 1 , nll
-      Amat_newton(:,ik) = Amat(:,ik) * dclvec(ik)
-    end do
-
-!   ! debug ----
-!   write(*,*) ' Amat_newton : '
-!   do ii = 1 , nll
-!     write(*,*) Amat_newton(ii,:)
+!   allocate(Amat_newton(nll,nll)) ! ; Amat_newton = Amat ! since dgsev destroys the input mat
+!   allocate(d_al(nll))            ! ; d_al = 0.0_wp
+!   allocate(ipiv(nll))            ! needed by dgesv
+! 
+!   newton_it = 1
+!   do while( ( norm2(fvec) .gt. newton_tol ) .and. &
+!             ( newton_it .lt. newton_maxit ) )
+! 
+!     ! fill Amat_newton ----
+!     do ik = 1 , nll
+!       Amat_newton(:,ik) = Amat(:,ik) * dclvec(ik)
+!     end do
+! 
+! !   ! debug ----
+! !   write(*,*) ' Amat_newton : '
+! !   do ii = 1 , nll
+! !     write(*,*) Amat_newton(ii,:)
+! !   end do
+! !   ! debug ----
+! 
+!     d_al = -fvec
+! !   write(*,*) ' -fvec '
+! !   write(*,*) d_al
+!     call dgesv(nll,1,Amat_newton,nll,ipiv,d_al,nll,info) 
+! !   write(*,*) ' d_al '
+! !   write(*,*) d_al
+! 
+!     if ( info .ne. 0 ) then
+!       write(msg,*) 'error while solving linear system, Lapack DGESV error code ', info
+!       call error(this_sub_name, this_mod_name, trim(msg))
+!     end if
+! 
+!     alvec = alvec + 0.25_wp * d_al
+! 
+!     do i_l = 1 , nll
+! !     write(*,*) ' i_l , al , ma , re : ' , &
+! !                  i_l , alvec(i_l) , ma_v(i_l) , re_v(i_l)
+!       select type( el=>elems_ll(i_l)%p ) ; type is (t_liftlin)
+!         call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil, &
+!                       (/alvec(i_l), ma_v(i_l), re_v(i_l)/) , aero_coeff , dclda )
+!       end select
+!       c_m(i_l,:)  = aero_coeff     ! overwrite ! 
+!       clvec( i_l) = aero_coeff(1)
+!       dclvec(i_l) = dclda
+!     end do
+! 
+!     fvec = matmul(Amat,clvec) + bvec  ! residue 
+!     
+!     write(*,*) ' n.it , res : ' , newton_it , norm2(fvec)
+! 
+!     newton_it = newton_it + 1
+! 
 !   end do
-!   ! debug ----
-
-    d_al = -fvec
-!   write(*,*) ' -fvec '
-!   write(*,*) d_al
-    call dgesv(nll,1,Amat_newton,nll,ipiv,d_al,nll,info) 
-!   write(*,*) ' d_al '
-!   write(*,*) d_al
-
-    if ( info .ne. 0 ) then
-      write(msg,*) 'error while solving linear system, Lapack DGESV error code ', info
-      call error(this_sub_name, this_mod_name, trim(msg))
-    end if
-
-    alvec = alvec + 0.25_wp * d_al
-
-    do i_l = 1 , nll
-!     write(*,*) ' i_l , al , ma , re : ' , &
-!                  i_l , alvec(i_l) , ma_v(i_l) , re_v(i_l)
-      select type( el=>elems_ll(i_l)%p ) ; type is (t_liftlin)
-        call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil, &
-                      (/alvec(i_l), ma_v(i_l), re_v(i_l)/) , aero_coeff , dclda )
-      end select
-      c_m(i_l,:)  = aero_coeff     ! overwrite ! 
-      clvec( i_l) = aero_coeff(1)
-      dclvec(i_l) = dclda
-    end do
-
-    fvec = matmul(Amat,clvec) + bvec  ! residue 
-    
-    write(*,*) ' n.it , res : ' , newton_it , norm2(fvec)
-
-    newton_it = newton_it + 1
-
-  end do
-
-  write(*,*) ' alvec: '
-  write(*,*)   alvec   
-
-  a_v = alvec * pi/180.0 ! overwrite
-
-  ! Loads computation ------------
-  do i_l = 1,size(elems_ll)
-   select type(el => elems_ll(i_l)%p) ; type is(t_liftlin)
-    ! singualrity intensity
-    el%mag    = -0.5_wp * u_v(i_l) * clvec(i_l) * el%chord
-
-    ! avg delta_p = \vec{F}.\vec{n} / A = ( L*cos(al)+D*sin(al) ) / A
-    el%pres   = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
-               ( c_m(i_l,1) * cos(a_v(i_l)) +  c_m(i_l,2) * sin(a_v(i_l)) )
-    ! elementary force = p*n + tangential contribution from L,D
-    el%dforce = ( el%nor * el%pres + &
-                  el%tang_cen * &
-                  0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * ( &
-                 -c_m(i_l,1) * sin(a_v(i_l)) + c_m(i_l,2) * cos(a_v(i_l)) &
-                 ) ) * el%area
-    ! elementary moment = 0.5 * rho * v^2 * A * c * cm, 
-    ! - around bnorm_cen (always? TODO: check)
-    ! - referred to the ref.point of the elem,
-    !   ( here, cen of the elem = cen of the liftlin (for liftlin elems) )
-    el%dmom = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
-                   el%chord * el%area * c_m(i_l,3)
-    end select
-  end do
-
-  write(*,*) ' ll , alvec ' 
-  do i_l = 1 , nll
-    write(*,*) elems_ll(i_l)%p%mag , alvec(i_l)
-  end do
-
-! stop
-  end if
-
-
-
-  ! === Newton's algorithm to assign u_rel.n = 0 ===
+! 
+!   write(*,*) ' alvec: '
+!   write(*,*)   alvec   
+! 
+!   a_v = alvec * pi/180.0 ! overwrite
+! 
+!   ! Loads computation ------------
+!   do i_l = 1,size(elems_ll)
+!    select type(el => elems_ll(i_l)%p) ; type is(t_liftlin)
+!     ! singualrity intensity
+!     el%mag    = -0.5_wp * u_v(i_l) * clvec(i_l) * el%chord
+! 
+!     ! avg delta_p = \vec{F}.\vec{n} / A = ( L*cos(al)+D*sin(al) ) / A
+!     el%pres   = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
+!                ( c_m(i_l,1) * cos(a_v(i_l)) +  c_m(i_l,2) * sin(a_v(i_l)) )
+!     ! elementary force = p*n + tangential contribution from L,D
+!     el%dforce = ( el%nor * el%pres + &
+!                   el%tang_cen * &
+!                   0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * ( &
+!                  -c_m(i_l,1) * sin(a_v(i_l)) + c_m(i_l,2) * cos(a_v(i_l)) &
+!                  ) ) * el%area
+!     ! elementary moment = 0.5 * rho * v^2 * A * c * cm, 
+!     ! - around bnorm_cen (always? TODO: check)
+!     ! - referred to the ref.point of the elem,
+!     !   ( here, cen of the elem = cen of the liftlin (for liftlin elems) )
+!     el%dmom = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
+!                    el%chord * el%area * c_m(i_l,3)
+!     end select
+!   end do
+! 
+!   write(*,*) ' ll , alvec ' 
+!   do i_l = 1 , nll
+!     write(*,*) elems_ll(i_l)%p%mag , alvec(i_l)
+!   end do
+! 
+! ! stop
+!   end if
+! 
+! 
+! 
+!   ! === Newton's algorithm to assign u_rel.n = 0 ===
 
 
 ! Debug ----

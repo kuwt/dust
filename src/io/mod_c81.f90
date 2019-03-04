@@ -259,10 +259,17 @@ subroutine read_c81_table ( filen , coeff )
       istallp = ind_cl0 ; istallm = ind_cl0
       ! positive stall
       stall_found = 0
-      do while ( ( coeff%aero_coeff(iRe)%coeff(1)%cf(istallp+1,iMa) .gt. & 
+      ! ---
+      write(*,*) ' cl1 : ' , cl1
+      write(*,*) ' shape(coeff%aero_coeff(',iRe,')%coeff(1)%cf) : ' , &
+                   shape(coeff%aero_coeff(  iRe  )%coeff(1)%cf)
+      do while ( ( istallp+1 .lt. cl1 ) .and. &
+                 ( coeff%aero_coeff(iRe)%coeff(1)%cf(istallp+1,iMa) .gt. & 
                    coeff%aero_coeff(iRe)%coeff(1)%cf(istallp  ,iMa) ) .and. &
-                 ( stall_found .eq. 0 ) ) 
+                 ( stall_found .eq. 0 ) &
+                 ) 
         istallp = istallp + 1
+        
 !       ! ---- check the "second derivative" ( high Ma cl(alpha) ) ----
 !       if ( coeff%aero_coeff(iRe)%coeff(1)%cf(istallp+1,iMa) .gt. &
 !         coeff%aero_coeff(iRe)%coeff(1)%cf(  istallp  ,iMa) + & 
@@ -275,13 +282,16 @@ subroutine read_c81_table ( filen , coeff )
 !             ) then  ! check the "second derivative" ( high Ma cl(alpha) )
 !         stall_found = 1
 !       end if
+
       end do
       ! negative stall
       stall_found = 0
-      do while ( ( coeff%aero_coeff(iRe)%coeff(1)%cf(istallm-1,iMa) .lt. & 
+      do while ( ( istallm-1 .gt. 1 ) .and. &
+                 ( coeff%aero_coeff(iRe)%coeff(1)%cf(istallm-1,iMa) .lt. & 
                    coeff%aero_coeff(iRe)%coeff(1)%cf(istallm  ,iMa) ) .and. &
                  ( stall_found .eq. 0 ) ) 
         istallm = istallm - 1
+        
 !       ! ---- check the "second derivative" ( high Ma cl(alpha) ) ----
 !       if ( coeff%aero_coeff(iRe)%coeff(1)%cf(istallp-1,iMa) .lt. &
 !         coeff%aero_coeff(iRe)%coeff(1)%cf(  istallp  ,iMa) + &
@@ -294,6 +304,7 @@ subroutine read_c81_table ( filen , coeff )
 !             ) then
 !         stall_found = 1
 !       end if
+        
       end do
 
       coeff%aero_coeff(iRe)%alstall_pos(iMa) = coeff%aero_coeff(iRe)%coeff(1)%par1(istallp)
@@ -368,6 +379,10 @@ subroutine interp_aero_coeff ( airfoil_data ,  &
       ! --- Reynolds effects with semi-empirical laws ---
       irey = 1
       k_fact = ( reyn / airfoil_data(id_a)%aero_coeff(irey)%Re ) ** n_fact
+
+      ! ! debug ----
+      ! write(*,*) ' k_fact : ' , k_fact
+      ! ! debug ----
 
       ! aero_par taking into account the Reynolds effect:
       ! --- find al(cl=0), for the desired mach number ---
