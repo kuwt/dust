@@ -295,6 +295,11 @@ call prms%CreateLogicalOption('ViscosityEffects','Simulate viscosity &
                                                               & effects','F')
 call prms%CreateLogicalOption('ParticlesRedistribution','Employ particles &
                                                         &redistribution','F')
+call prms%CreateIntOption('OctreeLevelSolid','Level at which the panels &
+                          & are considered for particles redistribution')
+call prms%CreateRealOption('ParticlesRedistributionRatio','How many times &
+         &a particle need to be smaller than the average of the cell to be&
+         & eliminated','3.0')
 
 
 ! get the parameters and print them out
@@ -378,6 +383,14 @@ if(sim_param%use_fmm) then
   endif
 
   sim_param%use_pr = getlogical(prms, 'ParticlesRedistribution')
+  if(sim_param%use_pr) then
+    sim_param%part_redist_ratio = getreal(prms, 'ParticlesRedistributionRatio')
+    if ( countoption(prms,'OctreeLevelSolid') .gt. 0 ) then
+      sim_param%lvl_solid = getint(prms, 'OctreeLevelSolid')
+    else
+      sim_param%lvl_solid = max(sim_param%NOctreeLevels-2,1)
+    endif
+  endif
 endif
 
 !-- Parameters Initializations --

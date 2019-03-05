@@ -252,6 +252,8 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
   octree%nlevels = nlevels
   octree%delta = delta
 
+  octree%lvl_solid = sim_param%lvl_solid
+
   call set_multipole_param(sim_param%use_vs)
 
   min_part_4_cell = min_part
@@ -766,8 +768,9 @@ subroutine sort_particles(part, n_prt, elem, octree, sim_param)
     enddo; enddo; enddo !layer cells i,j,k
   enddo
 
-  octree%lvl_solid = 4
   l = octree%lvl_solid
+  !DEBUG
+  write(*,*) 'solid levels',octree%lvl_solid
   do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
   
   if (octree%layers(l)%lcells(i,j,k)%npan .gt. 0) &
@@ -788,7 +791,8 @@ subroutine sort_particles(part, n_prt, elem, octree, sim_param)
 
         do ip=1,nprt
           if(octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag .lt. &
-             1.0_wp/3.0_wp*octree%layers(ll)%lcells(i,j,k)%ave_vortmag) then
+             1.0_wp/sim_param%part_redist_ratio *&
+             octree%layers(ll)%lcells(i,j,k)%ave_vortmag) then
             !the particle is significantly smaller than the average in the cell
             !free
             octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%free = .true.
@@ -1223,7 +1227,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
     endif
     enddo
   enddo
-!Don't ask me why, but without this pragra it is much faster!
+!Don't ask me why, but without this pragma it is much faster!
 !$omp end parallel do
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Calculated leaves interactions in: ' , t1 - t0,' s.'

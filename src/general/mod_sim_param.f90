@@ -141,6 +141,9 @@ type t_sim_param
       real(wp) :: LeavesTimeRatio
     !> use particles redistribution
     logical :: use_pr
+      !> Level at which is checked the presence of panels
+      integer :: lvl_solid
+      real(wp) :: part_redist_ratio
 
 
   !Handling parameters:
@@ -219,6 +222,11 @@ subroutine save_sim_param(this, loc)
       call write_hdf5_attr(this%LeavesTimeRatio, 'LeavesTimeRatio', loc)
     endif
     call write_hdf5_attr(this%use_pr, 'ParticlesRedistribution', loc)
+    if(this%use_pr) then
+      call write_hdf5_attr(this%lvl_solid, 'OctreeLevelSolid', loc)
+      call write_hdf5_attr(this%part_redist_ratio, &
+                                          'ParticlesRedistributionRatio', loc)
+    endif
   endif
   call write_hdf5_attr(this%debug_level, 'debug_level', loc)
   call write_hdf5_attr(this%dt_out, 'dt_out', loc)
