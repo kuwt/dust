@@ -129,6 +129,11 @@ subroutine assemble_pressure_sys(linsys, geo, elems, wake)
  real(wp) :: elcen(3), dist(3), dist2(3)
  real(wp) :: Pinf, rhoinf, uinf(3)
 
+  ! Free-stream conditions
+  uinf   = sim_param%u_inf
+  Pinf   = sim_param%P_inf
+  rhoinf = sim_param%rho_inf
+
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++
 
   ! Slicing --------------------
