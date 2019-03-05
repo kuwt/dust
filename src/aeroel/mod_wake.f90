@@ -525,9 +525,6 @@ subroutine prepare_wake(wake, geo, elems, sim_param)
  real(wp) :: dir(3), partvec(3), ave, alpha_p(3), alpha_p_n
  integer :: ir, k, n_part
 
- real(wp), allocatable :: new_part_vec(:,:)
- real(wp), allocatable :: new_part_vec_2(:,:)
-
  ! flow separation variables
  integer :: i_comp , i_elem , n_elem
  integer :: n_end_vort   ! for structure update (around l.750)
@@ -616,36 +613,51 @@ subroutine prepare_wake(wake, geo, elems, sim_param)
 
   !==> Particles: if the panel wake is at the end, create a particle
   if(wake%full_panels) then
-    allocate(new_part_vec(3,wake%n_pan_points))
-    allocate(new_part_vec_2(3,wake%n_pan_stripes))
-    new_part_vec = 0.0_wp
-    new_part_vec_2 = 0.0_wp
-
+    k = 1
     do iw = 1,wake%n_pan_stripes
       p1 = wake%i_start_points(1,iw)
       p2 = wake%i_start_points(2,iw)
-
-      ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+      partvec = 0.0_wp
       !Left side
       dir = wake%pan_w_points(:,p1,wake%nmax_pan+1)-points_end(:,p1)
-      new_part_vec(:,p1) = new_part_vec(:,p1) + dir*ave
+      if (wake%pan_neigh(1,iw) .gt. 0) then
+        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
+              wake%pan_neigh_o(1,iw)* &
+              wake%wake_panels(wake%pan_neigh(1,iw),wake%pan_wake_len)%mag
+        ave = ave/2.0_wp
+      else
+        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+      endif
+      partvec = partvec + dir*ave
 
       !Right side
       dir = -wake%pan_w_points(:,p2,wake%nmax_pan+1)+points_end(:,p2)
-      new_part_vec(:,p2) = new_part_vec(:,p2) + dir*ave
+      if (wake%pan_neigh(2,iw) .gt. 0) then
+        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
+              wake%pan_neigh_o(2,iw)*wake%wake_panels(wake%pan_neigh(2,iw),wake%pan_wake_len)%mag
+        ave = ave/2.0_wp
+      else
+        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+      endif
+      partvec = partvec + dir*ave
 
       !End side
       dir = points_end(:,p1) - points_end(:,p2)
       ave = wake%wake_panels(iw,wake%pan_wake_len)%mag-wake%last_pan_idou(iw)
-      new_part_vec_2(:,iw) = new_part_vec_2(:,iw) + dir*ave
       wake%last_pan_idou(iw) = wake%wake_panels(iw,wake%pan_wake_len)%mag
+      partvec = partvec + dir*ave
 
-    enddo !iw
+      !Calculate the center
+      pos_p = (points_end(:,p1)+points_end(:,p2)+ &
+              wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
+              wake%pan_w_points(:,p2,wake%nmax_pan+1) )/4.0_wp
 
-    k = 1
-    do iw = 1,wake%n_pan_points
-      pos_p = 0.5_wp*(points_end(:,iw) + wake%pan_w_points(:,iw,wake%nmax_pan+1))
-      partvec = new_part_vec(:,iw)
+      !pos_p = (1.5_wp*points_end(:,p1)+1.5_wp*points_end(:,p2)+ &
+      !        wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
+      !        wake%pan_w_points(:,p2,wake%nmax_pan+1) )/5.0_wp
+
+      !pos_p = (points_end(:,p1)+points_end(:,p2))/2.0_wp
+
       !Add the particle (if it is in the box)
       if(all(pos_p .ge. wake%part_box_min) .and. &
          all(pos_p .le. wake%part_box_max)) then
@@ -676,46 +688,8 @@ subroutine prepare_wake(wake, geo, elems, sim_param)
         call error(this_sub_name, this_mod_name, trim(msg))
         endif !max number of particles
       endif !inside the box
-    enddo !iw, number of particles in a row
-
-    do iw = 1,wake%n_pan_stripes
-      p1 = wake%i_start_points(1,iw)
-      p2 = wake%i_start_points(2,iw)
-      pos_p = 0.5_wp*(points_end(:,p1) + points_end(:,p2)) 
-      partvec = new_part_vec_2(:,iw)
-      !Add the particle (if it is in the box)
-      if(all(pos_p .ge. wake%part_box_min) .and. &
-         all(pos_p .le. wake%part_box_max)) then
-        do ip = k, size(wake%wake_parts)
-          if (wake%wake_parts(ip)%free) then
-            
-            wake%wake_parts(ip)%free = .false.
-            k = ip+1
-            wake%n_prt = wake%n_prt+1
-            wake%wake_parts(ip)%mag = norm2(partvec)
-            if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
-              wake%wake_parts(ip)%dir = partvec/wake%wake_parts(ip)%mag
-            else
-              wake%wake_parts(ip)%dir = partvec
-            endif
-            wake%wake_parts(ip)%cen = pos_p
-
-            wake%wake_parts(ip)%vel = 0.5_wp * &
-                             ( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
-                               wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
-            exit
-          endif
-        enddo
-        if (ip .gt. wake%nmax_prt) then
-          write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
-            wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
-            &restarting with a higher number of maximum wake particles'
-        call error(this_sub_name, this_mod_name, trim(msg))
-        endif !max number of particles
-      endif !inside the box
-    enddo !iw, number of particles in a row
       
-    deallocate(new_part_vec)
+    enddo !iw
   endif !full wake 
 
   if(wake%full_rings) then
@@ -1634,7 +1608,7 @@ subroutine avoid_collision(elems, wake, part, sim_param, vel)
   ! Thickness of the "surface blocks" 
   ! ( now, HARDCODED. TODO: read as an input: same order of dimension of the blob radius )
   !blthick = 0.05_wp
-  blthick = sim_param%VortexRad*0.01_wp
+  blthick = sim_param%VortexRad
  
   !tolerance for the minimum wall distance 
   ! ( now, HARDCODED. TODO: read as an input: same order of dimension of the blob radius )

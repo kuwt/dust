@@ -97,6 +97,7 @@ type, extends(c_impl_elem) :: t_surfpan
   real(wp) :: dUn_dt
   real(wp) :: dn_dt(3)
   real(wp) :: bernoulli_source
+  real(wp), pointer :: pres_sol
 
   !> boundary layer and flow separation
   real(wp) :: h_bl      ! height of the surface (boundary??) layer
@@ -782,17 +783,18 @@ subroutine compute_pres_surfpan(this, R_g, sim_param)
   !                                - 0.5*rho_inf*V^2 - rho_inf*dphi/dt
   !                                     + rho * ub.u_phi
   ! with idou = -phi
-  this%pres  = sim_param%P_inf &
+  !this%pres  = sim_param%P_inf &
 ! reduced equation after some manipulation
 !   - 0.5 * sim_param%rho_inf * norm2(vel_phi+this%uvort)**2.0_wp & 
 !         - sim_param%rho_inf * sum( & 
 !            (sim_param%u_inf-this%ub)*(vel_phi+this%uvort) ) & 
 !         + sim_param%rho_inf * this%didou_dt
 ! full equation
-    + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
-    - 0.5_wp * sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp  &
-             + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
-             + sim_param%rho_inf * this%didou_dt
+   ! + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
+   ! - 0.5_wp * sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp  &
+   !          + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
+   !          + sim_param%rho_inf * this%didou_dt
+   this%pres = this%pres_sol - 0.5*sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp
 
 end subroutine compute_pres_surfpan
 
