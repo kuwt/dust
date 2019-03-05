@@ -1278,7 +1278,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
   
   if (sim_param%use_fmm) then
     t0 = dust_time()
-    call sort_particles(wake%part_p, wake%n_prt, octree, sim_param)
+    call sort_particles(wake%part_p, wake%n_prt, elems, octree, sim_param)
     call calculate_multipole(wake%part_p, octree)
     call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
                          wake%end_vorts, sim_param)

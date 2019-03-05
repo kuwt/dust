@@ -113,6 +113,15 @@ type :: t_cell
   !> Poiners to all the particles contained in the cell
   type(t_vortpart_p), allocatable :: cell_parts(:)
 
+  !> Number of panels (centres) contained in the cell 
+  integer :: npan
+
+  !> Poiners to all the panels contained in the cell
+  type(t_pot_elem_p), allocatable :: cell_pans(:)
+
+  !> Is it near to a solid wall?
+  logical :: near_wall
+
   !> Center of the cell
   real(wp) :: cen(3)
   
@@ -159,6 +168,9 @@ type :: t_octree
  !> number of levels of octree division
  integer :: nlevels
  
+ !> Level at which the solid walls are considered (for particles redistribution)
+ integer :: lvl_solid
+
  !> total number of cells (sum of cells at each level)
  integer :: ncells_tot
 
@@ -357,6 +369,8 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
       allocate(octree%layers(l)%lcells(i,j,k)%cell_parts(0))
       allocate(octree%layers(l)%lcells(i,j,k)%leaf_neigh(0))
       octree%layers(l)%lcells(i,j,k)%npart = 0
+      allocate(octree%layers(l)%lcells(i,j,k)%cell_pans(0))
+      octree%layers(l)%lcells(i,j,k)%npan = 0
       octree%layers(l)%lcells(i,j,k)%active = .false.
       octree%layers(l)%lcells(i,j,k)%leaf = .false.
       allocate(octree%layers(l)%lcells(i,j,k)%interaction_list(0) )
@@ -583,6 +597,8 @@ subroutine add_layer(octree)
     ! speed, so things are allocated to zero here)
     allocate(octree%layers(ll)%lcells(i,j,k)%cell_parts(0))
     octree%layers(ll)%lcells(i,j,k)%npart = 0
+    allocate(octree%layers(ll)%lcells(i,j,k)%cell_pans(0))
+    octree%layers(ll)%lcells(i,j,k)%npan = 0
     octree%layers(ll)%lcells(i,j,k)%active = .true.
     octree%layers(ll)%lcells(i,j,k)%leaf = .false.
     allocate(octree%layers(ll)%lcells(i,j,k)%interaction_list(0) )
@@ -652,9 +668,10 @@ end subroutine
 !----------------------------------------------------------------------
 
 !> Sort particles inside the octree grid
-subroutine sort_particles(part, n_prt, octree, sim_param)
+subroutine sort_particles(part, n_prt, elem, octree, sim_param)
  type(t_vortpart_p), intent(in), target :: part(:)
  integer, intent(inout) :: n_prt
+ type(t_pot_elem_p), intent(in) :: elem(:)
  type(t_octree), intent(inout), target :: octree
  type(t_sim_param), intent(in) :: sim_param
 
@@ -712,50 +729,97 @@ subroutine sort_particles(part, n_prt, octree, sim_param)
       octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%ave_vortmag + &
       part(ip)%p%mag
 
-
-
   enddo
 
+  !Sort also all the elements
+  do ip=1,size(elem)
+    !check in which cell at the lowest level it is located
+    idx = ceiling((elem(ip)%p%cen-octree%xmin)/csize)
+
+    !check that we are not sorting things outside the octree
+    if(any(idx.le.0).or.any(idx.gt.shape(octree%layers(ll)%lcells))) then
+      call error(this_sub_name, this_mod_name, 'Sorted element resulted &
+                                                &outside the octree box') 
+    endif
+
+    !add the particle to the lowest level
+    octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npan = &
+                    octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npan + 1
+    !call push_ptr(octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%cell_parts,part(ip)%p)
+
+  enddo
+  !From the second to last level upwards, add the panels
+  do l = ll-1,1,-1
+    !cycle on the elements on the level
+    do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
+
+      !cycle on the children, gather the number of particles and if are 
+      !leaves
+      do child = 1,8
+        octree%layers(l)%lcells(i,j,k)%npan = &
+              octree%layers(l)%lcells(i,j,k)%npan + &
+              octree%layers(l)%lcells(i,j,k)%children(child)%p%npan
+        !push all the panels pointers
+        !call push_ptr(octree%layers(l)%lcells(i,j,k)%cell_parts, &
+        !octree%layers(l)%lcells(i,j,k)%children(child)%p%cell_parts)
+      enddo !child
+    enddo; enddo; enddo !layer cells i,j,k
+  enddo
+
+  octree%lvl_solid = 4
+  l = octree%lvl_solid
+  do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
+  
+  if (octree%layers(l)%lcells(i,j,k)%npan .gt. 0) &
+    call set_near_wall(octree%layers(l)%lcells(i,j,k))
+
+  enddo; enddo; enddo !layer cells i,j,k
+
+
+  
+  ! --- Particles Redistribution --- 
   if(sim_param%use_pr) then
     !On the bottom level remove the too small particles
     do k=1,octree%ncl(3,ll); do j=1,octree%ncl(2,ll); do i = 1,octree%ncl(1,ll)
-      nprt = octree%layers(ll)%lcells(i,j,k)%npart
-      octree%layers(ll)%lcells(i,j,k)%ave_vortmag =  &
-        octree%layers(ll)%lcells(i,j,k)%ave_vortmag/real(nprt,wp)
+      if(.not. octree%layers(ll)%lcells(i,j,k)%near_wall) then
+        nprt = octree%layers(ll)%lcells(i,j,k)%npart
+        octree%layers(ll)%lcells(i,j,k)%ave_vortmag =  &
+          octree%layers(ll)%lcells(i,j,k)%ave_vortmag/real(nprt,wp)
 
-      do ip=1,nprt
-        if(octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag .lt. &
-           1.0_wp/3.0_wp*octree%layers(ll)%lcells(i,j,k)%ave_vortmag) then
-          !the particle is significantly smaller than the average in the cell
-          !free
-          octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%free = .true.
-          octree%layers(ll)%lcells(i,j,k)%npart = &
-                                    octree%layers(ll)%lcells(i,j,k)%npart - 1
-          !lower also the global counter
-          n_prt = n_prt -1
+        do ip=1,nprt
+          if(octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag .lt. &
+             1.0_wp/3.0_wp*octree%layers(ll)%lcells(i,j,k)%ave_vortmag) then
+            !the particle is significantly smaller than the average in the cell
+            !free
+            octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%free = .true.
+            octree%layers(ll)%lcells(i,j,k)%npart = &
+                                      octree%layers(ll)%lcells(i,j,k)%npart - 1
+            !lower also the global counter
+            n_prt = n_prt -1
 
-          !redistribute it
-          nprt2 = octree%layers(ll)%lcells(i,j,k)%npart
-          redistr = (octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag * &
-                  octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%dir) / nprt2
-          do iq=1,nprt
-              if(.not. octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%free) then
-                vort =  octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%mag*&
-                        octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%dir
-                vort = vort + redistr
-                octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%mag = norm2(vort)
-                if(norm2(vort) .gt. 0.0_wp) then
-                  octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%dir = &
-                                                   vort/norm2(vort)
-                else
-                  octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%dir = 0.0_wp
-                endif
-              endif
-          enddo
-        endif
-      enddo
+            !redistribute it
+            nprt2 = octree%layers(ll)%lcells(i,j,k)%npart
+            redistr = (octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag * &
+                    octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%dir) / nprt2
+            do iq=1,nprt
+                if(.not. octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%free) then
+                  vort =  octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%mag*&
+                          octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%dir
+                  vort = vort + redistr
+                  octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%mag = norm2(vort)
+                  if(norm2(vort) .gt. 0.0_wp) then
+                    octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%dir = &
+                                                     vort/norm2(vort)
+                  else
+                    octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%dir = 0.0_wp
+                  endif
+                endif !not free particle
+            enddo !iq, rest of the particles
+          endif !too small particle
+        enddo !ip, particles in cell
+      endif !near wall
     enddo; enddo; enddo !layer cells i,j,k
-  endif
+  endif !particles redistribution
 
   nl = 0
   !Bottom level: just check if are leaves
@@ -1314,6 +1378,25 @@ end subroutine set_inactive
 
 !----------------------------------------------------------------------
 
+!> Set a cell near wall
+!!
+!! The cell is set near wall and then all the children are set near wall
+recursive subroutine set_near_wall(cell)
+ type(t_cell), intent(inout) :: cell
+
+ integer :: child
+
+  cell%near_wall = .true.
+
+  do child = 1,8
+    if(associated(cell%children(child)%p)) &
+       call set_near_wall(cell%children(child)%p)
+  enddo
+
+end subroutine set_near_wall
+
+!----------------------------------------------------------------------
+
 ! DISCONTINUED
 !> Add a certain number of particles upward in the tree
 !!recursive subroutine add_part_upwards(cell, npart)
@@ -1433,13 +1516,17 @@ subroutine reset_cell(cell)
 
  deallocate(cell%cell_parts)
  allocate(cell%cell_parts(0))
- deallocate(cell%leaf_neigh)
- allocate(cell%leaf_neigh(0))
  cell%npart = 0
+ deallocate(cell%cell_pans)
+ allocate(cell%cell_pans(0))
+ cell%npan = 0
  !cell%active = .true.
  cell%branch = .false.
  cell%leaf = .false.
+ cell%near_wall = .false.
  cell%ave_vortmag = 0.0_wp
+ deallocate(cell%leaf_neigh)
+ allocate(cell%leaf_neigh(0))
 
 end subroutine reset_cell
 
