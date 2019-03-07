@@ -133,6 +133,8 @@ subroutine assemble_pressure_sys(linsys, geo, elems, wake)
   uinf   = sim_param%u_inf
   Pinf   = sim_param%P_inf
   rhoinf = sim_param%rho_inf
+  ntot = linsys%rank
+
 
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++
 
