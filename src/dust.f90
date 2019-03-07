@@ -289,14 +289,14 @@ call prms%CreateRealOption( 'CutoffRad', &
 ! --- lifting line elements ---
 call prms%CreateLogicalOption('LLReynoldsCorrections', &
        'Use Reynolds corrections for the .c81 tables?', 'F')
-call prms%CreateIntOption('LLReynoldsCorrectionsNfact', &
+call prms%CreateRealOption('LLReynoldsCorrectionsNfact', &
        'Exponent in (Re/Re_T)^n correction', '0.2')
 call prms%CreateIntOption('LLmaxIter', & 
        'Maximum number of iteration in LL algorithm', '100')
 call prms%CreateRealOption('LLtol', & 
        'Tolerance for the relative error in fixed point iteration for LL','1.0e-6' )
 call prms%CreateRealOption('LLdamp', &
-       'Damping param in fixed point iteration for LL used to avoid oscillations','5.0_wp')
+       'Damping param in fixed point iteration for LL used to avoid oscillations','5.0')
 call prms%CreateLogicalOption('LLstallRegularisation', & 
        'Avoid "unphysical" separations in inner sections of LL?','T')
 call prms%CreateIntOption('LLstallRegularisationNelems', &
@@ -391,7 +391,7 @@ sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
 sim_param%use_ve = getlogical(prms, 'ViscosityEffects')
 !Lifting line elements
 sim_param%llReynoldsCorrections      = getlogical(prms, 'LLreynoldsCorrections')
-sim_param%llReynoldsCorrectionsNfact = getint(    prms, 'LLreynoldsCorrectionsNfact')
+sim_param%llReynoldsCorrectionsNfact = getreal(   prms, 'LLreynoldsCorrectionsNfact')
 sim_param%llMaxIter                  = getint(    prms, 'LLmaxIter'            )
 sim_param%llTol                      = getreal(   prms, 'LLtol'                )
 sim_param%llDamp                     = getreal(   prms, 'LLdamp'               )
