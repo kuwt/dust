@@ -680,7 +680,7 @@ subroutine sort_particles(part, n_prt, elem, octree, sim_param)
  integer :: ip
  integer :: idx(3)
  real(wp) :: csize
- integer :: l, i,j,k, child, ic, jc, kc
+ integer :: l, i,j,k, child, ic,jc,kc, in,jn,kn
  integer :: ll, nl
  logical :: got_leaves
  integer :: nprt, nprt2, iq
@@ -768,20 +768,28 @@ subroutine sort_particles(part, n_prt, elem, octree, sim_param)
     enddo; enddo; enddo !layer cells i,j,k
   enddo
 
-  l = octree%lvl_solid
-  !DEBUG
-  write(*,*) 'solid levels',octree%lvl_solid
-  do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
-  
-  if (octree%layers(l)%lcells(i,j,k)%npan .gt. 0) &
-    call set_near_wall(octree%layers(l)%lcells(i,j,k))
-
-  enddo; enddo; enddo !layer cells i,j,k
 
 
   
   ! --- Particles Redistribution --- 
   if(sim_param%use_pr) then
+
+    !Check if the cells contain a solid boundary at level lvl_solid
+    l = octree%lvl_solid
+    do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
+      !Check if the cell has solid boundaries in it
+      if (octree%layers(l)%lcells(i,j,k)%npan .gt. 0) &
+        call set_near_wall(octree%layers(l)%lcells(i,j,k))
+      !Check also that no neighbour has solid boundaries
+      do kc = -1,1; do jc = -1,1; do ic = -1,1
+        if(associated(octree%layers(l)%lcells(i,j,k)%&
+                                                neighbours(ic,jc,kc)%p)) then
+          if(octree%layers(l)%lcells(i,j,k)%neighbours(ic,jc,kc)%p%npan.gt.0) &
+            call set_near_wall(octree%layers(l)%lcells(i,j,k))
+        endif
+      enddo; enddo; enddo !layer cells in,jn,kn
+    enddo; enddo; enddo !layer cells i,j,k
+
     !On the bottom level remove the too small particles
     do k=1,octree%ncl(3,ll); do j=1,octree%ncl(2,ll); do i = 1,octree%ncl(1,ll)
       if(.not. octree%layers(ll)%lcells(i,j,k)%near_wall) then
