@@ -80,6 +80,7 @@ type, extends(c_expl_elem) :: t_liftlin
   integer               :: i_airfoil(2)
   real(wp)              :: chord
   real(wp)              :: ctr_pt(3)
+  real(wp)              :: nor_zeroLift(3)
 contains
 
   procedure, pass(this) :: compute_pot      => compute_pot_liftlin
@@ -288,14 +289,39 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
  type(t_vort_elem_p), intent(in)    :: elems_vort(:)
  type(t_sim_param),   intent(in)    :: sim_param
  type(t_aero_tab),    intent(in)    :: airfoil_data(:)
+ real(wp) :: uinf(3)
+ integer  :: i_l, j, ic
+ real(wp) :: vel(3), v(3), up(3)
+ real(wp), allocatable :: vel_w(:,:)
+ real(wp) :: unorm, alpha
+ real(wp) :: cl
+ real(wp), allocatable :: aero_coeff(:)
+ real(wp), allocatable :: dou_temp(:)
+
+ ! mach and reynolds number for each el
+ real(wp) :: mach , reynolds
+ ! arrays used for force projection
+ real(wp) , allocatable :: a_v(:)   ! size(elems_ll)
+ real(wp) , allocatable :: c_m(:,:) ! size(elems_ll) , 3
+ real(wp) , allocatable :: u_v(:)   ! size(elems_ll)
+
+ ! fixed point algorithm for ll ----
+ real(wp) :: fp_tol , fp_damp , diff
+ integer  :: fp_maxIter
+ logical  :: stall_regularisation
+ integer              :: n_inner_stall
+ real(wp) , parameter :: al_stall = 15.0_wp*pi/180.0_wp ! hardcoded
+
+ real(wp) :: max_mag_ll
+
 ! debug ----
  integer, intent(in) :: it
  character(len=4) :: it_str
  real(wp) , allocatable :: re_v(:) , ma_v(:)
 
  real(wp) , allocatable :: vel_ctr(:,:)
-!real(wp) , allocatable :: vel_ctr_rel(:,:)
 ! debug ----
+
 ! newton ---
  real(wp) , allocatable :: ll_mag(:)
  real(wp) , allocatable :: Amat(:,:) , Amat_newton(:,:)
@@ -309,30 +335,20 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
  integer, allocatable :: ipiv(:)
  integer :: info
  real(wp) :: res , res_old
+ real(wp) :: al0
 ! newton ---
 
- real(wp) :: uinf(3)
- integer  :: i_l, j, ic
- real(wp) :: vel(3), v(3), up(3)
- real(wp), allocatable :: vel_w(:,:)
- real(wp) :: unorm, alpha
- real(wp) :: cl
- real(wp), allocatable :: aero_coeff(:)
- real(wp), allocatable :: dou_temp(:)
- real(wp) :: damp=2.0_wp
- real(wp), parameter :: toll=1e-6_wp
- real(wp) :: diff
- ! mach and reynolds number for each el
- real(wp) :: mach , reynolds
- ! arrays used for force projection
- real(wp) , allocatable :: a_v(:)   ! size(elems_ll)
- real(wp) , allocatable :: c_m(:,:) ! size(elems_ll) , 3
- real(wp) , allocatable :: u_v(:)   ! size(elems_ll)
-
- real(wp) :: max_mag_ll
  
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name = 'solve_liftlin'
+
+  ! parameters of the fixed point iterations
+  fp_tol     = sim_param%llTol
+  fp_damp    = sim_param%llDamp
+  fp_maxIter = sim_param%llMaxIter
+  stall_regularisation = sim_param%llStallRegularisation
+! n_inner_stall        = sim_param%llStallRegularisationNelems
+  n_inner_stall = 1
 
   uinf = sim_param%u_inf
 
@@ -408,57 +424,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
    end select
   end do
 
-  ! newton ---
-  ! === Amat, bvec === 
-  ! allocate and fill constant vectors and array for newton method
-  allocate(Amat(nll,nll), bvec(nll)) ; Amat = 0.0_wp ; bvec = 0.0_wp
-
-  ! set all the intensity of the liftling lines to 1.0_wp in order to
-  ! compute the influence of the unitary vortices on the control points 
-  ! needed to build matrix Amat
-  allocate(ll_mag(nll)) 
-  do i_l = 1 , nll
-    ll_mag(i_l) = elems_ll(i_l)%p%mag 
-    elems_ll(i_l)%p%mag = 1.0_wp
-  end do
- 
-  ! fill constant matrix Amat and vector bvec 
-  do ii = 1 , nll
-    select type( el=>elems_ll(ii)%p ) ; type is (t_liftlin)
-      bvec(ii) = sum( ( uinf - el%ub + vel_ctr(:,ii) ) * el%nor )
-      do ik = 1 , nll
-        call elems_ll(ik)%p%compute_vel(el%ctr_pt,uinf,v)
-        Amat(ii,ik) = sum( v / (4.0_wp*pi) * el%nor )
-      end do 
-    end select
-  end do 
-
-! ! debug ----
-! write(it_str,'(I4.4)') it 
-! open(unit=21, file='./Debug/ll_Amat_'//trim(it_str)//'.dat')
-! do i_l = 1 , nll
-!   write(21,*) Amat(i_l,:)
-! end do
-! close(21)
-! ! debug ----
-
-  do ik = 1 , nll
-    select type( el=>elems_ll(ik)%p ) ; type is (t_liftlin)
-      Amat(:,ik) = Amat(:,ik) * (-0.5*u_v(ik)*el%chord)
-    end select
-  end do
-  
-  do i_l = 1,nll  !Initialise ll magnitude to the value at previous timestep
-    elems_ll(i_l)%p%mag = ll_mag(i_l) 
-  end do
-  ! === Amat, bvec === 
-
-! ! debug ----
-! write(*,*) ' Amat : '
-! do ii = 1 , nll
-!   write(*,*) Amat(ii,:)
-! end do
-! ! debug ----
 
   ! allocate and initialised to zero other vectors used in newton methods
   allocate(fvec(  nll)) ; fvec   = 0.0_wp
@@ -468,8 +433,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   ! newton ---
 
   !Calculate the induced velocity on the airfoil
-  do ic = 1,100      !TODO: Refine this iterative process 
-    diff = 0.0_wp    ! max diff ("norm \infty")
+  do ic = 1, fp_maxIter       !TODO: Refine this iterative process 
+    diff = 0.0_wp             ! max diff ("norm \infty")
     max_mag_ll = 0.0_wp
     do i_l = 1,size(elems_ll)
 
@@ -483,9 +448,13 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       select type(el => elems_ll(i_l)%p)
       type is(t_liftlin)
         vel = vel/(4.0_wp*pi) + uinf - el%ub +vel_w(:,i_l)
+        !vel =                 + uinf - el%ub +vel_w(:,i_l)
         !vel = uinf - el%ub
-        up = vel-el%bnorm_cen*sum(el%bnorm_cen*vel)
+!       up = vel-el%bnorm_cen*sum(el%bnorm_cen*vel)
+        up = uinf-el%ub+vel_w(:,i_l) &
+            -el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub+vel_w(:,i_l)))
         u_v(i_l) = norm2(up) ! overwrite !!!
+        up = vel-el%bnorm_cen*sum(el%bnorm_cen*vel)
 
         ! Compute reference velocity (includes the motion of the body)
         ! to use in LUT (.c81) of aerodynamic loads (2d airfoil)
@@ -509,8 +478,12 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 !       ! debug ----
 
         call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil, &
-                      (/alpha, mach, reynolds/) , aero_coeff , dclda )
+                      (/alpha, mach, reynolds/) , aero_coeff , dclda , al0 )
         cl = aero_coeff(1)   ! cl needed for the iterative process
+
+        ! >>> update/define the zero lift normal versor for liftlin elems
+        al0 = al0 * pi/180.0_wp
+        el%nor_zeroLift = el%nor * cos(al0) - el%tang_cen * sin(al0) 
 
 !       ! debug ----
 !       write(*,*) ' cl , cd , cm , dclda ' 
@@ -532,21 +505,43 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       dclvec(i_l) = dclda   ! [deg]
       ! clvec, alvec set before the Newton loop
 
-    enddo
+    enddo  ! i_l
 
-    !TODO: while refining the iterative process, 
-    ! move this hardcoded parameter in the input files
-    damp = 5.0_wp
+    ! --- avoid stall on an elem between 2 elems without stall ---
+    ! TODO:
+    ! - read neighbouring elements and not the prev and next elem in ll numbering <<<<
+    ! - decide if using .and. or .or. in the if statement (or user input ?)       <<<<
+    ! - use n_inner_stall to check more than one inner elems 
+    ! - read al_stall from tables (?) or leave it as an input from the user
+    ! al_stall = ... \hardcoded as a parameter
+    ! rough ----
+    if ( stall_regularisation ) then 
+      do i_l = 2 , size(elems_ll) - 1
+        if ( a_v(i_l) .gt. al_stall ) then
+          if ( ( a_v(i_l-1) .lt. al_stall ) .and. &
+               ( a_v(i_l+1) .lt. al_stall ) ) then
+             a_v(     i_l) = 0.5_wp * ( a_v(     i_l-1) + a_v(     i_l+1) ) 
+             dou_temp(i_l) = 0.5_wp * ( dou_temp(i_l-1) + dou_temp(i_l+1) ) 
+           end if
+        elseif ( a_v(i_l) .lt. -al_stall ) then
+          if ( ( a_v(i_l-1) .gt. -al_stall ) .and. &
+               ( a_v(i_l+1) .gt. -al_stall ) ) then
+             a_v(     i_l) = 0.5_wp * ( a_v(     i_l-1) + a_v(     i_l+1) ) 
+             dou_temp(i_l) = 0.5_wp * ( dou_temp(i_l-1) + dou_temp(i_l+1) ) 
+           end if
+        end if
+      end do
+    end if
+    ! rough ---- 
 
+    ! Update ll intensity
     do i_l = 1,size(elems_ll)
-      elems_ll(i_l)%p%mag = ( dou_temp(i_l)+ damp*elems_ll(i_l)%p%mag )&
-                             /(1.0_wp+damp)
+      elems_ll(i_l)%p%mag = ( dou_temp(i_l)+ fp_damp*elems_ll(i_l)%p%mag )&
+                             /(1.0_wp+fp_damp)
       max_mag_ll = max(max_mag_ll,abs(elems_ll(i_l)%p%mag))
-
     enddo
 
-!   if(diff .le. toll) exit
-    if(diff/max_mag_ll .le. toll) exit
+    if ( diff/max_mag_ll .le. fp_tol ) exit
 
   enddo
 
@@ -588,20 +583,74 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
 
   ! === Newton's algorithm to assign u_rel.n = 0 ===
-  if  ( it .ge. 000 ) then
-  ! dclvec set in the previous part of the algorithm
+  
+  ! === Amat, bvec === 
+  ! allocate and fill constant vectors and array for newton method
+  allocate(Amat(nll,nll), bvec(nll)) ; Amat = 0.0_wp ; bvec = 0.0_wp
+
+  ! set all the intensity of the liftling lines to 1.0_wp in order to
+  ! compute the influence of the unitary vortices on the control points 
+  ! needed to build matrix Amat
+  allocate(ll_mag(nll)) 
+  do i_l = 1 , nll
+    ll_mag(i_l) = elems_ll(i_l)%p%mag 
+    elems_ll(i_l)%p%mag = 1.0_wp
+  end do
+ 
+  ! fill constant matrix Amat and vector bvec 
+  do ii = 1 , nll
+    select type( el=>elems_ll(ii)%p ) ; type is (t_liftlin)
+      bvec(ii) = sum( ( uinf - el%ub + vel_ctr(:,ii) ) * el%nor_zeroLift )
+      do ik = 1 , nll
+        call elems_ll(ik)%p%compute_vel(el%ctr_pt,uinf,v)
+        Amat(ii,ik) = sum( v / (4.0_wp*pi) * el%nor_zeroLift )
+      end do 
+    end select
+  end do 
+
+! ! debug ----
+! write(it_str,'(I4.4)') it 
+! open(unit=21, file='./Debug/ll_Amat_'//trim(it_str)//'.dat')
+! do i_l = 1 , nll
+!   write(21,*) Amat(i_l,:)
+! end do
+! close(21)
+! ! debug ----
+
+  do ik = 1 , nll
+    select type( el=>elems_ll(ik)%p ) ; type is (t_liftlin)
+      Amat(:,ik) = Amat(:,ik) * (-0.5*u_v(ik)*el%chord)
+    end select
+  end do
+  
+  do i_l = 1,nll  !Initialise ll magnitude to the value at previous timestep
+    elems_ll(i_l)%p%mag = ll_mag(i_l) 
+  end do
+  ! === Amat, bvec === 
+
+! ! debug ----
+! write(*,*) ' Amat : '
+! do ii = 1 , nll
+!   write(*,*) Amat(ii,:)
+! end do
+! ! debug ----
+
   clvec = c_m(:,1)                  ! from previous algorithm / initial guess
   alvec = a_v(:)*180.0_wp/pi        ! from previous algorithm / initial guess
   fvec = matmul(Amat,clvec) + bvec  ! residue 
 
-! ! debug ----
-! write(*,*) '    a_v    ,    alvec    ,    clvec    ,    dclvec    ,    fvec    ,    mag ' 
-! do i_l = 1 , nll
-!  select type(el => elems_ll(i_l)%p) ; type is (t_liftlin)
-!   write(*,'(6E14.4)') a_v(i_l) , alvec(i_l) , clvec(i_l) , dclvec(i_l) , fvec(i_l) , el%mag
-!  end select 
-! end do
-! ! debug ----
+  ! debug ----
+  write(*,*) '    a_v    ,    alvec    ,    clvec    ,    dclvec    ,    fvec    ,    mag ' 
+  do i_l = 1 , nll
+   select type(el => elems_ll(i_l)%p) ; type is (t_liftlin)
+    write(*,'(6E14.4)') a_v(i_l) , alvec(i_l) , clvec(i_l) , dclvec(i_l) , fvec(i_l) , el%mag
+   end select 
+  end do
+  ! debug ----
+
+  ! === Newton's iterations ===
+  if  ( it .ge. 2000 ) then
+  ! dclvec set in the previous part of the algorithm
 
   write(*,*) ' === Before Newton''s iterations === '
   write(*,*) '      norm2(res)  : ' ,      norm2(fvec)
@@ -646,7 +695,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 !                  i_l , alvec(i_l) , ma_v(i_l) , re_v(i_l)
       select type( el=>elems_ll(i_l)%p ) ; type is (t_liftlin)
         call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil, &
-                      (/alvec(i_l), ma_v(i_l), re_v(i_l)/) , aero_coeff , dclda )
+                      (/alvec(i_l), ma_v(i_l), re_v(i_l)/) , aero_coeff , dclda , al0 )
       end select
       c_m(i_l,:)  = aero_coeff     ! overwrite ! 
       clvec( i_l) = aero_coeff(1)
@@ -667,7 +716,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 ! write(*,*) ' alvec: '
 ! write(*,*)   alvec   
 
-  a_v = alvec * pi/180.0 ! overwrite
+  a_v = alvec * pi/180.0_wp ! overwrite
 
   ! Loads computation ------------
   ! Is it necessary to divide the loads by (cos(alpha))^2 ?
@@ -694,9 +743,10 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     end select
   end do
 
-  write(*,*) ' alvec , ll%mag ' 
+  write(*,*) ' alvec , ll%mag , u , cl ,  cd ,  cm ,  pres , dforce' 
   do i_l = 1 , nll
-    write(*,*) alvec(i_l) , elems_ll(i_l)%p%mag
+    write(*,*) alvec(i_l) , elems_ll(i_l)%p%mag , u_v(i_l) , &
+               c_m(i_l,:) , elems_ll(i_l)%p%pres , elems_ll(i_l)%p%dforce
   end do
 
 ! stop

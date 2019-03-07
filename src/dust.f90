@@ -247,13 +247,16 @@ call prms%CreateLogicalOption('reset_time','reset the time from previous &
                                &execution?','F')
 
 ! parameters:
+! --- reference conditions ---
 call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
                                                        '(/1.0, 0.0, 0.0/)')
-call prms%CreateRealOption( 'u_ref', "reference velocity")
-call prms%CreateRealOption( 'P_inf', "free stream pressure", '1.0')
-call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')
-call prms%CreateRealOption( 'a_inf', "Speed of sound", '340.0')  ! m/s
-call prms%CreateRealOption( 'mu_inf', "Dynamic viscosity", '0.00001') ! kg/ms
+call prms%CreateRealOption( 'u_ref', "reference velocity")             !
+call prms%CreateRealOption( 'P_inf', "free stream pressure", '0.0')    ! 
+call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')   !
+call prms%CreateRealOption( 'a_inf', "Speed of sound", '340.0')        ! m/s   for dimensional sim
+call prms%CreateRealOption( 'mu_inf', "Dynamic viscosity", '0.000018') ! kg/ms
+
+! --- wake ---
 call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
 call prms%CreateIntOption('n_wake_particles', 'number of wake particles', &
                                                                   '10000')
@@ -266,7 +269,10 @@ call prms%CreateRealOption( 'ImplicitPanelScale', &
                     "Scaling of the first implicit wake panel", '0.3')
 call prms%CreateRealOption( 'ImplicitPanelMinVel', &
                     "Minimum velocity at the trailing edge", '1.0e-8')
+call prms%CreateLogicalOption('rigid_wake','rigid wake?','F')
+call prms%CreateRealArrayOption( 'rigid_wake_vel', "rigid wake velocity" )
 
+! --- regularisation ---
 call prms%CreateRealOption( 'FarFieldRatioDoublet', &
       "Multiplier for far field threshold computation on doublet", '10.0')
 call prms%CreateRealOption( 'FarFieldRatioSource', &
@@ -280,8 +286,21 @@ call prms%CreateRealOption( 'VortexRad', &
 call prms%CreateRealOption( 'CutoffRad', &
       "Radius of complete cutoff  for vortex induction near core", '0.001')
 
-call prms%CreateLogicalOption('rigid_wake','rigid wake?','F')
-call prms%CreateRealArrayOption( 'rigid_wake_vel', "rigid wake velocity" )
+! --- lifting line elements ---
+call prms%CreateLogicalOption('LLReynoldsCorrections', &
+       'Use Reynolds corrections for the .c81 tables?', 'F')
+call prms%CreateIntOption('LLReynoldsCorrectionsNfact', &
+       'Exponent in (Re/Re_T)^n correction', '0.2')
+call prms%CreateIntOption('LLmaxIter', & 
+       'Maximum number of iteration in LL algorithm', '100')
+call prms%CreateRealOption('LLtol', & 
+       'Tolerance for the relative error in fixed point iteration for LL','1.0e-6' )
+call prms%CreateRealOption('LLdamp', &
+       'Damping param in fixed point iteration for LL used to avoid oscillations','5.0_wp')
+call prms%CreateLogicalOption('LLstallRegularisation', & 
+       'Avoid "unphysical" separations in inner sections of LL?','T')
+call prms%CreateIntOption('LLstallRegularisationNelems', &
+       'Number of "unphysical" separations to be removed', '1' )
 
 !== Octree and multipole data == 
 call prms%CreateLogicalOption('FMM','Employ fast multipole method?','T')
@@ -307,7 +326,6 @@ call prms%CreateLogicalOption('ViscosityEffects','Simulate viscosity &
                                                               & effects','F')
 call prms%CreateLogicalOption('ParticlesRedistribution','Employ particles &
                                                         &redistribution','F')
-
 
 ! get the parameters and print them out
 call printout(nl//'====== Input parameters: ======')
@@ -371,6 +389,15 @@ sim_param%use_vs = getlogical(prms, 'Vortstretch')
 sim_param%use_vd = getlogical(prms, 'Diffusion')
 sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
 sim_param%use_ve = getlogical(prms, 'ViscosityEffects')
+!Lifting line elements
+sim_param%llReynoldsCorrections      = getlogical(prms, 'LLreynoldsCorrections')
+sim_param%llReynoldsCorrectionsNfact = getint(    prms, 'LLreynoldsCorrectionsNfact')
+sim_param%llMaxIter                  = getint(    prms, 'LLmaxIter'            )
+sim_param%llTol                      = getreal(   prms, 'LLtol'                )
+sim_param%llDamp                     = getreal(   prms, 'LLdamp'               )
+sim_param%llStallRegularisation      = getlogical(prms, 'LLstallRegularisation')
+sim_param%llStallRegularisationNelems= getint(    prms, 'LLstallRegularisationNelems')
+
 !Octree and FMM parameters
 sim_param%use_fmm = getlogical(prms, 'FMM')
 if(sim_param%use_fmm) then
