@@ -68,7 +68,8 @@ public :: &
   unit_errout, &
   t_realtime, &
   new_file_unit, &
-  check_preproc
+  check_preproc, &
+  check_basename
 
 private
 
@@ -397,6 +398,36 @@ end subroutine new_file_unit
 
 !-----------------------------------------------------------------------
 
+!> Check if the basename provided is legitimate
+!!
+!! Attempts to create a test file with such basename, if it fails, 
+!! aborts with error
+subroutine check_basename(basename,sub_name,mod_name)
+ character(len=*), intent(in) :: basename
+ character(len=*), intent(in) :: sub_name
+ character(len=*), intent(in) :: mod_name
+ integer :: estat, cstat
+  
+  !try to print a test file in the provided basename
+  call execute_command_line('touch '//trim(basename)//'.try', &
+                                          exitstat=estat,cmdstat=cstat)
+
+  if( estat.ne.0 .or. cstat.ne.0) then
+    !got a problem with the basename
+    call error(trim(sub_name),trim(mod_name),'Problems creating output&
+    & with basename: '//trim(basename)//' possibly invalid path.')
+  else
+    !the basename is good, remove the test file
+    call execute_command_line('rm '//trim(basename)//'.try', &
+                                          exitstat=estat,cmdstat=cstat)
+  endif
+
+end subroutine check_basename
+
+!-----------------------------------------------------------------------
+
+!> Check if the geometry files exists, if not, try to generate it 
+!! calling the preprocessor
 subroutine check_preproc(filename)
  character(len=*), intent(in) :: filename
 

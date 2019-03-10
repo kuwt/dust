@@ -44,7 +44,7 @@ use mod_sim_param, only: &
   t_sim_param, sim_param
 
 use mod_handling, only: &
-  error, warning, info, printout, dust_time, t_realtime
+  error, warning, info, printout, dust_time, t_realtime, check_basename
 
 use mod_geometry, only: &
   t_geo, &
@@ -443,6 +443,11 @@ if (sim_param%debug_level .ge. 3) then
   write(message,*) 'Debug basename: ', trim(basename_debug); call printout(message)
 endif
 
+
+!---- Check that the basenames are valid ----
+  call check_basename(trim(sim_param%basename),'dust main','')
+  if(sim_param%debug_level.ge.10) &
+    call check_basename(trim(basename_debug),'dust main','')
 
 !---- Simulation parameters ----
 nstep = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1 

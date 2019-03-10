@@ -260,6 +260,10 @@ call initialize_vortpart(r_Vortex, r_cutoff)
 
 n_analyses = countoption(prms,'Analysis')
 
+!Check that the basenames are valid
+call check_basename(trim(basename),'dust postprocessor','')
+call check_basename(trim(data_basename),'dust postprocessor','')
+
 !Cycle on all the analyses
 do ia = 1,n_analyses
   

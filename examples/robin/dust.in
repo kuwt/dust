@@ -1,6 +1,6 @@
 
 basename       = ./Output/robin
-basename_debug =  ./Debug/puppa
+basename_debug =  ./Debug/robin_debug
 
 ! Kinetic free-stream conditions -------------------
 ! mu = 0.15 -----
