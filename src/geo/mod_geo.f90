@@ -1211,6 +1211,28 @@ subroutine import_aero_tab(geo,coeff)
    call read_c81_table( list_tmp(i_a) , coeff(i_a) )
  end do
 
+! ! debug -----
+! write(*,*) nl // ' debug .c81 Reynolds corrections ' // nl
+! do i_a = 1 , n_a
+!   write(*,*) ' file : ' , trim(list_tmp(i_a))
+!   do i_c = 1 , size(coeff(i_a)%aero_coeff) ! 1 , nRe
+!     write(*,*) ' Re : ' , coeff(i_a)%aero_coeff(i_c)%Re
+!     write(*,*) ' Ma , clmax , al0 , al_stall_p , cl_stall_p , al_stall_m , al_stall_p '
+!     do i_l = 1 , size(coeff(i_a)%aero_coeff(i_c)%coeff(1)%par2)
+!       write(*,*) coeff(i_a)%aero_coeff(i_c)%coeff(1)%par2(i_l) , &
+!                  coeff(i_a)%aero_coeff(i_c)%clmax(i_l) , &
+!                  coeff(i_a)%aero_coeff(i_c)%alcl0(i_l) , &
+!                  coeff(i_a)%aero_coeff(i_c)%alstall_pos(i_l) , &
+!                  coeff(i_a)%aero_coeff(i_c)%clstall_pos(i_l) , &
+!                  coeff(i_a)%aero_coeff(i_c)%alstall_neg(i_l) , &
+!                  coeff(i_a)%aero_coeff(i_c)%clstall_neg(i_l)
+!     end do           
+!   end do
+! end do
+! write(*,*) ' stop in mod_geo.f90 l.1225 '
+! stop
+! ! debug -----
+
 end subroutine import_aero_tab
 
 !----------------------------------------------------------------------
@@ -1672,7 +1694,7 @@ subroutine update_geometry(geo, t, update_static)
  real(wp), intent(in) :: t
  logical, intent(in) :: update_static
 
- integer :: i_comp, ie
+ integer :: i_comp, ie , ip
 
  !update all the references
  call update_all_references(geo%refs,t)
@@ -1689,6 +1711,7 @@ subroutine update_geometry(geo, t, update_static)
         !comp%el(ie)%ver = move_points(comp%loc_points(:,comp%el(ie)%i_ver), &
         !                   geo%refs(comp%ref_id)%R_g, &
         !                   geo%refs(comp%ref_id)%of_g)
+
         call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
       enddo
 

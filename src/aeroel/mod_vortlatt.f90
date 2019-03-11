@@ -428,6 +428,14 @@ else
              this%didou_dt ) ! dG_dt )
 end if
 
+! debug ----
+write(*,*) ' el%id , el%urel : ' , &
+  this%id , norm2(sim_param%u_inf + this%uvort - this%ub)
+write(*,*) ' uinf : ' , sim_param%u_inf
+write(*,*) ' uv   : ' , this%uvort
+write(*,*) ' ub   : ' , this%ub
+! debug ----
+
 
 end subroutine compute_pres_vortlatt
 

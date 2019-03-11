@@ -109,7 +109,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
  character(len=*), parameter :: this_sub_name = 'read_mesh_parametric'
 
- 
+
   !Prepare all the parameters to be read in the file
   ! Global parameters
   call pmesh_prs%CreateStringOption('ElType', &
@@ -238,8 +238,8 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
          &number of type_span different from number of regions.')
   end if
 
-  allocate(chord_list  (nSections))  ; chord_list = 0.0d0
-  allocate(twist_list  (nSections))  ; twist_list = 0.0d0
+  allocate(chord_list  (nSections))  ; chord_list = 0.0_wp
+  allocate(twist_list  (nSections))  ; twist_list = 0.0_wp
   allocate(airfoil_list(nSections)) 
 
   do iSection= 1,nSections
@@ -247,6 +247,11 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     twist_list(iSection)   = getreal(pmesh_prs,'twist')
     airfoil_list(iSection) = getstr(pmesh_prs,'airfoil_table')
   enddo
+
+  ! set the te 0.75*chord far from the ll
+  do iSection= 1,nSections
+    chord_list(iSection)   = chord_list(iSection) * 0.75_wp 
+  end do 
 
 
   npoint_chord_tot = nelem_chord_tot + 1
@@ -401,7 +406,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     end do
   
   end do
-
 
 ! === new-2019-02-06 ===
 ! Save the fields related to the definition of actual airfoils
