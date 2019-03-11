@@ -148,7 +148,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
                 multiple=.true.);
   call pmesh_prs%CreateRealOption(     'twist', 'section twist angle',&
                 multiple=.true.);
-  call pmesh_prs%CreateStringOption( 'airfoil', 'section airfoil',&
+  call pmesh_prs%CreateStringOption( 'airfoil_table', 'section airfoil',&
                 multiple=.true.);
 
   ! Region parameters
@@ -200,9 +200,9 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   if(countoption(pmesh_prs,'twist') .ne. nSections ) &
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
          &number of "twist" different from number of sections.')
-  if(countoption(pmesh_prs,'airfoil') .ne. nSections ) &
+  if(countoption(pmesh_prs,'airfoil_table') .ne. nSections ) &
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-         &number of "airfoil" different from number of sections.')
+         &number of "airfoil_table" different from number of sections.')
 
   ! Get total number of elements and initialize arrays
   allocate(nelem_span_list(nRegions));   nelem_span_list = 0
@@ -245,7 +245,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   do iSection= 1,nSections
     chord_list(iSection)   = getreal(pmesh_prs,'chord')
     twist_list(iSection)   = getreal(pmesh_prs,'twist')
-    airfoil_list(iSection) = getstr(pmesh_prs,'airfoil')
+    airfoil_list(iSection) = getstr(pmesh_prs,'airfoil_table')
   enddo
 
 
