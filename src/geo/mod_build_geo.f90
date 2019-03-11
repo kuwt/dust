@@ -46,7 +46,7 @@ use mod_parse, only: &
   , finalizeparameters
 
 use mod_handling, only: &
-  error, warning, info, printout, dust_time, t_realtime
+  error, warning, info, printout, dust_time, t_realtime, check_file_exists
 
 use mod_basic_io, only: &
   read_mesh_basic, write_basic
@@ -249,6 +249,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                                 'Scaling of the points coordinates.', '1.0')
   
   !read the parameters
+  call check_file_exists(geo_file,this_sub_name,this_mod_name)
   call geo_prs%read_options(geo_file,printout_val=.false.)
 
   mesh_file_type = getstr(geo_prs,'MeshFileType')

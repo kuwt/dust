@@ -69,7 +69,8 @@ public :: &
   t_realtime, &
   new_file_unit, &
   check_preproc, &
-  check_basename
+  check_basename, &
+  check_file_exists
 
 private
 
@@ -103,7 +104,7 @@ character(len=*), parameter :: &
   this_mod_name = 'mod_handling'
 
 interface error
-  module procedure error, error_multiline
+  module procedure error, error_multiline, error_main
 end interface
 interface warning
   module procedure warning, warning_multiline
@@ -184,6 +185,31 @@ recursive subroutine error(caller,caller_mod,text)
   call dust_abort()
 
 end subroutine error
+
+!-----------------------------------------------------------------------
+
+!> Error: abort the execution, printing a message of the abort location
+!! and reason, without the caller module
+recursive subroutine error_main(caller,text)
+ character(len=*), intent(in) :: &
+   caller, text
+
+ ! compiler bug -- gfortran bug
+ ! https://gcc.gnu.org/bugzilla/show_bug.cgi?id=77649
+ character(len=len_trim(text)) :: gfortran_bug_text(1)
+ character(len=*), parameter :: &
+   this_sub_name = 'error'
+
+
+  gfortran_bug_text(1) = trim(text)
+  call put_msg( 1 , format_out_string_main(                            &
+      !'ERROR in "', caller , caller_mod , '"!' , (/trim(text)/) ) )
+      'ERROR in "', caller , '"!' , gfortran_bug_text ) )
+
+  call dust_abort()
+
+end subroutine error_main
+ 
  
 !-----------------------------------------------------------------------
 
@@ -319,6 +345,29 @@ function format_out_string(msg,caller,caller_mod,end, text ) result(s)
 end function format_out_string
 
 !-----------------------------------------------------------------------
+
+!> Make a string and count its length, without module
+function format_out_string_main(msg,caller,end, text ) result(s)
+ character(len=*), intent(in) :: msg, caller, end
+ character(len=*), intent(in) :: text(:)
+ integer :: i
+ character( &
+   len = 1+len(msg)+len(caller)+len(end)    &
+        +1+sum((/( 2+len_trim(text(i))+1 , i=1,size(text) )/)) &
+          ) :: s
+
+  ! See ifort bug
+  ! DPD200411297
+  ! https://software.intel.com/en-us/forums/intel-fortran-compiler-for-linux-and-mac-os-x/topic/629432
+  ! and also
+  ! https://software.intel.com/en-us/comment/1878150#comment-1878150
+  write(s,'(a,*(a))') &
+      nl//msg // caller // end &
+      // nl, ( "  "//trim(text(i))//nl ,i=1,size(text))
+
+end function format_out_string_main
+
+!-----------------------------------------------------------------------
  
 !> Write a message to the selcted channel
 subroutine put_msg( msg_type , msg )
@@ -405,17 +454,22 @@ end subroutine new_file_unit
 subroutine check_basename(basename,sub_name,mod_name)
  character(len=*), intent(in) :: basename
  character(len=*), intent(in) :: sub_name
- character(len=*), intent(in) :: mod_name
+ character(len=*), intent(in), optional :: mod_name
  integer :: estat, cstat
   
   !try to print a test file in the provided basename
-  call execute_command_line('touch '//trim(basename)//'.try', &
+  call execute_command_line('touch '//trim(basename)//'.try > /dev/null 2>&1 ', &
                                           exitstat=estat,cmdstat=cstat)
 
   if( estat.ne.0 .or. cstat.ne.0) then
     !got a problem with the basename
-    call error(trim(sub_name),trim(mod_name),'Problems creating output&
-    & with basename: '//trim(basename)//' possibly invalid path.')
+    if(present(mod_name)) then
+      call error(trim(sub_name),trim(mod_name),'Problems creating output&
+      & with basename: '//trim(basename)//' possibly invalid path.')
+    else
+      call error(trim(sub_name),'Problems creating output&
+      & with basename: '//trim(basename)//' possibly invalid path.')
+    endif
   else
     !the basename is good, remove the test file
     call execute_command_line('rm '//trim(basename)//'.try', &
@@ -423,6 +477,34 @@ subroutine check_basename(basename,sub_name,mod_name)
   endif
 
 end subroutine check_basename
+
+!-----------------------------------------------------------------------
+
+!> Check if one file exists (before opening it), if not returns an error
+!!
+subroutine check_file_exists(filename,sub_name,mod_name)
+ character(len=*), intent(in) :: filename
+ character(len=*), intent(in) :: sub_name
+ character(len=*), intent(in), optional :: mod_name
+ logical :: exists
+  
+  !Inquire file existence
+  inquire(file=trim(filename), exist=exists)
+
+  if( .not. exists) then
+    !got a problem with the basename
+    if(present(mod_name)) then
+      call error(trim(sub_name),trim(mod_name),'The file "'//trim(filename) &
+      //'" about to be read does not exist, check that input paths and &
+      &commands are correct.')
+    else
+      call error(trim(sub_name),'The file "'//trim(filename) &
+      //'" about to be read does not exist, check that input paths and &
+      &commands are correct.')
+    endif
+  endif
+
+end subroutine check_file_exists
 
 !-----------------------------------------------------------------------
 

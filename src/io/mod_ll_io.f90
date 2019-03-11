@@ -41,7 +41,7 @@ use mod_param, only: &
   wp, max_char_len, nl, pi
 
 use mod_handling, only: &
-  error, warning, info, printout, new_file_unit
+  error, warning, info, printout, new_file_unit, check_file_exists
 
 use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption
@@ -414,6 +414,8 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     if ( trim(airfoil_list(i)) .ne. 'interp' ) then
       iAirfoil = iAirfoil + 1
       airfoil_list_actual(iAirfoil) = trim(airfoil_list(i))
+      call check_file_exists(airfoil_list_actual(iAirfoil), this_sub_name, &
+           this_mod_name)
     end if
   end do
 
@@ -430,11 +432,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
     iend = sum(nelem_span_list(1:i_aero2-1))
 
-! ! debug ----
-!     write(*,*) ' i_aero1 , i_aero2 : ' , i_aero1 , i_aero2
-!     write(*,*) ' iAirfoil , iAirfoil+1 : ' , iAirfoil , iAirfoil+1
-!     write(*,*) ' ista , iend : ' , ista , iend
-! ! debug ----
     do iSpan = ista , iend 
       i_airfoil_e(1, iSpan) = iAirfoil 
       i_airfoil_e(2, iSpan) = iAirfoil+1 
@@ -451,14 +448,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
   end do
 
-! ! debug -----
-!   write(*,*)
-!   do i = 1 , size(i_airfoil_e,2)
-!     write(*,*) ' i, i_airfoil_e(:,i) , normalised_coord_e(:,i) : ' , &
-!                  i, i_airfoil_e(:,i) , normalised_coord_e(:,i)
-!   end do
-!   write(*,*)
-! ! debug -----
 ! === new-2019-02-06 ===
 
 

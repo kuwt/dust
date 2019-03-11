@@ -47,7 +47,8 @@ use mod_parse, only: &
   , finalizeparameters
 
 use mod_handling, only: &
-  error, warning, info, printout, dust_time, t_realtime, check_preproc
+  error, warning, info, printout, dust_time, t_realtime, check_preproc, &
+  check_file_exists
 
 use mod_basic_io, only: &
   read_mesh_basic, write_basic
@@ -357,6 +358,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   if (trim(ref_file_name) .eq. 'no_set') then
     ref_file_name = trim(in_file_name)
   endif
+  call check_file_exists(trim(ref_file_name), this_sub_name, this_mod_name)
   call build_references(geo%refs, trim(ref_file_name), sim_param)
 
 ! -----------------------------------------------------------------------------------------

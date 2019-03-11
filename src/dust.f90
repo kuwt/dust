@@ -44,7 +44,8 @@ use mod_sim_param, only: &
   t_sim_param, sim_param
 
 use mod_handling, only: &
-  error, warning, info, printout, dust_time, t_realtime, check_basename
+  error, warning, info, printout, dust_time, t_realtime, check_basename, &
+  check_file_exists
 
 use mod_geometry, only: &
   t_geo, &
@@ -299,6 +300,7 @@ call prms%CreateLogicalOption('ParticlesRedistribution','Employ particles &
 
 ! get the parameters and print them out
 call printout(nl//'====== Input parameters: ======')
+call check_file_exists(input_file_name,'dust main')
 call prms%read_options(input_file_name, printout_val=.true.)
 !timing
 sim_param%t0 = getreal(prms, 'tstart')
@@ -445,9 +447,9 @@ endif
 
 
 !---- Check that the basenames are valid ----
-  call check_basename(trim(sim_param%basename),'dust main','')
+  call check_basename(trim(sim_param%basename),'dust main')
   if(sim_param%debug_level.ge.10) &
-    call check_basename(trim(basename_debug),'dust main','')
+    call check_basename(trim(basename_debug),'dust main')
 
 !---- Simulation parameters ----
 nstep = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1 
