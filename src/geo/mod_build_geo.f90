@@ -1410,7 +1410,7 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
  allocate(ii_te(2,ne_te)) ; ii_te = ii_te_tmp(:,1:ne_te)
 
  
- write(msg,'(A,I0,A,I0,A)') 'Trailing edge detection completed, found &
+ write(msg,'(A,I0,A,I0,A)') ' Trailing edge detection completed, found &
        &',ne_te,' elements at the trailing edge, with ',nn_te,' nodes &
        &on the trailing edge' 
  call printout(msg)

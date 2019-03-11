@@ -95,7 +95,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
  integer :: ista , iend
 
  character :: ElType
- logical :: symmetry
  real(wp), allocatable :: chord_fraction(:), span_fraction(:)
  character(len=max_char_len) :: type_chord
  integer :: i1  
@@ -111,8 +110,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   ! Global parameters
   call pmesh_prs%CreateStringOption('ElType', &
                 'element type (temporary) p panel v vortex ring')
-  call pmesh_prs%CreateLogicalOption('mesh_symmetry', &
-                'symmetry yes/no' )
   call pmesh_prs%CreateIntOption('nelem_chord',&
                 'number of chord-wise elements', &
                 multiple=.false.);
@@ -164,7 +161,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
   nelem_chord = getint(pmesh_prs,'nelem_chord')
   ElType  = getstr(pmesh_prs,'ElType')
-  symmetry= getlogical(pmesh_prs,'mesh_symmetry')
    
   nSections = countoption(pmesh_prs,'chord')
   nRegions  = countoption(pmesh_prs,'span')
@@ -178,7 +174,23 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   ref_chord_fraction = getreal(pmesh_prs,'reference_chord_fraction')
   ref_point          = getrealarray(pmesh_prs,'starting_point',3)
 
-  ! TODO: check on number of inputs
+
+  !Check the number of inputs
+  if(countoption(pmesh_prs,'nelem_span') .ne. nRegions ) &
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         &number of "nelem_span" different from number of regions.')
+  if(countoption(pmesh_prs,'dihed') .ne. nRegions ) &
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         &number of "dihed" different from number of regions.')
+  if(countoption(pmesh_prs,'sweep') .ne. nRegions ) &
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         &number of "sweep" different from number of regions.')
+  if(countoption(pmesh_prs,'twist') .ne. nSections ) &
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         &number of "twist" different from number of sections.')
+  if(countoption(pmesh_prs,'airfoil') .ne. nSections ) &
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         &number of "airfoil" different from number of sections.')
 
   ! Get total number of elements and initialize arrays
   allocate(nelem_span_list(nRegions));   nelem_span_list = 0
