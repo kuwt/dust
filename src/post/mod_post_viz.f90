@@ -111,7 +111,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
  type(t_geo_component), allocatable :: comps(:)
  character(len=max_char_len) :: filename
  integer(h5loc) :: floc , ploc
- logical :: out_vort, out_vel, out_cp, out_press , out_wake
+ logical :: out_vort, out_vel, out_cp, out_press , out_wake, separate_wake
  integer :: n_var , i_var
  character(len=max_char_len), allocatable :: var_names(:)
  real(wp), allocatable :: points(:,:), points_exp(:,:) , wpoints(:,:)
@@ -166,6 +166,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   
   ! Print the wake or not 
   out_wake = getlogical(sbprms,'Wake')
+  separate_wake = getlogical(sbprms,'SeparateWake')
   
   if(out_wake .and. average) call error(this_sub_name, this_mod_name, &
   'Cannot output an averaged wake visualization. Remove the wake or avoid &
@@ -260,7 +261,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     
     if(.not. average) then
       ! Output filename
-      write(filename,'(A,I4.4)') trim(basename)//'_'//trim(an_name)//'_',it
+      write(filename,'(A,I4.4)') trim(basename)//'_'//trim(an_name)//'-',it
       
       if (out_wake) then
         
@@ -299,7 +300,8 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                        w_rr=wpoints, w_ee=welems, w_vars=print_vars_w, &
                        w_var_names = print_var_names_w, &
                        vp_rr=vppoints, vp_vars=print_vars_vp, &
-                       vp_var_names = print_var_names_w)
+                       vp_var_names = print_var_names_w, &
+                       separate_wake = separate_wake)
          case default
            call error('dust_post','','Unknown format '//trim(out_frmt)//&
                       ' for visualization output')

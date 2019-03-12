@@ -1284,9 +1284,9 @@ subroutine update_wake(wake, elems, octree, sim_param)
                          wake%end_vorts, sim_param)
     t1 = dust_time()
     write(msg,'(A,F9.3,A)') 'Multipoles calculation: ' , t1 - t0,' s.'
-    call printout(msg)
+    if(sim_param%debug_level.ge.3) call printout(msg)
     write(msg,'(A,I0)') 'Number of particles: ' , wake%n_prt
-    call printout(msg)
+    if(sim_param%debug_level.ge.5) call printout(msg)
   endif
 
   !Check the difference

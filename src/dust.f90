@@ -41,10 +41,11 @@ use mod_param, only: &
   wp, nl, max_char_len, extended_char_len , pi
 
 use mod_sim_param, only: &
-  t_sim_param
+  t_sim_param, sim_param
 
 use mod_handling, only: &
-  error, warning, info, printout, dust_time, t_realtime
+  error, warning, info, printout, dust_time, t_realtime, check_basename, &
+  check_file_exists
 
 use mod_geometry, only: &
   t_geo, &
@@ -83,8 +84,11 @@ use mod_linsys_vars, only: &
 
 use mod_linsys, only: &
   initialize_linsys, assemble_linsys, solve_linsys, destroy_linsys, &
-  dump_linsys , dump_linsys_pres , &
-  solve_linsys_pressure
+  dump_linsys
+
+use mod_pressure_equation, only: &
+  dump_linsys_pres, press_normvel_der, initialize_pressure_sys, &
+  assemble_pressure_sys, solve_pressure_sys
 
 use mod_basic_io, only: &
   read_mesh_basic, write_basic
@@ -133,7 +137,7 @@ character(len=max_char_len) :: target_file
 character(len=extended_char_len) :: message
 
 !Simulation parameters
-type(t_sim_param) :: sim_param
+!type(t_sim_param) :: sim_param
 ! Asymptotic conditions
 
 !Time parameters
@@ -183,25 +187,10 @@ real(wp) , allocatable :: res_old(:)
 real(wp) , allocatable :: surf_vel_SurfPan_old(:,:)
 real(wp) , allocatable ::      nor_SurfPan_old(:,:)
 
-integer :: i_el , i , i_e
+integer :: i_el , i
 
 !octree parameters
 type(t_octree) :: octree
-
-! pres_IE +++++
-!result of the integral equation for pressure
-real(wp), allocatable :: surfpan_H_IE(:)
-!real(wp), allocatable :: b_unsteady_debug(:)
-! TODO:
-! in linsys/mod_linsys.f90:
-! - remove Kutta condition from linsys%A_pres
-! - add forcing terms to linsys%b_pres
-! in dust.f90:
-! - redistribute pressure to the surfpan elems only
-! - adjust ALL the things
-!
-real(wp) :: GradS_Un(3)
-real(wp) :: DivS_U
 
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
 t00 = dust_time()
@@ -247,13 +236,16 @@ call prms%CreateLogicalOption('reset_time','reset the time from previous &
                                &execution?','F')
 
 ! parameters:
+! --- reference conditions ---
 call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
                                                        '(/1.0, 0.0, 0.0/)')
-call prms%CreateRealOption( 'u_ref', "reference velocity")
-call prms%CreateRealOption( 'P_inf', "free stream pressure", '1.0')
-call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')
-call prms%CreateRealOption( 'a_inf', "Speed of sound", '340.0')  ! m/s
-call prms%CreateRealOption( 'mu_inf', "Dynamic viscosity", '0.00001') ! kg/ms
+call prms%CreateRealOption( 'u_ref', "reference velocity")             !
+call prms%CreateRealOption( 'P_inf', "free stream pressure", '0.0')    ! 
+call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')   !
+call prms%CreateRealOption( 'a_inf', "Speed of sound", '340.0')        ! m/s   for dimensional sim
+call prms%CreateRealOption( 'mu_inf', "Dynamic viscosity", '0.000018') ! kg/ms
+
+! --- wake ---
 call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
 call prms%CreateIntOption('n_wake_particles', 'number of wake particles', &
                                                                   '10000')
@@ -266,7 +258,10 @@ call prms%CreateRealOption( 'ImplicitPanelScale', &
                     "Scaling of the first implicit wake panel", '0.3')
 call prms%CreateRealOption( 'ImplicitPanelMinVel', &
                     "Minimum velocity at the trailing edge", '1.0e-8')
+call prms%CreateLogicalOption('rigid_wake','rigid wake?','F')
+call prms%CreateRealArrayOption( 'rigid_wake_vel', "rigid wake velocity" )
 
+! --- regularisation ---
 call prms%CreateRealOption( 'FarFieldRatioDoublet', &
       "Multiplier for far field threshold computation on doublet", '10.0')
 call prms%CreateRealOption( 'FarFieldRatioSource', &
@@ -280,8 +275,21 @@ call prms%CreateRealOption( 'VortexRad', &
 call prms%CreateRealOption( 'CutoffRad', &
       "Radius of complete cutoff  for vortex induction near core", '0.001')
 
-call prms%CreateLogicalOption('rigid_wake','rigid wake?','F')
-call prms%CreateRealArrayOption( 'rigid_wake_vel', "rigid wake velocity" )
+! --- lifting line elements ---
+call prms%CreateLogicalOption('LLReynoldsCorrections', &
+       'Use Reynolds corrections for the .c81 tables?', 'F')
+call prms%CreateRealOption('LLReynoldsCorrectionsNfact', &
+       'Exponent in (Re/Re_T)^n correction', '0.2')
+call prms%CreateIntOption('LLmaxIter', & 
+       'Maximum number of iteration in LL algorithm', '100')
+call prms%CreateRealOption('LLtol', & 
+       'Tolerance for the relative error in fixed point iteration for LL','1.0e-6' )
+call prms%CreateRealOption('LLdamp', &
+       'Damping param in fixed point iteration for LL used to avoid oscillations','5.0')
+call prms%CreateLogicalOption('LLstallRegularisation', & 
+       'Avoid "unphysical" separations in inner sections of LL?','T')
+call prms%CreateIntOption('LLstallRegularisationNelems', &
+       'Number of "unphysical" separations to be removed', '1' )
 
 !== Octree and multipole data == 
 call prms%CreateLogicalOption('FMM','Employ fast multipole method?','T')
@@ -308,9 +316,9 @@ call prms%CreateLogicalOption('ViscosityEffects','Simulate viscosity &
 call prms%CreateLogicalOption('ParticlesRedistribution','Employ particles &
                                                         &redistribution','F')
 
-
 ! get the parameters and print them out
 call printout(nl//'====== Input parameters: ======')
+call check_file_exists(input_file_name,'dust main')
 call prms%read_options(input_file_name, printout_val=.true.)
 !timing
 sim_param%t0 = getreal(prms, 'tstart')
@@ -371,6 +379,15 @@ sim_param%use_vs = getlogical(prms, 'Vortstretch')
 sim_param%use_vd = getlogical(prms, 'Diffusion')
 sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
 sim_param%use_ve = getlogical(prms, 'ViscosityEffects')
+!Lifting line elements
+sim_param%llReynoldsCorrections      = getlogical(prms, 'LLreynoldsCorrections')
+sim_param%llReynoldsCorrectionsNfact = getreal(   prms, 'LLreynoldsCorrectionsNfact')
+sim_param%llMaxIter                  = getint(    prms, 'LLmaxIter'            )
+sim_param%llTol                      = getreal(   prms, 'LLtol'                )
+sim_param%llDamp                     = getreal(   prms, 'LLdamp'               )
+sim_param%llStallRegularisation      = getlogical(prms, 'LLstallRegularisation')
+sim_param%llStallRegularisationNelems= getint(    prms, 'LLstallRegularisationNelems')
+
 !Octree and FMM parameters
 sim_param%use_fmm = getlogical(prms, 'FMM')
 if(sim_param%use_fmm) then
@@ -433,18 +450,11 @@ endif
 
 ! Check that tend .gt. tinit
 if ( sim_param%tend .le. sim_param%t0 ) then
-    write(*,*) nl//' ==== In dust.in ==== '
-    write(*,*) ' restart_simulation : ' , sim_param%restart_from_file
-    write(*,*) ' restart_file : ' , trim(sim_param%restart_file)
-    write(*,*) ' reset_time : ' , sim_param%reset_time
-    write(*,*) ' tend   : ' , sim_param%tend 
-    if ( sim_param%restart_from_file .and. ( .not. sim_param%reset_time ) ) then
-      write(*,*) ' tstart read from restart file : ' , sim_param%t0 
-    else
-      write(*,*) ' tstart read from dust.in file : ' , sim_param%t0 
-    end if
-    call error('dust','','sim_param%tend .le. sim_param%t0. Check your input&
-    & file and restart options. STOP.')
+    write(message,*) 'The end time of the simulation',sim_param%tend,'is&
+                     & lower or equal to the start time',sim_param%t0,'.&
+                     & Remembver that when restarting without resetting the&
+                     & time the start time is taken from the restart result!'
+    call error('dust','',message)
 end if
 
 
@@ -462,6 +472,11 @@ if (sim_param%debug_level .ge. 3) then
   write(message,*) 'Debug basename: ', trim(basename_debug); call printout(message)
 endif
 
+
+!---- Check that the basenames are valid ----
+  call check_basename(trim(sim_param%basename),'dust main')
+  if(sim_param%debug_level.ge.10) &
+    call check_basename(trim(basename_debug),'dust main')
 
 !---- Simulation parameters ----
 nstep = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1 
@@ -492,7 +507,7 @@ if(sim_param%debug_level .ge. 15) &
       call debug_ll_printout_geometry(elems_ll, geo, basename_debug, 0)
 
 !TODO: check whether to move these calls before, and precisely what they do
-call ignoredParameters(prms)
+if(sim_param%debug_level .ge. 7) call ignoredParameters(prms)
 call finalizeParameters(prms)
 
 
@@ -508,6 +523,8 @@ call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
 call initialize_linsys(linsys, geo, elems, elems_expl, &
                        wake, sim_param ) ! sim_param%u_inf)
+call initialize_pressure_sys(linsys, geo, elems)
+
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Initialized linear system in: ' , t1 - t0,' s.'
@@ -541,12 +558,15 @@ if (restart) then
 endif
 
 t22 = dust_time()
-write(message,'(A,F9.3,A)') nl//'------ Completed all preliminary operations &
+if(sim_param%debug_level .ge. 1) then
+  write(message,'(A,F9.3,A)') nl//'------ Completed all preliminary operations &
                              &in: ' , t22 - t00,' s.'
-call printout(message)
+  call printout(message)
+endif
 
 
 !====== Time Cycle ======
+call printout(nl//'////////// Performing Computations //////////')
 time = sim_param%t0
 t_last_out = time; t_last_debug_out = time
 
@@ -557,92 +577,30 @@ allocate(res_old(size(elems))) ; res_old = 0.0_wp
 
 t11 = dust_time()
 do it = 1,nstep
-
-  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
-  ! compute the time derivative of the normal component of the velocity on 
-  !  surfpan to be used in the source rhs of the Bernoulli integral equation.
-  ! surf_vel_SurfPan_old saved at the end of the time step (for surfpan only)
-
-
-  do i_el = 1 , geo%nSurfPan
-
-    select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
-
-      el%dUn_dt = sum( el%nor * ( el%ub - & 
-             surf_vel_SurfPan_old( i_el , : ) ) ) / sim_param%dt
-!            surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) ) / sim_param%dt ! <<< mod-2018-12-21
-
-      ! Compute GradS_Un
-      GradS_Un = 0.0_wp
-      do i_e = 1 , el%n_ver
-        if ( associated(el%neigh(i_e)%p) ) then !  .and. &
-          select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
-            GradS_Un = GradS_Un + &
-              matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g , &
-                el%pot_vel_stencil(:,i_e) * ( &
-                  sum(el%nor* (el_neigh%surf_vel - el%surf_vel) ) ) )
-          end select
-        else
-!         select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
-            GradS_Un = GradS_Un + &
-              matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g , &
-               el%pot_vel_stencil(:,i_e) * ( &
-                  sum(el%nor* ( - 2.0_wp * el%surf_vel) ) ) )
-!         end select
-        end if
-      end do
-!     GradS_Un = GradS_Un - el%nor * sum(el%nor*GradS_Un) ! tangential projection
-
-      ! Compute DivS_U
-      DivS_U = 0.0_wp
-      do i_e = 1 , el%n_ver
-        if ( associated(el%neigh(i_e)%p) ) then !  .and. &
-          select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
-            DivS_U = DivS_U + &
-               sum( &
-                 matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g ,   &
-                                                            el%pot_vel_stencil(:,i_e) ) * &
-                    ( el_neigh%surf_vel - el%surf_vel )   )
-          end select
-        else  
-!         select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
-            DivS_U = DivS_U + &
-              sum( &
-                matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g ,   & 
-                                                           el%pot_vel_stencil(:,i_e) ) * &
-                   ( - 2.0_wp * el%surf_vel ) )
-!         end select
-        end if
-      end do  
-
-      ! Compute "source intensity" of Bernoulli equations
-      el%bernoulli_source = + el%dUn_dt & !    n . DU/Dt 
-         - sum( GradS_Un * ( el%ub ))   & !  - GradS_Un . el%ub 
-         + DivS_U * sum(el%ub*el%nor)     !  + Un * Div_S U
-
-    end select
-  end do
-
-  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
-
+  
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
-                                                 nstep, ' time: ', time
+                                        nstep, ' simulation time: ', time
     call printout(message)
     t22 = dust_time()
-    write(message,'(A,F9.3,A)') 'Elapsed time: ',t22-t00
+    write(message,'(A,F9.3,A)') 'Elapsed wall time: ',t22-t00
     call printout(message)
   endif
 
+  !Calculate the normal velocity derivative for the pressure equation
+  call press_normvel_der(geo, elems, surf_vel_SurfPan_old)
+  
+  !time related checks
   call init_timestep(time)
 
   !call update_geometry(geo, time, .false.)
   !call prepare_wake(wake, geo, sim_param, it)
-
+ 
   call update_liftlin(elems_ll,linsys)
   call update_actdisk(elems_ad,linsys,sim_param)
 
-
+  
+  !debug geometry printing
   if((sim_param%debug_level .ge. 16).and.time_2_debug_out)&
             call debug_printout_geometry(elems, geo, basename_debug, it)
   if((sim_param%debug_level .ge. 16).and.time_2_debug_out)&
@@ -652,38 +610,30 @@ do it = 1,nstep
   !call prepare_wake(wake, geo, sim_param)
   t0 = dust_time()
 
-! call assemble_linsys(linsys, elems, elems_expl,  &     ! old subroutine
-!                      wake, sim_param%u_inf)
   call assemble_linsys(linsys, geo, elems, elems_expl,  &
                        wake, sim_param)
+  call assemble_pressure_sys(linsys, geo, elems, wake)
   t1 = dust_time()
 
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,F9.3,A)') 'Assembled linear system in: ' , t1 - t0,' s.'
     call printout(message)
   endif
-
+  !debug output of the system
   if ((sim_param%debug_level .ge. 50).and.time_2_debug_out) then
     write(frmt,'(I4.4)') it
     call dump_linsys(linsys, trim(basename_debug)//'A_'//trim(frmt)//'.dat', &
                              trim(basename_debug)//'b_'//trim(frmt)//'.dat' )
-    call dump_linsys_pres(linsys, trim(basename_debug)//'Apres_'//trim(frmt)//'.dat', &
-                                  trim(basename_debug)//'bpres_'//trim(frmt)//'.dat', &
-                                  trim(basename_debug)//'Bmatpres_'//trim(frmt)//'.dat' )
+    call dump_linsys_pres(linsys, &
+                         trim(basename_debug)//'Apres_'//trim(frmt)//'.dat', &
+                         trim(basename_debug)//'bpres_'//trim(frmt)//'.dat', &
+                         trim(basename_debug)//'Bmatpres_'//trim(frmt)//'.dat')
   endif
-
-  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
-  !                                                                            !
-  !------ Solve the linsys for Bernoulli polynomial ------                     !
-  ! only for it > 1   <---- TODO: assess the effects of timestepping on loads  !
-  !                                                                            
-
       
-  if ( it .gt. 1 .and. geo%nSurfPan .gt. 0 ) then                                                        !
-    call solve_linsys_pressure(linsys,surfpan_H_IE)                            !
-  end if                                                                       !
-
-  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
+  !------ Solve the pressure system ------
+  if ( it .gt. 1 .and. geo%nSurfPan .gt. 0 ) then
+    call solve_pressure_sys(linsys)
+  end if
 
   !------ Solve the system ------
   t0 = dust_time()
@@ -697,21 +647,21 @@ do it = 1,nstep
     elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
   end do
   res_old = linsys%res
-
+  
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
     call printout(message)
   endif
-
+  
+  !debug print of the results
   if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                       call debug_printout_result(linsys, basename_debug, it)
 
   !------ Update the explicit part ------  % v-----implicit elems: p,v
   if ( size(elems_ll) .gt. 0 ) then
     call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
-            (/ wake%pan_p, wake%rin_p/), wake%vort_p, sim_param, airfoil_data)
+            (/ wake%pan_p, wake%rin_p/), wake%vort_p, sim_param, airfoil_data, it)
   end if
-
 
   !------ Compute loads -------
   ! Implicit elements: vortex rings and 3d-panels
@@ -739,7 +689,7 @@ do it = 1,nstep
       select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
        ! check UHLMAN's EQN -----
        el%pres = &
-        surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp 
+        linsys%res_pres(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp 
 !      el%pres = &
 !       surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp + &
 !          sim_param%rho_inf * sum(el%surf_vel*el%ub)
@@ -757,6 +707,7 @@ do it = 1,nstep
   end if
 
   ! pres_IE +++++
+
 
   !Print the results
   if(time_2_out)  then
@@ -794,10 +745,10 @@ do it = 1,nstep
   call update_geometry(geo, time, .false.)
   call prepare_wake(wake, geo, elems_tot, sim_param)
 
-enddo
 
-! pres_IE +++++
- if(allocated(surfpan_H_IE)) deallocate( surfpan_H_IE )
+enddo
+call printout(nl//'\\\\\\\\\\  Computations Finished \\\\\\\\\\')
+
 
 deallocate( res_old )
 !===== End Time Cycle ======
@@ -814,8 +765,10 @@ call destroy_geometry(geo, elems_tot)
 call destroy_hdf5()
 
 t22 = dust_time()
-write(message,'(A,F9.3,A)') 'Completed all computations in ',t22-t00,' s'
-call printout(message)
+if(sim_param%debug_level .ge. 1) then
+  write(message,'(A,F9.3,A)') 'Completed all computations in ',t22-t00,' s'
+  call printout(message)
+endif
 call printout(nl//'<<<<<< DUST end <<<<<<'//nl)
 
 
@@ -920,53 +873,6 @@ subroutine init_timestep(t)
 
 end subroutine init_timestep
 
-!----------------------------------------------------------------------
-!DISCONTINUED: substituted by the routines in dust_io and dust_post
-!subroutine output_status(elems_tot, geo, wake_panels, basename, it, t)
-! type(t_elem_p),   intent(in) :: elems_tot(:)
-! type(t_geo),      intent(in) :: geo
-! type(t_wake_panels), intent(in) :: wake_panels
-! character(len=*), intent(in) :: basename
-! integer,          intent(in) :: it
-! real(wp), intent(in)         :: t
-!
-! integer, allocatable :: el(:,:), w_el(:,:)
-! real(wp), allocatable :: w_points(:,:), w_res(:)
-! integer :: ie, of, p1, p2
-! character(len=max_char_len) :: sit
-!
-!  allocate(el(4,size(elems_tot))); el = 0
-!  allocate(w_el(4,size(wake_panels%pan_p))); w_el = 0
-!  allocate(w_points(3,(wake_panels%n_wake_points)*(wake_panels%wake_len+1)))
-!  allocate(w_res(size(wake_panels%pan_p)))
-!
-!  !=== VTK output ===
-!  do ie=1,size(elems_tot)
-!    el(1:elems_tot(ie)%p%n_ver,ie) = elems_tot(ie)%p%i_ver
-!  enddo
-!  do ie=1,size(wake_panels%pan_p)
-!    p1 = wake_panels%i_start_points(1,mod(ie-1,wake_panels%n_wake_stripes)+1)
-!    p2 = wake_panels%i_start_points(2,mod(ie-1,wake_panels%n_wake_stripes)+1)
-!    !of = ie-mod(ie,wake_panels%n_wake_stripes-1)
-!    of = wake_panels%n_wake_points*((ie-1)/wake_panels%n_wake_stripes)
-!    w_el(1:4,ie) = (/of+p2, of+p1, of+p1+wake_panels%n_wake_points, &
-!                     of+p2+wake_panels%n_wake_points/)
-!    w_res(ie) = wake_panels%pan_p(ie)%p%idou
-!  enddo
-!  w_points = reshape(wake_panels%w_points(:,:,1:wake_panels%wake_len+1),&
-!    (/3,(wake_panels%n_wake_points)*(wake_panels%wake_len+1)/))
-!  write(sit,'(I4.4)') it
-!  call vtk_out_bin (geo%points, el, (/linsys%res,linsys%res_expl(:,1)/),  &
-!                    w_points, w_el, w_res,  &
-!                    trim(basename)//'_res_'//trim(sit)//'.vtu')
-!  call tec_out_sol_bin(geo%points, el, (/linsys%res,linsys%res_expl(:,1)/),  &
-!                    w_points, w_el, w_res, t,  &
-!                    trim(basename)//'_res_'//trim(sit)//'.plt')
-!
-!
-!  deallocate(el,w_el,w_points,w_res)
-!
-!end subroutine output_status
 
 !------------------------------------------------------------------------------
 
@@ -986,6 +892,7 @@ subroutine debug_printout_result(linsys, basename, it)
   deallocate(res)
 
 end subroutine debug_printout_result
+
 !------------------------------------------------------------------------------
 
 subroutine debug_printout_geometry(elems, geo, basename, it)
@@ -1109,7 +1016,7 @@ subroutine debug_printout_geometry_minimal(elems,geo,basename, it)
   deallocate(norm, cent, el)
 end subroutine debug_printout_geometry_minimal
 
-! ------------------------------------------------------------------------------
+! ---------------------------------------------------------------------
 
 subroutine debug_ll_printout_geometry(elems, geo, basename, it)
  type(t_expl_elem_p),   intent(in) :: elems(:)

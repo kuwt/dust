@@ -38,7 +38,7 @@ use mod_param, only: &
   wp, nl, max_char_len, extended_char_len
 
 use mod_handling, only: &
-  error, warning, info, printout, dust_time, t_realtime
+  error, warning, info, printout, dust_time, t_realtime, check_file_exists
 
 use mod_geometry, only: &
   t_geo, create_geometry, update_geometry, &
@@ -116,6 +116,7 @@ call prms%CreateRealOption('InnerProductTe','Global parameter for edge identific
 
 call prms%CreateStringOption('FileName','Preprocessor output file')
 
+call check_file_exists(input_file_name,'dust preprocessor')
 call prms%read_options(input_file_name, printout_val=.false.)
 
 n_name = countoption(prms,'CompName')

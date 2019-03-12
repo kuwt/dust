@@ -38,7 +38,8 @@ use mod_param, only: &
   wp, nl, max_char_len, extended_char_len , pi
 
 use mod_handling, only: &
-  error, warning, info, printout, dust_time, t_realtime, new_file_unit
+  error, warning, info, printout, dust_time, t_realtime, new_file_unit, &
+  check_basename, check_file_exists
 
 use mod_geometry, only: &
   t_geo, t_geo_component
@@ -192,6 +193,8 @@ call sbprms%CreateIntOption('StepRes', 'Result stride of the analysis')
 call sbprms%CreateLogicalOption('Average', 'Perform time averaging','F')
 call sbprms%CreateLogicalOption('Wake', 'Output also the wake for &
                                 &visualization','T')
+call sbprms%CreateLogicalOption('SeparateWake', 'Output the wake in a separate &
+                                &way','F')
 call sbprms%CreateStringOption('Format','Output format')
 call sbprms%CreateStringOption('Component','Component to analyse', &
                                multiple=.true.)
@@ -239,6 +242,7 @@ call sbprms%CreateRealArrayOption('AxisMom','axis for the computation of the mom
 
 sbprms=>null()
 
+call check_file_exists(input_file_name, 'dust postprocessor')
 call prms%read_options(input_file_name, printout_val=.false.)
 
 basename = getstr(prms,'basename')
@@ -257,6 +261,10 @@ call initialize_vortline(r_Rankine, r_cutoff)
 call initialize_vortpart(r_Vortex, r_cutoff)
 
 n_analyses = countoption(prms,'Analysis')
+
+!Check that the basenames are valid
+call check_basename(trim(basename),'dust postprocessor')
+call check_basename(trim(data_basename),'dust postprocessor')
 
 !Cycle on all the analyses
 do ia = 1,n_analyses

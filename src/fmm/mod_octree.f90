@@ -43,7 +43,7 @@ use mod_math, only: &
   cross
 
 use mod_sim_param, only: &
-  t_sim_param
+  t_sim_param, sim_param
 
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
@@ -367,7 +367,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
   !PROFILE
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Initialized neighbours in: ' , t1 - t0,' s.'
-  call printout(msg)
+  if(sim_param%debug_level.ge.5) call printout(msg)
 
 
 
@@ -431,7 +431,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
   !PROFILE
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Initialized interaction lists in: ' , t1 - t0,' s.'
-  call printout(msg)
+  if(sim_param%debug_level.ge.5) call printout(msg)
 
    
   !pre-build all the kernel derivatives for cell-cell interactions
@@ -488,7 +488,7 @@ subroutine add_layer(octree)
   ll = octree%nlevels
   write(msg,'(A,I0,A)') 'Adding an octree level!! Now there are ',ll,& 
                           ' levels.'
-  call printout(msg)
+  if(sim_param%debug_level.ge.5) call printout(msg)
   
 
   
@@ -861,7 +861,7 @@ subroutine sort_particles(part, n_prt, octree, sim_param)
   !PROFILE
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Sorted particles in: ' , t1 - t0,' s.'
-  call printout(msg)
+  if(sim_param%debug_level.ge.5) call printout(msg)
 end subroutine sort_particles
 
 
@@ -903,7 +903,7 @@ subroutine calculate_multipole(part,octree)
   !PROFILE
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Calculated multipoles in leaves in: ' , t1 - t0,' s.'
-  call printout(msg)
+  if(sim_param%debug_level.ge.5) call printout(msg)
 
 
   !layer by layer (except the last, in which are only leaves or inactive)
@@ -934,7 +934,7 @@ subroutine calculate_multipole(part,octree)
   !PROFILE
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Calculated M2M in: ' , t1 - t0,' s.'
-  call printout(msg)
+  if(sim_param%debug_level.ge.5) call printout(msg)
 
   
   !from the top, interact in the interaction list, then pass to the children
@@ -965,7 +965,7 @@ subroutine calculate_multipole(part,octree)
   !PROFILE
   t1 = dust_time()
   write(msg,'(A,I0,A,F9.3,A)') 'Calculated M2L layer ',l,' in: ' , t1 - t0,' s.'
-  call printout(msg)
+  if(sim_param%debug_level.ge.5) call printout(msg)
 
   !PROFILE
   t0 = dust_time()
@@ -989,14 +989,14 @@ subroutine calculate_multipole(part,octree)
   !PROFILE
   t1 = dust_time()
   write(msg,'(A,I0,A,F9.3,A)') 'Calculated L2L layer ',l,' in: ' , t1 - t0,' s.'
-  call printout(msg)
+  if(sim_param%debug_level.ge.5) call printout(msg)
   enddo !l
   tend = dust_time()
   octree%t_mp = tend-tsta
   !PROFILE
   t11 = dust_time()
   write(msg,'(A,F9.3,A)') 'Calculated Multipole in all layers in: ' , t11 - t00,' s.'
-  call printout(msg)
+  if(sim_param%debug_level.ge.5) call printout(msg)
 
 end subroutine calculate_multipole
 
@@ -1163,7 +1163,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
 !$omp end parallel do
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Calculated leaves interactions in: ' , t1 - t0,' s.'
-  call printout(msg)
+  if(sim_param%debug_level.ge.5) call printout(msg)
   tend = dust_time()
   octree%t_lv = tend-tsta
   if(sim_param%use_dyn_layers) then

@@ -40,14 +40,15 @@ use mod_param, only: &
   wp, max_char_len, nl, prev_tri, next_tri, prev_qua, next_qua
 
 use mod_sim_param, only: &
-  t_sim_param
+  t_sim_param, sim_param
 
 use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption &
   , finalizeparameters
 
 use mod_handling, only: &
-  error, warning, info, printout, dust_time, t_realtime, check_preproc
+  error, warning, info, printout, dust_time, t_realtime, check_preproc, &
+  check_file_exists
 
 use mod_basic_io, only: &
   read_mesh_basic, write_basic
@@ -357,6 +358,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   if (trim(ref_file_name) .eq. 'no_set') then
     ref_file_name = trim(in_file_name)
   endif
+  call check_file_exists(trim(ref_file_name), this_sub_name, this_mod_name)
   call build_references(geo%refs, trim(ref_file_name), sim_param)
 
 ! -----------------------------------------------------------------------------------------
@@ -669,6 +671,7 @@ subroutine load_components(geo, in_file, out_file, sim_param, te)
   rewrite_geo = .true.
   if(trim(in_file).eq.trim(out_file)) rewrite_geo = .false.
 
+  call printout('Reading geometry from file "'//trim(in_file)//'"')
   call open_hdf5_file(trim(in_file),floc)
   call open_hdf5_group(floc,'Components',gloc)
   call read_hdf5(n_comp,'NComponents',gloc)
@@ -1208,6 +1211,28 @@ subroutine import_aero_tab(geo,coeff)
    call read_c81_table( list_tmp(i_a) , coeff(i_a) )
  end do
 
+! ! debug -----
+! write(*,*) nl // ' debug .c81 Reynolds corrections ' // nl
+! do i_a = 1 , n_a
+!   write(*,*) ' file : ' , trim(list_tmp(i_a))
+!   do i_c = 1 , size(coeff(i_a)%aero_coeff) ! 1 , nRe
+!     write(*,*) ' Re : ' , coeff(i_a)%aero_coeff(i_c)%Re
+!     write(*,*) ' Ma , clmax , al0 , al_stall_p , cl_stall_p , al_stall_m , al_stall_p '
+!     do i_l = 1 , size(coeff(i_a)%aero_coeff(i_c)%coeff(1)%par2)
+!       write(*,*) coeff(i_a)%aero_coeff(i_c)%coeff(1)%par2(i_l) , &
+!                  coeff(i_a)%aero_coeff(i_c)%clmax(i_l) , &
+!                  coeff(i_a)%aero_coeff(i_c)%alcl0(i_l) , &
+!                  coeff(i_a)%aero_coeff(i_c)%alstall_pos(i_l) , &
+!                  coeff(i_a)%aero_coeff(i_c)%clstall_pos(i_l) , &
+!                  coeff(i_a)%aero_coeff(i_c)%alstall_neg(i_l) , &
+!                  coeff(i_a)%aero_coeff(i_c)%clstall_neg(i_l)
+!     end do           
+!   end do
+! end do
+! write(*,*) ' stop in mod_geo.f90 l.1225 '
+! stop
+! ! debug -----
+
 end subroutine import_aero_tab
 
 !----------------------------------------------------------------------
@@ -1605,8 +1630,9 @@ subroutine create_strip_connectivity(geo)
                       comp%el(i_el)%ver(:,1) - comp%el(i_el)%ver(:,3) ) * &
                comp%el(i_el)%nor )
 
-     if ( abs( h2 - comp%el(i_el)%dy ) .gt. 1e-4 ) then
-       write(*,*) ' WARNING: non parallel stripe edges (rough check) '
+     if ( abs( h2 - comp%el(i_el)%dy ) .gt. 1e-4 .and. &
+          sim_param%debug_level .ge. 7) then
+       call warning(this_sub_name, this_mod_name, 'non parallel stripe edges (rough check)')
      end if
 
     end do
@@ -1668,7 +1694,7 @@ subroutine update_geometry(geo, t, update_static)
  real(wp), intent(in) :: t
  logical, intent(in) :: update_static
 
- integer :: i_comp, ie
+ integer :: i_comp, ie , ip
 
  !update all the references
  call update_all_references(geo%refs,t)
@@ -1685,6 +1711,7 @@ subroutine update_geometry(geo, t, update_static)
         !comp%el(ie)%ver = move_points(comp%loc_points(:,comp%el(ie)%i_ver), &
         !                   geo%refs(comp%ref_id)%R_g, &
         !                   geo%refs(comp%ref_id)%of_g)
+
         call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
       enddo
 

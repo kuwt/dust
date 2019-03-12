@@ -116,7 +116,10 @@ use MOD_StringTools, only: &
   LowCase!, use_escape_codes!, set_formatting, clear_formatting
 
 use mod_param, only: &
-  wp, max_char_len
+  wp, max_char_len, nl
+
+use mod_sim_param, only: &
+  sim_param
 
 use mod_handling, only: &
   error, warning, info, unit_stdout, printout
@@ -647,7 +650,8 @@ subroutine read_options(this, filename, printout_val)
 
   !call info(this_sub_name, this_mod_name, &
   !                  'Reading parameters from file "'//trim(filename)//'":')
-  call printout('Reading input parameters from file "'//trim(filename)//'"')
+  call printout(nl//nl//'Reading input parameters from file "'//&
+                trim(filename)//'"')
 
   ! Open parameter file for reading
   iniUnit= 100 !getfreeunit()
@@ -693,11 +697,11 @@ subroutine read_options(this, filename, printout_val)
       if (.not.actually_reading%read_option(HelpStr, sub_option, prev_read)) then
         if (firstWarn) then
           firstWarn=.false.
-          write(UNIT_StdOut,'(100("!"))')
-          write(UNIT_StdOut, *) "warning: The following options in file "&
-                                             //trim(filename)//" are unknown!"
+          !=!write(UNIT_StdOut,'(100("!"))')
+          !=!write(UNIT_StdOut, *) "warning: The following options in file "&
+          !=                                //trim(filename)//" are unknown!"
         end if
-        write(UNIT_StdOut,*) "   ", trim(HelpStr)
+        !=!write(UNIT_StdOut,*) "   ", trim(HelpStr)
       end if
 
       if (associated(sub_option)) then
@@ -718,7 +722,7 @@ subroutine read_options(this, filename, printout_val)
 
   end do
   if (.not.firstWarn) then
-    write(UNIT_StdOut,'(100("!"))')
+    !=!write(UNIT_StdOut,'(100("!"))')
   end if
   close(iniUnit)
 
@@ -959,7 +963,7 @@ subroutine IgnoredParameters(prms)
   if (prms_ignored) then
     current => prms%firstLink
     !call set_formatting("bright red")
-    write(UNIT_StdOut,'(100("!"))')
+    write(UNIT_StdOut,'(72("!"))')
     write(UNIT_StdOut,*) "warning: The following parameters were set in the &
     &input file, but are not currently employed :"
     do while (associated(current))
@@ -968,7 +972,7 @@ subroutine IgnoredParameters(prms)
       end if
       current => current%next
     end do
-    write(UNIT_StdOut,'(100("!"))')
+    write(UNIT_StdOut,'(72("!"))')
     !call clear_formatting()
   endif
 end subroutine IgnoredParameters

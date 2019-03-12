@@ -46,7 +46,7 @@ use mod_hdf5_io, only: &
 
 implicit none
 
-public :: t_sim_param
+public :: t_sim_param, sim_param
 
 private
 
@@ -118,6 +118,22 @@ type t_sim_param
   !> simulate viscosity effects or not
   logical :: use_ve
 
+  !Lifting Lines
+  !> Reynolds corrections of .c81 tables
+  logical  :: llReynoldsCorrections
+  !> n factor for Reynolds corrections of .c81 tables: (Re/Re_T)^n
+  real(wp) :: llReynoldsCorrectionsNfact
+  !> Maximum number of iteration in LL algorithm
+  integer  :: llMaxIter
+  !> Tolerance for the relative error in fixed point iteration for LL
+  real(wp) :: llTol
+  !> Damping param in fixed point iteration for LL used to avoid oscillations
+  real(wp) :: llDamp
+  !> Avoid "unphysical" separations in inner sections of LL? :: llTol
+  logical  :: llStallRegularisation
+  !> Number of "unphysical" separations thata can be removed 
+  integer  :: llStallRegularisationNelems
+
   !FMM parameters
   !> Employing the FMM method
   logical :: use_fmm
@@ -166,6 +182,8 @@ contains
   procedure, pass(this) :: save_param => save_sim_param
 
 end type t_sim_param
+
+type(t_sim_param) :: sim_param
 
 !----------------------------------------------------------------------
 contains

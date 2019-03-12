@@ -41,7 +41,7 @@ use mod_param, only: &
   wp, max_char_len, nl, pi
 
 use mod_handling, only: &
-  error, warning, info, printout, new_file_unit
+  error, warning, info, printout, new_file_unit, check_file_exists
 
 use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption
@@ -54,6 +54,7 @@ public :: read_mesh_ll
 
 private
 
+character(len=max_char_len) :: msg
 character(len=*), parameter :: this_mod_name = 'mod_parametric_io'
 
 !----------------------------------------------------------------------
@@ -108,7 +109,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
  character(len=*), parameter :: this_sub_name = 'read_mesh_parametric'
 
- 
+
   !Prepare all the parameters to be read in the file
   ! Global parameters
   call pmesh_prs%CreateStringOption('ElType', &
@@ -147,7 +148,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
                 multiple=.true.);
   call pmesh_prs%CreateRealOption(     'twist', 'section twist angle',&
                 multiple=.true.);
-  call pmesh_prs%CreateStringOption( 'airfoil', 'section airfoil',&
+  call pmesh_prs%CreateStringOption( 'airfoil_table', 'section airfoil',&
                 multiple=.true.);
 
   ! Region parameters
@@ -174,24 +175,41 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   nSections = countoption(pmesh_prs,'chord')
   nRegions  = countoption(pmesh_prs,'span')
 
-  !DEBUG
-  write(*,*) ' nSections : ' , nSections
-  write(*,*) ' nRegions  : ' , nRegions 
+  write(msg,*) nl,'  Number of sections: ',nSections; call printout(msg)
+  write(msg,*) ' Number of regions:  ',nRegions; call printout(msg)
   
   ! Check that nSections = nRegion + 1
   if ( nSections .ne. nRegions + 1 ) then
-    call error(this_sub_name, this_mod_name, 'Unconsistent input: &
-         &nSections .ne. nRegions. Stop.')
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         &number of sections different from number of regions + 1.')
   end if 
 
   ref_chord_fraction = getreal(pmesh_prs,'reference_chord_fraction')
   ref_point          = getrealarray(pmesh_prs,'starting_point',3)
+
+  !Check the number of inputs
+  if(countoption(pmesh_prs,'nelem_span') .ne. nRegions ) &
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         &number of "nelem_span" different from number of regions.')
+  if(countoption(pmesh_prs,'dihed') .ne. nRegions ) &
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         &number of "dihed" different from number of regions.')
+  if(countoption(pmesh_prs,'sweep') .ne. nRegions ) &
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         &number of "sweep" different from number of regions.')
+  if(countoption(pmesh_prs,'twist') .ne. nSections ) &
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         &number of "twist" different from number of sections.')
+  if(countoption(pmesh_prs,'airfoil_table') .ne. nSections ) &
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         &number of "airfoil_table" different from number of sections.')
 
   ! Get total number of elements and initialize arrays
   allocate(nelem_span_list(nRegions));   nelem_span_list = 0
   allocate(      span_list(nRegions));         span_list = 0.0_wp
   allocate(     sweep_list(nRegions));        sweep_list = 0.0_wp
   allocate(     dihed_list(nRegions));        dihed_list = 0.0_wp
+
   nelem_span_tot = 0
   do iRegion = 1,nRegions
     nelem_span_list(iRegion) = getint(pmesh_prs,'nelem_span')
@@ -216,19 +234,24 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
    write(*,*) ' mesh_file   : ' , trim(mesh_file)
    write(*,*) ' n_type_span : ' , n_type_span
    write(*,*) ' nRegions    : ' , nRegions    
-   call error(this_sub_name, this_mod_name, 'Unconsistent input: &
-         &n_type_span .ne. nRegions. Stop.')
+   call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         &number of type_span different from number of regions.')
   end if
 
-  allocate(chord_list  (nSections))  ; chord_list = 0.0d0
-  allocate(twist_list  (nSections))  ; twist_list = 0.0d0
+  allocate(chord_list  (nSections))  ; chord_list = 0.0_wp
+  allocate(twist_list  (nSections))  ; twist_list = 0.0_wp
   allocate(airfoil_list(nSections)) 
 
   do iSection= 1,nSections
     chord_list(iSection)   = getreal(pmesh_prs,'chord')
     twist_list(iSection)   = getreal(pmesh_prs,'twist')
-    airfoil_list(iSection) = getstr(pmesh_prs,'airfoil')
+    airfoil_list(iSection) = getstr(pmesh_prs,'airfoil_table')
   enddo
+
+  ! set the te 0.75*chord far from the ll
+  do iSection= 1,nSections
+    chord_list(iSection)   = chord_list(iSection) * 0.75_wp 
+  end do 
 
 
   npoint_chord_tot = nelem_chord_tot + 1
@@ -278,10 +301,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   ich = 1
 
   do iRegion = 1,nRegions
-  
-! check ----
-    write(*,*) ' Region ' , iRegion , ' / ' , nRegions
-! check ----
  
     if ( iRegion .gt. 1 ) then  ! first section = last section of the previous region 
       rrSection1 = rrSection2
@@ -364,7 +383,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
       else
         write(*,*) ' mesh_file   : ' , trim(mesh_file)
         write(*,*) ' type_span_list(',iRegion,') : ' , trim(type_span_list(iRegion)) 
-        call error(this_sub_name, this_mod_name, 'Unconsistent input: &
+        call error(this_sub_name, this_mod_name, 'Inconsistent input: &
               & type_span must be equal to uniform, cosine, cosineIB, cosineOB.')
       end if 
 
@@ -387,7 +406,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     end do
   
   end do
-
 
 ! === new-2019-02-06 ===
 ! Save the fields related to the definition of actual airfoils
@@ -414,6 +432,8 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     if ( trim(airfoil_list(i)) .ne. 'interp' ) then
       iAirfoil = iAirfoil + 1
       airfoil_list_actual(iAirfoil) = trim(airfoil_list(i))
+      call check_file_exists(airfoil_list_actual(iAirfoil), this_sub_name, &
+           this_mod_name)
     end if
   end do
 
@@ -430,11 +450,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
     iend = sum(nelem_span_list(1:i_aero2-1))
 
-! ! debug ----
-!     write(*,*) ' i_aero1 , i_aero2 : ' , i_aero1 , i_aero2
-!     write(*,*) ' iAirfoil , iAirfoil+1 : ' , iAirfoil , iAirfoil+1
-!     write(*,*) ' ista , iend : ' , ista , iend
-! ! debug ----
     do iSpan = ista , iend 
       i_airfoil_e(1, iSpan) = iAirfoil 
       i_airfoil_e(2, iSpan) = iAirfoil+1 
@@ -451,14 +466,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
   end do
 
-! ! debug -----
-!   write(*,*)
-!   do i = 1 , size(i_airfoil_e,2)
-!     write(*,*) ' i, i_airfoil_e(:,i) , normalised_coord_e(:,i) : ' , &
-!                  i, i_airfoil_e(:,i) , normalised_coord_e(:,i)
-!   end do
-!   write(*,*)
-! ! debug -----
 ! === new-2019-02-06 ===
 
 
