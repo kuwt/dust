@@ -35,24 +35,28 @@
 
 !> Module to treat the most simple input-output from ascii formatted data
 !! files
+!!
+!! BUG: older versions of cgns expose a method called "error" and so dust
+!! error cannot be employed.
 module mod_cgns_io
 
 use mod_param, only: &
   wp, max_char_len, nl
 
 use mod_handling, only: &
-  error, warning, info, printout, new_file_unit
+  !error, 
+  warning, info, printout, new_file_unit, dust_abort
 
 use mod_stringtools, only: &
   IsInList, StripSpaces
 
-! use cgns
+use cgns
 
 !----------------------------------------------------------------------
 
 implicit none
 
-include 'cgnslib_f.h'
+!include 'cgnslib_f.h'
 
 public :: read_mesh_cgns
 
@@ -126,8 +130,10 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
   if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
   if (nbase /= 1) then
     write(*,'(A,I2)') ' Number of bases in the cgns file: ', nbase
-    call error(this_sub_name, this_mod_name,'More than one base in the &
-      &CGNS file, not supported')
+    !call error(this_sub_name, this_mod_name,'More than one base in the &
+    !  &CGNS file, not supported')
+    write(*,'(A)') 'More than one base in the CGNS file, not supported' 
+    call dust_abort()
   end if
   ibase = 1
 
@@ -148,8 +154,10 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
 
   if ( nzone .ne. 1 ) then 
     write(*,'(A,I2)') ' Number of zones in the cgns base: ', nzone
-    call error(this_sub_name, this_mod_name,'More than one zon in the &
-      &CGNS file, not supported')
+    !call error(this_sub_name, this_mod_name,'More than one zon in the &
+    !  &CGNS file, not supported')
+    write(*,'(A)') 'More than one zone in the CGNS file, not supported'
+    call dust_abort()
   end if
 
   do izone = 1,nzone
@@ -169,8 +177,10 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
     call CG_ZONE_TYPE_F(INDEX_FILE, ibase, izone, id, ier)
     if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
     if ( id /= unstructured ) then
-      call error(this_sub_name, this_mod_name,'No unstructured grid was &
-        &found in the CGNS file')
+      !call error(this_sub_name, this_mod_name,'No unstructured grid was &
+      !  &found in the CGNS file')
+      write(*,'(A)') 'No unstructured grid was found in the CGNS file'
+      call dust_abort()
     end if
 
     nNodes = isize(1)
