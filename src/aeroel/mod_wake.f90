@@ -293,14 +293,13 @@ contains
 
 !> Initialize the panel wake
 subroutine initialize_wake(wake, geo, te,  npan, nrings, &
-                           nparts, part_box_min, part_box_max, sim_param)
+                           nparts, sim_param)
  type(t_wake), intent(out),target :: wake
  type(t_geo), intent(in), target :: geo
  type(t_tedge), intent(in) :: te
  integer, intent(in) :: npan
  integer, intent(in) :: nrings
  integer, intent(in) :: nparts
- real(wp), intent(in) :: part_box_min(3), part_box_max(3)
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: iw, ip, nsides
@@ -496,8 +495,8 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, &
   do ip = 1,wake%nmax_prt
     wake%wake_parts(ip)%mag => wake%prt_ivort(ip)
   enddo
-  wake%part_box_min = part_box_min
-  wake%part_box_max = part_box_max
+  wake%part_box_min = sim_param%particles_box_min
+  wake%part_box_max = sim_param%particles_box_max
 
   allocate(wake%vort_p(0))
   allocate(wake%last_pan_idou(wake%n_pan_stripes))

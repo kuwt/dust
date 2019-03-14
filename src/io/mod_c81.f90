@@ -222,14 +222,6 @@ subroutine read_c81_table ( filen , coeff )
         ( coeff%aero_coeff(iRe)%coeff(1)%par1(i1+1) - coeff%aero_coeff(iRe)%coeff(1)%par1(i1-1) )
     end do
 
-!   ! check ----
-!   write(*,*) ' airfoil , Re ' , trim(filen) , coeff%aero_coeff(iRe)%Re
-!   do i1 = 1 , cl1
-!     write(*,*) coeff%aero_coeff(iRe)%dclda(i1,:)
-!   end do
-!   write(*,*)
-!   ! check ----
-
     ! === Parameters for corrections for Reynolds number effects ===
     ! Find clmax, alcl0, cdmin for each (Re,M) 
     allocate(coeff%aero_coeff(iRe)%clmax(cl2)) ; coeff%aero_coeff(iRe)%clmax = -333.0_wp
@@ -247,7 +239,6 @@ subroutine read_c81_table ( filen , coeff )
 
       ! --- al(cl=0) ---
       do iAl = 1 , cl1
-        ! write(*,*) coeff%aero_coeff(iRe)%coeff(1)%par1(iAl) , alMin , alMax 
         if ( ( coeff%aero_coeff(iRe)%coeff(1)%par1(iAl) .ge. alMin ) .and. &
              ( coeff%aero_coeff(iRe)%coeff(1)%par1(iAl) .lt. alMax ) ) then
           if ( coeff%aero_coeff(iRe)%coeff(1)%cf(iAl  ,iMa) * & 
@@ -274,9 +265,6 @@ subroutine read_c81_table ( filen , coeff )
       ! positive stall
       stall_found = 0
       ! ---
-      write(*,*) ' cl1 : ' , cl1
-      write(*,*) ' shape(coeff%aero_coeff(',iRe,')%coeff(1)%cf) : ' , &
-                   shape(coeff%aero_coeff(  iRe  )%coeff(1)%cf)
       do while ( ( istallp+1 .lt. cl1 ) .and. &
                  ( coeff%aero_coeff(iRe)%coeff(1)%cf(istallp+1,iMa) .gt. & 
                    coeff%aero_coeff(iRe)%coeff(1)%cf(istallp  ,iMa) ) .and. &
@@ -596,9 +584,6 @@ subroutine interp2d_aero_coeff ( aero_coeff , x , c )
 
    n1 = size(aero_coeff(ic)%par1)
    n2 = size(aero_coeff(ic)%par2)
-
-!  ! DEBUG
-!  write(*,*) ' n1 , n2 : ' , n1 , n2
 
    if ( size(aero_coeff(ic)%cf,1) .ne. n1 ) then
      write(*,*) ' Error in interp2d. '

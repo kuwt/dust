@@ -522,12 +522,25 @@ call finalizeParameters(prms)
 
 
 !------ Initialization ------
+
+if(sim_param%use_fmm) then
+  call printout(nl//'====== Initializing Octree ======')
+  t0 = dust_time()
+  call initialize_octree(sim_param%BoxLength, sim_param%NBox, &
+                         sim_param%OctreeOrigin, sim_param%NOctreeLevels, &
+                         sim_param%MinOctreePart, sim_param%MultipoleDegree, &
+                         sim_param%RankineRad, octree)
+  t1 = dust_time()
+  if(sim_param%debug_level .ge. 1) then
+    write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
+    call printout(message)
+  endif
+endif
+
 call printout(nl//'====== Initializing Wake ======')
 
 call initialize_wake(wake, geo, te, sim_param%n_wake_panels, &
-       sim_param%n_wake_panels, sim_param%n_wake_particles, &
-       sim_param%particles_box_min, &
-       sim_param%particles_box_max,  sim_param)
+       sim_param%n_wake_panels, sim_param%n_wake_particles, sim_param)
 
 call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
@@ -539,20 +552,6 @@ t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Initialized linear system in: ' , t1 - t0,' s.'
   call printout(message)
-endif
-
-if(sim_param%use_fmm) then
-  call printout(nl//'====== Initializing Octree ======')
-  t0 = dust_time()
-  call initialize_octree(sim_param%BoxLength, sim_param%NBox, &
-                         sim_param%OctreeOrigin, sim_param%NOctreeLevels, &
-                         sim_param%MinOctreePart, sim_param%MultipoleDegree, &
-                         sim_param%RankineRad, sim_param, octree)
-  t1 = dust_time()
-  if(sim_param%debug_level .ge. 1) then
-    write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
-    call printout(message)
-  endif
 endif
 
 ! Restart --------------

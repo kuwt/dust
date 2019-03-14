@@ -228,7 +228,7 @@ contains
 
 !> Initialize the octree
 subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
-                             degree, delta, sim_param, octree)
+                             degree, delta, octree)
  real(wp), intent(in) :: box_length
  integer,  intent(in) :: nbox(3)
  real(wp), intent(in) :: origin(3)
@@ -236,7 +236,6 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
  integer,  intent(in) :: min_part
  integer,  intent(in) :: degree
  real(wp), intent(in) :: delta
- type(t_sim_param), intent(in) :: sim_param
  type(t_octree), intent(out), target :: octree
 
  type(t_cell_p) :: inter_list(208) !all the possible interactions
@@ -244,12 +243,23 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
  integer :: imax, jmax, kmax
  integer :: p, child
  integer :: indx(3)
+ character(len=*), parameter :: this_sub_name = 'initialize_octree'
 
   octree%xmin = origin
   octree%xmax = origin + real(nbox,wp)*box_length
   octree%nbox = nbox
   octree%nlevels = nlevels
   octree%delta = delta
+  
+  !Check the particles bounding
+  if (any(octree%xmax-sim_param%particles_box_max .lt. 0.0_wp) .or. &
+      any(sim_param%particles_box_min-octree%xmin .lt. 0.0_wp)) then
+    where(sim_param%particles_box_max .gt. octree%xmax) &
+          sim_param%particles_box_max  =   octree%xmax
+    where(sim_param%particles_box_min .lt. octree%xmin) &
+          sim_param%particles_box_min  =   octree%xmin
+    call warning(this_sub_name, this_mod_name, 'Particles box bigger than octree box, particles box resized to the octree box')
+  endif
 
   call set_multipole_param(sim_param%use_vs)
 
