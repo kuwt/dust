@@ -1,10 +1,21 @@
-!!=====================================================================
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
+!..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
+!...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
+!....\/\\\......\/\\\.\/\\\......\/\\\.....\///\\...........\/\\\......
+!.....\/\\\......\/\\\.\/\\\......\/\\\.......\///\\\........\/\\\......
+!......\/\\\....../\\\..\//\\\...../\\\../\\\....\//\\\.......\/\\\......
+!.......\/\\\\\\\\\\\/....\///\\\\\\\\/..\///\\\\\\\\\/........\/\\\......
+!........\///////////........\////////......\/////////..........\///.......
+!!=========================================================================
 !!
-!! Copyright (C) 2018 Politecnico di Milano
+!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!!                         Matteo   Tugnoli, 
+!!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!!
+!! 
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -13,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!!
+!! 
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!!
+!! 
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -25,12 +36,12 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!!
-!! Authors:
-!!          Federico Fonte             <federico.fonte@polimi.it>
-!!          Davide Montagnani       <davide.montagnani@polimi.it>
-!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
-!!=====================================================================
+!! 
+!! Authors: 
+!!          Federico Fonte             <federico.fonte@outlook.com>
+!!          Davide Montagnani       <davide.montagnani@gmail.com>
+!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!=========================================================================
 
 
 !> Module to treat the whole wake
@@ -282,14 +293,13 @@ contains
 
 !> Initialize the panel wake
 subroutine initialize_wake(wake, geo, te,  npan, nrings, &
-                           nparts, part_box_min, part_box_max, sim_param)
+                           nparts, sim_param)
  type(t_wake), intent(out),target :: wake
  type(t_geo), intent(in), target :: geo
  type(t_tedge), intent(in) :: te
  integer, intent(in) :: npan
  integer, intent(in) :: nrings
  integer, intent(in) :: nparts
- real(wp), intent(in) :: part_box_min(3), part_box_max(3)
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: iw, ip, nsides
@@ -485,8 +495,8 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, &
   do ip = 1,wake%nmax_prt
     wake%wake_parts(ip)%mag => wake%prt_ivort(ip)
   enddo
-  wake%part_box_min = part_box_min
-  wake%part_box_max = part_box_max
+  wake%part_box_min = sim_param%particles_box_min
+  wake%part_box_max = sim_param%particles_box_max
 
   allocate(wake%vort_p(0))
   allocate(wake%last_pan_idou(wake%n_pan_stripes))

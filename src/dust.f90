@@ -1,10 +1,21 @@
-!!=====================================================================
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
+!..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
+!...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
+!....\/\\\......\/\\\.\/\\\......\/\\\.....\///\\...........\/\\\......
+!.....\/\\\......\/\\\.\/\\\......\/\\\.......\///\\\........\/\\\......
+!......\/\\\....../\\\..\//\\\...../\\\../\\\....\//\\\.......\/\\\......
+!.......\/\\\\\\\\\\\/....\///\\\\\\\\/..\///\\\\\\\\\/........\/\\\......
+!........\///////////........\////////......\/////////..........\///.......
+!!=========================================================================
 !!
-!! Copyright (C) 2018 Politecnico di Milano
+!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!!                         Matteo   Tugnoli, 
+!!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!!
+!! 
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -13,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!!
+!! 
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!!
+!! 
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -25,15 +36,14 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!!
-!! Authors:
-!!          Federico Fonte             <federico.fonte@polimi.it>
-!!          Davide Montagnani       <davide.montagnani@polimi.it>
-!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
-!!=====================================================================
+!! 
+!! Authors: 
+!!          Federico Fonte             <federico.fonte@outlook.com>
+!!          Davide Montagnani       <davide.montagnani@gmail.com>
+!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!=========================================================================
 
-!> This is a more structured version of the test code to build a sort of
-!! architecture proof
+!> This is the main file of the DUST solver
 
 program dust
 
@@ -512,12 +522,25 @@ call finalizeParameters(prms)
 
 
 !------ Initialization ------
+
+if(sim_param%use_fmm) then
+  call printout(nl//'====== Initializing Octree ======')
+  t0 = dust_time()
+  call initialize_octree(sim_param%BoxLength, sim_param%NBox, &
+                         sim_param%OctreeOrigin, sim_param%NOctreeLevels, &
+                         sim_param%MinOctreePart, sim_param%MultipoleDegree, &
+                         sim_param%RankineRad, octree)
+  t1 = dust_time()
+  if(sim_param%debug_level .ge. 1) then
+    write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
+    call printout(message)
+  endif
+endif
+
 call printout(nl//'====== Initializing Wake ======')
 
 call initialize_wake(wake, geo, te, sim_param%n_wake_panels, &
-       sim_param%n_wake_panels, sim_param%n_wake_particles, &
-       sim_param%particles_box_min, &
-       sim_param%particles_box_max,  sim_param)
+       sim_param%n_wake_panels, sim_param%n_wake_particles, sim_param)
 
 call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
@@ -529,20 +552,6 @@ t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Initialized linear system in: ' , t1 - t0,' s.'
   call printout(message)
-endif
-
-if(sim_param%use_fmm) then
-  call printout(nl//'====== Initializing Octree ======')
-  t0 = dust_time()
-  call initialize_octree(sim_param%BoxLength, sim_param%NBox, &
-                         sim_param%OctreeOrigin, sim_param%NOctreeLevels, &
-                         sim_param%MinOctreePart, sim_param%MultipoleDegree, &
-                         sim_param%RankineRad, sim_param, octree)
-  t1 = dust_time()
-  if(sim_param%debug_level .ge. 1) then
-    write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
-    call printout(message)
-  endif
 endif
 
 ! Restart --------------
