@@ -635,8 +635,7 @@ do it = 1,nstep
                              trim(basename_debug)//'b_'//trim(frmt)//'.dat' )
     call dump_linsys_pres(linsys, &
                          trim(basename_debug)//'Apres_'//trim(frmt)//'.dat', &
-                         trim(basename_debug)//'bpres_'//trim(frmt)//'.dat', &
-                         trim(basename_debug)//'Bmatpres_'//trim(frmt)//'.dat')
+                         trim(basename_debug)//'bpres_'//trim(frmt)//'.dat')
   endif
       
   !------ Solve the pressure system ------

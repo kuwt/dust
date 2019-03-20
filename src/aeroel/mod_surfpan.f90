@@ -408,10 +408,6 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
                linsys%b_pres( ipres ) + &
                b1* el%bernoulli_source 
 
-      ! for DEBUG only ( TO BE DELETED )
-!     write(*,*) ' ipres , j1 , linsys%idSurfPanG2L(j1) ' , ipres , j1 , linsys%idSurfPanG2L(j1)  
-      linsys%b_matrix_pres_debug( ipres , linsys%idSurfPanG2L(j1) ) = b1
-
     end select
 
 

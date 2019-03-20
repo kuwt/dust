@@ -95,9 +95,6 @@ type :: t_linsys
  ! OSS -> b_static_pres = b_static(1:idSurfPan_static , 1:idSurfPan_static )
  ! OSS    with idSurfPan_static = idSurfPan(1:nstatic_SurfPan)
 
- !> for DEBUG only ( TO BE DELETED )
- real(wp), allocatable :: b_matrix_pres_debug(:,:) 
-
  !> Static part of the lifting line contribution
  !!
  !! The contribution of the lifting line is similar to wake contribution,

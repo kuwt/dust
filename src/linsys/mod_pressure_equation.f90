@@ -111,8 +111,6 @@ subroutine  initialize_pressure_sys(linsys, geo, elems)
   linsys%b_pres = 0.0_wp
   allocate( linsys%res_pres(geo%nSurfPan) )
   linsys%res_pres = 0.0_wp
-  allocate( linsys%b_matrix_pres_debug(geo%nSurfPan,geo%nSurfPan) )
-  linsys%b_matrix_pres_debug = 0.0_wp
   allocate( linsys%b_static_pres(geo%nstatic_SurfPan,geo%nstatic_SurfPan) ) 
   linsys%b_static_pres = linsys%b_static( & 
          geo%idSurfPan(1:geo%nstatic_SurfPan), &
@@ -387,10 +385,9 @@ end subroutine press_normvel_der
 !> Dump the matrix and rhs of the pressure linear system to file
 !!
 !! TODO: consider moving these functionalities to the i/o modules
-subroutine dump_linsys_pres(linsys , filen_A , filen_b , filen_b_debug )
+subroutine dump_linsys_pres(linsys , filen_A , filen_b )
  type(t_linsys), intent(in) :: linsys
  character(len=*) , intent(in) :: filen_A , filen_b
- character(len=*) , optional , intent(in) :: filen_b_debug
 
  integer :: fid
  integer :: i1 
@@ -409,15 +406,6 @@ subroutine dump_linsys_pres(linsys , filen_A , filen_b , filen_b_debug )
   write(fid,*) linsys%b_pres(i1)
  end do
  close(fid)
-
- if ( present( filen_b_debug ) ) then
-   fid = 24
-   open(unit=fid, file=trim(adjustl(filen_b_debug)) )
-   do i1 = 1 , size(linsys%b_matrix_pres_debug,1)
-    write(fid,*) linsys%b_matrix_pres_debug(i1,:)
-   end do
-   close(fid)
- end if
 
 end subroutine dump_linsys_pres
 
