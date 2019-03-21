@@ -331,6 +331,9 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
  real(wp) , allocatable :: re_v(:) , ma_v(:)
 
  real(wp) , allocatable :: vel_ctr(:,:)
+ real(wp) , allocatable :: chord_v(:) , cl_v(:)
+ real(wp) , allocatable :: el_csi_cen_v(:)
+ integer  , allocatable :: el_i_airfoil_m(:,:) 
 ! debug ----
 
 ! newton ---
@@ -425,6 +428,13 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   allocate(re_v( size(elems_ll)  )) ;  re_v = 0.0_wp
   allocate(ma_v( size(elems_ll)  )) ;  ma_v = 0.0_wp
 
+  ! debug ----
+  allocate(chord_v( size(elems_ll)  )) ; chord_v = 0.0_wp
+  allocate(   cl_v( size(elems_ll)  )) ;    cl_v = 0.0_wp
+  allocate(el_i_airfoil_m( size(elems_ll),2)) ; el_i_airfoil_m = 0.0_wp
+  allocate(el_csi_cen_v  ( size(elems_ll)  )) ; el_csi_cen_v   = 0.0_wp
+  ! debug ----
+
   ! Remove the "out-of-plane" component of the relative velocity:
   ! 2d-velocity to enter the airfoil look-up-tables
   do i_l=1,size(elems_ll)
@@ -452,9 +462,19 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       ! compute velocity
       vel = 0.0_wp
       do j = 1,size(elems_ll)
+! ! debug ----
+!         write(*,'(A,4(F12.4))') ' elems(j)%mag , elems(l)%cen ' , &
+!                      elems_ll(j)%p%mag , elems_ll(i_l)%p%cen
+! ! debug ----
         call elems_ll(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
         vel = vel + v
+! ! debug ----
+!         write(*,'(A,3(F12.4))') '        v : ' , v
+! ! debug ----
       enddo
+! ! debug ----
+!       write(*,*) '      vel : ' , vel 
+! ! debug ----
 
       select type(el => elems_ll(i_l)%p)
       type is(t_liftlin)
@@ -483,6 +503,11 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
         reynolds = sim_param%rho_inf * unorm * & 
                    el%chord / sim_param%mu_inf    
 
+        ! debug ----
+        el_i_airfoil_m(i_l,:) = el%i_airfoil
+        el_csi_cen_v(  i_l  ) = el%csi_cen
+        ! debug ----
+
         ! read the aero coeff from .c81 tables
         call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil , &
                                    (/alpha, mach, reynolds/) , sim_param , &
@@ -508,6 +533,11 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
         ! Compute the "equivalent" intensity of the vortex line 
         dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
         diff = max(diff,abs(elems_ll(i_l)%p%mag-dou_temp(i_l)))
+
+        ! debug ----
+        chord_v(i_l) = el%chord 
+        cl_v(i_l) = cl
+        ! debug ----
 
       end select
 
@@ -551,10 +581,23 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
     ! Update ll intensity
     do i_l = 1,size(elems_ll)
+!     ! debug ----
+!     write(*,*) elems_ll(i_l)%p%mag
+!     ! debug ----
       elems_ll(i_l)%p%mag = ( dou_temp(i_l)+ fp_damp*elems_ll(i_l)%p%mag )&
                              /(1.0_wp+fp_damp)
       max_mag_ll = max(max_mag_ll,abs(elems_ll(i_l)%p%mag))
     enddo
+
+!   ! debug ----
+!   write(*,*) ' Iter n.' , ic 
+!   write(*,'(A)') ' i_l  ,   u_v  ,   a_v  ,  chord ,   cl  , dou_temp : ' 
+!   do i_l = 1,size(elems_ll)
+!      write(*,'(I4.4,5(F10.4),2(I4.2),F10.4)') &
+!          i_l , u_v(i_l) , a_v(i_l) , chord_v(i_l) , cl_v(i_l) , dou_temp(i_l) , &
+!          el_i_airfoil_m(i_l,:) , el_csi_cen_v(i_l)
+!   end do
+!   ! debug ----
 
     if ( diff/max_mag_ll .le. fp_tol ) exit
 
@@ -579,6 +622,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     !   ( here, cen of the elem = cen of the liftlin (for liftlin elems) )
     el%dmom = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
                    el%chord * el%area * c_m(i_l,3)
+
+
    end select
   end do
 
@@ -813,9 +858,9 @@ subroutine calc_geo_data_liftlin(this, vert)
   this%ver = vert
   nsides = this%n_ver
 
-  ! correct here and at the end of the subroutine
-  this%ver(:,3) = this%ver(:,3) + ( this%ver(:,3) - this%ver(:,2) ) / 3.0_wp
-  this%ver(:,4) = this%ver(:,4) + ( this%ver(:,4) - this%ver(:,1) ) / 3.0_wp
+! ! correct here and at the end of the subroutine
+! this%ver(:,3) = this%ver(:,3) + ( this%ver(:,3) - this%ver(:,2) ) / 3.0_wp
+! this%ver(:,4) = this%ver(:,4) + ( this%ver(:,4) - this%ver(:,1) ) / 3.0_wp
 
 
   ! center, for the lifting line is the mid-point
@@ -828,7 +873,7 @@ subroutine calc_geo_data_liftlin(this, vert)
   nor = cross( this%ver(:,3) - this%ver(:,1) , &
                this%ver(:,4) - this%ver(:,2)     )
 
-  this%area = 0.5_wp * norm2(nor)
+  this%area = 0.5_wp * norm2(nor) * 4.0_wp/3.0_wp
   this%nor = nor / norm2(nor)   ! then overwritten
 
   ! *** 2019-02-27 ***
@@ -870,12 +915,13 @@ subroutine calc_geo_data_liftlin(this, vert)
   this%nor = this%nor / norm2(this%nor)
 
   ! *** 2019-02-27 ***
-  ! ...before 2019-02-27 at the beginning of the routin
+  ! ...before 2019-02-27 at the beginning of the routine
   ! local tangent unit vector as in PANAIR
   tanl = 0.5_wp * ( this%ver(:,nsides) + this%ver(:,1) ) - this%cen
 
-  this%tang(:,1) = tanl / norm2(tanl)
-  this%tang(:,2) = cross( this%nor, this%tang(:,1)  )
+  ! they should not be used, but ...
+  this%tang(:,1) = tanl / norm2(tanl)                   ! this%tang_cen    ! 
+  this%tang(:,2) = cross( this%nor, this%tang(:,1)  )   ! this%bnorm_cen   ! 
   ! *** 2019-02-27 ***
 
   !TODO: is it necessary to initialize it here?
@@ -892,9 +938,9 @@ subroutine calc_geo_data_liftlin(this, vert)
 ! write(*,*)
 ! ! debug ----
 
-  ! correct here and at the beginning of the subroutine
-  this%ver(:,3) = this%ver(:,3) - ( this%ver(:,3) - this%ver(:,2) ) / 4.0_wp
-  this%ver(:,4) = this%ver(:,4) - ( this%ver(:,4) - this%ver(:,1) ) / 4.0_wp
+! ! correct here and at the beginning of the subroutine
+! this%ver(:,3) = this%ver(:,3) - ( this%ver(:,3) - this%ver(:,2) ) / 4.0_wp
+! this%ver(:,4) = this%ver(:,4) - ( this%ver(:,4) - this%ver(:,1) ) / 4.0_wp
 
 end subroutine calc_geo_data_liftlin
 !----------------------------------------------------------------------

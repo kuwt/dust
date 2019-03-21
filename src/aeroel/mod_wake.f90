@@ -1622,7 +1622,7 @@ subroutine avoid_collision(elems, wake, part, sim_param, vel)
  
   !tolerance for the minimum wall distance 
   ! ( now, HARDCODED. TODO: read as an input: same order of dimension of the blob radius )
-  tol = 0.005_wp
+  tol = 0.025_wp
 
   r2d2 = sqrt(2.0_wp)/2.0_wp
   

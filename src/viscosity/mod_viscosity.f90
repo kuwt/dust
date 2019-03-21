@@ -106,7 +106,7 @@ subroutine viscosity_effects( geo , elems , te , sim_param )
  integer :: i_e , ie_te , ne_te
  integer :: ie1 , ie2
 
- real(wp) , parameter :: c = 1.136_wp
+ real(wp) , parameter :: c = 1.136_wp   ! Ojima-Kamemoto(2000)
  real(wp) :: c2_2
 
  real(wp) :: OmV(3) , OmV_free(3) , OmV_bound(3)
@@ -114,9 +114,9 @@ subroutine viscosity_effects( geo , elems , te , sim_param )
  real(wp) :: edge_te(3)
 
  ! preliminary "fixed" parameters
- real(wp) , parameter :: h = 0.100_wp           
- !real(wp) , parameter :: tol_velSep = 0.5_wp   
- real(wp) , parameter :: tol_velSep = 0.0_wp   
+ real(wp) , parameter :: h = 0.025_wp          ! h = 0.100_wp           
+ real(wp) , parameter :: tol_velSep = 0.0_wp  ! 0.00_wp for the cylinder ! 0.10_wp , 0.05_wp for the airfoil  ! 0.5_wp 
+ real(wp) , parameter :: vc_ratio   = 0.50_wp  ! 1.00_wp for the cylinder ! 0.50_wp for the airfoil
 
 ! airfoil ------------------
 !   h = 0.025_wp   ! 0.05_wp   ! 0.1_wp   ! 0.025_wp

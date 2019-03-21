@@ -433,6 +433,11 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call symmetry_update_ll_lists( nelem_span_list , &
                        theta_p , chord_p , i_airfoil_e , normalised_coord_e )
       end if
+      if ( mesh_mirror ) then
+        call mirror_update_ll_lists( nelem_span_list , &
+                       theta_p , chord_p , i_airfoil_e , normalised_coord_e )
+      end if
+
       ! -------------------------------------------------------------------
 
       call write_hdf5(airfoil_list   ,'airfoil_list'   ,geo_loc)
@@ -499,9 +504,10 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call mirror_mesh_structured(ee, rr,  &
                                        npoints_chord_tot , nelems_span , &
                                        mirror_point, mirror_normal)
+
       case default
-       call error(this_sub_name, this_mod_name,&
-             'Symmetry routines not implemented for this kind of input.')
+        call error(this_sub_name, this_mod_name,&
+              'Mirror routines not implemented for this kind of input.')
     end select
 
   end if
@@ -918,6 +924,7 @@ subroutine mirror_mesh_structured( ee, rr, &
     rr_temp(:,ip) = rr_temp(:,ip) - 2*d*n
   enddo
 
+! ---
   ! sort ee array  
   nelems_chord = npoints_chord_tot-1
   allocate(ee_sort(size(ee_temp,1),size(ee_temp,2)) ) ; ee_sort = 0
@@ -925,6 +932,7 @@ subroutine mirror_mesh_structured( ee, rr, &
     ee_sort(:,1+(i1-1)*nelems_chord:i1*nelems_chord) = &
        ee_temp(:,ne-i1*nelems_chord+1:ne-(i1-1)*nelems_chord)
   end do
+! ---
 
 ! !move alloc back to the original vectors
   call move_alloc(rr_temp, rr)
@@ -1673,19 +1681,15 @@ subroutine symmetry_update_ll_lists ( nelem_span_list , &
  real(wp), allocatable :: theta_p_tmp(:) , chord_p_tmp(:)
 
  integer :: nelem_span_section
- integer :: nelem
+ integer :: nelems
  integer :: npts   ! nelem + 1 
 
  integer :: i , siz
 
  ! Update dimensions ----------
- nelem = sum(nelem_span_list) 
- npts  = nelem + 1 
+ nelems = size(i_airfoil_e,2) * 2
+ npts  = nelems + 1 
  nelem_span_section = size(nelem_span_list) * 2 
-! === old-2019-02-06 === !
-! nelem = size(i_airfoil_e,2) * 2 
-! npts  = size(i_airfoil_e,2) * 2 + 1 
-! === old-2019-02-06 === !
 
  ! Fill temporary arrays ------
  allocate(nelem_span_list_tmp( nelem_span_section ))
@@ -1695,20 +1699,14 @@ subroutine symmetry_update_ll_lists ( nelem_span_list , &
    nelem_span_list_tmp( siz-i+1 ) = nelem_span_list(i)
  end do 
 
-! === old-2019-02-06 === !
-! allocate(i_airfoil_e_tmp( 2, nelem ))
-! === old-2019-02-06 === !
- allocate(i_airfoil_e_tmp( 2, 2*size(i_airfoil_e,2) ))
+ allocate(i_airfoil_e_tmp( 2, nelems ))
  siz = size(i_airfoil_e,2)
  do i = 1 , siz
    i_airfoil_e_tmp( 1:2 , siz+i   ) = i_airfoil_e( 1:2    , i )
    i_airfoil_e_tmp( 1:2 , siz-i+1 ) = i_airfoil_e( 2:1:-1 , i )
  end do
 
-! === old-2019-02-06 === !
-! allocate(normalised_coord_e_tmp( 2, nelem ))
-! === old-2019-02-06 === !
- allocate(normalised_coord_e_tmp( 2, 2*size(normalised_coord_e,2) ))
+ allocate(normalised_coord_e_tmp( 2, nelems ))
  siz = size(normalised_coord_e,2)
  do i = 1 , siz
    normalised_coord_e_tmp( 1:2 , siz+i   ) = normalised_coord_e( 1:2    , i )
@@ -1732,6 +1730,77 @@ subroutine symmetry_update_ll_lists ( nelem_span_list , &
  call move_alloc(            chord_p_tmp ,             chord_p )
 
 end subroutine symmetry_update_ll_lists 
+
+!----------------------------------------------------------------------
+
+!> Updates lifting lines fields in case of mirroring
+subroutine mirror_update_ll_lists ( nelem_span_list , &
+                 theta_p , chord_p , i_airfoil_e , normalised_coord_e )
+
+ integer , allocatable , intent(inout) :: nelem_span_list(:)
+ integer , allocatable , intent(inout) :: i_airfoil_e(:,:)
+ real(wp), allocatable , intent(inout) :: normalised_coord_e(:,:)
+ real(wp), allocatable , intent(inout) :: theta_p(:) , chord_p(:)
+
+ integer , allocatable :: nelem_span_list_tmp(:)
+ integer , allocatable :: i_airfoil_e_tmp(:,:)
+ real(wp), allocatable :: normalised_coord_e_tmp(:,:)
+ real(wp), allocatable :: theta_p_tmp(:) , chord_p_tmp(:)
+
+ integer :: nelem_span_section
+ integer :: nelem
+ integer :: npts   ! nelem + 1 
+
+ integer :: i , siz
+
+ ! Update dimensions ----------
+ nelem = sum(nelem_span_list) 
+ npts  = nelem + 1 
+ nelem_span_section = size(nelem_span_list)
+! === old-2019-02-06 === !
+! nelem = size(i_airfoil_e,2) * 2 
+! npts  = size(i_airfoil_e,2) * 2 + 1 
+! === old-2019-02-06 === !
+
+ ! Fill temporary arrays ------
+ allocate(nelem_span_list_tmp( nelem_span_section ))
+ siz = size(nelem_span_list)
+ do i = 1 , siz 
+   nelem_span_list_tmp( siz-i+1 ) = nelem_span_list(i)
+ end do 
+
+! === old-2019-02-06 === !
+! allocate(i_airfoil_e_tmp( 2, nelem ))
+! === old-2019-02-06 === !
+ allocate(i_airfoil_e_tmp( 2, size(i_airfoil_e,2) ))
+ siz = size(i_airfoil_e,2) 
+ do i = 1 , siz
+   i_airfoil_e_tmp( 1:2 , siz-i+1 ) = i_airfoil_e( 2:1:-1 , i )
+ end do
+! === old-2019-02-06 === !
+! allocate(normalised_coord_e_tmp( 2, nelem ))
+! === old-2019-02-06 === !
+ allocate(normalised_coord_e_tmp( 2, size(normalised_coord_e,2) ))
+ do i = 1 , siz
+   normalised_coord_e_tmp( 1:2 , siz-i+1 ) = 1.0_wp - normalised_coord_e( 2:1:-1 , i )
+ end do
+
+ allocate(theta_p_tmp( npts ))
+ allocate(chord_p_tmp( npts ))
+ siz = size(theta_p)
+ theta_p_tmp( siz ) = theta_p(1) ; chord_p_tmp( siz ) = chord_p(1)
+ do i = 2 , siz
+   theta_p_tmp( siz-i+1 ) = theta_p( i ) ; chord_p_tmp( siz-i+1 ) = chord_p( i )
+ end do
+
+ ! Move_alloc to the original arrays -------------------------
+ call move_alloc(    nelem_span_list_tmp ,     nelem_span_list ) 
+ call move_alloc(        i_airfoil_e_tmp ,         i_airfoil_e )
+ call move_alloc( normalised_coord_e_tmp ,  normalised_coord_e )
+ call move_alloc(            theta_p_tmp ,             theta_p )
+ call move_alloc(            chord_p_tmp ,             chord_p )
+
+end subroutine mirror_update_ll_lists 
 
 !----------------------------------------------------------------------
 
