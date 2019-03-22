@@ -94,6 +94,7 @@ contains
 
 !> Initialize the linear system of the pressure
 !!
+!! DISCONTINUED: operations performed inside initialize linsys
 subroutine  initialize_pressure_sys(linsys, geo, elems)
  type(t_linsys), intent(inout), target :: linsys
  type(t_geo), intent(in) :: geo
@@ -268,81 +269,73 @@ end subroutine assemble_pressure_sys
 
 !> Solve the linear system for the pressure
 !!
-!! At the moment the linear system is solved directly by means of a call to 
-!! a standard lapack solver.
+!! The linear system for the pressure with a similar procedure to the one
+!! used for the main linear system: the stored LU static decomposition is
+!! completed by the decomposition of the dynamic part and the factorized
+!! system is solved
 subroutine solve_pressure_sys(linsys)
  type(t_linsys), intent(inout) :: linsys
 
- real(wp) , allocatable :: A_tmp(:,:)
- integer, allocatable :: IPIV(:)
  integer              :: INFO
- integer              :: ARNK
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name = 'solve_linsys_pressure'
- real(t_realtime) :: t1 , t0
 
-
+  ! Operations on the side band matrices: done only if the system is
+  ! mixed static/dynamic and those matrices exists
   if (linsys%nstatic_sp .gt. 0 .and. linsys%nmoving_sp .gt.0) then
-  t0 = dust_time()
-  !=>Create the upper-diagonal block Usd
-  !Swap in place Asd to get PssAsd
-  call dlaswp(linsys%nmoving_sp, &
-         linsys%A_pres(1:linsys%nstatic_sp,linsys%nstatic_sp+1:linsys%n_sp), &
-         linsys%nstatic_sp,1,linsys%nstatic_sp, &
-         linsys%P_pres(1:linsys%nstatic_sp),1)
 
-  !Solve Lss Usd = Pss Asd to get Usd and put it in place of Asd
-  call dtrsm('L','L','N','U',linsys%nstatic_sp,linsys%nmoving_sp,1.0d+0,   &
-         linsys%A_pres(1:linsys%nstatic_sp,1:linsys%nstatic_sp), &
-         linsys%nstatic_sp, &
-         linsys%A_pres(1:linsys%nstatic_sp,linsys%nstatic_sp+1:linsys%n_sp),&
-         linsys%nstatic_sp)
-  
-  !==>Solve the lower-diagoal block Lds
-  !Solve Pdd-1 Lds Uss = Ads for Pdd-1 Lds and put it in place of Ads
-  call dtrsm('R','U','N','N',linsys%nmoving_sp,linsys%nstatic_sp,1.0d+0,   &
-         linsys%A_pres(1:linsys%nstatic_sp,1:linsys%nstatic_sp), &
-         linsys%nstatic_sp,  &
-         linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%nstatic_sp),&
-         linsys%nmoving_sp)
-  t1 = dust_time()
-  write(msg,'(A,F9.3,A)') 'Pres Linsys preliminars in: ' , t1 - t0,' s.'
-  call printout(msg)
+    !=>Create the upper-diagonal block Usd
+    !Swap in place Asd to get PssAsd
+    call dlaswp(linsys%nmoving_sp, &
+          linsys%A_pres(1:linsys%nstatic_sp,linsys%nstatic_sp+1:linsys%n_sp),&
+          linsys%nstatic_sp,1,linsys%nstatic_sp, &
+          linsys%P_pres(1:linsys%nstatic_sp),1)
 
-  !==>Factorize the dynamic square block
-  t0 = dust_time()
-  !Modify the square block from Add to Add - Pdd-1Lds Usd
-  call dgemm('N','N',linsys%nmoving_sp,linsys%nmoving_sp,linsys%nstatic_sp, &
-         -1.0d+0, &
-         linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%nstatic_sp), &
-         linsys%nmoving_sp,&
-         linsys%A_pres(1:linsys%nstatic_sp,linsys%nstatic_sp+1:linsys%n_sp), &
-         linsys%nstatic_sp,1.0d+0,&
-         linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,linsys%nstatic_sp+1:linsys%n_sp),&
-         linsys%nmoving_sp)
-   
-  t1 = dust_time()
-  write(msg,'(A,F9.3,A)') 'Pres Matmul in: ' , t1 - t0,' s.'
-  call printout(msg)
+    !Solve Lss Usd = Pss Asd to get Usd and put it in place of Asd
+    call dtrsm('L','L','N','U',linsys%nstatic_sp,linsys%nmoving_sp,1.0d+0,   &
+          linsys%A_pres(1:linsys%nstatic_sp,1:linsys%nstatic_sp), &
+          linsys%nstatic_sp, &
+          linsys%A_pres(1:linsys%nstatic_sp,linsys%nstatic_sp+1:linsys%n_sp),&
+          linsys%nstatic_sp)
+    
+    !==>Solve the lower-diagoal block Lds
+    !Solve Pdd-1 Lds Uss = Ads for Pdd-1 Lds and put it in place of Ads
+    call dtrsm('R','U','N','N',linsys%nmoving_sp,linsys%nstatic_sp,1.0d+0,   &
+          linsys%A_pres(1:linsys%nstatic_sp,1:linsys%nstatic_sp), &
+          linsys%nstatic_sp,  &
+          linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%nstatic_sp),&
+           linsys%nmoving_sp)
 
+    !==>Modify the dynamic square block
+    !Modify the square block from Add to Add - Pdd-1Lds Usd
+    call dgemm('N','N',linsys%nmoving_sp,linsys%nmoving_sp,linsys%nstatic_sp, &
+          -1.0d+0, &
+          linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%nstatic_sp),&
+          linsys%nmoving_sp,&
+          linsys%A_pres(1:linsys%nstatic_sp,linsys%nstatic_sp+1:linsys%n_sp),&
+          linsys%nstatic_sp,1.0d+0,&
+          linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,linsys%nstatic_sp+1:linsys%n_sp),&
+          linsys%nmoving_sp)
+     
   endif
+
+  ! If the system has a dynamic part, factorize such part
   if (linsys%nmoving_sp .gt. 0) then
-  !Factorize and put in place the square dynamic bloc
-  t0 = dust_time()
-  call dgetrf(linsys%nmoving_sp,linsys%nmoving_sp, &
-         linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,linsys%nstatic_sp+1:linsys%n_sp), &
-         linsys%nmoving_sp,linsys%P_pres(linsys%nstatic_sp+1:linsys%n_sp),info)
-  if ( info .ne. 0 ) then
-    write(msg,*) 'error while factorizing the dynamic  block of &
-                 &the pressure linear system, Lapack DGETRF error code ', info
-    call error(this_sub_name, this_mod_name, trim(msg))
-  end if
-  t1 = dust_time()
-  write(msg,'(A,F9.3,A)') 'Factorization in: ' , t1 - t0,' s.'
-  call printout(msg)
+  
+    !==>Factorize and put in place the square dynamic block
+    call dgetrf(linsys%nmoving_sp,linsys%nmoving_sp, &
+          linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,linsys%nstatic_sp+1:linsys%n_sp), &
+          linsys%nmoving_sp,linsys%P_pres(linsys%nstatic_sp+1:linsys%n_sp),info)
+    if ( info .ne. 0 ) then
+      write(msg,*) 'error while factorizing the dynamic  block of the &
+                    pressure linear system, Lapack DGETRF error code ', info
+      call error(this_sub_name, this_mod_name, trim(msg))
+    end if
+
   endif
  
-  if (linsys%nstatic_sp .gt. 0) then
+  ! If the system is mixed finish the operation on the band blocks
+  if (linsys%nstatic .gt. 0 .and. linsys%nmoving .gt.0) then
   !==> Permute the lower mixed bloc
   call dlaswp(linsys%nstatic_sp, &
          linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%nstatic_sp), &
@@ -355,7 +348,6 @@ subroutine solve_pressure_sys(linsys)
   linsys%P_pres(linsys%nstatic_sp+1:linsys%n_sp) + linsys%nstatic_sp
 
   !==> Solve the factorized system
-  t0 = dust_time()
   linsys%res_pres = linsys%b_pres
   call dgetrs('N',linsys%n_sp,1,linsys%A_pres,linsys%n_sp,linsys%P_pres, &
          linsys%res_pres, linsys%n_sp,info)
@@ -364,40 +356,6 @@ subroutine solve_pressure_sys(linsys)
       &Lapack DGETRS error code ', info
     call error(this_sub_name, this_mod_name, trim(msg))
   end if
-  t1 = dust_time()
-  write(msg,'(A,F9.3,A)') 'Pressure Solution in: ' , t1 - t0,' s.'
-  call printout(msg)
-
-
-
-
-
-
-
-
-  !ARNK = size(linsys%A_pres,1)
-  !if ( size(linsys%A_pres,2) .ne. ARNK ) then
-  !  write(msg,*) ' matrix of the pressure integral equation A_pres is not square'
-  !  call error(this_sub_name, this_mod_name, trim(msg))
-  !end if
-
-  !allocate(A_tmp(ARNK,ARNK) ) ; A_tmp = linsys%A_pres
-  !allocate(IPIV(ARNK))
-
-  !linsys%res_pres = linsys%b_pres 
-
-  !!call system_clock(count1,count_rate1,count_max1)
-  !call dgesv(ARNK,1,A_tmp,ARNK,IPIV, &
-  !           linsys%res_pres ,ARNK,INFO) 
-  !!call system_clock(count2,count_rate2,count_max2)
-
-  !if ( INFO .ne. 0 ) then
-  !  write(msg,*) 'error while solving linear system, Lapack DGESV error code ',&
-  !                INFO
-  !  call error(this_sub_name, this_mod_name, trim(msg))
-  !end if
-
-  !deallocate(A_tmp,IPIV) 
 
 end subroutine solve_pressure_sys
 
