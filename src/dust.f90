@@ -546,7 +546,7 @@ call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
 call initialize_linsys(linsys, geo, elems, elems_expl, &
                        wake, sim_param ) ! sim_param%u_inf)
-call initialize_pressure_sys(linsys, geo, elems)
+!call initialize_pressure_sys(linsys, geo, elems)
 
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then

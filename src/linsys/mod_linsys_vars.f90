@@ -84,6 +84,7 @@ type :: t_linsys
 
  !> LU solvers pivot permutation matrix (in vector form)
  integer, allocatable :: P(:)
+ integer, allocatable :: P_pres(:)
  
  !> Static part of the right hand side
  !!
@@ -123,8 +124,8 @@ type :: t_linsys
  !> Number of static and moving panels
  integer :: nstatic, nmoving
 
- !> Number of static and moving lifting lines
- !integer :: nstatic_ll, nmoving_ll, n_ll
+ !> Number of static and moving surface panels
+ integer :: nstatic_sp, nmoving_sp, n_sp
 
  !> Number of static and moving actuator disks
  !integer :: nstatic_ad, nmoving_ad, n_ad

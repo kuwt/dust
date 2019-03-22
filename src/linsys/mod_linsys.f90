@@ -122,7 +122,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
  integer :: ie, ntot, info
 
  character(len=max_char_len) :: msg
- character(len=*), parameter :: this_sub_name = 'solve_linsys'
+ character(len=*), parameter :: this_sub_name = 'initialize_linsys'
  
 
   ! Free-stream conditions
@@ -154,7 +154,27 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
   allocate( linsys%res_expl(linsys%n_expl,2))
   linsys%b_static = 0.0_wp
   linsys%res_expl = 0.0_wp
+ 
 
+  !! == Pressure
+  !Set the number of surface panels
+  linsys%n_sp = geo%nSurfPan
+  linsys%nstatic_sp = geo%nstatic_SurfPan
+  linsys%nmoving_sp = geo%nSurfPan - geo%nstatic_SurfPan
+  !Allocate matrix and rhs for pressure integral equation
+  allocate( linsys%idSurfPan(geo%nSurfPan) )
+  linsys%idSurfPan    = geo%idSurfPan
+  allocate( linsys%idSurfPanG2L(geo%nSurfPan) )
+  linsys%idSurfPanG2L = geo%idSurfPanG2L
+  allocate( linsys%A_pres(geo%nSurfPan,geo%nSurfPan) )
+  linsys%A_pres = 0.0_wp
+  allocate( linsys%b_pres(geo%nSurfPan) )
+  linsys%b_pres = 0.0_wp
+  allocate( linsys%P_pres(linsys%n_sp) )
+  allocate( linsys%res_pres(geo%nSurfPan) )
+  linsys%res_pres = 0.0_wp
+  allocate( linsys%b_static_pres(geo%nstatic_SurfPan,geo%nstatic_SurfPan) ) 
+  
 
   !Build the static part of the system, saving also the static part of the 
   ! rhs
@@ -163,7 +183,14 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
     !build one row
     call elems(ie)%p%build_row_static(elems, expl_elems, linsys, &
                                       uinf, ie, 1, linsys%nstatic)
-
+  enddo
+  
+  !! == Pressure
+  !copy the matrix before it gets corrected for the wake contribution
+  linsys%A_pres = linsys%A( geo%idSurfPan , geo%idSurfPan )
+  
+  ! add the wake contribution
+  do ie = 1,linsys%nstatic
     !call elems(ie)%p%add_wake((/wake_elems%pan_p, wake_rings%pan_p/), &
     !                wake_elems%gen_elems_id, linsys,uinf,ie,1,linsys%nstatic)
     call elems(ie)%p%add_wake((/wake%pan_p, wake%rin_p/), &
@@ -188,15 +215,39 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
     expl_elems(ie)%p%mag => linsys%res_expl(ie,1) 
   enddo
 
+  !! == Pressure
+  linsys%b_static_pres = linsys%b_static( & 
+         geo%idSurfPan(1:geo%nstatic_SurfPan), &
+         geo%idSurfPan(1:geo%nstatic_SurfPan) )
+  do ie = 1 , geo%nSurfpan
+    select type( el => elems(geo%idSurfPan(ie))%p ) ; class is(t_surfpan)
+      el%pres_sol => linsys%res_pres(ie) 
+    end select
+  end do
+
   !Now perform a one-time LU decomposition of the static part of the system
-  call dgetrf(linsys%nstatic,linsys%nstatic, &
-         linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic, &
-         linsys%P(1:linsys%nstatic),info)
-  if ( info .ne. 0 ) then
-    write(msg,*) 'error while factorizing the static part of the linear &
-                  &system, Lapack DGETRF error code ', info
-    call error(this_sub_name, this_mod_name, trim(msg))
-  end if
+  if (linsys%nstatic .gt. 0)  then
+   call dgetrf(linsys%nstatic,linsys%nstatic, &
+           linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic, &
+           linsys%P(1:linsys%nstatic),info)
+    if ( info .ne. 0 ) then
+      write(msg,*) 'error while factorizing the static part of the linear &
+                    &system, Lapack DGETRF error code ', info
+      call error(this_sub_name, this_mod_name, trim(msg))
+    end if
+  endif
+
+  !! == Pressure
+  if (linsys%nstatic_sp .gt. 0)  then
+   call dgetrf(linsys%nstatic_sp,linsys%nstatic_sp, &
+           linsys%A_pres(1:linsys%nstatic_sp,1:linsys%nstatic_sp), &
+           linsys%nstatic_sp, linsys%P_pres(1:linsys%nstatic_sp),info)
+    if ( info .ne. 0 ) then
+      write(msg,*) 'error while factorizing the static part of the linear &
+                    &system for pressure, Lapack DGETRF error code ', info
+      call error(this_sub_name, this_mod_name, trim(msg))
+    end if
+  endif
 
 
 end subroutine initialize_linsys
@@ -236,7 +287,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
 
  nst = linsys%nstatic
  ntot = linsys%rank
- !calculate the vortex induced velocity
+ !!1) calculate the vortex induced velocity
  !$omp parallel do private(ie) schedule(dynamic,2)
  do ie =1,linsys%rank
 
@@ -247,18 +298,13 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
  enddo
  !$omp end parallel do
 
+  !!2) Generate the matrix without the wake correction
   !First all the static ones (passing as start and end only the dynamic part)
 !$omp parallel private(ie) firstprivate(nst, ntot)
 !$omp do schedule(dynamic)
   do ie = 1,nst
 
     call elems(ie)%p%build_row(elems,linsys,uinf,ie,nst+1,ntot)
-
-    !call elems(ie)%p%add_wake((/wake_elems%pan_p, wake_rings%pan_p/), wake_elems%gen_elems_id, linsys,uinf,ie,nst+1,ntot)
-    call elems(ie)%p%add_wake((/wake%pan_p, wake%rin_p/), wake%pan_gen_elems_id, linsys,uinf,ie,nst+1,ntot)
-
-    call elems(ie)%p%add_expl(expl_elems, linsys,uinf,ie,linsys%nstatic_expl+1,linsys%n_expl)
-
 
   enddo
 !$omp end do nowait
@@ -269,7 +315,35 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
 
     call elems(ie)%p%build_row(elems,linsys,uinf,ie,1,ntot)
 
-    !call elems(ie)%p%add_wake((/wake_elems%pan_p, wake_rings%pan_p/), wake_elems%gen_elems_id, linsys,uinf,ie,1,ntot)
+  enddo
+!$omp end do
+!$omp end parallel
+
+  !!3) Copy the non modified dynamic part of the matrix into the pressure one
+  linsys%A_pres(1:linsys%nstatic_sp,linsys%nstatic_sp+1:linsys%n_sp) = & 
+    linsys%A( geo%idSurfPan(1:linsys%nstatic_sp) , &
+              geo%idSurfPan(linsys%nstatic_sp+1:linsys%n_sp) )
+  linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%n_sp) = &
+    linsys%A( geo%idSurfPan(linsys%nstatic_sp+1:linsys%n_sp) , &
+              geo%idSurfPan(1:linsys%n_sp) )
+   
+   !!4) Correct the matrix with the wake contributions
+  !First all the static ones (passing as start and end only the dynamic part)
+!$omp parallel private(ie) firstprivate(nst, ntot)
+!$omp do schedule(dynamic)
+  do ie = 1,nst
+
+    call elems(ie)%p%add_wake((/wake%pan_p, wake%rin_p/), wake%pan_gen_elems_id, linsys,uinf,ie,nst+1,ntot)
+
+    call elems(ie)%p%add_expl(expl_elems, linsys,uinf,ie,linsys%nstatic_expl+1,linsys%n_expl)
+
+  enddo
+!$omp end do nowait
+
+  !Then all the dynamic ones (passing as start and end the whole system)
+!$omp do
+  do ie = nst+1,ntot
+
     call elems(ie)%p%add_wake((/wake%pan_p, wake%rin_p/), wake%pan_gen_elems_id, linsys,uinf,ie,1,ntot)
 
     call elems(ie)%p%add_expl(expl_elems, linsys,uinf,ie,1,linsys%n_expl)
@@ -294,15 +368,11 @@ subroutine solve_linsys(linsys)
  integer              :: INFO   
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name = 'solve_linsys'
-real(t_realtime) :: t1 , t0
- !TODO: cleanup output vars and calls
- !real(KIND=8) :: elapsed_time ! time_ini , time_fin
- !integer :: count1 , count_rate1 , count_max1 
- !integer :: count2 , count_rate2 , count_max2 
+ real(t_realtime) :: t1 , t0
 
   !allocate(A_tmp(size(linsys%A,1),size(linsys%A,2)) ) ; A_tmp = linsys%A
   !allocate(IPIV(linsys%rank))
-
+  if (linsys%nstatic .gt. 0 .and. linsys%nmoving .gt.0) then
   t0 = dust_time()
   !=>Create the upper-diagonal block Usd
   !Swap in place Asd to get PssAsd
@@ -317,11 +387,6 @@ real(t_realtime) :: t1 , t0
          linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank),    &
          linsys%nstatic)
   write(*,*) 'Lower diagonal system done'
-  !if ( info .ne. 0 ) then
-  !  write(msg,*) 'error while solving the upper diagonal mixed block of &
-  !               &the linear system, Lapack DTRSM error code ', info
-  !  call error(this_sub_name, this_mod_name, trim(msg))
-  !end if
   
   !==>Solve the lower-diagoal block Lds
   !Solve Pdd-1 Lds Uss = Ads for Pdd-1 Lds and put it in place of Ads
@@ -330,11 +395,6 @@ real(t_realtime) :: t1 , t0
          linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic),    &
          linsys%nmoving)
   write(*,*) 'Upper diagonal system done'
-  !if ( info .ne. 0 ) then
-  !  write(msg,*) 'error while solving the lower diagonal mixed block of &
-  !               &the linear system, Lapack DTRSM error code ', info
-  !  call error(this_sub_name, this_mod_name, trim(msg))
-  !end if
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Linsys preliminars in: ' , t1 - t0,' s.'
   call printout(msg)
@@ -357,6 +417,9 @@ real(t_realtime) :: t1 , t0
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Matmul in: ' , t1 - t0,' s.'
   call printout(msg)
+
+  endif
+  if (linsys%nmoving .gt. 0) then
   !Factorize and put in place the square dynamic bloc
   t0 = dust_time()
   call dgetrf(linsys%nmoving,linsys%nmoving, &
@@ -371,13 +434,16 @@ real(t_realtime) :: t1 , t0
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Factorization in: ' , t1 - t0,' s.'
   call printout(msg)
+  endif
  
+  if (linsys%nstatic .gt. 0) then
   !==> Permute the lower mixed bloc
   call dlaswp(linsys%nstatic, &
          linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic), &
          linsys%nmoving,1,linsys%nmoving,&
          linsys%P(linsys%nstatic+1:linsys%rank),1)
   write(*,*) 'Last swap done'
+  endif
 
   !==> Fix the lower part of the permutation matrix to make it global
   !write(*,*) 'nstatic, rank',linsys%nstatic, linsys%rank
