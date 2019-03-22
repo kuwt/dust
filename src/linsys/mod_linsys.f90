@@ -294,6 +294,7 @@ subroutine solve_linsys(linsys)
  integer              :: INFO   
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name = 'solve_linsys'
+real(t_realtime) :: t1 , t0
  !TODO: cleanup output vars and calls
  !real(KIND=8) :: elapsed_time ! time_ini , time_fin
  !integer :: count1 , count_rate1 , count_max1 
@@ -302,6 +303,7 @@ subroutine solve_linsys(linsys)
   !allocate(A_tmp(size(linsys%A,1),size(linsys%A,2)) ) ; A_tmp = linsys%A
   !allocate(IPIV(linsys%rank))
 
+  t0 = dust_time()
   !=>Create the upper-diagonal block Usd
   !Swap in place Asd to get PssAsd
   call dlaswp(linsys%nmoving, &
@@ -333,14 +335,30 @@ subroutine solve_linsys(linsys)
   !               &the linear system, Lapack DTRSM error code ', info
   !  call error(this_sub_name, this_mod_name, trim(msg))
   !end if
+  t1 = dust_time()
+  write(msg,'(A,F9.3,A)') 'Linsys preliminars in: ' , t1 - t0,' s.'
+  call printout(msg)
 
   !==>Factorize the dynamic square block
+  t0 = dust_time()
   !Modify the square block from Add to Add - Pdd-1Lds Usd
-  linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank) = &
-  linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank) - &
-  matmul(linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic), &
-         linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank))
+  !linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank) = &
+  !linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank) - &
+  !matmul(linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic), &
+  !       linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank))
+  call dgemm('N','N',linsys%nmoving,linsys%nmoving,linsys%nstatic,-1.0d+0, &
+         linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic), &
+         linsys%nmoving,&
+         linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
+         linsys%nstatic,1.0d+0,&
+         linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank),&
+         linsys%nmoving)
+   
+  t1 = dust_time()
+  write(msg,'(A,F9.3,A)') 'Matmul in: ' , t1 - t0,' s.'
+  call printout(msg)
   !Factorize and put in place the square dynamic bloc
+  t0 = dust_time()
   call dgetrf(linsys%nmoving,linsys%nmoving, &
          linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank), &
          linsys%nmoving,linsys%P(linsys%nstatic+1:linsys%rank),info)
@@ -350,6 +368,9 @@ subroutine solve_linsys(linsys)
     call error(this_sub_name, this_mod_name, trim(msg))
   end if
   write(*,*) 'Lower factorization done'
+  t1 = dust_time()
+  write(msg,'(A,F9.3,A)') 'Factorization in: ' , t1 - t0,' s.'
+  call printout(msg)
  
   !==> Permute the lower mixed bloc
   call dlaswp(linsys%nstatic, &
@@ -370,6 +391,7 @@ subroutine solve_linsys(linsys)
   !write(*,*) 'P AFTER END'
 
   !==> Solve the factorized system
+  t0 = dust_time()
   linsys%res = linsys%b
   call dgetrs('N',linsys%rank,1,linsys%A,linsys%rank,linsys%P,linsys%res, &
          linsys%rank,info)
@@ -378,6 +400,9 @@ subroutine solve_linsys(linsys)
       &Lapack DGETRS error code ', info
     call error(this_sub_name, this_mod_name, trim(msg))
   end if
+  t1 = dust_time()
+  write(msg,'(A,F9.3,A)') 'Solution in: ' , t1 - t0,' s.'
+  call printout(msg)
 
 
 
