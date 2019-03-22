@@ -81,6 +81,9 @@ type :: t_linsys
  
  !> Linear system right hand side (for pressure integral equation)
  real(wp), allocatable :: b_pres(:)
+
+ !> LU solvers pivot permutation matrix (in vector form)
+ integer, allocatable :: P(:)
  
  !> Static part of the right hand side
  !!

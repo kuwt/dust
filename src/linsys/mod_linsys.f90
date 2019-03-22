@@ -119,8 +119,10 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
  type(t_sim_param) :: sim_param 
  real(wp) :: uinf(3)
  real(wp) :: rhoinf , Pinf
+ integer :: ie, ntot, info
 
- integer :: ie, ntot
+ character(len=max_char_len) :: msg
+ character(len=*), parameter :: this_sub_name = 'solve_linsys'
  
 
   ! Free-stream conditions
@@ -145,6 +147,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
   allocate( linsys%L_static(linsys%nstatic, linsys%nstatic_expl))
  ! allocate( linsys%D_static(linsys%nstatic, linsys%nstatic_ad))
   allocate( linsys%b(linsys%rank) )
+  allocate( linsys%P(linsys%rank) )
   !allocate( linsys%b_static(3,linsys%rank) )
   allocate( linsys%b_static(linsys%nstatic,linsys%nstatic) )
   allocate( linsys%res(linsys%rank) )
@@ -184,6 +187,17 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
   do ie = 1,linsys%n_expl
     expl_elems(ie)%p%mag => linsys%res_expl(ie,1) 
   enddo
+
+  !Now perform a one-time LU decomposition of the static part of the system
+  call dgetrf(linsys%nstatic,linsys%nstatic, &
+         linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic, &
+         linsys%P(1:linsys%nstatic),info)
+  if ( info .ne. 0 ) then
+    write(msg,*) 'error while factorizing the static part of the linear &
+                  &system, Lapack DGETRF error code ', info
+    call error(this_sub_name, this_mod_name, trim(msg))
+  end if
+
 
 end subroutine initialize_linsys
 
@@ -285,24 +299,102 @@ subroutine solve_linsys(linsys)
  !integer :: count1 , count_rate1 , count_max1 
  !integer :: count2 , count_rate2 , count_max2 
 
-  allocate(A_tmp(size(linsys%A,1),size(linsys%A,2)) ) ; A_tmp = linsys%A
-  allocate(IPIV(linsys%rank))
+  !allocate(A_tmp(size(linsys%A,1),size(linsys%A,2)) ) ; A_tmp = linsys%A
+  !allocate(IPIV(linsys%rank))
+
+  !=>Create the upper-diagonal block Usd
+  !Swap in place Asd to get PssAsd
+  call dlaswp(linsys%nmoving, &
+         linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
+         linsys%nstatic,1,linsys%nstatic,linsys%P(1:linsys%nstatic),1)
+  write(*,*) 'First swap done'
+
+  !Solve Lss Usd = Pss Asd to get Usd and put it in place of Asd
+  call dtrsm('L','L','N','U',linsys%nstatic,linsys%nmoving,1.0d+0,   &
+         linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic, &
+         linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank),    &
+         linsys%nstatic)
+  write(*,*) 'Lower diagonal system done'
+  !if ( info .ne. 0 ) then
+  !  write(msg,*) 'error while solving the upper diagonal mixed block of &
+  !               &the linear system, Lapack DTRSM error code ', info
+  !  call error(this_sub_name, this_mod_name, trim(msg))
+  !end if
+  
+  !==>Solve the lower-diagoal block Lds
+  !Solve Pdd-1 Lds Uss = Ads for Pdd-1 Lds and put it in place of Ads
+  call dtrsm('R','U','N','N',linsys%nmoving,linsys%nstatic,1.0d+0,   &
+         linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic,  &
+         linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic),    &
+         linsys%nmoving)
+  write(*,*) 'Upper diagonal system done'
+  !if ( info .ne. 0 ) then
+  !  write(msg,*) 'error while solving the lower diagonal mixed block of &
+  !               &the linear system, Lapack DTRSM error code ', info
+  !  call error(this_sub_name, this_mod_name, trim(msg))
+  !end if
+
+  !==>Factorize the dynamic square block
+  !Modify the square block from Add to Add - Pdd-1Lds Usd
+  linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank) = &
+  linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank) - &
+  matmul(linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic), &
+         linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank))
+  !Factorize and put in place the square dynamic bloc
+  call dgetrf(linsys%nmoving,linsys%nmoving, &
+         linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank), &
+         linsys%nmoving,linsys%P(linsys%nstatic+1:linsys%rank),info)
+  if ( info .ne. 0 ) then
+    write(msg,*) 'error while factorizing the dynamic  block of &
+                 &the linear system, Lapack DGETRF error code ', info
+    call error(this_sub_name, this_mod_name, trim(msg))
+  end if
+  write(*,*) 'Lower factorization done'
  
+  !==> Permute the lower mixed bloc
+  call dlaswp(linsys%nstatic, &
+         linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic), &
+         linsys%nmoving,1,linsys%nmoving,&
+         linsys%P(linsys%nstatic+1:linsys%rank),1)
+  write(*,*) 'Last swap done'
+
+  !==> Fix the lower part of the permutation matrix to make it global
+  !write(*,*) 'nstatic, rank',linsys%nstatic, linsys%rank
+  !write(*,*) 'P BEFORE'
+  !write(*,*) linsys%P
+  !write(*,*) 'P BEFORE END'
+  linsys%P(linsys%nstatic+1:linsys%rank) = &
+  linsys%P(linsys%nstatic+1:linsys%rank) + linsys%nstatic
+  !write(*,*) 'P AFTER'
+  !write(*,*) linsys%P
+  !write(*,*) 'P AFTER END'
+
+  !==> Solve the factorized system
   linsys%res = linsys%b
-
-   
-  !call system_clock(count1,count_rate1,count_max1)
-  call dgesv(linsys%rank,1,A_tmp,linsys%rank,IPIV, &
-             linsys%res ,linsys%rank,INFO) 
-  !call system_clock(count2,count_rate2,count_max2)
-
-  if ( INFO .ne. 0 ) then
-    write(msg,*) 'error while solving linear system, Lapack DGESV error code ',&
-                  INFO
+  call dgetrs('N',linsys%rank,1,linsys%A,linsys%rank,linsys%P,linsys%res, &
+         linsys%rank,info)
+  if ( info .ne. 0 ) then
+    write(msg,*) 'error while solving the factorized system &
+      &Lapack DGETRS error code ', info
     call error(this_sub_name, this_mod_name, trim(msg))
   end if
 
-  deallocate(A_tmp,IPIV) 
+
+
+   
+  !!!call system_clock(count1,count_rate1,count_max1)
+  !!call dgesv(linsys%rank,1,A_tmp,linsys%rank,IPIV, &
+  !!           linsys%res ,linsys%rank,INFO) 
+  !!!call system_clock(count2,count_rate2,count_max2)
+
+  !!if ( INFO .ne. 0 ) then
+  !!  write(msg,*) 'error while solving linear system, Lapack DGESV error code ',&
+  !!                INFO
+  !!  call error(this_sub_name, this_mod_name, trim(msg))
+  !!end if
+
+  !!!deallocate(A_tmp,IPIV) 
+  write(*,*) 'system solution done'
 
 end subroutine solve_linsys
 
