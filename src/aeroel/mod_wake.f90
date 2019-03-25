@@ -429,16 +429,18 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, &
     if(any(wake%pan_neigh(:,iw).eq.0)) nend = nend+1
   enddo
   
-  !Store the indices of the ends of the panel wakes
-  allocate(wake%pan_i_ends(nend))
-  allocate(wake%joined_tes(2,nend,npan+1)); wake%joined_tes = 0
-  ie = 1
-  do iw=1,wake%n_pan_stripes
-    if(any(wake%pan_neigh(:,iw).eq.0)) then
-      wake%pan_i_ends(ie) = iw
-      ie = ie+1
-    endif
-  enddo
+  if (sim_param%join_te) then
+    !Store the indices of the ends of the panel wakes
+    allocate(wake%pan_i_ends(nend))
+    allocate(wake%joined_tes(2,nend,npan+1)); wake%joined_tes = 0
+    ie = 1
+    do iw=1,wake%n_pan_stripes
+      if(any(wake%pan_neigh(:,iw).eq.0)) then
+        wake%pan_i_ends(ie) = iw
+        ie = ie+1
+      endif
+    enddo
+  endif
 
   wake%pan_idou = 0.0_wp
   wake%rin_idou = 0.0_wp
@@ -504,7 +506,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, &
                                                                    (/3,4/)))
   enddo
 
-  call join_first_panels(wake)
+  if (sim_param%join_te) call join_first_panels(wake)
 
 
   !Particles
@@ -551,11 +553,10 @@ subroutine prepare_wake(wake, geo, elems, sim_param)
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: p1, p2
- real(wp) :: sp1(3), sp1_1(3), sp2(3), sp2_1(3), l1, l2, tol
- integer :: ip, iw, ipan, id, is, nprev, i, j
+ integer :: ip, iw, ipan, id, is, nprev
  real(wp) :: dist(3) , vel_te(3), pos_p(3)
  real(wp) :: dir(3), partvec(3), ave, alpha_p(3), alpha_p_n
- integer :: ir, k, n_part, iend, ineigh
+ integer :: ir, k, n_part
 
  ! flow separation variables
  integer :: i_comp , i_elem , n_elem
@@ -591,9 +592,12 @@ subroutine prepare_wake(wake, geo, elems, sim_param)
   enddo
   
   !==> Check if the panels need to be joined
-  wake%joined_tes(:,:,2:wake%nmax_pan+1) = wake%joined_tes(:,:,1:wake%nmax_pan)
-  wake%joined_tes(:,:,1) = 0
-  call join_first_panels(wake)
+  if(sim_param%join_te) then
+    wake%joined_tes(:,:,2:wake%nmax_pan+1) = &
+          wake%joined_tes(:,:,1:wake%nmax_pan)
+    wake%joined_tes(:,:,1) = 0
+    call join_first_panels(wake)
+  endif
 
   !==> Panels:  update the panels geometrical quantities of all the panels, 
   !      the first two row of points have just been updated, the other 
@@ -663,7 +667,11 @@ subroutine prepare_wake(wake, geo, elems, sim_param)
               wake%wake_panels(wake%pan_neigh(1,iw),wake%pan_wake_len)%mag
         ave = ave/2.0_wp
       else !has no fixed neighbour
-        ave = get_joined_intensity(wake, iw, 1)
+        if(sim_param%join_te) then
+          ave = get_joined_intensity(wake, iw, 1)
+        else
+          ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+        endif
       endif
       partvec = partvec + dir*ave
 
@@ -674,7 +682,11 @@ subroutine prepare_wake(wake, geo, elems, sim_param)
               wake%pan_neigh_o(2,iw)*wake%wake_panels(wake%pan_neigh(2,iw),wake%pan_wake_len)%mag
         ave = ave/2.0_wp
       else
-        ave = get_joined_intensity(wake, iw, 2)
+        if(sim_param%join_te) then
+          ave = get_joined_intensity(wake, iw, 2)
+        else
+          ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+        endif
       endif
       partvec = partvec + dir*ave
 
@@ -1072,8 +1084,8 @@ subroutine update_wake(wake, elems, octree, sim_param)
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: iw, ipan, ie, ip, np, iq
- integer :: id, ir, n_part
- real(wp) :: pos_p(3), vel_p(3), alpha_p(3)
+ integer :: id, ir
+ real(wp) :: pos_p(3), vel_p(3)
  real(wp) :: str(3), stretch(3)
  real(wp) :: df(3), diff(3)
  type(t_pot_elem_p), allocatable :: pan_p_temp(:)
@@ -1705,14 +1717,14 @@ subroutine avoid_collision(elems, wake, part, sim_param, vel)
  real(wp), intent(inout) :: vel(3)
 
  integer :: ie
- real(wp) :: dist1(3), dist2(3), dist12(3), n(3)
+ real(wp) :: dist1(3), dist2(3), n(3)
  real(wp) :: pos1(3), pos2(3), relvel(3), newvel(3), nveldiff
  real(wp) :: distn, dist1_nor, dist1_tan, dist2_nor, dist2_tan
  real(wp) :: normvel, normvel_corr, tanvel(3), dt_part, tanvel2
  real(wp) :: check_radius, rad_mult, elrad_mult, r2d2, elrad, tol, blthick
  
   !Multiplication factor for the check radius
-  rad_mult = 1000_wp
+  rad_mult = 1000.0_wp
   !rad_mult = 2.0_wp
  
   !Multiplication factor for the element radius
