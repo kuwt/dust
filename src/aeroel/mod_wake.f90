@@ -163,6 +163,12 @@ type :: t_wake
  !> Relative orientation of neighbours
  integer, allocatable :: pan_neigh_o(:,:)
 
+ !> Index in the stripes of end elements in panel wake
+ integer, allocatable :: pan_i_ends(:)
+
+ !> Index of the joined trailing edges
+ integer, allocatable :: joined_tes(:,:,:)
+
  !> Wake starting points: calculated from the 2 (or 1) starting points of the
  !! geometry possibly moved
  real(wp), allocatable :: w_start_points(:,:)
@@ -303,7 +309,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, &
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: iw, ip, nsides
- integer :: ic, nad, ie, npt, id, ir
+ integer :: ic, nad, ie, npt, id, ir, nend
  integer :: p1, p2
  real(wp) :: dist(3) , vel_te(3)
 
@@ -412,12 +418,25 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, &
   wake%i_start_points = te%ii
   wake%pan_neigh = te%neigh
   wake%pan_neigh_o = te%o
+  nend = 0
   do iw=1,wake%n_pan_stripes
     wake%pan_gen_elems_id(1,iw) = wake%pan_gen_elems(1,iw)%p%id
     if(associated(wake%pan_gen_elems(2,iw)%p)) then
       wake%pan_gen_elems_id(2,iw) = wake%pan_gen_elems(2,iw)%p%id
     else
       wake%pan_gen_elems_id(2,iw) = 0
+    endif
+    if(any(wake%pan_neigh(:,iw).eq.0)) nend = nend+1
+  enddo
+  
+  !Store the indices of the ends of the panel wakes
+  allocate(wake%pan_i_ends(nend))
+  allocate(wake%joined_tes(2,nend,npan+1)); wake%joined_tes = 0
+  ie = 1
+  do iw=1,wake%n_pan_stripes
+    if(any(wake%pan_neigh(:,iw).eq.0)) then
+      wake%pan_i_ends(ie) = iw
+      ie = ie+1
     endif
   enddo
 
@@ -485,6 +504,8 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, &
                                                                    (/3,4/)))
   enddo
 
+  call join_first_panels(wake)
+
 
   !Particles
   wake%nmax_prt = nparts
@@ -530,10 +551,11 @@ subroutine prepare_wake(wake, geo, elems, sim_param)
  type(t_sim_param), intent(in) :: sim_param
 
  integer :: p1, p2
- integer :: ip, iw, ipan, id, is, nprev
+ real(wp) :: sp1(3), sp1_1(3), sp2(3), sp2_1(3), l1, l2, tol
+ integer :: ip, iw, ipan, id, is, nprev, i, j
  real(wp) :: dist(3) , vel_te(3), pos_p(3)
  real(wp) :: dir(3), partvec(3), ave, alpha_p(3), alpha_p_n
- integer :: ir, k, n_part
+ integer :: ir, k, n_part, iend, ineigh
 
  ! flow separation variables
  integer :: i_comp , i_elem , n_elem
@@ -567,6 +589,11 @@ subroutine prepare_wake(wake, geo, elems, sim_param)
                   sim_param%min_vel_at_te*sim_param%dt / norm2(dist)
     end if
   enddo
+  
+  !==> Check if the panels need to be joined
+  wake%joined_tes(:,:,2:wake%nmax_pan+1) = wake%joined_tes(:,:,1:wake%nmax_pan)
+  wake%joined_tes(:,:,1) = 0
+  call join_first_panels(wake)
 
   !==> Panels:  update the panels geometrical quantities of all the panels, 
   !      the first two row of points have just been updated, the other 
@@ -635,8 +662,8 @@ subroutine prepare_wake(wake, geo, elems, sim_param)
               wake%pan_neigh_o(1,iw)* &
               wake%wake_panels(wake%pan_neigh(1,iw),wake%pan_wake_len)%mag
         ave = ave/2.0_wp
-      else
-        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+      else !has no fixed neighbour
+        ave = get_joined_intensity(wake, iw, 1)
       endif
       partvec = partvec + dir*ave
 
@@ -647,7 +674,7 @@ subroutine prepare_wake(wake, geo, elems, sim_param)
               wake%pan_neigh_o(2,iw)*wake%wake_panels(wake%pan_neigh(2,iw),wake%pan_wake_len)%mag
         ave = ave/2.0_wp
       else
-        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+        ave = get_joined_intensity(wake, iw, 2)
       endif
       partvec = partvec + dir*ave
 
@@ -1500,6 +1527,82 @@ subroutine get_vel_rigid(this, elems, wake, pos, sim_param, vel)
  vel = sim_param%rigid_wake_vel
 
 end subroutine get_vel_rigid
+
+!----------------------------------------------------------------------
+
+subroutine join_first_panels(wake)
+ type(t_wake), intent(inout) :: wake
+
+ integer :: i, j, iw, ir
+ real(wp) :: sp1(3), sp2(3), sp1_1(3), sp2_1(3), l1, l2, tol, pos_p(3)
+
+  do i = 1,size(wake%pan_i_ends)
+    iw = wake%pan_i_ends(i)
+    sp1 = wake%w_start_points(:,wake%i_start_points(1,iw))
+    sp2 = wake%w_start_points(:,wake%i_start_points(2,iw))
+    l1 = norm2(sp1-sp2)
+    do j = 1,size(wake%pan_i_ends)
+      ir = wake%pan_i_ends(j)
+      sp1_1 = wake%w_start_points(:,wake%i_start_points(1,ir))
+      sp2_1 = wake%w_start_points(:,wake%i_start_points(2,ir))
+      l2 = norm2(sp1_1-sp2_1)
+      tol = 0.5_wp*min(l1,l2)
+      !checking only one side is enough, it is the opposite side for the other
+      !end
+      if(norm2(sp1-sp2_1).lt.tol) then 
+        pos_p = (sp1+sp2_1)/2.0_wp
+        wake%pan_w_points(:,wake%i_start_points(1,iw),1) = pos_p
+        wake%pan_w_points(:,wake%i_start_points(2,ir),1) = pos_p
+        pos_p = (wake%pan_w_points(:,wake%i_start_points(1,iw),2) + &
+                 wake%pan_w_points(:,wake%i_start_points(2,ir),2))/2.0_wp
+        wake%pan_w_points(:,wake%i_start_points(1,iw),2) = pos_p
+        wake%pan_w_points(:,wake%i_start_points(2,ir),2) = pos_p
+
+        wake%joined_tes(1,i,1) = ir
+        wake%joined_tes(2,j,1) = iw
+      endif
+    enddo
+  enddo
+
+
+end subroutine join_first_panels
+
+!----------------------------------------------------------------------
+
+function get_joined_intensity(wake, iw, side) result(ave)
+ type(t_wake), intent(in) :: wake
+ integer, intent(in)      :: iw
+ integer, intent(in)      :: side
+ real(wp)                 :: ave
+
+ integer :: iend, ineigh
+ real(wp) :: orient
+
+  !this is the clean call, but gfortran...
+  !iend = findloc(wake%pan_i_ends,iw,1)
+  do iend = 1,size(wake%pan_i_ends)
+    if(wake%pan_i_ends(iend) .eq. iw) exit
+  enddo
+
+
+  ineigh = wake%joined_tes(side,iend,wake%nmax_pan+1)
+  if (ineigh .ne. 0) then
+    !check orientation
+    if(sum(wake%wake_panels(iw,1)%nor * wake%wake_panels(ineigh,1)%nor) &
+       .ge. 0.0_wp) then 
+      orient = 1.0_wp
+    else
+      orient = -1.0_wp
+    endif
+    ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
+          orient * wake%wake_panels(ineigh,wake%pan_wake_len)%mag
+    ave = ave/2.0_wp
+  else
+    ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+  endif
+
+end function get_joined_intensity
+
 !----------------------------------------------------------------------
 
 !subroutine avoid_collision(elems, wake, part, sim_param, vel)
