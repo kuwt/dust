@@ -106,6 +106,10 @@ type t_sim_param
   !> Minimum and maximum of the particles box
   real(wp) :: particles_box_min(3)
   real(wp) :: particles_box_max(3)
+  !> Join close trailing edges
+  logical :: join_te
+    !> All trailing edges closer than join_te_factor will be joined
+    real(wp) :: join_te_factor
 
   !Method parameters
   !> Multiplier for far field threshold computation on doublet
@@ -222,6 +226,11 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%n_wake_particles, 'n_wake_particles', loc)
   call write_hdf5_attr(this%particles_box_min, 'particles_box_min', loc)
   call write_hdf5_attr(this%particles_box_max, 'particles_box_max', loc)
+  call write_hdf5_attr(this%join_te, 'join_te', loc)
+  if(this%join_te) &
+    call write_hdf5_attr(this%join_te_factor, 'join_te_factor', loc)
+
+
   call write_hdf5_attr(this%FarFieldRatioDoublet, 'FarFieldRatioDoublet', loc)
   call write_hdf5_attr(this%FarFieldRatioSource, 'FarFieldRatioSource', loc)
   call write_hdf5_attr(this%DoubletThreshold, 'DoubletThreshold', loc)
