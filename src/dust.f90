@@ -270,6 +270,9 @@ call prms%CreateRealOption( 'ImplicitPanelMinVel', &
                     "Minimum velocity at the trailing edge", '1.0e-8')
 call prms%CreateLogicalOption('rigid_wake','rigid wake?','F')
 call prms%CreateRealArrayOption( 'rigid_wake_vel', "rigid wake velocity" )
+call prms%CreateLogicalOption('join_te','join trailing edge','F')
+call prms%CreateRealOption( 'join_te_factor', "join the trailing edges &
+                             &when closer than factor*te element size",'1.0' )
 
 ! --- regularisation ---
 call prms%CreateRealOption( 'FarFieldRatioDoublet', &
@@ -371,6 +374,9 @@ if ( sim_param%rigid_wake ) then
     sim_param%rigid_wake_vel = sim_param%u_inf
   end if
 end if
+sim_param%join_te = getlogical(prms, 'join_te')
+if (sim_param%join_te) sim_param%join_te_factor=getreal(prms,'join_te_factor')
+
 !Names
 sim_param%basename = getstr(prms,'basename')
 basename_debug = getstr(prms,'basename_debug')
@@ -546,7 +552,7 @@ call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
 call initialize_linsys(linsys, geo, elems, elems_expl, &
                        wake, sim_param ) ! sim_param%u_inf)
-call initialize_pressure_sys(linsys, geo, elems)
+!call initialize_pressure_sys(linsys, geo, elems)
 
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
@@ -635,8 +641,7 @@ do it = 1,nstep
                              trim(basename_debug)//'b_'//trim(frmt)//'.dat' )
     call dump_linsys_pres(linsys, &
                          trim(basename_debug)//'Apres_'//trim(frmt)//'.dat', &
-                         trim(basename_debug)//'bpres_'//trim(frmt)//'.dat', &
-                         trim(basename_debug)//'Bmatpres_'//trim(frmt)//'.dat')
+                         trim(basename_debug)//'bpres_'//trim(frmt)//'.dat')
   endif
       
   !------ Solve the pressure system ------

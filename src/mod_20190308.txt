@@ -1,0 +1,8 @@
+dust.f90
+- lines moved from l.867 upward to l. 791: these lines have been modified
+- l.606 modified
+
+
+old modifications -----
+- different strategies for the stencil of boundary elements
+- removed pressure update from integral equation

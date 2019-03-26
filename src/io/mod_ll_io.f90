@@ -259,6 +259,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     airfoil_list(iSection) = getstr(pmesh_prs,'airfoil_table')
   enddo
 
+  ! -- 0.75 chord -- look for other "0.75 chord" tag
   ! set the te 0.75*chord far from the ll
   do iSection= 1,nSections
     chord_list(iSection)   = chord_list(iSection) * 0.75_wp 
@@ -398,25 +399,16 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
               & type_span must be equal to uniform, cosine, cosineIB, cosineOB.')
       end if 
 
-! ===
-! Moved outside this loop (see below), to allow the specification of aerodynamic
-! characteristic on some sections only
-! ===
-!       ! airfoil file and non-dimensional coordinate between two sections
-!       i_airfoil_e( 1,ich-1) = iRegion 
-!       i_airfoil_e( 2,ich-1) = iRegion+1
-! !     normalised_coord_e(2,ich-1) = ( rr(2,ista) - rrSection1(2,iRegion) ) / &
-! !                        ( rrSection2(2,iRegion) - rrSection1(2,iRegion) )
-!       normalised_coord_e(2,ich-1) = ( rr(2,ista) - rrSection1(2,1) ) / &
-!                          ( rrSection2(2,1) - rrSection1(2,1) )
-!       if ( iSpan .ne. 1 ) then ! else = 0.0_wp
-!         normalised_coord_e(1,ich-1) = normalised_coord_e(2,ich-2)
-!       end if
-! ===
-
     end do
   
   end do
+
+  ! -- 0.75 chord -- look for other "0.75 chord" tag
+  ! correct the chord value ----
+  do ich = 1 , size(chord_p)
+    chord_p(ich) = chord_p(ich) / 0.75_wp
+  end do 
+
 
 ! === new-2019-02-06 ===
 ! Save the fields related to the definition of actual airfoils
