@@ -56,3 +56,16 @@ Build instructions for DUST:
    -> If a specific cgns implementation is used, set the appropriate paths
 4) make
 5) The executable should be in build/bin
+
+KNOWN ISSUES:
+
+ * On debian, the Lapack and BLAS system libraries are not properly linked. 
+   The user must link /usr/lib/liblapack.so.3 and /usr/lib/libblas.so.3 to 
+   /usr/lib/liblapack.so and /usr/lib/libblas.so respectively.
+   Only then the cmake configuration, as well as the linker ld, should 
+   work properly. 
+
+ * Depending on the system, the Lapack/BLAS implementation might not be 
+   thread parallel. Usually installing the ATLAS implementation of the BLAS 
+   routines should override the serial libraries and allow for parallel 
+   execution
