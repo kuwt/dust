@@ -1771,9 +1771,62 @@ subroutine avoid_collision(elems, wake, part, sim_param, vel)
         !do not perform any modification
 !       if (dist1_nor .lt. 0.0_wp .or. normvel.ge.0.0_wp) cycle
         if (dist1_nor .lt. -blthick .or. normvel.ge.0.0_wp) cycle
+
+        !TEMPORARY CASE: we are inside the boundary layer, the particle somehow
+        !should be absorbed if near an element, however not now, just limit ourselves
+        !to keep it outside the surface
+        if (dist1_nor .ge. -blthick .and. dist1_nor .le. 0.0_wp) then
+          dist1 = pos1-(elem%cen)
+          dist1_nor = sum(dist1 * n) 
+          dist1_tan = norm2(dist1-(n*dist1_nor))
+          !make sure not to go back in time
+          dt_part = max(-dist1_nor/normvel,0.0_wp) 
+          if(dt_part .le. sim_param%dt) then
+            
+            !Get the position at the time in which the particle hits the 
+            !surface plane
+            pos2  = part%cen+relvel*dt_part
+            dist2 = pos2 - ( elem%cen )
+            dist2_nor = sum(dist2 * n)
+            dist2_tan = norm2(dist2-(n*dist2_nor))
+            
+            !If when the particle hits the surface plane it is within the 
+            !considered element radius, keep on correcting (otherwise it is not
+            !passing from the considered element)
+            !if (dist2_tan .lt. elrad_mult*elrad) then
+            if (dist2_tan .lt. elrad) then !since it is closer to surface, need
+                                           !a smaller radius
+              !correct the normal velocity to avoid penetration
+!             normvel_corr = -dist1_nor*(1-tol)/sim_param%dt
+              normvel_corr = -dist1_nor*(1.0_wp-0.0_wp)/sim_param%dt
+               
+              ! should be 
+              ! vel = relvel + (normvel_corr-normvel)*n + elem%ub
+              ! but simplifying
+              newvel = vel + (normvel_corr-normvel)*n
+              !already without the element motion
+
+              !fix the tangential velocity to keep the magnitude constant
+              normvel_corr = sum(newvel*n)
+              normvel  = sum(vel*n)
+              tanvel   = vel - normvel*n
+              tanvel2  = sum(tanvel**2)
+              nveldiff = normvel**2-normvel_corr**2+tanvel2
+              if(tanvel2.gt.0.0_wp .and. normvel_corr*normvel.ge.0.0_wp .and. &
+                                                     nveldiff.ge.0.0_wp) then
+                tanvel = tanvel * (sqrt(nveldiff)/sqrt(tanvel2) )
+              endif
+              !reconstruct the velocity 
+              vel = tanvel + normvel_corr*n
+            endif
+          endif
+          cycle
+        endif
+
         
         !get the time at which the particle hits the surface
-        dt_part = -dist1_nor/normvel
+        !make sure not to go back in time
+        dt_part = max(-dist1_nor/normvel,0.0_wp) 
         !if it is lower than the timestep (i.e. the particles hits the surface 
         !within next step) start the correction
         if(dt_part .le. sim_param%dt) then
