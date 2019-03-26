@@ -12,7 +12,7 @@ in most linux distributions.
 HDF5 can be found packed in many distribution. 
 However it can be easily built with the following procedure:
   * clone the desired version of HDF5 fromt the git repositories:
-    git clone -b hdf5_1_10_2 https://bitbucket.hdfgroup.org/scm/hdffv/hdf5.git
+    git clone -b hdf5-1_10_5 https://bitbucket.hdfgroup.org/scm/hdffv/hdf5.git
   
   * move into the folder, and build an install folder
     cd hdf5
@@ -29,7 +29,7 @@ CGNS can be found packed in some distributions, however tends to be outdated,
 and since CGNS tend to change radically the API behaviour it is advised to
 build it from the git repositories
   * clone the stable release from the git repositories
-    git clone -b master https://github.com/CGNS/CGNS.git
+    git clone -b v3.3.1 https://github.com/CGNS/CGNS.git
 
   * move into folder, create the installation folders
     cd CGNS
