@@ -2,17 +2,13 @@
 MeshFileType = parametric
 ElType = l
 
-mesh_reflection = F
-reflection_point = (/0.0,0.0,0.0/)
-reflection_normal = (/0.0,1.0,0.0/)
-
 starting_point = (/0.0,0.152,0.0/)
 reference_chord_fraction = 0.0
 
 ! First section: root
 chord = 0.0686
 twist =  6.0
-airfoil = ./airfoil_table/naca0012.c81  ! tabulated data ("formatted" file)
+airfoil_table = ./airfoil_table/naca0012.c81  ! tabulated data ("formatted" file)
 
 ! First region
 span = 0.445
@@ -24,7 +20,7 @@ type_span = uniform
 ! Second section: approx 7/8
 chord = 0.0686
 twist = 0.0
-airfoil = ./airfoil_table/naca0012.c81  ! tabulated data ("formatted" file)
+airfoil_table = ./airfoil_table/naca0012.c81  ! tabulated data ("formatted" file)
 
 ! Second region
 span = 0.215
@@ -36,5 +32,5 @@ type_span = uniform
 ! Third section : tip
 chord = 0.0686
 twist = -2.0
-airfoil = ./airfoil_table/naca0012.c81  ! tabulated data ("formatted" file)
+airfoil_table = ./airfoil_table/naca0012.c81  ! tabulated data ("formatted" file)
 

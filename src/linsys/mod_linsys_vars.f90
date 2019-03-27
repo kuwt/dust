@@ -1,6 +1,17 @@
-!!=====================================================================
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
+!..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
+!...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
+!....\/\\\......\/\\\.\/\\\......\/\\\.....\///\\...........\/\\\......
+!.....\/\\\......\/\\\.\/\\\......\/\\\.......\///\\\........\/\\\......
+!......\/\\\....../\\\..\//\\\...../\\\../\\\....\//\\\.......\/\\\......
+!.......\/\\\\\\\\\\\/....\///\\\\\\\\/..\///\\\\\\\\\/........\/\\\......
+!........\///////////........\////////......\/////////..........\///.......
+!!=========================================================================
 !!
-!! Copyright (C) 2018 Politecnico di Milano
+!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!!                         Matteo   Tugnoli, 
+!!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
@@ -27,11 +38,10 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !! 
 !! Authors: 
-!!          Federico Fonte             <federico.fonte@polimi.it>
-!!          Davide Montagnani       <davide.montagnani@polimi.it>
-!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
-!!=====================================================================
-
+!!          Federico Fonte             <federico.fonte@outlook.com>
+!!          Davide Montagnani       <davide.montagnani@gmail.com>
+!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!=========================================================================
 
 
 !> Module to expose only the linsys type
@@ -71,6 +81,10 @@ type :: t_linsys
  
  !> Linear system right hand side (for pressure integral equation)
  real(wp), allocatable :: b_pres(:)
+
+ !> LU solvers pivot permutation matrix (in vector form)
+ integer, allocatable :: P(:)
+ integer, allocatable :: P_pres(:)
  
  !> Static part of the right hand side
  !!
@@ -84,9 +98,6 @@ type :: t_linsys
  real(wp), allocatable :: b_static_pres(:,:) ! not strictly required
  ! OSS -> b_static_pres = b_static(1:idSurfPan_static , 1:idSurfPan_static )
  ! OSS    with idSurfPan_static = idSurfPan(1:nstatic_SurfPan)
-
- !> for DEBUG only ( TO BE DELETED )
- real(wp), allocatable :: b_matrix_pres_debug(:,:) 
 
  !> Static part of the lifting line contribution
  !!
@@ -113,8 +124,8 @@ type :: t_linsys
  !> Number of static and moving panels
  integer :: nstatic, nmoving
 
- !> Number of static and moving lifting lines
- !integer :: nstatic_ll, nmoving_ll, n_ll
+ !> Number of static and moving surface panels
+ integer :: nstatic_sp, nmoving_sp, n_sp
 
  !> Number of static and moving actuator disks
  !integer :: nstatic_ad, nmoving_ad, n_ad

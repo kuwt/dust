@@ -1,6 +1,17 @@
-!!=====================================================================
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
+!..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
+!...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
+!....\/\\\......\/\\\.\/\\\......\/\\\.....\///\\...........\/\\\......
+!.....\/\\\......\/\\\.\/\\\......\/\\\.......\///\\\........\/\\\......
+!......\/\\\....../\\\..\//\\\...../\\\../\\\....\//\\\.......\/\\\......
+!.......\/\\\\\\\\\\\/....\///\\\\\\\\/..\///\\\\\\\\\/........\/\\\......
+!........\///////////........\////////......\/////////..........\///.......
+!!=========================================================================
 !!
-!! Copyright (C) 2018 Politecnico di Milano
+!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!!                         Matteo   Tugnoli, 
+!!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
@@ -27,10 +38,10 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !! 
 !! Authors: 
-!!          Federico Fonte             <federico.fonte@polimi.it>
-!!          Davide Montagnani       <davide.montagnani@polimi.it>
-!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
-!!=====================================================================
+!!          Federico Fonte             <federico.fonte@outlook.com>
+!!          Davide Montagnani       <davide.montagnani@gmail.com>
+!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!=========================================================================
 
 
 
@@ -384,6 +395,7 @@ subroutine write_string_hdf5(outdata, outname, file_id)
  integer(HID_T) :: dspace_id!, memspace_id
  integer(HID_T) :: dset_id
  integer(HID_T) :: filetype_id, memtype_id
+ integer, parameter :: rank=1
  integer(HSIZE_T) :: out_size(1)
  character(len=*), parameter :: &
     this_sub_name = 'write_string_hdf5'
@@ -396,12 +408,22 @@ subroutine write_string_hdf5(outdata, outname, file_id)
 
   !create the string datatypes
   call h5Tcopy_f(h5t_mem_char, memtype_id, h5err)
-  call h5Tset_size_f(memtype_id, int(strlen,HSIZE_T),h5err)
   call h5Tcopy_f(h5t_file_char, filetype_id, h5err)
-  call h5Tset_size_f(filetype_id, int(strlen,HSIZE_T),h5err)
 
-  !create a (single) scalar dataspace
-  call h5Screate_f(H5S_SCALAR_F, dspace_id, h5err)
+  if(strlen .gt. 0) then !create the string type and a scalar space
+
+    call h5Tset_size_f(memtype_id, int(strlen,HSIZE_T),h5err)
+    call h5Tset_size_f(filetype_id, int(strlen,HSIZE_T),h5err)
+
+    !create a (single) scalar dataspace
+    call h5Screate_f(H5S_SCALAR_F, dspace_id, h5err)
+
+  else !create a 1 rank space of lenth 0
+
+    out_size = 0
+    call h5Screate_simple_f(rank, out_size, dspace_id, h5err)
+
+  endif
 
   !check if the dataset on file exists
   call h5Lexists_f(file_id, trim(outname), l_exists, h5err)
@@ -2107,12 +2129,22 @@ subroutine write_string_hdf5_attr(outdata, outname, loc_id)
 
   !create the string datatypes
   call h5Tcopy_f(h5t_mem_char, memtype_id, h5err)
-  call h5Tset_size_f(memtype_id, int(strlen,HSIZE_T),h5err)
   call h5Tcopy_f(h5t_file_char, filetype_id, h5err)
-  call h5Tset_size_f(filetype_id, int(strlen,HSIZE_T),h5err)
+  
+  if(strlen .gt. 0) then !create the string type and a scalar space
 
-  !create a (single) scalar dataspace
-  call h5Screate_f(H5S_SCALAR_F, dspace_id, h5err)
+    call h5Tset_size_f(memtype_id, int(strlen,HSIZE_T),h5err)
+    call h5Tset_size_f(filetype_id, int(strlen,HSIZE_T),h5err)
+
+    !create a (single) scalar dataspace
+    call h5Screate_f(H5S_SCALAR_F, dspace_id, h5err)
+
+  else !create a 1 rank space of lenth 0
+
+    out_size = 0
+    call h5Screate_simple_f(rank, out_size, dspace_id, h5err)
+
+  endif
 
   !check if the dataset on file exists
   call h5Aexists_f(loc_id, trim(outname), l_exists, h5err)

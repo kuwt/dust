@@ -1,6 +1,17 @@
-!!=====================================================================
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
+!..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
+!...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
+!....\/\\\......\/\\\.\/\\\......\/\\\.....\///\\...........\/\\\......
+!.....\/\\\......\/\\\.\/\\\......\/\\\.......\///\\\........\/\\\......
+!......\/\\\....../\\\..\//\\\...../\\\../\\\....\//\\\.......\/\\\......
+!.......\/\\\\\\\\\\\/....\///\\\\\\\\/..\///\\\\\\\\\/........\/\\\......
+!........\///////////........\////////......\/////////..........\///.......
+!!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Politecnico di Milano
+!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!!                         Matteo   Tugnoli, 
+!!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
@@ -27,9 +38,10 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !! 
 !! Authors: 
-!!          Davide Montagnani       <davide.montagnani@polimi.it>
-!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
-!!=====================================================================
+!!          Federico Fonte             <federico.fonte@outlook.com>
+!!          Davide Montagnani       <davide.montagnani@gmail.com>
+!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!=========================================================================
 
 
 !> Module to treat several parts of the pressure integral equation
@@ -82,11 +94,17 @@ contains
 
 !> Initialize the linear system of the pressure
 !!
+!! DISCONTINUED: operations performed inside initialize linsys
 subroutine  initialize_pressure_sys(linsys, geo, elems)
  type(t_linsys), intent(inout), target :: linsys
  type(t_geo), intent(in) :: geo
  type(t_impl_elem_p), intent(inout) :: elems(:)
  integer :: ie
+
+  !Set the number of surface panels
+  linsys%n_sp = geo%nSurfPan
+  linsys%nstatic_sp = geo%nstatic_SurfPan
+  linsys%nmoving_sp = geo%nSurfPan - geo%nstatic_SurfPan
 
   !Allocate matrix and rhs for pressure integral equation
   allocate( linsys%idSurfPan(geo%nSurfPan) )
@@ -99,8 +117,6 @@ subroutine  initialize_pressure_sys(linsys, geo, elems)
   linsys%b_pres = 0.0_wp
   allocate( linsys%res_pres(geo%nSurfPan) )
   linsys%res_pres = 0.0_wp
-  allocate( linsys%b_matrix_pres_debug(geo%nSurfPan,geo%nSurfPan) )
-  linsys%b_matrix_pres_debug = 0.0_wp
   allocate( linsys%b_static_pres(geo%nstatic_SurfPan,geo%nstatic_SurfPan) ) 
   linsys%b_static_pres = linsys%b_static( & 
          geo%idSurfPan(1:geo%nstatic_SurfPan), &
@@ -137,16 +153,17 @@ subroutine assemble_pressure_sys(linsys, geo, elems, wake)
 
 
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++
-
-  ! Slicing --------------------
-  linsys%A_pres = linsys%A( geo%idSurfPan , geo%idSurfPan )
-  ! Remove Kutta condtion ------
-  do ie = 1 , geo%nSurfpan
-    select type( el => elems(geo%idSurfPan(ie))%p ) ; class is(t_surfpan)
-      call el%correct_pressure_kutta( &
-            (/wake%pan_p, wake%rin_p/), wake%pan_gen_elems_id, linsys,uinf,ie,1,ntot)
-    end select
-  end do
+  
+  !This should have been done in the linear system assembling
+  !!! Slicing --------------------
+  !!linsys%A_pres = linsys%A( geo%idSurfPan , geo%idSurfPan )
+  !!! Remove Kutta condtion ------
+  !!do ie = 1 , geo%nSurfpan
+  !!  select type( el => elems(geo%idSurfPan(ie))%p ) ; class is(t_surfpan)
+  !!    call el%correct_pressure_kutta( &
+  !!          (/wake%pan_p, wake%rin_p/), wake%pan_gen_elems_id, linsys,uinf,ie,1,ntot)
+  !!  end select
+  !!end do
   
   ! rhs: ....
 
@@ -252,45 +269,93 @@ end subroutine assemble_pressure_sys
 
 !> Solve the linear system for the pressure
 !!
-!! At the moment the linear system is solved directly by means of a call to 
-!! a standard lapack solver.
+!! The linear system for the pressure with a similar procedure to the one
+!! used for the main linear system: the stored LU static decomposition is
+!! completed by the decomposition of the dynamic part and the factorized
+!! system is solved
 subroutine solve_pressure_sys(linsys)
  type(t_linsys), intent(inout) :: linsys
 
- real(wp) , allocatable :: A_tmp(:,:)
- integer, allocatable :: IPIV(:)
  integer              :: INFO
- integer              :: ARNK
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name = 'solve_linsys_pressure'
- !TODO: cleanup output vars and calls
- !real(KIND=8) :: elapsed_time ! time_ini , time_fin
- !integer :: count1 , count_rate1 , count_max1 
- !integer :: count2 , count_rate2 , count_max2 
 
-  ARNK = size(linsys%A_pres,1)
-  if ( size(linsys%A_pres,2) .ne. ARNK ) then
-    write(msg,*) ' matrix of the pressure integral equation A_pres is not square'
+  ! Operations on the side band matrices: done only if the system is
+  ! mixed static/dynamic and those matrices exists
+  if (linsys%nstatic_sp .gt. 0 .and. linsys%nmoving_sp .gt.0) then
+
+    !=>Create the upper-diagonal block Usd
+    !Swap in place Asd to get PssAsd
+    call dlaswp(linsys%nmoving_sp, &
+          linsys%A_pres(1:linsys%nstatic_sp,linsys%nstatic_sp+1:linsys%n_sp),&
+          linsys%nstatic_sp,1,linsys%nstatic_sp, &
+          linsys%P_pres(1:linsys%nstatic_sp),1)
+
+    !Solve Lss Usd = Pss Asd to get Usd and put it in place of Asd
+    call dtrsm('L','L','N','U',linsys%nstatic_sp,linsys%nmoving_sp,1.0d+0,   &
+          linsys%A_pres(1:linsys%nstatic_sp,1:linsys%nstatic_sp), &
+          linsys%nstatic_sp, &
+          linsys%A_pres(1:linsys%nstatic_sp,linsys%nstatic_sp+1:linsys%n_sp),&
+          linsys%nstatic_sp)
+    
+    !==>Solve the lower-diagoal block Lds
+    !Solve Pdd-1 Lds Uss = Ads for Pdd-1 Lds and put it in place of Ads
+    call dtrsm('R','U','N','N',linsys%nmoving_sp,linsys%nstatic_sp,1.0d+0,   &
+          linsys%A_pres(1:linsys%nstatic_sp,1:linsys%nstatic_sp), &
+          linsys%nstatic_sp,  &
+          linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%nstatic_sp),&
+           linsys%nmoving_sp)
+
+    !==>Modify the dynamic square block
+    !Modify the square block from Add to Add - Pdd-1Lds Usd
+    call dgemm('N','N',linsys%nmoving_sp,linsys%nmoving_sp,linsys%nstatic_sp, &
+          -1.0d+0, &
+          linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%nstatic_sp),&
+          linsys%nmoving_sp,&
+          linsys%A_pres(1:linsys%nstatic_sp,linsys%nstatic_sp+1:linsys%n_sp),&
+          linsys%nstatic_sp,1.0d+0,&
+          linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,linsys%nstatic_sp+1:linsys%n_sp),&
+          linsys%nmoving_sp)
+     
+  endif
+
+  ! If the system has a dynamic part, factorize such part
+  if (linsys%nmoving_sp .gt. 0) then
+  
+    !==>Factorize and put in place the square dynamic block
+    call dgetrf(linsys%nmoving_sp,linsys%nmoving_sp, &
+          linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,linsys%nstatic_sp+1:linsys%n_sp), &
+          linsys%nmoving_sp,linsys%P_pres(linsys%nstatic_sp+1:linsys%n_sp),info)
+    if ( info .ne. 0 ) then
+      write(msg,*) 'error while factorizing the dynamic  block of the &
+                    pressure linear system, Lapack DGETRF error code ', info
+      call error(this_sub_name, this_mod_name, trim(msg))
+    end if
+
+  endif
+ 
+  ! If the system is mixed finish the operation on the band blocks
+  if (linsys%nstatic .gt. 0 .and. linsys%nmoving .gt.0) then
+  !==> Permute the lower mixed bloc
+  call dlaswp(linsys%nstatic_sp, &
+         linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%nstatic_sp), &
+         linsys%nmoving_sp,1,linsys%nmoving_sp,&
+         linsys%P_pres(linsys%nstatic_sp+1:linsys%n_sp),1)
+  endif
+
+  !==> Fix the lower part of the permutation matrix to make it global
+  linsys%P_pres(linsys%nstatic_sp+1:linsys%n_sp) = &
+  linsys%P_pres(linsys%nstatic_sp+1:linsys%n_sp) + linsys%nstatic_sp
+
+  !==> Solve the factorized system
+  linsys%res_pres = linsys%b_pres
+  call dgetrs('N',linsys%n_sp,1,linsys%A_pres,linsys%n_sp,linsys%P_pres, &
+         linsys%res_pres, linsys%n_sp,info)
+  if ( info .ne. 0 ) then
+    write(msg,*) 'error while solving the factorized pressure system &
+      &Lapack DGETRS error code ', info
     call error(this_sub_name, this_mod_name, trim(msg))
   end if
-
-  allocate(A_tmp(ARNK,ARNK) ) ; A_tmp = linsys%A_pres
-  allocate(IPIV(ARNK))
-
-  linsys%res_pres = linsys%b_pres 
-
-  !call system_clock(count1,count_rate1,count_max1)
-  call dgesv(ARNK,1,A_tmp,ARNK,IPIV, &
-             linsys%res_pres ,ARNK,INFO) 
-  !call system_clock(count2,count_rate2,count_max2)
-
-  if ( INFO .ne. 0 ) then
-    write(msg,*) 'error while solving linear system, Lapack DGESV error code ',&
-                  INFO
-    call error(this_sub_name, this_mod_name, trim(msg))
-  end if
-
-  deallocate(A_tmp,IPIV) 
 
 end subroutine solve_pressure_sys
 
@@ -375,10 +440,9 @@ end subroutine press_normvel_der
 !> Dump the matrix and rhs of the pressure linear system to file
 !!
 !! TODO: consider moving these functionalities to the i/o modules
-subroutine dump_linsys_pres(linsys , filen_A , filen_b , filen_b_debug )
+subroutine dump_linsys_pres(linsys , filen_A , filen_b )
  type(t_linsys), intent(in) :: linsys
  character(len=*) , intent(in) :: filen_A , filen_b
- character(len=*) , optional , intent(in) :: filen_b_debug
 
  integer :: fid
  integer :: i1 
@@ -397,15 +461,6 @@ subroutine dump_linsys_pres(linsys , filen_A , filen_b , filen_b_debug )
   write(fid,*) linsys%b_pres(i1)
  end do
  close(fid)
-
- if ( present( filen_b_debug ) ) then
-   fid = 24
-   open(unit=fid, file=trim(adjustl(filen_b_debug)) )
-   do i1 = 1 , size(linsys%b_matrix_pres_debug,1)
-    write(fid,*) linsys%b_matrix_pres_debug(i1,:)
-   end do
-   close(fid)
- end if
 
 end subroutine dump_linsys_pres
 

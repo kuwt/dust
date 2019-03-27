@@ -1,6 +1,17 @@
-!!=====================================================================
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
+!..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
+!...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
+!....\/\\\......\/\\\.\/\\\......\/\\\.....\///\\...........\/\\\......
+!.....\/\\\......\/\\\.\/\\\......\/\\\.......\///\\\........\/\\\......
+!......\/\\\....../\\\..\//\\\...../\\\../\\\....\//\\\.......\/\\\......
+!.......\/\\\\\\\\\\\/....\///\\\\\\\\/..\///\\\\\\\\\/........\/\\\......
+!........\///////////........\////////......\/////////..........\///.......
+!!=========================================================================
 !!
-!! Copyright (C) 2018 Politecnico di Milano
+!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!!                         Matteo   Tugnoli, 
+!!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
@@ -27,18 +38,20 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !! 
 !! Authors: 
-!!          Federico Fonte             <federico.fonte@polimi.it>
-!!          Davide Montagnani       <davide.montagnani@polimi.it>
-!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
-!!=====================================================================
+!!          Federico Fonte             <federico.fonte@outlook.com>
+!!          Davide Montagnani       <davide.montagnani@gmail.com>
+!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!=========================================================================
 
+!> This is the main file of the DUST postprocessor
 program dust_post
 
 use mod_param, only: &
   wp, nl, max_char_len, extended_char_len , pi
 
 use mod_handling, only: &
-  error, warning, info, printout, dust_time, t_realtime, new_file_unit
+  error, warning, info, printout, dust_time, t_realtime, new_file_unit, &
+  check_basename, check_file_exists
 
 use mod_geometry, only: &
   t_geo, t_geo_component
@@ -241,6 +254,7 @@ call sbprms%CreateRealArrayOption('AxisMom','axis for the computation of the mom
 
 sbprms=>null()
 
+call check_file_exists(input_file_name, 'dust postprocessor')
 call prms%read_options(input_file_name, printout_val=.false.)
 
 basename = getstr(prms,'basename')
@@ -259,6 +273,10 @@ call initialize_vortline(r_Rankine, r_cutoff)
 call initialize_vortpart(r_Vortex, r_cutoff)
 
 n_analyses = countoption(prms,'Analysis')
+
+!Check that the basenames are valid
+call check_basename(trim(basename),'dust postprocessor')
+call check_basename(trim(data_basename),'dust postprocessor')
 
 !Cycle on all the analyses
 do ia = 1,n_analyses

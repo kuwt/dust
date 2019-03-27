@@ -337,10 +337,19 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 ! debug ----
 
 ! newton ---
-!integer, allocatable :: ipiv(:)
-!integer :: info
-!real(wp) :: res , res_old
-!real(wp) :: al0
+ real(wp) , allocatable :: ll_mag(:)
+ real(wp) , allocatable :: Amat(:,:) , Amat_newton(:,:)
+ real(wp) , allocatable :: bvec(:) , dclvec(:) , fvec(:) , clvec(:)
+ real(wp) , allocatable :: alvec(:) , d_al(:)
+ integer :: nll , ii , ik
+ real(wp) , parameter :: newton_tol = 1e-6_wp
+ integer  , parameter :: newton_maxit = 100
+ integer :: newton_it
+ real(wp) :: dclda
+ integer, allocatable :: ipiv(:)
+ integer :: info
+ real(wp) :: res , res_old
+ real(wp) :: al0
 ! newton ---
 
  
@@ -356,6 +365,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   n_inner_stall = 1
 
   uinf = sim_param%u_inf
+
+  nll = size(elems_ll)
 
   allocate(dou_temp(size(elems_ll))) ; dou_temp = 0.0_wp
 
@@ -408,7 +419,15 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   end do
 
 
-  do ic = 1, fp_maxIter
+  ! allocate and initialised to zero other vectors used in newton methods
+  allocate(fvec(  nll)) ;   fvec = 0.0_wp
+  allocate(dclvec(nll)) ; dclvec = 0.0_wp
+  allocate( clvec(nll)) ;  clvec = 0.0_wp
+  allocate( alvec(nll)) ;  alvec = 0.0_wp
+  ! newton ---
+
+  !Calculate the induced velocity on the airfoil
+  do ic = 1, fp_maxIter       !TODO: Refine this iterative process 
     diff = 0.0_wp             ! max diff ("norm \infty")
     max_mag_ll = 0.0_wp
     do i_l = 1,size(elems_ll)
@@ -416,18 +435,36 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       ! compute velocity
       vel = 0.0_wp
       do j = 1,size(elems_ll)
+! ! debug ----
+!         write(*,'(A,4(F12.4))') ' elems(j)%mag , elems(l)%cen ' , &
+!                      elems_ll(j)%p%mag , elems_ll(i_l)%p%cen
+! ! debug ----
         call elems_ll(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
         vel = vel + v
+! ! debug ----
+!         write(*,'(A,3(F12.4))') '        v : ' , v
+! ! debug ----
       enddo
+! ! debug ----
+!       write(*,*) '      vel : ' , vel 
+! ! debug ----
 
       select type(el => elems_ll(i_l)%p)
       type is(t_liftlin)
-        ! overall relative velocity computed in the centre of the ll elem
-        vel = vel/(4.0_wp*pi) + uinf - el%ub + vel_w(:,i_l)
-        ! "effective" velocity = proj. of vel in the n-t plane
-        up =  el%nor*sum(el%nor*vel) + el%tang_cen*sum(el%tang_cen*vel)
-        u_v(i_l) = norm2(up) 
+        vel = vel/(4.0_wp*pi) + uinf - el%ub +vel_w(:,i_l)
+        !vel =                 + uinf - el%ub +vel_w(:,i_l)
+        !vel = uinf - el%ub
+!       up = vel-el%bnorm_cen*sum(el%bnorm_cen*vel)
+        up = uinf-el%ub+vel_w(:,i_l) &
+            -el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub+vel_w(:,i_l)))
+        u_v(i_l) = norm2(up) ! overwrite !!!
+        up = vel-el%bnorm_cen*sum(el%bnorm_cen*vel)
+
+        ! Compute reference velocity (includes the motion of the body)
+        ! to use in LUT (.c81) of aerodynamic loads (2d airfoil)
+        !TODO: test these two approximations
         unorm = u_v(i_l)      ! velocity w/o induced velocity
+      ! unorm = norm2(up)     ! full velocity
        
         ! Angle of incidence (full velocity)
         alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
@@ -449,7 +486,23 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
                                    (/alpha, mach, reynolds/) , sim_param , &
                                                               aero_coeff )
         cl = aero_coeff(1)   ! cl needed for the iterative process
+! newton cleaning
+!       call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil, &
+!                                 (/alpha, mach, reynolds/) , sim_param , &
+!                                              aero_coeff , dclda , al0 )
+! newton cleaning
 
+! newton cleaning
+!       ! >>> update/define the zero lift normal versor for liftlin elems
+!       al0 = al0 * pi/180.0_wp
+!       el%nor_zeroLift = el%nor * cos(al0) - el%tang_cen * sin(al0) 
+! newton cleaning
+
+!       ! debug ----
+!       write(*,*) ' cl , cd , cm , dclda ' 
+!       write(*,*) aero_coeff , dclda
+!       ! debug ----
+       
         ! Compute the "equivalent" intensity of the vortex line 
         dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
         diff = max(diff,abs(elems_ll(i_l)%p%mag-dou_temp(i_l)))
@@ -465,6 +518,10 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       ma_v(i_l) = mach
       c_m(i_l,:) = aero_coeff
       a_v(i_l)   = alpha * pi/180.0_wp ! [rad]
+
+      ! --- to be used for the first newton iteration ---
+      dclvec(i_l) = dclda   ! [deg]
+      ! clvec, alvec set before the Newton loop
 
     enddo  ! i_l
 
@@ -562,7 +619,7 @@ subroutine calc_geo_data_liftlin(this, vert)
  real(wp), intent(in) :: vert(:,:)
 
  integer :: is, nsides
- real(wp):: nor(3), tanl(3) , cen(3)
+ real(wp):: nor(3), tanl(3)
 
   this%ver = vert
   nsides = this%n_ver
@@ -631,8 +688,7 @@ subroutine calc_geo_data_liftlin(this, vert)
   ! *** 2019-02-27 ***
   ! ...before 2019-02-27 at the beginning of the routine
   ! local tangent unit vector as in PANAIR
-  cen =  sum ( this%ver,2 ) / real(nsides,wp)
-  tanl = 0.5_wp * ( this%ver(:,nsides) + this%ver(:,1) ) - cen
+  tanl = 0.5_wp * ( this%ver(:,nsides) + this%ver(:,1) ) - this%cen
 
   ! they should not be used, but ...
   this%tang(:,1) = tanl / norm2(tanl)                   ! this%tang_cen    ! 

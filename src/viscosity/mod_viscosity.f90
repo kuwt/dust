@@ -1,10 +1,21 @@
-!!=====================================================================
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
+!..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
+!...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
+!....\/\\\......\/\\\.\/\\\......\/\\\.....\///\\...........\/\\\......
+!.....\/\\\......\/\\\.\/\\\......\/\\\.......\///\\\........\/\\\......
+!......\/\\\....../\\\..\//\\\...../\\\../\\\....\//\\\.......\/\\\......
+!.......\/\\\\\\\\\\\/....\///\\\\\\\\/..\///\\\\\\\\\/........\/\\\......
+!........\///////////........\////////......\/////////..........\///.......
+!!=========================================================================
 !!
-!! Copyright (C) 2018 Politecnico di Milano
+!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!!                         Matteo   Tugnoli, 
+!!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!!
+!! 
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -13,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!!
+!! 
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!!
+!! 
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -25,12 +36,12 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!!
-!! Authors:
-!!          Federico Fonte             <federico.fonte@polimi.it>
-!!          Davide Montagnani       <davide.montagnani@polimi.it>
-!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
-!!=====================================================================
+!! 
+!! Authors: 
+!!          Federico Fonte             <federico.fonte@outlook.com>
+!!          Davide Montagnani       <davide.montagnani@gmail.com>
+!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!=========================================================================
 
 module mod_viscosity
 
@@ -95,7 +106,7 @@ subroutine viscosity_effects( geo , elems , te , sim_param )
  integer :: i_e , ie_te , ne_te
  integer :: ie1 , ie2
 
- real(wp) , parameter :: c = 1.136_wp
+ real(wp) , parameter :: c = 1.136_wp   ! Ojima-Kamemoto(2000)
  real(wp) :: c2_2
 
  real(wp) :: OmV(3) , OmV_free(3) , OmV_bound(3)
@@ -103,9 +114,9 @@ subroutine viscosity_effects( geo , elems , te , sim_param )
  real(wp) :: edge_te(3)
 
  ! preliminary "fixed" parameters
- real(wp) , parameter :: h = 0.100_wp           
- !real(wp) , parameter :: tol_velSep = 0.5_wp   
- real(wp) , parameter :: tol_velSep = 0.0_wp   
+ real(wp) , parameter :: h = 0.025_wp          ! h = 0.100_wp           
+ real(wp) , parameter :: tol_velSep = 0.0_wp  ! 0.00_wp for the cylinder ! 0.10_wp , 0.05_wp for the airfoil  ! 0.5_wp 
+ real(wp) , parameter :: vc_ratio   = 0.50_wp  ! 1.00_wp for the cylinder ! 0.50_wp for the airfoil
 
 ! airfoil ------------------
 !   h = 0.025_wp   ! 0.05_wp   ! 0.1_wp   ! 0.025_wp

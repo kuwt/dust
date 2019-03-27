@@ -1,3 +1,19 @@
+0.5.5-b
+
+* More efficient linear system treatment
+* Joining of trailing edges
+* Some bugs fixed
+
+0.5.4-b
+
+* Minor bug fixe bug fixess 
+
+0.5.3-b
+
+* Some improvements in the lifting lines
+* Minor bugs fixed
+* Better output and user interface
+
 0.5.2-a
 
 * Minor improvements

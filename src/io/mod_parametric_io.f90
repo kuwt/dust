@@ -1,6 +1,17 @@
-!!=====================================================================
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
+!..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
+!...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
+!....\/\\\......\/\\\.\/\\\......\/\\\.....\///\\...........\/\\\......
+!.....\/\\\......\/\\\.\/\\\......\/\\\.......\///\\\........\/\\\......
+!......\/\\\....../\\\..\//\\\...../\\\../\\\....\//\\\.......\/\\\......
+!.......\/\\\\\\\\\\\/....\///\\\\\\\\/..\///\\\\\\\\\/........\/\\\......
+!........\///////////........\////////......\/////////..........\///.......
+!!=========================================================================
 !!
-!! Copyright (C) 2018 Politecnico di Milano
+!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!!                         Matteo   Tugnoli, 
+!!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
@@ -27,10 +38,10 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !! 
 !! Authors: 
-!!          Federico Fonte             <federico.fonte@polimi.it>
-!!          Davide Montagnani       <davide.montagnani@polimi.it>
-!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
-!!=====================================================================
+!!          Federico Fonte             <federico.fonte@outlook.com>
+!!          Davide Montagnani       <davide.montagnani@gmail.com>
+!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!=========================================================================
 
 
 !> Module to treat the most simple input-output from ascii formatted data
@@ -41,7 +52,7 @@ use mod_param, only: &
   wp, max_char_len, nl, pi
 
 use mod_handling, only: &
-  error, warning, info, printout, new_file_unit
+  error, warning, info, printout, new_file_unit, check_file_exists
 
 use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption
@@ -95,7 +106,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
  integer :: ista , iend
 
  character :: ElType
- logical :: symmetry
  real(wp), allocatable :: chord_fraction(:), span_fraction(:)
  character(len=max_char_len) :: type_chord
  integer :: i1  
@@ -111,8 +121,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   ! Global parameters
   call pmesh_prs%CreateStringOption('ElType', &
                 'element type (temporary) p panel v vortex ring')
-  call pmesh_prs%CreateLogicalOption('mesh_symmetry', &
-                'symmetry yes/no' )
   call pmesh_prs%CreateIntOption('nelem_chord',&
                 'number of chord-wise elements', &
                 multiple=.false.);
@@ -164,7 +172,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
   nelem_chord = getint(pmesh_prs,'nelem_chord')
   ElType  = getstr(pmesh_prs,'ElType')
-  symmetry= getlogical(pmesh_prs,'mesh_symmetry')
    
   nSections = countoption(pmesh_prs,'chord')
   nRegions  = countoption(pmesh_prs,'span')
@@ -178,7 +185,23 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   ref_chord_fraction = getreal(pmesh_prs,'reference_chord_fraction')
   ref_point          = getrealarray(pmesh_prs,'starting_point',3)
 
-  ! TODO: check on number of inputs
+
+  !Check the number of inputs
+  if(countoption(pmesh_prs,'nelem_span') .ne. nRegions ) &
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         &number of "nelem_span" different from number of regions.')
+  if(countoption(pmesh_prs,'dihed') .ne. nRegions ) &
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         &number of "dihed" different from number of regions.')
+  if(countoption(pmesh_prs,'sweep') .ne. nRegions ) &
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         &number of "sweep" different from number of regions.')
+  if(countoption(pmesh_prs,'twist') .ne. nSections ) &
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         &number of "twist" different from number of sections.')
+  if(countoption(pmesh_prs,'airfoil') .ne. nSections ) &
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         &number of "airfoil" different from number of sections.')
 
   ! Get total number of elements and initialize arrays
   allocate(nelem_span_list(nRegions));   nelem_span_list = 0
@@ -328,7 +351,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       dy_sections = abs(span_list(iRegion))
       csi = dy_sections / dy_actual_airfoils ! adimensional "coord" for interpolation
 
-!     write(*,*) ' iSec : ' , iSec
       call define_section( 1.0_wp , trim(adjustl(airfoil_list(iSec))), &
                            0.0_wp , ElType, nelem_chord,               &
                            type_chord , chord_fraction, 0.0_wp,        &
@@ -338,16 +360,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       if ( .not. allocated(xySection2) ) &
                   allocate(xySection2(size(xyAirfoil2,1),size(xyAirfoil2,2)))
 
-! ! debug ----
-!     write(*,*) ' csi : ' , csi
-!     write(*,*) ' iRegion : ' , iRegion
-!     write(*,*) ' twist_list(iRegion+1) : ' , twist_list(iRegion+1)
-!     write(*,*) ' chord_list(iRegion:iRegion+1) : ' , chord_list(iRegion:iRegion+1)
-!     write(*,*) ' maxval(rrSection1(1,:))-minval(rrSection1(1,:)) : ' , &
-!                  maxval(rrSection1(1,:))-minval(rrSection1(1,:))
-!     write(*,*) ' dx_ref , dz_ref : ' , dx_ref , dz_ref 
-!     write(*,*) ''
-! ! debug ----
 
       if ( allocated(xyAirfoil1) ) deallocate(xyAirfoil1)
       allocate(xyAirfoil1(size(xyAirfoil2,1),size(xyAirfoil2,2)))
@@ -357,26 +369,11 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
       xyAirfoil1(1,:) =   rrSection1(1,:) + ref_chord_fraction
 
-! ! debug ----
-!     write(*,*) ' xyAirfoil1 : ' 
-!     do i1 = 1 , size(xyAirfoil1,2)
-!       write(*,*)   xyAirfoil1(:,i1) , '   ' , rrSection1(:,i1)
-!     end do
-!     write(*,*) ''
-! ! debug ----
-
       twist_rad = twist_list(iRegion) * 4.0_wp * atan(1.0_wp) / 180.0_wp
       xyAirfoil1 = matmul( &
            reshape( (/ cos(twist_rad), sin(twist_rad) , &
                       -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
                                                           xyAirfoil1 )
-! ! debug ----
-!     write(*,*) ' xyAirfoil1 : ' 
-!     do i1 = 1 , size(xyAirfoil1,2)
-!       write(*,*)   xyAirfoil1(:,i1)
-!     end do
-!     write(*,*) ''
-! ! debug ----
   
 !     xySection2(1,:) = ( (1-csi) * xyAirfoil1(1,:) + &
 !                            csi  * xyAirfoil2(1,:) ) * chord_list(iRegion+1)
@@ -391,11 +388,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
            reshape( (/ cos(twist_rad),-sin(twist_rad) , &
                        sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
                                                           xySection2 )
-! ! debug -----
-!       do i1 = 1 , size(xySection2,2)
-!         write(*,*) xySection2(:,i1)
-!       end do
-! ! debug -----
 
     end if
     ! === new-2019-02-06 ===
@@ -408,17 +400,10 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       write(*,*) ' WARNING. abs( sweep_list(iRegion) ) .gt. 60.0d0. '
     end if
 
-! ! debug -----
-!   write(*,*) ' iRegion , span_list(iRegion) , sweep_list(iRegion) : ' , &
-!                iRegion , span_list(iRegion) , sweep_list(iRegion)
-! ! debug -----
     dx_ref = span_list(iRegion) * tan( sweep_list(iRegion)* pi / 180.0_wp ) + dx_ref 
     dy_ref = span_list(iRegion)                                             + dy_ref 
     dz_ref = span_list(iRegion) * tan( dihed_list(iRegion)* pi / 180.0_wp ) + dz_ref 
 
-! ! debug -----
-!   write(*,*) ' dx_ref , dz_ref : ' , dx_ref , dz_ref 
-! ! debug -----
     rrSection2(1,:) = xySection2(1,:) + dx_ref
     rrSection2(2,:) = 0.0_wp          + dy_ref  ! <--- read from region structure
     rrSection2(3,:) = xySection2(2,:) + dz_ref
@@ -506,7 +491,8 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   !   - NACA 5-digit: NACAxxxxx
   !   - ...
   if ( airfoil(len_trim(airfoil)-3 : len_trim(airfoil)) .eq. '.dat' ) then
-
+    
+    call check_file_exists(airfoil, this_sub_name, this_mod_name)
     call read_airfoil ( airfoil , trim(type_chord) , ElType , nelem_chord , point_list )
     do i1 = 1 , size(point_list,2)
       write(*,*) point_list(:,i1)
@@ -810,13 +796,6 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr )
  end do
  s_geo = st_geo / st_geo(np_geo)
 
-! ! check ----
-!  write(*,*) ' s_geo.  size(s_geo) = ' , size(s_geo)
-!  do i1 = 1 , size(s_geo)
-!   write(*,*) s_geo(i1)
-!  end do
-!  write(*,*)
-! ! check ----
 
  allocate(rr(2,nelems_chord_tot)) ; rr = 0.0_wp
  rr(:,1) = rr_geo(:,1)
@@ -826,15 +805,6 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr )
 
      if ( csi(i1) .lt. s_geo(i2) ) then
        ds_geo = s_geo(i2)-s_geo(i2-1)
-! check ----
-!      write(*,*) i1
-!      write(*,*) ' csi(i1),ds : ' , csi(i1) , ds_geo
-!      write(*,*) ' s_geo(i2-1): ' , s_geo(i2-1) , &
-!                 'rr_geo(:,i2-1)' , rr_geo(:,i2-1)
-!      write(*,*) ' s_geo(i2)  : ' , s_geo(i2)   , &
-!                 'rr_geo(:,i2)  ' , rr_geo(:,i2) 
-!      write(*,*) ' %ds : ' , (csi(i1)-s_geo(i2-1))/ds_geo 
-! check ----
        rr(:,i1) = (csi(i1)-s_geo(i2-1))/ds_geo * rr_geo(:,i2) + &
                   (s_geo(i2)-csi(i1)  )/ds_geo * rr_geo(:,i2-1)
        exit 

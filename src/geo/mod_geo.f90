@@ -1,10 +1,21 @@
-!!=====================================================================
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
+!..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
+!...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
+!....\/\\\......\/\\\.\/\\\......\/\\\.....\///\\...........\/\\\......
+!.....\/\\\......\/\\\.\/\\\......\/\\\.......\///\\\........\/\\\......
+!......\/\\\....../\\\..\//\\\...../\\\../\\\....\//\\\.......\/\\\......
+!.......\/\\\\\\\\\\\/....\///\\\\\\\\/..\///\\\\\\\\\/........\/\\\......
+!........\///////////........\////////......\/////////..........\///.......
+!!=========================================================================
 !!
-!! Copyright (C) 2018 Politecnico di Milano
+!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!!                         Matteo   Tugnoli, 
+!!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!!
+!! 
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -13,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!!
+!! 
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!!
+!! 
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -25,12 +36,12 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!!
-!! Authors:
-!!          Federico Fonte             <federico.fonte@polimi.it>
-!!          Davide Montagnani       <davide.montagnani@polimi.it>
-!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
-!!=====================================================================
+!! 
+!! Authors: 
+!!          Federico Fonte             <federico.fonte@outlook.com>
+!!          Davide Montagnani       <davide.montagnani@gmail.com>
+!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!=========================================================================
 
 !> Module to treat the geometry of the solid bodies
 
@@ -47,7 +58,8 @@ use mod_parse, only: &
   , finalizeparameters
 
 use mod_handling, only: &
-  error, warning, info, printout, dust_time, t_realtime, check_preproc
+  error, warning, info, printout, dust_time, t_realtime, check_preproc, &
+  check_file_exists
 
 use mod_basic_io, only: &
   read_mesh_basic, write_basic
@@ -357,6 +369,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   if (trim(ref_file_name) .eq. 'no_set') then
     ref_file_name = trim(in_file_name)
   endif
+  call check_file_exists(trim(ref_file_name), this_sub_name, this_mod_name)
   call build_references(geo%refs, trim(ref_file_name), sim_param)
 
 ! -----------------------------------------------------------------------------------------
@@ -1209,6 +1222,28 @@ subroutine import_aero_tab(geo,coeff)
    call read_c81_table( list_tmp(i_a) , coeff(i_a) )
  end do
 
+! ! debug -----
+! write(*,*) nl // ' debug .c81 Reynolds corrections ' // nl
+! do i_a = 1 , n_a
+!   write(*,*) ' file : ' , trim(list_tmp(i_a))
+!   do i_c = 1 , size(coeff(i_a)%aero_coeff) ! 1 , nRe
+!     write(*,*) ' Re : ' , coeff(i_a)%aero_coeff(i_c)%Re
+!     write(*,*) ' Ma , clmax , al0 , al_stall_p , cl_stall_p , al_stall_m , al_stall_p '
+!     do i_l = 1 , size(coeff(i_a)%aero_coeff(i_c)%coeff(1)%par2)
+!       write(*,*) coeff(i_a)%aero_coeff(i_c)%coeff(1)%par2(i_l) , &
+!                  coeff(i_a)%aero_coeff(i_c)%clmax(i_l) , &
+!                  coeff(i_a)%aero_coeff(i_c)%alcl0(i_l) , &
+!                  coeff(i_a)%aero_coeff(i_c)%alstall_pos(i_l) , &
+!                  coeff(i_a)%aero_coeff(i_c)%clstall_pos(i_l) , &
+!                  coeff(i_a)%aero_coeff(i_c)%alstall_neg(i_l) , &
+!                  coeff(i_a)%aero_coeff(i_c)%clstall_neg(i_l)
+!     end do           
+!   end do
+! end do
+! write(*,*) ' stop in mod_geo.f90 l.1225 '
+! stop
+! ! debug -----
+
 end subroutine import_aero_tab
 
 !----------------------------------------------------------------------
@@ -1670,7 +1705,7 @@ subroutine update_geometry(geo, t, update_static)
  real(wp), intent(in) :: t
  logical, intent(in) :: update_static
 
- integer :: i_comp, ie
+ integer :: i_comp, ie , ip
 
  !update all the references
  call update_all_references(geo%refs,t)
@@ -1687,6 +1722,7 @@ subroutine update_geometry(geo, t, update_static)
         !comp%el(ie)%ver = move_points(comp%loc_points(:,comp%el(ie)%i_ver), &
         !                   geo%refs(comp%ref_id)%R_g, &
         !                   geo%refs(comp%ref_id)%of_g)
+
         call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
       enddo
 

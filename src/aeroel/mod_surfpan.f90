@@ -1,10 +1,21 @@
-!!=====================================================================
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
+!..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
+!...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
+!....\/\\\......\/\\\.\/\\\......\/\\\.....\///\\...........\/\\\......
+!.....\/\\\......\/\\\.\/\\\......\/\\\.......\///\\\........\/\\\......
+!......\/\\\....../\\\..\//\\\...../\\\../\\\....\//\\\.......\/\\\......
+!.......\/\\\\\\\\\\\/....\///\\\\\\\\/..\///\\\\\\\\\/........\/\\\......
+!........\///////////........\////////......\/////////..........\///.......
+!!=========================================================================
 !!
-!! Copyright (C) 2018 Politecnico di Milano
+!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!!                         Matteo   Tugnoli, 
+!!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!!
+!! 
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -13,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!!
+!! 
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!!
+!! 
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -25,12 +36,12 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!!
-!! Authors:
-!!          Federico Fonte             <federico.fonte@polimi.it>
-!!          Davide Montagnani       <davide.montagnani@polimi.it>
-!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
-!!=====================================================================
+!! 
+!! Authors: 
+!!          Federico Fonte             <federico.fonte@outlook.com>
+!!          Davide Montagnani       <davide.montagnani@gmail.com>
+!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!=========================================================================
 
 
 !> Module to treat surface doublet + source panels
@@ -396,10 +407,6 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
       linsys%b_pres( ipres ) = &
                linsys%b_pres( ipres ) + &
                b1* el%bernoulli_source 
-
-      ! for DEBUG only ( TO BE DELETED )
-!     write(*,*) ' ipres , j1 , linsys%idSurfPanG2L(j1) ' , ipres , j1 , linsys%idSurfPanG2L(j1)  
-      linsys%b_matrix_pres_debug( ipres , linsys%idSurfPanG2L(j1) ) = b1
 
     end select
 
@@ -783,18 +790,22 @@ subroutine compute_pres_surfpan(this, R_g, sim_param)
   !                                - 0.5*rho_inf*V^2 - rho_inf*dphi/dt
   !                                     + rho * ub.u_phi
   ! with idou = -phi
-  !this%pres  = sim_param%P_inf &
+  this%pres  = sim_param%P_inf &
 ! reduced equation after some manipulation
 !   - 0.5 * sim_param%rho_inf * norm2(vel_phi+this%uvort)**2.0_wp & 
 !         - sim_param%rho_inf * sum( & 
 !            (sim_param%u_inf-this%ub)*(vel_phi+this%uvort) ) & 
 !         + sim_param%rho_inf * this%didou_dt
 ! full equation
-   ! + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
-   ! - 0.5_wp * sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp  &
-   !          + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
-   !          + sim_param%rho_inf * this%didou_dt
-   this%pres = this%pres_sol - 0.5*sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp
+    + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
+    - 0.5_wp * sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp  &
+             + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
+             + sim_param%rho_inf * this%didou_dt
+
+
+   !New equation
+   !this%pres = this%pres_sol - 0.5*sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp
+
 
 end subroutine compute_pres_surfpan
 

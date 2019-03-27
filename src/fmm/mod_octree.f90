@@ -1,10 +1,21 @@
-!!=====================================================================
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
+!..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
+!...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
+!....\/\\\......\/\\\.\/\\\......\/\\\.....\///\\...........\/\\\......
+!.....\/\\\......\/\\\.\/\\\......\/\\\.......\///\\\........\/\\\......
+!......\/\\\....../\\\..\//\\\...../\\\../\\\....\//\\\.......\/\\\......
+!.......\/\\\\\\\\\\\/....\///\\\\\\\\/..\///\\\\\\\\\/........\/\\\......
+!........\///////////........\////////......\/////////..........\///.......
+!!=========================================================================
 !!
-!! Copyright (C) 2018 Politecnico di Milano
+!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!!                         Matteo   Tugnoli, 
+!!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!!
+!! 
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -13,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!!
+!! 
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!!
+!! 
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -25,12 +36,12 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!!
-!! Authors:
-!!          Federico Fonte             <federico.fonte@polimi.it>
-!!          Davide Montagnani       <davide.montagnani@polimi.it>
-!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
-!!=====================================================================
+!! 
+!! Authors: 
+!!          Federico Fonte             <federico.fonte@outlook.com>
+!!          Davide Montagnani       <davide.montagnani@gmail.com>
+!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!=========================================================================
 
 
 !> Module to handle the octree grid
@@ -229,7 +240,7 @@ contains
 
 !> Initialize the octree
 subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
-                             degree, delta, sim_param, octree)
+                             degree, delta, octree)
  real(wp), intent(in) :: box_length
  integer,  intent(in) :: nbox(3)
  real(wp), intent(in) :: origin(3)
@@ -237,7 +248,6 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
  integer,  intent(in) :: min_part
  integer,  intent(in) :: degree
  real(wp), intent(in) :: delta
- type(t_sim_param), intent(in) :: sim_param
  type(t_octree), intent(out), target :: octree
 
  type(t_cell_p) :: inter_list(208) !all the possible interactions
@@ -245,12 +255,23 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
  integer :: imax, jmax, kmax
  integer :: p, child
  integer :: indx(3)
+ character(len=*), parameter :: this_sub_name = 'initialize_octree'
 
   octree%xmin = origin
   octree%xmax = origin + real(nbox,wp)*box_length
   octree%nbox = nbox
   octree%nlevels = nlevels
   octree%delta = delta
+  
+  !Check the particles bounding
+  if (any(octree%xmax-sim_param%particles_box_max .lt. 0.0_wp) .or. &
+      any(sim_param%particles_box_min-octree%xmin .lt. 0.0_wp)) then
+    where(sim_param%particles_box_max .gt. octree%xmax) &
+          sim_param%particles_box_max  =   octree%xmax
+    where(sim_param%particles_box_min .lt. octree%xmin) &
+          sim_param%particles_box_min  =   octree%xmin
+    call warning(this_sub_name, this_mod_name, 'Particles box bigger than octree box, particles box resized to the octree box')
+  endif
 
   octree%lvl_solid = sim_param%lvl_solid
 

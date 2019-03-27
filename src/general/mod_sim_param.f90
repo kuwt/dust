@@ -1,10 +1,21 @@
-!!=====================================================================
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
+!..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
+!...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
+!....\/\\\......\/\\\.\/\\\......\/\\\.....\///\\...........\/\\\......
+!.....\/\\\......\/\\\.\/\\\......\/\\\.......\///\\\........\/\\\......
+!......\/\\\....../\\\..\//\\\...../\\\../\\\....\//\\\.......\/\\\......
+!.......\/\\\\\\\\\\\/....\///\\\\\\\\/..\///\\\\\\\\\/........\/\\\......
+!........\///////////........\////////......\/////////..........\///.......
+!!=========================================================================
 !!
-!! Copyright (C) 2018 Politecnico di Milano
+!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!!                         Matteo   Tugnoli, 
+!!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!!
+!! 
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -13,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!!
+!! 
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!!
+!! 
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -25,12 +36,12 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!!
-!! Authors:
-!!          Federico Fonte             <federico.fonte@polimi.it>
-!!          Davide Montagnani       <davide.montagnani@polimi.it>
-!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
-!!=====================================================================
+!! 
+!! Authors: 
+!!          Federico Fonte             <federico.fonte@outlook.com>
+!!          Davide Montagnani       <davide.montagnani@gmail.com>
+!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!=========================================================================
 
 
 !> Module to define the structrues containing the simulation parameters
@@ -95,6 +106,10 @@ type t_sim_param
   !> Minimum and maximum of the particles box
   real(wp) :: particles_box_min(3)
   real(wp) :: particles_box_max(3)
+  !> Join close trailing edges
+  logical :: join_te
+    !> All trailing edges closer than join_te_factor will be joined
+    real(wp) :: join_te_factor
 
   !Method parameters
   !> Multiplier for far field threshold computation on doublet
@@ -117,6 +132,22 @@ type t_sim_param
   logical :: use_pa
   !> simulate viscosity effects or not
   logical :: use_ve
+
+  !Lifting Lines
+  !> Reynolds corrections of .c81 tables
+  logical  :: llReynoldsCorrections
+  !> n factor for Reynolds corrections of .c81 tables: (Re/Re_T)^n
+  real(wp) :: llReynoldsCorrectionsNfact
+  !> Maximum number of iteration in LL algorithm
+  integer  :: llMaxIter
+  !> Tolerance for the relative error in fixed point iteration for LL
+  real(wp) :: llTol
+  !> Damping param in fixed point iteration for LL used to avoid oscillations
+  real(wp) :: llDamp
+  !> Avoid "unphysical" separations in inner sections of LL? :: llTol
+  logical  :: llStallRegularisation
+  !> Number of "unphysical" separations thata can be removed 
+  integer  :: llStallRegularisationNelems
 
   !FMM parameters
   !> Employing the FMM method
@@ -198,6 +229,11 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%n_wake_particles, 'n_wake_particles', loc)
   call write_hdf5_attr(this%particles_box_min, 'particles_box_min', loc)
   call write_hdf5_attr(this%particles_box_max, 'particles_box_max', loc)
+  call write_hdf5_attr(this%join_te, 'join_te', loc)
+  if(this%join_te) &
+    call write_hdf5_attr(this%join_te_factor, 'join_te_factor', loc)
+
+
   call write_hdf5_attr(this%FarFieldRatioDoublet, 'FarFieldRatioDoublet', loc)
   call write_hdf5_attr(this%FarFieldRatioSource, 'FarFieldRatioSource', loc)
   call write_hdf5_attr(this%DoubletThreshold, 'DoubletThreshold', loc)

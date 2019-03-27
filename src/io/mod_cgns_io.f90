@@ -1,6 +1,17 @@
-!!=====================================================================
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
+!..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
+!...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
+!....\/\\\......\/\\\.\/\\\......\/\\\.....\///\\...........\/\\\......
+!.....\/\\\......\/\\\.\/\\\......\/\\\.......\///\\\........\/\\\......
+!......\/\\\....../\\\..\//\\\...../\\\../\\\....\//\\\.......\/\\\......
+!.......\/\\\\\\\\\\\/....\///\\\\\\\\/..\///\\\\\\\\\/........\/\\\......
+!........\///////////........\////////......\/////////..........\///.......
+!!=========================================================================
 !!
-!! Copyright (C) 2018 Politecnico di Milano
+!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!!                         Matteo   Tugnoli, 
+!!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
@@ -27,14 +38,16 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !! 
 !! Authors: 
-!!          Federico Fonte             <federico.fonte@polimi.it>
-!!          Davide Montagnani       <davide.montagnani@polimi.it>
-!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
-!!=====================================================================
-
+!!          Federico Fonte             <federico.fonte@outlook.com>
+!!          Davide Montagnani       <davide.montagnani@gmail.com>
+!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!=========================================================================
 
 !> Module to treat the most simple input-output from ascii formatted data
 !! files
+!!
+!! BUG: older versions of cgns expose a method called "error" and so dust
+!! error cannot be employed.
 module mod_cgns_io
 
 use mod_param, only: &
@@ -42,12 +55,12 @@ use mod_param, only: &
 
 use mod_handling, only: &
   !error, 
-  warning, info, printout, new_file_unit
+  warning, info, printout, new_file_unit, dust_abort
 
 use mod_stringtools, only: &
   IsInList, StripSpaces
 
- use cgns
+use cgns
 
 !----------------------------------------------------------------------
 
@@ -113,11 +126,8 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
   coordname(3) = 'CoordinateZ'
 
   nSectionsUsed = size(sectionNamesUsed)
- 
-  write(*,*) ' '
-  write(*,*) 'Opening cgns file: ', trim(mesh_file)
-  write(*,*) ' '
-  write(*,*) ' '
+
+  call printout(nl//' Loading geometry from cgns file: '//trim(mesh_file))
   call CG_OPEN_F(trim(mesh_file), MODE_READ, index_file, ier)
   if ( ier .ne. ALL_OK ) then
     write(*,*) ' ** error when reading cgns file'
@@ -128,11 +138,12 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
 
   call CG_NBASES_F(INDEX_FILE, nbase, ier)
   if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
-  write(*,'(A,I2)') ' Number of bases in the cgns file: ', nbase
   if (nbase /= 1) then
-    write(*,*) ' ** error: Only one base supported'
-    write(*,*) ' ** Program stopped'
-    stop
+    write(*,'(A,I2)') ' Number of bases in the cgns file: ', nbase
+    !call error(this_sub_name, this_mod_name,'More than one base in the &
+    !  &CGNS file, not supported')
+    write(*,'(A)') 'More than one base in the CGNS file, not supported' 
+    call dust_abort()
   end if
   ibase = 1
 
@@ -140,9 +151,6 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
  
   call CG_BASE_READ_F(INDEX_FILE, ibase, basename, icelldim, ndim, ier)
   if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
-
-  !write(*,*) ' icelldim = ' , icelldim ! todo
-  !write(*,*) ' ndim     = ' , ndim    
  
 !  Special case for 2d: if icelldim=2 we assume a pure 2d mesh with
 !  coordinates in x and y only (not a surface mesh in 3d)
@@ -153,11 +161,13 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
  
   call CG_NZONES_F(INDEX_FILE, ibase, nzone, ier)
   if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
-  write(*,'(A,I2)') ' Number of zones in the cgns base: ', nzone
 
   if ( nzone .ne. 1 ) then 
-    write(*,*)  ' up to now, only one zone is allowed ! ' 
-    stop  
+    write(*,'(A,I2)') ' Number of zones in the cgns base: ', nzone
+    !call error(this_sub_name, this_mod_name,'More than one zon in the &
+    !  &CGNS file, not supported')
+    write(*,'(A)') 'More than one zone in the CGNS file, not supported'
+    call dust_abort()
   end if
 
   do izone = 1,nzone
@@ -177,10 +187,10 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
     call CG_ZONE_TYPE_F(INDEX_FILE, ibase, izone, id, ier)
     if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
     if ( id /= unstructured ) then
-      write(*,*) ' ** error: Unstructured grid required. Found ', &
-                  'NONE' ! trim(zonetypename(id))
-      write(*,*) ' ** Program stopped'
-      stop
+      !call error(this_sub_name, this_mod_name,'No unstructured grid was &
+      !  &found in the CGNS file')
+      write(*,'(A)') 'No unstructured grid was found in the CGNS file'
+      call dust_abort()
     end if
 
     nNodes = isize(1)
@@ -189,7 +199,6 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
     write(*,'(A,I9)') ' Number of nodes:      ', isize(1)
     write(*,'(A,I9)') ' Number of cells:      ', isize(2)
     write(*,'(A,I2)') ' Coordinate dimension: ', ndim
-    write(*,*)
 
 
 
@@ -226,14 +235,13 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
 
       write(*,'(A,I3,A,I10,2A)') ' Section number:', isec,&
                            '   Number of elements: ', nelem, &
-                           '   Name: ', sectionname
+                           '   Name: ', trim(sectionname)
       ! TODO: why is no longer working with CGNS 3.3?
       ! write(*,'(A,A)')  ' Element type: ', trim(ElementTypeName(ieltype))
       ! write(*,'(A,I9)') ' First parent data: ', parent_flag
 
     end do
 
-    write(*,*) ' '
 
     ! Get number of elements considering the selection of sections
     if (nSectionsUsed > 0) then
@@ -255,15 +263,13 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
         endif
       enddo
     else
-      write(*,*)  ' All sections will be used' 
+      write(*,*)  'All sections will be used' 
       ! All sections will be selected
       selectedSection = .true.
       nelem_zone = nend 
     endif
 
-    write(*,*) ' '
-    write(*,*) 'Total number of elements ', nelem_zone
-    write(*,*) ' '
+    write(*,*) 'Total number of elements: ', nelem_zone
 
     allocate(ee(4,nelem_zone)) ; ee = 0
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

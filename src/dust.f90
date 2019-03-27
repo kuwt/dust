@@ -1,10 +1,21 @@
-!!=====================================================================
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
+!..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
+!...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
+!....\/\\\......\/\\\.\/\\\......\/\\\.....\///\\...........\/\\\......
+!.....\/\\\......\/\\\.\/\\\......\/\\\.......\///\\\........\/\\\......
+!......\/\\\....../\\\..\//\\\...../\\\../\\\....\//\\\.......\/\\\......
+!.......\/\\\\\\\\\\\/....\///\\\\\\\\/..\///\\\\\\\\\/........\/\\\......
+!........\///////////........\////////......\/////////..........\///.......
+!!=========================================================================
 !!
-!! Copyright (C) 2018 Politecnico di Milano
+!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!!                         Matteo   Tugnoli, 
+!!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!!
+!! 
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -13,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!!
+!! 
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!!
+!! 
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -25,15 +36,14 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!!
-!! Authors:
-!!          Federico Fonte             <federico.fonte@polimi.it>
-!!          Davide Montagnani       <davide.montagnani@polimi.it>
-!!          Matteo Tugnoli             <matteo.tugnoli@polimi.it>
-!!=====================================================================
+!! 
+!! Authors: 
+!!          Federico Fonte             <federico.fonte@outlook.com>
+!!          Davide Montagnani       <davide.montagnani@gmail.com>
+!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!=========================================================================
 
-!> This is a more structured version of the test code to build a sort of
-!! architecture proof
+!> This is the main file of the DUST solver
 
 program dust
 
@@ -44,7 +54,8 @@ use mod_sim_param, only: &
   t_sim_param, sim_param
 
 use mod_handling, only: &
-  error, warning, info, printout, dust_time, t_realtime
+  error, warning, info, printout, dust_time, t_realtime, check_basename, &
+  check_file_exists
 
 use mod_geometry, only: &
   t_geo, &
@@ -235,13 +246,16 @@ call prms%CreateLogicalOption('reset_time','reset the time from previous &
                                &execution?','F')
 
 ! parameters:
+! --- reference conditions ---
 call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
                                                        '(/1.0, 0.0, 0.0/)')
-call prms%CreateRealOption( 'u_ref', "reference velocity")
-call prms%CreateRealOption( 'P_inf', "free stream pressure", '1.0')
-call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')
-call prms%CreateRealOption( 'a_inf', "Speed of sound", '340.0')  ! m/s
-call prms%CreateRealOption( 'mu_inf', "Dynamic viscosity", '0.00001') ! kg/ms
+call prms%CreateRealOption( 'u_ref', "reference velocity")             !
+call prms%CreateRealOption( 'P_inf', "free stream pressure", '0.0')    ! 
+call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')   !
+call prms%CreateRealOption( 'a_inf', "Speed of sound", '340.0')        ! m/s   for dimensional sim
+call prms%CreateRealOption( 'mu_inf', "Dynamic viscosity", '0.000018') ! kg/ms
+
+! --- wake ---
 call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
 call prms%CreateIntOption('n_wake_particles', 'number of wake particles', &
                                                                   '10000')
@@ -254,7 +268,13 @@ call prms%CreateRealOption( 'ImplicitPanelScale', &
                     "Scaling of the first implicit wake panel", '0.3')
 call prms%CreateRealOption( 'ImplicitPanelMinVel', &
                     "Minimum velocity at the trailing edge", '1.0e-8')
+call prms%CreateLogicalOption('rigid_wake','rigid wake?','F')
+call prms%CreateRealArrayOption( 'rigid_wake_vel', "rigid wake velocity" )
+call prms%CreateLogicalOption('join_te','join trailing edge','F')
+call prms%CreateRealOption( 'join_te_factor', "join the trailing edges &
+                             &when closer than factor*te element size",'1.0' )
 
+! --- regularisation ---
 call prms%CreateRealOption( 'FarFieldRatioDoublet', &
       "Multiplier for far field threshold computation on doublet", '10.0')
 call prms%CreateRealOption( 'FarFieldRatioSource', &
@@ -268,8 +288,21 @@ call prms%CreateRealOption( 'VortexRad', &
 call prms%CreateRealOption( 'CutoffRad', &
       "Radius of complete cutoff  for vortex induction near core", '0.001')
 
-call prms%CreateLogicalOption('rigid_wake','rigid wake?','F')
-call prms%CreateRealArrayOption( 'rigid_wake_vel', "rigid wake velocity" )
+! --- lifting line elements ---
+call prms%CreateLogicalOption('LLReynoldsCorrections', &
+       'Use Reynolds corrections for the .c81 tables?', 'F')
+call prms%CreateRealOption('LLReynoldsCorrectionsNfact', &
+       'Exponent in (Re/Re_T)^n correction', '0.2')
+call prms%CreateIntOption('LLmaxIter', & 
+       'Maximum number of iteration in LL algorithm', '100')
+call prms%CreateRealOption('LLtol', & 
+       'Tolerance for the relative error in fixed point iteration for LL','1.0e-6' )
+call prms%CreateRealOption('LLdamp', &
+       'Damping param in fixed point iteration for LL used to avoid oscillations','5.0')
+call prms%CreateLogicalOption('LLstallRegularisation', & 
+       'Avoid "unphysical" separations in inner sections of LL?','T')
+call prms%CreateIntOption('LLstallRegularisationNelems', &
+       'Number of "unphysical" separations to be removed', '1' )
 
 !== Octree and multipole data == 
 call prms%CreateLogicalOption('FMM','Employ fast multipole method?','T')
@@ -301,9 +334,9 @@ call prms%CreateRealOption('ParticlesRedistributionRatio','How many times &
          &a particle need to be smaller than the average of the cell to be&
          & eliminated','3.0')
 
-
 ! get the parameters and print them out
 call printout(nl//'====== Input parameters: ======')
+call check_file_exists(input_file_name,'dust main')
 call prms%read_options(input_file_name, printout_val=.true.)
 !timing
 sim_param%t0 = getreal(prms, 'tstart')
@@ -346,6 +379,9 @@ if ( sim_param%rigid_wake ) then
     sim_param%rigid_wake_vel = sim_param%u_inf
   end if
 end if
+sim_param%join_te = getlogical(prms, 'join_te')
+if (sim_param%join_te) sim_param%join_te_factor=getreal(prms,'join_te_factor')
+
 !Names
 sim_param%basename = getstr(prms,'basename')
 basename_debug = getstr(prms,'basename_debug')
@@ -364,6 +400,15 @@ sim_param%use_vs = getlogical(prms, 'Vortstretch')
 sim_param%use_vd = getlogical(prms, 'Diffusion')
 sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
 sim_param%use_ve = getlogical(prms, 'ViscosityEffects')
+!Lifting line elements
+sim_param%llReynoldsCorrections      = getlogical(prms, 'LLreynoldsCorrections')
+sim_param%llReynoldsCorrectionsNfact = getreal(   prms, 'LLreynoldsCorrectionsNfact')
+sim_param%llMaxIter                  = getint(    prms, 'LLmaxIter'            )
+sim_param%llTol                      = getreal(   prms, 'LLtol'                )
+sim_param%llDamp                     = getreal(   prms, 'LLdamp'               )
+sim_param%llStallRegularisation      = getlogical(prms, 'LLstallRegularisation')
+sim_param%llStallRegularisationNelems= getint(    prms, 'LLstallRegularisationNelems')
+
 !Octree and FMM parameters
 sim_param%use_fmm = getlogical(prms, 'FMM')
 if(sim_param%use_fmm) then
@@ -457,6 +502,11 @@ if (sim_param%debug_level .ge. 3) then
 endif
 
 
+!---- Check that the basenames are valid ----
+  call check_basename(trim(sim_param%basename),'dust main')
+  if(sim_param%debug_level.ge.10) &
+    call check_basename(trim(basename_debug),'dust main')
+
 !---- Simulation parameters ----
 nstep = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1 
        !(+1 for the zero time step)
@@ -491,24 +541,6 @@ call finalizeParameters(prms)
 
 
 !------ Initialization ------
-call printout(nl//'====== Initializing Wake ======')
-
-call initialize_wake(wake, geo, te, sim_param%n_wake_panels, &
-       sim_param%n_wake_panels, sim_param%n_wake_particles, &
-       sim_param%particles_box_min, &
-       sim_param%particles_box_max,  sim_param)
-
-call printout(nl//'====== Initializing Linear System ======')
-t0 = dust_time()
-call initialize_linsys(linsys, geo, elems, elems_expl, &
-                       wake, sim_param ) ! sim_param%u_inf)
-call initialize_pressure_sys(linsys, geo, elems)
-
-t1 = dust_time()
-if(sim_param%debug_level .ge. 1) then
-  write(message,'(A,F9.3,A)') 'Initialized linear system in: ' , t1 - t0,' s.'
-  call printout(message)
-endif
 
 if(sim_param%use_fmm) then
   call printout(nl//'====== Initializing Octree ======')
@@ -516,12 +548,29 @@ if(sim_param%use_fmm) then
   call initialize_octree(sim_param%BoxLength, sim_param%NBox, &
                          sim_param%OctreeOrigin, sim_param%NOctreeLevels, &
                          sim_param%MinOctreePart, sim_param%MultipoleDegree, &
-                         sim_param%RankineRad, sim_param, octree)
+                         sim_param%RankineRad, octree)
   t1 = dust_time()
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
     call printout(message)
   endif
+endif
+
+call printout(nl//'====== Initializing Wake ======')
+
+call initialize_wake(wake, geo, te, sim_param%n_wake_panels, &
+       sim_param%n_wake_panels, sim_param%n_wake_particles, sim_param)
+
+call printout(nl//'====== Initializing Linear System ======')
+t0 = dust_time()
+call initialize_linsys(linsys, geo, elems, elems_expl, &
+                       wake, sim_param ) ! sim_param%u_inf)
+!call initialize_pressure_sys(linsys, geo, elems)
+
+t1 = dust_time()
+if(sim_param%debug_level .ge. 1) then
+  write(message,'(A,F9.3,A)') 'Initialized linear system in: ' , t1 - t0,' s.'
+  call printout(message)
 endif
 
 ! Restart --------------
@@ -605,8 +654,7 @@ do it = 1,nstep
                              trim(basename_debug)//'b_'//trim(frmt)//'.dat' )
     call dump_linsys_pres(linsys, &
                          trim(basename_debug)//'Apres_'//trim(frmt)//'.dat', &
-                         trim(basename_debug)//'bpres_'//trim(frmt)//'.dat', &
-                         trim(basename_debug)//'Bmatpres_'//trim(frmt)//'.dat')
+                         trim(basename_debug)//'bpres_'//trim(frmt)//'.dat')
   endif
       
   !------ Solve the pressure system ------
@@ -639,7 +687,7 @@ do it = 1,nstep
   !------ Update the explicit part ------  % v-----implicit elems: p,v
   if ( size(elems_ll) .gt. 0 ) then
     call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
-            (/ wake%pan_p, wake%rin_p/), wake%vort_p, sim_param, airfoil_data)
+            (/ wake%pan_p, wake%rin_p/), wake%vort_p, sim_param, airfoil_data, it)
   end if
 
   !------ Compute loads -------
@@ -661,6 +709,32 @@ do it = 1,nstep
              sim_param )
     call elems_ad(i_el)%p%compute_dforce(sim_param)
   end do
+
+  ! pres_IE +++++
+  if ( it .gt. 1 ) then
+    do i_el = 1 , geo%nSurfPan
+      select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
+       ! check UHLMAN's EQN -----
+       el%pres = &
+        linsys%res_pres(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp 
+!      el%pres = &
+!       surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp + &
+!          sim_param%rho_inf * sum(el%surf_vel*el%ub)
+       ! check UHLMAN's EQN -----
+      end select
+    end do
+    
+
+  else
+    do i_el = 1 , geo%nSurfPan
+      select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
+       el%pres = 0.0_wp
+      end select
+    end do
+  end if
+
+  ! pres_IE +++++
+
 
   !Print the results
   if(time_2_out)  then
@@ -697,6 +771,7 @@ do it = 1,nstep
   time = min(sim_param%tend, time+sim_param%dt)
   call update_geometry(geo, time, .false.)
   call prepare_wake(wake, geo, elems_tot, sim_param)
+
 
 enddo
 call printout(nl//'\\\\\\\\\\  Computations Finished \\\\\\\\\\')
