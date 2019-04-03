@@ -740,8 +740,9 @@ subroutine sort_particles(part, n_prt, elem, octree, sim_param)
 
     !check that we are not sorting things outside the octree
     if(any(idx.le.0).or.any(idx.gt.shape(octree%layers(ll)%lcells))) then
-      call error(this_sub_name, this_mod_name, 'Sorted particle resulted &
-                                                &outside the octree box') 
+      write(msg,*) 'Sorted particle resulted outside octree box at: ',&
+                    part(ip)%p%cen
+      call error(this_sub_name, this_mod_name, msg) 
     endif
 
     !add the particle to the lowest level
@@ -761,8 +762,9 @@ subroutine sort_particles(part, n_prt, elem, octree, sim_param)
 
     !check that we are not sorting things outside the octree
     if(any(idx.le.0).or.any(idx.gt.shape(octree%layers(ll)%lcells))) then
-      call error(this_sub_name, this_mod_name, 'Sorted element resulted &
-                                                &outside the octree box') 
+      write(msg,*) 'Sorted element resulted outside octree box at: ',&
+                    elem(ip)%p%cen
+      call error(this_sub_name, this_mod_name, msg) 
     endif
 
     !add the particle to the lowest level
