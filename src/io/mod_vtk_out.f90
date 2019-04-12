@@ -576,6 +576,9 @@ subroutine vtk_out_viz (out_filename, &
   if(got_particles) then
     nvp = size(vp_rr,2)
     nvars_vp = size(vp_var_names)
+  else
+    nvars_vp = 0
+    nvp = 0
   endif
 
   ! First cycle the elements to get the number of quads and trias
@@ -1151,9 +1154,11 @@ subroutine vtk_out_viz (out_filename, &
     endif
 
 
+
     buffer = '  </Piece>'//lf; write(fu) trim(buffer)
 
     buffer = ' </UnstructuredGrid>'//lf; write(fu) trim(buffer)
+
 
     !All the appended data
     buffer = '  <AppendedData encoding="raw">'//lf; write(fu) trim(buffer)
