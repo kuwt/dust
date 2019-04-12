@@ -303,6 +303,10 @@ call prms%CreateLogicalOption('LLstallRegularisation', &
        'Avoid "unphysical" separations in inner sections of LL?','T')
 call prms%CreateIntOption('LLstallRegularisationNelems', &
        'Number of "unphysical" separations to be removed', '1' )
+call prms%CreateIntOption('LLstallRegularisationNiters', &
+       'Number of timesteps between two regularisations', '1' )
+call prms%CreateRealOption('LLstallRegularisationAlphaStall', &
+       'Stall angle used as threshold for regularisation [deg]', '15.0' )
 
 !== Octree and multipole data == 
 call prms%CreateLogicalOption('FMM','Employ fast multipole method?','T')
@@ -396,13 +400,15 @@ sim_param%use_vd = getlogical(prms, 'Diffusion')
 sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
 sim_param%use_ve = getlogical(prms, 'ViscosityEffects')
 !Lifting line elements
-sim_param%llReynoldsCorrections      = getlogical(prms, 'LLreynoldsCorrections')
-sim_param%llReynoldsCorrectionsNfact = getreal(   prms, 'LLreynoldsCorrectionsNfact')
-sim_param%llMaxIter                  = getint(    prms, 'LLmaxIter'            )
-sim_param%llTol                      = getreal(   prms, 'LLtol'                )
-sim_param%llDamp                     = getreal(   prms, 'LLdamp'               )
-sim_param%llStallRegularisation      = getlogical(prms, 'LLstallRegularisation')
-sim_param%llStallRegularisationNelems= getint(    prms, 'LLstallRegularisationNelems')
+sim_param%llReynoldsCorrections           = getlogical(prms, 'LLreynoldsCorrections')
+sim_param%llReynoldsCorrectionsNfact      = getreal(   prms, 'LLreynoldsCorrectionsNfact')
+sim_param%llMaxIter                       = getint(    prms, 'LLmaxIter'            )
+sim_param%llTol                           = getreal(   prms, 'LLtol'                )
+sim_param%llDamp                          = getreal(   prms, 'LLdamp'               )
+sim_param%llStallRegularisation           = getlogical(prms, 'LLstallRegularisation')
+sim_param%llStallRegularisationNelems     = getint(    prms, 'LLstallRegularisationNelems')
+sim_param%llStallRegularisationNiters     = getint(    prms, 'LLstallRegularisationNiters')
+sim_param%llStallRegularisationAlphaStall = getreal(   prms, 'LLstallRegularisationAlphaStall')
 
 !Octree and FMM parameters
 sim_param%use_fmm = getlogical(prms, 'FMM')
@@ -702,6 +708,10 @@ do it = 1,nstep
     do i_el = 1 , geo%nSurfPan
       select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
        ! check UHLMAN's EQN -----
+! debug ----       
+!      write(*,*) ' i_el : ' , i_el , &
+!                 ' surfpan_H_IE(i_el) ' , surfpan_H_IE(i_el)
+! debug ----       
        el%pres = &
         linsys%res_pres(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp 
 !      el%pres = &
@@ -758,7 +768,6 @@ do it = 1,nstep
   time = min(sim_param%tend, time+sim_param%dt)
   call update_geometry(geo, time, .false.)
   call prepare_wake(wake, geo, elems_tot, sim_param)
-
 
 enddo
 call printout(nl//'\\\\\\\\\\  Computations Finished \\\\\\\\\\')

@@ -92,6 +92,7 @@ type, extends(c_expl_elem) :: t_liftlin
   real(wp)              :: chord
   real(wp)              :: ctr_pt(3)
   real(wp)              :: nor_zeroLift(3)
+  real(wp)              :: alpha
 contains
 
   procedure, pass(this) :: compute_pot      => compute_pot_liftlin
@@ -179,6 +180,7 @@ end subroutine compute_psi_liftlin
 subroutine compute_vel_liftlin (this, pos, uinf, vel)
  class(t_liftlin), intent(in) :: this
  real(wp), intent(in) :: pos(:)
+
  real(wp), intent(in) :: uinf(3)
  real(wp), intent(out) :: vel(3)
 
@@ -319,9 +321,11 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
  ! fixed point algorithm for ll ----
  real(wp) :: fp_tol , fp_damp , diff
  integer  :: fp_maxIter
+ ! stall regularisation: params read as inputs
  logical  :: stall_regularisation
- integer              :: n_inner_stall
- real(wp) , parameter :: al_stall = 15.0_wp*pi/180.0_wp ! hardcoded
+ real(wp):: al_stall 
+ integer :: i_do , i , nn_stall , n_stall
+ integer :: n_iter_reg
 
  real(wp) :: max_mag_ll
 
@@ -347,24 +351,25 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name = 'solve_liftlin'
 
-  ! parameters of the fixed point iterations
+  ! params of the fixed point iterations
   fp_tol     = sim_param%llTol
   fp_damp    = sim_param%llDamp
   fp_maxIter = sim_param%llMaxIter
+  ! params for stall regularisation
   stall_regularisation = sim_param%llStallRegularisation
-! n_inner_stall        = sim_param%llStallRegularisationNelems
-  n_inner_stall = 1
+  n_stall    = sim_param%llStallRegularisationNelems
+  n_iter_reg = sim_param%llStallRegularisationNiters
+  al_stall   = sim_param%llStallRegularisationAlphaStall * pi / 180.0_wp
 
   uinf = sim_param%u_inf
 
   allocate(dou_temp(size(elems_ll))) ; dou_temp = 0.0_wp
 
-  !Compute the velocity from all the elements except for liftling elems
+  !=== Compute the velocity from all the elements except for liftling elems ===
   ! and store it outside the loop, since it is constant
-  ! === %cen === velocity on the centres
   allocate(vel_w(3,size(elems_ll))) ; vel_w = 0.0_wp 
   do i_l = 1,size(elems_ll)
-    do j = 1,size(elems_impl) ! body panels: liftlin, vortlat 
+    do j = 1,size(elems_impl) ! body panels: liftlin, vor che tenga contotlat 
       call elems_impl(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
@@ -384,18 +389,20 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   vel_w = vel_w/(4.0_wp*pi)
 
+  ! allocate arrasy containing aoa, aero coeffs and relative velocity
   allocate( a_v( size(elems_ll)  )) ;   a_v = 0.0_wp
   allocate( c_m( size(elems_ll),3)) ;   c_m = 0.0_wp
   allocate( u_v( size(elems_ll)  )) ;   u_v = 0.0_wp
-  allocate(re_v( size(elems_ll)  )) ;  re_v = 0.0_wp
-  allocate(ma_v( size(elems_ll)  )) ;  ma_v = 0.0_wp
 
-  ! debug ----
-  allocate(chord_v( size(elems_ll)  )) ; chord_v = 0.0_wp
-  allocate(   cl_v( size(elems_ll)  )) ;    cl_v = 0.0_wp
-  allocate(el_i_airfoil_m( size(elems_ll),2)) ; el_i_airfoil_m = 0.0_wp
-  allocate(el_csi_cen_v  ( size(elems_ll)  )) ; el_csi_cen_v   = 0.0_wp
-  ! debug ----
+! ! debug ----
+! allocate(re_v( size(elems_ll)  )) ;  re_v = 0.0_wp
+! allocate(ma_v( size(elems_ll)  )) ;  ma_v = 0.0_wp
+! 
+! allocate(chord_v( size(elems_ll)  )) ; chord_v = 0.0_wp
+! allocate(   cl_v( size(elems_ll)  )) ;    cl_v = 0.0_wp
+! allocate(el_i_airfoil_m( size(elems_ll),2)) ; el_i_airfoil_m = 0.0_wp
+! allocate(el_csi_cen_v  ( size(elems_ll)  )) ; el_csi_cen_v   = 0.0_wp
+! ! debug ----
 
   ! Remove the "out-of-plane" component of the relative velocity:
   ! 2d-velocity to enter the airfoil look-up-tables
@@ -406,7 +413,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
          el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub))) 
    end select
   end do
-
 
   do ic = 1, fp_maxIter
     diff = 0.0_wp             ! max diff ("norm \infty")
@@ -420,8 +426,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
         vel = vel + v
       enddo
 
-      select type(el => elems_ll(i_l)%p)
-      type is(t_liftlin)
+      select type(el => elems_ll(i_l)%p) ; type is(t_liftlin)
+
         ! overall relative velocity computed in the centre of the ll elem
         vel = vel/(4.0_wp*pi) + uinf - el%ub + vel_w(:,i_l)
         ! "effective" velocity = proj. of vel in the n-t plane
@@ -439,12 +445,12 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
         reynolds = sim_param%rho_inf * unorm * & 
                    el%chord / sim_param%mu_inf    
 
-        ! debug ----
-        el_i_airfoil_m(i_l,:) = el%i_airfoil
-        el_csi_cen_v(  i_l  ) = el%csi_cen
-        ! debug ----
+!       ! debug ----
+!       el_i_airfoil_m(i_l,:) = el%i_airfoil
+!       el_csi_cen_v(  i_l  ) = el%csi_cen
+!       ! debug ----
 
-        ! read the aero coeff from .c81 tables
+        ! Read the aero coeff from .c81 tables
         call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil , &
                                    (/alpha, mach, reynolds/) , sim_param , &
                                                               aero_coeff )
@@ -454,72 +460,118 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
         dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
         diff = max(diff,abs(elems_ll(i_l)%p%mag-dou_temp(i_l)))
 
-        ! debug ----
-        chord_v(i_l) = el%chord 
-        cl_v(i_l) = cl
-        ! debug ----
+!       ! debug ----
+!       chord_v(i_l) = el%chord 
+!       cl_v(i_l) = cl
+!       ! debug ----
 
       end select
 
-      re_v(i_l) = reynolds
-      ma_v(i_l) = mach
+!       ! debug ----
+!     re_v(i_l) = reynolds
+!     ma_v(i_l) = mach
+!       ! debug ----
       c_m(i_l,:) = aero_coeff
       a_v(i_l)   = alpha * pi/180.0_wp ! [rad]
 
+      select type(el => elems_ll(i_l)%p) ; type is(t_liftlin)
+        el%alpha = a_v(i_l) * 180.0_wp / pi  ! [deg]
+      end select
+
     enddo  ! i_l
 
-    ! --- avoid stall on an elem between 2 elems without stall ---
-    ! TODO:
-    ! - read neighbouring elements and not the prev and next elem in ll numbering <<<<
-    ! - decide if using .and. or .or. in the if statement (or user input ?)       <<<<
-    ! - use n_inner_stall to check more than one inner elems 
-    ! - read al_stall from tables (?) or leave it as an input from the user
-    ! al_stall = ... \hardcoded as a parameter
-    ! rough ----
-    if ( stall_regularisation ) then 
-      do i_l = 2 , size(elems_ll) - 1
-        if ( a_v(i_l) .gt. al_stall ) then
-          if ( ( a_v(i_l-1) .lt. al_stall ) .and. &
-               ( a_v(i_l+1) .lt. al_stall ) ) then
-             a_v(     i_l) = 0.5_wp * ( a_v(     i_l-1) + a_v(     i_l+1) ) 
-             dou_temp(i_l) = 0.5_wp * ( dou_temp(i_l-1) + dou_temp(i_l+1) ) 
-           end if
-        elseif ( a_v(i_l) .lt. -al_stall ) then
-          if ( ( a_v(i_l-1) .gt. -al_stall ) .and. &
-               ( a_v(i_l+1) .gt. -al_stall ) ) then
-             a_v(     i_l) = 0.5_wp * ( a_v(     i_l-1) + a_v(     i_l+1) ) 
-             dou_temp(i_l) = 0.5_wp * ( dou_temp(i_l-1) + dou_temp(i_l+1) ) 
-           end if
-        end if
-      end do
-    end if
-    ! rough ---- 
 
-    ! Update ll intensity
+    ! === Stall regularisation ===
+    ! avoid "unphysical" stall on an elem between 2 elems without stall. Check
+    ! ll section of nn_stall elems, with nn_stall \in (1,llRegularisationNelems)
+    ! todo:
+    !   - read neighbouring elements and not the prev and next elem in ll numbering
+    !   - read al_stall from tables (?), now it is an input from the user 
+    if ( stall_regularisation ) then ! *** stall regularisation ***
+
+      if ( ( mod( ic , n_iter_reg ) .eq. 0 ) .or. &
+           ( ic .eq. fp_maxIter ) ) then
+
+        al_stall = al_stall * 180.0_wp / pi
+        a_v = a_v * 180.0_wp / pi
+        i_l = 2 
+
+        nn_stall = 1
+        do while( i_l .lt. size(elems_ll) )
+
+          nn_stall = 1 ; i_do = 1
+
+          do while ( ( i_do .eq. 1 ) .and. ( nn_stall .le. n_stall ) .and. &
+                    ( i_l + nn_stall .le. size(elems_ll) ) )
+
+            if ( ( all(a_v(i_l:i_l+nn_stall-1) .ge. al_stall ) ) .and. &
+                 ( a_v(i_l-1       ) .lt. al_stall )             .and. &
+                 ( a_v(i_l+nn_stall) .lt. al_stall ) ) then ! correct
+
+! ! todo: assign a proper debug_level to this screen output
+! ! debug ----
+!               write(*,*) ' stall_regularisation '
+!               write(*,*) ' i_l , i_l+nn_stall-1 : ' , i_l , i_l+nn_stall-1
+!               write(*,*) (a_v(i_l:i_l+nn_stall-1) .ge. al_stall ) , '       ' , &
+!                          (a_v(i_l-1) .lt. al_stall ) , &
+!                          (a_v(i_l+nn_stall) .lt. al_stall)
+!               write(*,*) ' a_v(i_l-1,i_l+nn_stall): ' , a_v(i_l-1) , a_v(i_l+nn_stall)
+!               write(*,*) ' a_v(i_l:i_l+nn_stall-1)    : ' , a_v(i_l:i_l+nn_stall-1)
+! ! debug ---- 
+              do i = 1 , nn_stall
+                a_v(     i_l+i-1) = dble(i )/dble(nn_stall+1) * a_v(i_l+nn_stall) + & 
+                        (nn_stall+1-dble(i))/dble(nn_stall+1) * a_v(i_l-1)
+                dou_temp(i_l+i-1) = dble(i )/dble(nn_stall+1) * dou_temp(i_l+nn_stall) + & 
+                        (nn_stall+1-dble(i))/dble(nn_stall+1) * dou_temp(i_l-1)
+              end do
+
+! ! todo: assign a proper debug_level to this screen output
+! ! debug ---- 
+!               write(*,*) ' a_v(i_l:i_l+nn_stall-1) new: ' , a_v(i_l:i_l+nn_stall-1)
+! ! debug ---- 
+
+              i_do = 0 ;  ! update variable for the do while loops
+
+            end if
+
+            nn_stall = nn_stall + 1 ! look for larger ll sections
+
+          end do        
+
+          ! update the index of the next elems to analyse for regularisation
+          if ( i_do .eq. 0 ) then ;  i_l = i_l + nn_stall-1
+          else ;                     i_l = i_l + 1
+          end if
+
+        end do ! *** loop over ll elems ***
+
+        a_v = a_v * pi / 180.0_wp
+        al_stall = al_stall * pi / 180.0_wp
+
+      end if ! *** if ic/n_iter_reg integer, and ... ***
+
+    end if ! *** stall regularisation ***
+
+    ! === Update ll intensity ===
     do i_l = 1,size(elems_ll)
-!     ! debug ----
-!     write(*,*) elems_ll(i_l)%p%mag
-!     ! debug ----
       elems_ll(i_l)%p%mag = ( dou_temp(i_l)+ fp_damp*elems_ll(i_l)%p%mag )&
                              /(1.0_wp+fp_damp)
       max_mag_ll = max(max_mag_ll,abs(elems_ll(i_l)%p%mag))
     enddo
 
-!   ! debug ----
-!   write(*,*) ' Iter n.' , ic 
-!   write(*,'(A)') ' i_l  ,   u_v  ,   a_v  ,  chord ,   cl  , dou_temp : ' 
-!   do i_l = 1,size(elems_ll)
-!      write(*,'(I4.4,5(F10.4),2(I4.2),F10.4)') &
-!          i_l , u_v(i_l) , a_v(i_l) , chord_v(i_l) , cl_v(i_l) , dou_temp(i_l) , &
-!          el_i_airfoil_m(i_l,:) , el_csi_cen_v(i_l)
-!   end do
-!   ! debug ----
-
-    if ( diff/max_mag_ll .le. fp_tol ) exit
+    if ( diff/max_mag_ll .le. fp_tol ) exit ! convergence
 
   enddo
 
-  ! Loads computation ------------
+! ! todo: assign a proper debug_level to this screen output
+! ! debug ----
+!   write(*,*) '     i_l      ,        ll_alpha  ,          ll_ma  '
+!   do i_l = 1 , size(elems_ll)
+!     write(*,*) i_l , a_v(i_l)*180.0_wp / pi , ma_v(i_l)
+!   end do
+! ! debug ----
+
+  ! === Loads computation ===
   do i_l = 1,size(elems_ll)
    select type(el => elems_ll(i_l)%p)
    type is(t_liftlin)
@@ -539,7 +591,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     el%dmom = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
                    el%chord * el%area * c_m(i_l,3)
 
-
    end select
   end do
 
@@ -549,9 +600,13 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     write(msg,*) 'diff/max_mag_ll:',diff/max_mag_ll; call printout(trim(msg))
   endif
 
-
+  ! useful arrays ---
   deallocate(dou_temp, vel_w)
   deallocate(a_v,c_m,u_v)
+  
+! ! debug ----
+! deallocate(re_v, ma_vm chord_v, cl_v, el_i_airfoil_m, el_csi_cen_v)
+! ! debug ----
 
 end subroutine solve_liftlin
 
@@ -658,6 +713,5 @@ subroutine calc_geo_data_liftlin(this, vert)
 ! this%ver(:,4) = this%ver(:,4) - ( this%ver(:,4) - this%ver(:,1) ) / 4.0_wp
 
 end subroutine calc_geo_data_liftlin
-!----------------------------------------------------------------------
 
 end module mod_liftlin

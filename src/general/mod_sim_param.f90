@@ -146,8 +146,12 @@ type t_sim_param
   real(wp) :: llDamp
   !> Avoid "unphysical" separations in inner sections of LL? :: llTol
   logical  :: llStallRegularisation
-  !> Number of "unphysical" separations thata can be removed 
+  !> Number of "unphysical" separations that can be removed 
   integer  :: llStallRegularisationNelems
+  !> Number of iterations between two regularisation processes
+  integer  :: llStallRegularisationNiters
+  !> Reference stall AOA for regularisation
+  real(wp) :: llStallRegularisationAlphaStall
 
   !FMM parameters
   !> Employing the FMM method
