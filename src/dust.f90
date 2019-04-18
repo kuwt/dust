@@ -711,27 +711,27 @@ do it = 1,nstep
   end do
 
   ! pres_IE +++++
-  if ( it .gt. 1 ) then
-    do i_el = 1 , geo%nSurfPan
-      select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
-       ! check UHLMAN's EQN -----
-       el%pres = &
-        linsys%res_pres(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp 
-!      el%pres = &
-!       surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp + &
-!          sim_param%rho_inf * sum(el%surf_vel*el%ub)
-       ! check UHLMAN's EQN -----
-      end select
-    end do
-    
+  !!if ( it .gt. 1 ) then
+  !!  do i_el = 1 , geo%nSurfPan
+  !!    select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
+  !!     ! check UHLMAN's EQN -----
+  !!     el%pres = &
+  !!      linsys%res_pres(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp 
+! !!     el%pres = &
+! !!      surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp + &
+! !!         sim_param%rho_inf * sum(el%surf_vel*el%ub)
+  !!     ! check UHLMAN's EQN -----
+  !!    end select
+  !!  end do
+  !!  
 
-  else
-    do i_el = 1 , geo%nSurfPan
-      select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
-       el%pres = 0.0_wp
-      end select
-    end do
-  end if
+  !!else
+  !!  do i_el = 1 , geo%nSurfPan
+  !!    select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
+  !!     el%pres = 0.0_wp
+  !!    end select
+  !!  end do
+  !!end if
 
   ! pres_IE +++++
 

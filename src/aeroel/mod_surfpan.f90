@@ -724,7 +724,7 @@ subroutine compute_pres_surfpan(this, R_g, sim_param)
   type(t_sim_param), intent(in)    :: sim_param
   !type(t_elem_p),   intent(in)    :: elems(:)
 
-  real(wp) :: vel_phi(3)
+  real(wp) :: vel_phi(3), force_pres
   real(wp) :: f(5)    ! <- max n_ver of a surfpan = 4 ; +1 for the constraint eqn
 
   integer :: i_e , n_neigh
@@ -790,29 +790,43 @@ subroutine compute_pres_surfpan(this, R_g, sim_param)
   !                                - 0.5*rho_inf*V^2 - rho_inf*dphi/dt
   !                                     + rho * ub.u_phi
   ! with idou = -phi
-  this%pres  = sim_param%P_inf &
-! reduced equation after some manipulation
-!   - 0.5 * sim_param%rho_inf * norm2(vel_phi+this%uvort)**2.0_wp & 
-!         - sim_param%rho_inf * sum( & 
-!            (sim_param%u_inf-this%ub)*(vel_phi+this%uvort) ) & 
-!         + sim_param%rho_inf * this%didou_dt
-! full equation
-    + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
-    - 0.5_wp * sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp  &
-             + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
-             + sim_param%rho_inf * this%didou_dt
+!!!  this%pres  = sim_param%P_inf &
+!!!! reduced equation after some manipulation
+!!!!   - 0.5 * sim_param%rho_inf * norm2(vel_phi+this%uvort)**2.0_wp & 
+!!!!         - sim_param%rho_inf * sum( & 
+!!!!            (sim_param%u_inf-this%ub)*(vel_phi+this%uvort) ) & 
+!!!!         + sim_param%rho_inf * this%didou_dt
+!!!! full equation
+!!!    + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
+!!!    - 0.5_wp * sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp  &
+!!!             + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
+!!!             + sim_param%rho_inf * this%didou_dt
 
 
    !New equation
-   !this%pres = this%pres_sol - 0.5*sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp
+   this%pres = this%pres_sol - 0.5*sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp
 
+  if (this%moving) then
+    force_pres  = sim_param%P_inf &
+      + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
+      - 0.5_wp * sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp  &
+               + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
+               + sim_param%rho_inf * this%didou_dt
+  else
+    force_pres = this%pres    
+  endif
+
+  this%dforce = - force_pres * this%area * this%nor
 
 end subroutine compute_pres_surfpan
 
 !----------------------------------------------------------------------
 
-! Compute the elementary force on the on the actual element
+!> Compute the elementary force on the on the actual element
 !!
+!! WARNING: at the moment this is completely bypassed, due to the
+!! different treatment of stationary and moving elements.
+!! Its functionalities were moved into compute_pres_surfpan
 subroutine compute_dforce_surfpan(this, sim_param)
   class(t_surfpan), intent(inout) :: this
   !type(t_elem_p), intent(in) :: elems(:)
@@ -821,7 +835,7 @@ subroutine compute_dforce_surfpan(this, sim_param)
   ! first rough approximation
   ! vec{F} = - this%pres * vec{n}
 
-  this%dforce = - this%pres * this%area * this%nor
+  !this%dforce = - this%pres * this%area * this%nor
 
 
 end subroutine compute_dforce_surfpan
