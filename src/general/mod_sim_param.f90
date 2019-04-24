@@ -55,6 +55,12 @@ use mod_hdf5_io, only: &
    h5loc, &
    write_hdf5_attr
 
+use mod_parse, only: &
+  t_parse, &
+  countoption , &
+  getstr, getlogical, getreal, getint, getrealarray, getintarray, &
+  ignoredParameters, finalizeParameters
+
 implicit none
 
 public :: t_sim_param, sim_param
@@ -199,7 +205,6 @@ type t_sim_param
 contains
 
   procedure, pass(this) :: save_param => save_sim_param
-
 end type t_sim_param
 
 type(t_sim_param) :: sim_param
@@ -207,6 +212,7 @@ type(t_sim_param) :: sim_param
 !----------------------------------------------------------------------
 contains
 !----------------------------------------------------------------------
+
 
 subroutine save_sim_param(this, loc)
  class(t_sim_param) :: this

@@ -51,7 +51,7 @@ use mod_param, only: &
   wp, nl, pi, max_char_len
 
 use mod_sim_param, only: &
-  t_sim_param
+  sim_param
 
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
@@ -267,13 +267,12 @@ type, abstract :: c_wake_mov
 end type
 
 abstract interface 
- subroutine i_get_vel(this, elems, wake, pos, sim_param, vel)
-   import :: c_wake_mov, wp, t_pot_elem_p, t_wake, t_sim_param
+ subroutine i_get_vel(this, elems, wake, pos, vel)
+   import :: c_wake_mov, wp, t_pot_elem_p, t_wake
    class(c_wake_mov) :: this
    type(t_pot_elem_p), intent(in) :: elems(:)
    type(t_wake), intent(in) :: wake
    real(wp), intent(in) :: pos(3)
-   type(t_sim_param), intent(in) :: sim_param
    real(wp), intent(out) :: vel(3)
  end subroutine
 end interface
@@ -298,15 +297,13 @@ contains
 !----------------------------------------------------------------------
 
 !> Initialize the panel wake
-subroutine initialize_wake(wake, geo, te,  npan, nrings, &
-                           nparts, sim_param)
+subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
  type(t_wake), intent(out),target :: wake
  type(t_geo), intent(in), target :: geo
  type(t_tedge), intent(in) :: te
  integer, intent(in) :: npan
  integer, intent(in) :: nrings
  integer, intent(in) :: nparts
- type(t_sim_param), intent(in) :: sim_param
 
  integer :: iw, ip, nsides
  integer :: ic, nad, ie, npt, id, ir, nend
@@ -546,11 +543,10 @@ end subroutine
 
 !> Prepare the first row of panels to be inserted inside the linear system
 !!
-subroutine prepare_wake(wake, geo, elems, sim_param)
+subroutine prepare_wake(wake, geo, elems)
  type(t_wake), target, intent(inout) :: wake
  type(t_geo), intent(in) :: geo
  type(t_pot_elem_p), intent(in) :: elems(:)
- type(t_sim_param), intent(in) :: sim_param
 
  integer :: p1, p2
  integer :: ip, iw, ipan, id, is, nprev
@@ -619,7 +615,7 @@ subroutine prepare_wake(wake, geo, elems, sim_param)
 !$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n)
   do ip = 1, n_part
     if(sim_param%use_pa) call avoid_collision(elems, wake, &
-                        wake%part_p(ip)%p, sim_param, wake%part_p(ip)%p%vel)
+                        wake%part_p(ip)%p, wake%part_p(ip)%p%vel)
                            !wake%part_p(ip)%p, sim_param, wake%prt_vel(:,ip))
     if(.not. wake%part_p(ip)%p%free) then
       !pos_p = wake%part_p(ip)%p%cen + wake%prt_vel(:,ip)*sim_param%dt
@@ -1077,11 +1073,10 @@ end subroutine load_wake
 !! Note: at this subroutine is passed the whole array of elements,
 !! comprising both the implicit panels and the explicit (ll)
 !! elements
-subroutine update_wake(wake, elems, octree, sim_param)
+subroutine update_wake(wake, elems, octree)
  type(t_wake), intent(inout), target :: wake
  type(t_pot_elem_p), intent(in) :: elems(:)
  type(t_octree), intent(inout) :: octree
- type(t_sim_param), intent(in) :: sim_param
 
  integer :: iw, ipan, ie, ip, np, iq
  integer :: id, ir
@@ -1138,7 +1133,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
       !wake%w_vel(:,iw,ipan-1) = vel_p
 
       !vel_p    = vel_p   + sim_param%u_inf
-      call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
+      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
 
       !update the position in time
       wake%pan_w_vel(   :,iw,ipan) = vel_p
@@ -1161,7 +1156,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
       !call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
 
       !vel_p    = vel_p   + sim_param%u_inf
-      call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
+      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
 
       !update the position in time
       points_end(:,iw) = pos_p + vel_p*sim_param%dt
@@ -1212,7 +1207,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
       pos_p = points(:,ip,ir)
       vel_p = 0.0_wp
 
-      call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
+      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
 
       !update the position in time
       points(:,ip,ir) = points(:,ip,ir) + vel_p*sim_param%dt
@@ -1239,7 +1234,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
       !call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
 
       !vel_p    = vel_p   + sim_param%u_inf
-      call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
+      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
 
       !update the position in time
       points_end_ring(:,ip) = pos_p + vel_p*sim_param%dt
@@ -1280,7 +1275,7 @@ subroutine update_wake(wake, elems, octree, sim_param)
     if (.not.sim_param%use_fmm) then
       pos_p = wake%part_p(ip)%p%cen
 
-      call wake_movement%get_vel(elems, wake, pos_p, sim_param, vel_p)
+      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
 
       !wake%prt_vel(:,ip) = vel_p                            ! *****(old) vel_prt(:,ip) = vel_p
       !wake%part_p(ip)%p%vel     =  wake%prt_vel(:,ip)       ! *****(old) vel_prt(:,ip)
@@ -1327,10 +1322,10 @@ subroutine update_wake(wake, elems, octree, sim_param)
   
   if (sim_param%use_fmm) then
     t0 = dust_time()
-    call sort_particles(wake%part_p, wake%n_prt, octree, sim_param)
+    call sort_particles(wake%part_p, wake%n_prt, octree)
     call calculate_multipole(wake%part_p, octree)
     call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
-                         wake%end_vorts, sim_param)
+                         wake%end_vorts)
     t1 = dust_time()
     write(msg,'(A,F9.3,A)') 'Multipoles calculation: ' , t1 - t0,' s.'
     if(sim_param%debug_level.ge.3) call printout(msg)
@@ -1462,11 +1457,10 @@ end subroutine update_wake
 
 !----------------------------------------------------------------------
 
-subroutine compute_vel_from_all(elems, wake, pos, sim_param, vel)
+subroutine compute_vel_from_all(elems, wake, pos, vel)
  type(t_pot_elem_p), intent(in) :: elems(:)
  type(t_wake), intent(in) :: wake
  real(wp), intent(in) :: pos(3)
- type(t_sim_param), intent(in) :: sim_param
  real(wp), intent(out) :: vel(3)
 
  integer :: ie
@@ -1511,15 +1505,14 @@ end subroutine compute_vel_from_all
 
 !----------------------------------------------------------------------
 
-subroutine get_vel_free(this, elems, wake, pos, sim_param, vel)
+subroutine get_vel_free(this, elems, wake, pos, vel)
  class(t_free_wake) :: this
  type(t_pot_elem_p), intent(in) :: elems(:)
  type(t_wake), intent(in) :: wake
  real(wp), intent(in) :: pos(3)
- type(t_sim_param), intent(in) :: sim_param
  real(wp), intent(out) :: vel(3)
 
-  call compute_vel_from_all(elems, wake, pos, sim_param, vel)
+  call compute_vel_from_all(elems, wake, pos, vel)
   
   vel = vel + sim_param%u_inf
 
@@ -1527,12 +1520,11 @@ end subroutine get_vel_free
 
 !----------------------------------------------------------------------
 
-subroutine get_vel_rigid(this, elems, wake, pos, sim_param, vel)
+subroutine get_vel_rigid(this, elems, wake, pos, vel)
  class(t_rigid_wake) :: this
  type(t_pot_elem_p), intent(in) :: elems(:)
  type(t_wake), intent(in) :: wake
  real(wp), intent(in) :: pos(3)
- type(t_sim_param), intent(in) :: sim_param
  real(wp), intent(out) :: vel(3)
 
 ! vel = sim_param%u_inf
@@ -1709,11 +1701,10 @@ end function get_joined_intensity
 !
 !end subroutine avoid_collision
 
-subroutine avoid_collision(elems, wake, part, sim_param, vel)
+subroutine avoid_collision(elems, wake, part, vel)
  type(t_pot_elem_p), intent(in) :: elems(:)
  type(t_wake), intent(inout) :: wake
  type(t_vortpart), intent(inout) :: part
- type(t_sim_param), intent(in) :: sim_param
  real(wp), intent(inout) :: vel(3)
 
  integer :: ie

@@ -52,7 +52,7 @@ use mod_param, only: &
   wp, max_char_len, nl
 
 use mod_sim_param, only: &
-  t_sim_param
+  sim_param
 
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime, check_preproc
@@ -125,10 +125,9 @@ character(len=*), parameter :: this_mod_name = 'mod_dust_io'
 contains
 
 !----------------------------------------------------------------------
-subroutine save_status(geo, wake,  sim_params, it, time, run_id)
+subroutine save_status(geo, wake, it, time, run_id)
  type(t_geo), intent(in)         :: geo
  type(t_wake), intent(in) :: wake
- type(t_sim_param), intent(in)  :: sim_params
  integer, intent(in)             :: it
  real(wp), intent(in)            :: time
  integer, intent(in)             :: run_id(10)
@@ -148,18 +147,18 @@ subroutine save_status(geo, wake,  sim_params, it, time, run_id)
 
   !create the output file
   write(sit,'(I4.4)') it
-  call new_hdf5_file(trim(sim_params%basename)//'_res_'//trim(sit)//'.h5', &
+  call new_hdf5_file(trim(sim_param%basename)//'_res_'//trim(sit)//'.h5', &
                      floc)
   call write_hdf5_attr(run_id, 'run_id', floc)
   call write_hdf5_attr(git_sha1, 'git_sha1', floc)
   call write_hdf5_attr(version, 'version', floc)
-  call sim_params%save_param(floc)
+  call sim_param%save_param(floc)
   call write_hdf5(time,'time',floc)
 
   call new_hdf5_group(floc, 'Parameters', ploc)
-  call write_hdf5(sim_params%u_inf,'u_inf', ploc)
-  call write_hdf5(sim_params%P_inf,'P_inf', ploc)
-  call write_hdf5(sim_params%rho_inf,'rho_inf', ploc)
+  call write_hdf5(sim_param%u_inf,'u_inf', ploc)
+  call write_hdf5(sim_param%P_inf,'P_inf', ploc)
+  call write_hdf5(sim_param%rho_inf,'rho_inf', ploc)
   call close_hdf5_group(ploc)
   
 

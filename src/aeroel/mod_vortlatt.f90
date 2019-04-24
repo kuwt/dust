@@ -59,7 +59,7 @@ use mod_linsys_vars, only: &
   t_linsys
 
 use mod_sim_param, only: &
-  t_sim_param
+  sim_param
 
 use mod_param, only: &
   wp, pi, max_char_len, prev_tri, next_tri, prev_qua, next_qua
@@ -403,10 +403,9 @@ end subroutine compute_vel_vortlatt
 !!  s.t. vec{dforce} = pres * vec{n}  ( since vec{n} = vec{n_upper} )
 !!
 !! see compute_dforce_vortlatt
-subroutine compute_pres_vortlatt(this, R_g, sim_param)
+subroutine compute_pres_vortlatt(this, R_g)
   class(t_vortlatt), intent(inout) :: this
   real(wp)         , intent(in)    :: R_g(3,3)
-  type(t_sim_param), intent(in)    :: sim_param
 !type(t_elem_p), intent(in) :: elems(:)
 
 integer  :: i_stripe
@@ -444,10 +443,9 @@ end subroutine compute_pres_vortlatt
 !----------------------------------------------------------------------
 
 !>  Compute the elementary force on the on the actual element
-subroutine compute_dforce_vortlatt(this, sim_param)
+subroutine compute_dforce_vortlatt(this)
 class(t_vortlatt), intent(inout) :: this
 !type(t_elem_p), intent(in) :: elems(:)
-type(t_sim_param), intent(in) :: sim_param
 
 this%dforce = this%pres * this%area * this%nor
 

@@ -61,7 +61,7 @@ use mod_linsys_vars, only: &
   t_linsys
 
 use mod_sim_param, only: &
-  t_sim_param
+  sim_param
 
 use mod_math, only: &
   cross
@@ -218,10 +218,9 @@ end subroutine compute_cp_liftlin
 
 !> The computation of the pressure in the lifting line is not meant to
 !! happen, loads are retrieved from the tables
-subroutine compute_pres_liftlin (this, R_g, sim_param)
+subroutine compute_pres_liftlin (this, R_g)
  class(t_liftlin) , intent(inout) :: this
  real(wp)         , intent(in)    :: R_g(3,3)
- type(t_sim_param), intent(in)    :: sim_param
  !type(t_elem_p), intent(in) :: elems(:)
 
  character(len=*), parameter      :: this_sub_name='compute_pres_liftlin'
@@ -240,10 +239,9 @@ end subroutine compute_pres_liftlin
 
 !> The computation of loads happens in solve_liftlin and not in
 !! this subroutine, which is not used
-subroutine compute_dforce_liftlin (this, sim_param)
+subroutine compute_dforce_liftlin (this)
  class(t_liftlin), intent(inout) :: this
  !type(t_elem_p), intent(in) :: elems(:)
- type(t_sim_param), intent(in) :: sim_param
 
  character(len=*), parameter      :: this_sub_name='compute_dforce_liftlin'
 
@@ -293,14 +291,13 @@ end subroutine update_liftlin
 subroutine solve_liftlin(elems_ll, elems_tot, &
                          elems_impl, elems_ad, &
                          elems_wake, elems_vort, &
-                         sim_param, airfoil_data, it)
+                         airfoil_data, it)
  type(t_expl_elem_p), intent(inout) :: elems_ll(:)
  type(t_pot_elem_p),  intent(in)    :: elems_tot(:)
  type(t_impl_elem_p), intent(in)    :: elems_impl(:)
  type(t_expl_elem_p), intent(in)    :: elems_ad(:)
  type(t_pot_elem_p),  intent(in)    :: elems_wake(:)
  type(t_vort_elem_p), intent(in)    :: elems_vort(:)
- type(t_sim_param),   intent(in)    :: sim_param
  type(t_aero_tab),    intent(in)    :: airfoil_data(:)
  real(wp) :: uinf(3)
  integer  :: i_l, j, ic
