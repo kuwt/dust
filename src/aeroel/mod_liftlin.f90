@@ -331,13 +331,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
 ! debug ----
  integer, intent(in) :: it
- character(len=4) :: it_str
- real(wp) , allocatable :: re_v(:) , ma_v(:)
 
- real(wp) , allocatable :: vel_ctr(:,:)
- real(wp) , allocatable :: chord_v(:) , cl_v(:)
- real(wp) , allocatable :: el_csi_cen_v(:)
- integer  , allocatable :: el_i_airfoil_m(:,:) 
 ! debug ----
 
 ! newton ---
@@ -519,10 +513,13 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 !               write(*,*) ' a_v(i_l:i_l+nn_stall-1)    : ' , a_v(i_l:i_l+nn_stall-1)
 ! ! debug ---- 
               do i = 1 , nn_stall
-                a_v(     i_l+i-1) = dble(i )/dble(nn_stall+1) * a_v(i_l+nn_stall) + & 
-                        (nn_stall+1-dble(i))/dble(nn_stall+1) * a_v(i_l-1)
-                dou_temp(i_l+i-1) = dble(i )/dble(nn_stall+1) * dou_temp(i_l+nn_stall) + & 
-                        (nn_stall+1-dble(i))/dble(nn_stall+1) * dou_temp(i_l-1)
+                a_v(     i_l+i-1) =  real(i,wp)/real(nn_stall+1,wp) &
+                        * a_v(i_l+nn_stall) + (real(nn_stall+1-i,wp))/&
+                                       real(nn_stall+1,wp) * a_v(i_l-1)
+
+                dou_temp(i_l+i-1) = real(i,wp)/real(nn_stall+1,wp) * &
+                     dou_temp(i_l+nn_stall) + (real(nn_stall+1-i,wp))/&
+                                  real(nn_stall+1,wp) * dou_temp(i_l-1)
               end do
 
 ! ! todo: assign a proper debug_level to this screen output

@@ -338,8 +338,7 @@ subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
   ! Reynolds effect correction ----
 
   ! dclda ----
-  real(wp) :: dclda1 , dclda2 , al01 , al02
-  real(wp) :: dclda_v(2) , al0_v(2)
+  real(wp) :: al01
   ! dclda ----
 
   ! n factor for the corrections of aerodynamic coeffs, with (Re/Re_table)^n

@@ -366,8 +366,8 @@ end subroutine assemble_linsys
 subroutine solve_linsys(linsys)
  type(t_linsys), intent(inout) :: linsys
 
- real(wp) , allocatable :: A_tmp(:,:)
- integer, allocatable :: IPIV(:)
+! real(wp) , allocatable :: A_tmp(:,:)
+! integer, allocatable :: IPIV(:)
  integer              :: INFO   
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name = 'solve_linsys'

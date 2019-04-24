@@ -328,7 +328,7 @@ subroutine solve_pressure_sys(linsys)
           linsys%nmoving_sp,linsys%P_pres(linsys%nstatic_sp+1:linsys%n_sp),info)
     if ( info .ne. 0 ) then
       write(msg,*) 'error while factorizing the dynamic  block of the &
-                    pressure linear system, Lapack DGETRF error code ', info
+                    &pressure linear system, Lapack DGETRF error code ', info
       call error(this_sub_name, this_mod_name, trim(msg))
     end if
 

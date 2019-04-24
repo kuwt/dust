@@ -1705,7 +1705,7 @@ subroutine update_geometry(geo, t, update_static)
  real(wp), intent(in) :: t
  logical, intent(in) :: update_static
 
- integer :: i_comp, ie , ip
+ integer :: i_comp, ie
 
  !update all the references
  call update_all_references(geo%refs,t)
