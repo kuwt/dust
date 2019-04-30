@@ -51,6 +51,10 @@ use mod_param, only: &
 use mod_handling, only: &
   error, warning, info, printout, new_file_unit
 
+use mod_vtk_utils, only: &
+  t_output_var, vtk_isize, vtk_fsize, vtk_print_piece_header, &
+  vtk_print_piece_data
+
 
 !---------------------------------------------------------------------
 implicit none
@@ -59,8 +63,6 @@ public :: vtk_out_bin, vtk_out_viz , vtr_write
 
 private
 
-integer, parameter :: vtk_isize = 4
-integer, parameter :: vtk_fsize = 4
 character(len=*), parameter :: &
   this_mod_name = 'mod_vtk_output'
 !---------------------------------------------------------------------
@@ -527,21 +529,24 @@ end subroutine vtk_out_bin
 !!
 !! This is a more advanced version, supporting different variables
 subroutine vtk_out_viz (out_filename, & 
-                        rr, ee, vars, var_names, &
-                        w_rr, w_ee, w_vars, w_var_names, &
-                        vp_rr, vp_vars, vp_var_names, separate_wake)
+                        rr, ee, vars, &
+                        w_rr, w_ee, w_vars, &
+                        vp_rr, vp_vars, separate_wake)
  character(len=*), intent(in) :: out_filename 
  real(wp), intent(in) :: rr(:,:)
  integer, intent(in) :: ee(:,:)
- real(wp), intent(in) :: vars(:,:)
- character(len=*), intent(in) :: var_names(:)
+ !real(wp), intent(in) :: vars(:,:)
+ !character(len=*), intent(in) :: var_names(:)
+ type(t_output_var), intent(in), optional :: vars(:)
  real(wp), intent(in), optional :: w_rr(:,:)
  integer, intent(in), optional :: w_ee(:,:)
- real(wp), intent(in), optional :: w_vars(:,:)
- character(len=*), intent(in), optional :: w_var_names(:)
+ !real(wp), intent(in), optional :: w_vars(:,:)
+ !character(len=*), intent(in), optional :: w_var_names(:)
+ type(t_output_var), intent(in), optional :: w_vars(:)
  real(wp), intent(in), optional :: vp_rr(:,:)
- real(wp), intent(in), optional :: vp_vars(:,:)
- character(len=*), intent(in), optional :: vp_var_names(:)
+ !real(wp), intent(in), optional :: vp_vars(:,:)
+ !character(len=*), intent(in), optional :: vp_var_names(:)
+ type(t_output_var), intent(in), optional :: vp_vars(:)
  logical, intent(in), optional :: separate_wake
 
  integer :: fu, ierr, i, i_shift
@@ -554,30 +559,33 @@ subroutine vtk_out_viz (out_filename, &
 
  integer :: ie, nquad, ntria, nquad_w, ntria_w, etype, nvp
  integer :: npoints_w, nw
- integer :: nvars, nvars_w, nvars_vp, i_v
+ !integer :: nvars, nvars_w, nvars_vp, 
+ integer :: i_v
  logical :: got_wake, got_particles, swake
 
-  got_wake = present(w_var_names)
+  got_wake = present(w_vars)
   got_particles = got_wake .and. (size(vp_rr,2) .gt. 0)
   swake = .false.
   if(present(separate_wake)) swake = separate_wake
 
   lf = char(10) !line feed char
+
   ne = size(ee,2) !number of elements
   npoints = size(rr,2)
   ncells = ne
-  nvars = size(var_names)
+
+ ! nvars = size(var_names)
   if(got_wake) then
     nw = size(w_ee,2) !number of wake elements
     npoints_w = size(w_rr,2)
-    nvars_w = size(w_var_names)
+ !   nvars_w = size(w_var_names)
   endif
 
   if(got_particles) then
     nvp = size(vp_rr,2)
-    nvars_vp = size(vp_var_names)
+  !  nvars_vp = size(vp_var_names)
   else
-    nvars_vp = 0
+  !  nvars_vp = 0
     nvp = 0
   endif
 
@@ -610,188 +618,23 @@ subroutine vtk_out_viz (out_filename, &
   call new_file_unit(fu,ierr)
   open(fu,file=trim(out_filename), &
         status='replace',access='stream',iostat=ierr)
+  offset = 0
   buffer = '<?xml version="1.0"?>'//lf; write(fu) trim(buffer)
   buffer = '<VTKFile type="UnstructuredGrid" version="0.1" byte_order="LittleEndian">'//lf
   write(fu) trim(buffer)
   buffer = ' <UnstructuredGrid>'//lf; write(fu) trim(buffer)
-  write(str1,'(I0)') npoints
-  write(str2,'(I0)') ncells
-  buffer = '  <Piece NumberOfPoints="'//trim(str1)//'" NumberOfCells="'//&
-                   trim(str2)//'">'//lf; write(fu) trim(buffer)
-  offset = 0
-  !Points
-  buffer =  '   <Points>'//lf; write(fu) trim(buffer)
-  write(ostr,'(I0)') offset
-  buffer='    <DataArray type="Float32" Name="Coordinates" &
-                  &NumberOfComponents="3" format="appended" &
-         &offset="'//trim(ostr)//'"/>'//lf;write(fu) trim(Buffer)
-
-  buffer =  '   </Points>'//lf; write(fu) trim(buffer)
-  offset = offset + vtk_isize + vtk_fsize*size(rr,1)*size(rr,2)
-
-  !Cells
-  buffer =  '   <Cells>'//lf; write(fu) trim(buffer)
-
-  write(ostr,'(I0)') offset
-  buffer = '    <DataArray type="Int32" Name="connectivity" &
-           &Format="appended" offset="'//trim(ostr)//'"/>'//lf; 
-  write(fu) trim(buffer)
-  offset = offset + vtk_isize + vtk_isize*3*ntria + vtk_isize*4*nquad
-
-  write(ostr,'(I0)') offset
-  buffer =  '    <DataArray type="Int32" Name="offsets" &
-    &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
-  write(fu) trim(buffer)
-  offset = offset + vtk_isize + vtk_isize*ne
-
-  write(ostr,'(I0)') offset
-  buffer = '    <DataArray type="Int32" Name="types" &
-    &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
-  write(fu) trim(buffer)
-  offset = offset + vtk_isize + vtk_isize*ne
-
-  buffer =  '   </Cells>'//lf; write(fu) trim(buffer)
-
-  !Data
-  if (nvars .gt. 0) then
-    buffer =  '   <CellData Scalars="scalars">'//lf; 
-    write(fu) trim(buffer)
-    do i_v = 1,nvars
-      write(ostr,'(I0)') offset
-      buffer = '    <DataArray type="Float32" Name="'//trim(var_names(i_v))//'" &
-        &Format="appended" offset="'//trim(ostr)//'"/>'//lf
-      write(fu) trim(buffer)
-      offset = offset + vtk_isize + vtk_fsize*ne
-    enddo
-    buffer = '   </CellData>'//lf; write(fu) trim(buffer)
-  endif
-
-  buffer = '  </Piece>'//lf; write(fu) trim(buffer)
-
-
-
+  call vtk_print_piece_header(fu,offset,npoints,ncells,nquad,ntria,0,vars)
 
   !WAKE ===
   if (got_wake) then
-    write(str1,'(I0)') npoints_w
-    write(str2,'(I0)') nw
-    buffer = '  <Piece NumberOfPoints="'//trim(str1)//'" NumberOfCells="'//&
-                     trim(str2)//'">'//lf; write(fu) trim(buffer)
-    !Points
-    buffer =  '   <Points>'//lf; write(fu) trim(buffer)
-    write(ostr,'(I0)') offset
-    buffer='    <DataArray type="Float32" Name="Coordinates" &
-                    &NumberOfComponents="3" format="appended" &
-           &offset="'//trim(ostr)//'"/>'//lf;write(fu) trim(Buffer)
-
-    buffer =  '   </Points>'//lf; write(fu) trim(buffer)
-    offset = offset + vtk_isize + vtk_fsize*size(w_rr,1)*size(w_rr,2)
-
-    !Cells
-    buffer =  '   <Cells>'//lf; write(fu) trim(buffer)
-
-    write(ostr,'(I0)') offset
-    buffer = '    <DataArray type="Int32" Name="connectivity" &
-             &Format="appended" offset="'//trim(ostr)//'"/>'//lf; 
-    write(fu) trim(buffer)
-    offset = offset + vtk_isize  + vtk_isize*4*nquad_w + vtk_isize*3*ntria_w
-
-    write(ostr,'(I0)') offset
-    buffer =  '    <DataArray type="Int32" Name="offsets" &
-      &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
-    write(fu) trim(buffer)
-    offset = offset + vtk_isize + vtk_isize*nw
-
-    write(ostr,'(I0)') offset
-    buffer = '    <DataArray type="Int32" Name="types" &
-      &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
-    write(fu) trim(buffer)
-    offset = offset + vtk_isize + vtk_isize*nw
-
-    buffer =  '   </Cells>'//lf; write(fu) trim(buffer)
-
-    !Data
-    if(nvars .gt. 0) then
-      buffer =  '   <CellData Scalars="scalars">'//lf; 
-      write(fu) trim(buffer)
-      do i_v = 1,nvars
-        write(ostr,'(I0)') offset
-        buffer = '    <DataArray type="Float32" Name="'//trim(var_names(i_v))//'" &
-          &Format="appended" offset="'//trim(ostr)//'"/>'//lf
-        write(fu) trim(buffer)
-        offset = offset + vtk_isize + vtk_fsize*nw
-      enddo
-
-      buffer = '   </CellData>'//lf; write(fu) trim(buffer)
-    endif
-
-
-    buffer = '  </Piece>'//lf; write(fu) trim(buffer)
+    call vtk_print_piece_header(fu,offset,npoints_w,nw,nquad_w,ntria_w,0,w_vars)
   endif
 
   !=== Vortex Particles
   if(got_particles) then
-    write(str1,'(I0)') size(vp_rr,2)
-    buffer = '  <Piece NumberOfPoints="'//trim(str1)//'" NumberOfCells="'//&
-                     trim(str1)//'">'//lf; write(fu) trim(buffer)
-    !Points
-    buffer =  '   <Points>'//lf; write(fu) trim(buffer)
-    write(ostr,'(I0)') offset
-    buffer='    <DataArray type="Float32" Name="Coordinates" &
-                    &NumberOfComponents="3" format="appended" &
-           &offset="'//trim(ostr)//'"/>'//lf;write(fu) trim(Buffer)
-
-    buffer =  '   </Points>'//lf; write(fu) trim(buffer)
-    offset = offset + vtk_isize + vtk_fsize*size(vp_rr,1)*size(vp_rr,2)
-
-    !Cells
-    buffer =  '   <Cells>'//lf; write(fu) trim(buffer)
-
-    write(ostr,'(I0)') offset
-    buffer = '    <DataArray type="Int32" Name="connectivity" &
-             &Format="appended" offset="'//trim(ostr)//'"/>'//lf; 
-    write(fu) trim(buffer)
-    offset = offset + vtk_isize  + vtk_isize*1*nvp
-
-    write(ostr,'(I0)') offset
-    buffer =  '    <DataArray type="Int32" Name="offsets" &
-      &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
-    write(fu) trim(buffer)
-    offset = offset + vtk_isize + vtk_isize*nvp
-
-    write(ostr,'(I0)') offset
-    buffer = '    <DataArray type="Int32" Name="types" &
-      &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
-    write(fu) trim(buffer)
-    offset = offset + vtk_isize + vtk_isize*nvp
-
-    buffer =  '   </Cells>'//lf; write(fu) trim(buffer)
-
-    !Data
-    if(nvars .gt. 0) then
-      !buffer =  '   <PointData>'//lf; 
-      buffer =  '   <CellData Scalars="scalars">'//lf; 
-      write(fu) trim(buffer)
-      do i_v = 1,nvars
-        write(ostr,'(I0)') offset
-        buffer = '    <DataArray type="Float32" Name="'//trim(var_names(i_v))//'" &
-          &Format="appended" offset="'//trim(ostr)//'"/>'//lf
-        write(fu) trim(buffer)
-        offset = offset + vtk_isize + vtk_fsize*nvp
-      enddo
-
-      !buffer = '   </PointData>'//lf; write(fu) trim(buffer)
-      buffer = '   </CellData>'//lf; write(fu) trim(buffer)
-    endif
-
-
-    buffer = '  </Piece>'//lf; write(fu) trim(buffer)
-
-
+    call vtk_print_piece_header(fu,offset,size(vp_rr,2),size(vp_rr,2),0,0, &
+                                size(vp_rr,2),vp_vars)
   endif
-
-
-
 
   buffer = ' </UnstructuredGrid>'//lf; write(fu) trim(buffer)
 
@@ -799,155 +642,16 @@ subroutine vtk_out_viz (out_filename, &
   buffer = '  <AppendedData encoding="raw">'//lf; write(fu) trim(buffer)
   buffer = '_'; write(fu) trim(buffer) !mark the beginning of the data 
 
-  !Points
-  nbytes = vtk_fsize *  &
-               size(rr,1)*size(rr,2)
-  write(fu) nbytes
-  do i=1,size(rr,2)
-   write(fu) real(rr(:,i),vtk_fsize)
-  enddo
-
-  !Connectivity
-  nbytes = vtk_isize*3*ntria+vtk_isize*4*nquad; write(fu) nbytes
-  do i=1,size(ee,2)
-    if (ee(4,i) .eq. 0) then
-      write(fu) ee(1:3,i)-1
-    else
-      write(fu) ee(1:4,i)-1
-    endif
-  enddo
-
-  !Offset
-  nbytes =  vtk_isize*ne; write(fu) nbytes
-  i_shift = 0
-  do i=1,size(ee,2)
-    if (ee(4,i) .eq. 0) then
-      i_shift = i_shift + 3
-    else
-      i_shift = i_shift + 4
-    endif
-    write(fu) i_shift
-  enddo
-
-  !Cell types
-  nbytes = vtk_isize*ne; write(fu) nbytes
-  do i=1,size(ee,2)
-    if (ee(4,i) .eq. 0) then
-      etype = 5
-    else
-      etype = 9
-    endif
-    write(fu) etype
-  enddo
-
-  !Variables
-  do i_v = 1,nvars
-    nbytes =  vtk_fsize*ne; write(fu) nbytes
-    do i=1,size(vars,1)
-      write(fu) real(vars(i,i_v), vtk_fsize)
-    enddo
-  enddo
+  call vtk_print_piece_data(fu, vars, nquad, ntria, 0, rr, ee) 
 
   !=  == Wake
   if (got_wake) then
-    !Points
-    nbytes = vtk_fsize *  &
-                 size(w_rr,1)*size(w_rr,2)
-    write(fu) nbytes
-    do i=1,size(w_rr,2)
-     write(fu) real(w_rr(:,i),vtk_fsize)
-    enddo
-
-    !Connectivity
-    nbytes = vtk_isize*4*nw; write(fu) nbytes
-    do i=1,size(w_ee,2)
-      if (w_ee(4,i) .eq. 0) then
-        write(fu) w_ee(1:3,i)-1
-      else
-        write(fu) w_ee(1:4,i)-1
-      endif
-    enddo
-
-    !Offset
-    nbytes =  vtk_isize*nw; write(fu) nbytes
-    i_shift = 0
-    do i=1,size(w_ee,2)
-      if (w_ee(4,i) .eq. 0) then
-        i_shift = i_shift + 3
-      else
-        i_shift = i_shift + 4
-      endif
-      write(fu) i_shift
-    enddo
-
-    !Cell types
-    nbytes = vtk_isize*nw; write(fu) nbytes
-    do i=1,size(w_ee,2)
-      if (w_ee(4,i) .eq. 0) then
-        etype = 5
-      else
-        etype = 9
-      endif
-      write(fu) etype
-    enddo
-
-    !Variables
-    do i_v = 1,nvars_w
-      nbytes =  vtk_fsize*nw; write(fu) nbytes
-      do i=1,size(w_vars,1)
-        write(fu) real(w_vars(i,i_v), vtk_fsize)
-      enddo
-    enddo
-    do i_v = nvars_w+1,nvars
-      nbytes =  vtk_fsize*nw; write(fu) nbytes
-      do i=1,size(w_vars,1)
-        write(fu) real(0.0_wp, vtk_fsize)
-      enddo
-    enddo
+    call vtk_print_piece_data(fu, w_vars, nquad_w, ntria_w, 0, w_rr, w_ee) 
   endif
   
   !=  == Particles
   if (got_particles) then
-    !Points
-    nbytes = vtk_fsize *  &
-                 size(vp_rr,1)*size(vp_rr,2)
-    write(fu) nbytes
-    do i=1,size(vp_rr,2)
-     write(fu) real(vp_rr(:,i),vtk_fsize)
-    enddo
-
-    !Connectivity
-    nbytes = vtk_isize*nvp; write(fu) nbytes
-    do i=1,nvp
-      write(fu) i-1
-    enddo
-
-    !Offset
-    nbytes =  vtk_isize*nvp; write(fu) nbytes
-    do i=1,nvp
-      write(fu) i
-    enddo
-
-    !Cell types
-    nbytes = vtk_isize*nvp; write(fu) nbytes
-    do i=1,nvp
-      etype = 1
-      write(fu) etype
-    enddo
-
-    !Variables
-    do i_v = 1,nvars_vp
-      nbytes =  vtk_fsize*nvp; write(fu) nbytes
-      do i=1,size(vp_vars,1)
-        write(fu) real(vp_vars(i,i_v), vtk_fsize)
-      enddo
-    enddo
-    do i_v = nvars_vp+1,nvars
-      nbytes =  vtk_fsize*nvp; write(fu) nbytes
-      do i=1,size(vp_vars,1)
-        write(fu) real(0.0_wp, vtk_fsize)
-      enddo
-    enddo
+    call vtk_print_piece_data(fu, vp_vars, 0, 0, nvp, vp_rr) 
   endif
 
   buffer = '  </AppendedData>'//lf; write(fu) trim(buffer)
@@ -969,60 +673,7 @@ subroutine vtk_out_viz (out_filename, &
     write(fu) trim(buffer)
     buffer = ' <UnstructuredGrid>'//lf; write(fu) trim(buffer)
 
-    write(str1,'(I0)') npoints_w
-    write(str2,'(I0)') nw
-    buffer = '  <Piece NumberOfPoints="'//trim(str1)//'" NumberOfCells="'//&
-                     trim(str2)//'">'//lf; write(fu) trim(buffer)
-    offset = 0
-    !Points
-    buffer =  '   <Points>'//lf; write(fu) trim(buffer)
-    write(ostr,'(I0)') offset
-    buffer='    <DataArray type="Float32" Name="Coordinates" &
-                    &NumberOfComponents="3" format="appended" &
-           &offset="'//trim(ostr)//'"/>'//lf;write(fu) trim(Buffer)
-
-    buffer =  '   </Points>'//lf; write(fu) trim(buffer)
-    offset = offset + vtk_isize + vtk_fsize*size(w_rr,1)*size(w_rr,2)
-
-    !Cells
-    buffer =  '   <Cells>'//lf; write(fu) trim(buffer)
-
-    write(ostr,'(I0)') offset
-    buffer = '    <DataArray type="Int32" Name="connectivity" &
-             &Format="appended" offset="'//trim(ostr)//'"/>'//lf; 
-    write(fu) trim(buffer)
-    offset = offset + vtk_isize  + vtk_isize*4*nquad_w + vtk_isize*3*ntria_w
-
-    write(ostr,'(I0)') offset
-    buffer =  '    <DataArray type="Int32" Name="offsets" &
-      &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
-    write(fu) trim(buffer)
-    offset = offset + vtk_isize + vtk_isize*nw
-
-    write(ostr,'(I0)') offset
-    buffer = '    <DataArray type="Int32" Name="types" &
-      &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
-    write(fu) trim(buffer)
-    offset = offset + vtk_isize + vtk_isize*nw
-
-    buffer =  '   </Cells>'//lf; write(fu) trim(buffer)
-
-    !Data
-    if(nvars .gt. 0) then
-      buffer =  '   <CellData Scalars="scalars">'//lf; 
-      write(fu) trim(buffer)
-      do i_v = 1,nvars
-        write(ostr,'(I0)') offset
-        buffer = '    <DataArray type="Float32" Name="'//trim(var_names(i_v))//'" &
-          &Format="appended" offset="'//trim(ostr)//'"/>'//lf
-        write(fu) trim(buffer)
-        offset = offset + vtk_isize + vtk_fsize*nw
-      enddo
-
-      buffer = '   </CellData>'//lf; write(fu) trim(buffer)
-    endif
-
-    buffer = '  </Piece>'//lf; write(fu) trim(buffer)
+    call vtk_print_piece_header(fu,offset,npoints_w,nw,nquad_w,ntria_w,0,w_vars)
 
     buffer = ' </UnstructuredGrid>'//lf; write(fu) trim(buffer)
 
@@ -1030,61 +681,8 @@ subroutine vtk_out_viz (out_filename, &
     buffer = '  <AppendedData encoding="raw">'//lf; write(fu) trim(buffer)
     buffer = '_'; write(fu) trim(buffer) !mark the beginning of the data 
 
-    !Points
-    nbytes = vtk_fsize *  &
-                 size(w_rr,1)*size(w_rr,2)
-    write(fu) nbytes
-    do i=1,size(w_rr,2)
-     write(fu) real(w_rr(:,i),vtk_fsize)
-    enddo
+    call vtk_print_piece_data(fu, w_vars, nquad_w, ntria_w, 0, w_rr, w_ee) 
 
-    !Connectivity
-    nbytes = vtk_isize*4*nw; write(fu) nbytes
-    do i=1,size(w_ee,2)
-      if (w_ee(4,i) .eq. 0) then
-        write(fu) w_ee(1:3,i)-1
-      else
-        write(fu) w_ee(1:4,i)-1
-      endif
-    enddo
-
-    !Offset
-    nbytes =  vtk_isize*nw; write(fu) nbytes
-    i_shift = 0
-    do i=1,size(w_ee,2)
-      if (w_ee(4,i) .eq. 0) then
-        i_shift = i_shift + 3
-      else
-        i_shift = i_shift + 4
-      endif
-      write(fu) i_shift
-    enddo
-
-    !Cell types
-    nbytes = vtk_isize*nw; write(fu) nbytes
-    do i=1,size(w_ee,2)
-      if (w_ee(4,i) .eq. 0) then
-        etype = 5
-      else
-        etype = 9
-      endif
-      write(fu) etype
-    enddo
-
-    !Variables
-    do i_v = 1,nvars_w
-      nbytes =  vtk_fsize*nw; write(fu) nbytes
-      do i=1,size(w_vars,1)
-        write(fu) real(w_vars(i,i_v), vtk_fsize)
-      enddo
-    enddo
-    do i_v = nvars_w+1,nvars
-      nbytes =  vtk_fsize*nw; write(fu) nbytes
-      do i=1,size(w_vars,1)
-        write(fu) real(0.0_wp, vtk_fsize)
-      enddo
-    enddo
-    
     buffer = '  </AppendedData>'//lf; write(fu) trim(buffer)
     buffer = '</VTKFile>'//lf; write(fu) trim(buffer)
 
@@ -1100,110 +698,16 @@ subroutine vtk_out_viz (out_filename, &
     buffer = ' <UnstructuredGrid>'//lf; write(fu) trim(buffer)
     offset = 0
 
-    write(str1,'(I0)') size(vp_rr,2)
-    buffer = '  <Piece NumberOfPoints="'//trim(str1)//'" NumberOfCells="'//&
-                     trim(str1)//'">'//lf; write(fu) trim(buffer)
-    !Points
-    buffer =  '   <Points>'//lf; write(fu) trim(buffer)
-    write(ostr,'(I0)') offset
-    buffer='    <DataArray type="Float32" Name="Coordinates" &
-                    &NumberOfComponents="3" format="appended" &
-           &offset="'//trim(ostr)//'"/>'//lf;write(fu) trim(Buffer)
-
-    buffer =  '   </Points>'//lf; write(fu) trim(buffer)
-    offset = offset + vtk_isize + vtk_fsize*size(vp_rr,1)*size(vp_rr,2)
-
-    !Cells
-    buffer =  '   <Cells>'//lf; write(fu) trim(buffer)
-
-    write(ostr,'(I0)') offset
-    buffer = '    <DataArray type="Int32" Name="connectivity" &
-             &Format="appended" offset="'//trim(ostr)//'"/>'//lf; 
-    write(fu) trim(buffer)
-    offset = offset + vtk_isize  + vtk_isize*1*nvp
-
-    write(ostr,'(I0)') offset
-    buffer =  '    <DataArray type="Int32" Name="offsets" &
-      &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
-    write(fu) trim(buffer)
-    offset = offset + vtk_isize + vtk_isize*nvp
-
-    write(ostr,'(I0)') offset
-    buffer = '    <DataArray type="Int32" Name="types" &
-      &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
-    write(fu) trim(buffer)
-    offset = offset + vtk_isize + vtk_isize*nvp
-
-    buffer =  '   </Cells>'//lf; write(fu) trim(buffer)
-
-    !Data
-    if(nvars .gt. 0) then
-      !buffer =  '   <PointData>'//lf; 
-      buffer =  '   <CellData Scalars="scalars">'//lf; 
-      write(fu) trim(buffer)
-      do i_v = 1,nvars
-        write(ostr,'(I0)') offset
-        buffer = '    <DataArray type="Float32" Name="'//trim(var_names(i_v))//'" &
-          &Format="appended" offset="'//trim(ostr)//'"/>'//lf
-        write(fu) trim(buffer)
-        offset = offset + vtk_isize + vtk_fsize*nvp
-      enddo
-
-      !buffer = '   </PointData>'//lf; write(fu) trim(buffer)
-      buffer = '   </CellData>'//lf; write(fu) trim(buffer)
-    endif
-
-
-
-    buffer = '  </Piece>'//lf; write(fu) trim(buffer)
+    call vtk_print_piece_header(fu,offset,size(vp_rr,2),size(vp_rr,2),0,0, &
+                                size(vp_rr,2),vp_vars)
 
     buffer = ' </UnstructuredGrid>'//lf; write(fu) trim(buffer)
-
 
     !All the appended data
     buffer = '  <AppendedData encoding="raw">'//lf; write(fu) trim(buffer)
     buffer = '_'; write(fu) trim(buffer) !mark the beginning of the data 
 
-    !Points
-    nbytes = vtk_fsize *  &
-                 size(vp_rr,1)*size(vp_rr,2)
-    write(fu) nbytes
-    do i=1,size(vp_rr,2)
-     write(fu) real(vp_rr(:,i),vtk_fsize)
-    enddo
-
-    !Connectivity
-    nbytes = vtk_isize*nvp; write(fu) nbytes
-    do i=1,nvp
-      write(fu) i-1
-    enddo
-
-    !Offset
-    nbytes =  vtk_isize*nvp; write(fu) nbytes
-    do i=1,nvp
-      write(fu) i
-    enddo
-
-    !Cell types
-    nbytes = vtk_isize*nvp; write(fu) nbytes
-    do i=1,nvp
-      etype = 1
-      write(fu) etype
-    enddo
-
-    !Variables
-    do i_v = 1,nvars_vp
-      nbytes =  vtk_fsize*nvp; write(fu) nbytes
-      do i=1,size(vp_vars,1)
-        write(fu) real(vp_vars(i,i_v), vtk_fsize)
-      enddo
-    enddo
-    do i_v = nvars_vp+1,nvars
-      nbytes =  vtk_fsize*nvp; write(fu) nbytes
-      do i=1,size(vp_vars,1)
-        write(fu) real(0.0_wp, vtk_fsize)
-      enddo
-    enddo
+    call vtk_print_piece_data(fu, vp_vars, 0, 0, nvp, vp_rr) 
 
     buffer = '  </AppendedData>'//lf; write(fu) trim(buffer)
     buffer = '</VTKFile>'//lf; write(fu) trim(buffer)

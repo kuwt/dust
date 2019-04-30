@@ -55,13 +55,16 @@ use mod_handling, only: &
 !---------------------------------------------------------------------
 implicit none
 
-!public ::
+public :: t_output_var, vtk_isize, vtk_fsize, add_output_var, &
+          copy_output_vars, clear_output_vars, vtk_print_piece_header, &
+          vtk_print_piece_data
 
 private
 
 type :: t_output_var
   character(max_char_len) :: var_name
   logical :: vector
+  logical :: skip
   real(wp), allocatable :: var(:,:)
 end type t_output_var
 
@@ -80,41 +83,114 @@ contains
 
 !---------------------------------------------------------------------
 
-subroutine add_output_var_scal(output_vars, var, var_name)
- type(t_output_var), intent(inout), allocatable :: output_vars(:)
+subroutine add_output_var_scal(output_var, var, var_name, skip)
+ type(t_output_var), intent(inout) :: output_var
  real(wp), intent(in) :: var(:)
  character(len=*), intent(in) :: var_name
+ logical, intent(in) :: skip
 
+  output_var%var_name = trim(var_name)
+  output_var%vector = .false.
+  output_var%skip = skip
+  
+  if(.not. skip) then
+    allocate(output_var%var(1,size(var)))
+    output_var%var(1,:) = var
+  endif
 
-end subroutine add_outpu_var_scal
-
-!---------------------------------------------------------------------
-
-subroutine extend_vars(output_vars)
- type(t_output_var), intent(inout), allocatable :: output_vars(:)
-
- type(t_output_var), allocatable :: vars_tmp(:)
- integer :: varlen,i
- character(len=*), parameter :: this_sub_name='extend_vars'
-
-  if(.not. allocated(output_vars)) &
-    call error(this_sub_name, this_mod_name, 'Internal error: not &
-    &allocated output_vars. This should have never happened, please &
-    &report this error so that  a team of professionals could travel &
-    &back in time and fix this')
-
-end subroutine extend_vars
+end subroutine add_output_var_scal
 
 !---------------------------------------------------------------------
 
-subroutine vtk_print_piece_header(offset, npoints, ncells, nquad, ntria)
+subroutine add_output_var_vec(output_var, var, var_name, skip)
+ type(t_output_var), intent(inout) :: output_var
+ real(wp), intent(in) :: var(:,:)
+ character(len=*), intent(in) :: var_name
+ logical, intent(in) :: skip
+
+ character(len=*), parameter :: this_sub_name = 'add_output_var_vec'
+
+  output_var%var_name = trim(var_name)
+  output_var%vector = .true.
+  output_var%skip = skip
+  
+  if(.not. skip) then
+    allocate(output_var%var(size(var,1),size(var,2)))
+    output_var%var = var
+  endif
+
+  if(size(var,1).ne.3) call internal_error(this_sub_name, this_mod_name, &
+  'Printing vector variable with size different from 3')
+
+end subroutine add_output_var_vec
+
+!---------------------------------------------------------------------
+
+subroutine copy_output_vars(output_vars, copy_vars, reset)
+ type(t_output_var), intent(in)  :: output_vars(:)
+ type(t_output_var), intent(out) :: copy_vars(:)
+ logical, intent(in) :: reset
+
+ integer :: i
+ character(len=*), parameter :: this_sub_name = 'copy_output_vars'
+
+  if(size(output_vars).ne.size(copy_vars)) call internal_error(this_sub_name,&
+    this_mod_name, 'Copying output vectors of different lengths')
+
+  do i=1,size(output_vars)
+    copy_vars(i)%var_name = output_vars(i)%var_name
+    copy_vars(i)%vector = output_vars(i)%vector
+    copy_vars(i)%skip = output_vars(i)%skip
+
+    allocate(copy_vars(i)%var(size(output_vars(i)%var,1), &
+                              size(output_vars(i)%var,2)))
+    if(reset) then
+      copy_vars(i)%var = 0.0_wp
+    else
+      copy_vars(i)%var = output_vars(i)%var
+    endif
+  enddo
+
+end subroutine copy_output_vars
+
+!---------------------------------------------------------------------
+
+subroutine clear_output_vars(output_vars)
+ type(t_output_var), intent(out)  :: output_vars(:)
+
+ integer :: i
+ character(len=*), parameter :: this_sub_name = 'clear_output_vars'
+
+  do i=1,size(output_vars)
+    output_vars(i)%var_name = ''
+    output_vars(i)%vector = .false.
+
+    if(allocated(output_vars(i)%var)) deallocate(output_vars(i)%var)
+  enddo
+
+
+end subroutine clear_output_vars
+
+!---------------------------------------------------------------------
+
+subroutine vtk_print_piece_header(fu, offset, npoints, ncells, nquad, ntria, &
+                                 npart, out_vars)
+ integer, intent(in) :: fu
  integer, intent(inout) :: offset
  integer, intent(in) :: npoints
  integer, intent(in) :: ncells
+ integer, intent(in) :: nquad
+ integer, intent(in) :: ntria
+ integer, intent(in) :: npart
+ type(t_output_var), intent(in) :: out_vars(:)
 
  character(len=200) :: buffer
+ integer :: i_v
  character(len=20) :: ostr, str1, str2
+ character(len=1)   :: lf
+ character(len=*), parameter :: this_sub_name = 'vtk_print_piece_header'
 
+  lf = char(10) !line feed char
   write(str1,'(I0)') npoints
   write(str2,'(I0)') ncells
   buffer = '  <Piece NumberOfPoints="'//trim(str1)//'" NumberOfCells="'//&
@@ -127,7 +203,7 @@ subroutine vtk_print_piece_header(offset, npoints, ncells, nquad, ntria)
          &offset="'//trim(ostr)//'"/>'//lf;write(fu) trim(Buffer)
 
   buffer =  '   </Points>'//lf; write(fu) trim(buffer)
-  offset = offset + vtk_isize + vtk_fsize*size(rr,1)*size(rr,2)
+  offset = offset + vtk_isize + vtk_fsize*3*npoints
 
   !Cells
   buffer =  '   <Cells>'//lf; write(fu) trim(buffer)
@@ -136,7 +212,8 @@ subroutine vtk_print_piece_header(offset, npoints, ncells, nquad, ntria)
   buffer = '    <DataArray type="Int32" Name="connectivity" &
            &Format="appended" offset="'//trim(ostr)//'"/>'//lf; 
   write(fu) trim(buffer)
-  offset = offset + vtk_isize + vtk_isize*3*ntria + vtk_isize*4*nquad
+  offset = offset + vtk_isize + vtk_isize*3*ntria + vtk_isize*4*nquad + &
+                                vtk_isize*1*npart
 
   write(ostr,'(I0)') offset
   buffer =  '    <DataArray type="Int32" Name="offsets" &
@@ -153,15 +230,26 @@ subroutine vtk_print_piece_header(offset, npoints, ncells, nquad, ntria)
   buffer =  '   </Cells>'//lf; write(fu) trim(buffer)
 
   !Data
-  if (nvars .gt. 0) then
+  if (size(out_vars) .gt. 0) then
     buffer =  '   <CellData Scalars="scalars">'//lf; 
     write(fu) trim(buffer)
-    do i_v = 1,nvars
-      write(ostr,'(I0)') offset
-      buffer = '    <DataArray type="Float32" Name="'//trim(var_names(i_v))//'" &
-        &Format="appended" offset="'//trim(ostr)//'"/>'//lf
-      write(fu) trim(buffer)
-      offset = offset + vtk_isize + vtk_fsize*ne
+    do i_v = 1,size(out_vars)
+      if(ncells.ne.size(out_vars(i_v)%var,2) .and. .not. out_vars(i_v)%skip) &
+        call internal_error(this_sub_name, this_mod_name, 'Nuber of output &
+        &variables different from number of cells')
+      if(out_vars(i_v)%vector) then
+        write(ostr,'(I0)') offset
+        buffer = '    <DataArray type="Float32" Name="'//trim(out_vars(i_v)%var_name)//'" &
+          & NumberOfComponents="3" Format="appended" offset="'//trim(ostr)//'"/>'//lf
+        write(fu) trim(buffer)
+        offset = offset + vtk_isize + vtk_fsize*3*ncells
+      else
+        write(ostr,'(I0)') offset
+        buffer = '    <DataArray type="Float32" Name="'//trim(out_vars(i_v)%var_name)//'" &
+          &Format="appended" offset="'//trim(ostr)//'"/>'//lf
+        write(fu) trim(buffer)
+        offset = offset + vtk_isize + vtk_fsize*ncells
+      endif
     enddo
     buffer = '   </CellData>'//lf; write(fu) trim(buffer)
   endif
@@ -169,6 +257,109 @@ subroutine vtk_print_piece_header(offset, npoints, ncells, nquad, ntria)
   buffer = '  </Piece>'//lf; write(fu) trim(buffer)
 
 end subroutine vtk_print_piece_header
+
+!----------------------------------------------------------------------
+
+subroutine vtk_print_piece_data(fu, out_vars, nquad, ntria, &
+                                 npart, rr, ee)
+ integer, intent(in) :: fu
+ type(t_output_var), intent(in) :: out_vars(:)
+ integer, intent(in) ::  nquad, ntria, npart
+ real(wp), intent(in) :: rr(:,:)
+ integer, intent(in), optional :: ee(:,:)
+
+ integer :: nbytes, ne, i_shift, etype
+ integer :: i, i_v
+ logical :: particles
+ character(len=*), parameter :: this_sub_name='vtk_print_piece_data'
+
+  if(nquad+ntria .gt. 0 .and. .not. present(ee)) call internal_error( &
+  this_sub_name,this_mod_name,'Not passed connectivity to piece with elements')
+  
+  particles = .false.
+  if(nquad+ntria .le. 0) particles = .true.
+  ne = nquad+ntria+npart
+
+
+
+  !Points
+  nbytes = vtk_fsize *  &
+               size(rr,1)*size(rr,2)
+  write(fu) nbytes
+  do i=1,size(rr,2)
+   write(fu) real(rr(:,i),vtk_fsize)
+  enddo
+
+  !Connectivity
+  if(particles) then
+    nbytes = vtk_isize*ne; write(fu) nbytes
+    do i=1,npart
+      write(fu) i-1
+    enddo
+  else
+    nbytes = vtk_isize*3*ntria+vtk_isize*4*nquad; write(fu) nbytes
+    do i=1,size(ee,2)
+      if (ee(4,i) .eq. 0) then
+        write(fu) ee(1:3,i)-1
+      else
+        write(fu) ee(1:4,i)-1
+      endif
+    enddo
+  endif
+
+  !Offset
+  nbytes =  vtk_isize*ne; write(fu) nbytes
+  if(particles) then
+    do i=1,npart
+      write(fu) i
+    enddo
+  else
+    i_shift = 0
+    do i=1,size(ee,2)
+      if (ee(4,i) .eq. 0) then
+        i_shift = i_shift + 3
+      else
+        i_shift = i_shift + 4
+      endif
+      write(fu) i_shift
+    enddo
+  endif
+
+  !Cell types
+  nbytes = vtk_isize*ne; write(fu) nbytes
+  if(particles) then
+    do i=1,ne
+      etype = 1
+      write(fu) etype
+    enddo
+  else
+    do i=1,size(ee,2)
+      if (ee(4,i) .eq. 0) then
+        etype = 5
+      else
+        etype = 9
+      endif
+      write(fu) etype
+    enddo
+  endif
+
+  !Variables
+  do i_v = 1,size(out_vars)
+    nbytes =  vtk_fsize*ne; write(fu) nbytes
+    if(.not.out_vars(i_v)%skip) then
+      do i=1,size(out_vars(i_v)%var,2)
+        write(fu) real(out_vars(i_v)%var(1,i), vtk_fsize)
+      enddo
+    else
+        do i=1,ne
+          write(fu) real(0.0_wp, vtk_fsize)
+        enddo
+    endif
+  enddo
+
+end subroutine vtk_print_piece_data
+
+!----------------------------------------------------------------------
 
 end module mod_vtk_utils
 

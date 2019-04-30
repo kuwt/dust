@@ -49,6 +49,9 @@ program dust_post
 use mod_param, only: &
   wp, nl, max_char_len, extended_char_len , pi
 
+use mod_sim_param, only: &
+  sim_param
+
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime, new_file_unit, &
   check_basename, check_file_exists
@@ -147,9 +150,6 @@ implicit none
 !Input
 character(len=*), parameter :: input_file_name_def = 'dust_post.in' 
 character(len=max_char_len) :: input_file_name
-
-!doublet parameters
-real(wp) :: ff_ratio_dou, ff_ratio_sou, eps_dou, r_Rankine, r_Vortex, r_cutoff
 
 !Geometry parameters
 type(t_parse) :: prms
@@ -260,17 +260,17 @@ call prms%read_options(input_file_name, printout_val=.false.)
 basename = getstr(prms,'basename')
 data_basename = getstr(prms,'data_basename')
 
-ff_ratio_dou  = getreal(prms, 'FarFieldRatioDoublet')
-ff_ratio_sou  = getreal(prms, 'FarFieldRatioSource')
-eps_dou   = getreal(prms, 'DoubletThreshold')
-r_Rankine = getreal(prms, 'RankineRad')
-r_Vortex  = getreal(prms, 'VortexRad')
-r_cutoff  = getreal(prms, 'CutoffRad')
+sim_param%FarFieldRatioDoublet  = getreal(prms, 'FarFieldRatioDoublet')
+sim_param%FarFieldRatioSource  = getreal(prms, 'FarFieldRatioSource')
+sim_param%DoubletThreshold   = getreal(prms, 'DoubletThreshold')
+sim_param%RankineRad = getreal(prms, 'RankineRad')
+sim_param%VortexRad = getreal(prms, 'VortexRad')
+sim_param%CutoffRad  = getreal(prms, 'CutoffRad')
 
-call initialize_doublet(ff_ratio_dou, eps_dou, r_Rankine, r_cutoff);
-call initialize_surfpan(ff_ratio_sou)
-call initialize_vortline(r_Rankine, r_cutoff)
-call initialize_vortpart(r_Vortex, r_cutoff)
+call initialize_doublet();
+call initialize_surfpan()
+call initialize_vortline()
+call initialize_vortpart()
 
 n_analyses = countoption(prms,'Analysis')
 
