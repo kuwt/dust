@@ -69,6 +69,9 @@ use mod_hdf5_io, only: &
 use mod_actuatordisk, only: &
   t_actdisk
 
+use mod_surfpan, only: &
+  t_surfpan
+
 use mod_wake, only: &
   t_wake
 
@@ -129,23 +132,26 @@ end subroutine load_refs
 
 !----------------------------------------------------------------------
 
-subroutine load_res(floc, comps, vort, press, t)
+subroutine load_res(floc, comps, vort, press, t, surfvel)
  integer(h5loc), intent(in) :: floc 
  type(t_geo_component), intent(inout) :: comps(:)
  real(wp), allocatable, intent(out) :: vort(:)
  real(wp), allocatable, intent(out) :: press(:)
  real(wp), intent(out) :: t
+ real(wp), allocatable, intent(out), optional :: surfvel(:,:)
 
  integer :: ncomps, icomp, ie
  integer :: nelems, offset, nelems_comp
  integer(h5loc) :: gloc1, gloc2, gloc3
  character(len=max_char_len) :: cname
  real(wp), allocatable :: vort_read(:)!, cp_read(:)
- real(wp), allocatable :: pres_read(:), dforce_read(:,:)
+ real(wp), allocatable :: pres_read(:), dforce_read(:,:), surfvel_read(:,:)
  integer :: ncomps_sol
+ logical :: got_surfvel
 
  character(len=*), parameter :: this_sub_name = 'load_res'
-
+  
+  got_surfvel = present(surfvel)
   ncomps = size(comps)
   nelems = 0
   do icomp = 1, ncomps
@@ -158,7 +164,7 @@ subroutine load_res(floc, comps, vort, press, t)
   enddo
   
   call read_hdf5(t,'time',floc)
-  allocate(vort(nelems), press(nelems))
+  allocate(vort(nelems), press(nelems), surfvel(3,nelems))
   call open_hdf5_group(floc,'Components',gloc1)
   call read_hdf5(ncomps_sol,'NComponents',gloc1)
   if(ncomps_sol .lt. ncomps) call error(this_sub_name, this_mod_name, &
@@ -178,6 +184,13 @@ subroutine load_res(floc, comps, vort, press, t)
     !call read_hdf5_al(cp_read,'Cp',gloc3)
     call read_hdf5_al(pres_read,'Pres',gloc3)
     call read_hdf5_al(dforce_read,'dF',gloc3)
+    select type(el =>comps(icomp)%el)
+     type is(t_surfpan)
+      call read_hdf5_al(surfvel_read,'surf_vel',gloc3)
+     class default
+      allocate(surfvel_read(3,nelems_comp))
+      surfvel_read = 0.0_wp
+    end select
 
     !check consistency of geometry and solution
     if((size(vort_read,1) .ne. nelems_comp) .or. &
@@ -201,6 +214,7 @@ subroutine load_res(floc, comps, vort, press, t)
      class default
       vort(offset+1:offset+nelems_comp) = vort_read
       press(offset+1:offset+nelems_comp) = pres_read
+      if(got_surfvel) surfvel(:,offset+1:offset+nelems_comp) = surfvel_read
       offset = offset + nelems_comp
       do ie = 1,nelems_comp
         if(associated(comps(icomp)%el(ie)%mag)) &
@@ -210,6 +224,11 @@ subroutine load_res(floc, comps, vort, press, t)
       do ie = 1,nelems_comp
         vort(offset+1:offset+el(ie)%n_ver) = vort_read(ie)
         press(offset+1:offset+el(ie)%n_ver) = pres_read(ie)
+        if(got_surfvel) then
+          surfvel(1,offset+1:offset+el(ie)%n_ver) = surfvel_read(1,ie)
+          surfvel(2,offset+1:offset+el(ie)%n_ver) = surfvel_read(2,ie)
+          surfvel(3,offset+1:offset+el(ie)%n_ver) = surfvel_read(3,ie)
+        endif
         offset = offset + el(ie)%n_ver
         if(associated(comps(icomp)%el(ie)%mag)) then
                         comps(icomp)%el(ie)%mag = vort_read(ie)

@@ -125,7 +125,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
  type(t_geo_component), allocatable :: comps(:)
  character(len=max_char_len) :: filename
  integer(h5loc) :: floc , ploc
- logical :: out_vort, out_vel, out_cp, out_press , out_wake, separate_wake
+ logical :: out_vort, out_vel, out_cp, out_press , out_wake, out_surfvel, separate_wake
  integer :: n_var , i_var
  character(len=max_char_len), allocatable :: var_names(:)
  real(wp), allocatable :: points(:,:), points_exp(:,:) , wpoints(:,:)
@@ -139,7 +139,8 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
  real(wp) :: P_inf , rho
 
  real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
- real(wp), allocatable :: vort(:), cp(:), vel(:), press(:), wvort(:)
+ real(wp), allocatable :: vort(:), cp(:), vel(:), press(:), surfvel(:,:)
+ real(wp), allocatable :: wvort(:)
 
  real(wp), allocatable :: print_vars(:,:)
  character(len=max_char_len), allocatable :: print_var_names(:)
@@ -173,11 +174,13 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   enddo
   out_vort = isInList('vorticity',var_names) ! Always lower case string in the code !
   out_vel  = isInList('velocity' ,var_names)
+  out_surfvel= isInList('surface_velocity' ,var_names)
   out_press= isInList('pressure' ,var_names)
   out_cp   = isInList('cp'       ,var_names)
   nprint = 0; nprint_w = 0
   if(out_vort)  nprint = nprint+1
   if(out_cp)    nprint = nprint+1
+  if(out_surfvel)   nprint = nprint+1
   if(out_vel)   nprint = nprint+1  !<--- *** TODO ***
   if(out_press) nprint = nprint+1  !<--- *** TODO ***
   allocate(out_vars(nprint))
@@ -240,39 +243,33 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   
     !Load the results ! TODO: check this routine and the content of the files to be read
     ! TODO : compute the missing quantities
-    call load_res(floc, comps, vort, press, t)
+    call load_res(floc, comps, vort, press, t, surfvel)
   
     !Prepare the variable for output
     nelem_out = size(vort)
     ! TODO: compute/or read pressure and velocity field. Now set equal to zero
     allocate(  vel(size( vort,1)) ) ; vel = 0.0_wp
     allocate(   cp(size(press,1)) ) ;  cp = 0.0_wp
-  
-    !allocate(print_var_names(nprint), print_vars(nelem_out, nprint))
     
     i_var = 1
     if(out_vort) then
-      !print_vars(:,i_var) = vort
-      !print_var_names(i_var) = 'Vorticity'
       call add_output_var(out_vars(i_var), vort, 'Singularity_Intensity', &
                           .false.)
       i_var = i_var +1
     endif
     if(out_cp) then
-      !print_vars(:,i_var) = cp
-      !print_var_names(i_var) = 'Cp'
       call add_output_var(out_vars(i_var), cp, 'Cp',.false.)
       i_var = i_var +1
     endif
+    if(out_surfvel) then
+      call add_output_var(out_vars(i_var), surfvel, 'Surface_Velocity',.false.)
+      i_var = i_var +1
+    endif
     if(out_vel) then
-      !print_vars(:,i_var) = vel
-      !print_var_names(i_var) = 'Velocity'
       call add_output_var(out_vars(i_var), vel, 'Velocity',.false.)
       i_var = i_var +1
     endif
     if(out_press) then
-      !print_vars(:,i_var) = press
-      !print_var_names(i_var) = 'Pressure'
       call add_output_var(out_vars(i_var), press, 'Pressure',.false.)
       i_var = i_var +1
     endif
@@ -281,14 +278,6 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
       if( ires .eq. 1) then
         call copy_output_vars(out_vars, ave_out_vars, .true.)
       endif
-      !if( .not. allocated(ave_vars)) then
-      !  allocate(ave_vars(size(print_vars,1),size(print_vars,2)))
-      !  ave_vars = 0.0_wp
-      !endif
-      !if( .not. allocated(ave_var_names)) then
-      !  allocate(ave_var_names(size(print_var_names,1)))
-      !  ave_var_names = print_var_names
-      !endif
       do i_var = 1,size(ave_out_vars)
       ave_out_vars(i_var)%var = ave_out_vars(i_var)%var * &
                                 (real(ires-1,wp)/real(ires,wp)) + &
@@ -308,10 +297,6 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
         
         i_var = 1
         if(out_vort) then
-          !print_vars_w(:,ivar) = reshape(wvort,(/nelem_w/))
-          !print_vars_w(:,i_var) = wvort
-          !print_vars_vp(:,i_var) = vpvort
-          !print_var_names_w(i_var) = 'Vorticity'
           call add_output_var(out_vars_w(i_var), wvort, &
                  'Singularity_Intensity',.false.)
           call add_output_var(out_vars_vp(i_var), vpvort, &
@@ -323,6 +308,13 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                  'Cp',.true.)
           call add_output_var(out_vars_vp(i_var), cp, &
                  'Cp',.true.)
+          i_var = i_var +1
+        endif
+        if(out_surfvel) then
+          call add_output_var(out_vars_w(i_var), surfvel, &
+                 'Surface_Velocity',.true.)
+          call add_output_var(out_vars_vp(i_var), surfvel, &
+                 'Surface_Velocity',.true.)
           i_var = i_var +1
         endif
         if(out_vel) then
@@ -352,13 +344,6 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                        vp_var_names = print_var_names_w)
          case ('vtk')
           filename = trim(filename)//'.vtu'
-          !call  vtk_out_viz(filename, &
-          !             points_exp, elems, print_vars, print_var_names, &
-          !             w_rr=wpoints, w_ee=welems, w_vars=print_vars_w, &
-          !             w_var_names = print_var_names_w, &
-          !             vp_rr=vppoints, vp_vars=print_vars_vp, &
-          !             vp_var_names = print_var_names_w, &
-          !             separate_wake = separate_wake)
           call  vtk_out_viz(filename, &
                        points_exp, elems, out_vars, &
                        w_rr=wpoints, w_ee=welems, w_vars=out_vars_w, &
@@ -372,8 +357,6 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
         deallocate (wpoints, welems,  wvort)
         call clear_output_vars(out_vars_w)
         call clear_output_vars(out_vars_vp)
-        !deallocate(print_var_names_w, print_vars_w)
-        !deallocate(print_vars_vp)
   
       else
         
@@ -404,6 +387,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   
     if (allocated(vort ) ) deallocate(vort )
     if (allocated(press) ) deallocate(press)
+    if (allocated(press) ) deallocate(surfvel)
     if (allocated(vel  ) ) deallocate(vel  )
     if (allocated(cp   ) ) deallocate(cp   )
   

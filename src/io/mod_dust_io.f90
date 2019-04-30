@@ -139,7 +139,7 @@ subroutine save_status(geo, wake, it, time, run_id)
  character(len=max_char_len) :: ref_name
  integer :: ie, ne
  real(wp), allocatable :: vort(:), cp(:) , pres(:)
- real(wp), allocatable :: dforce(:,:) 
+ real(wp), allocatable :: dforce(:,:), surf_vel(:,:)
  real(wp), allocatable :: points_w(:,:,:), cent(:,:,:) , vel_w(:,:,:)
  real(wp), allocatable :: vort_v(:,:)
  integer, allocatable :: conn_pe(:)
@@ -193,6 +193,18 @@ subroutine save_status(geo, wake, it, time, run_id)
     call write_hdf5(pres,'Pres',gloc3)
     call write_hdf5(dforce,'dF',gloc3)
     deallocate(vort, cp, pres, dforce)
+    
+    !Output the surface velocity
+    if ( trim( geo%components(icomp)%comp_el_type ) .eq. 'p' ) then
+      allocate(surf_vel(3,ne))    
+      do ie = 1,ne
+        select type( el => geo%components(icomp)%el(ie) ) ; type is (t_surfpan)
+          surf_vel(:,ie) = el%surf_vel
+        end select
+      end do 
+      call write_hdf5(surf_vel,'surf_vel',gloc3)
+      deallocate(surf_vel)
+    endif
 
     call close_hdf5_group(gloc3)
     call close_hdf5_group(gloc2)

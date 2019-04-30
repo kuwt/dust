@@ -345,15 +345,28 @@ subroutine vtk_print_piece_data(fu, out_vars, nquad, ntria, &
 
   !Variables
   do i_v = 1,size(out_vars)
-    nbytes =  vtk_fsize*ne; write(fu) nbytes
-    if(.not.out_vars(i_v)%skip) then
-      do i=1,size(out_vars(i_v)%var,2)
-        write(fu) real(out_vars(i_v)%var(1,i), vtk_fsize)
-      enddo
-    else
-        do i=1,ne
-          write(fu) real(0.0_wp, vtk_fsize)
+    if(.not.out_vars(i_v)%vector) then
+      nbytes =  vtk_fsize*ne; write(fu) nbytes
+      if(.not.out_vars(i_v)%skip) then
+        do i=1,size(out_vars(i_v)%var,2)
+          write(fu) real(out_vars(i_v)%var(1,i), vtk_fsize)
         enddo
+      else
+          do i=1,ne
+            write(fu) real(0.0_wp, vtk_fsize)
+          enddo
+      endif
+    else
+      nbytes =  3*vtk_fsize*ne; write(fu) nbytes
+      if(.not.out_vars(i_v)%skip) then
+        do i=1,size(out_vars(i_v)%var,2)
+          write(fu) real(out_vars(i_v)%var(:,i), vtk_fsize)
+        enddo
+      else
+          do i=1,ne
+            write(fu) real((/0.0_wp, 0.0_wp, 0.0_wp/), vtk_fsize)
+          enddo
+      endif
     endif
   enddo
 
