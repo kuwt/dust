@@ -164,7 +164,8 @@ subroutine load_res(floc, comps, vort, press, t, surfvel)
   enddo
   
   call read_hdf5(t,'time',floc)
-  allocate(vort(nelems), press(nelems), surfvel(3,nelems))
+  allocate(vort(nelems), press(nelems))
+  if(got_surfvel) allocate(surfvel(3,nelems))
   call open_hdf5_group(floc,'Components',gloc1)
   call read_hdf5(ncomps_sol,'NComponents',gloc1)
   if(ncomps_sol .lt. ncomps) call error(this_sub_name, this_mod_name, &
