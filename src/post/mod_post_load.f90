@@ -50,7 +50,7 @@ use mod_param, only: &
   wp, nl, max_char_len, pi
 
 use mod_handling, only: &
-  error, warning, info, printout, dust_time, t_realtime, new_file_unit
+  error, internal_error, warning, info
 
 use mod_geometry, only: &
   t_geo, t_geo_component
@@ -72,6 +72,9 @@ use mod_actuatordisk, only: &
 use mod_surfpan, only: &
   t_surfpan
 
+use mod_liftlin, only: &
+  t_liftlin
+
 use mod_wake, only: &
   t_wake
 
@@ -80,7 +83,7 @@ use mod_aeroel, only: &
 
 implicit none
 
-public :: load_refs , load_res ,  &
+public :: load_refs , load_res ,  load_ll, &
           load_wake_post, load_wake_viz , &
           load_wake_pan , load_wake_ring , &
           check_if_components_exist
@@ -244,6 +247,75 @@ subroutine load_res(floc, comps, vort, press, t, surfvel)
   call close_hdf5_group(gloc1)
 
 end subroutine load_res
+
+!----------------------------------------------------------------------
+
+subroutine load_ll(floc, comps, alpha, vel_2d, vel_outplane)
+ integer(h5loc), intent(in) :: floc 
+ type(t_geo_component), intent(inout) :: comps(:)
+ real(wp), intent(out) :: alpha(:)
+ real(wp), intent(out) :: vel_2d(:)
+ real(wp), intent(out) :: vel_outplane(:)
+
+ integer :: ncomps, icomp
+ integer :: nelems, offset, nelems_comp
+ integer(h5loc) :: gloc1, gloc2, gloc3
+ character(len=max_char_len) :: cname
+ real(wp), allocatable :: alpha_read(:), vel2d_read(:), velop_read(:)
+ integer :: ncomps_sol
+
+ character(len=*), parameter :: this_sub_name = 'load_ll'
+  
+  ncomps = size(comps)
+  nelems = 0
+  do icomp = 1, ncomps
+    select type(el=>comps(icomp)%el)
+     type is(t_liftlin)
+      nelems = nelems + comps(icomp)%nelems 
+     class default
+      call internal_error(this_sub_name, this_mod_name,'Loading lifting &
+      &lines from a non lifting line component')
+    end select
+  enddo
+  
+  call open_hdf5_group(floc,'Components',gloc1)
+  call read_hdf5(ncomps_sol,'NComponents',gloc1)
+  if(ncomps_sol .lt. ncomps) call error(this_sub_name, this_mod_name, &
+  'Different number of components between solution and geometry')
+
+  offset = 0
+  do icomp = 1, ncomps
+    
+    nelems_comp = comps(icomp)%nelems
+    write(cname,'(A,I3.3)') 'Comp',comps(icomp)%comp_id
+    call open_hdf5_group(gloc1,trim(cname),gloc2)
+    call open_hdf5_group(gloc2,'Solution',gloc3)
+    call read_hdf5_al(alpha_read,'alpha',gloc3)
+    call read_hdf5_al(vel2d_read,'vel_2d',gloc3)
+    call read_hdf5_al(velop_read,'vel_outplane',gloc3)
+
+    !check consistency of geometry and solution
+    if((size(alpha_read,1) .ne. nelems_comp) .or. &
+       (size(vel2d_read,1) .ne. nelems_comp) .or. &
+       (size(velop_read,1) .ne. nelems_comp)) call error(this_mod_name, &
+       this_sub_name, 'inconsistent number of elements between geometry and&
+       & solution')   
+
+    call close_hdf5_group(gloc3)
+    call close_hdf5_group(gloc2)
+
+    alpha(offset+1:offset+nelems_comp) = alpha_read
+    vel_2d(offset+1:offset+nelems_comp) = vel2d_read
+    vel_outplane(offset+1:offset+nelems_comp) = velop_read
+    offset = offset + nelems_comp
+
+    deallocate(alpha_read, vel2d_read, velop_read)
+
+  enddo
+
+  call close_hdf5_group(gloc1)
+
+end subroutine load_ll
 
 !----------------------------------------------------------------------
 

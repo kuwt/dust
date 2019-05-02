@@ -237,6 +237,8 @@ call sbprms%CreateRealArrayOption('AxisDir','Direction of the axis defined the r
                             & points for sectional loads analisys', multiple=.true.)
 call sbprms%CreateRealArrayOption('AxisNod','Node belonging to the axis used for sectional&
                             & loads analisys', multiple=.true.)
+call sbprms%CreateLogicalOption('LiftingLineData', 'Output lifting line data&
+                                 & alongside sectional loads','F')
 ! sectional loads: box -----
 call sbprms%CreateSubOption('BoxSect','Definition of the box for sectional loads', &
                           bxprms)

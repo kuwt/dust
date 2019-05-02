@@ -140,6 +140,7 @@ subroutine save_status(geo, wake, it, time, run_id)
  integer :: ie, ne
  real(wp), allocatable :: vort(:), cp(:) , pres(:)
  real(wp), allocatable :: dforce(:,:), surf_vel(:,:)
+ real(wp), allocatable :: alpha(:), vel_2d(:), vel_outplane(:)
  real(wp), allocatable :: points_w(:,:,:), cent(:,:,:) , vel_w(:,:,:)
  real(wp), allocatable :: vort_v(:,:)
  integer, allocatable :: conn_pe(:)
@@ -204,6 +205,22 @@ subroutine save_status(geo, wake, it, time, run_id)
       end do 
       call write_hdf5(surf_vel,'surf_vel',gloc3)
       deallocate(surf_vel)
+    endif
+
+    !Output the lifting lines data
+    if ( trim( geo%components(icomp)%comp_el_type ) .eq. 'l' ) then
+      allocate(alpha(ne), vel_2d(ne), vel_outplane(ne))    
+      do ie = 1,ne
+        select type( el => geo%components(icomp)%el(ie) ) ; type is (t_liftlin)
+          alpha(ie) = el%alpha
+          vel_2d(ie) = el%vel_2d
+          vel_outplane(ie) = el%vel_outplane
+        end select
+      end do 
+      call write_hdf5(alpha,'alpha',gloc3)
+      call write_hdf5(vel_2d,'vel_2d',gloc3)
+      call write_hdf5(vel_outplane,'vel_outplane',gloc3)
+      deallocate(alpha, vel_2d, vel_outplane)
     endif
 
     call close_hdf5_group(gloc3)

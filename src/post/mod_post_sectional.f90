@@ -79,10 +79,10 @@ use mod_geometry, only: &
   t_geo, t_geo_component, destroy_elements
 
 use mod_post_load, only: &
-  load_refs, load_res
+  load_refs, load_res, load_ll
 
 use mod_dat_out, only: &
-   dat_out_sectional
+   dat_out_sectional, dat_out_sectional_ll
 
 use mod_tecplot_out, only: &
   tec_out_sectional
@@ -135,6 +135,8 @@ character(len=max_char_len) :: cname !, msg
 integer(h5loc) :: floc, gloc, cloc
 real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
 real(wp), allocatable :: vort(:), cp(:)
+real(wp), allocatable :: alpha(:,:), vel_2d(:,:), vel_outplane(:,:)
+real(wp), allocatable :: alpha_ave(:,:), vel_2d_ave(:,:), vel_outplane_ave(:,:)
 real(wp), allocatable :: points(:,:)
 integer :: nelem
 integer :: n_comp , n_comp_tot , i_comp , id_comp , ax_coor , ref_id
@@ -160,6 +162,7 @@ real(wp) , allocatable :: r_axis(:,:) , r_axis_bas(:,:)
 real(wp) :: F_bas(3) , F_bas1(3)
 real(wp) :: M_bas(3)! , M_bas1(3)
 integer :: ie , ic , it , i1
+logical :: print_ll
 
 ! sectional loads: box -------------------------------------
 character(len=max_char_len) :: comp_input
@@ -279,6 +282,18 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
   comp_input = trim(comps(1)%comp_input )
   n_box = countoption(sbprms,'BoxSect')
   if ( n_box .eq. 1 ) comp_input = 'cgns' 
+  if (n_box .gt. 1) call error(this_sub_name, this_mod_name, 'More than one&
+  & box defined for sectional loads')
+  
+  !decide on printing lifting lines data
+  print_ll = getlogical(sbprms,'LiftingLineData')
+  if (trim(comps(1)%comp_el_type) .ne. 'l')  then
+    print_ll = .false. 
+    call warning(this_sub_name, this_mod_name, 'Cannot output lifting &
+           &line data for a non lifting line component, output of lifting &
+           &line data skipped')
+  endif
+
   
   select case( trim(comp_input) )
   
@@ -356,6 +371,8 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
     sec_loads = -333.0_wp ! initialisation for DEBUG
     allocate( time(n_time) ) ; time = -333.0_wp
     allocate( ref_mat(n_time,9) , off_mat(n_time,3) ) 
+    if(print_ll) allocate(alpha(n_time,n_sect), vel_2d(n_time,n_sect), &
+                          vel_outplane(n_time,n_sect))
     ires = 0
     do it = an_start, an_end, an_step
       ires = ires + 1
@@ -370,6 +387,8 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
       call update_points_postpro(comps, points, refs_R, refs_off)
       ! Load the results --------------------------
       call load_res(floc, comps, vort, cp, t)
+      if(print_ll) call load_ll(floc, comps, alpha(ires,:), vel_2d(ires,:), &
+                                vel_outplane(ires,:))
     
       call close_hdf5_file(floc)
     
@@ -412,23 +431,38 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
     if(average) then
       allocate(sec_loads_ave(1,size(sec_loads,2),size(sec_loads,3)))
       sec_loads_ave(1,:,:) = sum(sec_loads, 1)/real(size(sec_loads,1),wp)
+      if (print_ll) then
+        allocate(alpha_ave(n_time,n_sect), vel_2d_ave(n_time,n_sect), &
+                          vel_outplane_ave(n_time,n_sect))
+        alpha_ave(1,:) = sum(alpha, 1)/real(size(alpha,1),wp)
+        vel_2d_ave(1,:) = sum(vel_2d, 1)/real(size(vel_2d,1),wp)
+        vel_outplane_ave(1,:) = sum(vel_outplane, 1)/&
+                                 real(size(vel_outplane,1),wp)
+      endif
+
       select case(trim(out_frmt))
        case('dat')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name) 
         call dat_out_sectional ( filename, y_cen, y_span, time(1:1), &
                           sec_loads_ave, ref_mat , off_mat, average ) 
+        if(print_ll) call dat_out_sectional_ll(filename, y_cen, y_span, &
+                          time(1:1), alpha_ave, vel_2d_ave, vel_outplane_ave,&
+                          average)
        case('tecplot')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt' 
         call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
                                                                      y_span ) 
       end select
       deallocate(sec_loads_ave)
+      if(print_ll) deallocate(alpha_ave, vel_2d_ave, vel_outplane_ave)
     else
       select case(trim(out_frmt))
        case('dat')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name) 
         call dat_out_sectional ( filename, y_cen, y_span, time, sec_loads, &
                                 ref_mat, off_mat, average ) 
+        if(print_ll) call dat_out_sectional_ll (filename, y_cen, y_span, &
+                          time, alpha, vel_2d, vel_outplane, average ) 
        case('tecplot')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
         call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span ) 

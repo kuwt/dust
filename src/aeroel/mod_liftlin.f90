@@ -93,6 +93,8 @@ type, extends(c_expl_elem) :: t_liftlin
   real(wp)              :: ctr_pt(3)
   real(wp)              :: nor_zeroLift(3)
   real(wp)              :: alpha
+  real(wp)              :: vel_2d
+  real(wp)              :: vel_outplane
 contains
 
   procedure, pass(this) :: compute_pot      => compute_pot_liftlin
@@ -397,6 +399,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   ! Remove the "out-of-plane" component of the relative velocity:
   ! 2d-velocity to enter the airfoil look-up-tables
+  ! IS THIS LOOP USED (u_v) seems to be overwritten few lines down)
   do i_l=1,size(elems_ll)
    select type(el => elems_ll(i_l)%p)
    type is(t_liftlin)
@@ -456,7 +459,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 !       cl_v(i_l) = cl
 !       ! debug ----
 
-      end select
+      !end select
 
 !       ! debug ----
 !     re_v(i_l) = reynolds
@@ -465,8 +468,10 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       c_m(i_l,:) = aero_coeff
       a_v(i_l)   = alpha * pi/180.0_wp ! [rad]
 
-      select type(el => elems_ll(i_l)%p) ; type is(t_liftlin)
+      !select type(el => elems_ll(i_l)%p) ; type is(t_liftlin)
         el%alpha = a_v(i_l) * 180.0_wp / pi  ! [deg]
+        el%vel_2d = unorm
+        el%vel_outplane = sum(el%bnorm_cen*vel)
       end select
 
     enddo  ! i_l
@@ -555,7 +560,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
     if ( diff/max_mag_ll .le. fp_tol ) exit ! convergence
 
-  enddo
+  enddo !solver iterations
 
 ! ! todo: assign a proper debug_level to this screen output
 ! ! debug ----
