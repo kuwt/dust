@@ -449,8 +449,14 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
                                  vel_2d_ave, vel_outplane_ave, average)
        case('tecplot')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt' 
-        call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
+        if (print_ll) then
+          call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
+                                  y_span, alpha_ave, vel_2d_ave, &
+                                  vel_outplane_ave ) 
+        else
+          call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
                                                                      y_span ) 
+        endif
       end select
       deallocate(sec_loads_ave)
       if(print_ll) deallocate(alpha_ave, vel_2d_ave, vel_outplane_ave)
@@ -466,7 +472,12 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
                                               vel_2d, vel_outplane, average ) 
        case('tecplot')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
-        call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span ) 
+        if (print_ll) then
+          call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span,&
+                                   alpha, vel_2d, vel_outplane) 
+        else
+          call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span ) 
+        endif
       end select
     endif
     

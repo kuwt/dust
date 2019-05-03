@@ -1108,23 +1108,31 @@ end subroutine tec_out_probes
 
 !---------------------------------------------------------------------
 
-subroutine tec_out_sectional(out_filename, time, vars, span, span_size)
+subroutine tec_out_sectional(out_filename, time, vars, span, span_size, &
+                             alpha, vel_2d, vel_outplane)
  character(len=*), intent(in) :: out_filename 
  real(wp), intent(in) :: time(:)
  real(wp), intent(in) :: vars(:,:,:)
  real(wp), intent(in) :: span(:)
  real(wp), intent(in) :: span_size(:)
+ real(wp), intent(in), optional :: alpha(:,:)
+ real(wp), intent(in), optional :: vel_2d(:,:)
+ real(wp), intent(in), optional :: vel_outplane(:,:)
  character(len=*), parameter :: var_names(4) = (/ 'Fx' , 'Fy' , 'Fz' , 'Mo' /)
+
  
  character, parameter :: zc = char(0)
  integer :: fu, ierr, i, j
  real(kind=4)  , parameter :: zoneMarker = 299.0
  real(kind=4)  , parameter :: eohMarker  = 357.0
  character(len=max_char_len) :: buffer_char
- integer :: nvars, nsec, timelen, iv
+ integer :: nvars, nvars_tot, nsec, timelen, iv
+ logical :: print_ll
 
-
+  print_ll = present(alpha)
   nvars = 4
+  nvars_tot = nvars
+  if(print_ll) nvars_tot = nvars_tot + 3
   nsec = size(vars, 2)
   timelen = size(vars, 1)
 
@@ -1145,7 +1153,7 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size)
   call put_tec_string('DUST sectional loads',fu)
 
   !number of variables
-  write(fu) int(3+nvars,s_size) !t+span+span_size+nvars
+  write(fu) int(3+nvars_tot,s_size) !t+span+span_size+nvars
 
   !Variables names
   call put_tec_string('t',fu)
@@ -1154,6 +1162,11 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size)
   do iv = 1,nvars
     call put_tec_string(trim(var_names(iv)),fu)
   enddo
+  if (print_ll) then
+    call put_tec_string('alpha',fu)
+    call put_tec_string('vel_2d',fu)
+    call put_tec_string('vel_outplane',fu)
+  endif
   
   !Zone marker
   write(fu) zoneMarker
@@ -1208,6 +1221,11 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size)
   do iv = 1,nvars
     write(fu) int(2,s_size)
   enddo
+  if(print_ll) then
+    write(fu) int(2,s_size) !alpha
+    write(fu) int(2,s_size) !vel_2d
+    write(fu) int(2,s_size) !vel_outplane
+  endif
 
   !Has passive variables?
   write(fu) int(0,s_size)
@@ -1229,6 +1247,14 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size)
     write(fu) dble(minval( vars(:,:,iv) ))
     write(fu) dble(maxval( vars(:,:,iv) ))
   enddo
+  if (print_ll) then
+    write(fu) dble(minval( alpha ))
+    write(fu) dble(maxval( alpha ))
+    write(fu) dble(minval( vel_2d ))
+    write(fu) dble(maxval( vel_2d ))
+    write(fu) dble(minval( vel_outplane ))
+    write(fu) dble(maxval( vel_outplane ))
+  endif
 
   !The actual data
   do j = 1, nsec
@@ -1253,6 +1279,24 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size)
       enddo
     enddo
   enddo
+
+  if (print_ll) then
+    do j = 1, nsec
+      do i = 1, timelen
+        write(fu) real(alpha(i,j),d_size)
+      enddo
+    enddo
+    do j = 1, nsec
+      do i = 1, timelen
+        write(fu) real(vel_2d(i,j),d_size)
+      enddo
+    enddo
+    do j = 1, nsec
+      do i = 1, timelen
+        write(fu) real(vel_outplane(i,j),d_size)
+      enddo
+    enddo
+  endif
 
 end subroutine tec_out_sectional
 
