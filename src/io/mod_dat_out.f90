@@ -128,9 +128,10 @@ end subroutine dat_out_probes_header
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_sectional (basename, y_cen ,y_span ,time ,sec_loads , &
-              ref_mat , off_mat, average )
+subroutine dat_out_sectional (basename, compname, y_cen, y_span, time, &
+                              sec_loads, ref_mat, off_mat, average )
  character(len=*) , intent(in) :: basename
+ character(len=*) , intent(in) :: compname
  real(wp) , intent(in) :: y_cen(:)
  real(wp) , intent(in) :: y_span(:)
  real(wp) , intent(in) :: time(:)
@@ -174,7 +175,8 @@ subroutine dat_out_sectional (basename, y_cen ,y_span ,time ,sec_loads , &
     endif
     open(unit=fid,file=trim(filename))
     ! Header -----------
-    write(fid,'(A)') '# TODO: component name and other beautiful stuff '
+    write(fid,'(A)') '# Sectional load '//trim(load_str(i1))//&
+                    &' of component: '//trim(compname)
     write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(sec_loads,2) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
     write(nnum,'(I0)') size(y_cen)
     write(fid,'('//trim(nnum)//ascii_real//')') y_cen 
@@ -202,9 +204,10 @@ end subroutine dat_out_sectional
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_sectional_ll (basename, y_cen, y_span, time, alpha, &
-                                 vel_2d, vel_outplane, average )
+subroutine dat_out_sectional_ll (basename, compname, y_cen, y_span, time, &
+                                 alpha, vel_2d, vel_outplane, average )
  character(len=*) , intent(in) :: basename
+ character(len=*) , intent(in) :: compname
  real(wp) , intent(in) :: y_cen(:)
  real(wp) , intent(in) :: y_span(:)
  real(wp) , intent(in) :: time(:)
@@ -239,7 +242,8 @@ subroutine dat_out_sectional_ll (basename, y_cen, y_span, time, alpha, &
   endif
   open(unit=fid,file=trim(filename))
   ! Header -----------
-  write(fid,'(A)') '# TODO: component name and other beautiful stuff '
+  write(fid,'(A)') '# Sectional angle of attack of component: '&
+                    &//trim(compname)
   write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(y_cen) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
   write(nnum,'(I0)') size(y_cen)
   write(fid,'('//trim(nnum)//ascii_real//')') y_cen 
@@ -266,7 +270,8 @@ subroutine dat_out_sectional_ll (basename, y_cen, y_span, time, alpha, &
   endif
   open(unit=fid,file=trim(filename))
   ! Header -----------
-  write(fid,'(A)') '# TODO: component name and other beautiful stuff '
+  write(fid,'(A)') '# Sectional two dimensional (in section plane) velocity &
+                    & of component: '//trim(compname)
   write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(y_cen) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
   write(nnum,'(I0)') size(y_cen)
   write(fid,'('//trim(nnum)//ascii_real//')') y_cen 
@@ -293,7 +298,8 @@ subroutine dat_out_sectional_ll (basename, y_cen, y_span, time, alpha, &
   endif
   open(unit=fid,file=trim(filename))
   ! Header -----------
-  write(fid,'(A)') '# TODO: component name and other beautiful stuff '
+  write(fid,'(A)') '# Sectional out of section plane velocity &
+                    & of component: '//trim(compname)
   write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(y_cen) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
   write(nnum,'(I0)') size(y_cen)
   write(fid,'('//trim(nnum)//ascii_real//')') y_cen 

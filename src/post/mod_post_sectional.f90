@@ -51,7 +51,8 @@ use mod_param, only: &
   wp, nl, max_char_len, extended_char_len , pi
 
 use mod_handling, only: &
-  error, warning, info, printout, dust_time, t_realtime, new_file_unit
+  error, internal_error, warning, info, printout, dust_time, t_realtime, &
+  new_file_unit
 
 use mod_parse, only: &
   t_parse, &
@@ -207,12 +208,11 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
   !  at time. If no component is specified --> return
   n_comp = countoption(sbprms,'Component')
   if ( n_comp .le. 0 ) then
-    call warning(trim(this_mod_name),trim(this_sub_name), &
-           'No component specified for ''sectional_loads''&
-         & analysis. Skipped analysis.')
+    call warning(this_mod_name, this_sub_name, 'No component specified for &
+                 sectional_loads analysis. Skipped analysis.')
     return
   else if ( n_comp .ge. 2 ) then
-    call warning(trim(this_mod_name),trim(this_sub_name) , &
+    call warning(this_mod_name, this_sub_name, &
         'More than one component specified &
       &for ''sectional_loads'' analysis: just the first one is considered. &
       &Please run another ''sectional_analysis'' if you need it on more than &
@@ -221,10 +221,8 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
   
   ! check if components_names is allocated (it should alwasy be allocated)
   if ( .not. allocated(components_names) ) then
-    call warning(trim(this_mod_name),trim(this_sub_name), &
-    ' components_name not allocated. Something unexpected&
-    & happened. Skipped analysis.')
-    return
+    call internal_error(this_mod_name,this_sub_name, &
+                        'components_name not allocated.')
   end if 
   
   ! ######### *** Check if the component really exists *** ######### !
@@ -443,11 +441,12 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
       select case(trim(out_frmt))
        case('dat')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name) 
-        call dat_out_sectional ( filename, y_cen, y_span, time(1:1), &
-                          sec_loads_ave, ref_mat , off_mat, average ) 
-        if(print_ll) call dat_out_sectional_ll(filename, y_cen, y_span, &
-                          time(1:1), alpha_ave, vel_2d_ave, vel_outplane_ave,&
-                          average)
+        call dat_out_sectional ( filename, components_names(1), y_cen, &
+                                 y_span, time(1:1), sec_loads_ave, ref_mat, &
+                                 off_mat, average ) 
+        if(print_ll) call dat_out_sectional_ll(filename, components_names(1),&
+                                 y_cen, y_span, time(1:1), alpha_ave, &
+                                 vel_2d_ave, vel_outplane_ave, average)
        case('tecplot')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt' 
         call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
@@ -459,10 +458,12 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
       select case(trim(out_frmt))
        case('dat')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name) 
-        call dat_out_sectional ( filename, y_cen, y_span, time, sec_loads, &
+        call dat_out_sectional ( filename, components_names(1), y_cen, &
+                                 y_span, time, sec_loads, &
                                 ref_mat, off_mat, average ) 
-        if(print_ll) call dat_out_sectional_ll (filename, y_cen, y_span, &
-                          time, alpha, vel_2d, vel_outplane, average ) 
+        if(print_ll) call dat_out_sectional_ll (filename, components_names(1),&
+                                                y_cen, y_span, time, alpha, &
+                                              vel_2d, vel_outplane, average ) 
        case('tecplot')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
         call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span ) 
@@ -925,7 +926,8 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
       select case(trim(out_frmt))
        case('dat')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name) 
-        call dat_out_sectional ( filename, y_cen, y_span, time(1:1), &
+        call dat_out_sectional ( filename, components_names(1), y_cen, &
+                                  y_span, time(1:1), &
                           sec_loads_ave, ref_mat , off_mat, average ) 
        case('tecplot')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt' 
@@ -937,8 +939,9 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
       select case(trim(out_frmt))
        case('dat')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name) 
-        call dat_out_sectional ( filename, y_cen, y_span, time, sec_loads, &
-                                ref_mat, off_mat, average) 
+        call dat_out_sectional ( filename, components_names(1), y_cen, &
+                                 y_span, time, sec_loads, &
+                                 ref_mat, off_mat, average) 
        case('tecplot')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
         call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span ) 

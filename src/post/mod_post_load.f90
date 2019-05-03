@@ -240,7 +240,8 @@ subroutine load_res(floc, comps, vort, press, t, surfvel)
       enddo
     end select
 
-    deallocate(vort_read)!, cp_read)
+    deallocate(vort_read, pres_read, dforce_read, surfvel_read)
+
 
   enddo
 
