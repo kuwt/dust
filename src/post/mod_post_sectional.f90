@@ -209,7 +209,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
   n_comp = countoption(sbprms,'Component')
   if ( n_comp .le. 0 ) then
     call warning(this_mod_name, this_sub_name, 'No component specified for &
-                 sectional_loads analysis. Skipped analysis.')
+                 &sectional_loads analysis. Skipped analysis.')
     return
   else if ( n_comp .ge. 2 ) then
     call warning(this_mod_name, this_sub_name, &

@@ -51,6 +51,9 @@ use mod_param, only: &
 use mod_handling, only: &
   error, warning, info, printout, new_file_unit
 
+use mod_vtk_utils, only: &
+  t_output_var
+
 !---------------------------------------------------------------------
 implicit none
 
@@ -362,22 +365,25 @@ end subroutine tec_out_sol_bin
 !----------------------------------------------------------------------
 
 subroutine tec_out_viz(out_filename, t, &
-                       rr, ee, vars, var_names,  &
-                     w_rr, w_ee, w_vars, w_var_names, &
-                     vp_rr, vp_vars, vp_var_names)
+                       rr, ee, vars,  &
+                     w_rr, w_ee, w_vars, &
+                     vp_rr, vp_vars)
  character(len=*), intent(in) :: out_filename 
  real(wp), intent(in) :: t
  real(wp), intent(in) :: rr(:,:)
  integer, intent(in)  :: ee(:,:)
- real(wp), intent(in) :: vars(:,:)
- character(len=*), intent(in) :: var_names(:)
+ !real(wp), intent(in) :: vars(:,:)
+ !character(len=*), intent(in) :: var_names(:)
+ type(t_output_var), intent(in) :: vars(:)
  real(wp), intent(in), optional :: w_rr(:,:)
  integer, intent(in), optional  :: w_ee(:,:)
- real(wp), intent(in), optional :: w_vars(:,:)
- character(len=*), intent(in), optional :: w_var_names(:)
+ !real(wp), intent(in), optional :: w_vars(:,:)
+ !character(len=*), intent(in), optional :: w_var_names(:)
+ type(t_output_var), intent(in), optional :: w_vars(:)
  real(wp), intent(in), optional :: vp_rr(:,:)
- real(wp), intent(in), optional :: vp_vars(:,:)
- character(len=*), intent(in), optional :: vp_var_names(:)
+ !real(wp), intent(in), optional :: vp_vars(:,:)
+ !character(len=*), intent(in), optional :: vp_var_names(:)
+ type(t_output_var), intent(in), optional :: vp_vars(:)
 
  character, parameter :: zc = char(0)
  integer :: npoints, ncells, ne
@@ -387,31 +393,44 @@ subroutine tec_out_viz(out_filename, t, &
  character(len=max_char_len) :: buffer_char
  integer :: ie, nquad, ntria, nvp
  integer npoints_w, nw
- logical :: got_wake, got_particles
- integer :: nvars, w_nvars, iv, nvars_vp
+ logical :: got_wake, got_particles, w_passive, vp_passive
+ integer :: nvars, w_nvars, iv, vp_nvars, nvars_tot
 
 
-  got_wake = present(w_var_names)
+  got_wake = present(w_vars)
   got_particles = got_wake .and. (size(vp_rr,2) .gt. 0)
 
   ne = size(ee,2) !number of elements
   npoints = size(rr,2)
   ncells = ne
-  nvars = size(var_names)
+  nvars = size(vars)
+  nvars_tot = 0
+  do iv = 1,nvars
+    if (vars(iv)%vector) then
+      nvars_tot = nvars_tot + 3
+    else
+      nvars_tot = nvars_tot + 1
+    endif
+  enddo
   
   if(got_wake) then
     nw = size(w_ee,2) !number of wake elements
     npoints_w = size(w_rr,2)
-    w_nvars = size(w_var_names)
+    w_nvars = size(w_vars)
+    w_passive = .false.
+    do iv = 1, w_nvars
+      if(w_vars(iv)%skip) w_passive = .true.
+    enddo
   endif
 
   if(got_particles) then
     nvp = size(vp_rr,2)
-    nvars_vp = size(vp_var_names)
+    vp_nvars = size(vp_vars)
+    vp_passive = .false.
+    do iv = 1, vp_nvars
+      if(vp_vars(iv)%skip) vp_passive = .true.
+    enddo
   endif
-
-  !WARNING: for the moment we are assuming that the number and type of 
-  ! wake variables is lower or equal to the body ones
 
   ! First cycle the elements to get the number of quads and trias
   ! (this is really ugly, make it more flexible)
@@ -441,14 +460,20 @@ subroutine tec_out_viz(out_filename, t, &
   call put_tec_string('DUST solution',fu)
 
   !number of variables
-  write(fu) int(3+nvars,s_size) !x-y-z-vort
+  write(fu) int(3+nvars_tot,s_size) !x-y-z-vort
 
   !Variables names
   call put_tec_string('X',fu)
   call put_tec_string('Y',fu)
   call put_tec_string('Z',fu)
   do iv = 1,nvars
-    call put_tec_string(trim(var_names(iv)),fu)
+    if(vars(iv)%vector) then
+      call put_tec_string(trim(vars(iv)%var_name)//'_x',fu)
+      call put_tec_string(trim(vars(iv)%var_name)//'_y',fu)
+      call put_tec_string(trim(vars(iv)%var_name)//'_z',fu)
+    else
+      call put_tec_string(trim(vars(iv)%var_name),fu)
+    endif
   enddo
  
   !BODY
@@ -481,7 +506,7 @@ subroutine tec_out_viz(out_filename, t, &
   write(fu) int(0,s_size)
   write(fu) int(0,s_size)
   ! Other variables stand at cells centers
-  do iv = 1,nvars
+  do iv = 1,nvars_tot
     write(fu) int(1,s_size)
   enddo
 
@@ -533,7 +558,7 @@ subroutine tec_out_viz(out_filename, t, &
     write(fu) int(0,s_size)
     write(fu) int(0,s_size)
     ! Other variables stand at cells centers
-    do iv = 1,nvars
+    do iv = 1,nvars_tot
       write(fu) int(1,s_size)
     enddo
 
@@ -610,7 +635,7 @@ subroutine tec_out_viz(out_filename, t, &
   write(fu) int(2,s_size)
   write(fu) int(2,s_size)
   write(fu) int(2,s_size)
-  do iv = 1,nvars
+  do iv = 1,nvars_tot
     write(fu) int(2,s_size)
   enddo
 
@@ -637,8 +662,17 @@ subroutine tec_out_viz(out_filename, t, &
   write(fu) dble(maxval( rr(3,:) ))
   !Vars
   do iv = 1,nvars
-    write(fu) dble(minval( vars(:,iv) ))
-    write(fu) dble(maxval( vars(:,iv) ))
+    if (vars(iv)%vector) then
+      write(fu) dble(minval( vars(iv)%var(1,:) ))
+      write(fu) dble(maxval( vars(iv)%var(1,:) ))
+      write(fu) dble(minval( vars(iv)%var(2,:) ))
+      write(fu) dble(maxval( vars(iv)%var(2,:) ))
+      write(fu) dble(minval( vars(iv)%var(3,:) ))
+      write(fu) dble(maxval( vars(iv)%var(3,:) ))
+    else
+      write(fu) dble(minval( vars(iv)%var(1,:) ))
+      write(fu) dble(maxval( vars(iv)%var(1,:) ))
+    endif
   enddo
 
   !The actual data
@@ -650,9 +684,21 @@ subroutine tec_out_viz(out_filename, t, &
   end do
   ! Vars
   do iv = 1,nvars
-    do i2 = 1 , size(vars,1)
-      write(fu) real(vars(i2,iv),d_size)
-    end do
+    if (vars(iv)%vector) then
+      do i2 = 1 , size(vars(iv)%var,2)
+        write(fu) real(vars(iv)%var(1,i2),d_size)
+      end do
+      do i2 = 1 , size(vars(iv)%var,2)
+        write(fu) real(vars(iv)%var(2,i2),d_size)
+      end do
+      do i2 = 1 , size(vars(iv)%var,2)
+        write(fu) real(vars(iv)%var(3,i2),d_size)
+      end do
+    else
+      do i2 = 1 , size(vars(iv)%var,2)
+        write(fu) real(vars(iv)%var(1,i2),d_size)
+      end do
+    endif
   enddo
 
   !Connectivity
@@ -676,11 +722,11 @@ subroutine tec_out_viz(out_filename, t, &
     write(fu) int(2,s_size)
     write(fu) int(2,s_size)
     write(fu) int(2,s_size)
-    do iv = 1,nvars
+    do iv = 1,nvars_tot
       write(fu) int(2,s_size)
     enddo
     
-    if (w_nvars .lt. nvars) then
+    if (w_passive) then
       !Has passive variables?
       write(fu) int(1,s_size)
       !x-y-z are not passive
@@ -689,11 +735,21 @@ subroutine tec_out_viz(out_filename, t, &
       write(fu) int(0,s_size)
       !first variables are not passive
       do iv=1,w_nvars
-        write(fu) int(0,s_size)
-      enddo
-      !last variables are passive
-      do iv = 1,(nvars-w_nvars)
-        write(fu) int(1,s_size)
+        if(w_vars(iv)%skip) then
+          !passive
+          write(fu) int(1,s_size)
+          if(w_vars(iv)%vector) then
+            write(fu) int(1,s_size)
+            write(fu) int(1,s_size)
+          endif
+        else
+          !not passive
+          write(fu) int(0,s_size)
+          if(w_vars(iv)%vector) then
+            write(fu) int(0,s_size)
+            write(fu) int(0,s_size)
+          endif
+        endif
       enddo
     else
       !Has passive variables?
@@ -718,8 +774,19 @@ subroutine tec_out_viz(out_filename, t, &
     write(fu) dble(maxval( w_rr(3,:) ))
     !Vars
     do iv = 1,w_nvars
-      write(fu) dble(minval( w_vars(:,iv) ))
-      write(fu) dble(maxval( w_vars(:,iv) ))
+      if(.not.w_vars(iv)%skip) then
+        if(w_vars(iv)%vector) then
+          write(fu) dble(minval( w_vars(iv)%var(1,:) ))
+          write(fu) dble(maxval( w_vars(iv)%var(1,:) ))
+          write(fu) dble(minval( w_vars(iv)%var(2,:) ))
+          write(fu) dble(maxval( w_vars(iv)%var(2,:) ))
+          write(fu) dble(minval( w_vars(iv)%var(3,:) ))
+          write(fu) dble(maxval( w_vars(iv)%var(3,:) ))
+        else
+          write(fu) dble(minval( w_vars(iv)%var(1,:) ))
+          write(fu) dble(maxval( w_vars(iv)%var(1,:) ))
+        endif
+      endif
     enddo
 
     !The actual data
@@ -731,9 +798,23 @@ subroutine tec_out_viz(out_filename, t, &
     end do
     ! Vort
     do iv = 1,w_nvars
-      do i2 = 1 , size(w_vars,1)
-        write(fu) real(w_vars(i2,iv),d_size)
-      end do
+      if(.not.w_vars(iv)%skip) then
+        if(w_vars(iv)%vector) then
+          do i2 = 1 , size(w_vars(iv)%var,2)
+            write(fu) real(w_vars(iv)%var(1,i2),d_size)
+          end do
+          do i2 = 1 , size(w_vars(iv)%var,2)
+            write(fu) real(w_vars(iv)%var(2,i2),d_size)
+          end do
+          do i2 = 1 , size(w_vars(iv)%var,2)
+            write(fu) real(w_vars(iv)%var(3,i2),d_size)
+          end do
+        else
+          do i2 = 1 , size(w_vars(iv)%var,2)
+            write(fu) real(w_vars(iv)%var(1,i2),d_size)
+          end do
+        endif
+      endif
     enddo
 
     !Connectivity
@@ -758,11 +839,11 @@ subroutine tec_out_viz(out_filename, t, &
     write(fu) int(2,s_size)
     write(fu) int(2,s_size)
     write(fu) int(2,s_size)
-    do iv = 1,nvars
+    do iv = 1,nvars_tot
       write(fu) int(2,s_size)
     enddo
     
-    if (nvars_vp .lt. nvars) then
+    if (vp_passive) then
       !Has passive variables?
       write(fu) int(1,s_size)
       !x-y-z are not passive
@@ -770,12 +851,22 @@ subroutine tec_out_viz(out_filename, t, &
       write(fu) int(0,s_size)
       write(fu) int(0,s_size)
       !first variables are not passive
-      do iv=1,nvars_vp
-        write(fu) int(0,s_size)
-      enddo
-      !last variables are passive
-      do iv = 1,(nvars-nvars_vp)
-        write(fu) int(1,s_size)
+      do iv=1,vp_nvars
+        if(vp_vars(iv)%skip) then
+          !passive
+          write(fu) int(1,s_size)
+          if(w_vars(iv)%vector) then
+            write(fu) int(1,s_size)
+            write(fu) int(1,s_size)
+          endif
+        else
+          !not passive
+          write(fu) int(0,s_size)
+          if(w_vars(iv)%vector) then
+            write(fu) int(0,s_size)
+            write(fu) int(0,s_size)
+          endif
+        endif
       enddo
     else
       !Has passive variables?
@@ -799,9 +890,20 @@ subroutine tec_out_viz(out_filename, t, &
     write(fu) dble(minval( vp_rr(3,:) ))
     write(fu) dble(maxval( vp_rr(3,:) ))
     !Vars
-    do iv = 1,nvars_vp
-      write(fu) dble(minval( vp_vars(:,iv) ))
-      write(fu) dble(maxval( vp_vars(:,iv) ))
+    do iv = 1,vp_nvars
+      if(.not.vp_vars(iv)%skip) then
+        if(vp_vars(iv)%vector) then
+          write(fu) dble(minval( vp_vars(iv)%var(1,:) ))
+          write(fu) dble(maxval( vp_vars(iv)%var(1,:) ))
+          write(fu) dble(minval( vp_vars(iv)%var(2,:) ))
+          write(fu) dble(maxval( vp_vars(iv)%var(2,:) ))
+          write(fu) dble(minval( vp_vars(iv)%var(3,:) ))
+          write(fu) dble(maxval( vp_vars(iv)%var(3,:) ))
+        else
+          write(fu) dble(minval( vp_vars(iv)%var(1,:) ))
+          write(fu) dble(maxval( vp_vars(iv)%var(1,:) ))
+        endif
+      endif
     enddo
 
     !The actual data
@@ -812,11 +914,26 @@ subroutine tec_out_viz(out_filename, t, &
       end do
     end do
     ! Vort
-    do iv = 1,nvars_vp
-      do i2 = 1 , size(vp_vars,1)
-        write(fu) real(vp_vars(i2,iv),d_size)
-      end do
+    do iv = 1,vp_nvars
+      if(.not.vp_vars(iv)%skip) then
+        if(vp_vars(iv)%vector) then
+          do i2 = 1 , size(vp_vars(iv)%var,2)
+            write(fu) real(vp_vars(iv)%var(1,i2),d_size)
+          end do
+          do i2 = 1 , size(vp_vars(iv)%var,2)
+            write(fu) real(vp_vars(iv)%var(2,i2),d_size)
+          end do
+          do i2 = 1 , size(vp_vars(iv)%var,2)
+            write(fu) real(vp_vars(iv)%var(3,i2),d_size)
+          end do
+        else
+          do i2 = 1 , size(vp_vars(iv)%var,2)
+            write(fu) real(vp_vars(iv)%var(1,i2),d_size)
+          end do
+        endif
+      endif
     enddo
+
   endif
   
   close(fu)

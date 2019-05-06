@@ -133,7 +133,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
  integer , allocatable :: elems(:,:) , welems(:,:)
  integer :: nelem , nelem_w, nelem_vp
 
- real(wp), allocatable :: points_ave(:,:), ave_vars(:,:)
+ real(wp), allocatable :: points_ave(:,:)
  
  real(wp) :: u_inf(3)
  real(wp) :: P_inf , rho
@@ -141,14 +141,6 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
  real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
  real(wp), allocatable :: vort(:), cp(:), vel(:), press(:), surfvel(:,:)
  real(wp), allocatable :: wvort(:)
-
- real(wp), allocatable :: print_vars(:,:)
- character(len=max_char_len), allocatable :: print_var_names(:)
- character(len=max_char_len), allocatable :: ave_var_names(:)
- 
- real(wp), allocatable :: print_vars_w(:,:)
- real(wp), allocatable :: print_vars_vp(:,:)
- character(len=max_char_len), allocatable :: print_var_names_w(:)
 
  type(t_output_var), allocatable :: out_vars(:), ave_out_vars(:)
  type(t_output_var), allocatable :: out_vars_w(:), out_vars_vp(:)
@@ -337,11 +329,9 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
          case ('tecplot')
           filename = trim(filename)//'.plt'
           call  tec_out_viz(filename, t, &
-                       points_exp, elems, print_vars, print_var_names, &
-                       w_rr=wpoints, w_ee=welems, w_vars=print_vars_w, &
-                       w_var_names = print_var_names_w, &
-                       vp_rr=vppoints, vp_vars=print_vars_vp, &
-                       vp_var_names = print_var_names_w)
+                       points_exp, elems, out_vars, &
+                       w_rr=wpoints, w_ee=welems, w_vars=out_vars_w, &
+                       vp_rr=vppoints, vp_vars=out_vars_vp)
          case ('vtk')
           filename = trim(filename)//'.vtu'
           call  vtk_out_viz(filename, &
@@ -365,7 +355,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
          case ('tecplot')
           filename = trim(filename)//'.plt'
           call  tec_out_viz(filename, t, &
-                       points_exp, elems, print_vars, print_var_names)
+                       points_exp, elems, out_vars)
          case ('vtk')
           filename = trim(filename)//'.vtu'
           call  vtk_out_viz(filename, &
@@ -402,7 +392,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
      case ('tecplot')
       filename = trim(filename)//'.plt'
       call  tec_out_viz(filename, t, &
-                   points_ave, elems, ave_vars, ave_var_names)
+                   points_ave, elems, ave_out_vars)
      case ('vtk')
       filename = trim(filename)//'.vtu'
       call  vtk_out_viz(filename, &

@@ -535,32 +535,23 @@ subroutine vtk_out_viz (out_filename, &
  character(len=*), intent(in) :: out_filename 
  real(wp), intent(in) :: rr(:,:)
  integer, intent(in) :: ee(:,:)
- !real(wp), intent(in) :: vars(:,:)
- !character(len=*), intent(in) :: var_names(:)
- type(t_output_var), intent(in), optional :: vars(:)
+ type(t_output_var), intent(in) :: vars(:)
  real(wp), intent(in), optional :: w_rr(:,:)
  integer, intent(in), optional :: w_ee(:,:)
- !real(wp), intent(in), optional :: w_vars(:,:)
- !character(len=*), intent(in), optional :: w_var_names(:)
  type(t_output_var), intent(in), optional :: w_vars(:)
  real(wp), intent(in), optional :: vp_rr(:,:)
- !real(wp), intent(in), optional :: vp_vars(:,:)
- !character(len=*), intent(in), optional :: vp_var_names(:)
  type(t_output_var), intent(in), optional :: vp_vars(:)
  logical, intent(in), optional :: separate_wake
 
- integer :: fu, ierr, i, i_shift
+ integer :: fu, ierr
  integer :: npoints, ncells, ne
- integer :: offset, nbytes
+ integer :: offset
  integer :: slen
  character(len=200) :: buffer
- character(len=20) :: ostr, str1, str2
  character(len=1)  :: lf
 
- integer :: ie, nquad, ntria, nquad_w, ntria_w, etype, nvp
+ integer :: ie, nquad, ntria, nquad_w, ntria_w, nvp
  integer :: npoints_w, nw
- !integer :: nvars, nvars_w, nvars_vp, 
- integer :: i_v
  logical :: got_wake, got_particles, swake
 
   got_wake = present(w_vars)
