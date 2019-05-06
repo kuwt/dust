@@ -54,7 +54,7 @@ use mod_math, only: &
   cross
 
 use mod_sim_param, only: &
-  t_sim_param, sim_param
+  sim_param
 
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
@@ -673,11 +673,10 @@ end subroutine
 !----------------------------------------------------------------------
 
 !> Sort particles inside the octree grid
-subroutine sort_particles(part, n_prt, octree, sim_param)
+subroutine sort_particles(part, n_prt, octree)
  type(t_vortpart_p), intent(in), target :: part(:)
  integer, intent(inout) :: n_prt
  type(t_octree), intent(inout), target :: octree
- type(t_sim_param), intent(in) :: sim_param
 
  integer :: ip
  integer :: idx(3)
@@ -1025,14 +1024,13 @@ end subroutine calculate_multipole
 
 !> Apply the local expansion and calculate interaction, and also calculate
 !! the interaction from other elements (not particles)
-subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort, sim_param)
+subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
  type(t_vortpart_p), intent(in), target :: part(:)
  type(t_octree), intent(inout) :: octree
  type(t_pot_elem_p), intent(in) :: elem(:)
  type(t_pot_elem_p), intent(in) :: wpan(:)
  type(t_pot_elem_p), intent(in) :: wrin(:)
  class(c_elem), intent(in) :: wvort(:)
- type(t_sim_param), intent(in) :: sim_param
 
  integer :: i, j, k, lv, ip, ipp, m, ie, iln
  real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3), dir(3)

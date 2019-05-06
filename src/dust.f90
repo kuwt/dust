@@ -183,12 +183,6 @@ type(t_wake) :: wake
 !> Timing vars
 real(t_realtime) :: t1 , t0, t00, t11, t22
 
-!Restart
-logical :: restart
-character(len=max_char_len) :: restart_file
-logical :: reset_time
-
-
 !I/O prefixes
 character(len=max_char_len) :: frmt
 character(len=max_char_len) :: basename_debug
@@ -303,6 +297,10 @@ call prms%CreateLogicalOption('LLstallRegularisation', &
        'Avoid "unphysical" separations in inner sections of LL?','T')
 call prms%CreateIntOption('LLstallRegularisationNelems', &
        'Number of "unphysical" separations to be removed', '1' )
+call prms%CreateIntOption('LLstallRegularisationNiters', &
+       'Number of timesteps between two regularisations', '1' )
+call prms%CreateRealOption('LLstallRegularisationAlphaStall', &
+       'Stall angle used as threshold for regularisation [deg]', '15.0' )
 
 !== Octree and multipole data == 
 call prms%CreateLogicalOption('FMM','Employ fast multipole method?','T')
@@ -333,136 +331,22 @@ call prms%CreateLogicalOption('ParticlesRedistribution','Employ particles &
 call printout(nl//'====== Input parameters: ======')
 call check_file_exists(input_file_name,'dust main')
 call prms%read_options(input_file_name, printout_val=.true.)
-!timing
-sim_param%t0 = getreal(prms, 'tstart')
-sim_param%tend   = getreal(prms, 'tend')
-sim_param%dt     = getreal(prms, 'dt')
-sim_param%dt_out = getreal(prms,'dt_out')
-dt_debug_out = getreal(prms, 'dt_debug_out')
+
+! initialize all the parameters
+nout = 0 !reset the numbering for output files
 output_start = getlogical(prms, 'output_start')
-sim_param%debug_level = getint(prms, 'debug_level')
-!Reference values
-sim_param%P_inf = getreal(prms,'P_inf')
-sim_param%rho_inf  = getreal(prms,'rho_inf')
-sim_param%u_inf = getrealarray(prms, 'u_inf', 3)
-if ( countoption(prms,'u_ref') .gt. 0 ) then
-  sim_param%u_ref = getreal(prms, 'u_ref')
-else
-  sim_param%u_ref = norm2(sim_param%u_inf)
-  if (sim_param%u_ref .le. 0.0_wp) then
-    call error('dust','dust','No reference velocity u_ref provided but &
-    &zero free stream velocity. Provide a non-zero reference velocity. &
-    &Stopping now before producing invalid results')
-  endif
-end if
-sim_param%a_inf  = getreal(prms,'a_inf')
-sim_param%mu_inf = getreal(prms,'mu_inf')
-sim_param%nu_inf = sim_param%mu_inf/sim_param%rho_inf
-!Wake parameters
-sim_param%n_wake_panels = getint(prms, 'n_wake_panels')
-sim_param%n_wake_particles = getint(prms, 'n_wake_particles')
-sim_param%particles_box_min = getrealarray(prms, 'particles_box_min',3)
-sim_param%particles_box_max = getrealarray(prms, 'particles_box_max',3)
-sim_param%rigid_wake = getlogical(prms, 'rigid_wake')
-sim_param%rigid_wake_vel = sim_param%u_inf   ! initialisation
-if ( sim_param%rigid_wake ) then
-  if ( countoption(prms,'rigid_wake_vel') .eq. 1 ) then
-    sim_param%rigid_wake_vel = getrealarray(prms, 'rigid_wake_vel',3)
-  else if ( countoption(prms,'rigid_wake_vel') .le. 0 ) then
-    call warning('dust','dust','no rigid_wake_vel parameter set, &
-         &with rigid_wake = T; rigid_wake_vel = u_inf')
-    sim_param%rigid_wake_vel = sim_param%u_inf
-  end if
-end if
-sim_param%join_te = getlogical(prms, 'join_te')
-if (sim_param%join_te) sim_param%join_te_factor=getreal(prms,'join_te_factor')
+call init_sim_param(sim_param, prms, nout, output_start)
 
-!Names
-sim_param%basename = getstr(prms,'basename')
+! remaining parameters
+dt_debug_out = getreal(prms, 'dt_debug_out')
 basename_debug = getstr(prms,'basename_debug')
-sim_param%GeometryFile = getstr(prms,'GeometryFile')
-sim_param%ReferenceFile = getstr(prms,'ReferenceFile')
-!Method parameters
-sim_param%FarFieldRatioDoublet  = getreal(prms, 'FarFieldRatioDoublet')
-sim_param%FarFieldRatioSource  = getreal(prms, 'FarFieldRatioSource')
-sim_param%DoubletThreshold   = getreal(prms, 'DoubletThreshold')
-sim_param%RankineRad = getreal(prms, 'RankineRad')
-sim_param%VortexRad = getreal(prms, 'VortexRad')
-sim_param%CutoffRad  = getreal(prms, 'CutoffRad')
-sim_param%first_panel_scaling = getreal(prms,'ImplicitPanelScale')
-sim_param%min_vel_at_te  = getreal(prms,'ImplicitPanelMinVel')
-sim_param%use_vs = getlogical(prms, 'Vortstretch')
-sim_param%use_vd = getlogical(prms, 'Diffusion')
-sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
-sim_param%use_ve = getlogical(prms, 'ViscosityEffects')
-!Lifting line elements
-sim_param%llReynoldsCorrections      = getlogical(prms, 'LLreynoldsCorrections')
-sim_param%llReynoldsCorrectionsNfact = getreal(   prms, 'LLreynoldsCorrectionsNfact')
-sim_param%llMaxIter                  = getint(    prms, 'LLmaxIter'            )
-sim_param%llTol                      = getreal(   prms, 'LLtol'                )
-sim_param%llDamp                     = getreal(   prms, 'LLdamp'               )
-sim_param%llStallRegularisation      = getlogical(prms, 'LLstallRegularisation')
-sim_param%llStallRegularisationNelems= getint(    prms, 'LLstallRegularisationNelems')
-
-!Octree and FMM parameters
-sim_param%use_fmm = getlogical(prms, 'FMM')
-if(sim_param%use_fmm) then
-  sim_param%BoxLength = getreal(prms, 'BoxLength')
-  sim_param%NBox = getintarray(prms, 'NBox',3)
-  sim_param%OctreeOrigin = getrealarray(prms, 'OctreeOrigin',3)
-  sim_param%NOctreeLevels = getint(prms, 'NOctreeLevels')
-  sim_param%MinOctreePart = getint(prms, 'MinOctreePart')
-  sim_param%MultipoleDegree = getint(prms,'MultipoleDegree')
-  
-  sim_param%use_dyn_layers = getlogical(prms,'DynLayers')
-  if(sim_param%use_dyn_layers) then
-    sim_param%NMaxOctreeLevels = getint(prms, 'NMaxOctreeLevels')
-    sim_param%LeavesTimeRatio = getreal(prms, 'LeavesTimeRatio')
-  else
-    sim_param%NMaxOctreeLevels = sim_param%NOctreeLevels
-  endif
-
-  sim_param%use_pr = getlogical(prms, 'ParticlesRedistribution')
-endif
 
 !-- Parameters Initializations --
-call initialize_doublet(sim_param%FarFieldRatioDoublet, &
-                        sim_param%DoubletThreshold, sim_param%RankineRad, &
-                        sim_param%CutoffRad);
-call initialize_vortline(sim_param%RankineRad, sim_param%CutoffRad);
-call initialize_vortpart(sim_param%VortexRad, sim_param%CutoffRad);
-call initialize_surfpan(sim_param%FarFieldRatioSource);
-!reset the numbering for output files
-nout = 0
+call initialize_doublet()
+call initialize_vortline()
+call initialize_vortpart()
+call initialize_surfpan()
 
-!Manage restart
-restart = getlogical(prms,'restart_from_file')
-if (restart) then
-
-  reset_time = getlogical(prms,'reset_time')
-  restart_file = getstr(prms,'restart_file')
-  call printout('RESTART: restarting from file: '//trim(restart_file))
-  sim_param%GeometryFile = restart_file(1:len(trim(restart_file))-11)&
-                                                           &//'geo.h5'
-
-  !restarting the same simulation, advance the numbers
-  if(restart_file(1:len(trim(restart_file))-12).eq. &
-                                               trim(sim_param%basename)) then
-  read(restart_file(len(trim(restart_file))-6:len(trim(restart_file))-3),*) &
-                                                                         nout 
-    call printout('Identified restart from the same simulation, keeping the&
-    & previous output numbering')
-    !avoid rewriting the same timestep
-    output_start = .false.
-  endif
-  if(.not. reset_time) call load_time(restart_file, sim_param%t0)
-
-  ! sim_param structure
-  sim_param%restart_from_file = restart
-  sim_param%restart_file = restart_file 
-  sim_param%reset_time = reset_time
-
-endif
 
 ! Check that tend .gt. tinit
 if ( sim_param%tend .le. sim_param%t0 ) then
@@ -508,8 +392,7 @@ t0 = dust_time()
 target_file = trim(sim_param%basename)//'_geo.h5'
 call create_geometry(sim_param%GeometryFile, sim_param%ReferenceFile, &
                      input_file_name, geo, te, elems, elems_expl, elems_ad, &
-                     elems_ll, elems_tot, airfoil_data, sim_param, &
-                     target_file, run_id)
+                     elems_ll, elems_tot, airfoil_data, target_file, run_id)
 
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
@@ -546,12 +429,12 @@ endif
 call printout(nl//'====== Initializing Wake ======')
 
 call initialize_wake(wake, geo, te, sim_param%n_wake_panels, &
-       sim_param%n_wake_panels, sim_param%n_wake_particles, sim_param)
+       sim_param%n_wake_panels, sim_param%n_wake_particles)
 
 call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
 call initialize_linsys(linsys, geo, elems, elems_expl, &
-                       wake, sim_param ) ! sim_param%u_inf)
+                       wake ) ! sim_param%u_inf)
 !call initialize_pressure_sys(linsys, geo, elems)
 
 t1 = dust_time()
@@ -562,9 +445,9 @@ endif
 
 ! Restart --------------
 !------ Reloading ------
-if (restart) then
- call load_solution(restart_file, geo%components, geo%refs)
- call load_wake(restart_file, wake)
+if (sim_param%restart_from_file) then
+ call load_solution(sim_param%restart_file, geo%components, geo%refs)
+ call load_wake(sim_param%restart_file, wake)
 
 ! Moved to mod_geo.f90/create_geometry()
 !! Update the initial relative position of the ref.sys.
@@ -612,7 +495,7 @@ do it = 1,nstep
   !call prepare_wake(wake, geo, sim_param, it)
  
   call update_liftlin(elems_ll,linsys)
-  call update_actdisk(elems_ad,linsys,sim_param)
+  call update_actdisk(elems_ad,linsys)
 
   
   !debug geometry printing
@@ -625,8 +508,7 @@ do it = 1,nstep
   !call prepare_wake(wake, geo, sim_param)
   t0 = dust_time()
 
-  call assemble_linsys(linsys, geo, elems, elems_expl,  &
-                       wake, sim_param)
+  call assemble_linsys(linsys, geo, elems, elems_expl, wake)
   call assemble_pressure_sys(linsys, geo, elems, wake)
   t1 = dust_time()
 
@@ -674,16 +556,15 @@ do it = 1,nstep
   !------ Update the explicit part ------  % v-----implicit elems: p,v
   if ( size(elems_ll) .gt. 0 ) then
     call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
-            (/ wake%pan_p, wake%rin_p/), wake%vort_p, sim_param, airfoil_data, it)
+            (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it)
   end if
 
   !------ Compute loads -------
   ! Implicit elements: vortex rings and 3d-panels
   do i_el = 1 , size(elems)
     call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
-             geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g, &
-             sim_param )
-    call elems(i_el)%p%compute_dforce(sim_param)
+             geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g)
+    call elems(i_el)%p%compute_dforce()
   end do
   ! Explicit elements:
   ! - liftlin: _pres and _dforce computed in solve_liftin()
@@ -692,9 +573,8 @@ do it = 1,nstep
   do i_el = 1 , size(elems_ad)
 !   call elems_ad(i_el)%p%compute_pres(sim_param)
     call elems_ad(i_el)%p%compute_pres( &     ! update surf_vel field too
-             geo%refs( geo%components(elems_ad(i_el)%p%comp_id)%ref_id )%R_g, &
-             sim_param )
-    call elems_ad(i_el)%p%compute_dforce(sim_param)
+             geo%refs( geo%components(elems_ad(i_el)%p%comp_id)%ref_id )%R_g)
+    call elems_ad(i_el)%p%compute_dforce()
   end do
 
   ! pres_IE +++++
@@ -702,6 +582,10 @@ do it = 1,nstep
     do i_el = 1 , geo%nSurfPan
       select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
        ! check UHLMAN's EQN -----
+! debug ----       
+!      write(*,*) ' i_el : ' , i_el , &
+!                 ' surfpan_H_IE(i_el) ' , surfpan_H_IE(i_el)
+! debug ----       
        el%pres = &
         linsys%res_pres(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp 
 !      el%pres = &
@@ -726,19 +610,19 @@ do it = 1,nstep
   !Print the results
   if(time_2_out)  then
     nout = nout+1
-    call save_status(geo, wake, sim_param, nout, time, run_id)
+    call save_status(geo, wake, nout, time, run_id)
   endif
 
   !------ Viscous Effects and Flow Separations ------
   ! some computation of surface quantities and vorticity to be released.
   ! Free vortices will be introduced in prepare_wake(), some lines below
-  if(sim_param%use_ve) call viscosity_effects( geo , elems , te , sim_param )
+  if(sim_param%use_ve) call viscosity_effects( geo , elems , te )
 
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
   !  next iteration)
   t0 = dust_time()
-  call update_wake(wake, elems_tot, octree, sim_param)
+  call update_wake(wake, elems_tot, octree)
   t1 = dust_time()
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,F9.3,A)') 'Updated wake in: ' , t1 - t0,' s.'
@@ -757,8 +641,7 @@ do it = 1,nstep
 
   time = min(sim_param%tend, time+sim_param%dt)
   call update_geometry(geo, time, .false.)
-  call prepare_wake(wake, geo, elems_tot, sim_param)
-
+  call prepare_wake(wake, geo, elems_tot)
 
 enddo
 call printout(nl//'\\\\\\\\\\  Computations Finished \\\\\\\\\\')
@@ -812,7 +695,134 @@ subroutine get_run_id (run_id)
 
 end subroutine
 
-!---------------------------------------------------------------------_
+!----------------------------------------------------------------------
+
+!> Initialize all the parameters reading them from the the input file
+subroutine init_sim_param(sim_param, prms, nout, output_start)
+ class(t_sim_param) :: sim_param
+ type(t_parse) :: prms
+ integer, intent(inout) :: nout
+ logical, intent(inout) :: output_start
+ 
+  !timing
+  sim_param%t0     = getreal(prms, 'tstart')
+  sim_param%tend   = getreal(prms, 'tend')
+  sim_param%dt     = getreal(prms, 'dt')
+  sim_param%dt_out = getreal(prms,'dt_out')
+  sim_param%debug_level = getint(prms, 'debug_level')
+  !Reference values
+  sim_param%P_inf = getreal(prms,'P_inf')
+  sim_param%rho_inf  = getreal(prms,'rho_inf')
+  sim_param%u_inf = getrealarray(prms, 'u_inf', 3)
+  if ( countoption(prms,'u_ref') .gt. 0 ) then
+    sim_param%u_ref = getreal(prms, 'u_ref')
+  else
+    sim_param%u_ref = norm2(sim_param%u_inf)
+    if (sim_param%u_ref .le. 0.0_wp) then
+      call error('dust','dust','No reference velocity u_ref provided but &
+      &zero free stream velocity. Provide a non-zero reference velocity. &
+      &Stopping now before producing invalid results')
+    endif
+  end if
+  sim_param%a_inf  = getreal(prms,'a_inf')
+  sim_param%mu_inf = getreal(prms,'mu_inf')
+  sim_param%nu_inf = sim_param%mu_inf/sim_param%rho_inf
+  !Wake parameters
+  sim_param%n_wake_panels = getint(prms, 'n_wake_panels')
+  sim_param%n_wake_particles = getint(prms, 'n_wake_particles')
+  sim_param%particles_box_min = getrealarray(prms, 'particles_box_min',3)
+  sim_param%particles_box_max = getrealarray(prms, 'particles_box_max',3)
+  sim_param%rigid_wake = getlogical(prms, 'rigid_wake')
+  sim_param%rigid_wake_vel = sim_param%u_inf   ! initialisation
+  if ( sim_param%rigid_wake ) then
+    if ( countoption(prms,'rigid_wake_vel') .eq. 1 ) then
+      sim_param%rigid_wake_vel = getrealarray(prms, 'rigid_wake_vel',3)
+    else if ( countoption(prms,'rigid_wake_vel') .le. 0 ) then
+      call warning('dust','dust','no rigid_wake_vel parameter set, &
+           &with rigid_wake = T; rigid_wake_vel = u_inf')
+      sim_param%rigid_wake_vel = sim_param%u_inf
+    end if
+  end if
+  sim_param%join_te = getlogical(prms, 'join_te')
+  if (sim_param%join_te) sim_param%join_te_factor=getreal(prms,'join_te_factor')
+  !Names
+  sim_param%basename = getstr(prms,'basename')
+  sim_param%GeometryFile = getstr(prms,'GeometryFile')
+  sim_param%ReferenceFile = getstr(prms,'ReferenceFile')
+  !Method parameters
+  sim_param%FarFieldRatioDoublet  = getreal(prms, 'FarFieldRatioDoublet')
+  sim_param%FarFieldRatioSource  = getreal(prms, 'FarFieldRatioSource')
+  sim_param%DoubletThreshold   = getreal(prms, 'DoubletThreshold')
+  sim_param%RankineRad = getreal(prms, 'RankineRad')
+  sim_param%VortexRad = getreal(prms, 'VortexRad')
+  sim_param%CutoffRad  = getreal(prms, 'CutoffRad')
+  sim_param%first_panel_scaling = getreal(prms,'ImplicitPanelScale')
+  sim_param%min_vel_at_te  = getreal(prms,'ImplicitPanelMinVel')
+  sim_param%use_vs = getlogical(prms, 'Vortstretch')
+  sim_param%use_vd = getlogical(prms, 'Diffusion')
+  sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
+  sim_param%use_ve = getlogical(prms, 'ViscosityEffects')
+  !Lifting line elements
+  sim_param%llReynoldsCorrections           = getlogical(prms, 'LLreynoldsCorrections')
+  sim_param%llReynoldsCorrectionsNfact      = getreal(   prms, 'LLreynoldsCorrectionsNfact')
+  sim_param%llMaxIter                       = getint(    prms, 'LLmaxIter'            )
+  sim_param%llTol                           = getreal(   prms, 'LLtol'                )
+  sim_param%llDamp                          = getreal(   prms, 'LLdamp'               )
+  sim_param%llStallRegularisation           = getlogical(prms, 'LLstallRegularisation')
+  sim_param%llStallRegularisationNelems     = getint(    prms, 'LLstallRegularisationNelems')
+  sim_param%llStallRegularisationNiters     = getint(    prms, 'LLstallRegularisationNiters')
+  sim_param%llStallRegularisationAlphaStall = getreal(   prms, 'LLstallRegularisationAlphaStall')
+  
+  !Octree and FMM parameters
+  sim_param%use_fmm = getlogical(prms, 'FMM')
+  if(sim_param%use_fmm) then
+    sim_param%BoxLength = getreal(prms, 'BoxLength')
+    sim_param%NBox = getintarray(prms, 'NBox',3)
+    sim_param%OctreeOrigin = getrealarray(prms, 'OctreeOrigin',3)
+    sim_param%NOctreeLevels = getint(prms, 'NOctreeLevels')
+    sim_param%MinOctreePart = getint(prms, 'MinOctreePart')
+    sim_param%MultipoleDegree = getint(prms,'MultipoleDegree')
+    
+    sim_param%use_dyn_layers = getlogical(prms,'DynLayers')
+    if(sim_param%use_dyn_layers) then
+      sim_param%NMaxOctreeLevels = getint(prms, 'NMaxOctreeLevels')
+      sim_param%LeavesTimeRatio = getreal(prms, 'LeavesTimeRatio')
+    else
+      sim_param%NMaxOctreeLevels = sim_param%NOctreeLevels
+    endif
+  
+    sim_param%use_pr = getlogical(prms, 'ParticlesRedistribution')
+  endif
+  
+  !Manage restart
+  sim_param%restart_from_file = getlogical(prms,'restart_from_file')
+  if (sim_param%restart_from_file) then
+  
+    sim_param%reset_time = getlogical(prms,'reset_time')
+    sim_param%restart_file = getstr(prms,'restart_file')
+    call printout('RESTART: restarting from file: '//trim(sim_param%restart_file))
+    sim_param%GeometryFile = sim_param%restart_file(1:len(trim(sim_param%restart_file))-11)&
+                                                             &//'geo.h5'
+  
+    !restarting the same simulation, advance the numbers
+    if(sim_param%restart_file(1:len(trim(sim_param%restart_file))-12).eq. &
+                                                 trim(sim_param%basename)) then
+    read(sim_param%restart_file(len(trim(sim_param%restart_file))-6:len(trim(sim_param%restart_file))-3),*) &
+                                                                           nout 
+      call printout('Identified restart from the same simulation, keeping the&
+      & previous output numbering')
+      !avoid rewriting the same timestep
+      output_start = .false.
+    endif
+    if(.not. sim_param%reset_time) call load_time(sim_param%restart_file, sim_param%t0)
+  
+  
+  endif
+  
+end subroutine init_sim_param
+
+!----------------------------------------------------------------------
+
 !DISCONTINUED: consider removing
 subroutine copy_geo(sim_param, geo_file, run_id)
  type(t_sim_param), intent(inout) :: sim_param

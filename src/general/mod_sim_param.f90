@@ -55,6 +55,12 @@ use mod_hdf5_io, only: &
    h5loc, &
    write_hdf5_attr
 
+use mod_parse, only: &
+  t_parse, &
+  countoption , &
+  getstr, getlogical, getreal, getint, getrealarray, getintarray, &
+  ignoredParameters, finalizeParameters
+
 implicit none
 
 public :: t_sim_param, sim_param
@@ -146,8 +152,12 @@ type t_sim_param
   real(wp) :: llDamp
   !> Avoid "unphysical" separations in inner sections of LL? :: llTol
   logical  :: llStallRegularisation
-  !> Number of "unphysical" separations thata can be removed 
+  !> Number of "unphysical" separations that can be removed 
   integer  :: llStallRegularisationNelems
+  !> Number of iterations between two regularisation processes
+  integer  :: llStallRegularisationNiters
+  !> Reference stall AOA for regularisation
+  real(wp) :: llStallRegularisationAlphaStall
 
   !FMM parameters
   !> Employing the FMM method
@@ -195,7 +205,6 @@ type t_sim_param
 contains
 
   procedure, pass(this) :: save_param => save_sim_param
-
 end type t_sim_param
 
 type(t_sim_param) :: sim_param
@@ -203,6 +212,7 @@ type(t_sim_param) :: sim_param
 !----------------------------------------------------------------------
 contains
 !----------------------------------------------------------------------
+
 
 subroutine save_sim_param(this, loc)
  class(t_sim_param) :: this

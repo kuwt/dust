@@ -64,6 +64,9 @@ use mod_aeroel, only: &
 use mod_math, only: &
   cross
 
+use mod_sim_param, only: &
+  sim_param
+
 implicit none
 
 public :: initialize_doublet, velocity_calc_doublet, potential_calc_doublet
@@ -82,14 +85,12 @@ contains
 
 !> Subroutine to populate the module variables from input
 !!
-subroutine initialize_doublet(ff_ratio_in, eps_dou_in, r_Rankine_in, &
-                               r_cutoff_in)
- real(wp), intent(in) :: ff_ratio_in, eps_dou_in, r_Rankine_in, r_cutoff_in
+subroutine initialize_doublet()
 
-  ff_ratio = ff_ratio_in
-  eps_dou = eps_dou_in
-  r_Rankine = r_Rankine_in
-  r_cutoff = r_cutoff_in
+  ff_ratio  = sim_param%FarFieldRatioDoublet
+  eps_dou   = sim_param%DoubletThreshold
+  r_Rankine = sim_param%RankineRad
+  r_cutoff  = sim_param%CutoffRad
 
 end subroutine initialize_doublet
 

@@ -1,3 +1,8 @@
+0.5.6-b
+
+* Minor bugs fixed
+* More output in the lifting lines sectional loads
+
 0.5.5-b
 
 * More efficient linear system treatment
