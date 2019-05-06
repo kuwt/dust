@@ -49,13 +49,13 @@ use mod_param, only: &
   wp, nl, max_char_len, extended_char_len, ascii_real
 
 use mod_handling, only: &
-  error, warning ! , info, printout, dust_time, t_realtime
+  error, warning, internal_error, new_file_unit
 
 !---------------------------------------------------------------------
 implicit none
 
 public :: dat_out_probes_header , dat_out_loads_header , &
-          dat_out_sectional
+          dat_out_sectional, dat_out_sectional_ll
 
 private
 
@@ -128,9 +128,10 @@ end subroutine dat_out_probes_header
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_sectional (basename, y_cen ,y_span ,time ,sec_loads , &
-              ref_mat , off_mat, average )
+subroutine dat_out_sectional (basename, compname, y_cen, y_span, time, &
+                              sec_loads, ref_mat, off_mat, average )
  character(len=*) , intent(in) :: basename
+ character(len=*) , intent(in) :: compname
  real(wp) , intent(in) :: y_cen(:)
  real(wp) , intent(in) :: y_span(:)
  real(wp) , intent(in) :: time(:)
@@ -174,7 +175,8 @@ subroutine dat_out_sectional (basename, y_cen ,y_span ,time ,sec_loads , &
     endif
     open(unit=fid,file=trim(filename))
     ! Header -----------
-    write(fid,'(A)') '# TODO: component name and other beautiful stuff '
+    write(fid,'(A)') '# Sectional load '//trim(load_str(i1))//&
+                    &' of component: '//trim(compname)
     write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(sec_loads,2) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
     write(nnum,'(I0)') size(y_cen)
     write(fid,'('//trim(nnum)//ascii_real//')') y_cen 
@@ -200,6 +202,125 @@ subroutine dat_out_sectional (basename, y_cen ,y_span ,time ,sec_loads , &
 
 end subroutine dat_out_sectional
 
+!---------------------------------------------------------------------
+
+subroutine dat_out_sectional_ll (basename, compname, y_cen, y_span, time, &
+                                 alpha, vel_2d, vel_outplane, average )
+ character(len=*) , intent(in) :: basename
+ character(len=*) , intent(in) :: compname
+ real(wp) , intent(in) :: y_cen(:)
+ real(wp) , intent(in) :: y_span(:)
+ real(wp) , intent(in) :: time(:)
+ real(wp) , intent(in) :: alpha(:,:)
+ real(wp) , intent(in) :: vel_2d(:,:)
+ real(wp) , intent(in) :: vel_outplane(:,:)
+ logical,   intent(in) :: average
+ 
+ character(len=8) :: nnum
+ character(len=max_char_len) :: filename
+ integer :: it , nt , fid , ierr 
+ character(len=*), parameter :: this_sub_name = 'dat_out_sectional_ll'
+
+  nt = size(time)
+ 
+  ! Some checks --------
+  if ( size(y_cen) .ne. size(alpha,2) ) then
+    call internal_error(trim(this_mod_name),'','Inconsistent inputs.& 
+            & different length of nodes and solution ')
+  end if
+  if ( size(alpha,1) .ne. nt ) then
+    call error(trim(this_mod_name),'','Inconsistent inputs.& 
+            & size(sec_loads,1) .ne. size(time). Stop ')
+  end if
+ 
+  ! Print out .dat files
+  call new_file_unit(fid, ierr)
+  if(average) then
+    write(filename,'(A)') trim(basename)//'_alpha_ave.dat'
+  else
+    write(filename,'(A)') trim(basename)//'_alpha.dat'
+  endif
+  open(unit=fid,file=trim(filename))
+  ! Header -----------
+  write(fid,'(A)') '# Sectional angle of attack of component: '&
+                    &//trim(compname)
+  write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(y_cen) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
+  write(nnum,'(I0)') size(y_cen)
+  write(fid,'('//trim(nnum)//ascii_real//')') y_cen 
+  write(fid,'('//trim(nnum)//ascii_real//')') y_span
+  
+  if(average) then
+    write(fid,'(A)') '# alpha(n_sec)' 
+    write(nnum,'(I0)') size(y_cen)
+    write(fid,'('//trim(nnum)//ascii_real//')') alpha(1,:) 
+  else
+    write(fid,'(A)') '# t , alpha(n_sec) ' 
+    do it = 1 , nt 
+      write(nnum,'(I0)') 1+size(y_cen)
+      write(fid,'('//trim(nnum)//ascii_real//')') time(it), alpha(it,:)
+    end do
+  endif
+  close(fid)
+ 
+  call new_file_unit(fid, ierr)
+  if(average) then
+    write(filename,'(A)') trim(basename)//'_vel_2d_ave.dat'
+  else
+    write(filename,'(A)') trim(basename)//'_vel_2d.dat'
+  endif
+  open(unit=fid,file=trim(filename))
+  ! Header -----------
+  write(fid,'(A)') '# Sectional two dimensional (in section plane) velocity &
+                    & of component: '//trim(compname)
+  write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(y_cen) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
+  write(nnum,'(I0)') size(y_cen)
+  write(fid,'('//trim(nnum)//ascii_real//')') y_cen 
+  write(fid,'('//trim(nnum)//ascii_real//')') y_span
+  
+  if(average) then
+    write(fid,'(A)') '# vel_2d(n_sec)' 
+    write(nnum,'(I0)') size(y_cen)
+    write(fid,'('//trim(nnum)//ascii_real//')') vel_2d(1,:) 
+  else
+    write(fid,'(A)') '# t , vel_2d(n_sec) ' 
+    do it = 1 , nt 
+      write(nnum,'(I0)') 1+size(y_cen)
+      write(fid,'('//trim(nnum)//ascii_real//')') time(it), vel_2d(it,:)
+    end do
+  endif
+  close(fid)
+
+  call new_file_unit(fid, ierr)
+  if(average) then
+    write(filename,'(A)') trim(basename)//'_vel_outplane_ave.dat'
+  else
+    write(filename,'(A)') trim(basename)//'_vel_outplane.dat'
+  endif
+  open(unit=fid,file=trim(filename))
+  ! Header -----------
+  write(fid,'(A)') '# Sectional out of section plane velocity &
+                    & of component: '//trim(compname)
+  write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(y_cen) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
+  write(nnum,'(I0)') size(y_cen)
+  write(fid,'('//trim(nnum)//ascii_real//')') y_cen 
+  write(fid,'('//trim(nnum)//ascii_real//')') y_span
+  
+  if(average) then
+    write(fid,'(A)') '# vel_outplane(n_sec)' 
+    write(nnum,'(I0)') size(y_cen)
+    write(fid,'('//trim(nnum)//ascii_real//')') vel_outplane(1,:) 
+  else
+    write(fid,'(A)') '# t , vel_outplane(n_sec) ' 
+    do it = 1 , nt 
+      write(nnum,'(I0)') 1+size(y_cen)
+      write(fid,'('//trim(nnum)//ascii_real//')') time(it), vel_outplane(it,:)
+    end do
+  endif
+  close(fid)
+
+end subroutine dat_out_sectional_ll
+
+!---------------------------------------------------------------------
 !---------------------------------------------------------------------
 
 end module mod_dat_out
