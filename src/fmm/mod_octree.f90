@@ -130,8 +130,11 @@ type :: t_cell
   !> Multipole data relative to the cell
   type(t_multipole) :: mp
 
-  !> Average vorticity magniture
+  !> Average vorticity magnitude
   real(wp) :: ave_vortmag
+
+  !>Pointer to the cell layer
+  type(t_cell_layer), pointer :: layer
 
 end type
 
@@ -382,6 +385,9 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
       octree%layers(l)%lcells(i,j,k)%leaf = .false.
       allocate(octree%layers(l)%lcells(i,j,k)%interaction_list(0) )
       !call octree%layers(l)%lcells(i,j,k)%mp%init(octree%pexp)
+
+      !Pointer to the layer itself
+      octree%layers(l)%lcells(i,j,k)%layer => octree%layers(l)
 
     enddo; enddo; enddo !layer cells i,j,k
   enddo
@@ -1034,21 +1040,28 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
 
  integer :: i, j, k, lv, ip, ipp, m, ie, iln
  real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3), dir(3)
+ real(wp), allocatable :: velv(:,:), stretchv(:,:)
  real(wp) :: grad(3,3)
  real(t_realtime) :: tsta , tend
+ real(wp) :: turbvort, ave_ros
 
   tsta = dust_time()
   !for all the leaves apply the local expansion and then local interactions 
   t0 = dust_time()
-!$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, v, stretch, str, grad, alpha, dir) schedule(dynamic)
+!$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, &
+!$omp& v, stretch, str, grad, alpha, dir, velv, stretchv) schedule(dynamic)
   do lv = 1, octree%nleaves
     !I am on a leaf, cycle on all the particles inside the leaf
+    allocate(velv(3,octree%leaves(lv)%p%npart),&
+             stretchv(3,octree%leaves(lv)%p%npart))
+
     do ip = 1,octree%leaves(lv)%p%npart
     if(.not. octree%leaves(lv)%p%cell_parts(ip)%p%free) then
       
       vel = 0.0_wp
       stretch = 0.0_wp
       grad = 0.0_wp
+      ave_ros = 0.0_wp
       pos = octree%leaves(lv)%p%cell_parts(ip)%p%cen
       alpha = octree%leaves(lv)%p%cell_parts(ip)%p%mag * &
               octree%leaves(lv)%p%cell_parts(ip)%p%dir
@@ -1066,12 +1079,41 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
              product((pos-octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
         endif
       enddo
+      velv(:,ip) = vel
       if(sim_param%use_vs)  then
         str = matmul(alpha, grad)
         !str = matmul(alpha, transpose(grad))
         stretch = stretch + str - sum(str*dir)*dir !remove the parallel comp.
+        stretchv(:,ip) = stretch
       endif
-      !if(sim_param%use_vs) stretch = stretch + matmul(transpose(grad),alpha)
+      if(sim_param%use_vd)  then
+        ave_ros = ave_ros + sum((0.5_wp*(grad+transpose(grad)))**2)
+      endif
+    endif
+    enddo
+
+    if(sim_param%use_vd)  then
+      if(octree%leaves(lv)%p%npart .gt. 0) then
+        ave_ros = ave_ros/real(octree%leaves(lv)%p%npart,wp)
+      else
+        ave_ros = 0.0_wp
+      endif
+      turbvort = (0.11_wp*octree%leaves(lv)%p%layer%cell_size)**2 * &
+                 sqrt(2.0_wp*ave_ros)
+      !DEBUG
+      !write(*,*) 'Nu, turbvort',sim_param%nu_inf, turbvort
+    endif
+
+    do ip = 1,octree%leaves(lv)%p%npart
+    if(.not. octree%leaves(lv)%p%cell_parts(ip)%p%free) then
+
+      vel = velv(:,ip)
+      stretch = stretchv(:,ip)
+      grad = 0.0_wp
+      pos = octree%leaves(lv)%p%cell_parts(ip)%p%cen
+      alpha = octree%leaves(lv)%p%cell_parts(ip)%p%mag * &
+              octree%leaves(lv)%p%cell_parts(ip)%p%dir
+      dir = octree%leaves(lv)%p%cell_parts(ip)%p%dir
 
       !then interact with all the neighbouring cell particles
       do k=-1,1; do j=-1,1; do i=-1,1
@@ -1091,7 +1133,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
             if(sim_param%use_vd) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
                  %compute_diffusion(pos, alpha, str)
-              stretch = stretch +str*sim_param%nu_inf
+              stretch = stretch +str*(sim_param%nu_inf+turbvort)
             endif
           enddo
         endif
@@ -1114,7 +1156,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
          if(sim_param%use_vd) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
               %compute_diffusion(pos, alpha, str)
-           stretch = stretch +str*sim_param%nu_inf
+           stretch = stretch +str*(sim_param%nu_inf+turbvort)
          endif
        enddo
       enddo
@@ -1135,7 +1177,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
           if(sim_param%use_vd) then
             call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_diffusion(pos, &
                                                           alpha, str)
-            stretch = stretch + str*sim_param%nu_inf
+            stretch = stretch + str*(sim_param%nu_inf+turbvort)
           endif
 
         endif
@@ -1177,6 +1219,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       endif
     endif
     enddo
+    deallocate(velv, stretchv)
   enddo
 !Don't ask me why, but without this pragra it is much faster!
 !$omp end parallel do
