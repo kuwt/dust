@@ -186,7 +186,7 @@ subroutine compute_stretch_vortpart (this, pos, alpha, stretch)
 !      +1.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
 
   stretch = -cross(this%dir*this%mag, alpha)/(distn)**3 &
-       +1.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
+       +3.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
 
 
 end subroutine compute_stretch_vortpart
