@@ -1043,7 +1043,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
  real(wp), allocatable :: velv(:,:), stretchv(:,:)
  real(wp) :: grad(3,3)
  real(t_realtime) :: tsta , tend
- real(wp) :: turbvort, ave_ros
+ real(wp) :: turbvisc, ave_ros
 
   tsta = dust_time()
   !for all the leaves apply the local expansion and then local interactions 
@@ -1098,10 +1098,9 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       else
         ave_ros = 0.0_wp
       endif
-      turbvort = (0.11_wp*octree%leaves(lv)%p%layer%cell_size)**2 * &
+      turbvisc = (0.11_wp*sim_param%VortexRad)**2 * &
                  sqrt(2.0_wp*ave_ros)
-      !DEBUG
-      !write(*,*) 'Nu, turbvort',sim_param%nu_inf, turbvort
+
     endif
 
     do ip = 1,octree%leaves(lv)%p%npart
@@ -1114,6 +1113,8 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       alpha = octree%leaves(lv)%p%cell_parts(ip)%p%mag * &
               octree%leaves(lv)%p%cell_parts(ip)%p%dir
       dir = octree%leaves(lv)%p%cell_parts(ip)%p%dir
+      octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc = turbvisc
+
 
       !then interact with all the neighbouring cell particles
       do k=-1,1; do j=-1,1; do i=-1,1
@@ -1133,7 +1134,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
             if(sim_param%use_vd) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
                  %compute_diffusion(pos, alpha, str)
-              stretch = stretch +str*(sim_param%nu_inf+turbvort)
+              stretch = stretch +str*(sim_param%nu_inf+turbvisc)
             endif
           enddo
         endif
@@ -1156,7 +1157,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
          if(sim_param%use_vd) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
               %compute_diffusion(pos, alpha, str)
-           stretch = stretch +str*(sim_param%nu_inf+turbvort)
+           stretch = stretch +str*(sim_param%nu_inf+turbvisc)
          endif
        enddo
       enddo
@@ -1177,7 +1178,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
           if(sim_param%use_vd) then
             call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_diffusion(pos, &
                                                           alpha, str)
-            stretch = stretch + str*(sim_param%nu_inf+turbvort)
+            stretch = stretch + str*(sim_param%nu_inf+turbvisc)
           endif
 
         endif
