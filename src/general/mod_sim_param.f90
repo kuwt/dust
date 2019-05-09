@@ -79,6 +79,8 @@ type t_sim_param
   integer  :: n_timesteps
   !> Vector of time instants
   real(wp) , allocatable :: time_vec(:)
+  !> Actual time
+  real(wp) :: time
 
   !Physical parameters:
   !> Free stream pressure
@@ -182,6 +184,14 @@ type t_sim_param
       real(wp) :: LeavesTimeRatio
     !> use particles redistribution
     logical :: use_pr
+
+  !HCAS parameters
+  !> Use hcas
+  logical :: hcas
+    !> Time of deployment of the hcas
+    real(wp) :: hcas_time
+    !> Velocity of the hcas 
+    real(wp) :: hcas_vel(3)
 
 
   !Handling parameters:

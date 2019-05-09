@@ -326,6 +326,11 @@ call prms%CreateLogicalOption('ViscosityEffects','Simulate viscosity &
                                                               & effects','F')
 call prms%CreateLogicalOption('ParticlesRedistribution','Employ particles &
                                                         &redistribution','F')
+! HCAS
+call prms%CreateLogicalOption('HCAS','Hover Convergence Augmentation System',&
+                               'F')
+call prms%CreateRealOption('HCAS_time','HCAS deployment time')
+call prms%CreateRealArrayOption('HCAS_velocity','HCAS velocity')
 
 ! get the parameters and print them out
 call printout(nl//'====== Input parameters: ======')
@@ -384,7 +389,7 @@ nstep = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1
 sim_param%n_timesteps = nstep
 allocate(sim_param%time_vec(sim_param%n_timesteps))
 sim_param%time_vec = (/ ( sim_param%t0 + &
-         dble(i-1)*sim_param%dt, i=1,sim_param%n_timesteps ) /)
+         real(i-1,wp)*sim_param%dt, i=1,sim_param%n_timesteps ) /)
 
 !------ Geometry creation ------
 call printout(nl//'====== Geometry Creation ======')
@@ -475,6 +480,8 @@ allocate(res_old(size(elems))) ; res_old = 0.0_wp
 
 t11 = dust_time()
 do it = 1,nstep
+  !DEBUG
+  write(*,*) 'time, sim_time', time, sim_param%time_vec(it)
   
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
@@ -639,7 +646,8 @@ do it = 1,nstep
   end do
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
 
-  time = min(sim_param%tend, time+sim_param%dt)
+  !time = min(sim_param%tend, time+sim_param%dt)
+  time = min(sim_param%tend, sim_param%time_vec(it+1))
   call update_geometry(geo, time, .false.)
   call prepare_wake(wake, geo, elems_tot)
 
@@ -793,6 +801,13 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   
     sim_param%use_pr = getlogical(prms, 'ParticlesRedistribution')
   endif
+
+  !HCAS
+  sim_param%hcas = getlogical(prms,'HCAS')
+  if(sim_param%hcas) then
+    sim_param%hcas_time = getreal(prms,'HCAS_time')
+    sim_param%hcas_vel = getrealarray(prms,'HCAS_velocity',3)
+  endif
   
   !Manage restart
   sim_param%restart_from_file = getlogical(prms,'restart_from_file')
@@ -864,6 +879,8 @@ end subroutine copy_geo
 !! to perform output or not
 subroutine init_timestep(t)
  real(wp), intent(in) :: t
+  
+  sim_param%time = t
 
   if (real(t-t_last_out) .ge. real(sim_param%dt_out)) then
     time_2_out = .true.
