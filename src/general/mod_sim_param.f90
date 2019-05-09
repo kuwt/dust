@@ -79,6 +79,8 @@ type t_sim_param
   integer  :: n_timesteps
   !> Vector of time instants
   real(wp) , allocatable :: time_vec(:)
+  !> Actual time
+  real(wp) :: time
 
   !Physical parameters:
   !> Free stream pressure
@@ -183,6 +185,14 @@ type t_sim_param
     !> use particles redistribution
     logical :: use_pr
 
+  !HCAS parameters
+  !> Use hcas
+  logical :: hcas
+    !> Time of deployment of the hcas
+    real(wp) :: hcas_time
+    !> Velocity of the hcas 
+    real(wp) :: hcas_vel(3)
+
 
   !Handling parameters:
   !> Debug level
@@ -275,6 +285,11 @@ subroutine save_sim_param(this, loc)
   if(this%restart_from_file) then
     call write_hdf5_attr(this%restart_file, 'restart_file', loc)
     call write_hdf5_attr(this%reset_time, 'reset_time', loc)
+  endif
+  call write_hdf5_attr(this%hcas, 'HCAS', loc)
+  if(this%hcas) then
+    call write_hdf5_attr(this%hcas_time, 'HCAS_time', loc)
+    call write_hdf5_attr(this%hcas_vel, 'HCAS_velocity', loc)
   endif
 
 end subroutine save_sim_param
