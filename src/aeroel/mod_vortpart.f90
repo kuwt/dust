@@ -113,7 +113,7 @@ contains
 !> Initialize vortex line 
 subroutine initialize_vortpart()
 
-  r_Vortex = sim_param%RankineRad
+  r_Vortex = sim_param%VortexRad
   r_cutoff  = sim_param%CutoffRad
 
 end subroutine initialize_vortpart
