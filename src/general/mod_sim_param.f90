@@ -286,6 +286,11 @@ subroutine save_sim_param(this, loc)
     call write_hdf5_attr(this%restart_file, 'restart_file', loc)
     call write_hdf5_attr(this%reset_time, 'reset_time', loc)
   endif
+  call write_hdf5_attr(this%hcas, 'HCAS', loc)
+  if(this%hcas) then
+    call write_hdf5_attr(this%hcas_time, 'HCAS_time', loc)
+    call write_hdf5_attr(this%hcas_vel, 'HCAS_velocity', loc)
+  endif
 
 end subroutine save_sim_param
 
