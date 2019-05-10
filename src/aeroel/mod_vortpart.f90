@@ -86,6 +86,7 @@ type, extends(c_vort_elem) :: t_vortpart
   real(wp) :: vel(3)
   real(wp), pointer :: stretch(:)
   logical :: free=.true.
+  real(wp) :: turbvisc
 contains
 
   procedure, pass(this) :: compute_vel       => compute_vel_vortpart
@@ -113,7 +114,7 @@ contains
 !> Initialize vortex line 
 subroutine initialize_vortpart()
 
-  r_Vortex = sim_param%RankineRad
+  r_Vortex = sim_param%VortexRad
   r_cutoff  = sim_param%CutoffRad
 
 end subroutine initialize_vortpart
@@ -186,7 +187,7 @@ subroutine compute_stretch_vortpart (this, pos, alpha, stretch)
 !      +1.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
 
   stretch = -cross(this%dir*this%mag, alpha)/(distn)**3 &
-       +1.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
+       +3.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
 
 
 end subroutine compute_stretch_vortpart
@@ -211,7 +212,9 @@ subroutine compute_diffusion_vortpart (this, pos, alpha, diff)
   volp = 4.0_wp/3.0_wp*pi*r_Vortex**3
   volq = 4.0_wp/3.0_wp*pi*r_Vortex**3
   diff = 1/(r_Vortex**2)*(volp*this%dir*this%mag - volq*alpha) &
-                                                *etaeps(distn,r_Vortex)
+                                      *etaeps(distn,r_Vortex)
+  !diff = 1/(r_Vortex**2)*( - volq*alpha) &
+  !                                              *etaeps(distn,r_Vortex)
 
 end subroutine compute_diffusion_vortpart
 
