@@ -1,3 +1,13 @@
+0.5.7-b
+
+
+* Introduced turbulent viscosity
+* Introduced HCAS
+* Updated particles redistribution* Introduced turbulent viscosity
+* Introduced HCAS
+* Updated particles redistribution
+* Some bug fixed and minor improvements
+
 0.5.6-b
 
 * Minor bugs fixed
