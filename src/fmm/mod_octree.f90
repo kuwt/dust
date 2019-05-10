@@ -133,9 +133,6 @@ type :: t_cell
   !> Average vorticity magnitude
   real(wp) :: ave_vortmag
 
-  !>Pointer to the cell layer
-  type(t_cell_layer), pointer :: layer
-
 end type
 
 !----------------------------------------------------------------------
@@ -385,9 +382,6 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
       octree%layers(l)%lcells(i,j,k)%leaf = .false.
       allocate(octree%layers(l)%lcells(i,j,k)%interaction_list(0) )
       !call octree%layers(l)%lcells(i,j,k)%mp%init(octree%pexp)
-
-      !Pointer to the layer itself
-      octree%layers(l)%lcells(i,j,k)%layer => octree%layers(l)
 
     enddo; enddo; enddo !layer cells i,j,k
   enddo

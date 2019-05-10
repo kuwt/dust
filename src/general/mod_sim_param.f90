@@ -136,6 +136,8 @@ type t_sim_param
   logical :: use_vs
   !> use the vorticity diffusion or not
   logical :: use_vd
+  !> use turbulent viscosity or not
+  logical :: use_tv
   !> use the penetration avoidance
   logical :: use_pa
   !> simulate viscosity effects or not
@@ -259,6 +261,7 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%CutoffRad, 'CutoffRad', loc)
   call write_hdf5_attr(this%use_vs, 'vortstretch', loc)
   call write_hdf5_attr(this%use_vd, 'vortdiff', loc)
+  call write_hdf5_attr(this%use_tv, 'turbvort', loc)
   call write_hdf5_attr(this%use_pa, 'PenetrationAvoidance', loc)
   call write_hdf5_attr(this%use_ve, 'ViscosityEffects', loc)
   call write_hdf5_attr(this%use_fmm, 'use_fmm', loc)

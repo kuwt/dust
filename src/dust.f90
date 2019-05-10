@@ -320,6 +320,8 @@ call prms%CreateRealOption('LeavesTimeRatio','Ratio that triggers the &
 ! models options
 call prms%CreateLogicalOption('Vortstretch','Employ vortex stretching','T')
 call prms%CreateLogicalOption('Diffusion','Employ vorticity diffusion','T')
+call prms%CreateLogicalOption('Turbulent_Viscosity','Employ turbulent &
+                               &viscosity','F')
 call prms%CreateLogicalOption('PenetrationAvoidance','Employ penetration &
                                                               & avoidance','F')
 call prms%CreateLogicalOption('ViscosityEffects','Simulate viscosity &
@@ -768,6 +770,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%min_vel_at_te  = getreal(prms,'ImplicitPanelMinVel')
   sim_param%use_vs = getlogical(prms, 'Vortstretch')
   sim_param%use_vd = getlogical(prms, 'Diffusion')
+  sim_param%use_tv = getlogical(prms, 'Turbulent_Viscosity')
   sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
   sim_param%use_ve = getlogical(prms, 'ViscosityEffects')
   !Lifting line elements
