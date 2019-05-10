@@ -120,9 +120,6 @@ use MOD_StringTools, only: &
 use mod_param, only: &
   wp, max_char_len, nl
 
-use mod_sim_param, only: &
-  sim_param
-
 use mod_handling, only: &
   error, warning, info, unit_stdout, printout
 

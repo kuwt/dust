@@ -51,9 +51,6 @@ module mod_aeroel
 
 use mod_linsys_vars, only: t_linsys
 
-use mod_sim_param, only: &
-  t_sim_param
-
 use mod_param, only: &
   wp
 
@@ -436,12 +433,11 @@ end interface
 
 !> Compute an approximation of the pressure acting on the acutal element
 abstract interface
-  subroutine i_compute_pres (this, R_g, sim_param)
-    import :: c_pot_elem , t_elem_p , wp ,t_sim_param
+  subroutine i_compute_pres (this, R_g)
+    import :: c_pot_elem , t_elem_p , wp
     implicit none
     class(c_pot_elem), intent(inout) :: this
     real(wp)         , intent(in)    :: R_g(3,3)
-    type(t_sim_param), intent(in)    :: sim_param
     !type(t_elem_p), intent(in)   :: elems(:)
   end subroutine
 end interface
@@ -450,12 +446,11 @@ end interface
 
 !> Compute the elementary force acting on the actual element
 abstract interface
-  subroutine i_compute_dforce (this, sim_param)
-    import :: c_pot_elem , t_elem_p , wp , t_sim_param
+  subroutine i_compute_dforce (this)
+    import :: c_pot_elem , t_elem_p , wp
     implicit none
     class(c_pot_elem), intent(inout) :: this
     !type(t_elem_p), intent(in)   :: elems(:)
-    type(t_sim_param), intent(in):: sim_param
   end subroutine
 end interface
 
@@ -464,7 +459,7 @@ end interface
 !> Compute the geometrical quantities of the elemsnts
 abstract interface
   subroutine i_calc_geo_data (this,vert)
-    import :: c_pot_elem , t_elem_p , wp , t_sim_param
+    import :: c_pot_elem , t_elem_p , wp
     implicit none
     class(c_pot_elem), intent(inout) :: this
     real(wp), intent(in) :: vert(:,:)

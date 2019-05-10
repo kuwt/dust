@@ -55,7 +55,7 @@ use mod_math, only: &
   cross
 
 use mod_sim_param, only: &
-  t_sim_param
+  sim_param
 
 use mod_geometry, only: &
   t_geo , t_tedge
@@ -95,11 +95,10 @@ contains
 ! 4. create new particles with the associated velocity to be evolved NOT HERE
 !    but instead where the whole wake is evolved
 !
-subroutine viscosity_effects( geo , elems , te , sim_param )
+subroutine viscosity_effects( geo , elems , te )
  type(t_geo)         , intent(inout) , target :: geo
  type(t_impl_elem_p) , intent(inout)          :: elems(:)
  type(t_tedge)       , intent(in)             :: te
- type(t_sim_param)   , intent(in)             :: sim_param
 
  real(wp) :: vc , vd
  integer :: i_comp , n_comp , i_elem , n_elem

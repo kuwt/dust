@@ -54,7 +54,7 @@ use mod_handling, only: &
   error
 
 use mod_sim_param, only: &
-  t_sim_param
+  sim_param
 
 use mod_math, only: &
   cross
@@ -206,10 +206,9 @@ end subroutine compute_cp_actdisk
 
 !> The computation of the pressure in the actuator disk is not meant to
 !! happen, loads are retrieved from the tables
-subroutine compute_pres_actdisk (this, R_g, sim_param)
+subroutine compute_pres_actdisk (this, R_g)
  class(t_actdisk) , intent(inout) :: this
  real(wp)         , intent(in)    :: R_g(3,3)
- type(t_sim_param), intent(in)    :: sim_param
  !type(t_elem_p), intent(in) :: elems(:)
 
  character(len=*), parameter      :: this_sub_name='compute_pres_actdisk'
@@ -230,10 +229,9 @@ end subroutine compute_pres_actdisk
 
 !----------------------------------------------------------------------
 
-subroutine compute_dforce_actdisk (this, sim_param)
+subroutine compute_dforce_actdisk (this)
  class(t_actdisk), intent(inout) :: this
  !type(t_elem_p), intent(in) :: elems(:)
- type(t_sim_param), intent(in) :: sim_param
 
  character(len=*), parameter      :: this_sub_name='compute_dforce_actdisk'
 
@@ -253,10 +251,9 @@ end subroutine compute_dforce_actdisk
 
 !----------------------------------------------------------------------
 
-subroutine update_actdisk(elems_ad, linsys, sim_param)
+subroutine update_actdisk(elems_ad, linsys)
  type(t_expl_elem_p), intent(inout) :: elems_ad(:)
  type(t_linsys), intent(inout) :: linsys
- type(t_sim_param), intent(in) :: sim_param
 
  integer :: ie
 

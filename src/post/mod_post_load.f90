@@ -50,7 +50,7 @@ use mod_param, only: &
   wp, nl, max_char_len, pi
 
 use mod_handling, only: &
-  error, warning, info, printout, dust_time, t_realtime, new_file_unit
+  error, internal_error, warning, info
 
 use mod_geometry, only: &
   t_geo, t_geo_component
@@ -69,6 +69,12 @@ use mod_hdf5_io, only: &
 use mod_actuatordisk, only: &
   t_actdisk
 
+use mod_surfpan, only: &
+  t_surfpan
+
+use mod_liftlin, only: &
+  t_liftlin
+
 use mod_wake, only: &
   t_wake
 
@@ -77,7 +83,7 @@ use mod_aeroel, only: &
 
 implicit none
 
-public :: load_refs , load_res ,  &
+public :: load_refs , load_res ,  load_ll, &
           load_wake_post, load_wake_viz , &
           load_wake_pan , load_wake_ring , &
           check_if_components_exist
@@ -129,23 +135,26 @@ end subroutine load_refs
 
 !----------------------------------------------------------------------
 
-subroutine load_res(floc, comps, vort, press, t)
+subroutine load_res(floc, comps, vort, press, t, surfvel)
  integer(h5loc), intent(in) :: floc 
  type(t_geo_component), intent(inout) :: comps(:)
  real(wp), allocatable, intent(out) :: vort(:)
  real(wp), allocatable, intent(out) :: press(:)
  real(wp), intent(out) :: t
+ real(wp), allocatable, intent(out), optional :: surfvel(:,:)
 
  integer :: ncomps, icomp, ie
  integer :: nelems, offset, nelems_comp
  integer(h5loc) :: gloc1, gloc2, gloc3
  character(len=max_char_len) :: cname
  real(wp), allocatable :: vort_read(:)!, cp_read(:)
- real(wp), allocatable :: pres_read(:), dforce_read(:,:)
+ real(wp), allocatable :: pres_read(:), dforce_read(:,:), surfvel_read(:,:)
  integer :: ncomps_sol
+ logical :: got_surfvel
 
  character(len=*), parameter :: this_sub_name = 'load_res'
-
+  
+  got_surfvel = present(surfvel)
   ncomps = size(comps)
   nelems = 0
   do icomp = 1, ncomps
@@ -159,6 +168,7 @@ subroutine load_res(floc, comps, vort, press, t)
   
   call read_hdf5(t,'time',floc)
   allocate(vort(nelems), press(nelems))
+  if(got_surfvel) allocate(surfvel(3,nelems))
   call open_hdf5_group(floc,'Components',gloc1)
   call read_hdf5(ncomps_sol,'NComponents',gloc1)
   if(ncomps_sol .lt. ncomps) call error(this_sub_name, this_mod_name, &
@@ -178,6 +188,13 @@ subroutine load_res(floc, comps, vort, press, t)
     !call read_hdf5_al(cp_read,'Cp',gloc3)
     call read_hdf5_al(pres_read,'Pres',gloc3)
     call read_hdf5_al(dforce_read,'dF',gloc3)
+    select type(el =>comps(icomp)%el)
+     type is(t_surfpan)
+      call read_hdf5_al(surfvel_read,'surf_vel',gloc3)
+     class default
+      allocate(surfvel_read(3,nelems_comp))
+      surfvel_read = 0.0_wp
+    end select
 
     !check consistency of geometry and solution
     if((size(vort_read,1) .ne. nelems_comp) .or. &
@@ -201,6 +218,7 @@ subroutine load_res(floc, comps, vort, press, t)
      class default
       vort(offset+1:offset+nelems_comp) = vort_read
       press(offset+1:offset+nelems_comp) = pres_read
+      if(got_surfvel) surfvel(:,offset+1:offset+nelems_comp) = surfvel_read
       offset = offset + nelems_comp
       do ie = 1,nelems_comp
         if(associated(comps(icomp)%el(ie)%mag)) &
@@ -210,6 +228,11 @@ subroutine load_res(floc, comps, vort, press, t)
       do ie = 1,nelems_comp
         vort(offset+1:offset+el(ie)%n_ver) = vort_read(ie)
         press(offset+1:offset+el(ie)%n_ver) = pres_read(ie)
+        if(got_surfvel) then
+          surfvel(1,offset+1:offset+el(ie)%n_ver) = surfvel_read(1,ie)
+          surfvel(2,offset+1:offset+el(ie)%n_ver) = surfvel_read(2,ie)
+          surfvel(3,offset+1:offset+el(ie)%n_ver) = surfvel_read(3,ie)
+        endif
         offset = offset + el(ie)%n_ver
         if(associated(comps(icomp)%el(ie)%mag)) then
                         comps(icomp)%el(ie)%mag = vort_read(ie)
@@ -217,7 +240,8 @@ subroutine load_res(floc, comps, vort, press, t)
       enddo
     end select
 
-    deallocate(vort_read)!, cp_read)
+    deallocate(vort_read, pres_read, dforce_read, surfvel_read)
+
 
   enddo
 
@@ -227,13 +251,84 @@ end subroutine load_res
 
 !----------------------------------------------------------------------
 
-subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort)
+subroutine load_ll(floc, comps, alpha, vel_2d, vel_outplane)
+ integer(h5loc), intent(in) :: floc 
+ type(t_geo_component), intent(inout) :: comps(:)
+ real(wp), intent(out) :: alpha(:)
+ real(wp), intent(out) :: vel_2d(:)
+ real(wp), intent(out) :: vel_outplane(:)
+
+ integer :: ncomps, icomp
+ integer :: nelems, offset, nelems_comp
+ integer(h5loc) :: gloc1, gloc2, gloc3
+ character(len=max_char_len) :: cname
+ real(wp), allocatable :: alpha_read(:), vel2d_read(:), velop_read(:)
+ integer :: ncomps_sol
+
+ character(len=*), parameter :: this_sub_name = 'load_ll'
+  
+  ncomps = size(comps)
+  nelems = 0
+  do icomp = 1, ncomps
+    select type(el=>comps(icomp)%el)
+     type is(t_liftlin)
+      nelems = nelems + comps(icomp)%nelems 
+     class default
+      call internal_error(this_sub_name, this_mod_name,'Loading lifting &
+      &lines from a non lifting line component')
+    end select
+  enddo
+  
+  call open_hdf5_group(floc,'Components',gloc1)
+  call read_hdf5(ncomps_sol,'NComponents',gloc1)
+  if(ncomps_sol .lt. ncomps) call error(this_sub_name, this_mod_name, &
+  'Different number of components between solution and geometry')
+
+  offset = 0
+  do icomp = 1, ncomps
+    
+    nelems_comp = comps(icomp)%nelems
+    write(cname,'(A,I3.3)') 'Comp',comps(icomp)%comp_id
+    call open_hdf5_group(gloc1,trim(cname),gloc2)
+    call open_hdf5_group(gloc2,'Solution',gloc3)
+    call read_hdf5_al(alpha_read,'alpha',gloc3)
+    call read_hdf5_al(vel2d_read,'vel_2d',gloc3)
+    call read_hdf5_al(velop_read,'vel_outplane',gloc3)
+
+    !check consistency of geometry and solution
+    if((size(alpha_read,1) .ne. nelems_comp) .or. &
+       (size(vel2d_read,1) .ne. nelems_comp) .or. &
+       (size(velop_read,1) .ne. nelems_comp)) call error(this_mod_name, &
+       this_sub_name, 'inconsistent number of elements between geometry and&
+       & solution')   
+
+    call close_hdf5_group(gloc3)
+    call close_hdf5_group(gloc2)
+
+    alpha(offset+1:offset+nelems_comp) = alpha_read
+    vel_2d(offset+1:offset+nelems_comp) = vel2d_read
+    vel_outplane(offset+1:offset+nelems_comp) = velop_read
+    offset = offset + nelems_comp
+
+    deallocate(alpha_read, vel2d_read, velop_read)
+
+  enddo
+
+  call close_hdf5_group(gloc1)
+
+end subroutine load_ll
+
+!----------------------------------------------------------------------
+
+subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
+                         vpturbvisc)
  integer(h5loc), intent(in) :: floc 
  real(wp), allocatable, intent(out) :: wpoints(:,:)
  integer, allocatable, intent(out)  :: welems(:,:)
  real(wp), allocatable, intent(out) :: wvort(:)
  real(wp), allocatable, intent(out) :: vppoints(:,:)
  real(wp), allocatable, intent(out) :: vpvort(:)
+ real(wp), allocatable, intent(out) :: vpturbvisc(:)
 
  integer(h5loc) :: gloc
  logical :: got_dset 
@@ -373,6 +468,7 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort)
     call open_hdf5_group(floc,'ParticleWake',gloc)
     call read_hdf5_al(vppoints,'WakePoints',gloc)
     call read_hdf5_al(wvort_read,'WakeVort',gloc)
+    call read_hdf5_al(vpturbvisc,'turbvisc',gloc)
     allocate(vpvort(size(wvort_read,2)))
     do ip = 1,size(vpvort)
       vpvort(ip) = norm2(wvort_read(:,ip))

@@ -70,6 +70,7 @@ public :: &
   pure_abort, &
   dust_time, &
   error,   &
+  internal_error,   &
   warning, &
   info, &
   printout, &
@@ -194,6 +195,33 @@ recursive subroutine error(caller,caller_mod,text)
   call dust_abort()
 
 end subroutine error
+
+!-----------------------------------------------------------------------
+
+!> Internal Error: abort the execution, printing a witty message of the
+!! abort location and reason.
+!! To be used for internal checks that should never fail
+recursive subroutine internal_error(caller,caller_mod,text)
+ character(len=*), intent(in) :: &
+   caller, caller_mod, text
+
+ ! compiler bug -- gfortran bug
+ ! https://gcc.gnu.org/bugzilla/show_bug.cgi?id=77649
+ character(len=len_trim(text)) :: gfortran_bug_text(1)
+ character(len=*), parameter :: &
+   this_sub_name = 'internal_error'
+
+
+  gfortran_bug_text(1) = trim(text)
+  call put_msg( 1 , format_out_string(                            &
+      !'ERROR in "', caller , caller_mod , '"!' , (/trim(text)/) ) )
+      'Interna ERROR in "', caller , caller_mod , '"!' , gfortran_bug_text//&
+      'This should have never happened, please report this error so &
+    &that  a team of professionals could travel back in time and fix this' ) )
+
+  call dust_abort()
+
+end subroutine internal_error
 
 !-----------------------------------------------------------------------
 

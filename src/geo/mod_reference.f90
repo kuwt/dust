@@ -75,7 +75,7 @@ use mod_param, only: &
   wp, eps, max_char_len, nl , pi
 
 use mod_sim_param, only: &
-  t_sim_param
+  sim_param
 
 use mod_parse, only: &
   t_parse, getstr, getint, getintarray, getreal, getrealarray, getlogical, countoption, &
@@ -252,10 +252,9 @@ contains
 !!
 !! Each reference frame can be both self_moving, if moving with respect to the
 !! parent, or moving if either moving or fixed on a moving parent
-subroutine build_references(refs, reference_file, sim_param)
+subroutine build_references(refs, reference_file)
  type(t_ref), allocatable, intent(out)   :: refs(:)
  character(len=*), intent(in) :: reference_file
- type(t_sim_param) , intent(inout) :: sim_param
 
  type(t_ref), allocatable :: refs_temp(:)
  type(t_parse) :: ref_prs

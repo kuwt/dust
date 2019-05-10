@@ -55,6 +55,12 @@ use mod_hdf5_io, only: &
    h5loc, &
    write_hdf5_attr
 
+use mod_parse, only: &
+  t_parse, &
+  countoption , &
+  getstr, getlogical, getreal, getint, getrealarray, getintarray, &
+  ignoredParameters, finalizeParameters
+
 implicit none
 
 public :: t_sim_param, sim_param
@@ -73,6 +79,8 @@ type t_sim_param
   integer  :: n_timesteps
   !> Vector of time instants
   real(wp) , allocatable :: time_vec(:)
+  !> Actual time
+  real(wp) :: time
 
   !Physical parameters:
   !> Free stream pressure
@@ -128,6 +136,8 @@ type t_sim_param
   logical :: use_vs
   !> use the vorticity diffusion or not
   logical :: use_vd
+  !> use turbulent viscosity or not
+  logical :: use_tv
   !> use the penetration avoidance
   logical :: use_pa
   !> simulate viscosity effects or not
@@ -146,8 +156,12 @@ type t_sim_param
   real(wp) :: llDamp
   !> Avoid "unphysical" separations in inner sections of LL? :: llTol
   logical  :: llStallRegularisation
-  !> Number of "unphysical" separations thata can be removed 
+  !> Number of "unphysical" separations that can be removed 
   integer  :: llStallRegularisationNelems
+  !> Number of iterations between two regularisation processes
+  integer  :: llStallRegularisationNiters
+  !> Reference stall AOA for regularisation
+  real(wp) :: llStallRegularisationAlphaStall
 
   !FMM parameters
   !> Employing the FMM method
@@ -176,6 +190,14 @@ type t_sim_param
       integer :: lvl_solid
       real(wp) :: part_redist_ratio
 
+  !HCAS parameters
+  !> Use hcas
+  logical :: hcas
+    !> Time of deployment of the hcas
+    real(wp) :: hcas_time
+    !> Velocity of the hcas 
+    real(wp) :: hcas_vel(3)
+
 
   !Handling parameters:
   !> Debug level
@@ -198,7 +220,6 @@ type t_sim_param
 contains
 
   procedure, pass(this) :: save_param => save_sim_param
-
 end type t_sim_param
 
 type(t_sim_param) :: sim_param
@@ -206,6 +227,7 @@ type(t_sim_param) :: sim_param
 !----------------------------------------------------------------------
 contains
 !----------------------------------------------------------------------
+
 
 subroutine save_sim_param(this, loc)
  class(t_sim_param) :: this
@@ -242,6 +264,7 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%CutoffRad, 'CutoffRad', loc)
   call write_hdf5_attr(this%use_vs, 'vortstretch', loc)
   call write_hdf5_attr(this%use_vd, 'vortdiff', loc)
+  call write_hdf5_attr(this%use_tv, 'turbvort', loc)
   call write_hdf5_attr(this%use_pa, 'PenetrationAvoidance', loc)
   call write_hdf5_attr(this%use_ve, 'ViscosityEffects', loc)
   call write_hdf5_attr(this%use_fmm, 'use_fmm', loc)
@@ -273,6 +296,11 @@ subroutine save_sim_param(this, loc)
   if(this%restart_from_file) then
     call write_hdf5_attr(this%restart_file, 'restart_file', loc)
     call write_hdf5_attr(this%reset_time, 'reset_time', loc)
+  endif
+  call write_hdf5_attr(this%hcas, 'HCAS', loc)
+  if(this%hcas) then
+    call write_hdf5_attr(this%hcas_time, 'HCAS_time', loc)
+    call write_hdf5_attr(this%hcas_vel, 'HCAS_velocity', loc)
   endif
 
 end subroutine save_sim_param

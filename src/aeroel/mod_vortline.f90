@@ -60,7 +60,7 @@ use mod_linsys_vars, only: &
   t_linsys
 
 use mod_sim_param, only: &
-  t_sim_param
+  sim_param
 
 use mod_math, only: &
   cross
@@ -106,11 +106,10 @@ contains
 !----------------------------------------------------------------------
 
 !> Initialize vortex line 
-subroutine initialize_vortline(r_Rankine_in, r_cutoff_in)
- real(wp), intent(in) :: r_Rankine_in, r_cutoff_in
+subroutine initialize_vortline()
 
-  r_Rankine = r_Rankine_in
-  r_cutoff  = r_cutoff_in
+  r_Rankine = sim_param%RankineRad
+  r_cutoff  = sim_param%CutoffRad
 
 end subroutine initialize_vortline
 

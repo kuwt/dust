@@ -123,6 +123,7 @@ end type t_aero_tab
 !-----------------------------------
 
 character(len=*), parameter :: this_mod_name='mod_c81'
+character(len=max_char_len) :: msg
 
 contains
 
@@ -151,6 +152,8 @@ subroutine read_c81_table ( filen , coeff )
   integer :: ind_cl0 , istallp , istallm , stall_found
   ! Reynolds effect corrections ---
 
+  character(len=*), parameter :: this_sub_name = 'read_c81_table'
+
   fid = 21
   open(unit=fid,file=trim(adjustl(filen))) 
   ! First tree lines containing unintelligilbe parameters
@@ -177,12 +180,11 @@ subroutine read_c81_table ( filen , coeff )
     if ( iRe .gt. 1 ) then
       do i1 = 1 , iRe-1
         if ( coeff%aero_coeff(i1)%Re .ge. Re ) then
-          write(*,*) ' in file: ' , trim(adjustl(filen)) , ' Reynolds number used to define'// &
-                     ' .c81 tables must be in increasing order, but '
-          write(*,*) ' -> Re(', iRe , '): ' , Re
-          write(*,*) ' -> Re(', i1  , '): ' , coeff%aero_coeff(i1)%Re
-          write(*,*) ' STOP ' // nl
-          stop
+          write(msg,*) ' in file: ' , trim(adjustl(filen)) , ' Reynolds number used to define'// &
+                     ' .c81 tables must be in increasing order, but ',nl, &
+                     ' -> Re(', iRe , '): ' , Re, nl,&
+                     ' -> Re(', i1  , '): ' , coeff%aero_coeff(i1)%Re
+          call error(this_sub_name, this_mod_name, msg)
         end if
       end do
     end if
@@ -336,8 +338,7 @@ subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
   ! Reynolds effect correction ----
 
   ! dclda ----
-  real(wp) :: dclda1 , dclda2 , al01 , al02
-  real(wp) :: dclda_v(2) , al0_v(2)
+  real(wp) :: al01
   ! dclda ----
 
   ! n factor for the corrections of aerodynamic coeffs, with (Re/Re_table)^n
@@ -585,47 +586,30 @@ subroutine interp2d_aero_coeff ( aero_coeff , x , c )
    n1 = size(aero_coeff(ic)%par1)
    n2 = size(aero_coeff(ic)%par2)
 
-   if ( size(aero_coeff(ic)%cf,1) .ne. n1 ) then
-     write(*,*) ' Error in interp2d. '
-     write(*,*) ' size(coeff(',ic,')%Mat,1) .ne. ', n1,'. STOP. ' ; stop
-   end if
-   if ( size(aero_coeff(ic)%cf,2) .ne. n2 ) then
-     write(*,*) ' Error in interp2d. '
-     write(*,*) ' size(coeff(',ic,')%Mat,2) .ne. n2. STOP. ' ; stop
+   if ( (size(aero_coeff(ic)%cf,1).ne.n1) .or. &
+        (size(aero_coeff(ic)%cf,2).ne.n2)) then
+     write(msg,*) 'Error in the aerodynamic coefficients tables, force &
+                &coefficient matrix size',shape(aero_coeff(ic)%cf), 'different&
+                & from corresponding alpha and mach vectors sizes',n1,n2
+     call error(this_sub_name, this_mod_name, msg)
    end if
 
    ! Check range of parameters the parameters are supposed to be defined in an
    ! increasing order
-   if ( x(1) .lt. aero_coeff(ic)%par1(1) ) then
-     write(*,*) ' x(1) : ' , x(1)
-     write(*,*) ' ic   : ' , ic , ' 1:cl, 2:cd, 3:cm '
-     write(*,*) ' minval(aero_ceoff(ic)%par1) : ' , aero_coeff(ic)%par1(1) , ' par1: alpha angle '
-     write(*,*) ' check .c81 input files ' 
-     write(*,*) ' Error in interp2d. x(1) .lt. minval(aero_coeff(ic)%par1). STOP' ; stop
-   end if
-   if ( x(1) .gt. aero_coeff(ic)%par1(n1) ) then
-     write(*,*) ' x(1) : ' , x(1)
-     write(*,*) ' ic   : ' , ic , ' 1:cl, 2:cd, 3:cm '
-     write(*,*) ' maxval(aero_ceoff(ic)%par1) : ' , aero_coeff(ic)%par1(n1) , ' par1: alpha angle '
-     write(*,*) ' check .c81 input files ' 
-     write(*,*) ' Error in interp2d. x(1) .gt. maxval(aero_coeff(ic)%par1). STOP' ; stop
-   end if
-   if ( x(2) .lt. aero_coeff(ic)%par2(1) ) then
-     write(*,*) ' x(2) : ' , x(2)
-     write(*,*) ' ic   : ' , ic , ' 1:cl, 2:cd, 3:cm '
-     write(*,*) ' minval(aero_ceoff(ic)%par2) : ' , aero_coeff(ic)%par2(1) , ' par2: Mach number '
-     write(*,*) ' check .c81 input files ' 
-     write(*,*) ' Error in interp2d. x(2) .lt. minval(aero_coeff(ic)%par2). STOP' ; stop
-   end if
-   if ( x(2) .gt. aero_coeff(ic)%par2(n2) ) then
-     write(*,*) ' x(2) : ' , x(2)
-     write(*,*) ' ic   : ' , ic , ' 1:cl, 2:cd, 3:cm '
-     write(*,*) ' maxval(aero_ceoff(ic)%par2) : ' , aero_coeff(ic)%par2(n2) , ' par2: Mach number '
-     write(*,*) ' check .c81 input files ' 
-     write(*,*) ' Error in interp2d. x(2) .gt. maxval(aero_coeff(ic)%par2). STOP'
-     write(*,*) aero_coeff(ic)%par2(:)
-     stop
-   end if
+   if ( x(1) .lt. aero_coeff(ic)%par1(1) .or. &
+        x(1) .gt. aero_coeff(ic)%par1(n1) ) then
+        write(msg,*) 'Trying to interpolate aerodynamic coefficients at an &
+        &angle ',x(1),' which is outside the table span of angles from ', &
+        aero_coeff(ic)%par1(1),'to',aero_coeff(ic)%par1(n1) 
+        call error(this_sub_name, this_mod_name, msg)
+   endif
+   if ( x(2) .lt. aero_coeff(ic)%par2(1) .or. &
+        x(2) .gt. aero_coeff(ic)%par2(n2) ) then
+        write(msg,*) 'Trying to interpolate aerodynamic coefficients at a &
+        &Mach number ',x(2),' which is outside the table span of Mach numbers &
+        &from ', aero_coeff(ic)%par2(1),'to',aero_coeff(ic)%par2(n2) 
+        call error(this_sub_name, this_mod_name, msg)
+   endif
    ! Check dimensions ---------
 
    i1 = 1 

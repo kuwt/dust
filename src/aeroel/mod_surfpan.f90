@@ -73,7 +73,7 @@ use mod_linsys_vars, only: &
   t_linsys
 
 use mod_sim_param, only: &
-  t_sim_param
+  t_sim_param, sim_param
 
 use mod_math, only: &
   cross , compute_qr
@@ -148,10 +148,9 @@ contains
 
 !> Subroutine to populate the module variables from input
 !!
-subroutine initialize_surfpan(ff_ratio_in)
- real(wp), intent(in) :: ff_ratio_in
+subroutine initialize_surfpan()
 
-  ff_ratio = ff_ratio_in
+  ff_ratio = sim_param%FarFieldRatioSource
 
 end subroutine initialize_surfpan
 
@@ -718,10 +717,9 @@ end subroutine compute_vel_surfpan
 
 !> Compute an approximate value of the mean pressure on the actual element
 ! TODO: move the velocity update outside this routine, in a dedicated routine
-subroutine compute_pres_surfpan(this, R_g, sim_param)
+subroutine compute_pres_surfpan(this, R_g)
   class(t_surfpan) , intent(inout) :: this
   real(wp)         , intent(in)    :: R_g(3,3)
-  type(t_sim_param), intent(in)    :: sim_param
   !type(t_elem_p),   intent(in)    :: elems(:)
 
   real(wp) :: vel_phi(3), force_pres
@@ -827,10 +825,9 @@ end subroutine compute_pres_surfpan
 !! WARNING: at the moment this is completely bypassed, due to the
 !! different treatment of stationary and moving elements.
 !! Its functionalities were moved into compute_pres_surfpan
-subroutine compute_dforce_surfpan(this, sim_param)
+subroutine compute_dforce_surfpan(this)
   class(t_surfpan), intent(inout) :: this
   !type(t_elem_p), intent(in) :: elems(:)
-  type(t_sim_param), intent(in) :: sim_param
 
   ! first rough approximation
   ! vec{F} = - this%pres * vec{n}

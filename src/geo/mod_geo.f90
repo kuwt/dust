@@ -51,7 +51,7 @@ use mod_param, only: &
   wp, max_char_len, nl, prev_tri, next_tri, prev_qua, next_qua
 
 use mod_sim_param, only: &
-  t_sim_param, sim_param
+  sim_param
 
 use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption &
@@ -332,7 +332,7 @@ contains
 !!    and vortex rings before, then lifting lines and finally actuator disks
 subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
                       te, elems_impl, elems_expl, elems_ad, elems_ll, &
-                    elems_tot, airfoil_data, sim_param, target_file, run_id)
+                    elems_tot, airfoil_data, target_file, run_id)
  character(len=*), intent(in) :: geo_file_name
  character(len=*), intent(inout) :: ref_file_name
  character(len=*), intent(in) :: in_file_name
@@ -344,7 +344,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
  type(t_pot_elem_p),  allocatable, intent(out) :: elems_tot(:)
  type(t_tedge), intent(out) :: te
  type(t_aero_tab) , allocatable, intent(out) :: airfoil_data(:)
- type(t_sim_param) , intent(inout) :: sim_param
  character(len=*), intent(in) :: target_file
  integer, intent(in)              :: run_id(10)
 
@@ -370,7 +369,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
     ref_file_name = trim(in_file_name)
   endif
   call check_file_exists(trim(ref_file_name), this_sub_name, this_mod_name)
-  call build_references(geo%refs, trim(ref_file_name), sim_param)
+  call build_references(geo%refs, trim(ref_file_name))
 
 ! -----------------------------------------------------------------------------------------
 ! The following lines were needed when the motion was defined w.r.t. the initial
@@ -392,8 +391,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
 
   !Load the components from the file created by the preprocessor
   call check_preproc(geo_file_name)
-  call load_components(geo, trim(geo_file_name), trim(target_file), &
-                       sim_param, te)
+  call load_components(geo, trim(geo_file_name), trim(target_file), te)
 
   call import_aero_tab(geo,airfoil_data)
 
@@ -627,11 +625,10 @@ end subroutine create_geometry
 !! attached to their relative reference frames.
 !! The points and the elements are then genereated.
 !! Finally the trailing edge is created
-subroutine load_components(geo, in_file, out_file, sim_param, te)
+subroutine load_components(geo, in_file, out_file, te)
  type(t_geo), intent(inout),target :: geo
  character(len=*), intent(in) :: in_file
  character(len=*), intent(in) :: out_file
- type(t_sim_param) :: sim_param
  type(t_tedge), intent(out) :: te
 
 
@@ -1705,7 +1702,7 @@ subroutine update_geometry(geo, t, update_static)
  real(wp), intent(in) :: t
  logical, intent(in) :: update_static
 
- integer :: i_comp, ie , ip
+ integer :: i_comp, ie
 
  !update all the references
  call update_all_references(geo%refs,t)
