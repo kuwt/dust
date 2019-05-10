@@ -79,6 +79,8 @@ type t_sim_param
   integer  :: n_timesteps
   !> Vector of time instants
   real(wp) , allocatable :: time_vec(:)
+  !> Actual time
+  real(wp) :: time
 
   !Physical parameters:
   !> Free stream pressure
@@ -134,6 +136,8 @@ type t_sim_param
   logical :: use_vs
   !> use the vorticity diffusion or not
   logical :: use_vd
+  !> use turbulent viscosity or not
+  logical :: use_tv
   !> use the penetration avoidance
   logical :: use_pa
   !> simulate viscosity effects or not
@@ -182,6 +186,17 @@ type t_sim_param
       real(wp) :: LeavesTimeRatio
     !> use particles redistribution
     logical :: use_pr
+      !> Level at which is checked the presence of panels
+      integer :: lvl_solid
+      real(wp) :: part_redist_ratio
+
+  !HCAS parameters
+  !> Use hcas
+  logical :: hcas
+    !> Time of deployment of the hcas
+    real(wp) :: hcas_time
+    !> Velocity of the hcas 
+    real(wp) :: hcas_vel(3)
 
 
   !Handling parameters:
@@ -249,6 +264,7 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%CutoffRad, 'CutoffRad', loc)
   call write_hdf5_attr(this%use_vs, 'vortstretch', loc)
   call write_hdf5_attr(this%use_vd, 'vortdiff', loc)
+  call write_hdf5_attr(this%use_tv, 'turbvort', loc)
   call write_hdf5_attr(this%use_pa, 'PenetrationAvoidance', loc)
   call write_hdf5_attr(this%use_ve, 'ViscosityEffects', loc)
   call write_hdf5_attr(this%use_fmm, 'use_fmm', loc)
@@ -265,6 +281,11 @@ subroutine save_sim_param(this, loc)
       call write_hdf5_attr(this%LeavesTimeRatio, 'LeavesTimeRatio', loc)
     endif
     call write_hdf5_attr(this%use_pr, 'ParticlesRedistribution', loc)
+    if(this%use_pr) then
+      call write_hdf5_attr(this%lvl_solid, 'OctreeLevelSolid', loc)
+      call write_hdf5_attr(this%part_redist_ratio, &
+                                          'ParticlesRedistributionRatio', loc)
+    endif
   endif
   call write_hdf5_attr(this%debug_level, 'debug_level', loc)
   call write_hdf5_attr(this%dt_out, 'dt_out', loc)
@@ -275,6 +296,11 @@ subroutine save_sim_param(this, loc)
   if(this%restart_from_file) then
     call write_hdf5_attr(this%restart_file, 'restart_file', loc)
     call write_hdf5_attr(this%reset_time, 'reset_time', loc)
+  endif
+  call write_hdf5_attr(this%hcas, 'HCAS', loc)
+  if(this%hcas) then
+    call write_hdf5_attr(this%hcas_time, 'HCAS_time', loc)
+    call write_hdf5_attr(this%hcas_vel, 'HCAS_velocity', loc)
   endif
 
 end subroutine save_sim_param

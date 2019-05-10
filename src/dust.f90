@@ -320,12 +320,24 @@ call prms%CreateRealOption('LeavesTimeRatio','Ratio that triggers the &
 ! models options
 call prms%CreateLogicalOption('Vortstretch','Employ vortex stretching','T')
 call prms%CreateLogicalOption('Diffusion','Employ vorticity diffusion','T')
+call prms%CreateLogicalOption('Turbulent_Viscosity','Employ turbulent &
+                               &viscosity','F')
 call prms%CreateLogicalOption('PenetrationAvoidance','Employ penetration &
                                                               & avoidance','F')
 call prms%CreateLogicalOption('ViscosityEffects','Simulate viscosity &
                                                               & effects','F')
 call prms%CreateLogicalOption('ParticlesRedistribution','Employ particles &
                                                         &redistribution','F')
+call prms%CreateIntOption('OctreeLevelSolid','Level at which the panels &
+                          & are considered for particles redistribution')
+call prms%CreateRealOption('ParticlesRedistributionRatio','How many times &
+         &a particle need to be smaller than the average of the cell to be&
+         & eliminated','3.0')
+! HCAS
+call prms%CreateLogicalOption('HCAS','Hover Convergence Augmentation System',&
+                               'F')
+call prms%CreateRealOption('HCAS_time','HCAS deployment time')
+call prms%CreateRealArrayOption('HCAS_velocity','HCAS velocity')
 
 ! get the parameters and print them out
 call printout(nl//'====== Input parameters: ======')
@@ -340,6 +352,7 @@ call init_sim_param(sim_param, prms, nout, output_start)
 ! remaining parameters
 dt_debug_out = getreal(prms, 'dt_debug_out')
 basename_debug = getstr(prms,'basename_debug')
+
 
 !-- Parameters Initializations --
 call initialize_doublet()
@@ -384,7 +397,7 @@ nstep = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1
 sim_param%n_timesteps = nstep
 allocate(sim_param%time_vec(sim_param%n_timesteps))
 sim_param%time_vec = (/ ( sim_param%t0 + &
-         dble(i-1)*sim_param%dt, i=1,sim_param%n_timesteps ) /)
+         real(i-1,wp)*sim_param%dt, i=1,sim_param%n_timesteps ) /)
 
 !------ Geometry creation ------
 call printout(nl//'====== Geometry Creation ======')
@@ -475,6 +488,8 @@ allocate(res_old(size(elems))) ; res_old = 0.0_wp
 
 t11 = dust_time()
 do it = 1,nstep
+  !DEBUG
+  write(*,*) 'time, sim_time', time, sim_param%time_vec(it)
   
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
@@ -578,31 +593,28 @@ do it = 1,nstep
   end do
 
   ! pres_IE +++++
-  if ( it .gt. 1 ) then
-    do i_el = 1 , geo%nSurfPan
-      select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
-       ! check UHLMAN's EQN -----
-! debug ----       
-!      write(*,*) ' i_el : ' , i_el , &
-!                 ' surfpan_H_IE(i_el) ' , surfpan_H_IE(i_el)
-! debug ----       
-       el%pres = &
-        linsys%res_pres(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp 
-!      el%pres = &
-!       surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp + &
-!          sim_param%rho_inf * sum(el%surf_vel*el%ub)
-       ! check UHLMAN's EQN -----
-      end select
-    end do
-    
+  !!if ( it .gt. 1 ) then
+  !!  do i_el = 1 , geo%nSurfPan
+  !!    select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
+  !!     ! check UHLMAN's EQN -----
+  !!     el%pres = &
+  !!      linsys%res_pres(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp 
+! !!     el%pres = &
+! !!      surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp + &
+! !!         sim_param%rho_inf * sum(el%surf_vel*el%ub)
+  !!     ! check UHLMAN's EQN -----
+  !!    end select
+  !!  end do
+  !!  
 
-  else
-    do i_el = 1 , geo%nSurfPan
-      select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
-       el%pres = 0.0_wp
-      end select
-    end do
-  end if
+  !!else
+  !!  do i_el = 1 , geo%nSurfPan
+  !!    select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
+  !!     el%pres = 0.0_wp
+  !!    end select
+  !!  end do
+  !!end if
+
 
   ! pres_IE +++++
 
@@ -639,7 +651,8 @@ do it = 1,nstep
   end do
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
 
-  time = min(sim_param%tend, time+sim_param%dt)
+  !time = min(sim_param%tend, time+sim_param%dt)
+  time = min(sim_param%tend, sim_param%time_vec(it+1))
   call update_geometry(geo, time, .false.)
   call prepare_wake(wake, geo, elems_tot)
 
@@ -760,6 +773,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%min_vel_at_te  = getreal(prms,'ImplicitPanelMinVel')
   sim_param%use_vs = getlogical(prms, 'Vortstretch')
   sim_param%use_vd = getlogical(prms, 'Diffusion')
+  sim_param%use_tv = getlogical(prms, 'Turbulent_Viscosity')
   sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
   sim_param%use_ve = getlogical(prms, 'ViscosityEffects')
   !Lifting line elements
@@ -792,6 +806,21 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     endif
   
     sim_param%use_pr = getlogical(prms, 'ParticlesRedistribution')
+  if(sim_param%use_pr) then
+    sim_param%part_redist_ratio = getreal(prms, 'ParticlesRedistributionRatio')
+    if ( countoption(prms,'OctreeLevelSolid') .gt. 0 ) then
+      sim_param%lvl_solid = getint(prms, 'OctreeLevelSolid')
+    else
+      sim_param%lvl_solid = max(sim_param%NOctreeLevels-2,1)
+    endif
+  endif
+  endif
+
+  !HCAS
+  sim_param%hcas = getlogical(prms,'HCAS')
+  if(sim_param%hcas) then
+    sim_param%hcas_time = getreal(prms,'HCAS_time')
+    sim_param%hcas_vel = getrealarray(prms,'HCAS_velocity',3)
   endif
   
   !Manage restart
@@ -864,6 +893,8 @@ end subroutine copy_geo
 !! to perform output or not
 subroutine init_timestep(t)
  real(wp), intent(in) :: t
+  
+  sim_param%time = t
 
   if (real(t-t_last_out) .ge. real(sim_param%dt_out)) then
     time_2_out = .true.

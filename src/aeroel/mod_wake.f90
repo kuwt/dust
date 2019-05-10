@@ -553,6 +553,7 @@ subroutine prepare_wake(wake, geo, elems)
  real(wp) :: dist(3) , vel_te(3), pos_p(3)
  real(wp) :: dir(3), partvec(3), ave, alpha_p(3), alpha_p_n
  integer :: ir, k, n_part
+ real :: hcas_reltime
 
  ! flow separation variables
  integer :: i_comp , i_elem , n_elem
@@ -614,6 +615,13 @@ subroutine prepare_wake(wake, geo, elems)
   n_part = wake%n_prt
 !$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n)
   do ip = 1, n_part
+    if(sim_param%HCAS) then
+      hcas_reltime = (sim_param%time-sim_param%t0)/sim_param%hcas_time
+      if(hcas_reltime .le. 1.0_wp) then
+        wake%part_p(ip)%p%vel = wake%part_p(ip)%p%vel + &
+          sim_param%hcas_vel*(1.0-hcas_reltime) !linear reduction
+      endif
+    endif
     if(sim_param%use_pa) call avoid_collision(elems, wake, &
                         wake%part_p(ip)%p, wake%part_p(ip)%p%vel)
                            !wake%part_p(ip)%p, sim_param, wake%prt_vel(:,ip))
@@ -1322,7 +1330,7 @@ subroutine update_wake(wake, elems, octree)
   
   if (sim_param%use_fmm) then
     t0 = dust_time()
-    call sort_particles(wake%part_p, wake%n_prt, octree)
+    call sort_particles(wake%part_p, wake%n_prt, elems, octree)
     call calculate_multipole(wake%part_p, octree)
     call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
                          wake%end_vorts)

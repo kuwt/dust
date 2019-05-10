@@ -86,6 +86,7 @@ type, extends(c_vort_elem) :: t_vortpart
   real(wp) :: vel(3)
   real(wp), pointer :: stretch(:)
   logical :: free=.true.
+  real(wp) :: turbvisc
 contains
 
   procedure, pass(this) :: compute_vel       => compute_vel_vortpart
@@ -211,7 +212,9 @@ subroutine compute_diffusion_vortpart (this, pos, alpha, diff)
   volp = 4.0_wp/3.0_wp*pi*r_Vortex**3
   volq = 4.0_wp/3.0_wp*pi*r_Vortex**3
   diff = 1/(r_Vortex**2)*(volp*this%dir*this%mag - volq*alpha) &
-                                                *etaeps(distn,r_Vortex)
+                                      *etaeps(distn,r_Vortex)
+  !diff = 1/(r_Vortex**2)*( - volq*alpha) &
+  !                                              *etaeps(distn,r_Vortex)
 
 end subroutine compute_diffusion_vortpart
 
