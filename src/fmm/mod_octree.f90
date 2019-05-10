@@ -1092,8 +1092,12 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       else
         ave_ros = 0.0_wp
       endif
-      turbvisc = (0.11_wp*sim_param%VortexRad)**2 * &
-                 sqrt(2.0_wp*ave_ros)
+      if(sim_param%use_tv) then
+        turbvisc = (0.11_wp*sim_param%VortexRad)**2 * &
+                   sqrt(2.0_wp*ave_ros)
+      else
+        turbvisc = 0.0_wp
+      endif
 
     endif
 
