@@ -239,6 +239,8 @@ subroutine save_status(geo, wake, it, time, run_id)
       call write_hdf5(vel_outplane_isolated,'vel_outplane_isolated',gloc3)
       call write_hdf5(transpose(aero_coeff),'aero_coeff',gloc3)
       deallocate(alpha, vel_2d, vel_outplane)
+      deallocate(alpha_isolated, vel_2d_isolated, vel_outplane_isolated)
+      deallocate(aero_coeff)
     endif
 
     call close_hdf5_group(gloc3)
