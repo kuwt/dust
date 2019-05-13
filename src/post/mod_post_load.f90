@@ -251,18 +251,16 @@ end subroutine load_res
 
 !----------------------------------------------------------------------
 
-subroutine load_ll(floc, comps, alpha, vel_2d, vel_outplane)
+subroutine load_ll(floc, comps, ll_data)
  integer(h5loc), intent(in) :: floc 
  type(t_geo_component), intent(inout) :: comps(:)
- real(wp), intent(out) :: alpha(:)
- real(wp), intent(out) :: vel_2d(:)
- real(wp), intent(out) :: vel_outplane(:)
+ real(wp), intent(out) :: ll_data(:,:)
 
  integer :: ncomps, icomp
  integer :: nelems, offset, nelems_comp
  integer(h5loc) :: gloc1, gloc2, gloc3
  character(len=max_char_len) :: cname
- real(wp), allocatable :: alpha_read(:), vel2d_read(:), velop_read(:)
+ real(wp), allocatable :: ll_data_read(:,:)
  integer :: ncomps_sol
 
  character(len=*), parameter :: this_sub_name = 'load_ll'
@@ -288,29 +286,25 @@ subroutine load_ll(floc, comps, alpha, vel_2d, vel_outplane)
   do icomp = 1, ncomps
     
     nelems_comp = comps(icomp)%nelems
+    allocate(ll_data_read(nelems_comp,9))
     write(cname,'(A,I3.3)') 'Comp',comps(icomp)%comp_id
     call open_hdf5_group(gloc1,trim(cname),gloc2)
     call open_hdf5_group(gloc2,'Solution',gloc3)
-    call read_hdf5_al(alpha_read,'alpha',gloc3)
-    call read_hdf5_al(vel2d_read,'vel_2d',gloc3)
-    call read_hdf5_al(velop_read,'vel_outplane',gloc3)
-
-    !check consistency of geometry and solution
-    if((size(alpha_read,1) .ne. nelems_comp) .or. &
-       (size(vel2d_read,1) .ne. nelems_comp) .or. &
-       (size(velop_read,1) .ne. nelems_comp)) call error(this_mod_name, &
-       this_sub_name, 'inconsistent number of elements between geometry and&
-       & solution')   
+    call read_hdf5(ll_data_read(:,1:3),'aero_coeff',gloc3)
+    call read_hdf5(ll_data_read(:,4),'alpha',gloc3)
+    call read_hdf5(ll_data_read(:,5),'alpha_isolated',gloc3)
+    call read_hdf5(ll_data_read(:,6),'vel_2d',gloc3)
+    call read_hdf5(ll_data_read(:,7),'vel_2d_isolated',gloc3)
+    call read_hdf5(ll_data_read(:,8),'vel_outplane',gloc3)
+    call read_hdf5(ll_data_read(:,9),'vel_outplane_isolated',gloc3)
 
     call close_hdf5_group(gloc3)
     call close_hdf5_group(gloc2)
 
-    alpha(offset+1:offset+nelems_comp) = alpha_read
-    vel_2d(offset+1:offset+nelems_comp) = vel2d_read
-    vel_outplane(offset+1:offset+nelems_comp) = velop_read
+    ll_data(offset+1:offset+nelems_comp,:) = ll_data_read
     offset = offset + nelems_comp
 
-    deallocate(alpha_read, vel2d_read, velop_read)
+    deallocate(ll_data_read)
 
   enddo
 

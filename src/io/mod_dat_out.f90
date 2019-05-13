@@ -205,118 +205,79 @@ end subroutine dat_out_sectional
 !---------------------------------------------------------------------
 
 subroutine dat_out_sectional_ll (basename, compname, y_cen, y_span, time, &
-                                 alpha, vel_2d, vel_outplane, average )
+                                 ll_sec, average )
  character(len=*) , intent(in) :: basename
  character(len=*) , intent(in) :: compname
  real(wp) , intent(in) :: y_cen(:)
  real(wp) , intent(in) :: y_span(:)
  real(wp) , intent(in) :: time(:)
- real(wp) , intent(in) :: alpha(:,:)
- real(wp) , intent(in) :: vel_2d(:,:)
- real(wp) , intent(in) :: vel_outplane(:,:)
+ real(wp) , intent(in) :: ll_sec(:,:,:)
  logical,   intent(in) :: average
  
  character(len=8) :: nnum
  character(len=max_char_len) :: filename
- integer :: it , nt , fid , ierr 
+ integer :: it , nt , fid , ierr, il
  character(len=*), parameter :: this_sub_name = 'dat_out_sectional_ll'
+ character(len=21) :: load_str(9)
+ character(len=max_char_len) :: description_str(9)
+
+  load_str(1) = 'Cl'; load_str(2) = 'Cd'; load_str(3) = 'Cm'
+  load_str(4) =  'alpha'; load_str(5) =  'alpha_isolated'
+  load_str(6) = 'vel_2d'; load_str(7) = 'vel_2d_isolated'
+  load_str(8) = 'vel_outplane'; load_str(9) = 'vel_outplane_isolated'
+  description_str(1) = 'lift coefficient'
+  description_str(2) = 'drag coefficient'
+  description_str(3) = 'moment coefficient'
+  description_str(4) = 'angle of attack'
+  description_str(5) = 'isolated angle of attack'
+  description_str(6) = 'in section plane velocity'
+  description_str(7) = 'in section plane velocity isolated'
+  description_str(8) = 'out of section (spanwise) velocity'
+  description_str(9) = 'out of section (spanwise) isolated velocity'
 
   nt = size(time)
  
   ! Some checks --------
-  if ( size(y_cen) .ne. size(alpha,2) ) then
+  if ( size(y_cen) .ne. size(ll_sec,2) ) then
     call internal_error(trim(this_mod_name),'','Inconsistent inputs.& 
             & different length of nodes and solution ')
   end if
-  if ( size(alpha,1) .ne. nt ) then
-    call error(trim(this_mod_name),'','Inconsistent inputs.& 
+  if ( size(ll_sec,1) .ne. nt ) then
+    call internal_error(trim(this_mod_name),'','Inconsistent inputs.& 
             & size(sec_loads,1) .ne. size(time). Stop ')
   end if
  
   ! Print out .dat files
-  call new_file_unit(fid, ierr)
-  if(average) then
-    write(filename,'(A)') trim(basename)//'_alpha_ave.dat'
-  else
-    write(filename,'(A)') trim(basename)//'_alpha.dat'
-  endif
-  open(unit=fid,file=trim(filename))
-  ! Header -----------
-  write(fid,'(A)') '# Sectional angle of attack of component: '&
-                    &//trim(compname)
-  write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(y_cen) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
-  write(nnum,'(I0)') size(y_cen)
-  write(fid,'('//trim(nnum)//ascii_real//')') y_cen 
-  write(fid,'('//trim(nnum)//ascii_real//')') y_span
-  
-  if(average) then
-    write(fid,'(A)') '# alpha(n_sec)' 
+  do il = 1 , size(load_str)
+    call new_file_unit(fid, ierr)
+    if(average) then
+      write(filename,'(A)') trim(basename)//'_'//trim(load_str(il))//'_ave.dat'
+    else
+      write(filename,'(A)') trim(basename)//'_'//trim(load_str(il))//'.dat'
+    endif
+    open(unit=fid,file=trim(filename))
+    ! Header -----------
+    write(fid,'(A)') '# Sectional '//trim(description_str(il))//&
+                     &' of component: '//trim(compname)
+    write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(y_cen) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
     write(nnum,'(I0)') size(y_cen)
-    write(fid,'('//trim(nnum)//ascii_real//')') alpha(1,:) 
-  else
-    write(fid,'(A)') '# t , alpha(n_sec) ' 
-    do it = 1 , nt 
-      write(nnum,'(I0)') 1+size(y_cen)
-      write(fid,'('//trim(nnum)//ascii_real//')') time(it), alpha(it,:)
-    end do
-  endif
-  close(fid)
+    write(fid,'('//trim(nnum)//ascii_real//')') y_cen 
+    write(fid,'('//trim(nnum)//ascii_real//')') y_span
+    
+    if(average) then
+      write(fid,'(A)') '# '//trim(load_str(il))//'(n_sec)' 
+      write(nnum,'(I0)') size(y_cen)
+      write(fid,'('//trim(nnum)//ascii_real//')') ll_sec(1,:,il) 
+    else
+      write(fid,'(A)') '# t , '//trim(load_str(il))//'(n_sec) ' 
+      do it = 1 , nt 
+        write(nnum,'(I0)') 1+size(y_cen)
+        write(fid,'('//trim(nnum)//ascii_real//')') time(it), ll_sec(it,:,il)
+      end do
+    endif
+    close(fid)
+  enddo
  
-  call new_file_unit(fid, ierr)
-  if(average) then
-    write(filename,'(A)') trim(basename)//'_vel_2d_ave.dat'
-  else
-    write(filename,'(A)') trim(basename)//'_vel_2d.dat'
-  endif
-  open(unit=fid,file=trim(filename))
-  ! Header -----------
-  write(fid,'(A)') '# Sectional two dimensional (in section plane) velocity &
-                    & of component: '//trim(compname)
-  write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(y_cen) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
-  write(nnum,'(I0)') size(y_cen)
-  write(fid,'('//trim(nnum)//ascii_real//')') y_cen 
-  write(fid,'('//trim(nnum)//ascii_real//')') y_span
-  
-  if(average) then
-    write(fid,'(A)') '# vel_2d(n_sec)' 
-    write(nnum,'(I0)') size(y_cen)
-    write(fid,'('//trim(nnum)//ascii_real//')') vel_2d(1,:) 
-  else
-    write(fid,'(A)') '# t , vel_2d(n_sec) ' 
-    do it = 1 , nt 
-      write(nnum,'(I0)') 1+size(y_cen)
-      write(fid,'('//trim(nnum)//ascii_real//')') time(it), vel_2d(it,:)
-    end do
-  endif
-  close(fid)
-
-  call new_file_unit(fid, ierr)
-  if(average) then
-    write(filename,'(A)') trim(basename)//'_vel_outplane_ave.dat'
-  else
-    write(filename,'(A)') trim(basename)//'_vel_outplane.dat'
-  endif
-  open(unit=fid,file=trim(filename))
-  ! Header -----------
-  write(fid,'(A)') '# Sectional out of section plane velocity &
-                    & of component: '//trim(compname)
-  write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(y_cen) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
-  write(nnum,'(I0)') size(y_cen)
-  write(fid,'('//trim(nnum)//ascii_real//')') y_cen 
-  write(fid,'('//trim(nnum)//ascii_real//')') y_span
-  
-  if(average) then
-    write(fid,'(A)') '# vel_outplane(n_sec)' 
-    write(nnum,'(I0)') size(y_cen)
-    write(fid,'('//trim(nnum)//ascii_real//')') vel_outplane(1,:) 
-  else
-    write(fid,'(A)') '# t , vel_outplane(n_sec) ' 
-    do it = 1 , nt 
-      write(nnum,'(I0)') 1+size(y_cen)
-      write(fid,'('//trim(nnum)//ascii_real//')') time(it), vel_outplane(it,:)
-    end do
-  endif
-  close(fid)
 
 end subroutine dat_out_sectional_ll
 

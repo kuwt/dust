@@ -95,6 +95,10 @@ type, extends(c_expl_elem) :: t_liftlin
   real(wp)              :: alpha
   real(wp)              :: vel_2d
   real(wp)              :: vel_outplane
+  real(wp)              :: aero_coeff(3)
+  real(wp)              :: alpha_isolated
+  real(wp)              :: vel_2d_isolated
+  real(wp)              :: vel_outplane_isolated
 contains
 
   procedure, pass(this) :: compute_pot      => compute_pot_liftlin
@@ -405,6 +409,11 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
    type is(t_liftlin)
      u_v(i_l) = norm2((uinf-el%ub) - &
          el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub))) 
+     el%vel_2d_isolated = norm2((uinf-el%ub) - &
+                          el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
+     el%vel_outplane_isolated = sum(el%bnorm_cen*(uinf-el%ub))
+     el%alpha_isolated = atan2(sum((uinf-el%ub)*el%nor), &
+                               sum((uinf-el%ub)*el%tang_cen))*180.0_wp/pi
    end select
   end do
 
@@ -469,8 +478,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       a_v(i_l)   = alpha * pi/180.0_wp ! [rad]
 
       !select type(el => elems_ll(i_l)%p) ; type is(t_liftlin)
-        el%alpha = a_v(i_l) * 180.0_wp / pi  ! [deg]
-        el%vel_2d = unorm
+        !el%alpha = a_v(i_l) * 180.0_wp / pi  ! [deg]
+        !el%vel_2d = unorm
         el%vel_outplane = sum(el%bnorm_cen*vel)
       end select
 
@@ -589,6 +598,11 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     !   ( here, cen of the elem = cen of the liftlin (for liftlin elems) )
     el%dmom = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
                    el%chord * el%area * c_m(i_l,3)
+
+    el%alpha = a_v(i_l) * 180_wp/pi
+    el%vel_2d = u_v(i_l)
+    el%aero_coeff = c_m(i_l,:)
+
 
    end select
   end do

@@ -140,11 +140,14 @@ subroutine save_status(geo, wake, it, time, run_id)
  integer :: ie, ne
  real(wp), allocatable :: vort(:), cp(:) , pres(:)
  real(wp), allocatable :: dforce(:,:), surf_vel(:,:)
- real(wp), allocatable :: alpha(:), vel_2d(:), vel_outplane(:)
  real(wp), allocatable :: turbvisc(:)
  real(wp), allocatable :: points_w(:,:,:), cent(:,:,:) , vel_w(:,:,:)
  real(wp), allocatable :: vort_v(:,:)
  integer, allocatable :: conn_pe(:)
+ !LL data
+ real(wp), allocatable :: alpha(:), vel_2d(:), vel_outplane(:)
+ real(wp), allocatable :: alpha_isolated(:), vel_2d_isolated(:)
+ real(wp), allocatable :: vel_outplane_isolated(:), aero_coeff(:,:)
  integer :: ir, id, ip, np
 
   !create the output file
@@ -211,16 +214,30 @@ subroutine save_status(geo, wake, it, time, run_id)
     !Output the lifting lines data
     if ( trim( geo%components(icomp)%comp_el_type ) .eq. 'l' ) then
       allocate(alpha(ne), vel_2d(ne), vel_outplane(ne))    
+      allocate(alpha_isolated(ne), vel_2d_isolated(ne), &
+               vel_outplane_isolated(ne))    
+      allocate(aero_coeff(3,ne))
       do ie = 1,ne
         select type( el => geo%components(icomp)%el(ie) ) ; type is (t_liftlin)
           alpha(ie) = el%alpha
           vel_2d(ie) = el%vel_2d
           vel_outplane(ie) = el%vel_outplane
+
+          alpha_isolated(ie) = el%alpha_isolated
+          vel_2d_isolated(ie) = el%vel_2d_isolated
+          vel_outplane_isolated(ie) = el%vel_outplane_isolated
+
+          aero_coeff(:,ie) = el%aero_coeff
+
         end select
       end do 
       call write_hdf5(alpha,'alpha',gloc3)
       call write_hdf5(vel_2d,'vel_2d',gloc3)
       call write_hdf5(vel_outplane,'vel_outplane',gloc3)
+      call write_hdf5(alpha_isolated,'alpha_isolated',gloc3)
+      call write_hdf5(vel_2d_isolated,'vel_2d_isolated',gloc3)
+      call write_hdf5(vel_outplane_isolated,'vel_outplane_isolated',gloc3)
+      call write_hdf5(transpose(aero_coeff),'aero_coeff',gloc3)
       deallocate(alpha, vel_2d, vel_outplane)
     endif
 
