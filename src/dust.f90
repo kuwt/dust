@@ -651,10 +651,12 @@ do it = 1,nstep
   end do
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
 
-  !time = min(sim_param%tend, time+sim_param%dt)
-  time = min(sim_param%tend, sim_param%time_vec(it+1))
-  call update_geometry(geo, time, .false.)
-  call prepare_wake(wake, geo, elems_tot)
+  if(it .lt. nstep) then 
+    !time = min(sim_param%tend, time+sim_param%dt)
+    time = min(sim_param%tend, sim_param%time_vec(it+1))
+    call update_geometry(geo, time, .false.)
+    call prepare_wake(wake, geo, elems_tot)
+  endif
 
 enddo
 call printout(nl//'\\\\\\\\\\  Computations Finished \\\\\\\\\\')
