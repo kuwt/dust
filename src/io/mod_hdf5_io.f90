@@ -79,6 +79,7 @@ use mod_handling, only: &
    write_hdf5_attr, &
    read_hdf5, &
    read_hdf5_al, &
+   read_hdf5_attr, &
    append_hdf5, &
    h5t_mem_float, &
    h5t_file_float, &
@@ -146,6 +147,15 @@ use mod_handling, only: &
                    read_1d_string_hdf5, &
                    read_2d_string_hdf5
  end interface read_hdf5
+
+ interface read_hdf5_attr
+  module procedure read_1d_int_hdf5_attr, &
+                   read_int_hdf5_attr, &
+                   read_1d_real_hdf5_attr, &
+                   read_real_hdf5_attr, &
+                   read_logical_hdf5_attr, &
+                   read_string_hdf5_attr
+ end interface
 
  interface read_hdf5_al
   module procedure read_1d_real_hdf5_al, &
@@ -1931,7 +1941,7 @@ end subroutine read_3d_int_hdf5_al
 !-----------------------------------------------------------------------
 
 !-----------------------------------------------------------------------
-! ==== Attributes ====
+! ==== Write Attributes ====
 !-----------------------------------------------------------------------
 
 !> Write a single real value to an attribute
@@ -2227,6 +2237,257 @@ subroutine write_logical_hdf5_attr(outdata, outname, loc_id)
   !call h5Tclose_f(memtype_id, h5err)
   !call h5Tclose_f(filetype_id, h5err)
 end subroutine write_logical_hdf5_attr
+
+!-----------------------------------------------------------------------
+! ==== Read Attributes ====
+!-----------------------------------------------------------------------
+
+!> Read a single real value from an attribute
+!!
+subroutine read_real_hdf5_attr(input, inputname, loc_id)
+ real(wp), intent(out)           :: input
+ character(len=*), intent(in)  :: inputname
+ integer(HID_T), intent(in)    :: loc_id
+
+ integer(HID_T) :: attr_id
+ integer(HSIZE_T) :: in_size(1)
+ character(len=*), parameter :: &
+    this_sub_name = 'read_real_hdf5_attr'
+ integer :: h5err
+
+  !create a scalar dataspace
+  in_size = int((/1/), h5sz)
+
+  !open the attribute
+  call h5Aopen_f(loc_id, inputname, attr_id, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                               'Problems opening attribute  '//inputname)
+  !read
+  call h5Aread_f(attr_id, h5t_mem_float, input, in_size, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                               'Problems reading attribute  '//inputname)
+  !release resources
+  call h5Aclose_f(attr_id, h5err)
+
+end subroutine read_real_hdf5_attr
+
+!-----------------------------------------------------------------------
+
+!> Read a rank 1 array of reals from an attribute
+!!
+subroutine read_1d_real_hdf5_attr(input, inputname, loc_id)
+ real(wp), intent(out) :: input(:)
+ character(len=*), intent(in)       :: inputname
+ integer(HID_T), intent(in)         :: loc_id
+
+ character(len=*), parameter :: &
+    this_sub_name = 'read_1d_real_hdf5_attr'
+ integer(HSIZE_T) :: in_size(1), max_size(1)
+ integer :: in_rank
+ integer(HID_T) :: filespace_id
+ integer(HID_T) :: attr_id
+ integer :: h5err
+
+  !open the dataset
+  call h5Aopen_f(loc_id, inputname, attr_id, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                               'Problems opening attribute  '//inputname)
+  !get its dataspace
+  call h5Dget_space_f(attr_id, filespace_id, h5err)
+  !get dataspace rank and dimensions
+  call h5Sget_simple_extent_ndims_f(filespace_id, in_rank, h5err)
+  if (in_rank .ne. 1) call error(this_mod_name,this_sub_name, &
+     'Attribute rank different from the requested 1 for data ' &
+     //trim(inputname))
+  call h5Sget_simple_extent_dims_f(filespace_id, in_size, &
+                                   max_size, h5err)
+  if(in_size(1) .ne. int(size(input,1), h5sz)) &
+      call  error(this_mod_name, this_sub_name, &
+      'Dimension of read file and target array differs, for array '//inputname)
+  !read
+  call h5Aread_f(attr_id, h5t_mem_float, input, in_size, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                               'Problems reading attribute  '//inputname)
+
+  !release resources
+  call h5Sclose_f(filespace_id, h5err)
+  call h5Aclose_f(attr_id, h5err)
+
+end subroutine read_1d_real_hdf5_attr
+
+!-----------------------------------------------------------------------
+
+!> Read an integer from an attribute
+!!
+subroutine read_int_hdf5_attr(input, inputname, loc_id)
+ integer, intent(out) :: input
+ character(len=*), intent(in) :: inputname
+ integer(HID_T), intent(in) :: loc_id
+
+ character(len=*), parameter :: &
+    this_sub_name = 'read_int_hdf5_attr'
+ integer(HSIZE_T) :: in_size(1)
+ integer(HID_T) :: attr_id
+ integer :: h5err
+
+  in_size = int((/1/), h5sz)
+  !open the attribute
+  call h5Aopen_f(loc_id, inputname, attr_id, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                               'Problems opening attribute  '//inputname)
+  !read
+  call h5Aread_f(attr_id, h5t_mem_int, input, in_size, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                               'Problems reading attribute  '//inputname)
+  !release resources
+  call h5Aclose_f(attr_id, h5err)
+
+end subroutine read_int_hdf5_attr
+
+!-----------------------------------------------------------------------
+
+!> Read a rank 1 array of integers from an attribute
+!!
+subroutine read_1d_int_hdf5_attr(input, inputname, loc_id)
+ integer, intent(out) :: input(:)
+ character(len=*), intent(in)       :: inputname
+ integer(HID_T), intent(in)         :: loc_id
+
+ character(len=*), parameter :: &
+    this_sub_name = 'read_1d_int_hdf5_attr'
+ integer(HSIZE_T) :: in_size(1), max_size(1)
+ integer :: in_rank
+ integer(HID_T) :: filespace_id
+ integer(HID_T) :: attr_id
+ integer :: h5err
+
+  !open the attribute
+  call h5Aopen_f(loc_id, inputname, attr_id, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                               'Problems opening attribute  '//inputname)
+  !get its dataspace
+  call h5Aget_space_f(attr_id, filespace_id, h5err)
+  !get dataspace rank and dimensions
+  call h5Sget_simple_extent_ndims_f(filespace_id, in_rank, h5err)
+  if (in_rank .ne. 1) call error(this_mod_name,this_sub_name, &
+     'Dataset rank different from the requested 1 for data ' &
+     //trim(inputname))
+  call h5Sget_simple_extent_dims_f(filespace_id, in_size, &
+                                   max_size, h5err)
+  if(in_size(1) .ne. int(size(input,1), h5sz))  &
+      call  error(this_mod_name, this_sub_name, &
+      'Dimension of read file and target array differs, for array '//inputname)
+  !read
+  call h5Aread_f(attr_id, h5t_mem_int, input, in_size, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                               'Problems reading attribute  '//inputname)
+
+  !release resources
+  call h5Sclose_f(filespace_id, h5err)
+  call h5Aclose_f(attr_id, h5err)
+
+end subroutine read_1d_int_hdf5_attr
+
+!-----------------------------------------------------------------------
+
+!> Read a string from an attribute
+!!
+subroutine read_string_hdf5_attr(input, inputname, loc_id)
+ character(len=*), intent(out)        :: input
+ character(len=*), intent(in)         :: inputname
+ integer(HID_T), intent(in)           :: loc_id
+
+ !integer(HID_T) :: dspace_id, memspace_id
+ integer(HID_T) :: attr_id
+ integer(HID_T) :: filetype_id, memtype_id
+ integer(HSIZE_T) :: in_size(1)
+ character(len=*), parameter :: &
+    this_sub_name = 'read_string_hdf5_attr'
+ integer :: h5err
+ integer(HSIZE_T) ::strlen
+  
+  in_size(1) = 1
+  !open the attribute
+  call h5Aopen_f(loc_id, inputname, attr_id, h5err)
+  !get the type
+  call h5Aget_type_f(attr_id, filetype_id, h5err)
+  !get the size
+  call h5Tget_size_f(filetype_id, strlen, h5err)
+
+  !Check the size
+  if (int(strlen) .gt. len(input)) call error(this_mod_name, this_sub_name, &
+     'The string'//trim(inputname)//' about to be read is shorter than the&
+     &data on the file')
+
+  !create the memory datatypes
+  call h5Tcopy_f(h5t_mem_char, memtype_id, h5err)
+  call h5Tset_size_f(memtype_id, strlen,h5err)
+
+  !Prepare the local string: it might be filled with random data, and 
+  !since we read only the first part is necessary to clear it to avoid
+  !having garbage at the end of the string
+  input = ''
+  !read
+  !WARNING: no dimensions check for the moment
+  call h5Aread_f(attr_id, memtype_id, input, in_size, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                           'Problems reading attribute '//inputname)
+
+  !release resources
+  call h5Tclose_f(memtype_id, h5err)
+  call h5Tclose_f(filetype_id, h5err)
+  call h5Aclose_f(attr_id, h5err)
+end subroutine read_string_hdf5_attr
+
+!-----------------------------------------------------------------------
+
+
+!> Read a logical from an attribute
+!!
+!! WARNING: the hdf5 support for boolean data types is doubtful, so for the 
+!! moment a single character "T" or "F" is being read
+subroutine read_logical_hdf5_attr(input, inputname, loc_id)
+ logical, intent(out)                 :: input
+ character(len=*), intent(in)         :: inputname
+ integer(HID_T), intent(in)           :: loc_id
+
+ character(len=1) :: strin
+
+ character(len=*), parameter :: &
+    this_sub_name = 'read_logical_hdf5_attr'
+
+ integer(HSIZE_T) :: in_size(1)
+ integer(HID_T) :: attr_id
+ integer :: h5err
+
+
+  in_size = int((/1/), h5sz)
+  !open the attribute
+  call h5Aopen_f(loc_id, inputname, attr_id, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                               'Problems opening attribute  '//inputname)
+  !read
+  call h5Aread_f(attr_id, h5t_mem_char, strin, in_size, h5err)
+  if(h5err<0) call error(this_mod_name,this_sub_name, &
+                               'Problems reading attribute  '//inputname)
+  !release resources
+  call h5Aclose_f(attr_id, h5err)
+
+  select case(strin)
+    
+   case('t','T')
+    input = .true.
+
+   case('f','F')
+    input = .false.
+
+   case default
+    call error(this_mod_name,this_sub_name, &
+              'Invalid logical hdf5 read while readin atribute  '//inputname)
+
+  end select
+
+end subroutine read_logical_hdf5_attr
 
 !-----------------------------------------------------------------------
 end module mod_hdf5_io

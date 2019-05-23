@@ -209,6 +209,10 @@ subroutine load_res(floc, comps, vort, press, t, surfvel)
     do ie = 1 , nelems_comp
       comps(icomp)%el(ie)%pres = pres_read(ie) 
       comps(icomp)%el(ie)%dforce = dforce_read(:,ie) 
+      select type(el =>comps(icomp)%el(ie))
+       type is(t_surfpan)
+        el%surf_vel = surfvel_read(:,ie)
+      end select
     end do
 
     call close_hdf5_group(gloc3)
