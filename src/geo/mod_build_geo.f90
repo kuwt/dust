@@ -67,6 +67,9 @@ use mod_cgns_io, only: &
 use mod_parametric_io, only: &
   read_mesh_parametric, read_actuatordisk_parametric
 
+use mod_pointwise_io, only: &
+  read_mesh_pointwise
+
 use mod_ll_io, only: &
   read_mesh_ll
 
@@ -455,6 +458,25 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call write_hdf5(radius,'Radius', comp_loc)
 
     end if
+   case('pointwise')
+
+    mesh_file = geo_file
+
+    if ( ( ElType .eq. 'v' ) .or. ( ElType .eq. 'p' ) ) then
+
+      call read_mesh_pointwise( trim(mesh_file) , ee , rr , &
+                                npoints_chord_tot, nelems_span )
+
+    elseif ( ElType .eq. 'l' ) then
+      write(*,*) ' MeshFileType = pointwise'
+      write(*,*) ' ElType = l '
+      write(*,*) ' not implemented yet. Stop' ; stop
+    else
+      write(*,*) ' MeshFileType = pointwise'
+      write(*,*) ' ElType = ' , ElType
+      write(*,*) ' but ElType must be either p , v or l. Stop ' ; stop
+    end if
+
    case default
     call error(this_sub_name, this_mod_name, 'Unknown mesh file type')
 

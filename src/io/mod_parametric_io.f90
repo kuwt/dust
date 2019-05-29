@@ -149,9 +149,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 !               multiple=.true.);
   call pmesh_prs%CreateRealOption(     'chord', 'section chord', &
                 multiple=.true.);
-  call pmesh_prs%CreateRealOption(     'twist', 'section twist angle',&
+  call pmesh_prs%CreateRealOption(     'twist', 'section twist angle', &
                 multiple=.true.);
-  call pmesh_prs%CreateStringOption( 'airfoil', 'section airfoil',&
+  call pmesh_prs%CreateStringOption( 'airfoil', 'section airfoil', &
                 multiple=.true.);
 
   ! Region parameters
