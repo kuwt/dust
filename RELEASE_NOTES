@@ -1,3 +1,8 @@
+0.5.8-b
+
+* additional output for sectional loads of lifting lines
+* added additional output and postprocessing for aeroacoustics
+
 0.5.7-b
 
 * Introduced turbulent viscosity
