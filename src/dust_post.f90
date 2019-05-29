@@ -145,6 +145,9 @@ use mod_post_integral, only: &
 use mod_post_sectional, only: &
   post_sectional
 
+use mod_post_aa, only: &
+  post_aeroacoustics
+
 implicit none
 
 !Input
@@ -352,6 +355,12 @@ do ia = 1,n_analyses
                           out_frmt , components_names , all_comp , &
                           an_start , an_end , an_step, average )
 
+   !///////////////   Aeroacoustics   \\\\\\\\\\\\\\\
+   case('aeroacoustics')
+    
+    call post_aeroacoustics ( sbprms, basename, data_basename, &
+                              an_name, ia, out_frmt, components_names, &
+                              all_comp, an_start, an_end, an_step, average )
    case default
     call error('dust_post','','Unknown type of analysis: '//trim(an_type))
 

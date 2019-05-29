@@ -244,6 +244,14 @@ subroutine save_status(geo, wake, it, time, run_id)
     endif
 
     call close_hdf5_group(gloc3)
+
+    if(sim_param%output_detailed_geo) then
+      call new_hdf5_group(gloc2, 'Geometry', gloc3)
+      call write_hdf5(geo%points(:,geo%components(icomp)%i_points), &
+                      'rr',gloc3)
+      call close_hdf5_group(gloc3)
+    endif
+
     call close_hdf5_group(gloc2)
   enddo
   call close_hdf5_group(gloc1)

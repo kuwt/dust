@@ -54,8 +54,8 @@ use mod_handling, only: &
 !---------------------------------------------------------------------
 implicit none
 
-public :: dat_out_probes_header , dat_out_loads_header , &
-          dat_out_sectional, dat_out_sectional_ll
+public :: dat_out_probes_header , dat_out_loads_header , dat_out_aa_header, &
+          dat_out_sectional, dat_out_sectional_ll, dat_out_aa
 
 private
 
@@ -95,6 +95,40 @@ subroutine dat_out_loads_header ( fid , comps_meas , ref_sys , average)
    
 
 end subroutine dat_out_loads_header
+
+!---------------------------------------------------------------------
+
+subroutine dat_out_aa_header ( fid , t, P, rho, a, mu, u)
+ integer , intent(in) :: fid
+ real(wp), intent(in) :: t, P, rho, a, mu, u(3)
+
+ character(len=max_char_len) :: istr
+ 
+  write(fid,'(A)') '# Aeroacustics data'
+  write(fid,'(A)') '# Time, free stream: Pressure, density, sound speed, &
+                  &dynamic viscosity, flow velocity'
+  
+  write(fid,'(8'//ascii_real//')') t, P, rho, a, mu, u
+  write(fid,'(A)') '#  Element centre (3), Element normal (3), Element area, &
+               &Element centre velocity (3), Surface flow velocity on &
+               &element (3), Force acting on element (3)' 
+   
+
+end subroutine dat_out_aa_header
+
+!---------------------------------------------------------------------
+
+subroutine dat_out_aa ( fid , cen, n, area, vel, surfvel, f)
+ integer , intent(in) :: fid
+ real(wp), intent(in) :: cen(3), n(3), area, vel(3), surfvel(3), f(3)
+
+ character(len=max_char_len) :: istr
+ 
+  
+  write(fid,'(16'//ascii_real//')') cen, n, area, vel, surfvel, f
+   
+
+end subroutine dat_out_aa
 
 !---------------------------------------------------------------------
 

@@ -82,6 +82,9 @@ type t_sim_param
   !> Actual time
   real(wp) :: time
 
+  !> Output detailed geometry each timestep
+  logical :: output_detailed_geo
+
   !Physical parameters:
   !> Free stream pressure
   real(wp) :: P_inf
@@ -236,6 +239,7 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%t0, 't0', loc)
   call write_hdf5_attr(this%dt, 'dt', loc)
   call write_hdf5_attr(this%tend, 'tend', loc)
+  call write_hdf5_attr(this%output_detailed_geo, 'output_detailed_geo', loc)
   call write_hdf5_attr(this%P_inf, 'P_inf', loc)
   call write_hdf5_attr(this%rho_inf, 'rho_inf', loc)
   call write_hdf5_attr(this%u_inf, 'u_inf', loc)
