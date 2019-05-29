@@ -136,8 +136,7 @@ character(len=max_char_len) :: cname !, msg
 integer(h5loc) :: floc, gloc, cloc
 real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
 real(wp), allocatable :: vort(:), cp(:)
-real(wp), allocatable :: alpha(:,:), vel_2d(:,:), vel_outplane(:,:)
-real(wp), allocatable :: alpha_ave(:,:), vel_2d_ave(:,:), vel_outplane_ave(:,:)
+real(wp), allocatable :: ll_data(:,:,:), ll_data_ave(:,:,:)
 real(wp), allocatable :: points(:,:)
 integer :: nelem
 integer :: n_comp , n_comp_tot , i_comp , id_comp , ax_coor , ref_id
@@ -154,7 +153,8 @@ real(wp) :: axis_dir(3) , axis_nod(3)
 real(wp) , allocatable :: sec_loads(:,:,:)
 real(wp) , allocatable :: sec_loads_ave(:,:,:)
 integer :: is 
-integer :: n_loads = 4   ! F and moment around an axis
+integer, parameter :: n_loads = 4   ! F and moment around an axis
+integer, parameter :: n_ll_data = 9
 real(wp) , allocatable :: ref_mat(:,:) , off_mat(:,:)
 real(wp) , allocatable :: y_cen(:) , y_span(:)
 real(wp) , parameter   :: tol_y_cen = 1.0e-3_wp
@@ -369,8 +369,9 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
     sec_loads = -333.0_wp ! initialisation for DEBUG
     allocate( time(n_time) ) ; time = -333.0_wp
     allocate( ref_mat(n_time,9) , off_mat(n_time,3) ) 
-    if(print_ll) allocate(alpha(n_time,n_sect), vel_2d(n_time,n_sect), &
-                          vel_outplane(n_time,n_sect))
+    !if(print_ll) allocate(alpha(n_time,n_sect), vel_2d(n_time,n_sect), &
+    !                      vel_outplane(n_time,n_sect))
+    if(print_ll) allocate(ll_data(n_time,n_sect,n_ll_data))
     ires = 0
     do it = an_start, an_end, an_step
       ires = ires + 1
@@ -385,8 +386,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
       call update_points_postpro(comps, points, refs_R, refs_off)
       ! Load the results --------------------------
       call load_res(floc, comps, vort, cp, t)
-      if(print_ll) call load_ll(floc, comps, alpha(ires,:), vel_2d(ires,:), &
-                                vel_outplane(ires,:))
+      if(print_ll) call load_ll(floc, comps, ll_data(ires,:,:))
     
       call close_hdf5_file(floc)
     
@@ -430,12 +430,14 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
       allocate(sec_loads_ave(1,size(sec_loads,2),size(sec_loads,3)))
       sec_loads_ave(1,:,:) = sum(sec_loads, 1)/real(size(sec_loads,1),wp)
       if (print_ll) then
-        allocate(alpha_ave(n_time,n_sect), vel_2d_ave(n_time,n_sect), &
-                          vel_outplane_ave(n_time,n_sect))
-        alpha_ave(1,:) = sum(alpha, 1)/real(size(alpha,1),wp)
-        vel_2d_ave(1,:) = sum(vel_2d, 1)/real(size(vel_2d,1),wp)
-        vel_outplane_ave(1,:) = sum(vel_outplane, 1)/&
-                                 real(size(vel_outplane,1),wp)
+        !allocate(alpha_ave(n_time,n_sect), vel_2d_ave(n_time,n_sect), &
+        !                  vel_outplane_ave(n_time,n_sect))
+        allocate(ll_data_ave(1,size(ll_data,2),size(ll_data,3)))
+        ll_data_ave(1,:,:) = sum(ll_data, 1)/real(size(ll_data,1),wp)
+        !alpha_ave(1,:) = sum(alpha, 1)/real(size(alpha,1),wp)
+        !vel_2d_ave(1,:) = sum(vel_2d, 1)/real(size(vel_2d,1),wp)
+        !vel_outplane_ave(1,:) = sum(vel_outplane, 1)/&
+        !                         real(size(vel_outplane,1),wp)
       endif
 
       select case(trim(out_frmt))
@@ -445,21 +447,18 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
                                  y_span, time(1:1), sec_loads_ave, ref_mat, &
                                  off_mat, average ) 
         if(print_ll) call dat_out_sectional_ll(filename, components_names(1),&
-                                 y_cen, y_span, time(1:1), alpha_ave, &
-                                 vel_2d_ave, vel_outplane_ave, average)
+                              y_cen, y_span, time(1:1), ll_data_ave, average)
        case('tecplot')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt' 
         if (print_ll) then
           call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
-                                  y_span, alpha_ave, vel_2d_ave, &
-                                  vel_outplane_ave ) 
+                                  y_span, ll_data_ave ) 
         else
           call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
                                                                      y_span ) 
         endif
       end select
       deallocate(sec_loads_ave)
-      if(print_ll) deallocate(alpha_ave, vel_2d_ave, vel_outplane_ave)
     else
       select case(trim(out_frmt))
        case('dat')
@@ -468,13 +467,12 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
                                  y_span, time, sec_loads, &
                                 ref_mat, off_mat, average ) 
         if(print_ll) call dat_out_sectional_ll (filename, components_names(1),&
-                                                y_cen, y_span, time, alpha, &
-                                              vel_2d, vel_outplane, average ) 
+                                      y_cen, y_span, time, ll_data, average ) 
        case('tecplot')
         write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
         if (print_ll) then
           call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span,&
-                                   alpha, vel_2d, vel_outplane) 
+                                   ll_data) 
         else
           call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span ) 
         endif

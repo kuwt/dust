@@ -230,6 +230,8 @@ call prms%CreateStringOption('basename_debug','oputput basename for debug', &
                                                                          './')
 call prms%CreateLogicalOption( 'output_start', "output values at starting &
                                                           & iteration", 'F')
+call prms%CreateLogicalOption( 'output_detailed_geo', "output at each &
+                    &timestep the detailed geometry in the results file", 'F')
 call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output', &
                                                                          '0')
 
@@ -651,10 +653,12 @@ do it = 1,nstep
   end do
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
 
-  !time = min(sim_param%tend, time+sim_param%dt)
-  time = min(sim_param%tend, sim_param%time_vec(it+1))
-  call update_geometry(geo, time, .false.)
-  call prepare_wake(wake, geo, elems_tot)
+  if(it .lt. nstep) then 
+    !time = min(sim_param%tend, time+sim_param%dt)
+    time = min(sim_param%tend, sim_param%time_vec(it+1))
+    call update_geometry(geo, time, .false.)
+    call prepare_wake(wake, geo, elems_tot)
+  endif
 
 enddo
 call printout(nl//'\\\\\\\\\\  Computations Finished \\\\\\\\\\')
@@ -723,6 +727,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%dt     = getreal(prms, 'dt')
   sim_param%dt_out = getreal(prms,'dt_out')
   sim_param%debug_level = getint(prms, 'debug_level')
+  sim_param%output_detailed_geo = getlogical(prms, 'output_detailed_geo')
   !Reference values
   sim_param%P_inf = getreal(prms,'P_inf')
   sim_param%rho_inf  = getreal(prms,'rho_inf')

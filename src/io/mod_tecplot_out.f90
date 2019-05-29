@@ -1226,16 +1226,15 @@ end subroutine tec_out_probes
 !---------------------------------------------------------------------
 
 subroutine tec_out_sectional(out_filename, time, vars, span, span_size, &
-                             alpha, vel_2d, vel_outplane)
+                             ll_vars)
  character(len=*), intent(in) :: out_filename 
  real(wp), intent(in) :: time(:)
  real(wp), intent(in) :: vars(:,:,:)
  real(wp), intent(in) :: span(:)
  real(wp), intent(in) :: span_size(:)
- real(wp), intent(in), optional :: alpha(:,:)
- real(wp), intent(in), optional :: vel_2d(:,:)
- real(wp), intent(in), optional :: vel_outplane(:,:)
+ real(wp), intent(in), optional :: ll_vars(:,:,:)
  character(len=*), parameter :: var_names(4) = (/ 'Fx' , 'Fy' , 'Fz' , 'Mo' /)
+ character(len=21) :: ll_var_names(9)
 
  
  character, parameter :: zc = char(0)
@@ -1243,13 +1242,19 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size, &
  real(kind=4)  , parameter :: zoneMarker = 299.0
  real(kind=4)  , parameter :: eohMarker  = 357.0
  character(len=max_char_len) :: buffer_char
- integer :: nvars, nvars_tot, nsec, timelen, iv
+ integer :: nvars, nvars_ll, nvars_tot, nsec, timelen, iv
  logical :: print_ll
 
-  print_ll = present(alpha)
+  ll_var_names(1) = 'Cl'; ll_var_names(2) = 'Cd'; ll_var_names(3) = 'Cm'
+  ll_var_names(4) =  'alpha'; ll_var_names(5) =  'alpha_isolated'
+  ll_var_names(6) = 'vel_2d'; ll_var_names(7) = 'vel_2d_isolated'
+  ll_var_names(8) = 'vel_outplane'; ll_var_names(9) = 'vel_outplane_isolated'
+
+  print_ll = present(ll_vars)
   nvars = 4
+  nvars_ll = 9
   nvars_tot = nvars
-  if(print_ll) nvars_tot = nvars_tot + 3
+  if(print_ll) nvars_tot = nvars_tot + nvars_ll
   nsec = size(vars, 2)
   timelen = size(vars, 1)
 
@@ -1280,9 +1285,9 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size, &
     call put_tec_string(trim(var_names(iv)),fu)
   enddo
   if (print_ll) then
-    call put_tec_string('alpha',fu)
-    call put_tec_string('vel_2d',fu)
-    call put_tec_string('vel_outplane',fu)
+    do iv = 1,nvars_ll
+      call put_tec_string(trim(ll_var_names(iv)),fu)
+    enddo
   endif
   
   !Zone marker
@@ -1339,9 +1344,9 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size, &
     write(fu) int(2,s_size)
   enddo
   if(print_ll) then
-    write(fu) int(2,s_size) !alpha
-    write(fu) int(2,s_size) !vel_2d
-    write(fu) int(2,s_size) !vel_outplane
+    do iv = 1,nvars_ll
+      write(fu) int(2,s_size)
+    enddo
   endif
 
   !Has passive variables?
@@ -1365,12 +1370,10 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size, &
     write(fu) dble(maxval( vars(:,:,iv) ))
   enddo
   if (print_ll) then
-    write(fu) dble(minval( alpha ))
-    write(fu) dble(maxval( alpha ))
-    write(fu) dble(minval( vel_2d ))
-    write(fu) dble(maxval( vel_2d ))
-    write(fu) dble(minval( vel_outplane ))
-    write(fu) dble(maxval( vel_outplane ))
+    do iv = 1,nvars_ll
+      write(fu) dble(minval( ll_vars(:,:,iv) ))
+      write(fu) dble(maxval( ll_vars(:,:,iv) ))
+    enddo
   endif
 
   !The actual data
@@ -1398,19 +1401,11 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size, &
   enddo
 
   if (print_ll) then
-    do j = 1, nsec
-      do i = 1, timelen
-        write(fu) real(alpha(i,j),d_size)
-      enddo
-    enddo
-    do j = 1, nsec
-      do i = 1, timelen
-        write(fu) real(vel_2d(i,j),d_size)
-      enddo
-    enddo
-    do j = 1, nsec
-      do i = 1, timelen
-        write(fu) real(vel_outplane(i,j),d_size)
+    do iv = 1,nvars_ll
+      do j = 1, nsec
+        do i = 1, timelen
+          write(fu) real(ll_vars(i,j,iv),d_size)
+        enddo
       enddo
     enddo
   endif
