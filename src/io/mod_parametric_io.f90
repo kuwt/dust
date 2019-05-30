@@ -61,7 +61,8 @@ use mod_parse, only: &
 
 implicit none
 
-public :: read_mesh_parametric, read_actuatordisk_parametric
+public :: read_mesh_parametric, read_actuatordisk_parametric , &
+          define_section , define_division
 
 private
 

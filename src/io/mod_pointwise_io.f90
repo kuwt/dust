@@ -64,6 +64,9 @@ use mod_parse, only: &
 use mod_spline, only: &
   t_spline, hermite_spline , deallocate_spline
 
+use mod_parametric_io, only: &
+  define_section , define_division
+
 !----------------------------------------------------------------------
 
 implicit none
@@ -87,6 +90,7 @@ type :: t_point
   real(wp)                :: chord   !
   real(wp)                :: theta   ! deg
   real(wp)                :: sec_nor(3)
+  real(wp) , allocatable  :: xy(:,:)
 end type t_point
 
 !> line type
@@ -95,10 +99,20 @@ type :: t_line
   integer                 :: end_points(2)
   integer                 :: nelems
   character(max_char_len) :: type_span  ! discretisation in span
+  real(wp)                :: leng
   integer                 :: neigh_line(2) = 0
   real(wp), allocatable   :: t_vec1(:) , t_vec2(:)
 end type t_line
 
+!> refline_pt type: type containing info of the points on the reference line
+type :: t_refline_pt
+  real(wp)   :: r(3)     ! coordinate
+  real(wp)   :: t(3)     ! tangent (unit) vector to ref line
+  !> interpolation from inputs
+  integer    :: id_pt(2) ! neighboring points
+  real(wp)   :: s        ! curvilinear coord s\in(0,1) between the nodes
+  real(wp)   :: n(3)     ! unit vector normal to the plane where the 
+end type t_refline_pt
 
 !----------------------------------------------------------------------
 
@@ -121,8 +135,11 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
 
  !>
  integer   :: nelem_chord
+ character(max_char_len) :: type_chord
  character :: ElType
  real(wp)  :: ref_chord_fraction
+
+ real(wp), allocatable :: chord_fraction(:)
 
  !> point and line structures
  type(t_point) , allocatable :: points(:)
@@ -135,9 +152,18 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
 
  real(wp) , allocatable :: ref_line_points(:,:)
  real(wp) , allocatable :: ref_line_normal(:,:)
+ integer  , allocatable :: ref_line_interp_p(:,:)
+ real(wp) , allocatable :: ref_line_interp_s(:)
+ real(wp) , allocatable :: s_in(:)
 
+ real(wp) , allocatable :: xy1(:,:) , xy2(:,:) , xy(:,:)
+ real(wp) , allocatable :: rr_s(:,:) 
+ real(wp) :: twist_rad
 
- integer :: i 
+ real(wp) , allocatable :: s_lines(:) 
+
+ real(wp) :: w1 , w2
+ integer :: i , j , i1 , i2 
 
  
  !> Prepare parser and sub-parsers
@@ -147,6 +173,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
  call pmesh_prs%read_options(mesh_file,printout_val=.true.)
 
  nelem_chord = getint(pmesh_prs,'nelem_chord')
+ type_chord = getstr(pmesh_prs,'type_chord')
  ElType  = trim(getstr(pmesh_prs,'ElType'))
  ref_chord_fraction = getreal(pmesh_prs,'reference_chord_fraction')
  
@@ -193,17 +220,156 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
  call fill_line_tan_vec( points , lines )
 
  !>
- call build_reference_line( npoint_span_tot , &
-                            points , lines  , &
-                            ref_line_points , &
-                            ref_line_normal     )
-
-
+ call build_reference_line( npoint_span_tot   , &
+                            points , lines    , &
+                            ref_line_points   , &
+                            ref_line_normal   , &  
+                            ref_line_interp_p , & 
+                            ref_line_interp_s , s_in  )
   ! check ---
+  do i = 1 , size(s_in)
+    write(*,*) s_in(i)
+  end do
+  
   do i = 1 , size(ref_line_points,1)
-    write(*,*) ref_line_points(i,:) , ref_line_normal(i,:)
+    write(*,*) ref_line_points(i,:) , ref_line_normal(i,:) , ref_line_interp_p(i,:) , ref_line_interp_s(i)
   end do
 
+
+ ! === define the coordinates of the sections at all the input points === 
+ !> check that the first and last node has no interp attribute
+ if ( trim(points( lines(1)%end_points(1) )%airfoil) .eq. 'interp' ) then
+   write(*,*) ' error in read_mesh_pointwise: "airfoil" input &
+               &of the first point cannot be "interp". Stop ' ; stop
+ end if 
+ if ( trim(points( lines(size(lines))%end_points(2) )%airfoil) .eq. 'interp' ) then
+   write(*,*) ' error in read_mesh_pointwise: "airfoil" input &
+               &of the last point cannot be "interp". Stop ' ; stop
+ end if 
+
+ allocate(chord_fraction(nelem_chord+1))
+ call define_division(type_chord, nelem_chord, chord_fraction)
+
+ !> first point
+ call define_section( points(1)%chord , trim(adjustl(points(1)%airfoil)) , &
+                      points(1)%theta , ElType , nelem_chord             , & 
+                      type_chord , chord_fraction , ref_chord_fraction   , & 
+                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(1)%xy ) 
+ !> last point
+ i = size(points)
+ call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
+                      points(i)%theta , ElType , nelem_chord             , & 
+                      type_chord , chord_fraction , ref_chord_fraction   , & 
+                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy ) 
+
+ do i = 2 , size(points)-1
+
+  if ( trim(points(i)%airfoil) .ne. 'interp' ) then
+
+    call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
+                         points(i)%theta , ElType , nelem_chord             , & 
+                         type_chord , chord_fraction , ref_chord_fraction   , & 
+                         (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy ) 
+
+  else ! points of the section must be interpolated
+
+    !> find the input points and the weights to be used
+    i1 = i-1 ; i2 = i+1
+    do while ( trim(points(i1)%airfoil) .eq. 'interp' )
+      i1 = i1-1
+    end do
+    do while ( trim(points(i2)%airfoil) .eq. 'interp' )
+      i2 = i2+1
+    end do
+    
+    w1 = ( s_in(i2) - s_in(i ) ) / ( s_in(i2) - s_in(i1) )
+    w2 = ( s_in(i ) - s_in(i1) ) / ( s_in(i2) - s_in(i1) )
+
+    ! check ---
+    write(*,*) ' i , i1 , i2 , w1 , w2 : ' , i , i1 , i2 , w1 , w2
+
+    if ( allocated(xy1) ) deallocate(xy1) 
+    if ( allocated(xy2) ) deallocate(xy2) 
+
+    !> compute the xy coordinates of the neighboring points w/o interp attribute
+    !> interpolate the shape only:
+    !> -----> unitary chord, theta = 0.0, ref_chord fraction = 0.0_wp
+    call define_section( 1.0_wp , trim(adjustl(points(i1)%airfoil)) , &
+                         0.0_wp , ElType , nelem_chord              , & 
+                         type_chord , chord_fraction , 0.0_wp       , & 
+                         (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy1 ) 
+    call define_section( 1.0_wp , trim(adjustl(points(i2)%airfoil)) , &
+                         0.0_wp , ElType , nelem_chord              , & 
+                         type_chord , chord_fraction , 0.0_wp       , & 
+                         (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy2 ) 
+
+    ! linear interpolation (weighted sum)
+    if ( allocated(xy) ) deallocate(xy)
+    allocate( xy( size(xy1,1) , size(xy1,2) ) )
+
+    xy = xy1 * w1 + xy2 * w2
+
+    ! transformations: 1. translation, 2. scaling, 3. rotation
+    twist_rad = points(i)%theta * pi / 180.0_wp
+    xy(1,:) = xy(1,:) - ref_chord_fraction
+    xy      = xy * points(i)%chord
+    xy = matmul( reshape( (/ cos(twist_rad),-sin(twist_rad) , &
+                             sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
+                                                                      xy )
+
+    allocate(points(i)%xy(size(xy,1),size(xy,2))) ; points(i)%xy = xy
+
+  end if
+
+ end do
+
+ ! === define the desired (output) points of the geometry ===
+ allocate( rr( 3 , rr_size ) ) ; rr = 0.0_wp
+ allocate( rr_s ( 2 , size(points(1)%xy,2) ) )
+
+ ! !!!!!!!!! TODO: rotation is missing !!!!!!!!!!!
+ ! ----------> update structure, input and code below
+ write(*,*) ' shape(ref_line_interp_p) : ' ,  shape(ref_line_interp_p)
+ write(*,*) ' shape(ref_line_interp_s) : ' ,  shape(ref_line_interp_s)
+ write(*,*) ' shape(points           ) : ' ,  shape(points)
+ do i = 1 , npoint_span_tot
+
+
+   write(*,*) i , ref_line_interp_p(i,1) , ref_line_interp_p(i,2)
+
+   write(*,*) ' shape( points( ...(1) )%xy ) : ' , shape(points( ref_line_interp_p(i,1) )%xy)
+   write(*,*) ' shape( points( ...(2) )%xy ) : ' , shape(points( ref_line_interp_p(i,2) )%xy)
+   rr_s = points( ref_line_interp_p(i,1) )%xy * ( 1.0_wp - ref_line_interp_s(i) ) + &
+          points( ref_line_interp_p(i,2) )%xy            * ref_line_interp_s(i)
+
+   i1 = 1 + ( i-1 ) * npoint_chord_tot
+   i2 =       i     * npoint_chord_tot
+
+   rr(1,i1:i2) = rr_s(1,:) + ref_line_points(i,1)
+   rr(2,i1:i2) =             ref_line_points(i,2)
+   rr(3,i1:i2) = rr_s(2,:) + ref_line_points(i,3)
+
+
+ end do
+
+
+ ! check ---
+ open(unit=21,file='./test_rr_pointwise.dat')
+ do i = 1 , size(rr,2)
+   write(21,*) rr(:,i)
+ end do
+ close(21)
+
+
+! ! check ---
+! do i = 1 , size(points(1)%xy,2)
+!   write(*,*) points(1)%xy(:,i)
+! end do 
+
+
+
+ 
+ deallocate( rr_s )
 
 
 
@@ -214,24 +380,34 @@ end subroutine read_mesh_pointwise
 
 !----------------------------------------------------------------------
 !> build reference line
-subroutine build_reference_line( npoint_span_tot , &
-                                 points, lines   , &
-                                 ref_line_points , &
-                                 ref_line_normal     )
+subroutine build_reference_line( npoint_span_tot   , points, lines     , &
+                                 ref_line_points   , ref_line_normal   , &
+                                 ref_line_interp_p , ref_line_interp_s , &
+                                 s_in    )
 
  integer                     , intent(in)    :: npoint_span_tot
  type(t_point)               , intent(inout) :: points(:)
  type(t_line )               , intent(inout) :: lines( :)
  real(wp)      , allocatable , intent(out)   :: ref_line_points(:,:)
  real(wp)      , allocatable , intent(out)   :: ref_line_normal(:,:)
+ integer       , allocatable , intent(out)   :: ref_line_interp_p(:,:)
+ real(wp)      , allocatable , intent(out)   :: ref_line_interp_s(:)
+ real(wp)      , allocatable , intent(out)   :: s_in(:)
+ 
+ integer       , allocatable :: ip(:,:)
+ real(wp)      , allocatable :: s_in_1(:)
 
  type(t_spline) :: spl
 
  integer :: i , i1 , i2 , j , n
 
 !write(*,*) ' n. point in spanwise direction: ' , npoint_span_tot
- allocate(ref_line_points(npoint_span_tot,3))
- allocate(ref_line_normal(npoint_span_tot,3))
+ allocate(ref_line_points(  npoint_span_tot,3))
+ allocate(ref_line_normal(  npoint_span_tot,3))
+ allocate(ref_line_interp_p(npoint_span_tot,2))
+ allocate(ref_line_interp_s(npoint_span_tot  ))
+
+ allocate(s_in(size(points))) ; s_in = 0.0_wp
  
  !> Starting point
  ref_line_points(1,:) = points( lines(1)%end_points(1) ) % coord
@@ -243,13 +419,28 @@ subroutine build_reference_line( npoint_span_tot , &
    ref_line_points(i2,:) = points( lines(i)%end_points(2) ) % coord
 
    if (      trim(lines(i)%l_type) .eq. 'Straight' ) then
+
+     !> points for interpolation
+     do j = i1 , i2
+       ref_line_interp_p(j,:) = lines(i)%end_points(:)
+     end do
      
      call straight_line( points( lines(i)%end_points(1) )%coord , &
                          points( lines(i)%end_points(2) )%coord , &
                          lines(i)%nelems                        , &
                          lines(i)%type_span                     , &
                          ref_line_points(i1:i2,:)               , &
-                         ref_line_normal(i1:i2,:) )
+                         ref_line_normal(i1:i2,:)               , &
+                         ref_line_interp_s(i1:i2)               , &
+                         lines(i)%leng  )
+
+     if ( allocated(s_in_1) ) deallocate(s_in_1) ; allocate(s_in_1(n))
+     s_in_1 = (/ 0.0_wp , 1.0_wp /)
+     s_in(lines(i)%end_points(2)) = & 
+             s_in(lines(i)%end_points(2)-1) + s_in_1(2) * lines(i)%leng
+     
+     deallocate(s_in_1)
+      
  
    else if ( trim(lines(i)%l_type) .eq. 'Spline'   ) then
      
@@ -264,11 +455,27 @@ subroutine build_reference_line( npoint_span_tot , &
        spl%rr( j , : ) = points( lines(i)%end_points(1)-1+j )%coord
      end do
 
+     if ( allocated(ip)     ) deallocate(ip    ) ; allocate(ip(i2-i1+1,2))
+     if ( allocated(s_in_1) ) deallocate(s_in_1) ; allocate(s_in_1(n))
+ 
      !> compute ref_line_points on the spline
      call hermite_spline( spl , lines(i)%nelems           , &
                                 lines(i)%type_span        , &
                                 ref_line_points(i1:i2,:)  , &
-                                ref_line_normal(i1:i2,:) )
+                                ref_line_normal(i1:i2,:)  , &
+                                ip                        , &
+                                ref_line_interp_s(i1:i2)  , &
+                                lines(i)%leng , s_in_1 )
+
+     s_in( lines(i)%end_points(1): lines(i)%end_points(2) ) = &
+                     s_in_1 + s_in(lines(i)%end_points(1))
+
+     !> from ip to ref_line_interp_p
+     do j = 1 , i2-i1+1
+        ref_line_interp_p(i1+j-1,:) = lines(i)%end_points(1) - 1 + ip(j,:)
+     end do
+
+     deallocate( ip )
 
      call deallocate_spline( spl )
      
@@ -285,12 +492,15 @@ end subroutine build_reference_line
 
 !----------------------------------------------------------------------
 !> straight_line subdivision
-subroutine straight_line( r1 , r2 , nelems , type_span , rr , nor )
+subroutine straight_line( r1 , r2 , nelems , type_span , rr , nor , s , &
+                          leng )
   real(wp)                , intent(in) :: r1(3) , r2(3)
   integer                 , intent(in) :: nelems
   character(max_char_len) , intent(in) :: type_span
   real(wp)                , intent(inout) :: rr(:,:)
   real(wp)                , intent(inout) ::nor(:,:)
+  real(wp)                , intent(inout) ::  s(:)
+  real(wp)                , intent(out) :: leng
 
   real(wp) :: nor_v(3)
 
@@ -298,7 +508,9 @@ subroutine straight_line( r1 , r2 , nelems , type_span , rr , nor )
 
   ! allocate(rr(nelems+1,3))
 
-  nor_v = r2 - r1 ; nor_v = nor_v / norm2(nor_v)
+  nor_v = r2 - r1
+  leng = norm2(nor_v) 
+  nor_v = nor_v / leng
 
   do i = 1 , nelems+1
 
@@ -314,7 +526,12 @@ subroutine straight_line( r1 , r2 , nelems , type_span , rr , nor )
     !> nor
     nor(i,:) = nor_v
 
+    !> curvilinear coordinate, s
+    s(i) = norm2(rr(i,:)-r1) / norm2(r2-r1) 
+
   end do
+
+
 
 end subroutine straight_line
 

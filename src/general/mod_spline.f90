@@ -70,16 +70,24 @@ end type t_spline
 contains
 ! ----------------------------------------------------------------------
 !> build hermite_spline
-subroutine hermite_spline ( spl , nelems , type_span , rr_spl , nn_spl )
+subroutine hermite_spline ( spl , nelems , type_span , rr_spl , nn_spl , &
+                                                       ip_spl , ss_spl , &
+                                                       leng , s_in )
   type(t_spline)               , intent(inout) :: spl
   integer                      , intent(in)    :: nelems
   character(max_char_len)      , intent(in)    :: type_span
   real(wp)                     , intent(out)   :: rr_spl(:,:)
   real(wp)                     , intent(out)   :: nn_spl(:,:)
+  integer                      , intent(out)   :: ip_spl(:,:)
+  real(wp)                     , intent(out)   :: ss_spl(:)
+  real(wp)                     , intent(out)   :: leng
+  real(wp)                     , intent(out)   :: s_in(:)
 
   integer :: n_d , n_points , n_splines
   real(wp) , allocatable :: ll(:)  ! useless with this def of %t
   real(wp) , allocatable :: A(:,:) , b(:)
+
+  real(wp) , allocatable :: spl_s(:)
 
   ! lapack
   integer , allocatable :: ipiv(:)
@@ -190,7 +198,8 @@ subroutine hermite_spline ( spl , nelems , type_span , rr_spl , nn_spl )
   ! === spline (non-uniform param) ===
   allocate(rr( n_points1*n_splines + 1,n_d))
   allocate(tv1(n_points1))
-  allocate( s( n_points1*n_splines + 1 ) ) ! overall curvilinear coord.
+  allocate( s( n_points1*n_splines + 1 ) )   ! overall curvilinear coord.
+  allocate(spl_s(n_points)) ; spl_s = 0.0_wp ! overall curv. coord of the input points
   i_r = 0
   do i = 1 , n_splines
 
@@ -215,12 +224,23 @@ subroutine hermite_spline ( spl , nelems , type_span , rr_spl , nn_spl )
       else
         s(i_r) = 0.0_wp  ! first point: s = 0
       end if
-    end do 
+    end do
+
+    spl_s(i+1) = s(i_r)
 
   end do
 
   !> s \in [ 0 , 1 ]
-  s = s / s(size(s))
+  leng = s(size(s))
+  s     = s / s(size(s))
+
+  s_in = spl_s           ! curvilinear coord of the input points
+  spl_s = spl_s / spl_s(size(spl_s)) ! and its non-dimensionalisation
+
+  ! check ---
+  do i = 1 , size(spl_s)
+    write(*,*) spl_s(i)
+  end do
 
 ! ! check ---
 ! do i = 1 , size(rr,1)
@@ -243,10 +263,19 @@ subroutine hermite_spline ( spl , nelems , type_span , rr_spl , nn_spl )
   rr_spl(       1,:) = spl%rr(       1,:)
   rr_spl(nelems+1,:) = spl%rr(n_points,:)
 
-  nn_spl(1,:) = rr(2,:) - rr(1,:)
-  nn_spl(1,:) = nn_spl(1,:) / norm2(nn_spl(1,:))
+  nn_spl(       1,:) = rr(2,:) - rr(1,:)
+  nn_spl(       1,:) = nn_spl(1,:) / norm2(nn_spl(1,:))
+  nn_spl(nelems+1,:) = rr(size(rr,1),:) - rr(size(rr,1)-1,:)
+  nn_spl(nelems+1,:) = nn_spl(nelems+1,:) / norm2(nn_spl(nelems+1,:))
+
+  ip_spl(       1,:) = (/ 1 , 2 /) 
+  ip_spl(nelems+1,:) = (/ n_points-1, n_points /) 
+  ss_spl(       1)   = 0.0_wp
+  ss_spl(nelems+1)   = 1.0_wp
 
   do i = 2 , nelems
+
+    ! interp from the finest discretisation
     do j = 1 , size(s) 
       if ( s(j) .gt. s_spl(i)  ) then
 
@@ -265,8 +294,26 @@ subroutine hermite_spline ( spl , nelems , type_span , rr_spl , nn_spl )
  
       end if
     end do
+
+    ! find neighbouring input points (for input interpolation)
+    do j = 1 , n_points
+      if ( spl_s(j) .gt. s_spl(i) ) then
+
+        ip_spl(i,:) = (/ j-1 , j /) 
+        ss_spl(i)   = ( s_spl(i) - spl_s(j-1) )/( spl_s(j)-spl_s(j-1) )
+
+        exit
+
+      end if 
+    end do
+
   end do
 
+  ! check
+  write(*,*) ' in hermite_spline : ip , ss '
+  do i = 1 , size(ss_spl)
+    write(*,*) ip_spl(i,:) , '     ' , ss_spl(i)
+  end do
 
 end subroutine hermite_spline
 
