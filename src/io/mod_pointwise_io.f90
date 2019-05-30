@@ -75,6 +75,10 @@ private
 character(len=*), parameter :: this_mod_name = 'mod_pointwise_io'
 
 !----------------------------------------------------------------------
+!> module variables
+
+
+!----------------------------------------------------------------------
 !> point type
 type :: t_point
   integer                 :: id
@@ -82,6 +86,7 @@ type :: t_point
   character(max_char_len) :: airfoil
   real(wp)                :: chord   !
   real(wp)                :: theta   ! deg
+  real(wp)                :: sec_nor(3)
 end type t_point
 
 !> line type
@@ -91,7 +96,9 @@ type :: t_line
   integer                 :: nelems
   character(max_char_len) :: type_span  ! discretisation in span
   integer                 :: neigh_line(2) = 0
+  real(wp), allocatable   :: t_vec1(:) , t_vec2(:)
 end type t_line
+
 
 !----------------------------------------------------------------------
 
@@ -127,12 +134,10 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
  integer :: i_ch , i_sp , i_point , i_elem
 
  real(wp) , allocatable :: ref_line_points(:,:)
+ real(wp) , allocatable :: ref_line_normal(:,:)
 
- !> spl
- type(t_spline) :: spl
- real(wp) , allocatable :: rr_spl(:,:)
 
- integer :: i , i1 , i2 , il
+ integer :: i 
 
  
  !> Prepare parser and sub-parsers
@@ -161,8 +166,8 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
  ee_size =  nelem_chord_tot *  nelem_span_tot
  rr_size = npoint_chord_tot * npoint_span_tot
 
- ! check ---
- write(*,*) ' ee_size , rr_size : ' , ee_size , rr_size
+! ! check ---
+! write(*,*) ' ee_size , rr_size : ' , ee_size , rr_size
 
  ! === connectivity matrix, ee ===
  allocate( ee( 4 , ee_size ) ) ; ee = 0
@@ -177,24 +182,56 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   end do
  end do
 
- 
- !> Check line connectivity and re-order lines: 
+ ! === define the reference line ===
+ !> Check line connectivity, re-order lines and define tangent vectors
  call sort_lines( lines ) 
 
  !> check input consistency (todo: improve this subroutine)
- call check_point_line_inputs ( points, lines )
+ call check_point_line_inputs ( points , lines )
 
-! ! check --- 
-! do i = 1 , size(lines)
-!   write(*,*) trim(lines(i) % l_type)
-!   write(*,*)      lines(i) % end_points
-!   write(*,*)      lines(i) % nelems
-! end do
-! ! check --- 
+ !>  
+ call fill_line_tan_vec( points , lines )
 
- ! === points on the reference line ===
- write(*,*) ' n. point in spanwise direction: ' , npoint_span_tot
+ !>
+ call build_reference_line( npoint_span_tot , &
+                            points , lines  , &
+                            ref_line_points , &
+                            ref_line_normal     )
+
+
+  ! check ---
+  do i = 1 , size(ref_line_points,1)
+    write(*,*) ref_line_points(i,:) , ref_line_normal(i,:)
+  end do
+
+
+
+
+ write(*,*) ' stop in mod_pointwise_io ' ; stop
+
+
+end subroutine read_mesh_pointwise
+
+!----------------------------------------------------------------------
+!> build reference line
+subroutine build_reference_line( npoint_span_tot , &
+                                 points, lines   , &
+                                 ref_line_points , &
+                                 ref_line_normal     )
+
+ integer                     , intent(in)    :: npoint_span_tot
+ type(t_point)               , intent(inout) :: points(:)
+ type(t_line )               , intent(inout) :: lines( :)
+ real(wp)      , allocatable , intent(out)   :: ref_line_points(:,:)
+ real(wp)      , allocatable , intent(out)   :: ref_line_normal(:,:)
+
+ type(t_spline) :: spl
+
+ integer :: i , i1 , i2 , j , n
+
+!write(*,*) ' n. point in spanwise direction: ' , npoint_span_tot
  allocate(ref_line_points(npoint_span_tot,3))
+ allocate(ref_line_normal(npoint_span_tot,3))
  
  !> Starting point
  ref_line_points(1,:) = points( lines(1)%end_points(1) ) % coord
@@ -211,25 +248,32 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
                          points( lines(i)%end_points(2) )%coord , &
                          lines(i)%nelems                        , &
                          lines(i)%type_span                     , &
-                         ref_line_points(i1:i2,:) )
+                         ref_line_points(i1:i2,:)               , &
+                         ref_line_normal(i1:i2,:) )
  
    else if ( trim(lines(i)%l_type) .eq. 'Spline'   ) then
      
      !> build t_spline structure
-     allocate(spl%rr( lines(i)%nelems , 3 ))
-     allocate(spl%d0( 3 ))
-     allocate(spl%d1( 3 ))
+     n = lines(i)%end_points(2) - lines(i)%end_points(1) + 1
+     allocate(spl%rr( n , 3 ))
+     allocate(spl%d0( 3 )) ; spl%d0 = lines(i)%t_vec1
+     allocate(spl%d1( 3 )) ; spl%d1 = lines(i)%t_vec2
+     spl%e_bc = (/ 'derivative' , 'derivative' /) 
 
-!    !>
+     do j = 1 , n
+       spl%rr( j , : ) = points( lines(i)%end_points(1)-1+j )%coord
+     end do
 
-!    !> compute ref_line_points on the spline
-!    call hermite_spline( spl , lines(i)%nelems , &
-!                               lines(i)%type_span , rr_spl )
+     !> compute ref_line_points on the spline
+     call hermite_spline( spl , lines(i)%nelems           , &
+                                lines(i)%type_span        , &
+                                ref_line_points(i1:i2,:)  , &
+                                ref_line_normal(i1:i2,:) )
 
      call deallocate_spline( spl )
      
    else
-     write(*,*) ' error in read_mesh_pointwise(): '
+     write(*,*) ' error in build_reference_line(): '
      write(*,*) ' lines(',i,')%l_type = ' , lines(i)%l_type
      write(*,*) ' but l_type must be either Spline or Straight.'
      write(*,*) ' Stop. '; stop
@@ -237,37 +281,39 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
 
  end do 
 
- do i = 1 , size(ref_line_points,1)
-   write(*,*) ref_line_points(i,:)
- end do
-
-
-
-
- write(*,*) ' stop in mod_pointwise_io ' ; stop
-
-
-end subroutine read_mesh_pointwise
+end subroutine build_reference_line
 
 !----------------------------------------------------------------------
 !> straight_line subdivision
-subroutine straight_line( r1 , r2 , nelems , type_span , rr  )
+subroutine straight_line( r1 , r2 , nelems , type_span , rr , nor )
   real(wp)                , intent(in) :: r1(3) , r2(3)
   integer                 , intent(in) :: nelems
   character(max_char_len) , intent(in) :: type_span
   real(wp)                , intent(inout) :: rr(:,:)
+  real(wp)                , intent(inout) ::nor(:,:)
+
+  real(wp) :: nor_v(3)
 
   integer :: i
 
   ! allocate(rr(nelems+1,3))
 
+  nor_v = r2 - r1 ; nor_v = nor_v / norm2(nor_v)
+
   do i = 1 , nelems+1
+
+    !> rr
     if ( trim(type_span) .eq. 'uniform' ) then !> uniform spacing
       rr(i,:) = r1 * dble(nelems+1-i)/dble(nelems) + &
                 r2 * dble(       i-1)/dble(nelems)
     else
-
+      write(*,*) ' error in straight_line. Only uniform spacing '
+      write(*,*) ' implemented so far. Stop ' ; stop
     end if
+
+    !> nor
+    nor(i,:) = nor_v
+
   end do
 
 end subroutine straight_line
@@ -295,7 +341,7 @@ subroutine sort_lines( lines )
     end if
   end do
   if ( n_1 .ne. 1 ) then
-    write(*,*) ' error in sort_lines: only 1 line must'
+    write(*,*) ' error in sort_lines: only 1 line must have'
     write(*,*) ' end_points(1) = 1. Stop ' ; stop
   end if  
   lines(1) = lines_tmp(i1)
@@ -325,6 +371,9 @@ subroutine sort_lines( lines )
 
   end do
 
+  
+
+
 end subroutine sort_lines
 
 !----------------------------------------------------------------------
@@ -333,16 +382,118 @@ subroutine check_point_line_inputs( points , lines )
   type(t_point) , intent(inout) :: points(:)
   type(t_line ) , intent(inout) :: lines( :)
 
+  integer :: i , n_lines
+
+  n_lines = size(lines)
+
   !> all the points are present
   if ( size(points) .lt. lines(size(lines))%end_points(2) ) then
     write(*,*) ' n. points .lt. last line end point id. stop ' ; stop
   end if
   
-  !> other checks and sorting ???
+  !> if first or last lines are Splines, the user must provide the 
+  !  initial or final direction
+  if ( ( trim(lines(1)%l_type) .eq. 'Spline' ) .and. &
+       ( .not. allocated(lines(1)%t_vec1) ) ) then
+    write(*,*) ' error in check_point_lines_input: the first line is a Spline and &
+                &has no TangentVec1 provided as an input. Stop ' ; stop
+  end if
+  if ( ( trim(lines(size(lines))%l_type) .eq. 'Spline' ) .and. &
+       ( .not. allocated(lines(size(lines))%t_vec2) ) ) then
+    write(*,*) ' error in check_point_lines_input: the last line is a Spline and &
+                &has no TangentVec2 provided as an input. Stop. ' ; stop
+  end if
 
+  !> no consecutive splines are allowed so far
+  do i = 1 , n_lines-1
+    if ( ( trim(lines(i  )%l_type) .eq. 'Spline' ) .and. &
+         ( trim(lines(i+1)%l_type) .eq. 'Spline' ) ) then
+      write(*,*) ' error in check_point_lines_input: two consecutive splines are not &
+                  &allowed so far. '
+      write(*,*) ' In future release, this coul not be true anymore: '
+      write(*,*) ' two consecutive splines could be joined together if no'
+      write(*,*) ' TangentVec is provided, or two consecutive spline with'
+      write(*,*) ' TangentVec provided could be treated as well. So far, Stop.'
+      stop
+    end if
+  end do
+
+  
 
  
 end subroutine
+
+!----------------------------------------------------------------------
+!> 
+subroutine fill_line_tan_vec( points , lines )
+ type(t_point) , intent(inout) :: points(:)
+ type(t_line ) , intent(inout) :: lines( :)
+
+ integer :: n_lines , i
+
+ n_lines = size(lines)
+
+ ! first straight lines
+ do i = 1 , n_lines
+
+   if ( trim(lines(i)%l_type) .eq. 'Straight' ) then
+
+     allocate( lines(i)%t_vec1(3) , lines(i)%t_vec2(3) ) ;
+
+     lines(i)%t_vec1 = points( lines(i)%end_points(2) ) %coord - &
+                       points( lines(i)%end_points(1) ) %coord
+
+     if ( norm2(lines(i)%t_vec1) .lt. 1.0e-9_wp ) then
+       write(*,*) ' error in fill_line_tan_vec ... stop ' ; stop
+     end if
+
+     lines(i)%t_vec1 = lines(i)%t_vec1 / norm2(lines(i)%t_vec1)
+     lines(i)%t_vec2 = lines(i)%t_vec1
+
+   end if 
+
+ end do
+
+ !> then splines
+ do i = 1 , n_lines
+
+   if ( trim(lines(i)%l_type) .eq. 'Spline' ) then
+
+     if ( .not. allocated(lines(i)%t_vec1) ) then
+ 
+       if  ( i .eq. 1 ) then  ! check
+         write(*,*) ' error in fill_line_tan_vec: '
+         write(*,*) ' first line is a spline w/o tangentVec1 input '
+         write(*,*) ' stop. ' ; stop
+       end if
+
+       allocate(lines(i)%t_vec1(3))
+       lines(i)%t_vec1 = lines(i-1)%t_vec2
+       
+     end if
+
+     if ( .not. allocated(lines(i)%t_vec2) ) then
+
+       if  ( i .eq. n_lines ) then  ! check
+         write(*,*) ' error in fill_line_tan_vec: '
+         write(*,*) ' last line is a spline w/o tangentVec2 input '
+         write(*,*) ' stop. ' ; stop
+
+       end if
+
+       allocate(lines(i)%t_vec2(3))
+       lines(i)%t_vec2 = lines(i+1)%t_vec1
+
+     end if
+
+   end if
+
+ end do
+
+
+
+end subroutine fill_line_tan_vec
+
 
 !----------------------------------------------------------------------
 !> fill point structure
@@ -364,6 +515,7 @@ subroutine read_points ( pmesh_prs , point_prs , points )
    points(i) % airfoil  = getstr(      point_prs, 'Airfoil')
    points(i) % chord    = getreal(     point_prs, 'Chord')
    points(i) % theta    = getreal(     point_prs, 'Twist')
+   points(i) % sec_nor  = getrealarray(point_prs, 'SectionNormal',3)
  end do
 
 end subroutine read_points
@@ -383,12 +535,43 @@ subroutine read_lines ( pmesh_prs , line_prs , lines  , nelems_span_tot)
 
  nelems_span_tot = 0
  do i = 1 , nLines
+
    call getsuboption( pmesh_prs , 'Line' , line_prs )
+
    lines(i) % l_type     = getstr(      line_prs , 'Type'   )
    lines(i) % end_points = getintarray( line_prs , 'EndPoints' , 2 )
    lines(i) % nelems     = getint(      line_prs , 'Nelems' )
    lines(i) % type_span  = getstr(      line_prs , 'Type_span')
+
+   !> allocate tvec for spline if they are provided as a input
+   if ( trim(lines(i)%l_type) .eq.'Spline' ) then 
+ 
+     !> allocate tangent vec1 if specified as an input 
+     if ( countoption( line_prs , 'TangentVec1' ) .eq. 0 ) then 
+       ! do nothing: tan vec must be inherited 
+     elseif ( countoption( line_prs , 'TangentVec1' ) .eq. 1 ) then
+       allocate(lines(i)%t_vec1(3))
+       lines(i)%t_vec1 = getrealarray(line_prs , 'TangentVec1' , 3 )
+     else
+       write(*,*) ' Error in read_lines(). Provided more than one &
+                   &TangentVec1 as an input. Stop' ; stop
+     end if
+
+     !> allocate tangent vec2 if specified as an input 
+     if ( countoption( line_prs , 'TangentVec2' ) .eq. 0 ) then
+       ! do nothing: tan vec must be inherited 
+     elseif ( countoption( line_prs , 'TangentVec2' ) .eq. 1 ) then
+       allocate(lines(i)%t_vec2(3))
+       lines(i)%t_vec2 = getrealarray(line_prs , 'TangentVec2' , 3 )
+     else
+       write(*,*) ' Error in read_lines(). Provided more than one &
+                   &TangentVec2 as an input. Stop' ; stop
+     end if
+ 
+   end if
+
    nelems_span_tot = nelems_span_tot + lines(i)%nelems
+
  end do
 
 end subroutine read_lines
@@ -427,6 +610,10 @@ subroutine set_parser_pointwise( pmesh_prs , point_prs , line_prs )
  call point_prs%CreateStringOption(  'airfoil', 'section airfoil' )
  call point_prs%CreateRealOption(      'chord', 'section chord' )
  call point_prs%CreateRealOption(      'twist', 'section twist angle' )
+ call point_prs%CreateRealArrayOption('SectionNormal', &
+               'normal vector of the plane section containing the airfoil &
+               &points', &
+               '(/ 0.0, 1.0, 0.0 /)' ) ! default y-axis
 
  ! === Line sub-parser ===
  call pmesh_prs%CreateSubOption('Line','Line group',line_prs, &
@@ -441,6 +628,16 @@ subroutine set_parser_pointwise( pmesh_prs , point_prs , line_prs )
  call line_prs%CreateStringOption('type_span', 'type of span-wise division: &
                &uniform, cosine, cosineIB, cosineOB', &
                'uniform' ) ! defualt
+ !> TangentVec1,2: in the code:
+ ! straight lines: useles input -> tan vec computed
+ ! spline lines  : either assigned or inherited from neighbouring lines
+ !                        
+ call line_prs%CreateRealArrayOption('TangentVec1' , &
+               'assign tangent vector to the line at its first point' )
+ call line_prs%CreateRealArrayOption('TangentVec2' , &
+               'assign tangent vector to the line at its first point' )
+                
+
 
 
 end subroutine set_parser_pointwise

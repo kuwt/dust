@@ -38,7 +38,7 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !! 
 !! Authors: 
-!!          Federico Fonte             <federico.fonte@outlook.com>
+!!          Federico Fonte           <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
 !!=========================================================================
