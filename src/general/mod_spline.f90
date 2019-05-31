@@ -72,7 +72,7 @@ contains
 !> build hermite_spline
 subroutine hermite_spline ( spl , nelems , type_span , rr_spl , nn_spl , &
                                                        ip_spl , ss_spl , &
-                                                       leng , s_in )
+                                                       leng , s_in , nor_in )
   type(t_spline)               , intent(inout) :: spl
   integer                      , intent(in)    :: nelems
   character(max_char_len)      , intent(in)    :: type_span
@@ -81,7 +81,8 @@ subroutine hermite_spline ( spl , nelems , type_span , rr_spl , nn_spl , &
   integer                      , intent(out)   :: ip_spl(:,:)
   real(wp)                     , intent(out)   :: ss_spl(:)
   real(wp)                     , intent(out)   :: leng
-  real(wp)                     , intent(out)   :: s_in(:)
+  real(wp)                     , intent(out)   ::   s_in(:)
+  real(wp)                     , intent(out)   :: nor_in(:,:)
 
   integer :: n_d , n_points , n_splines
   real(wp) , allocatable :: ll(:)  ! useless with this def of %t
@@ -194,6 +195,12 @@ subroutine hermite_spline ( spl , nelems , type_span , rr_spl , nn_spl , &
 
   end do 
 
+  ! === tangent vector to the reference line ===
+  nor_in = 0.0_wp
+  do i = 1 , n_points
+    nor_in(i,:) = spl%dp(i,:)
+    nor_in(i,:) = nor_in(i,:) / norm2(nor_in(i,:))
+  end do
 
   ! === spline (non-uniform param) ===
   allocate(rr( n_points1*n_splines + 1,n_d))
@@ -237,11 +244,11 @@ subroutine hermite_spline ( spl , nelems , type_span , rr_spl , nn_spl , &
   s_in = spl_s           ! curvilinear coord of the input points
   spl_s = spl_s / spl_s(size(spl_s)) ! and its non-dimensionalisation
 
-  ! check ---
-  do i = 1 , size(spl_s)
-    write(*,*) spl_s(i)
-  end do
-
+! ! check ---
+! do i = 1 , size(spl_s)
+!   write(*,*) spl_s(i)
+! end do
+!
 ! ! check ---
 ! do i = 1 , size(rr,1)
 !   write(*,*) ' rr,  s : ' , rr(i,:) , '   ' , s(i)
@@ -253,7 +260,7 @@ subroutine hermite_spline ( spl , nelems , type_span , rr_spl , nn_spl , &
   !  allocate(rr_spl(nelems+1,3)) <- passed as an input
   allocate(s_spl(nelems+1)) ! curvilinear coord of the output points
   if ( trim(type_span) .eq. 'uniform' ) then
-    s_spl = (/ ( dble(j) , j = 0,nelems ) /) / nelems
+    s_spl = (/ ( dble(j) , j = 0,nelems ) /) / dble(nelems)
   else
     write(*,*) ' error in hermite_spline. Only type_span = uniform '
     write(*,*) ' implemented so far. Stop. ' ; stop
@@ -309,11 +316,11 @@ subroutine hermite_spline ( spl , nelems , type_span , rr_spl , nn_spl , &
 
   end do
 
-  ! check
-  write(*,*) ' in hermite_spline : ip , ss '
-  do i = 1 , size(ss_spl)
-    write(*,*) ip_spl(i,:) , '     ' , ss_spl(i)
-  end do
+! ! check
+! write(*,*) ' in hermite_spline : ip , ss '
+! do i = 1 , size(ss_spl)
+!   write(*,*) ip_spl(i,:) , '     ' , ss_spl(i)
+! end do
 
 end subroutine hermite_spline
 
