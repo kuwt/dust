@@ -68,7 +68,7 @@ use mod_parametric_io, only: &
   read_mesh_parametric, read_actuatordisk_parametric
 
 use mod_pointwise_io, only: &
-  read_mesh_pointwise
+  read_mesh_pointwise , read_mesh_pointwise_ll
 
 use mod_ll_io, only: &
   read_mesh_ll
@@ -475,9 +475,36 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       write(*,*) ' nelems_span       : ' , nelems_span      
 
     elseif ( ElType .eq. 'l' ) then
-      write(*,*) ' MeshFileType = pointwise'
-      write(*,*) ' ElType = l '
-      write(*,*) ' not implemented yet. Stop' ; stop
+
+      call read_mesh_pointwise_ll(trim(mesh_file),ee,rr, &
+                                  airfoil_list   , nelem_span_list   , &
+                                  i_airfoil_e    , normalised_coord_e, &
+                                  npoints_chord_tot, nelems_span, &
+                                  chord_p,theta_p )
+      ! nelems_span_tot will be overwritten if symmetry is required (around l.220)
+      nelems_span_tot =   nelems_span
+
+
+      ! correction of the following list, if symmetry is required ---------
+      if ( mesh_symmetry ) then
+        call symmetry_update_ll_lists( nelem_span_list , &
+                       theta_p , chord_p , i_airfoil_e , normalised_coord_e )
+      end if
+      if ( mesh_mirror ) then
+        call mirror_update_ll_lists( nelem_span_list , &
+                       theta_p , chord_p , i_airfoil_e , normalised_coord_e )
+      end if
+
+      ! -------------------------------------------------------------------
+
+      call write_hdf5(airfoil_list   ,'airfoil_list'   ,geo_loc)
+      call write_hdf5(nelem_span_list,'nelem_span_list',geo_loc)
+      call write_hdf5(theta_p,'theta_p',geo_loc)
+      call write_hdf5(chord_p,'chord_p',geo_loc)
+      call write_hdf5(i_airfoil_e,'i_airfoil_e',geo_loc)
+      call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
+
+
     else
       write(*,*) ' MeshFileType = pointwise'
       write(*,*) ' ElType = ' , ElType
