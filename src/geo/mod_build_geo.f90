@@ -758,12 +758,21 @@ subroutine symmetry_mesh_structured( ee, rr, &
  ! some checks  and warnings -----
  real(wp) :: mabs  , m
  real(wp) :: minmaxPn 
- real(wp), parameter :: eps = 1e-6_wp ! TODO: move it as an input
+ real(wp), parameter :: eps = 1e-4_wp ! TODO: move it as an input
  integer :: imabs, i1, nsew
 
  logical :: sew_first_sec = .false. , sew_last_sec = .false.
 
  character(len=*), parameter :: this_sub_name = 'symmetry_mesh_structured'
+
+! ! debug ---
+! write(*,*) ' rr: '
+! do i1 = 1 , size(rr,2)
+!   write(*,*) rr(:,i1)
+! end do
+! write(*,*) ' cen : ' , cent
+! write(*,*) ' nor : ' , norm
+! ! debug ---
 
  ! some checks ---------------------------------
  mabs = 0.0_wp
@@ -777,7 +786,7 @@ subroutine symmetry_mesh_structured( ee, rr, &
    minmaxPn = sum( (rr(:,1)-cent)*norm )
    do i1  = 2 , size(rr,2)
      if (     sum( (rr(:,i1)-cent)*norm ) .lt. minmaxPn ) then 
-       minmaxPn = sum( (rr(:,1)-cent)*norm )
+       minmaxPn = sum( (rr(:,i1)-cent)*norm )
      end if
    end do
    if ( minmaxPn .gt. eps ) then
@@ -789,7 +798,7 @@ subroutine symmetry_mesh_structured( ee, rr, &
    minmaxPn = sum( (rr(:,1)-cent)*norm )
    do i1  = 2 , size(rr,2)
      if (     sum( (rr(:,i1)-cent)*norm ) .gt. minmaxPn ) then 
-       minmaxPn = sum( (rr(:,1)-cent)*norm )
+       minmaxPn = sum( (rr(:,i1)-cent)*norm )
      end if
    end do
    if ( minmaxPn .lt. -eps ) then

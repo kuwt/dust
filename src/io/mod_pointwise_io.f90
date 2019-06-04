@@ -175,6 +175,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
  !> Enable option reading 
  call pmesh_prs%read_options(mesh_file,printout_val=.true.)
 
+
  nelem_chord = getint(pmesh_prs,'nelem_chord')
  type_chord  = getstr(pmesh_prs,'type_chord')
  ElType = trim(getstr(pmesh_prs,'ElType'))
@@ -184,6 +185,11 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
  call read_points ( 'p' , pmesh_prs , point_prs , points )
  call read_lines  (       pmesh_prs ,  line_prs , lines  , nelem_span_tot )
 
+ ! debug ---
+ do i = 1 , size(points)
+   write(*,*) points(i)%flip_sec
+ end do
+ ! debug ---
 
  !> Set dimensions of ee, rr mat
  if (ElType.eq.'p') then ;  nelem_chord_tot = 2 * nelem_chord 
@@ -215,6 +221,13 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
  ! === define the reference line ===
  !> Check line connectivity, re-order lines and define tangent vectors
  call sort_lines( lines ) 
+
+ call sort_points( points ) 
+
+ do i = 1 , size(points)
+   write(*,*) points(i)%flip_sec
+ end do
+ write(*,*) ' stop mod_pointwise_io.f90 , l.244 ' ; stop
 
  !> check input consistency (todo: improve this subroutine)
  call check_point_line_inputs ( points , lines )
@@ -385,6 +398,25 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
 
  end do
 
+! ! debug ---
+! write(*,*) ' points(:)%coord '
+! do i = 1 , size(points)
+!   write(*,*) i , points(i)%id , points(i)%coord
+! end do
+! write(*,*)
+! write(*,*) ' ref_line_points'
+! do i = 1 , size(ref_line_points,1)
+!   write(*,*) ref_line_points(i,:)
+! end do
+! write(*,*)
+! write(*,*) ' rr :'
+! do i = 1 , size(rr,2)
+!   write(*,*) rr(:,i)
+! end do
+! write(*,*) ' stop in mod_pointwise_io.f90, l.403 . '
+! stop
+
+
 !! check ---
 !open(unit=21,file='./test_rr_pointwise.dat')
 !do i = 1 , size(rr,2)
@@ -509,6 +541,9 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
 
 
  !> === build ee, rr arrays (and all the remaining variables) ===
+  do i = 1 , size(points)
+   
+  end do
  ee_size = nelem_span_tot
  rr_size = npoint_span_tot * npoint_chord_tot
 
@@ -528,6 +563,8 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
  ! === define the reference line ===
  !> Check line connectivity, re-order lines and define tangent vectors
  call sort_lines( lines ) 
+
+ call sort_points( points ) 
 
  !> check input consistency (todo: improve this subroutine)
  call check_point_line_inputs ( points , lines )
@@ -946,6 +983,31 @@ subroutine straight_line( r1 , r2 , nelems , type_span , rr , nor , s , &
 end subroutine straight_line
 
 !----------------------------------------------------------------------
+!> sort points:
+subroutine sort_points( points )
+  type(t_point) , intent(inout) :: points(:)
+  type(t_point) , allocatable   :: points_tmp(:)
+
+  integer :: n_points
+  integer :: i , j
+
+  n_points = size(points)
+
+  allocate(points_tmp(n_points)) ; points_tmp = points
+
+  do i = 1 , n_points
+    do j = 1 , n_points
+      if ( points_tmp(j)%id .eq. i ) then
+        points( i ) = points_tmp( j )
+      end if
+    end do
+  end do
+
+  deallocate(points_tmp)
+
+end subroutine sort_points
+
+!----------------------------------------------------------------------
 !> sort lines: first line has the first point with id = 1
 !  and then chain last-to-first points until the last line
 subroutine sort_lines( lines )
@@ -1237,6 +1299,7 @@ subroutine read_points ( eltype , pmesh_prs , point_prs , points )
 
  ! loop over Point groups
  do i = 1 , nPoints
+
    call getsuboption( pmesh_prs , 'Point' , point_prs )
    points(i) % id          = getint(      point_prs, 'Id')
    points(i) % coord       = getrealarray(point_prs, 'Coordinates',3)
@@ -1253,13 +1316,17 @@ subroutine read_points ( eltype , pmesh_prs , point_prs , points )
    points(i) % sec_nor_str = getstr(      point_prs, 'SectionNormal')
    if ( trim(points(i)%sec_nor_str) .eq. 'vector' ) then
      points(i) % sec_nor = getrealarray(  point_prs, 'SectionNormalVector',3)
-   end if 
-   if ( eltype .ne. 'l' ) then
-     points(i) % flip_sec    = getlogical(  point_prs, 'FlipSection')
+   end if
+   !> flipSection for 'p' or 'v'
+   if ( ( eltype .eq. 'p' ) .or. ( eltype .eq. 'v' ) ) then
+     points(i) % flip_sec  = getlogical(  point_prs, 'FlipSection', 'F' )
+     write(*,*) ' points(',i,')%id       : ' , points(i)%id , &
+                ' points(',i,')%flip_sec : ' , points(i)%flip_sec
    else
      points(i) % flip_sec    = .false.
    end if
 
+   point_prs => null()
 
  end do
 
@@ -1316,6 +1383,8 @@ subroutine read_lines ( pmesh_prs , line_prs , lines  , nelems_span_tot)
    end if
 
    nelems_span_tot = nelems_span_tot + lines(i)%nelems
+
+   line_prs => null()
 
  end do
 
@@ -1374,11 +1443,11 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
                &points', 'referenceLine' ) ! default y-axis
  call point_prs%CreateRealArrayOption('SectionNormalVector', &
                'normal vector of the plane section containing the airfoil' )
-  if ( ( eltype .eq. 'p' ) .or. ( eltype .eq. 'v' ) ) then
+ if ( ( eltype .eq. 'p' ) .or. ( eltype .eq. 'v' ) ) then
    call point_prs%CreateLogicalOption('FlipSection', &
-                 'flip section definition, e.g. for box wing configurations', &
-                 'F' ) ! default y-axis
-  end if
+                 'flip section definition, e.g. for box wing configurations' , &
+                 'F')
+ end if
 
  ! === Line sub-parser ===
  call pmesh_prs%CreateSubOption('Line','Line group',line_prs, &
