@@ -301,7 +301,7 @@ subroutine CreateOption(this, opt, name, description, value, multiple)
 
   opt%hasDefault = present(value)
   if (opt%hasDefault) then
-    call opt%parse(value)
+    call opt%parse(value,is_default=.true.)
   end if
 
   opt%multiple   = .false.
@@ -1198,34 +1198,65 @@ use MOD_Options
           return
         end if
       end if
-      ! copy value from option to result variable
-      select type (opt)
-      !class is (SubOption)
-      !  select type(value)
-      !  type is (t_parse)
-      !    value => current%sub_list
-      !  end select
-      class is (IntOption)
-        select type(value)
-        type is (integer)
-          value = opt%value
+      if(opt%isSet) then
+        ! copy value from option to result variable
+        select type (opt)
+        !class is (SubOption)
+        !  select type(value)
+        !  type is (t_parse)
+        !    value => current%sub_list
+        !  end select
+        class is (IntOption)
+          select type(value)
+          type is (integer)
+            value = opt%value
+          end select
+        class is (RealOption)
+          select type(value)
+          type is (real(wp))
+            value = opt%value
+          end select
+        class is (LogicalOption)
+          select type(value)
+          type is (logical)
+            value = opt%value
+          end select
+        class is (StringOption)
+          select type(value)
+          type is (t_str)
+            value%chars = opt%value
+          end select
         end select
-      class is (RealOption)
-        select type(value)
-        type is (real(wp))
-          value = opt%value
+      else
+        ! copy value from default option to result variable
+        select type (opt)
+        !class is (SubOption)
+        !  select type(value)
+        !  type is (t_parse)
+        !    value => current%sub_list
+        !  end select
+        class is (IntOption)
+          select type(value)
+          type is (integer)
+            value = opt%default_value
+          end select
+        class is (RealOption)
+          select type(value)
+          type is (real(wp))
+            value = opt%default_value
+          end select
+        class is (LogicalOption)
+          select type(value)
+          type is (logical)
+            value = opt%default_value
+          end select
+        class is (StringOption)
+          select type(value)
+          type is (t_str)
+            value%chars = opt%default_value
+          end select
         end select
-      class is (LogicalOption)
-        select type(value)
-        type is (logical)
-          value = opt%value
-        end select
-      class is (StringOption)
-        select type(value)
-        type is (t_str)
-          value%chars = opt%value
-        end select
-      end select
+      endif
       !TODO: at the moment completely commented out, fix in another moment
       ! print option and value to stdout (if configured to do so)
       !if (prms%printout_val) &
@@ -1282,39 +1313,76 @@ use MOD_Options
           return
         end if
       end if
-      ! copy value from option to result variable
-      select type (opt)
-      class is (IntArrayOption)
-        if (size(opt%value).ne.no) call error(this_sub_name, this_mod_name, &
-                     "Array size of option '"//trim(name)//"' is not correct!")
-        select type(value)
-        type is (integer)
-          value = opt%value
+
+      if(opt%isSet) then
+        ! copy value from option to result variable
+        select type (opt)
+        class is (IntArrayOption)
+          if (size(opt%value).ne.no) call error(this_sub_name, this_mod_name, &
+                       "Array size of option '"//trim(name)//"' is not correct!")
+          select type(value)
+          type is (integer)
+            value = opt%value
+          end select
+        class is (RealArrayOption)
+          if (size(opt%value).ne.no) call error(this_sub_name, this_mod_name, &
+                       "Array size of option '"//trim(name)//"' is not correct!")
+          select type(value)
+          type is (real(wp))
+            value = opt%value
+          end select
+        class is (LogicalArrayOption)
+          if (size(opt%value).ne.no) call error(this_sub_name, this_mod_name, &
+                       "Array size of option '"//trim(name)//"' is not correct!")
+          select type(value)
+          type is (logical)
+            value = opt%value
+          end select
+        !class is (StringArrayOption)
+          !if (size(opt%value).ne.no) call Abort(__STAMP__,"Array size of 
+          !option '"//trim(name)//"' is not correct!")
+          !select type(value)
+          !type is (t_str)
+            !do i=1,no
+              !value(i)%chars = opt%value(i)
+            !end do
+          !end select
         end select
-      class is (RealArrayOption)
-        if (size(opt%value).ne.no) call error(this_sub_name, this_mod_name, &
-                     "Array size of option '"//trim(name)//"' is not correct!")
-        select type(value)
-        type is (real(wp))
-          value = opt%value
+      else
+        ! copy value from option to result variable
+        select type (opt)
+        class is (IntArrayOption)
+          if (size(opt%default_value).ne.no) call error(this_sub_name, this_mod_name, &
+                       "Array size of option '"//trim(name)//"' is not correct!")
+          select type(value)
+          type is (integer)
+            value = opt%default_value
+          end select
+        class is (RealArrayOption)
+          if (size(opt%default_value).ne.no) call error(this_sub_name, this_mod_name, &
+                       "Array size of option '"//trim(name)//"' is not correct!")
+          select type(value)
+          type is (real(wp))
+            value = opt%default_value
+          end select
+        class is (LogicalArrayOption)
+          if (size(opt%default_value).ne.no) call error(this_sub_name, this_mod_name, &
+                       "Array size of option '"//trim(name)//"' is not correct!")
+          select type(value)
+          type is (logical)
+            value = opt%default_value
+          end select
+        !class is (StringArrayOption)
+          !if (size(opt%default_value).ne.no) call Abort(__STAMP__,"Array size of 
+          !option '"//trim(name)//"' is not correct!")
+          !select type(value)
+          !type is (t_str)
+            !do i=1,no
+              !value(i)%chars = opt%default_value(i)
+            !end do
+          !end select
         end select
-      class is (LogicalArrayOption)
-        if (size(opt%value).ne.no) call error(this_sub_name, this_mod_name, &
-                     "Array size of option '"//trim(name)//"' is not correct!")
-        select type(value)
-        type is (logical)
-          value = opt%value
-        end select
-      !class is (StringArrayOption)
-        !if (size(opt%value).ne.no) call Abort(__STAMP__,"Array size of 
-        !option '"//trim(name)//"' is not correct!")
-        !select type(value)
-        !type is (t_str)
-          !do i=1,no
-            !value(i)%chars = opt%value(i)
-          !end do
-        !end select
-      end select
+      endif
       ! print option and value to stdout
       !MATTEO: at the moment hardcoded NOT to print values
       !call opt%print(prms%maxNameLen, prms%maxValueLen, mode=0)

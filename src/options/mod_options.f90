@@ -168,11 +168,13 @@ end type option
 !> Integer Option
 type, extends(option) :: IntOption
   integer :: value
+  integer :: default_value
 end type IntOption
 
 !> Integer from String Option
 type, extends(option) :: IntFromStringOption
   character(len=max_char_len)              :: value
+  character(len=max_char_len)              :: default_value
   integer,allocatable             :: intList(:)
   character(len=max_char_len),allocatable  :: strList(:)
   integer                         :: listIndex
@@ -183,21 +185,25 @@ end type IntFromStringOption
 !> Integer Array Option
 type, extends(option) :: IntArrayOption
   integer,allocatable :: value(:)
+  integer,allocatable :: default_value(:)
 end type IntArrayOption
 
 !> Logical Option
 type, extends(option) :: LogicalOption
   logical :: value
+  logical :: default_value
 end type LogicalOption
 
 !> Logical Array Option
 type, extends(option) :: LogicalArrayOption
   logical,allocatable :: value(:)
+  logical,allocatable :: default_value(:)
 end type LogicalArrayOption
 
 !> Real Option
 type, extends(option) :: RealOption
   real(wp)    :: value
+  real(wp)    :: default_value
   !< number of digits, the value has in parameter file
   !! - negative: -number of digits in exponential representation
   !! - 0 means not given
@@ -207,6 +213,7 @@ end type RealOption
 !> Real Array Option
 type, extends(option) :: RealArrayOption
   real(wp),allocatable    :: value(:)
+  real(wp),allocatable    :: default_value(:)
   !< number of digits, the value has in parameter file
   !! - negative: -number of digits in exponential representation
   !! - 0 means not given
@@ -216,11 +223,13 @@ end type RealArrayOption
 !> String Option
 type, extends(option) :: StringOption
   character(len=max_char_len) :: value
+  character(len=max_char_len) :: default_value
 end type StringOption
 
 !> Sub-option: just an empty container of options
 type, extends(option) :: SubOption
   character(len=max_char_len) :: value
+  character(len=max_char_len) :: default_value
 end type SubOption
 
 !> String Array Option
@@ -273,7 +282,7 @@ function getvaluelen(this)
 
   ! only if option is set of has default value, we have to find the length of
   ! this value
-  if ((this%isSet).or.(this%hasDefault)) then
+  if ((this%isSet)) then
     ! each class has a different type, which requires different commands
     ! to get the string-length of the value
     select type (this)
@@ -320,6 +329,60 @@ function getvaluelen(this)
       !end do
       ! ', ' between array elements
       !getvaluelen = getvaluelen + 2*(size(this%value)-1)
+      !getvaluelen = getvaluelen + 3 ! ' /)'
+    class is (SubOption)
+      getvaluelen = 2
+      !TODO: fix this
+    class default
+      stop 'Unknown type'
+    end select
+  else if ((this%hasDefault)) then
+    ! each class has a different type, which requires different commands
+    ! to get the string-length of the value
+    select type (this)
+    class is (IntOption)
+      write(tmp,"(I0)") this%default_value
+      getvaluelen = LEN_TRIM(tmp)
+    class is (LogicalOption)
+      getvaluelen = 1
+    class is (RealOption)
+      getvaluelen = getstrlenreal(this%default_value,this%digits)
+    class is (StringOption)
+      getvaluelen = LEN_TRIM(this%default_value)
+    class is (IntFromStringOption)
+      getvaluelen = this%maxLength
+    class is (IntArrayOption)
+      getvaluelen = 3 ! '(/ '
+      do i=1,size(this%default_value)
+        write(tmp,"(I0)") this%default_value(i)
+        getvaluelen = getvaluelen + LEN_TRIM(tmp)
+      end do
+      ! ', ' between array elements
+      getvaluelen = getvaluelen + 2*(size(this%default_value)-1)
+      ! ' /)'
+      getvaluelen = getvaluelen + 3
+    class is (LogicalArrayOption)
+      getvaluelen = 3 ! '(/ '
+      ! each value needs only one character
+      getvaluelen = getvaluelen + size(this%default_value)
+      ! ', ' between array elements
+      getvaluelen = getvaluelen + 2*(size(this%default_value)-1)
+      getvaluelen = getvaluelen + 3 ! ' /)'
+    class is (RealArrayOption)
+      getvaluelen = 3 ! '(/ '
+      do i=1,size(this%default_value)
+        getvaluelen = getvaluelen + getstrlenreal(this%default_value(i), this%digits(i))
+      end do
+      ! ', ' between array elements
+      getvaluelen = getvaluelen + 2*(size(this%default_value)-1)
+      getvaluelen = getvaluelen + 3 ! ' /)'
+    !class is (StringArrayOption)
+      !getvaluelen = 3 ! '(/ '
+      !do i=1,size(this%default_value)
+        !getvaluelen = getvaluelen + LEN_TRIM(this%default_value(i))
+      !end do
+      ! ', ' between array elements
+      !getvaluelen = getvaluelen + 2*(size(this%default_value)-1)
       !getvaluelen = getvaluelen + 3 ! ' /)'
     class is (SubOption)
       getvaluelen = 2
@@ -608,16 +671,24 @@ end subroutine printValue
 !> parse value from string 'rest_in'.
 !!
 !!This subroutine is used to readin values from the parameter file.
-subroutine parse(this, rest_in)
+subroutine parse(this, rest_in, is_default)
  class(option)               :: this     !< class(option)
  character(len=*),intent(in) :: rest_in  !< string to parse
+ logical, optional, intent(in) :: is_default
  character(len=max_char_len)  :: tmp,tmp2,rest
  integer             :: count,i,stat
  integer,allocatable :: inttmp(:)
  logical,allocatable :: logtmp(:)
  real(wp),allocatable    :: realtmp(:)
+ logical :: def
  character(len=*), parameter :: this_sub_name = 'parse'
  !character(len=max_char_len),allocatable :: strtmp(:)
+
+  def = .false.
+  if(present(is_default)) then
+    if(is_default) def = .true.
+  endif
+    
 
   stat=0
   ! Replace brackets
@@ -627,15 +698,35 @@ subroutine parse(this, rest_in)
 
   select type (this)
   class is (IntOption)
-    read(rest, *,iostat=stat) this%value
+    if(.not.def) then
+      read(rest, *,iostat=stat) this%value
+    else
+      read(rest, *,iostat=stat) this%default_value
+    endif
   class is (LogicalOption)
-    read(rest, *,iostat=stat) this%value
+    if(.not.def) then
+      read(rest, *,iostat=stat) this%value
+    else
+      read(rest, *,iostat=stat) this%default_value
+    endif
   class is (RealOption)
-    call this%parseReal(rest, this%value, this%digits)
+    if(.not.def) then
+      call this%parseReal(rest, this%value, this%digits)
+    else
+      call this%parseReal(rest, this%default_value, this%digits)
+    endif
   class is (StringOption)
-    read(rest, "(A)",iostat=stat) this%value
+    if(.not.def) then
+      read(rest, "(A)",iostat=stat) this%value
+    else
+      read(rest, "(A)",iostat=stat) this%default_value
+    endif
   class is (IntFromStringOption)
-    read(rest, "(A)",iostat=stat) this%value
+    if(.not.def) then
+      read(rest, "(A)",iostat=stat) this%value
+    else
+      read(rest, "(A)",iostat=stat) this%default_value
+    endif
   class is (IntArrayOption)
     ! Array options are complicated, since we do not know a priori how long
     ! the array will be.
@@ -670,6 +761,7 @@ subroutine parse(this, rest_in)
       read(tmp, *,iostat=stat) this%value(count)
       if (i.eq.0) exit
     end do
+    if(def) call move_alloc(this%value, this%default_value)
   class is (LogicalArrayOption)
     ! comments see IntArrayOption!
     tmp2 = trim(adjustl(rest))
@@ -699,6 +791,7 @@ subroutine parse(this, rest_in)
       read(tmp, *,iostat=stat) this%value(count)
       if (i.eq.0) exit
     end do
+    if(def) call move_alloc(this%value, this%default_value)
   class is (RealArrayOption)
     ! comments see IntArrayOption!
     tmp2 = trim(adjustl(rest))
@@ -730,6 +823,7 @@ subroutine parse(this, rest_in)
 
       if (i.eq.0) exit
     end do
+    if(def) call move_alloc(this%value, this%default_value)
   !class is (StringArrayOption)
     !! comments see IntArrayOption!
     !tmp2 = trim(adjustl(rest))
