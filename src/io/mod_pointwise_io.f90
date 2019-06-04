@@ -421,7 +421,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
                         airfoil_list_actual, nelem_span_list, &
                         i_airfoil_e , normalised_coord_e    , &
                         npoints_chord_tot , nelem_span_tot  , &
-                                            chord_p,theta_p)
+                        chord_p,theta_p )
 
  character(len=*), intent(in) :: mesh_file
  integer  , allocatable, intent(out) :: ee(:,:) 
@@ -646,7 +646,9 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
 
  allocate(airfoil_list_actual(  nAirfoils))
  allocate(airfoil_list_actual_s(nAirfoils))
+
  iAirfoil = 0
+
  do i = 1 , size(points)
    if ( trim(points(i)%airfoil) .ne. 'interp' ) then
                
@@ -1252,7 +1254,13 @@ subroutine read_points ( eltype , pmesh_prs , point_prs , points )
    if ( trim(points(i)%sec_nor_str) .eq. 'vector' ) then
      points(i) % sec_nor = getrealarray(  point_prs, 'SectionNormalVector',3)
    end if 
-   points(i) % flip_sec    = getlogical(  point_prs, 'FlipSection')
+   if ( eltype .ne. 'l' ) then
+     points(i) % flip_sec    = getlogical(  point_prs, 'FlipSection')
+   else
+     points(i) % flip_sec    = .false.
+   end if
+
+
  end do
 
 end subroutine read_points
@@ -1366,9 +1374,11 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
                &points', 'referenceLine' ) ! default y-axis
  call point_prs%CreateRealArrayOption('SectionNormalVector', &
                'normal vector of the plane section containing the airfoil' )
- call point_prs%CreateLogicalOption('FlipSection', &
-               'flip section definition, e.g. for box wing configurations', &
-               'F' ) ! default y-axis
+  if ( ( eltype .eq. 'p' ) .or. ( eltype .eq. 'v' ) ) then
+   call point_prs%CreateLogicalOption('FlipSection', &
+                 'flip section definition, e.g. for box wing configurations', &
+                 'F' ) ! default y-axis
+  end if
 
  ! === Line sub-parser ===
  call pmesh_prs%CreateSubOption('Line','Line group',line_prs, &

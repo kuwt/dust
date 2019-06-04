@@ -406,8 +406,8 @@ subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
     
         if ( .not. allocated(coeff_airfoil) ) allocate(coeff_airfoil(2,size(coeff1)))
         coeff_airfoil(i_a,:) = ( coeff1 * ( reyn2 - reyn ) + coeff2 * ( reyn - reyn1 ) ) /  &
-                               ( reyn2 - reyn1 ) 
-    
+                               ( reyn2 - reyn1 )
+
       end if
     
     end do
