@@ -137,6 +137,8 @@ contains
   procedure, pass(this) :: create_chtls_stencil => &
                            create_chtls_stencil_surfpan
 
+  procedure, pass(this) :: get_bernoulli_source => get_bernoulli_source_surfpan
+
 end type
 
 real(wp) :: ff_ratio
@@ -378,11 +380,9 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
 
   ! + Bernoulli polynomial equation --------------
   do j1 = 1, min(ista-1 , size(linsys%b_static_pres,1))
-    select type( el => elems(linsys%idSurfPan(j1))%p ) ; class is(t_surfpan)
-      linsys%b_pres( ipres ) = &
-               linsys%b_pres( ipres ) + &
-               linsys%b_static_pres( ipres , j1 ) * el%bernoulli_source
-    end select
+      linsys%b_pres( ipres ) = linsys%b_pres( ipres ) + &
+                               linsys%b_static_pres( ipres , j1 ) * &
+                        elems(linsys%idSurfPan(j1))%p%get_bernoulli_source()
   end do
 
   ! Moving part ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -1105,6 +1105,16 @@ subroutine get_vort_vel_surfpan(this, vort_elems, uinf)
  enddo
 
 end subroutine 
+
+!----------------------------------------------------------------------
+
+function get_bernoulli_source_surfpan(this) result(source)
+  class(t_surfpan), intent(inout) :: this
+  real(wp) :: source
+  
+  source = this%bernoulli_source
+
+end function
 
 !----------------------------------------------------------------------
 end module mod_surfpan

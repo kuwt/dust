@@ -48,8 +48,8 @@
 !! type of aerodynamic elements
 module mod_vortlatt
 
-!use mod_aero_elements, only: &
-!  c_elem, t_elem_p
+use mod_handling, only: &
+  internal_error
 
 use mod_doublet, only: &
   potential_calc_doublet , &
@@ -102,6 +102,7 @@ procedure, pass(this) :: compute_pres     => compute_pres_vortlatt
 procedure, pass(this) :: compute_dforce   => compute_dforce_vortlatt
 procedure, pass(this) :: calc_geo_data    => calc_geo_data_vortlatt
 procedure, pass(this) :: get_vort_vel     => get_vort_vel_vortlatt
+procedure, pass(this) :: get_bernoulli_source => get_bernoulli_source_vortlatt
 end type
 
 
@@ -538,6 +539,22 @@ subroutine get_vort_vel_vortlatt(this, vort_elems, uinf)
  enddo
 
 end subroutine 
+
+!----------------------------------------------------------------------
+
+function get_bernoulli_source_vortlatt(this) result(source)
+  class(t_vortlatt), intent(inout) :: this
+  real(wp) :: source
+
+  character(len=*), parameter :: this_sub_name = 'get_bernoulli_source_vortlatt'
+  
+  !this is just a dummy, should never be used
+  source = 0.0_wp
+  !and for this reason here is an internal error
+  call internal_error(this_sub_name, this_mod_name, &
+                      'getting bernoulli source from a vortex lattice')
+
+end function
 
 !----------------------------------------------------------------------
 
