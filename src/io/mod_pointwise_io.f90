@@ -224,10 +224,10 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
 
  call sort_points( points ) 
 
- do i = 1 , size(points)
-   write(*,*) points(i)%flip_sec
- end do
- write(*,*) ' stop mod_pointwise_io.f90 , l.244 ' ; stop
+!do i = 1 , size(points)
+!  write(*,*) points(i)%flip_sec
+!end do
+!write(*,*) ' stop mod_pointwise_io.f90 , l.244 ' ; stop
 
  !> check input consistency (todo: improve this subroutine)
  call check_point_line_inputs ( points , lines )
@@ -245,11 +245,22 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
                             ref_line_interp_s_all , &
                             s_in , nor_in )
 
+ !DEBUG
+ write(*,*) ' s_in ' , shape(s_in)
+ do i = 1 , size(s_in)
+   write(*,*) s_in(i)
+ end do 
+ write(*,*) ' ref_lin_intrep_s_all ' , shape(ref_line_interp_s_all)
+ do i = 1 , size(ref_line_interp_s_all)
+   write(*,*) ref_line_interp_s_all(i)
+ end do 
+
  !> update ref_line_normal
  call update_ref_line_normal( points , ref_line_normal   , &
                                        ref_line_interp_p , &
                                        ref_line_interp_s , &
-                                       nor_in    )
+                                       ref_line_interp_s_all , &
+                                       s_in , nor_in    )
 ! ! check ---
 ! do i = 1 , size(s_in)
 !   write(*,*) s_in(i) , '      ' , nor_in(i,:)
@@ -586,7 +597,8 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
  call update_ref_line_normal( points , ref_line_normal   , &
                                        ref_line_interp_p , &
                                        ref_line_interp_s , &
-                                       nor_in    )
+                                       ref_line_interp_s_all , &
+                                       s_in , nor_in    )
 
  !> output ~ read_mesh_ll(): nelem_span_list
  allocate(nelem_span_list(size(lines)))
@@ -1150,14 +1162,30 @@ end subroutine check_point_line_inputs
 subroutine update_ref_line_normal( points , ref_line_normal   , &
                                             ref_line_interp_p , &
                                             ref_line_interp_s , &
-                                            nor_in    )
+                                            ref_line_interp_s_all , &
+                                            s_in , nor_in    )
   type(t_point) , intent(inout) :: points(:)
   integer       , intent(in)    :: ref_line_interp_p(:,:)
   real(wp)      , intent(in)    :: ref_line_interp_s(:)
+  real(wp)      , intent(in)    :: ref_line_interp_s_all(:)
   real(wp)      , intent(inout) :: ref_line_normal(:,:)
+  real(wp)      , intent(in)    :: s_in(:)
   real(wp)      , intent(in)    :: nor_in(:,:)
 
+  real(wp) :: nor1(3) , nor2(3) , nor0(3)
+  character(max_char_len) :: str1 , str2
+  real(wp) , parameter :: tol = 1e-6_wp
+
+  real(wp) :: ds
+
+  real(wp) :: w1 , w2 , w0
   integer :: i
+
+ ! check
+ write(*,*) ' ref_line_interp_s(i) :' , size(ref_line_interp_s)
+ do i = 1 , size(ref_line_interp_s)
+   write(*,*) ref_line_interp_s(i) , ref_line_normal(i,:)
+ end do
 
  !> set points(...)%sec_nor
  do i = 1 , size(points)
@@ -1177,39 +1205,74 @@ subroutine update_ref_line_normal( points , ref_line_normal   , &
    endif 
  end do
 
- !> set ref_line_nor to "yAxis" and "yAxisNeg"
+ !> set ref_line_normal vector
  do i = 1 , size(ref_line_normal,1)
-   if ( ( trim(points( ref_line_interp_p(i,1) ) % sec_nor_str ) .eq. 'yAxis' ) .and. &
-        ( trim(points( ref_line_interp_p(i,2) ) % sec_nor_str ) .eq. 'yAxis' ) ) then
-     ref_line_normal(i,:) = (/ 0.0_wp , 1.0_wp , 0.0_wp /)
-   elseif ( ( trim(points( ref_line_interp_p(i,1) ) % sec_nor_str ) .eq. 'yAxisNeg' ) .and. &
-            ( trim(points( ref_line_interp_p(i,2) ) % sec_nor_str ) .eq. 'yAxisNeg' ) ) then
-     ref_line_normal(i,:) = (/ 0.0_wp ,-1.0_wp , 0.0_wp /)
-   endif
+ 
+   str1 = trim( points( ref_line_interp_p(i,1) ) %sec_nor_str )
+   str2 = trim( points( ref_line_interp_p(i,2) ) %sec_nor_str )
+
+   if (     trim(str1) .eq. 'yAxis'         ) then
+     nor1 = (/ 0.0_wp , 1.0_wp , 0.0_wp /)
+   elseif ( trim(str1) .eq. 'yAxisNeg'      ) then
+     nor1 = (/ 0.0_wp ,-1.0_wp , 0.0_wp /)
+   elseif ( trim(str1) .eq. 'vector'        ) then
+     nor1 = points( ref_line_interp_p(i,1) )%sec_nor
+   elseif ( trim(str1) .eq. 'referenceLine' ) then
+     nor1 = ref_line_normal(i,:)
+   end if
+   if (     trim(str2) .eq. 'yAxis'         ) then
+     nor2 = (/ 0.0_wp , 1.0_wp , 0.0_wp /)
+   elseif ( trim(str2) .eq. 'yAxisNeg'      ) then
+     nor2 = (/ 0.0_wp ,-1.0_wp , 0.0_wp /)
+   elseif ( trim(str2) .eq. 'vector'        ) then
+     nor2 = points( ref_line_interp_p(i,2) )%sec_nor
+   elseif ( trim(str2) .eq. 'referenceLine' ) then
+     nor2 = ref_line_normal(i,:)
+   end if
+
+   nor1 = nor1 / norm2(nor1)
+   nor2 = nor2 / norm2(nor2)
+
+   if ( norm2( nor1+nor2 ) .gt. tol ) then
+
+     w1 = ( s_in( ref_line_interp_p(i,2) ) - ref_line_interp_s_all(i)       ) / &
+          ( s_in( ref_line_interp_p(i,2) ) - s_in( ref_line_interp_p(i,1) ) )
+     w2 = ( ref_line_interp_s_all(i)       - s_in( ref_line_interp_p(i,1) ) ) / &
+          ( s_in( ref_line_interp_p(i,2) ) - s_in( ref_line_interp_p(i,1) ) )
+  
+     write(*,*) ' w1 , w2  : ' , w1 , w2
+  
+     ref_line_normal(i,:) = nor1 * w1 +  nor2 * w2 
+
+   else
+
+     nor0 = points( ref_line_interp_p(i,2) ) % coord - &
+            points( ref_line_interp_p(i,1) ) % coord
+
+     !> non-dimensional coord \in (-1,1)
+     ds = ( ref_line_interp_s_all(i) - &
+            0.5_wp * ( s_in( ref_line_interp_p(i,2) ) + s_in( ref_line_interp_p(i,1) ) ) ) * &
+            2.0_wp / ( s_in( ref_line_interp_p(i,2) ) - s_in( ref_line_interp_p(i,1) ) ) 
+
+     w1 = 0.5_wp * ds * ( ds-1.0_wp)
+     w2 = 0.5_wp * ds * ( ds+1.0_wp)
+     w0 = (1.0_wp - ds)*(1.0_wp + ds) 
+     
+     write(*,*) ' w1 , w2 , w0 : ' , w1 , w2 , w0
+ 
+     ref_line_normal(i,:) = nor1 * w1 +  nor2 * w2 + w0 * nor0 
+
+   end if
+
+   !> normalisation
+   ref_line_normal(i,:) = ref_line_normal(i,:) / norm2(ref_line_normal(i,:))
+
  end do
- do i = 1 , size(ref_line_normal,1)
-   !>
-   if ((     trim(points( ref_line_interp_p(i,1) ) % sec_nor_str ) .eq. 'vector' ) .and. &
-       (.not.trim(points( ref_line_interp_p(i,2) ) % sec_nor_str ) .eq. 'vector' ) ) then
 
-     ref_line_normal(i,:) = points(ref_line_interp_p(i,1))%sec_nor * ( 1.0_wp - ref_line_interp_s(i) ) + &
-                                              ref_line_normal(i,:) * ref_line_interp_s(i)
-   endif
-   !>
-   if ((.not.trim(points( ref_line_interp_p(i,1) ) % sec_nor_str ) .eq. 'vector' ) .and. &
-       (     trim(points( ref_line_interp_p(i,2) ) % sec_nor_str ) .eq. 'vector' ) ) then
-
-     ref_line_normal(i,:) =                   ref_line_normal(i,:) * ( 1.0_wp - ref_line_interp_s(i) ) + &
-                            points(ref_line_interp_p(i,2))%sec_nor * ref_line_interp_s(i)
-   endif
-   !>
-   if ((     trim(points( ref_line_interp_p(i,1) ) % sec_nor_str ) .eq. 'vector' ) .and. &
-       (     trim(points( ref_line_interp_p(i,2) ) % sec_nor_str ) .eq. 'vector' ) ) then
-
-     ref_line_normal(i,:) = points(ref_line_interp_p(i,1))%sec_nor * ( 1.0_wp - ref_line_interp_s(i) ) + &
-                            points(ref_line_interp_p(i,2))%sec_nor *            ref_line_interp_s(i)
-   endif
-
+ ! check
+ write(*,*) ' ref_line_interp_s(i) :' , size(ref_line_interp_s)
+ do i = 1 , size(ref_line_interp_s)
+   write(*,*) ref_line_interp_s(i) , ref_line_normal(i,:)
  end do
 
 end subroutine update_ref_line_normal
