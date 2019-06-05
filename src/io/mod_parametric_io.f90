@@ -38,7 +38,7 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !! 
 !! Authors: 
-!!          Federico Fonte             <federico.fonte@outlook.com>
+!!          Federico Fonte           <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
 !!=========================================================================
@@ -61,7 +61,8 @@ use mod_parse, only: &
 
 implicit none
 
-public :: read_mesh_parametric, read_actuatordisk_parametric
+public :: read_mesh_parametric, read_actuatordisk_parametric , &
+          define_section , define_division
 
 private
 
@@ -149,9 +150,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 !               multiple=.true.);
   call pmesh_prs%CreateRealOption(     'chord', 'section chord', &
                 multiple=.true.);
-  call pmesh_prs%CreateRealOption(     'twist', 'section twist angle',&
+  call pmesh_prs%CreateRealOption(     'twist', 'section twist angle', &
                 multiple=.true.);
-  call pmesh_prs%CreateStringOption( 'airfoil', 'section airfoil',&
+  call pmesh_prs%CreateStringOption( 'airfoil', 'section airfoil', &
                 multiple=.true.);
 
   ! Region parameters
@@ -480,7 +481,7 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
 
   integer :: i1
 
-  write(*,*) ' airfoil input ' , airfoil
+! write(*,*) ' airfoil input ' , airfoil
 
   twist_rad = twist * 4.0_wp * atan(1.0_wp) / 180.0_wp
 

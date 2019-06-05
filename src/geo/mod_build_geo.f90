@@ -67,6 +67,9 @@ use mod_cgns_io, only: &
 use mod_parametric_io, only: &
   read_mesh_parametric, read_actuatordisk_parametric
 
+use mod_pointwise_io, only: &
+  read_mesh_pointwise , read_mesh_pointwise_ll
+
 use mod_ll_io, only: &
   read_mesh_ll
 
@@ -455,6 +458,59 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call write_hdf5(radius,'Radius', comp_loc)
 
     end if
+   case('pointwise')
+
+    mesh_file = geo_file
+
+    if ( ( ElType .eq. 'v' ) .or. ( ElType .eq. 'p' ) ) then
+
+      call read_mesh_pointwise( trim(mesh_file) , ee , rr , &
+                                npoints_chord_tot, nelems_span )
+      nelems_span_tot =   nelems_span
+
+!     ! check ---
+!     write(*,*) ' shape(ee)         : ' , shape(ee)
+!     write(*,*) ' shape(rr)         : ' , shape(rr)
+!     write(*,*) ' npoints_chord_tot : ' , npoints_chord_tot
+!     write(*,*) ' nelems_span       : ' , nelems_span      
+
+    elseif ( ElType .eq. 'l' ) then
+
+      call read_mesh_pointwise_ll(trim(mesh_file),ee,rr, &
+                                  airfoil_list   , nelem_span_list   , &
+                                  i_airfoil_e    , normalised_coord_e, &
+                                  npoints_chord_tot, nelems_span, &
+                                  chord_p,theta_p )
+      ! nelems_span_tot will be overwritten if symmetry is required (around l.220)
+      nelems_span_tot =   nelems_span
+
+
+      ! correction of the following list, if symmetry is required ---------
+      if ( mesh_symmetry ) then
+        call symmetry_update_ll_lists( nelem_span_list , &
+                       theta_p , chord_p , i_airfoil_e , normalised_coord_e )
+      end if
+      if ( mesh_mirror ) then
+        call mirror_update_ll_lists( nelem_span_list , &
+                       theta_p , chord_p , i_airfoil_e , normalised_coord_e )
+      end if
+
+      ! -------------------------------------------------------------------
+
+      call write_hdf5(airfoil_list   ,'airfoil_list'   ,geo_loc)
+      call write_hdf5(nelem_span_list,'nelem_span_list',geo_loc)
+      call write_hdf5(theta_p,'theta_p',geo_loc)
+      call write_hdf5(chord_p,'chord_p',geo_loc)
+      call write_hdf5(i_airfoil_e,'i_airfoil_e',geo_loc)
+      call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
+
+
+    else
+      write(*,*) ' MeshFileType = pointwise'
+      write(*,*) ' ElType = ' , ElType
+      write(*,*) ' but ElType must be either p , v or l. Stop ' ; stop
+    end if
+
    case default
     call error(this_sub_name, this_mod_name, 'Unknown mesh file type')
 
@@ -465,12 +521,13 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     select case (trim(mesh_file_type))
       case('cgns', 'basic' )  ! TODO: check basic
         call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
-      case('parametric')
+      case('parametric','pointwise')
 !! !    if ( ElType .ne. 'l' ) then
         call symmetry_mesh_structured(ee, rr,  &
                                        npoints_chord_tot , nelems_span , &
                                        symmetry_point, symmetry_normal)
           nelems_span_tot = 2*nelems_span
+
 
 !! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !!
 !! Same routines used for all parametric elements: p,v,l        !!
@@ -483,11 +540,14 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 !! !       end if
       case default
        call error(this_sub_name, this_mod_name,&
-             'Symmetry routines not implemented for this kind of input.')
+             'Symmetry routines implemented for MeshFileType = &
+             & "cgns", "pointwise", "parametric", "basic".'//nl// &
+             'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
     end select
   end if
 
-  if ( trim(mesh_file_type) .eq. 'parametric' ) then
+  if ( ( trim(mesh_file_type) .eq. 'parametric' ) .or. &
+       ( trim(mesh_file_type) .eq. 'pointwise'  ) ) then
     !write HDF5 fields
     call write_hdf5(  nelems_span_tot  ,'parametric_nelems_span',geo_loc)
     call write_hdf5(npoints_chord_tot-1,'parametric_nelems_chor',geo_loc)
@@ -500,14 +560,16 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     select case (trim(mesh_file_type))
       case('cgns', 'basic' )  ! TODO: check basic
         call mirror_mesh(ee, rr, mirror_point, mirror_normal)
-      case('parametric')
+      case('parametric','pointwise')
         call mirror_mesh_structured(ee, rr,  &
                                        npoints_chord_tot , nelems_span , &
                                        mirror_point, mirror_normal)
 
       case default
         call error(this_sub_name, this_mod_name,&
-              'Mirror routines not implemented for this kind of input.')
+             'Mirror routines implemented for MeshFileType = &
+             & "cgns", "pointwise", "parametric", "basic".'//nl// &
+             'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
     end select
 
   end if
@@ -557,7 +619,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
                                                           !te as an output
 
-    case( 'parametric' )
+    case( 'parametric' , 'pointwise' )
      if ( ElType .eq. 'l' .or. ElType .eq. 'v' .or. ElType .eq. 'p' ) then
         call build_connectivity_parametric( ee ,     &
                        npoints_chord_tot , nelems_span_tot , &
@@ -696,10 +758,13 @@ subroutine symmetry_mesh_structured( ee, rr, &
  ! some checks  and warnings -----
  real(wp) :: mabs  , m
  real(wp) :: minmaxPn 
- real(wp), parameter :: eps = 1e-6_wp ! TODO: move it as an input
+ real(wp), parameter :: eps = 1e-2_wp ! TODO: move it as an input
  integer :: imabs, i1, nsew
 
+ logical :: sew_first_sec = .false. , sew_last_sec = .false.
+
  character(len=*), parameter :: this_sub_name = 'symmetry_mesh_structured'
+
 
  ! some checks ---------------------------------
  mabs = 0.0_wp
@@ -713,7 +778,9 @@ subroutine symmetry_mesh_structured( ee, rr, &
    minmaxPn = sum( (rr(:,1)-cent)*norm )
    do i1  = 2 , size(rr,2)
      if (     sum( (rr(:,i1)-cent)*norm ) .lt. minmaxPn ) then 
-       minmaxPn = sum( (rr(:,1)-cent)*norm )
+       minmaxPn = sum( (rr(:,i1)-cent)*norm )
+       !DEBUG
+       write(*,*) ' i1 , minmaxPn : ' , i1 , minmaxPn
      end if
    end do
    if ( minmaxPn .gt. eps ) then
@@ -725,7 +792,7 @@ subroutine symmetry_mesh_structured( ee, rr, &
    minmaxPn = sum( (rr(:,1)-cent)*norm )
    do i1  = 2 , size(rr,2)
      if (     sum( (rr(:,i1)-cent)*norm ) .gt. minmaxPn ) then 
-       minmaxPn = sum( (rr(:,1)-cent)*norm )
+       minmaxPn = sum( (rr(:,i1)-cent)*norm )
      end if
    end do
    if ( minmaxPn .lt. -eps ) then
@@ -740,10 +807,35 @@ subroutine symmetry_mesh_structured( ee, rr, &
  do i1 = 1 , size(rr,2)
    if ( abs(sum( (rr(:,i1)-cent)*norm )) .lt. eps ) then
      nsew = nsew + 1
+     
+     if ( i1 .eq. 1          ) sew_first_sec = .true.
+     if ( i1 .eq. size(rr,2) ) sew_last_sec = .true.
+
    end if
  end do
 
- if ( nsew .ne. npoints_chord_tot ) then
+ ! === some checks ===
+ !> no section to be sewed. (first, last) = (f , f)
+ if ( ( .not. sew_first_sec ) .and. ( .not. sew_last_sec ) ) then
+   call error(this_sub_name, this_mod_name, 'No section to be sewed. Stop')
+ end if
+ !> So far, avoid (first, last) = (f,t)
+ if ( ( .not. sew_first_sec ) .and. ( sew_last_sec ) ) then
+   call error(this_sub_name, this_mod_name, 'So far, the last section of a &
+    &"parametric" of "pointwise" component can be sewed only if the first &
+    &section is sewed. Stop.')
+ end if
+ !> (first, last) = (t , f) or (first, last) = (f , t)
+ if ( ( ( nsew .ne. npoints_chord_tot ) .and. ( .not. sew_last_sec ) ) .or. &
+      ( ( nsew .ne. npoints_chord_tot ) .and. ( .not. sew_first_sec ) )  ) then
+   write(msg,'(A,I0,A,I0,A)') 'Wrong sewing of parametric component during &
+         &symmetry reflection. Only ',nsew,' out of ',npoints_chord_tot,&
+         'effectively sewed'
+   call error(this_sub_name, this_mod_name, msg)
+ end if
+ !> (first, last) = (t , t)
+ if ( ( nsew .ne. 2*npoints_chord_tot ) .and.  &
+      ( ( sew_last_sec ) .and. ( sew_first_sec ) ) )  then
    write(msg,'(A,I0,A,I0,A)') 'Wrong sewing of parametric component during &
          &symmetry reflection. Only ',nsew,' out of ',npoints_chord_tot,&
          'effectively sewed'
@@ -755,14 +847,19 @@ subroutine symmetry_mesh_structured( ee, rr, &
   
   ! enlarge size
   allocate(ee_temp(size(ee,1),2*ne))
-  allocate(rr_temp(size(rr,1),2*np-npoints_chord_tot))
+! if ( ( .not. sew_first_sec ) .or. ( .not. sew_first_sec ) ) then ! only one sec to sew
+  if ( ( .not. sew_last_sec ) ) then ! only one sec to sew
+    allocate(rr_temp(size(rr,1),2*np-npoints_chord_tot))
+  else ! two sections to sew
+    allocate(rr_temp(size(rr,1),2*np-2*npoints_chord_tot))
+  endif
 
-  !first part equal
+  !first part of the rr,ee arrays remains the same
   ee_temp(:,1:ne) = ee
   rr_temp(:,1:np) = rr
   
   !second part of the elements: index incremented, need to rearrange the 
-  !connectivity to preserve the normal
+  !connectivity to preserve the normal direction (outward pointing)
   ee_temp(:,ne+1:2*ne) = 0
   do ie = 1,ne
     nv = count(ee(:,ie).ne.0)
@@ -772,19 +869,35 @@ subroutine symmetry_mesh_structured( ee, rr, &
     ee_temp(3,ne+ie) = np-npoints_chord_tot+ee(4,ie)
     ee_temp(4,ne+ie) = np-npoints_chord_tot+ee(3,ie)
   enddo
-  ! correct the first elements ----- 
+
   ee_temp(1,ne+(/(i1,i1=1,npoints_chord_tot-1)/)) = (/(i1,i1=1,npoints_chord_tot-1)/)
   ee_temp(4,ne+(/(i1,i1=1,npoints_chord_tot-1)/)) = (/(i1,i1=2,npoints_chord_tot  )/)
+
+  if ( sew_last_sec ) then
+    ee_temp(2,2*ne-npoints_chord_tot+1+(/(i1,i1=1,npoints_chord_tot-1)/)) = &
+        maxval(ee)-npoints_chord_tot + (/(i1,i1=1,npoints_chord_tot-1)/)
+    ee_temp(3,2*ne-npoints_chord_tot+1+(/(i1,i1=1,npoints_chord_tot-1)/)) = &
+        maxval(ee)-npoints_chord_tot + (/(i1,i1=2,npoints_chord_tot  )/)
+  endif
+
  
   !calculate normal unit vector and distance from origin
   n = norm/norm2(norm) 
   l = sum(cent * n)
  
   !now reflect the points
-  do ip=1,np-npoints_chord_tot  
-    d = sum( rr(:,ip+npoints_chord_tot) * n) - l 
-    rr_temp(:,np+ip) = rr_temp(:,npoints_chord_tot+ip) - 2*d*n
-  enddo
+! if ( ( .not. sew_first_sec ) .or. ( .not. sew_first_sec ) ) then ! only one sec to sew
+  if ( ( .not. sew_last_sec ) ) then ! only one sec to sew
+    do ip=1,np-npoints_chord_tot  
+      d = sum( rr(:,ip+npoints_chord_tot) * n) - l 
+      rr_temp(:,np+ip) = rr_temp(:,npoints_chord_tot+ip) - 2*d*n
+    enddo
+  else
+    do ip=1,np-2*npoints_chord_tot  
+      d = sum( rr(:,ip+npoints_chord_tot) * n) - l 
+      rr_temp(:,np+ip) = rr_temp(:,npoints_chord_tot+ip) - 2*d*n
+    enddo
+  endif
 
   ! sort ee array  
   nelems_chord = npoints_chord_tot-1
@@ -801,6 +914,10 @@ subroutine symmetry_mesh_structured( ee, rr, &
 ! !move alloc back to the original vectors
   call move_alloc(rr_temp, rr)
   call move_alloc(ee_sort, ee)
+
+! ! check ----
+! write(*,*) ' sew_first_sec , sew_last_sec : ' , sew_first_sec , sew_last_sec 
+! write(*,*) ' in symmetry_mesh_structured, shape(rr) : ' , shape(rr)
 
 
   if ( allocated(ee_temp) )  deallocate(ee_temp)
@@ -1041,6 +1158,10 @@ character(len=*), parameter :: this_sub_name = 'build_component_parametric'
 
 if ( allocated(neigh) )   deallocate(neigh)
 allocate(neigh(4,size(ee,2))) ; neigh = 0
+
+! write(*,*) ' shape(neigh) : ' , shape(neigh)
+! write(*,*) ' npoints_chord_tot : ' , npoints_chord_tot
+! write(*,*) ' nelems_span       : ' , nelems_span
 
 nelems_chord = npoints_chord_tot - 1
   ! inner strips -----
