@@ -91,20 +91,15 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
 
   integer :: n_d , n_points , n_splines
   real(wp) , allocatable :: ll(:)  ! useless with this def of %t
-  real(wp) , allocatable :: A(:,:) , b(:)
 
   real(wp) , allocatable :: spl_s(:)
-
-  ! lapack
-  integer , allocatable :: ipiv(:)
-  integer :: info
 
   ! spline reconstruction 
   integer , parameter :: n_points1 = 100  ! now hardcoded (pass as a default input)
   real(wp) , allocatable :: tv1(:) , s(:) , s_spl(:)
   real(wp) , allocatable :: rr(:,:)
 
-  integer :: i_r , i , j , n
+  integer :: i_r , i , j 
 
   !> scale derivatives
   spl%d0 = spl%d0
@@ -186,63 +181,6 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
     write(*,*) ' Only "derivative" implemented so far. Stop.' ; stop
   end if
 
-! ! === Linear system to solve for the derivatives of the spline ===
-! !> one linear system per coorindate since the systems are not coupled
-! allocate(spl%dp(n_points,n_d)) ; spl%dp = 0.0_wp
-! allocate(A(n_points,n_points)) ; A = 0.0_wp
-! allocate(b(n_points))          ; b = 0.0_wp
-!
-! do n = 1 , n_d
-!
-!   !> Initialise (reset) A,b 
-!   A = 0.0_wp ; b = 0.0_wp
-!
-!   !> inner points
-!   do i = 2 , n_points - 1
-!
-!     A(i,i-1:i+1) = (/ spl%dt(i) ,  & 
-!               2.0_wp*(spl%dt(i-1)+spl%dt(i)) , &
-!                       spl%dt(i-1) /)
-!     b(i) = 3.0_wp * spl%dt(i-1)/spl%dt(i  ) * &
-!                   ( spl%rr(i+1,n) - spl%rr(i  ,n) ) + &
-!            3.0_wp * spl%dt(i  )/spl%dt(i-1) * & 
-!                   ( spl%rr(i  ,n) - spl%rr(i-1,n) ) 
-!
-!   end do
-!
-!   !> end points: boundary conditions 
-!   if ( trim( spl%e_bc(1) ) .eq. 'derivative' ) then
-!     A(1,1) = 1.0_wp
-!     b(1  ) = spl%d0(n) 
-!   else
-!     write(*,*) ' hermite_spline. Wrong b.c. '
-!     write(*,*) ' Only "derivative" implemented so far. Stop.' ; stop
-!   end if 
-!   if ( trim( spl%e_bc(2) ) .eq. 'derivative' ) then
-!     A(n_points,n_points) = 1.0_wp
-!     b(n_points         ) = spl%d1(n)
-!   else
-!     write(*,*) ' hermite_spline. Wrong b.c. '
-!     write(*,*) ' Only "derivative" implemented so far. Stop.' ; stop
-!   end if 
-!
-!   ! ! check ---
-!   ! do i = 1 , size(A,1)
-!   !   write(*,*) A(i,:) , '           ' , b(i)
-!   ! end do
-!   ! write(*,*)
-!
-!   !> add a multiplication factor
-!   A = A * der_factor
-!
-!   !> solve the linear system ( call to lapack dgesv )
-!   spl%dp(:,n) = b   ! intent(inout) in dgesv
-!   allocate(ipiv(n_points))
-!   call dgesv( n_points, 1 , A , n_points , &
-!            ipiv , spl%dp(:,n) , n_points , info ) 
-!   deallocate(ipiv)
-!
-! end do 
 
   ! === tangent vector to the reference line ===
   nor_in = 0.0_wp
@@ -250,6 +188,7 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
     nor_in(i,:) = spl%dp(i,:)
     nor_in(i,:) = nor_in(i,:) / norm2(nor_in(i,:))
   end do
+
 
   ! === spline (non-uniform param) ===
   allocate(rr( n_points1*n_splines + 1,n_d))
@@ -293,15 +232,6 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
   s_in = spl_s           ! curvilinear coord of the input points
   spl_s = spl_s / spl_s(size(spl_s)) ! and its non-dimensionalisation
 
-! ! check ---
-! do i = 1 , size(spl_s)
-!   write(*,*) spl_s(i)
-! end do
-!
-! ! check ---
-! do i = 1 , size(rr,1)
-!   write(*,*) ' rr,  s : ' , rr(i,:) , '   ' , s(i)
-! end do
 
   deallocate(tv1)
 
@@ -368,11 +298,6 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
 
   end do
 
-! ! check
-! write(*,*) ' in hermite_spline : ip , ss '
-! do i = 1 , size(ss_spl)
-!   write(*,*) ip_spl(i,:) , '     ' , ss_spl(i)
-! end do
 
 end subroutine hermite_spline
 

@@ -161,12 +161,12 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
  real(wp) , allocatable :: ref_line_interp_s_all(:)
  real(wp) , allocatable :: s_in(:) , nor_in(:,:)
 
- real(wp) , allocatable :: xy1(:,:) , xy2(:,:) , xy(:,:) , xy_flip(:,:)
+ real(wp) , allocatable :: xy1(:,:) , xy2(:,:) , xy(:,:)
  real(wp) , allocatable :: rr_s(:,:) 
  real(wp) :: twist_rad , theta
 
  real(wp) :: w1 , w2
- integer :: i , j , i1 , i2 
+ integer :: i , i1 , i2 
 
  
  !> Prepare parser and sub-parsers
@@ -427,7 +427,6 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
  !>
  integer   :: nelem_chord
  character :: ElType
- real(wp)  :: ref_chord_fraction
 
  !> point and line structures
  type(t_point) , allocatable :: points(:)
@@ -452,7 +451,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
  !>
  integer :: nAirfoils , iAirfoil
 
- integer :: i , i1 , i2 , i_aero1 , i_aero2 , j
+ integer :: i , i1 , i2 , j
 
  character(len=*), parameter :: this_sub_name = 'read_mesh_pointwise_ll'
 
@@ -1265,7 +1264,9 @@ subroutine fill_line_tan_vec( points , lines )
  
        if  ( i .eq. 1 ) then  ! check
          write(*,*) ' error in fill_line_tan_vec: '
-         write(*,*) ' first line is a spline w/o tangentVec1 input '
+         write(*,*) ' first line is a spline w/o tangentVec1 input. '
+         write(*,*) ' Some minor modifications in mod_pointwise_io.f90 '
+         write(*,*) ' should be enough to have "free" ends.'
          write(*,*) ' stop. ' ; stop
        end if
 
@@ -1279,6 +1280,8 @@ subroutine fill_line_tan_vec( points , lines )
        if  ( i .eq. n_lines ) then  ! check
          write(*,*) ' error in fill_line_tan_vec: '
          write(*,*) ' last line is a spline w/o tangentVec2 input '
+         write(*,*) ' Some minor modifications in mod_pointwise_io.f90 '
+         write(*,*) ' should be enough to have "free" ends.'
          write(*,*) ' stop. ' ; stop
 
        end if
@@ -1366,7 +1369,7 @@ subroutine read_lines ( pmesh_prs , line_prs , lines  , nelems_span_tot)
    lines(i) % nelems     = getint(      line_prs , 'Nelems' )
    lines(i) % type_span  = getstr(      line_prs , 'Type_span')
 
-   !> multiplication factor of the end-points derivatives of a spline
+   !> tension , bias parameters
    if ( trim(lines(i)%l_type) .eq. 'Spline' ) then
      lines(i) % tension = getreal(line_prs , 'Tension')
      lines(i) % bias    = getreal(line_prs , 'Bias'   )
@@ -1375,7 +1378,6 @@ subroutine read_lines ( pmesh_prs , line_prs , lines  , nelems_span_tot)
      lines(i) % bias    = 0.0_wp
    end if
 
-     
    !> allocate tvec for spline if they are provided as a input
    if ( trim(lines(i)%l_type) .eq.'Spline' ) then 
  
