@@ -70,16 +70,20 @@ end type t_spline
 contains
 ! ----------------------------------------------------------------------
 !> build hermite_spline
-subroutine hermite_spline ( spl , nelems , type_span , rr_spl , nn_spl , &
+subroutine hermite_spline ( spl , nelems , der_factor , &
+                                           type_span , rr_spl , nn_spl , &
                                                        ip_spl , ss_spl , &
+                                                       spl_spl  , &
                                                        leng , s_in , nor_in )
   type(t_spline)               , intent(inout) :: spl
   integer                      , intent(in)    :: nelems
+  real(wp)                     , intent(in)    :: der_factor
   character(max_char_len)      , intent(in)    :: type_span
   real(wp)                     , intent(out)   :: rr_spl(:,:)
   real(wp)                     , intent(out)   :: nn_spl(:,:)
   integer                      , intent(out)   :: ip_spl(:,:)
   real(wp)                     , intent(out)   :: ss_spl(:)
+  real(wp)                     , intent(out)   :: spl_spl(:)
   real(wp)                     , intent(out)   :: leng
   real(wp)                     , intent(out)   ::   s_in(:)
   real(wp)                     , intent(out)   :: nor_in(:,:)
@@ -100,6 +104,10 @@ subroutine hermite_spline ( spl , nelems , type_span , rr_spl , nn_spl , &
   real(wp) , allocatable :: rr(:,:)
 
   integer :: i_r , i , j , n
+
+  !> scale derivatives
+  spl%d0 = spl%d0
+  spl%d1 = spl%d1
 
 
   !> check input consistency
@@ -166,7 +174,7 @@ subroutine hermite_spline ( spl , nelems , type_span , rr_spl , nn_spl , &
     !> end points: boundary conditions 
     if ( trim( spl%e_bc(1) ) .eq. 'derivative' ) then
       A(1,1) = 1.0_wp
-      b(1  ) = spl%d0(n)
+      b(1  ) = spl%d0(n) 
     else
       write(*,*) ' hermite_spline. Wrong b.c. '
       write(*,*) ' Only "derivative" implemented so far. Stop.' ; stop
@@ -185,6 +193,8 @@ subroutine hermite_spline ( spl , nelems , type_span , rr_spl , nn_spl , &
     ! end do
     ! write(*,*)
 
+    !> add a multiplication factor
+    A = A * der_factor
 
     !> solve the linear system ( call to lapack dgesv )
     spl%dp(:,n) = b   ! intent(inout) in dgesv
@@ -313,6 +323,9 @@ subroutine hermite_spline ( spl , nelems , type_span , rr_spl , nn_spl , &
 
       end if 
     end do
+
+    ! spl_spl
+    spl_spl(i) = ( s_spl(i) - spl_s(1) ) / ( spl_s(size(spl_s)) - spl_s(1) )
 
   end do
 

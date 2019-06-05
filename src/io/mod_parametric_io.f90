@@ -481,7 +481,7 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
 
   integer :: i1
 
-  write(*,*) ' airfoil input ' , airfoil
+! write(*,*) ' airfoil input ' , airfoil
 
   twist_rad = twist * 4.0_wp * atan(1.0_wp) / 180.0_wp
 

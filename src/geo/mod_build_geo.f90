@@ -468,11 +468,11 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                                 npoints_chord_tot, nelems_span )
       nelems_span_tot =   nelems_span
 
-      ! check ---
-      write(*,*) ' shape(ee)         : ' , shape(ee)
-      write(*,*) ' shape(rr)         : ' , shape(rr)
-      write(*,*) ' npoints_chord_tot : ' , npoints_chord_tot
-      write(*,*) ' nelems_span       : ' , nelems_span      
+!     ! check ---
+!     write(*,*) ' shape(ee)         : ' , shape(ee)
+!     write(*,*) ' shape(rr)         : ' , shape(rr)
+!     write(*,*) ' npoints_chord_tot : ' , npoints_chord_tot
+!     write(*,*) ' nelems_span       : ' , nelems_span      
 
     elseif ( ElType .eq. 'l' ) then
 
@@ -765,14 +765,6 @@ subroutine symmetry_mesh_structured( ee, rr, &
 
  character(len=*), parameter :: this_sub_name = 'symmetry_mesh_structured'
 
- ! debug ---
- write(*,*) ' rr: '
- do i1 = 1 , size(rr,2)
-   write(*,*) rr(:,i1)
- end do
- write(*,*) ' cen : ' , cent
- write(*,*) ' nor : ' , norm
- ! debug ---
 
  ! some checks ---------------------------------
  mabs = 0.0_wp
@@ -923,10 +915,9 @@ subroutine symmetry_mesh_structured( ee, rr, &
   call move_alloc(rr_temp, rr)
   call move_alloc(ee_sort, ee)
 
-  ! check ----
-  write(*,*) ' sew_first_sec , sew_last_sec : ' , sew_first_sec , sew_last_sec 
-  write(*,*) ' in symmetry_mesh_structured, shape(rr) : ' , shape(rr)
-  
+! ! check ----
+! write(*,*) ' sew_first_sec , sew_last_sec : ' , sew_first_sec , sew_last_sec 
+! write(*,*) ' in symmetry_mesh_structured, shape(rr) : ' , shape(rr)
 
 
   if ( allocated(ee_temp) )  deallocate(ee_temp)
@@ -1168,9 +1159,9 @@ character(len=*), parameter :: this_sub_name = 'build_component_parametric'
 if ( allocated(neigh) )   deallocate(neigh)
 allocate(neigh(4,size(ee,2))) ; neigh = 0
 
-write(*,*) ' shape(neigh) : ' , shape(neigh)
-write(*,*) ' npoints_chord_tot : ' , npoints_chord_tot
-write(*,*) ' nelems_span       : ' , nelems_span
+! write(*,*) ' shape(neigh) : ' , shape(neigh)
+! write(*,*) ' npoints_chord_tot : ' , npoints_chord_tot
+! write(*,*) ' nelems_span       : ' , nelems_span
 
 nelems_chord = npoints_chord_tot - 1
   ! inner strips -----
@@ -1730,8 +1721,6 @@ subroutine build_te_parametric ( ee , rr , ElType , &
  end if
  
  ! rr_te ---------
- write(*,*) ' before allocating rr_te, nelems_span : ' , nelems_span
- write(*,*) '                          shape(rr)   : ' , shape(rr)  
  allocate(rr_te(3,nelems_span+1)) ; rr_te = 0.0_wp
  rr_te = 0.5_wp * ( rr(:,i_te(1,:)) + rr(:,i_te(2,:)) )
  
