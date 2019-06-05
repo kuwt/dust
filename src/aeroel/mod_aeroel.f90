@@ -213,6 +213,8 @@ type, abstract, extends(c_pot_elem) :: c_impl_elem
 
   procedure(i_get_vort_vel), deferred, pass(this)     :: get_vort_vel
 
+  procedure(i_get_bernoulli_source),    deferred, pass(this) :: get_bernoulli_source
+
 end type c_impl_elem
 
 !----------------------------------------------------------------------
@@ -464,6 +466,21 @@ abstract interface
     class(c_pot_elem), intent(inout) :: this
     real(wp), intent(in) :: vert(:,:)
   end subroutine
+end interface
+
+!----------------------------------------------------------------------
+
+!> Get the bernoulli source for the pressure equation
+!!
+!! This interface is used to avoid the use of select types to get the 
+!! bernoulli source field which is defined only on surface panels
+abstract interface
+  function i_get_bernoulli_source(this) result(source)
+    import :: c_impl_elem , wp
+    implicit none
+    class(c_impl_elem), intent(inout) :: this
+    real(wp) :: source
+  end function
 end interface
 
 !----------------------------------------------------------------------
