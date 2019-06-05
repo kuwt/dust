@@ -100,7 +100,8 @@ type :: t_line
   character(max_char_len) :: l_type
   integer                 :: end_points(2)
   integer                 :: nelems
-  real(wp)                :: der_factor
+  real(wp)                :: tension
+  real(wp)                :: bias
   character(max_char_len) :: type_span   ! discretisation in span
   real(wp)                :: leng
   integer                 :: neigh_line(2) = 0
@@ -853,7 +854,8 @@ subroutine build_reference_line( npoint_span_tot   , points, lines     , &
  
      !> compute ref_line_points on the spline
      call hermite_spline( spl , lines(i)%nelems           , &
-                                lines(i)%der_factor       , &
+                                lines(i)%tension          , &
+                                lines(i)%bias             , &
                                 lines(i)%type_span        , &
                                 ref_line_points(i1:i2,:)  , &
                                 ref_line_normal(i1:i2,:)  , &
@@ -1366,9 +1368,11 @@ subroutine read_lines ( pmesh_prs , line_prs , lines  , nelems_span_tot)
 
    !> multiplication factor of the end-points derivatives of a spline
    if ( trim(lines(i)%l_type) .eq. 'Spline' ) then
-     lines(i) % der_factor = getreal(line_prs , 'DerivativeFactor')
+     lines(i) % tension = getreal(line_prs , 'Tension')
+     lines(i) % bias    = getreal(line_prs , 'Bias'   )
    else
-     lines(i) % der_factor = 1.0_wp
+     lines(i) % tension = 0.0_wp
+     lines(i) % bias    = 0.0_wp
    end if
 
      
@@ -1476,9 +1480,10 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
                'list of point id.s belonging to the line' )
  call line_prs%CreateIntOption(        'Nelems', &
                'n. spanwise elems of the line section' )
- call line_prs%CreateRealOption('DerivativeFactor', &
-               'multiplication factor of the derivatives of the spline &
-               &at the end points', '1.0' )
+ call line_prs%CreateRealOption('Tension', &
+               'tension factor of the spline', '0.0' )
+ call line_prs%CreateRealOption('Bias', &
+               'bias factor for the spline', '0.0' )
  call line_prs%CreateStringOption('type_span', 'type of span-wise division: &
                &uniform, cosine, cosineIB, cosineOB', &
                'uniform' ) ! defualt
