@@ -118,7 +118,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
  type(t_wake), intent(inout) :: wake
  real(wp) :: uinf(3)
  real(wp) :: rhoinf , Pinf
- integer :: ie, ntot, info
+ integer :: ie, ntot, info, nst
 
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name = 'initialize_linsys'
@@ -175,21 +175,25 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
   allocate( linsys%b_static_pres(geo%nstatic_SurfPan,geo%nstatic_SurfPan) ) 
   
 
+  nst = linsys%nstatic
   !Build the static part of the system, saving also the static part of the 
   ! rhs
-  do ie = 1,linsys%nstatic
+!$omp parallel do private(ie) firstprivate(nst) schedule(dynamic)
+  do ie = 1,nst
 
     !build one row
     call elems(ie)%p%build_row_static(elems, expl_elems, linsys, &
                                       uinf, ie, 1, linsys%nstatic)
   enddo
+!$omp end parallel do
   
   !! == Pressure
   !copy the matrix before it gets corrected for the wake contribution
   linsys%A_pres = linsys%A( geo%idSurfPan , geo%idSurfPan )
   
   ! add the wake contribution
-  do ie = 1,linsys%nstatic
+!$omp parallel do private(ie) firstprivate(nst)
+  do ie = 1,nst
     !call elems(ie)%p%add_wake((/wake_elems%pan_p, wake_rings%pan_p/), &
     !                wake_elems%gen_elems_id, linsys,uinf,ie,1,linsys%nstatic)
     call elems(ie)%p%add_wake((/wake%pan_p, wake%rin_p/), &
@@ -199,6 +203,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
     elems(ie)%p%mag => linsys%res(ie)
 
   enddo
+!$omp end parallel do
 
   !all the moving part will be assembled in \ref assemble_linsys, here
   !only the pointer to the solutions are associated
