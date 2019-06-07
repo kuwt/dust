@@ -75,7 +75,7 @@ use mod_surfpan, only: &
   t_surfpan , initialize_surfpan
 
 use mod_liftlin, only: &
- update_liftlin, solve_liftlin
+ update_liftlin, solve_liftlin, t_liftlin_p
 
 use mod_actuatordisk, only: &
  update_actdisk
@@ -164,7 +164,8 @@ type(t_impl_elem_p), allocatable :: elems(:)
 !> All the explicit elements
 type(t_expl_elem_p), allocatable :: elems_expl(:)
 !> Only the lifting line elements
-type(t_expl_elem_p), allocatable :: elems_ll(:)
+!type(t_expl_elem_p), allocatable :: elems_ll(:)
+type(t_liftlin_p), allocatable :: elems_ll(:)
 !> Only the actuator disk elements
 type(t_expl_elem_p), allocatable :: elems_ad(:)
 !> All the elements (panels+ll)
@@ -191,7 +192,7 @@ real(wp) , allocatable :: res_old(:)
 real(wp) , allocatable :: surf_vel_SurfPan_old(:,:)
 real(wp) , allocatable ::      nor_SurfPan_old(:,:)
 
-integer :: i_el , i
+integer :: i_el , i, sel
 
 !octree parameters
 type(t_octree) :: octree
@@ -555,10 +556,14 @@ do it = 1,nstep
   endif
   t1 = dust_time()
 
+
+  sel = size(elems) 
   ! compute time derivative of the result ( = i_vortex = -i_doublet ) -------
-  do i_el = 1 , size(elems)
+!$omp parallel do private(i_el)
+  do i_el = 1 , sel
     elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
   end do
+!$omp end parallel do
   res_old = linsys%res
   
   if(sim_param%debug_level .ge. 1) then
@@ -578,21 +583,25 @@ do it = 1,nstep
 
   !------ Compute loads -------
   ! Implicit elements: vortex rings and 3d-panels
-  do i_el = 1 , size(elems)
+!$omp parallel do private(i_el)
+  do i_el = 1 , sel
     call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
              geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g)
     call elems(i_el)%p%compute_dforce()
   end do
+!$omp end parallel do
   ! Explicit elements:
   ! - liftlin: _pres and _dforce computed in solve_liftin()
   ! - actdisk: avg delta_pressure and force computed here,
   !            to include thier effects in postpro (e.g. integral loads)
+!$omp parallel do private(i_el)
   do i_el = 1 , size(elems_ad)
 !   call elems_ad(i_el)%p%compute_pres(sim_param)
     call elems_ad(i_el)%p%compute_pres( &     ! update surf_vel field too
              geo%refs( geo%components(elems_ad(i_el)%p%comp_id)%ref_id )%R_g)
     call elems_ad(i_el)%p%compute_dforce()
   end do
+!$omp end parallel do
 
   ! pres_IE +++++
   !!if ( it .gt. 1 ) then
@@ -1079,7 +1088,8 @@ end subroutine debug_printout_geometry_minimal
 ! ---------------------------------------------------------------------
 
 subroutine debug_ll_printout_geometry(elems, geo, basename, it)
- type(t_expl_elem_p),   intent(in) :: elems(:)
+ !type(t_expl_elem_p),   intent(in) :: elems(:)
+ type(t_liftlin_p),   intent(in) :: elems(:)
  type(t_geo),      intent(in) :: geo
  character(len=*), intent(in) :: basename
  integer,          intent(in) :: it
