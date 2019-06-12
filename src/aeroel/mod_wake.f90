@@ -551,6 +551,7 @@ subroutine prepare_wake(wake, geo, elems)
  integer :: p1, p2
  integer :: ip, iw, ipan, id, is, nprev
  real(wp) :: dist(3) , vel_te(3), pos_p(3)
+ real(wp) :: vel_in(3), vel_out(3)
  real(wp) :: dir(3), partvec(3), ave, alpha_p(3), alpha_p_n
  integer :: ir, k, n_part
  real :: hcas_reltime
@@ -613,7 +614,7 @@ subroutine prepare_wake(wake, geo, elems)
   !==> Particles: update the position and intensity in time, avoid penetration
   !               and chech if remain into the boundaries
   n_part = wake%n_prt
-!$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n)
+!$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n,vel_in,vel_out)
   do ip = 1, n_part
     if(sim_param%HCAS) then
       hcas_reltime = (sim_param%time-sim_param%t0)/sim_param%hcas_time
@@ -622,9 +623,12 @@ subroutine prepare_wake(wake, geo, elems)
           sim_param%hcas_vel*(1.0-hcas_reltime) !linear reduction
       endif
     endif
-    if(sim_param%use_pa) call avoid_collision(elems, wake, &
-                        wake%part_p(ip)%p, wake%part_p(ip)%p%vel)
+    if(sim_param%use_pa) then
+      vel_in = wake%part_p(ip)%p%vel
+      call avoid_collision(elems, wake, wake%part_p(ip)%p, vel_in, vel_out)
                            !wake%part_p(ip)%p, sim_param, wake%prt_vel(:,ip))
+      wake%part_p(ip)%p%vel = vel_out
+    endif
     if(.not. wake%part_p(ip)%p%free) then
       !pos_p = wake%part_p(ip)%p%cen + wake%prt_vel(:,ip)*sim_param%dt
       pos_p = wake%part_p(ip)%p%cen + wake%part_p(ip)%p%vel*sim_param%dt
@@ -1709,11 +1713,12 @@ end function get_joined_intensity
 !
 !end subroutine avoid_collision
 
-subroutine avoid_collision(elems, wake, part, vel)
+subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
  type(t_pot_elem_p), intent(in) :: elems(:)
  type(t_wake), intent(inout) :: wake
  type(t_vortpart), intent(inout) :: part
- real(wp), intent(inout) :: vel(3)
+ real(wp), intent(in)  :: vel_in(3)
+ real(wp), intent(out) :: vel_out(3)
 
  integer :: ie
  real(wp) :: dist1(3), dist2(3), n(3)
@@ -1760,7 +1765,7 @@ subroutine avoid_collision(elems, wake, part, vel)
 
         !use the relative velocity to take into account also the element 
         !movement
-        relvel = vel - elem%ub
+        relvel = vel_in - elem%ub
         n = elem%nor
         dist1_nor = sum(dist1 * n) 
         dist1_tan = norm2(dist1-(n*dist1_nor))
@@ -1802,13 +1807,13 @@ subroutine avoid_collision(elems, wake, part, vel)
               ! should be 
               ! vel = relvel + (normvel_corr-normvel)*n + elem%ub
               ! but simplifying
-              newvel = vel + (normvel_corr-normvel)*n
+              newvel = vel_in + (normvel_corr-normvel)*n
               !already without the element motion
 
               !fix the tangential velocity to keep the magnitude constant
               normvel_corr = sum(newvel*n)
-              normvel  = sum(vel*n)
-              tanvel   = vel - normvel*n
+              normvel  = sum(vel_in*n)
+              tanvel   = vel_in - normvel*n
               tanvel2  = sum(tanvel**2)
               nveldiff = normvel**2-normvel_corr**2+tanvel2
               if(tanvel2.gt.0.0_wp .and. normvel_corr*normvel.ge.0.0_wp .and. &
@@ -1816,7 +1821,7 @@ subroutine avoid_collision(elems, wake, part, vel)
                 tanvel = tanvel * (sqrt(nveldiff)/sqrt(tanvel2) )
               endif
               !reconstruct the velocity 
-              vel = tanvel + normvel_corr*n
+              vel_out = tanvel + normvel_corr*n
             endif
           endif
           cycle
@@ -1849,13 +1854,13 @@ subroutine avoid_collision(elems, wake, part, vel)
             ! should be 
             ! vel = relvel + (normvel_corr-normvel)*n + elem%ub
             ! but simplifying
-            newvel = vel + (normvel_corr-normvel)*n
+            newvel = vel_in + (normvel_corr-normvel)*n
             !already without the element motion
 
             !fix the tangential velocity to keep the magnitude constant
             normvel_corr = sum(newvel*n)
-            normvel  = sum(vel*n)
-            tanvel   = vel - normvel*n
+            normvel  = sum(vel_in*n)
+            tanvel   = vel_in - normvel*n
             tanvel2  = sum(tanvel**2)
             nveldiff = normvel**2-normvel_corr**2+tanvel2
             if(tanvel2.gt.0.0_wp .and. normvel_corr*normvel.ge.0.0_wp .and. &
@@ -1863,7 +1868,7 @@ subroutine avoid_collision(elems, wake, part, vel)
               tanvel = tanvel * (sqrt(nveldiff)/sqrt(tanvel2) )
             endif
             !reconstruct the velocity 
-            vel = tanvel + normvel_corr*n
+            vel_out = tanvel + normvel_corr*n
           endif
         endif
 
