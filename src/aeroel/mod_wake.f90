@@ -503,7 +503,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
                                                                    (/3,4/)))
   enddo
 
-  if (sim_param%join_te) call join_first_panels(wake)
+  if (sim_param%join_te) call join_first_panels(wake,sim_param%join_te_factor)
 
 
   !Particles
@@ -593,7 +593,7 @@ subroutine prepare_wake(wake, geo, elems)
     wake%joined_tes(:,:,2:wake%nmax_pan+1) = &
           wake%joined_tes(:,:,1:wake%nmax_pan)
     wake%joined_tes(:,:,1) = 0
-    call join_first_panels(wake)
+    call join_first_panels(wake,sim_param%join_te_factor)
   endif
 
   !==> Panels:  update the panels geometrical quantities of all the panels, 
@@ -1542,40 +1542,109 @@ end subroutine get_vel_rigid
 
 !----------------------------------------------------------------------
 
-subroutine join_first_panels(wake)
+subroutine join_first_panels(wake, te_fact)
  type(t_wake), intent(inout) :: wake
+ real(wp)    , intent(in)    :: te_fact
 
- integer :: i, j, iw, ir
+ real(wp) :: lmin
+ integer  :: i, j, iw, ir , i_case
  real(wp) :: sp1(3), sp2(3), sp1_1(3), sp2_1(3), l1, l2, tol, pos_p(3)
+
+!integer :: n_joined_te
 
   do i = 1,size(wake%pan_i_ends)
     iw = wake%pan_i_ends(i)
     sp1 = wake%w_start_points(:,wake%i_start_points(1,iw))
     sp2 = wake%w_start_points(:,wake%i_start_points(2,iw))
     l1 = norm2(sp1-sp2)
-    do j = 1,size(wake%pan_i_ends)
+    do j = i+1,size(wake%pan_i_ends)
       ir = wake%pan_i_ends(j)
       sp1_1 = wake%w_start_points(:,wake%i_start_points(1,ir))
       sp2_1 = wake%w_start_points(:,wake%i_start_points(2,ir))
       l2 = norm2(sp1_1-sp2_1)
-      tol = 0.5_wp*min(l1,l2)
+      tol = te_fact*min(l1,l2)
+      
+      !> check which is the pair of nodes to be joined, very rude approach
+      i_case = 1
+      lmin = norm2(sp1_1-sp1)
+      if ( norm2(sp2_1-sp1) .lt. lmin ) then
+        lmin = norm2(sp2_1-sp1) ; i_case = 2
+      end if 
+      if ( norm2(sp1_1-sp2) .lt. lmin ) then
+        lmin = norm2(sp1_1-sp2) ; i_case = 3
+      end if 
+      if ( norm2(sp2_1-sp2) .lt. lmin ) then
+        lmin = norm2(sp2_1-sp2) ; i_case = 4
+      end if 
+      
       !checking only one side is enough, it is the opposite side for the other
       !end
-      if(norm2(sp1-sp2_1).lt.tol) then 
-        pos_p = (sp1+sp2_1)/2.0_wp
-        wake%pan_w_points(:,wake%i_start_points(1,iw),1) = pos_p
-        wake%pan_w_points(:,wake%i_start_points(2,ir),1) = pos_p
-        pos_p = (wake%pan_w_points(:,wake%i_start_points(1,iw),2) + &
-                 wake%pan_w_points(:,wake%i_start_points(2,ir),2))/2.0_wp
-        wake%pan_w_points(:,wake%i_start_points(1,iw),2) = pos_p
-        wake%pan_w_points(:,wake%i_start_points(2,ir),2) = pos_p
+      if ( i_case .eq. 1 ) then
+        if( norm2(sp1-sp1_1).lt.tol) then
+ 
+          pos_p = (sp1+sp1_1)/2.0_wp
+          wake%pan_w_points(:,wake%i_start_points(1,iw),1) = pos_p
+          wake%pan_w_points(:,wake%i_start_points(1,ir),1) = pos_p
+          pos_p = (wake%pan_w_points(:,wake%i_start_points(1,iw),2) + &
+                   wake%pan_w_points(:,wake%i_start_points(1,ir),2))/2.0_wp
+          wake%pan_w_points(:,wake%i_start_points(1,iw),2) = pos_p
+          wake%pan_w_points(:,wake%i_start_points(1,ir),2) = pos_p
+  
+          wake%joined_tes(1,i,1) = ir
+          wake%joined_tes(1,j,1) = iw
 
-        wake%joined_tes(1,i,1) = ir
-        wake%joined_tes(2,j,1) = iw
+        end if
+      elseif ( i_case .eq. 2 ) then
+        if( norm2(sp1-sp2_1).lt.tol) then 
+
+          pos_p = (sp1+sp2_1)/2.0_wp
+          wake%pan_w_points(:,wake%i_start_points(1,iw),1) = pos_p
+          wake%pan_w_points(:,wake%i_start_points(2,ir),1) = pos_p
+          pos_p = (wake%pan_w_points(:,wake%i_start_points(1,iw),2) + &
+                   wake%pan_w_points(:,wake%i_start_points(2,ir),2))/2.0_wp
+          wake%pan_w_points(:,wake%i_start_points(1,iw),2) = pos_p
+          wake%pan_w_points(:,wake%i_start_points(2,ir),2) = pos_p
+  
+          wake%joined_tes(1,i,1) = ir
+          wake%joined_tes(2,j,1) = iw
+
+        end if
+      elseif ( i_case .eq. 3 ) then
+        if( norm2(sp2-sp1_1).lt.tol) then 
+
+          pos_p = (sp2+sp1_1)/2.0_wp
+          wake%pan_w_points(:,wake%i_start_points(2,iw),1) = pos_p
+          wake%pan_w_points(:,wake%i_start_points(1,ir),1) = pos_p
+          pos_p = (wake%pan_w_points(:,wake%i_start_points(2,iw),2) + &
+                   wake%pan_w_points(:,wake%i_start_points(1,ir),2))/2.0_wp
+          wake%pan_w_points(:,wake%i_start_points(2,iw),2) = pos_p
+          wake%pan_w_points(:,wake%i_start_points(1,ir),2) = pos_p
+  
+          wake%joined_tes(2,i,1) = ir
+          wake%joined_tes(1,j,1) = iw
+
+        end if
+      elseif ( i_case .eq. 4 ) then
+        if( norm2(sp2-sp2_1).lt.tol) then 
+
+          pos_p = (sp2+sp2_1)/2.0_wp
+          wake%pan_w_points(:,wake%i_start_points(2,iw),1) = pos_p
+          wake%pan_w_points(:,wake%i_start_points(2,ir),1) = pos_p
+          pos_p = (wake%pan_w_points(:,wake%i_start_points(2,iw),2) + &
+                   wake%pan_w_points(:,wake%i_start_points(2,ir),2))/2.0_wp
+          wake%pan_w_points(:,wake%i_start_points(2,iw),2) = pos_p
+          wake%pan_w_points(:,wake%i_start_points(2,ir),2) = pos_p
+  
+          wake%joined_tes(2,i,1) = ir
+          wake%joined_tes(2,j,1) = iw
+
+        end if
       endif
     enddo
   enddo
 
+  ! check ---
+  ! write(*,* ) ' n_joined_te = ' , n_joined_te ! ; stop
 
 end subroutine join_first_panels
 
