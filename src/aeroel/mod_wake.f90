@@ -617,6 +617,7 @@ subroutine prepare_wake(wake, geo, elems)
   !==> Particles: update the position and intensity in time, avoid penetration
   !               and chech if remain into the boundaries
   n_part = wake%n_prt
+!$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n,vel_in,vel_out)
   do ip = 1, n_part
     if(sim_param%HCAS) then
       hcas_reltime = (sim_param%time-sim_param%t0)/sim_param%hcas_time
@@ -627,12 +628,10 @@ subroutine prepare_wake(wake, geo, elems)
     endif
     if(sim_param%use_pa) then
       vel_in = wake%part_p(ip)%p%vel
-      call avoid_collision(elems, wake, &
+      call avoid_collision_2(elems, wake, &
                         wake%part_p(ip)%p, vel_in, vel_out)
                            !wake%part_p(ip)%p, sim_param, wake%prt_vel(:,ip))
       wake%part_p(ip)%p%vel = vel_out
-      !DEBUG:
-      !write(*,*) 'hello, I am thread',omp_get_thread_num(),'of',omp_get_num_threads()
     endif
     if(.not. wake%part_p(ip)%p%free) then
       !pos_p = wake%part_p(ip)%p%cen + wake%prt_vel(:,ip)*sim_param%dt
@@ -662,6 +661,7 @@ subroutine prepare_wake(wake, geo, elems)
     !nullify(wake%part_p(ip)%p%vel)
     if(sim_param%use_vs) nullify(wake%part_p(ip)%p%stretch)
   enddo
+!$omp end parallel do
   deallocate(wake%prt_vortevol)
 
   !==> Particles: if the panel wake is at the end, create a particle
@@ -1964,5 +1964,135 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
   vel_out = vel
 
 end subroutine avoid_collision
+
+subroutine avoid_collision_2(elems, wake, part, vel_in, vel_out)
+ type(t_pot_elem_p), intent(in) :: elems(:)
+ type(t_wake), intent(inout) :: wake
+ type(t_vortpart), intent(inout) :: part
+ real(wp), intent(in)  :: vel_in(3)
+ real(wp), intent(out) :: vel_out(3)
+
+ real(wp) :: vel(3)
+
+ integer :: ie
+ real(wp) :: dist1(3), dist2(3), n(3)
+ real(wp) :: pos1(3), pos2(3), relvel(3), newvel(3), nveldiff
+ real(wp) :: distn, dist1_nor, dist1_tan, dist2_nor, dist2_tan
+ real(wp) :: normvel, normvel_corr, tanvel(3), dt_part, tanvel2
+ real(wp) :: check_radius, rad_mult, elrad_mult, r2d2, elrad, tol, blthick
+ real(wp) :: dampf
+ 
+  !Multiplication factor for the check radius
+  rad_mult = 1000.0_wp
+  !rad_mult = 2.0_wp
+ 
+  !Multiplication factor for the element radius
+  elrad_mult = 1.0_wp
+
+  ! Thickness of the "surface blocks" 
+  ! ( now, HARDCODED. TODO: read as an input: same order of dimension of the blob radius )
+  !blthick = 0.05_wp
+  blthick = sim_param%VortexRad
+ 
+  !tolerance for the minimum wall distance 
+  ! ( now, HARDCODED. TODO: read as an input: same order of dimension of the blob radius )
+  tol = 0.025_wp
+
+  r2d2 = sqrt(2.0_wp)/2.0_wp
+  
+  !starting position
+  pos1 = part%cen
+  
+  vel = vel_in
+
+  !Cycle on all the elements
+  do ie=1,size(elems)
+
+    select type( elem => elems(ie)%p )
+
+     class is (t_surfpan) 
+      !Get the position of the particle with respect to the element
+      dist1 = pos1-(elem%cen)
+      elrad = maxval(elem%edge_len)*r2d2
+      check_radius = sim_param%dt*sim_param%u_ref*rad_mult + elrad
+      distn = norm2(dist1)
+
+      !if it is in the check radius perform calculations
+      if ((distn .lt. check_radius) ) then
+
+        !use the relative velocity to take into account also the element 
+        !movement
+        relvel = vel - elem%ub
+        n = elem%nor
+        dist1_nor = sum(dist1 * n) 
+        dist1_tan = norm2(dist1-(n*dist1_nor))
+        normvel = sum(relvel*n) 
+        
+        !If it is on the opposite side of the element, or it is moving away, 
+        !do not perform any modification
+!       if (dist1_nor .lt. 0.0_wp .or. normvel.ge.0.0_wp) cycle
+        if (dist1_nor .lt. 0.0 .or. normvel.ge.0.0_wp) cycle
+        
+        !get the time at which the particle hits the surface
+        !make sure not to go back in time
+        dt_part = min(max((dist1_nor)/(-normvel),0.0_wp), sim_param%dt)
+        !if it is lower than the timestep (i.e. the particles hits the surface 
+        !within next step) start the correction
+          
+        !Get the position at the time in which the particle hits the 
+        !surface plane
+        pos2  = part%cen+relvel*dt_part
+        dist2 = pos2 - ( elem%cen )
+        dist2_nor = sum(dist2 * n)
+        if(dist2_nor .le. blthick) then
+          dist2_tan = norm2(dist2-(n*dist2_nor))
+          
+          if (dist2_tan .lt. elrad_mult*elrad) then
+            
+            !correct the normal velocity to avoid penetration
+!           normvel_corr = -dist1_nor*(1-tol)/sim_param%dt
+            if (dt_part .lt. sim_param%dt) then
+              normvel_corr = -dist1_nor/sim_param%dt
+            else
+              dampf = (dist2_nor/blthick)
+              normvel_corr = normvel + (blthick-dist2_nor)/sim_param%dt * dampf
+            endif
+             
+            ! should be 
+            ! vel = relvel + (normvel_corr-normvel)*n + elem%ub
+            ! but simplifying
+            newvel = vel + (normvel_corr-normvel)*n
+            !already without the element motion
+
+            !fix the tangential velocity to keep the magnitude constant
+            normvel_corr = sum(newvel*n)
+            normvel  = sum(vel*n)
+            tanvel   = vel - normvel*n
+            tanvel2  = sum(tanvel**2)
+            nveldiff = normvel**2-normvel_corr**2+tanvel2
+            if(tanvel2.gt.0.0_wp .and. normvel_corr*normvel.ge.0.0_wp .and. &
+                                                   nveldiff.ge.0.0_wp) then
+              tanvel = tanvel * (sqrt(nveldiff)/sqrt(tanvel2) )
+            endif
+            !reconstruct the velocity 
+            vel = tanvel + normvel_corr*n
+          endif
+        endif
+
+      endif
+   
+    class is ( t_vortlatt )
+
+    class is ( t_liftlin ) 
+
+    class default
+
+   end select
+
+  enddo
+
+  vel_out = vel
+
+end subroutine avoid_collision_2
 
 end module mod_wake
