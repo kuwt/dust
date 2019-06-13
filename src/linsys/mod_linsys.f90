@@ -118,7 +118,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
  type(t_wake), intent(inout) :: wake
  real(wp) :: uinf(3)
  real(wp) :: rhoinf , Pinf
- integer :: ie, ntot, info, nst
+ integer :: ie, ntot, info, nst, i, j
 
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name = 'initialize_linsys'
@@ -189,7 +189,13 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
   
   !! == Pressure
   !copy the matrix before it gets corrected for the wake contribution
-  linsys%A_pres = linsys%A( geo%idSurfPan , geo%idSurfPan )
+  !linsys%A_pres = linsys%A( geo%idSurfPan , geo%idSurfPan )
+  !ifort workaround
+  do i=1,geo%nSurfPan
+    do j=1,geo%nSurfPan
+      linsys%A_pres(i,j) = linsys%A( geo%idSurfPan(i) , geo%idSurfPan(j) )
+    enddo
+  enddo
   
   ! add the wake contribution
 !$omp parallel do private(ie) firstprivate(nst)
@@ -220,9 +226,17 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
   enddo
 
   !! == Pressure
-  linsys%b_static_pres = linsys%b_static( & 
-         geo%idSurfPan(1:geo%nstatic_SurfPan), &
-         geo%idSurfPan(1:geo%nstatic_SurfPan) )
+  !linsys%b_static_pres = linsys%b_static( & 
+  !       geo%idSurfPan(1:geo%nstatic_SurfPan), &
+  !       geo%idSurfPan(1:geo%nstatic_SurfPan) )
+  !ifort workaround
+  do i = 1, geo%nstatic_SurfPan
+    do j = 1, geo%nstatic_SurfPan
+      linsys%b_static_pres(i,j) = linsys%b_static( & 
+                                  geo%idSurfPan(i), &
+                                  geo%idSurfPan(j) )
+    enddo
+  enddo
   do ie = 1 , geo%nSurfpan
     select type( el => elems(geo%idSurfPan(ie))%p ) ; class is(t_surfpan)
       el%pres_sol => linsys%res_pres(ie) 
