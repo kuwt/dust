@@ -100,6 +100,9 @@ use mod_hdf5_io, only: &
 
 use mod_octree, only: &
   t_octree, sort_particles, calculate_multipole, apply_multipole
+
+!$ use omp_lib, only: &
+!$   omp_get_thread_num, omp_get_num_threads
 !----------------------------------------------------------------------
 
 implicit none
@@ -553,7 +556,8 @@ subroutine prepare_wake(wake, geo, elems)
  real(wp) :: dist(3) , vel_te(3), pos_p(3)
  real(wp) :: dir(3), partvec(3), ave, alpha_p(3), alpha_p_n
  integer :: ir, k, n_part
- real :: hcas_reltime
+ real(wp) :: hcas_reltime
+ real(wp) :: vel_in(3), vel_out(3)
 
  ! flow separation variables
  integer :: i_comp , i_elem , n_elem
@@ -613,7 +617,6 @@ subroutine prepare_wake(wake, geo, elems)
   !==> Particles: update the position and intensity in time, avoid penetration
   !               and chech if remain into the boundaries
   n_part = wake%n_prt
-!$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n)
   do ip = 1, n_part
     if(sim_param%HCAS) then
       hcas_reltime = (sim_param%time-sim_param%t0)/sim_param%hcas_time
@@ -622,9 +625,15 @@ subroutine prepare_wake(wake, geo, elems)
           sim_param%hcas_vel*(1.0-hcas_reltime) !linear reduction
       endif
     endif
-    if(sim_param%use_pa) call avoid_collision(elems, wake, &
-                        wake%part_p(ip)%p, wake%part_p(ip)%p%vel)
+    if(sim_param%use_pa) then
+      vel_in = wake%part_p(ip)%p%vel
+      call avoid_collision(elems, wake, &
+                        wake%part_p(ip)%p, vel_in, vel_out)
                            !wake%part_p(ip)%p, sim_param, wake%prt_vel(:,ip))
+      wake%part_p(ip)%p%vel = vel_out
+      !DEBUG:
+      !write(*,*) 'hello, I am thread',omp_get_thread_num(),'of',omp_get_num_threads()
+    endif
     if(.not. wake%part_p(ip)%p%free) then
       !pos_p = wake%part_p(ip)%p%cen + wake%prt_vel(:,ip)*sim_param%dt
       pos_p = wake%part_p(ip)%p%cen + wake%part_p(ip)%p%vel*sim_param%dt
@@ -653,7 +662,6 @@ subroutine prepare_wake(wake, geo, elems)
     !nullify(wake%part_p(ip)%p%vel)
     if(sim_param%use_vs) nullify(wake%part_p(ip)%p%stretch)
   enddo
-!$omp end parallel do
   deallocate(wake%prt_vortevol)
 
   !==> Particles: if the panel wake is at the end, create a particle
@@ -1778,11 +1786,14 @@ end function get_joined_intensity
 !
 !end subroutine avoid_collision
 
-subroutine avoid_collision(elems, wake, part, vel)
+subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
  type(t_pot_elem_p), intent(in) :: elems(:)
  type(t_wake), intent(inout) :: wake
  type(t_vortpart), intent(inout) :: part
- real(wp), intent(inout) :: vel(3)
+ real(wp), intent(in)  :: vel_in(3)
+ real(wp), intent(out) :: vel_out(3)
+
+ real(wp) :: vel(3)
 
  integer :: ie
  real(wp) :: dist1(3), dist2(3), n(3)
@@ -1812,6 +1823,8 @@ subroutine avoid_collision(elems, wake, part, vel)
   !starting position
   pos1 = part%cen
   
+  vel = vel_in
+
   !Cycle on all the elements
   do ie=1,size(elems)
 
@@ -1948,7 +1961,7 @@ subroutine avoid_collision(elems, wake, part, vel)
 
   enddo
 
-
+  vel_out = vel
 
 end subroutine avoid_collision
 
