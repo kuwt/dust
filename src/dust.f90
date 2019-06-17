@@ -491,8 +491,6 @@ allocate(res_old(size(elems))) ; res_old = 0.0_wp
 
 t11 = dust_time()
 do it = 1,nstep
-  !DEBUG
-  write(*,*) 'time, sim_time', time, sim_param%time_vec(it)
   
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
@@ -787,7 +785,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%min_vel_at_te  = getreal(prms,'ImplicitPanelMinVel')
   sim_param%use_vs = getlogical(prms, 'Vortstretch')
   sim_param%use_vd = getlogical(prms, 'Diffusion')
-  sim_param%use_tv = getlogical(prms, 'Turbulent_Viscosity')
+  sim_param%use_tv = getlogical(prms, 'TurbulentViscosity')
   sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
   sim_param%use_ve = getlogical(prms, 'ViscosityEffects')
   !Lifting line elements
