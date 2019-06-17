@@ -323,7 +323,7 @@ call prms%CreateRealOption('LeavesTimeRatio','Ratio that triggers the &
 ! models options
 call prms%CreateLogicalOption('Vortstretch','Employ vortex stretching','T')
 call prms%CreateLogicalOption('Diffusion','Employ vorticity diffusion','T')
-call prms%CreateLogicalOption('Turbulent_Viscosity','Employ turbulent &
+call prms%CreateLogicalOption('TurbulentViscosity','Employ turbulent &
                                &viscosity','F')
 call prms%CreateLogicalOption('PenetrationAvoidance','Employ penetration &
                                                               & avoidance','F')
