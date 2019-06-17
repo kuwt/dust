@@ -214,6 +214,7 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
     enddo
 
     !close the file
+    close(fid_out)
     
   
   
