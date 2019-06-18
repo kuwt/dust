@@ -223,7 +223,8 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
     if (allocated(vort ) ) deallocate(vort )
     if (allocated(press) ) deallocate(press)
     if (allocated(press) ) deallocate(surfvel)
-  
+
+    call close_hdf5_file(floc)
   
   end do ! Time loop
 
