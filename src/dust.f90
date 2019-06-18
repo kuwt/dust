@@ -323,10 +323,14 @@ call prms%CreateRealOption('LeavesTimeRatio','Ratio that triggers the &
 ! models options
 call prms%CreateLogicalOption('Vortstretch','Employ vortex stretching','T')
 call prms%CreateLogicalOption('Diffusion','Employ vorticity diffusion','T')
-call prms%CreateLogicalOption('Turbulent_Viscosity','Employ turbulent &
+call prms%CreateLogicalOption('TurbulentViscosity','Employ turbulent &
                                &viscosity','F')
 call prms%CreateLogicalOption('PenetrationAvoidance','Employ penetration &
                                                               & avoidance','F')
+call prms%CreateRealOption('PenetrationAvoidanceCheckRadius', &
+     'Check radius for penetration avoidance','5.0')
+call prms%CreateRealOption('PenetrationAvoidanceElementRadius', &
+     'Element impact radius for penetration avoidance','1.5')
 call prms%CreateLogicalOption('ViscosityEffects','Simulate viscosity &
                                                               & effects','F')
 call prms%CreateLogicalOption('ParticlesRedistribution','Employ particles &
@@ -787,6 +791,10 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%use_vd = getlogical(prms, 'Diffusion')
   sim_param%use_tv = getlogical(prms, 'TurbulentViscosity')
   sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
+  if(sim_param%use_pa) then
+    sim_param%pa_rad_mult = getreal(prms, 'PenetrationAvoidanceCheckRadius')
+    sim_param%pa_elrad_mult = getreal(prms,'PenetrationAvoidanceElementRadius')
+  endif
   sim_param%use_ve = getlogical(prms, 'ViscosityEffects')
   !Lifting line elements
   sim_param%llReynoldsCorrections           = getlogical(prms, 'LLreynoldsCorrections')

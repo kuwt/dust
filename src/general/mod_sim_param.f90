@@ -143,6 +143,10 @@ type t_sim_param
   logical :: use_tv
   !> use the penetration avoidance
   logical :: use_pa
+    !> check radius for penetration avoidance
+    real(wp) :: pa_rad_mult
+    !> element impact radius for penetration avoidance
+    real(wp) :: pa_elrad_mult
   !> simulate viscosity effects or not
   logical :: use_ve
 
@@ -270,6 +274,10 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%use_vd, 'vortdiff', loc)
   call write_hdf5_attr(this%use_tv, 'turbvort', loc)
   call write_hdf5_attr(this%use_pa, 'PenetrationAvoidance', loc)
+  if(this%use_pa) then
+    call write_hdf5_attr(this%pa_rad_mult, 'PenetrationAvoidanceCheckRadius', loc)
+    call write_hdf5_attr(this%pa_elrad_mult, 'PenetrationAvoidanceElementRadius', loc)
+  endif
   call write_hdf5_attr(this%use_ve, 'ViscosityEffects', loc)
   call write_hdf5_attr(this%use_fmm, 'use_fmm', loc)
   if(this%use_fmm) then

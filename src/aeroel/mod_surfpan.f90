@@ -294,6 +294,7 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
      R1 = norm2( pos - this%verp(:,i1) )
      R2 = norm2( pos - this%verp(:,indp1) )
      ! si = this%edge_len(i1)
+     if(sim_param%debug_level .ge.5) then
      if ( abs(R1+R2-this%edge_len(i1)) .lt. 1e-6 ) then
       call warning(this_sub_name, this_mod_name, &
         'too small denominator in calculation of velocity')
@@ -312,6 +313,7 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
       write(message,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
       call printout(message)
      end if
+     endif
      
      if ( R1+R2-this%edge_len(i1) .lt. 1e-12 ) then
        souLog = 0.0_wp

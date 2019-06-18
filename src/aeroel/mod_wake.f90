@@ -623,7 +623,7 @@ subroutine prepare_wake(wake, geo, elems)
       hcas_reltime = (sim_param%time-sim_param%t0)/sim_param%hcas_time
       if(hcas_reltime .le. 1.0_wp) then
         wake%part_p(ip)%p%vel = wake%part_p(ip)%p%vel + &
-          sim_param%hcas_vel*(1.0-hcas_reltime) !linear reduction
+          sim_param%hcas_vel*(1.0_wp-hcas_reltime) !linear reduction
       endif
     endif
     if(sim_param%use_pa) then
@@ -1983,11 +1983,11 @@ subroutine avoid_collision_2(elems, wake, part, vel_in, vel_out)
  real(wp) :: dampf
  
   !Multiplication factor for the check radius
-  rad_mult = 1000.0_wp
+  rad_mult = sim_param%pa_rad_mult
   !rad_mult = 2.0_wp
  
   !Multiplication factor for the element radius
-  elrad_mult = 1.0_wp
+  elrad_mult = sim_param%pa_elrad_mult
 
   ! Thickness of the "surface blocks" 
   ! ( now, HARDCODED. TODO: read as an input: same order of dimension of the blob radius )
@@ -2031,7 +2031,7 @@ subroutine avoid_collision_2(elems, wake, part, vel_in, vel_out)
         !If it is on the opposite side of the element, or it is moving away, 
         !do not perform any modification
 !       if (dist1_nor .lt. 0.0_wp .or. normvel.ge.0.0_wp) cycle
-        if (dist1_nor .lt. 0.0 .or. normvel.ge.0.0_wp) cycle
+        if (dist1_nor .lt. 0.0_wp .or. normvel.ge.0.0_wp) cycle
         
         !get the time at which the particle hits the surface
         !make sure not to go back in time
