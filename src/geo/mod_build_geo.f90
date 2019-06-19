@@ -192,6 +192,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  logical  :: te_proj_logical
  character(len=max_char_len) :: te_proj_dir
  real(wp) , allocatable :: te_proj_vec(:)
+ logical :: suppress_te
 
  ! trailing edge ------
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
@@ -250,6 +251,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                &ProjTeVector direction.','parallel') 
   call geo_prs%CreateRealArrayOption('ProjTeVector','Vector used for &
                &the te projection.')
+  call geo_prs%CreateLogicalOption('SuppressTe','Suppress the trailing edge &
+                                    &from the component','F')
 
   ! Section name from CGNS file
   call geo_prs%CreateStringOption('SectionName', &
@@ -275,6 +278,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   mesh_mirror   = getlogical(geo_prs, 'mesh_mirror')
   mirror_point  = getrealarray(geo_prs, 'mirror_point',3)
   mirror_normal = getrealarray(geo_prs, 'mirror_normal',3)
+
+  suppress_te = getlogical(geo_prs, 'SuppressTe')
 
   comp_el_type = getstr(geo_prs,'ElType')
   ElType = comp_el_type(1:1)
@@ -657,6 +662,13 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   call close_hdf5_group(geo_loc)
 
   if (ElType .ne. 'a') then
+    !supppress the trailing edge for the current component
+    if(suppress_te) then
+      !ignorance is strength, just kill all the trailing edge components
+      deallocate(e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te)
+      allocate(e_te(2,0), i_te(2,0), rr_te(3,0), ii_te(2,0), neigh_te(2,0))
+      allocate(o_te(2,0), t_te(3,0))
+    endif
     call new_hdf5_group(comp_loc, 'Trailing_Edge', te_loc)
     call write_hdf5(    e_te,    'e_te',te_loc)
     call write_hdf5(    i_te,    'i_te',te_loc)
