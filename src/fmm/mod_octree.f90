@@ -1121,7 +1121,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
   !for all the leaves apply the local expansion and then local interactions 
   t0 = dust_time()
 !$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, &
-!$omp& v, stretch, str, grad, alpha, dir, velv, stretchv) schedule(dynamic)
+!$omp& v, stretch, str, grad, alpha, dir, velv, stretchv, ave_ros, turbvisc, iln) schedule(dynamic)
   do lv = 1, octree%nleaves
     !I am on a leaf, cycle on all the particles inside the leaf
     allocate(velv(3,octree%leaves(lv)%p%npart),&
