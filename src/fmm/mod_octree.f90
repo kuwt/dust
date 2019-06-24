@@ -60,7 +60,7 @@ use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
 
 use mod_aeroel, only: &
-  t_elem_p, t_pot_elem_p, c_elem
+  t_elem_p, t_pot_elem_p, c_pot_elem, c_elem
 
 use mod_vortpart, only: &
   t_vortpart, t_vortpart_p
@@ -73,7 +73,7 @@ use mod_multipole, only: &
 implicit none
 
 public :: initialize_octree, destroy_octree, sort_particles, t_octree, &
-          calculate_multipole, apply_multipole
+          calculate_multipole, apply_multipole, apply_multipole_panels
 
 private
 
@@ -224,6 +224,7 @@ end type
 interface push_ptr
   module procedure push_cell_ptr_scalar, push_cell_ptr_vec
   module procedure push_part_ptr_scalar, push_part_ptr_vec
+  module procedure push_pan_ptr_scalar,  push_pan_ptr_vec
 end interface
 
 !----------------------------------------------------------------------
@@ -754,41 +755,7 @@ subroutine sort_particles(part, n_prt, elem, octree)
 
   enddo
 
-  !Sort also all the elements
-  do ip=1,size(elem)
-    !check in which cell at the lowest level it is located
-    idx = ceiling((elem(ip)%p%cen-octree%xmin)/csize)
-
-    !check that we are not sorting things outside the octree
-    if(any(idx.le.0).or.any(idx.gt.shape(octree%layers(ll)%lcells))) then
-      write(msg,*) 'Sorted element resulted outside octree box at: ',&
-                    elem(ip)%p%cen
-      call error(this_sub_name, this_mod_name, msg) 
-    endif
-
-    !add the particle to the lowest level
-    octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npan = &
-                    octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npan + 1
-    !call push_ptr(octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%cell_parts,part(ip)%p)
-
-  enddo
-  !From the second to last level upwards, add the panels
-  do l = ll-1,1,-1
-    !cycle on the elements on the level
-    do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
-
-      !cycle on the children, gather the number of particles and if are 
-      !leaves
-      do child = 1,8
-        octree%layers(l)%lcells(i,j,k)%npan = &
-              octree%layers(l)%lcells(i,j,k)%npan + &
-              octree%layers(l)%lcells(i,j,k)%children(child)%p%npan
-        !push all the panels pointers
-        !call push_ptr(octree%layers(l)%lcells(i,j,k)%cell_parts, &
-        !octree%layers(l)%lcells(i,j,k)%children(child)%p%cell_parts)
-      enddo !child
-    enddo; enddo; enddo !layer cells i,j,k
-  enddo
+  
 
 
 
@@ -1316,6 +1283,128 @@ end subroutine apply_multipole
 
 !----------------------------------------------------------------------
 
+!> Apply multipole to the panels
+subroutine apply_multipole_panels(octree, elem)
+ type(t_octree), intent(inout) :: octree
+ type(t_pot_elem_p), intent(in) :: elem(:)
+
+ integer :: i, j, k, lv, ip, ipp, m, ie, iln
+ real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3), dir(3)
+ real(wp), allocatable :: velv(:,:), stretchv(:,:)
+ real(wp) :: grad(3,3)
+ real(t_realtime) :: tsta , tend
+ real(wp) :: turbvisc, ave_ros
+
+ integer :: child, idx(3), l, ll
+ real(wp) :: csize
+
+ character(len=*), parameter :: this_sub_name = 'apply_multipole_panels'
+
+  ll = octree%nlevels
+  csize = octree%layers(ll)%cell_size
+  !Sort also all the elements
+  do ip=1,size(elem)
+    !check in which cell at the lowest level it is located
+    idx = ceiling((elem(ip)%p%cen-octree%xmin)/csize)
+
+    !check that we are not sorting things outside the octree
+    if(any(idx.le.0).or.any(idx.gt.shape(octree%layers(ll)%lcells))) then
+      write(msg,*) 'Sorted element resulted outside octree box at: ',&
+                    elem(ip)%p%cen
+      call error(this_sub_name, this_mod_name, msg) 
+    endif
+
+    !add the particle to the lowest level
+    octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npan = &
+                    octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npan + 1
+    call push_ptr(octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%cell_pans, &
+                  elem(ip)%p)
+
+  enddo
+  !From the second to last level upwards, add the panels
+  do l = ll-1,1,-1
+    !cycle on the elements on the level
+    do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
+
+      !cycle on the children, gather the number of particles and if are 
+      !leaves
+      do child = 1,8
+        octree%layers(l)%lcells(i,j,k)%npan = &
+              octree%layers(l)%lcells(i,j,k)%npan + &
+              octree%layers(l)%lcells(i,j,k)%children(child)%p%npan
+        !push all the panels pointers
+        call push_ptr(octree%layers(l)%lcells(i,j,k)%cell_pans, &
+        octree%layers(l)%lcells(i,j,k)%children(child)%p%cell_pans)
+      enddo !child
+    enddo; enddo; enddo !layer cells i,j,k
+  enddo
+
+
+  tsta = dust_time()
+  !for all the leaves apply the local expansion and then local interactions 
+  t0 = dust_time()
+!$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, &
+!$omp& v, stretch, str, grad, alpha, dir, velv, stretchv, ave_ros, turbvisc, iln) schedule(dynamic)
+  do lv = 1, octree%nleaves
+    !I am on a leaf, cycle on all the particles inside the leaf
+
+    do ip = 1,octree%leaves(lv)%p%npan
+      
+      vel = 0.0_wp
+      pos = octree%leaves(lv)%p%cell_pans(ip)%p%cen
+
+      !first apply the local multipole expansion
+      do m = 1,size(octree%leaves(lv)%p%mp%b,2)
+        !velocity
+        vel = vel + &
+          octree%leaves(lv)%p%mp%b(:,m)* &
+          product((pos-octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
+      enddo
+
+      !then interact with all the neighbouring cell particles
+      do k=-1,1; do j=-1,1; do i=-1,1
+        if(associated(octree%leaves(lv)%p%neighbours(i,j,k)%p)) then
+        if(octree%leaves(lv)%p%neighbours(i,j,k)%p%active) then
+          do ipp = 1,octree%leaves(lv)%p%neighbours(i,j,k)%p%npart
+
+            call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
+                 %compute_vel(pos, sim_param%u_inf, v)
+            vel = vel +v/(4.0_wp*pi)
+          enddo
+        endif
+        endif
+      enddo; enddo; enddo
+
+      !interact with the leaf neighbours
+      do iln = 1,size(octree%leaves(lv)%p%leaf_neigh)
+       do ipp = 1,octree%leaves(lv)%p%leaf_neigh(iln)%p%npart
+
+         call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
+              %compute_vel(pos, sim_param%u_inf, v)
+         vel = vel +v/(4.0_wp*pi)
+       enddo
+      enddo
+
+      !finally interact with the particles inside the cell 
+      do ipp = 1,octree%leaves(lv)%p%npart
+        call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_vel(pos, &
+                                                      sim_param%u_inf, v)
+        vel = vel +v/(4.0_wp*pi)
+      enddo
+
+      octree%leaves(lv)%p%cell_pans(ip)%p%uvort = &
+      octree%leaves(lv)%p%cell_pans(ip)%p%uvort + vel
+    enddo
+  enddo
+!Don't ask me why, but without this pragma it is much faster!
+!$omp end parallel do
+  t1 = dust_time()
+  write(msg,'(A,F9.3,A)') 'Calculated panels interactions in: ' , t1 - t0,' s.'
+  if(sim_param%debug_level.ge.5) call printout(msg)
+  
+end subroutine apply_multipole_panels
+!----------------------------------------------------------------------
+
 !! DISCONTINUED
 !!!> Check the quantity of particles in a cell
 !!!!
@@ -1578,6 +1667,53 @@ subroutine push_part_ptr_vec(pointers, elements)
   enddo
 
 end subroutine push_part_ptr_vec
+
+!----------------------------------------------------------------------
+
+!> Push another pointer to a list of panels pointers
+subroutine push_pan_ptr_scalar(pointers, particle)
+ type(t_pot_elem_p), allocatable, target, intent(inout) :: pointers(:)
+ class(c_pot_elem), intent(in), target :: particle
+
+ type(t_pot_elem_p) :: tmp_ptr(size(pointers)+1)
+ integer :: i, l
+
+  l = size(pointers)
+  do i=1,l
+    tmp_ptr(i)%p => pointers(i)%p
+  enddo
+  deallocate(pointers); allocate(pointers(l+1))
+  do i=1,l
+    pointers(i)%p => tmp_ptr(i)%p
+  enddo
+  pointers(l+1)%p => particle
+
+end subroutine push_pan_ptr_scalar
+
+!----------------------------------------------------------------------
+
+!> Push another pointer list to a list of panels pointers
+subroutine push_pan_ptr_vec(pointers, elements)
+ type(t_pot_elem_p), allocatable, target, intent(inout) :: pointers(:)
+ type(t_pot_elem_p), target, intent(in) :: elements(:)
+
+ type(t_pot_elem_p) :: tmp_ptr(size(pointers)+1)
+ integer :: i, l, m
+
+  l = size(pointers)
+  m = size(elements)
+  do i=1,l
+    tmp_ptr(i)%p => pointers(i)%p
+  enddo
+  deallocate(pointers); allocate(pointers(l+m))
+  do i=1,l
+    pointers(i)%p => tmp_ptr(i)%p
+  enddo
+  do i = 1,m
+    pointers(l+i)%p => elements(i)%p
+  enddo
+
+end subroutine push_pan_ptr_vec
 
 !----------------------------------------------------------------------
 

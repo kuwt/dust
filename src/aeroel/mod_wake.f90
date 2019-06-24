@@ -872,7 +872,11 @@ subroutine prepare_wake(wake, geo, elems)
     if ( wake%full_panels .or. wake%full_rings ) then
       n_end_vort = wake%n_pan_stripes
     end if
-    allocate(wake%vort_p(wake%n_prt + n_end_vort))
+    if(sim_param%use_fmm) then
+      allocate(wake%vort_p( n_end_vort))
+    else
+      allocate(wake%vort_p(wake%n_prt + n_end_vort))
+    endif
     !TODO: consider inverting these two cycles
     k = 1
     do ip = 1, wake%n_prt
@@ -880,7 +884,7 @@ subroutine prepare_wake(wake, geo, elems)
         if(.not. wake%wake_parts(ir)%free) then
           k = ir+1
           wake%part_p(ip)%p => wake%wake_parts(ir)
-          wake%vort_p(ip)%p => wake%wake_parts(ir)
+          if(.not.sim_param%use_fmm) wake%vort_p(ip)%p => wake%wake_parts(ir)
           exit
         endif
       enddo
@@ -888,7 +892,11 @@ subroutine prepare_wake(wake, geo, elems)
     !Add the end vortex to the votical elements pointer
 !   if ( wake%full_panels .or. wake%full_rings ) then ! useless if ( n_end_vort may be 0 )
     do iw = 1, n_end_vort
-      wake%vort_p(wake%n_prt+iw)%p => wake%end_vorts(iw)
+      if(sim_param%use_fmm) then
+        wake%vort_p(iw)%p => wake%end_vorts(iw)
+      else
+        wake%vort_p(wake%n_prt+iw)%p => wake%end_vorts(iw)
+      endif
     enddo
 !   end if
   endif
@@ -912,9 +920,10 @@ end subroutine prepare_wake
 !----------------------------------------------------------------------
 
 !> Load the wake panels solution from a previous result
-subroutine load_wake(filename, wake)
+subroutine load_wake(filename, wake, elems)
  character(len=*), intent(in) :: filename
  type(t_wake), intent(inout), target :: wake
+ type(t_pot_elem_p), intent(inout) :: elems(:)
 
  integer(h5loc) :: floc, gloc
  real(wp), allocatable :: wpoints(:,:,:), wvels(:,:,:), wvort(:,:)
@@ -922,7 +931,8 @@ subroutine load_wake(filename, wake)
  integer, allocatable :: start_points(:,:)
  integer, allocatable :: conn_pe(:)
  integer :: ipan, iw, p1, p2, ipt
- integer :: id, ir, ip, np
+ integer :: id, ir, ip, np, ie
+ real(wp) :: vel(3)
  character(len=*), parameter :: this_sub_name = 'load_wake'
    
   call open_hdf5_file(filename, floc)
@@ -1042,9 +1052,18 @@ subroutine load_wake(filename, wake)
   allocate(wake%part_p(wake%n_prt))
   if(wake%n_prt .gt. 0) then
     deallocate(wake%vort_p)
-    allocate(wake%vort_p(wake%n_prt+wake%n_pan_stripes))
+    if(sim_param%use_fmm) then
+      allocate(wake%vort_p(wake%n_pan_stripes))
+    else
+      allocate(wake%vort_p(wake%n_prt+wake%n_pan_stripes))
+    endif
+
     do iw = 1, wake%n_pan_stripes 
-      wake%vort_p(wake%n_prt+iw)%p => wake%end_vorts(iw)
+      if(sim_param%use_fmm) then
+        wake%vort_p(iw)%p => wake%end_vorts(iw)
+      else
+        wake%vort_p(wake%n_prt+iw)%p => wake%end_vorts(iw)
+      endif
     enddo
   endif
 
@@ -1059,7 +1078,7 @@ subroutine load_wake(filename, wake)
     endif
     wake%wake_parts(ip)%free = .false.
     wake%part_p(ip)%p => wake%wake_parts(ip)
-    wake%vort_p(ip)%p => wake%wake_parts(ip)
+    if(.not.sim_param%use_fmm) wake%vort_p(ip)%p => wake%wake_parts(ip)
   enddo
   
   deallocate(vppoints, vpvort, vpvels)
@@ -1079,6 +1098,23 @@ subroutine load_wake(filename, wake)
                     wake%pan_w_points(:,p2,wake%pan_wake_len+1)/), (/3,2/)))
     enddo
   endif
+  
+  !If there are particles and the multipole is employed, i
+  !need to pre-compute the particles induced velocity now
+  if(sim_param%use_fmm .and. wake%n_prt .gt. 0) then
+!$omp parallel do private(ie, ip, vel)
+    do ie = 1, size(elems)
+      elems(ie)%p%uvort = 0.0
+      do ip = 1,wake%n_prt
+        call wake%part_p(ip)%p%compute_vel(elems(ie)%p%cen, &
+                                               sim_param%u_inf, vel)
+         elems(ie)%p%uvort = elems(ie)%p%uvort + vel/(4.0_wp*pi)
+      enddo
+    enddo
+!$omp end parallel do
+  endif
+
+
 end subroutine load_wake
 
 

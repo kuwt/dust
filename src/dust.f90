@@ -131,7 +131,8 @@ use mod_viscosity, only: &
   viscosity_effects
 
 use mod_octree, only: &
-  initialize_octree, destroy_octree, sort_particles, t_octree
+  initialize_octree, destroy_octree, sort_particles, t_octree, &
+  apply_multipole_panels
 
 implicit none
 
@@ -192,7 +193,7 @@ real(wp) , allocatable :: res_old(:)
 real(wp) , allocatable :: surf_vel_SurfPan_old(:,:)
 real(wp) , allocatable ::      nor_SurfPan_old(:,:)
 
-integer :: i_el , i, sel
+integer :: i_el , i, sel, ie
 
 !octree parameters
 type(t_octree) :: octree
@@ -467,7 +468,7 @@ endif
 !------ Reloading ------
 if (sim_param%restart_from_file) then
  call load_solution(sim_param%restart_file, geo%components, geo%refs)
- call load_wake(sim_param%restart_file, wake)
+ call load_wake(sim_param%restart_file, wake, elems_tot)
 
 ! Moved to mod_geo.f90/create_geometry()
 !! Update the initial relative position of the ref.sys.
@@ -665,9 +666,13 @@ do it = 1,nstep
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
 
   if(it .lt. nstep) then 
+    do ie = 1,size(elems_tot)
+      elems_tot(ie)%p%uvort = 0.0_wp
+    enddo
     !time = min(sim_param%tend, time+sim_param%dt)
     time = min(sim_param%tend, sim_param%time_vec(it+1))
     call update_geometry(geo, time, .false.)
+    call apply_multipole_panels(octree, elems_tot)
     call prepare_wake(wake, geo, elems_tot)
   endif
 

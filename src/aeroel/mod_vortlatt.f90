@@ -531,7 +531,7 @@ subroutine get_vort_vel_vortlatt(this, vort_elems, uinf)
  integer :: iv
  real(wp) :: vel(3)
 
- this%uvort = 0.0_wp
+ !this%uvort = 0.0_wp
 
  do iv=1,size(vort_elems)
    call vort_elems(iv)%p%compute_vel(this%cen, uinf, vel)
