@@ -111,7 +111,7 @@ use mod_parse, only: &
 
 use mod_wake, only: &
   t_wake, initialize_wake, update_wake, &
-  prepare_wake, load_wake, destroy_wake
+  prepare_wake, load_wake, complete_wake, destroy_wake
 
 use mod_vtk_out, only: &
   vtk_out_bin
@@ -512,8 +512,7 @@ do it = 1,nstep
   !time related checks
   call init_timestep(time)
 
-  !call update_geometry(geo, time, .false.)
-  !call prepare_wake(wake, geo, sim_param, it)
+  call prepare_wake(wake, elems_tot, octree)
  
   call update_liftlin(elems_ll,linsys)
   call update_actdisk(elems_ad,linsys)
@@ -633,7 +632,7 @@ do it = 1,nstep
   ! pres_IE +++++
 
 
-  !Print the results
+  !----- Print the results -----
   if(time_2_out)  then
     nout = nout+1
     call save_status(geo, wake, nout, time, run_id)
@@ -655,7 +654,7 @@ do it = 1,nstep
     call printout(message)
   endif
 
-  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
+  ! Pressure integral equation  +++++++
   ! save old velocity on the surfpan (before updating the geom, few lines below)
   do i_el = 1 , geo%nSurfPan
     select type ( el => elems(i_el)%p ) ; class is ( t_surfpan )
@@ -663,17 +662,13 @@ do it = 1,nstep
            nor_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) = el%nor  ! el%surf_vel
     end select
   end do
-  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++++++++++
+  ! Pressure integral equation ++++++++
 
   if(it .lt. nstep) then 
-    do ie = 1,size(elems_tot)
-      elems_tot(ie)%p%uvort = 0.0_wp
-    enddo
     !time = min(sim_param%tend, time+sim_param%dt)
     time = min(sim_param%tend, sim_param%time_vec(it+1))
     call update_geometry(geo, time, .false.)
-    call apply_multipole_panels(octree, elems_tot)
-    call prepare_wake(wake, geo, elems_tot)
+    call complete_wake(wake, geo, elems_tot)
   endif
 
 enddo

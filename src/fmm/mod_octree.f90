@@ -57,7 +57,7 @@ use mod_sim_param, only: &
   sim_param
 
 use mod_handling, only: &
-  error, warning, info, printout, dust_time, t_realtime
+  error, warning, info, printout, dust_time, t_realtime, internal_error
 
 use mod_aeroel, only: &
   t_elem_p, t_pot_elem_p, c_pot_elem, c_elem
@@ -692,13 +692,13 @@ end subroutine
 !----------------------------------------------------------------------
 
 !> Sort particles inside the octree grid
-subroutine sort_particles(part, n_prt, elem, octree)
- type(t_vortpart_p), intent(in), target :: part(:)
+subroutine sort_particles(wparts, n_prt, elem, octree)
+ type(t_vortpart), intent(inout), target :: wparts(:)
  integer, intent(inout) :: n_prt
  type(t_pot_elem_p), intent(in) :: elem(:)
  type(t_octree), intent(inout), target :: octree
 
- integer :: ip
+ integer :: ip, ipp
  integer :: idx(3)
  real(wp) :: csize
  integer :: l, i,j,k, child, ic,jc,kc, in,jn,kn
@@ -734,28 +734,72 @@ subroutine sort_particles(part, n_prt, elem, octree)
   
   !cycle on all the particles
   !TODO: make this parallel too, but pay attention to the race conditions
-  do ip=1,size(part)
+  ipp = 0
+  do ip=1,n_prt
+    ipp = ipp + 1
+    do while(wparts(ipp)%free)
+        ipp = ipp +1
+        if(ipp .gt. n_prt) call internal_error(this_sub_name, this_mod_name, &
+        'not enough non-free particles while sorting')
+    enddo
     !check in which cell at the lowest level it is located
-    idx = ceiling((part(ip)%p%cen-octree%xmin)/csize)
+    idx = ceiling((wparts(ipp)%cen-octree%xmin)/csize)
 
     !check that we are not sorting things outside the octree
     if(any(idx.le.0).or.any(idx.gt.shape(octree%layers(ll)%lcells))) then
       write(msg,*) 'Sorted particle resulted outside octree box at: ',&
-                    part(ip)%p%cen
+                    wparts(ipp)%cen
       call error(this_sub_name, this_mod_name, msg) 
     endif
 
     !add the particle to the lowest level
     octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npart = &
                     octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npart + 1
-    call push_ptr(octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%cell_parts,part(ip)%p)
+    call push_ptr(octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%cell_parts, &
+                  wparts(ipp))
     octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%ave_vortmag =  &
       octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%ave_vortmag + &
-      part(ip)%p%mag
+      wparts(ipp)%mag
 
   enddo
 
   
+  !Sort also all the elements
+  do ip=1,size(elem)
+    !check in which cell at the lowest level it is located
+    idx = ceiling((elem(ip)%p%cen-octree%xmin)/csize)
+
+    !check that we are not sorting things outside the octree
+    if(any(idx.le.0).or.any(idx.gt.shape(octree%layers(ll)%lcells))) then
+      write(msg,*) 'Sorted element resulted outside octree box at: ',&
+                    elem(ip)%p%cen
+      call error(this_sub_name, this_mod_name, msg) 
+    endif
+
+    !add the particle to the lowest level
+    octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npan = &
+                    octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npan + 1
+    call push_ptr(octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%cell_pans, &
+                  elem(ip)%p)
+
+  enddo
+  !From the second to last level upwards, add the panels
+  do l = ll-1,1,-1
+    !cycle on the elements on the level
+    do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
+
+      !cycle on the children, gather the number of particles and if are 
+      !leaves
+      do child = 1,8
+        octree%layers(l)%lcells(i,j,k)%npan = &
+              octree%layers(l)%lcells(i,j,k)%npan + &
+              octree%layers(l)%lcells(i,j,k)%children(child)%p%npan
+        !push all the panels pointers
+        call push_ptr(octree%layers(l)%lcells(i,j,k)%cell_pans, &
+        octree%layers(l)%lcells(i,j,k)%children(child)%p%cell_pans)
+      enddo !child
+    enddo; enddo; enddo !layer cells i,j,k
+  enddo
 
 
 
@@ -1299,45 +1343,6 @@ subroutine apply_multipole_panels(octree, elem)
  real(wp) :: csize
 
  character(len=*), parameter :: this_sub_name = 'apply_multipole_panels'
-
-  ll = octree%nlevels
-  csize = octree%layers(ll)%cell_size
-  !Sort also all the elements
-  do ip=1,size(elem)
-    !check in which cell at the lowest level it is located
-    idx = ceiling((elem(ip)%p%cen-octree%xmin)/csize)
-
-    !check that we are not sorting things outside the octree
-    if(any(idx.le.0).or.any(idx.gt.shape(octree%layers(ll)%lcells))) then
-      write(msg,*) 'Sorted element resulted outside octree box at: ',&
-                    elem(ip)%p%cen
-      call error(this_sub_name, this_mod_name, msg) 
-    endif
-
-    !add the particle to the lowest level
-    octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npan = &
-                    octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npan + 1
-    call push_ptr(octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%cell_pans, &
-                  elem(ip)%p)
-
-  enddo
-  !From the second to last level upwards, add the panels
-  do l = ll-1,1,-1
-    !cycle on the elements on the level
-    do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
-
-      !cycle on the children, gather the number of particles and if are 
-      !leaves
-      do child = 1,8
-        octree%layers(l)%lcells(i,j,k)%npan = &
-              octree%layers(l)%lcells(i,j,k)%npan + &
-              octree%layers(l)%lcells(i,j,k)%children(child)%p%npan
-        !push all the panels pointers
-        call push_ptr(octree%layers(l)%lcells(i,j,k)%cell_pans, &
-        octree%layers(l)%lcells(i,j,k)%children(child)%p%cell_pans)
-      enddo !child
-    enddo; enddo; enddo !layer cells i,j,k
-  enddo
 
 
   tsta = dust_time()

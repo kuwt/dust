@@ -99,7 +99,8 @@ use mod_hdf5_io, only: &
    check_dset_hdf5
 
 use mod_octree, only: &
-  t_octree, sort_particles, calculate_multipole, apply_multipole
+  t_octree, sort_particles, calculate_multipole, apply_multipole, &
+  apply_multipole_panels
 
 !$ use omp_lib, only: &
 !$   omp_get_thread_num, omp_get_num_threads
@@ -108,7 +109,7 @@ use mod_octree, only: &
 implicit none
 
 public :: t_wake, initialize_wake, update_wake, &
-          prepare_wake, load_wake, destroy_wake
+          prepare_wake, complete_wake, load_wake, destroy_wake
 
 private
 
@@ -544,9 +545,661 @@ end subroutine
 
 !----------------------------------------------------------------------
 
+!> Load the wake panels solution from a previous result
+subroutine load_wake(filename, wake, elems)
+ character(len=*), intent(in) :: filename
+ type(t_wake), intent(inout), target :: wake
+ type(t_pot_elem_p), intent(inout) :: elems(:)
+
+ integer(h5loc) :: floc, gloc
+ real(wp), allocatable :: wpoints(:,:,:), wvels(:,:,:), wvort(:,:)
+ real(wp), allocatable :: vppoints(:,:), vpvort(:,:) , vpvels(:,:)
+ integer, allocatable :: start_points(:,:)
+ integer, allocatable :: conn_pe(:)
+ integer :: ipan, iw, p1, p2, ipt
+ integer :: id, ir, ip, np, ie
+ real(wp) :: vel(3)
+ character(len=*), parameter :: this_sub_name = 'load_wake'
+   
+  call open_hdf5_file(filename, floc)
+
+  !=== Panels ===
+  !Read the past results
+  call open_hdf5_group(floc, 'PanelWake', gloc)
+
+  call read_hdf5_al(wpoints,'WakePoints',gloc)
+  call read_hdf5_al(wvels  ,'WakeVels'  ,gloc)
+  call read_hdf5_al(start_points,'StartPoints',gloc)
+  call read_hdf5_al(wvort,'WakeVort',gloc)
+
+  call close_hdf5_group(gloc)
+  !call close_hdf5_file(floc)
+
+  !Perform a few checks to be sure that the correct size solution was loaded
+  if(.not. all(start_points .eq. wake%i_start_points)) call error( &
+    this_sub_name, this_mod_name, 'Different wake trailing edge connectivity&
+    & between the loded and built geometry')
+
+  !the wake length is the loaded one, or less if imposed so
+  wake%pan_wake_len = min(wake%nmax_pan, size(wvort,2))
+
+  !store points position and doublets intensity
+  wake%pan_w_points(:,:,1:wake%pan_wake_len+1) = wpoints(:,:,1:wake%pan_wake_len+1)
+  wake%pan_w_vel(   :,:,1:wake%pan_wake_len+1) = wvels(  :,:,1:wake%pan_wake_len+1)
+  wake%pan_idou(:,1:wake%pan_wake_len) = wvort(:,1:wake%pan_wake_len)
+
+  deallocate(wake%pan_p)
+  allocate(wake%pan_p(wake%n_pan_stripes*wake%pan_wake_len))
+  ! Update the panels geometrical quantities of all the panels
+  ipt = 1
+  do ipan = 1,wake%pan_wake_len
+    do iw = 1,wake%n_pan_stripes
+      p1 = wake%i_start_points(1,iw)
+      p2 = wake%i_start_points(2,iw)
+      call wake%wake_panels(iw,ipan)%calc_geo_data( &
+           reshape((/wake%pan_w_points(:,p1,ipan),   wake%pan_w_points(:,p2,ipan), &
+                    wake%pan_w_points(:,p2,ipan+1), wake%pan_w_points(:,p1,ipan+1)/),&
+                                                                     (/3,4/)))
+      wake%pan_p(ipt)%p => wake%wake_panels(iw,ipan)
+      ipt = ipt + 1
+    enddo
+  enddo
+
+  deallocate(wpoints, wvels, wvort, start_points)
+
+  !=== Rings ===
+  !Read the past results
+  !call open_hdf5_file(filename, floc)
+  call open_hdf5_group(floc, 'RingWake', gloc)
+
+  call read_hdf5_al(wpoints,'WakePoints',gloc)
+  call read_hdf5_al(conn_pe,'Conn_pe',gloc)
+  call read_hdf5_al(wvort,'WakeVort',gloc)
+
+  call close_hdf5_group(gloc)
+  !call close_hdf5_file(floc)
+
+  !check the consistency
+  ip = 1
+  do id = 1,wake%ndisks
+    np = wake%rin_gen_elems(id)%p%n_ver
+    if (.not. all(conn_pe(ip:ip+np-1) .eq. id)) call error( &
+    this_sub_name, this_mod_name, 'Different wake disk connectivity&
+    & between the loded and built geometry')
+    ip = ip+np
+  enddo
+
+  !the wake length is the loaded one, or less if imposed so
+  wake%rin_wake_len = min(wake%nmax_rin, size(wvort,2))
+
+  !Load the old results
+  ip = 1
+  do id = 1,wake%ndisks
+    np = wake%rin_gen_elems(id)%p%n_ver
+    do ir = 1,wake%rin_wake_len
+      wake%wake_rings(id,ir)%ver(:,:) = wpoints(:,ip:ip+np-1,ir)
+    enddo
+    ip = ip+np
+  enddo
+  wake%rin_idou(:,1:wake%rin_wake_len) = wvort(:,1:wake%rin_wake_len)
+
+  deallocate(wake%rin_p); allocate(wake%rin_p(wake%ndisks*wake%rin_wake_len))
+
+  !Update the geometrical quantities
+  ipt = 1
+  do ir = 1,wake%rin_wake_len
+    do id = 1,wake%ndisks
+      call wake%wake_rings(id,ir)%calc_geo_data( &
+                    wake%wake_rings(id,ir)%ver)
+      wake%rin_p(ipt)%p => wake%wake_rings(id,ir)
+      ipt = ipt + 1
+    enddo
+  enddo
+
+  !=== Particles ===
+  call open_hdf5_group(floc, 'ParticleWake', gloc)
+  call read_hdf5_al(vppoints,'WakePoints',gloc)
+  if ( check_dset_hdf5('WakeVels',gloc) ) then
+    call read_hdf5_al(vpvels,'WakeVels',gloc) ! <<<< restart with Bernoulli integral equation
+  end if
+  call read_hdf5_al(vpvort,'WakeVort',gloc)
+  call read_hdf5(wake%last_pan_idou,'LastPanIdou',gloc)
+  call close_hdf5_group(gloc)
+  
+  if(size(vpvort,2) .gt. wake%nmax_prt) call error(this_sub_name, &
+    this_mod_name, 'Loading a number of particles &
+    & greater than the maximum allowed for this run: cannot truncate the &
+    & particles in a meaningful way. Consider restarting the run with a &
+    & higher amount of maximum particles')
+
+  wake%n_prt = size(vpvort,2)
+
+  deallocate(wake%part_p)
+  allocate(wake%part_p(wake%n_prt))
+  if(wake%n_prt .gt. 0) then
+    deallocate(wake%vort_p)
+    if(sim_param%use_fmm) then
+      allocate(wake%vort_p(wake%n_pan_stripes))
+    else
+      allocate(wake%vort_p(wake%n_prt+wake%n_pan_stripes))
+    endif
+
+    do iw = 1, wake%n_pan_stripes 
+      if(sim_param%use_fmm) then
+        wake%vort_p(iw)%p => wake%end_vorts(iw)
+      else
+        wake%vort_p(wake%n_prt+iw)%p => wake%end_vorts(iw)
+      endif
+    enddo
+  endif
+
+  do ip = 1,wake%n_prt
+    wake%wake_parts(ip)%cen = vppoints(:,ip)
+    wake%wake_parts(ip)%vel = vpvels(:,ip)
+    wake%wake_parts(ip)%mag = norm2(vpvort(:,ip))
+    if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
+      wake%wake_parts(ip)%dir = vpvort(:,ip)/wake%wake_parts(ip)%mag
+    else
+      wake%wake_parts(ip)%dir = vpvort(:,ip)
+    endif
+    wake%wake_parts(ip)%free = .false.
+    wake%part_p(ip)%p => wake%wake_parts(ip)
+    if(.not.sim_param%use_fmm) wake%vort_p(ip)%p => wake%wake_parts(ip)
+  enddo
+  
+  deallocate(vppoints, vpvort, vpvels)
+  
+  call close_hdf5_file(floc)
+
+
+  if(wake%pan_wake_len .eq. wake%nmax_pan) wake%full_panels=.true.
+  !If the wake is full, attach the end vortex
+  if (wake%full_panels) then
+    do iw = 1,wake%n_pan_stripes
+      wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag
+      p1 = wake%i_start_points(1,iw)
+      p2 = wake%i_start_points(2,iw)
+      call wake%end_vorts(iw)%calc_geo_data( &
+          reshape((/wake%pan_w_points(:,p1,wake%pan_wake_len+1),  &
+                    wake%pan_w_points(:,p2,wake%pan_wake_len+1)/), (/3,2/)))
+    enddo
+  endif
+  
+!!!  !If there are particles and the multipole is employed, i
+!!!  !need to pre-compute the particles induced velocity now
+!!!  if(sim_param%use_fmm .and. wake%n_prt .gt. 0) then
+!!!!$omp parallel do private(ie, ip, vel)
+!!!    do ie = 1, size(elems)
+!!!      elems(ie)%p%uvort = 0.0
+!!!      do ip = 1,wake%n_prt
+!!!        call wake%part_p(ip)%p%compute_vel(elems(ie)%p%cen, &
+!!!                                               sim_param%u_inf, vel)
+!!!         elems(ie)%p%uvort = elems(ie)%p%uvort + vel/(4.0_wp*pi)
+!!!      enddo
+!!!    enddo
+!!!!$omp end parallel do
+!!!  endif
+
+
+end subroutine load_wake
+
+!----------------------------------------------------------------------
+
+!> Prepare the wake before the timestep
+!!
+!! Mainly prepare all the structures for the octree
+subroutine prepare_wake(wake, elems, octree)
+ type(t_wake), intent(inout), target :: wake
+ type(t_pot_elem_p), intent(inout) :: elems(:)
+ type(t_octree), intent(inout) :: octree
+
+ integer :: k, ip, ir, iw, ie, n_end_vort
+  
+  !reset all the vorticity induced velocity
+  do ie = 1,size(elems)
+    elems(ie)%p%uvort = 0.0_wp
+  enddo
+
+  if (sim_param%use_fmm) then
+    call sort_particles(wake%wake_parts, wake%n_prt, elems, octree)
+    call calculate_multipole(wake%part_p, octree)
+    call apply_multipole_panels(octree, elems)
+  endif
+
+  !==>Recreate sturctures and pointers, if particles are present
+  if(wake%full_panels .or. wake%full_rings .or. (wake%n_prt.gt.0) ) then
+    !Recreate the pointer vector
+    if(allocated(wake%part_p)) deallocate(wake%part_p)
+    allocate(wake%part_p(wake%n_prt))
+    deallocate(wake%vort_p)
+    ! to add or not line vortices at the (only when ring or panel wakes are full )
+    n_end_vort = 0
+    if ( wake%full_panels .or. wake%full_rings ) then
+      n_end_vort = wake%n_pan_stripes
+    end if
+    if(sim_param%use_fmm) then
+      allocate(wake%vort_p( n_end_vort))
+    else
+      allocate(wake%vort_p(wake%n_prt + n_end_vort))
+    endif
+    !TODO: consider inverting these two cycles
+    k = 1
+    do ip = 1, wake%n_prt
+      do ir=k,wake%nmax_prt
+        if(.not. wake%wake_parts(ir)%free) then
+          k = ir+1
+          wake%part_p(ip)%p => wake%wake_parts(ir)
+          if(.not.sim_param%use_fmm) wake%vort_p(ip)%p => wake%wake_parts(ir)
+          exit
+        endif
+      enddo
+    enddo
+    !Add the end vortex to the votical elements pointer
+!   if ( wake%full_panels .or. wake%full_rings ) then ! useless if ( n_end_vort may be 0 )
+    do iw = 1, n_end_vort
+      if(sim_param%use_fmm) then
+        wake%vort_p(iw)%p => wake%end_vorts(iw)
+      else
+        wake%vort_p(wake%n_prt+iw)%p => wake%end_vorts(iw)
+      endif
+    enddo
+!   end if
+  endif
+
+end subroutine prepare_wake
+
+!----------------------------------------------------------------------
+
+!> Update the position and the intensities of the wake panels
+!!
+!! Note: at this subroutine is passed the whole array of elements,
+!! comprising both the implicit panels and the explicit (ll)
+!! elements
+subroutine update_wake(wake, elems, octree)
+ type(t_wake), intent(inout), target :: wake
+ type(t_pot_elem_p), intent(in) :: elems(:)
+ type(t_octree), intent(inout) :: octree
+
+ integer :: iw, ipan, ie, ip, np, iq
+ integer :: id, ir
+ real(wp) :: pos_p(3), vel_p(3)
+ real(wp) :: str(3), stretch(3)
+ real(wp) :: df(3), diff(3)
+ type(t_pot_elem_p), allocatable :: pan_p_temp(:)
+ real(wp), allocatable :: point_old(:,:,:)
+ real(wp), allocatable :: points(:,:,:)
+ logical :: increase_wake
+ integer :: size_old
+ character(len=*), parameter :: this_sub_name='update_wake'
+
+  wake%w_vel = 0.0_wp
+
+  if(wake%pan_wake_len .eq. wake%nmax_pan) wake%full_panels=.true.
+
+  !==> Panels:  Update the first row of vortex intensities:
+  !      it was already calculated (implicitly) in the linear system
+  do iw = 1,wake%n_pan_stripes
+    !
+    if      ( associated(wake%pan_gen_elems(2,iw)%p) ) then
+      wake%wake_panels(iw,1)%mag  = wake%pan_gen_elems(1,iw)%p%mag - &
+                                     wake%pan_gen_elems(2,iw)%p%mag
+    else if ( .not. associated(wake%pan_gen_elems(2,iw)%p) ) then
+      wake%wake_panels(iw,1)%mag  = wake%pan_gen_elems(1,iw)%p%mag
+    end if
+
+  enddo
+
+  !==> Panels: Update wake points position ==
+
+  !Save the old positions for the integration
+  allocate(point_old(size(wake%pan_w_points,1),size(wake%pan_w_points,2), &
+                                               size(wake%pan_w_points,3)))
+  point_old = wake%pan_w_points
+
+  !calculate the velocities at the old positions of the points and then
+  !update the positions (from the third row of points: the first is the
+  !trailing edge, the second is extrapolated from the trailing edge)
+  np = wake%pan_wake_len+1
+  !if(wake%pan_wake_len .lt. wake%nmax_pan) np = np + 1
+  if(.not.wake%full_panels) np = np + 1
+
+!$omp parallel do collapse(2) private(pos_p, vel_p, ie, ipan, iw) schedule(dynamic)
+  do ipan = 3,np
+    do iw = 1,wake%n_pan_points
+      pos_p = point_old(:,iw,ipan-1)
+      vel_p = 0.0_wp
+
+      !call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
+
+      !! for OUTPUT only -----
+      !wake%w_vel(:,iw,ipan-1) = vel_p
+
+      !vel_p    = vel_p   + sim_param%u_inf
+      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
+
+      !update the position in time
+      wake%pan_w_vel(   :,iw,ipan) = vel_p
+      wake%pan_w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + vel_p*sim_param%dt
+    enddo
+  enddo
+!$omp end parallel do
+  
+  !if the wake is full, calculate another row of points to generate the 
+  !particles
+  if(wake%full_panels) then
+    if(.not.allocated(points_end)) allocate(points_end(3,wake%n_pan_points)) 
+
+    ! create another row of points
+!$omp parallel do private(iw, pos_p, vel_p) schedule(dynamic)
+    do iw = 1,wake%n_pan_points
+      pos_p = point_old(:,iw,wake%pan_wake_len+1)
+      vel_p = 0.0_wp
+
+      !call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
+
+      !vel_p    = vel_p   + sim_param%u_inf
+      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
+
+      !update the position in time
+      points_end(:,iw) = pos_p + vel_p*sim_param%dt
+    enddo
+!$omp end parallel do
+  endif
+  
+
+  deallocate(point_old)
+
+  !==> Rings: Update wake points position ==
+
+  !Save the old positions for the integration
+  increase_wake = .false.
+  if(wake%rin_wake_len .lt. wake%nmax_rin) then
+    wake%rin_wake_len = wake%rin_wake_len+1
+    increase_wake = .true.
+  else
+    wake%full_rings = .true.
+  endif
+  allocate(points(3,wake%np_row,wake%rin_wake_len))
+
+  !Store at the beginning the disk points
+  ip=1
+  do id = 1,wake%ndisks
+    np = wake%rin_gen_elems(id)%p%n_ver
+    points(:,ip:ip+np-1,1) = wake%rin_gen_elems(id)%p%ver
+    ip = ip+np
+  enddo
+
+  !Then store the old points of the rest of the wake (the shift forward
+  ! of the points in the array is happening here)
+  do ir = 1,wake%rin_wake_len-1
+    ip=1
+    do id = 1,wake%ndisks
+      np = wake%wake_rings(id,ir)%n_ver
+      points(:,ip:ip+np-1,ir+1) = wake%wake_rings(id,ir)%ver(:,:)
+      ip = ip+np
+    enddo
+  enddo
+
+  !calculate the velocities at the old positions of the points and then
+  !update the positions
+
+!$omp parallel do private(pos_p, vel_p, ip, ir)
+  do ip = 1,size(points,2)
+    do ir = 1,size(points,3)
+      pos_p = points(:,ip,ir)
+      vel_p = 0.0_wp
+
+      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
+
+      !update the position in time
+      points(:,ip,ir) = points(:,ip,ir) + vel_p*sim_param%dt
+    enddo !ir
+  enddo !ip
+!$omp end parallel do
+
+  !if the wake is full, calculate another row of points to generate the 
+  !particles
+  if(wake%full_rings) then
+    if(.not.allocated(points_end_ring)) allocate(points_end_ring(3,wake%np_row)) 
+    !Store the end points
+    ip=1
+    do id = 1,wake%ndisks
+      np = wake%wake_rings(id,ir)%n_ver
+      points_end_ring(:,ip:ip+np-1) = wake%wake_rings(id,ir)%ver(:,:)
+      ip = ip+np
+    enddo
+    ! calculate velocity and evolve them
+    do ip = 1,wake%np_row
+      pos_p = points_end_ring(:,ip)
+      vel_p = 0.0_wp
+
+      !call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
+
+      !vel_p    = vel_p   + sim_param%u_inf
+      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
+
+      !update the position in time
+      points_end_ring(:,ip) = pos_p + vel_p*sim_param%dt
+    enddo
+  endif
+
+  !redistribute the points
+  do ir = 1,wake%rin_wake_len
+    ip = 1
+    do id = 1,wake%ndisks
+      np = wake%wake_rings(id,ir)%n_ver
+      wake%wake_rings(id,ir)%ver = points(:,ip:ip+np-1,ir)
+      ip = ip + np
+    enddo
+  enddo
+
+  deallocate(points)
+
+
+  !==>    Particles: evolve the position in time
+
+  allocate(wake%prt_vortevol(3,wake%n_prt))
+  wake%prt_vortevol = 0.0_wp
+
+  !if ( allocated(wake%prt_vel) ) deallocate(wake%prt_vel)
+  !allocate(wake%prt_vel(3,wake%n_prt))
+
+
+  !calculate the velocities at the points
+!$omp parallel do private(pos_p, vel_p, ip, iq,  stretch, diff, df, str)
+  do ip = 1, wake%n_prt
+
+    if (sim_param%use_vs .or. sim_param%use_vd) then
+      wake%part_p(ip)%p%stretch => wake%prt_vortevol(:,ip)
+    endif
+    
+    !If not using the fast multipole, update particles position now
+    if (.not.sim_param%use_fmm) then
+      pos_p = wake%part_p(ip)%p%cen
+
+      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
+
+      !wake%prt_vel(:,ip) = vel_p    ! *****(old) vel_prt(:,ip) = vel_p
+      !wake%part_p(ip)%p%vel =  wake%prt_vel(:,ip)  ! *****(old) vel_prt(:,ip)
+      wake%part_p(ip)%p%vel     =  vel_p
+
+      !if using vortex stretching, calculate it now
+      if(sim_param%use_vs) then
+        stretch = 0.0_wp
+        do iq = 1, wake%n_prt
+        if (ip.ne.iq) then
+          call wake%part_p(iq)%p%compute_stretch(wake%part_p(ip)%p%cen, &
+               wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, str)
+          !stretch = stretch + str/(4.0_wp*pi)
+           stretch = stretch +(str - &
+           sum(str*wake%part_p(ip)%p%dir)*wake%part_p(ip)%p%dir)/(4.0_wp*pi)
+          !removed the parallel component
+        endif 
+        enddo
+        !do ie=1,size(wake%end_vorts)
+        !  call wake%end_vorts(ie)%compute_stretch(wake%part_p(ip)%p%cen, &
+        !             wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, str)
+        !  stretch = stretch + str/(4.0_wp*pi)
+        !enddo
+        wake%prt_vortevol(:,ip) = wake%prt_vortevol(:,ip) + stretch
+      endif !use_vs
+
+      !if using the vortex diffusion, calculate it now
+      if(sim_param%use_vd) then
+        diff = 0.0_wp
+        do iq = 1, wake%n_prt
+        if (ip.ne.iq) then
+          call wake%part_p(iq)%p%compute_diffusion(wake%part_p(ip)%p%cen, &
+               wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, df)
+          diff = diff + df*sim_param%nu_inf
+        endif 
+        enddo !iq
+        wake%prt_vortevol(:,ip) = wake%prt_vortevol(:,ip) + diff
+      endif !use_vd
+    end if !use_fmm
+
+    
+  enddo
+!$omp end parallel do
+  
+  if (sim_param%use_fmm) then
+    t0 = dust_time()
+    call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
+                         wake%end_vorts)
+    t1 = dust_time()
+    write(msg,'(A,F9.3,A)') 'Multipoles calculation: ' , t1 - t0,' s.'
+    if(sim_param%debug_level.ge.3) call printout(msg)
+    write(msg,'(A,I0)') 'Number of particles: ' , wake%n_prt
+    if(sim_param%debug_level.ge.5) call printout(msg)
+  endif
+
+  !Check the difference
+  !err = norm2(points_prt-points_prt_fmm)/norm2(points_prt)
+  !write(*,*) 'error',err
+
+  !!Assign the moved points, if they get outside the bounding box free the 
+  !!particles
+  !n_part = wake%n_prt
+  !do ip = 1, n_part
+  !  if(sim_param%use_pa) call avoid_collision(elems, wake, &
+  !                      wake%part_p(ip)%p, sim_param, wake%part_p(ip)%p%vel)
+  !                         !wake%part_p(ip)%p, sim_param, wake%prt_vel(:,ip))
+  !  if(.not. wake%part_p(ip)%p%free) then
+  !    !pos_p = wake%part_p(ip)%p%cen + wake%prt_vel(:,ip)*sim_param%dt
+  !    pos_p = wake%part_p(ip)%p%cen + wake%part_p(ip)%p%vel*sim_param%dt
+  !    if(all(pos_p .ge. wake%part_box_min) .and. &
+  !       all(pos_p .le. wake%part_box_max)) then
+  !      !wake%part_p(ip)%p%cen = points_prt(:,ip)
+  !      wake%part_p(ip)%p%cen = pos_p
+  !      if(sim_param%use_vs .or. sim_param%use_vd) then
+  !        alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
+  !                        vortevol_prt(:,ip)*sim_param%dt
+  !        wake%part_p(ip)%p%mag = norm2(alpha_p)
+  !        if(wake%part_p(ip)%p%mag .ne. 0.0_wp) &
+  !           wake%part_p(ip)%p%dir = alpha_p/wake%part_p(ip)%p%mag
+  !      endif
+  !    else
+  !      wake%part_p(ip)%p%free = .true.
+  !      wake%n_prt = wake%n_prt -1
+  !    endif
+  !  endif
+  !  !nullify(wake%part_p(ip)%p%npos)
+  !  !nullify(wake%part_p(ip)%p%vel)
+  !  if(sim_param%use_vs) nullify(wake%part_p(ip)%p%stretch)
+  !enddo
+
+  !==> Panels:  Increase the length of the wake, if it is necessary
+  !if (wake%pan_wake_len .lt. wake%nmax_pan) then
+  if (.not.wake%full_panels) then
+      wake%pan_wake_len = wake%pan_wake_len + 1
+      allocate(pan_p_temp(wake%n_pan_stripes*wake%pan_wake_len))
+
+      do ip = 1,size(wake%pan_p)
+        pan_p_temp(ip) = wake%pan_p(ip)
+      enddo
+      do iw = 1,wake%n_pan_stripes
+        pan_p_temp(wake%n_pan_stripes*(wake%pan_wake_len-1)+iw)%p &
+                                        => wake%wake_panels(iw,wake%pan_wake_len)
+      enddo
+      if(allocated(wake%pan_p)) deallocate(wake%pan_p)
+      allocate(wake%pan_p(size(pan_p_temp)))
+      do ip = 1,size(wake%pan_p)
+        wake%pan_p(ip) = pan_p_temp(ip)
+      enddo
+      deallocate(pan_p_temp)
+
+  endif
+
+
+  !==> Rings:  Increase the length of the wake, if it is necessary
+  if (increase_wake) then
+    allocate(pan_p_temp(wake%ndisks*wake%rin_wake_len))
+    size_old = 0; if(allocated(wake%rin_p)) size_old = size(wake%rin_p)
+
+    do ip = 1,size_old
+      pan_p_temp(ip) = wake%rin_p(ip)
+    enddo
+    do id = 1,wake%ndisks
+      pan_p_temp(size_old+id)%p => wake%wake_rings(id,wake%rin_wake_len)
+    enddo
+
+    !manual move alloc
+    if(allocated(wake%rin_p)) deallocate(wake%rin_p)
+    allocate(wake%rin_p(size(pan_p_temp)))
+    do ip = 1,size(wake%rin_p)
+      wake%rin_p(ip) = pan_p_temp(ip)
+    enddo
+    deallocate(pan_p_temp)
+  endif
+
+  !==> Panels:  Update the intensities of the panels
+  !       From the back, all the vortex intensities come from
+  !       the previous panel
+  do ipan = wake%pan_wake_len,2,-1
+    do iw = 1,wake%n_pan_stripes
+      wake%wake_panels(iw,ipan)%mag = wake%wake_panels(iw,ipan-1)%mag
+    enddo
+  enddo
+
+  !==> End vortices: If the wake is full, attach the end vortex
+  !if (wake%pan_wake_len .eq. wake%nmax_pan) then
+  if (wake%full_panels) then
+    do iw = 1,wake%n_pan_stripes
+      wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag
+    enddo
+  endif
+
+  !==> Rings: Update the intensities of the rings
+  !       From the back, all the vortex intensities come from the 
+  !       previous panel
+  do ir = wake%rin_wake_len,2,-1
+    do id = 1,wake%ndisks
+      wake%wake_rings(id,ir)%mag = wake%wake_rings(id,ir-1)%mag
+    enddo
+  enddo
+  do id = 1,wake%ndisks
+    wake%wake_rings(id,1)%mag  = wake%rin_gen_elems(id)%p%mag
+  enddo
+
+  !==> Rings: Update rings geometrical quantities
+  do ir = 1,wake%rin_wake_len
+    do id = 1,wake%ndisks
+      call wake%wake_rings(id,ir)%calc_geo_data( &
+                    wake%wake_rings(id,ir)%ver)
+    enddo
+  enddo
+
+  ! The geometrical quantities of the panels will be all updated in prepare
+  ! wake after the geometry have been updated
+
+
+end subroutine update_wake
+
+!----------------------------------------------------------------------
+
 !> Prepare the first row of panels to be inserted inside the linear system
 !!
-subroutine prepare_wake(wake, geo, elems)
+subroutine complete_wake(wake, geo, elems)
  type(t_wake), target, intent(inout) :: wake
  type(t_geo), intent(in) :: geo
  type(t_pot_elem_p), intent(in) :: elems(:)
@@ -861,45 +1514,6 @@ subroutine prepare_wake(wake, geo, elems)
     end do ! ***** loop #1 over components *****
   endif !calculate the viscous particles detachment
 
-  !==>Recreate sturctures and pointers, if particles are present
-  if(wake%full_panels .or. wake%full_rings .or. (wake%n_prt.gt.0) ) then
-    !Recreate the pointer vector
-    if(allocated(wake%part_p)) deallocate(wake%part_p)
-    allocate(wake%part_p(wake%n_prt))
-    deallocate(wake%vort_p)
-    ! to add or not line vortices at the (only when ring or panel wakes are full )
-    n_end_vort = 0
-    if ( wake%full_panels .or. wake%full_rings ) then
-      n_end_vort = wake%n_pan_stripes
-    end if
-    if(sim_param%use_fmm) then
-      allocate(wake%vort_p( n_end_vort))
-    else
-      allocate(wake%vort_p(wake%n_prt + n_end_vort))
-    endif
-    !TODO: consider inverting these two cycles
-    k = 1
-    do ip = 1, wake%n_prt
-      do ir=k,wake%nmax_prt
-        if(.not. wake%wake_parts(ir)%free) then
-          k = ir+1
-          wake%part_p(ip)%p => wake%wake_parts(ir)
-          if(.not.sim_param%use_fmm) wake%vort_p(ip)%p => wake%wake_parts(ir)
-          exit
-        endif
-      enddo
-    enddo
-    !Add the end vortex to the votical elements pointer
-!   if ( wake%full_panels .or. wake%full_rings ) then ! useless if ( n_end_vort may be 0 )
-    do iw = 1, n_end_vort
-      if(sim_param%use_fmm) then
-        wake%vort_p(iw)%p => wake%end_vorts(iw)
-      else
-        wake%vort_p(wake%n_prt+iw)%p => wake%end_vorts(iw)
-      endif
-    enddo
-!   end if
-  endif
 
   !If the wake is full, attach the end vortex
   if (wake%full_panels) then
@@ -915,597 +1529,7 @@ subroutine prepare_wake(wake, geo, elems)
     enddo
   endif
 
-end subroutine prepare_wake
-
-!----------------------------------------------------------------------
-
-!> Load the wake panels solution from a previous result
-subroutine load_wake(filename, wake, elems)
- character(len=*), intent(in) :: filename
- type(t_wake), intent(inout), target :: wake
- type(t_pot_elem_p), intent(inout) :: elems(:)
-
- integer(h5loc) :: floc, gloc
- real(wp), allocatable :: wpoints(:,:,:), wvels(:,:,:), wvort(:,:)
- real(wp), allocatable :: vppoints(:,:), vpvort(:,:) , vpvels(:,:)
- integer, allocatable :: start_points(:,:)
- integer, allocatable :: conn_pe(:)
- integer :: ipan, iw, p1, p2, ipt
- integer :: id, ir, ip, np, ie
- real(wp) :: vel(3)
- character(len=*), parameter :: this_sub_name = 'load_wake'
-   
-  call open_hdf5_file(filename, floc)
-
-  !=== Panels ===
-  !Read the past results
-  call open_hdf5_group(floc, 'PanelWake', gloc)
-
-  call read_hdf5_al(wpoints,'WakePoints',gloc)
-  call read_hdf5_al(wvels  ,'WakeVels'  ,gloc)
-  call read_hdf5_al(start_points,'StartPoints',gloc)
-  call read_hdf5_al(wvort,'WakeVort',gloc)
-
-  call close_hdf5_group(gloc)
-  !call close_hdf5_file(floc)
-
-  !Perform a few checks to be sure that the correct size solution was loaded
-  if(.not. all(start_points .eq. wake%i_start_points)) call error( &
-    this_sub_name, this_mod_name, 'Different wake trailing edge connectivity&
-    & between the loded and built geometry')
-
-  !the wake length is the loaded one, or less if imposed so
-  wake%pan_wake_len = min(wake%nmax_pan, size(wvort,2))
-
-  !store points position and doublets intensity
-  wake%pan_w_points(:,:,1:wake%pan_wake_len+1) = wpoints(:,:,1:wake%pan_wake_len+1)
-  wake%pan_w_vel(   :,:,1:wake%pan_wake_len+1) = wvels(  :,:,1:wake%pan_wake_len+1)
-  wake%pan_idou(:,1:wake%pan_wake_len) = wvort(:,1:wake%pan_wake_len)
-
-  deallocate(wake%pan_p)
-  allocate(wake%pan_p(wake%n_pan_stripes*wake%pan_wake_len))
-  ! Update the panels geometrical quantities of all the panels
-  ipt = 1
-  do ipan = 1,wake%pan_wake_len
-    do iw = 1,wake%n_pan_stripes
-      p1 = wake%i_start_points(1,iw)
-      p2 = wake%i_start_points(2,iw)
-      call wake%wake_panels(iw,ipan)%calc_geo_data( &
-           reshape((/wake%pan_w_points(:,p1,ipan),   wake%pan_w_points(:,p2,ipan), &
-                    wake%pan_w_points(:,p2,ipan+1), wake%pan_w_points(:,p1,ipan+1)/),&
-                                                                     (/3,4/)))
-      wake%pan_p(ipt)%p => wake%wake_panels(iw,ipan)
-      ipt = ipt + 1
-    enddo
-  enddo
-
-  deallocate(wpoints, wvels, wvort, start_points)
-
-  !=== Rings ===
-  !Read the past results
-  !call open_hdf5_file(filename, floc)
-  call open_hdf5_group(floc, 'RingWake', gloc)
-
-  call read_hdf5_al(wpoints,'WakePoints',gloc)
-  call read_hdf5_al(conn_pe,'Conn_pe',gloc)
-  call read_hdf5_al(wvort,'WakeVort',gloc)
-
-  call close_hdf5_group(gloc)
-  !call close_hdf5_file(floc)
-
-  !check the consistency
-  ip = 1
-  do id = 1,wake%ndisks
-    np = wake%rin_gen_elems(id)%p%n_ver
-    if (.not. all(conn_pe(ip:ip+np-1) .eq. id)) call error( &
-    this_sub_name, this_mod_name, 'Different wake disk connectivity&
-    & between the loded and built geometry')
-    ip = ip+np
-  enddo
-
-  !the wake length is the loaded one, or less if imposed so
-  wake%rin_wake_len = min(wake%nmax_rin, size(wvort,2))
-
-  !Load the old results
-  ip = 1
-  do id = 1,wake%ndisks
-    np = wake%rin_gen_elems(id)%p%n_ver
-    do ir = 1,wake%rin_wake_len
-      wake%wake_rings(id,ir)%ver(:,:) = wpoints(:,ip:ip+np-1,ir)
-    enddo
-    ip = ip+np
-  enddo
-  wake%rin_idou(:,1:wake%rin_wake_len) = wvort(:,1:wake%rin_wake_len)
-
-  deallocate(wake%rin_p); allocate(wake%rin_p(wake%ndisks*wake%rin_wake_len))
-
-  !Update the geometrical quantities
-  ipt = 1
-  do ir = 1,wake%rin_wake_len
-    do id = 1,wake%ndisks
-      call wake%wake_rings(id,ir)%calc_geo_data( &
-                    wake%wake_rings(id,ir)%ver)
-      wake%rin_p(ipt)%p => wake%wake_rings(id,ir)
-      ipt = ipt + 1
-    enddo
-  enddo
-
-  !=== Particles ===
-  call open_hdf5_group(floc, 'ParticleWake', gloc)
-  call read_hdf5_al(vppoints,'WakePoints',gloc)
-  if ( check_dset_hdf5('WakeVels',gloc) ) then
-    call read_hdf5_al(vpvels,'WakeVels',gloc) ! <<<< restart with Bernoulli integral equation
-  end if
-  call read_hdf5_al(vpvort,'WakeVort',gloc)
-  call read_hdf5(wake%last_pan_idou,'LastPanIdou',gloc)
-  call close_hdf5_group(gloc)
-  
-  if(size(vpvort,2) .gt. wake%nmax_prt) call error(this_sub_name, &
-    this_mod_name, 'Loading a number of particles &
-    & greater than the maximum allowed for this run: cannot truncate the &
-    & particles in a meaningful way. Consider restarting the run with a &
-    & higher amount of maximum particles')
-
-  wake%n_prt = size(vpvort,2)
-
-  deallocate(wake%part_p)
-  allocate(wake%part_p(wake%n_prt))
-  if(wake%n_prt .gt. 0) then
-    deallocate(wake%vort_p)
-    if(sim_param%use_fmm) then
-      allocate(wake%vort_p(wake%n_pan_stripes))
-    else
-      allocate(wake%vort_p(wake%n_prt+wake%n_pan_stripes))
-    endif
-
-    do iw = 1, wake%n_pan_stripes 
-      if(sim_param%use_fmm) then
-        wake%vort_p(iw)%p => wake%end_vorts(iw)
-      else
-        wake%vort_p(wake%n_prt+iw)%p => wake%end_vorts(iw)
-      endif
-    enddo
-  endif
-
-  do ip = 1,wake%n_prt
-    wake%wake_parts(ip)%cen = vppoints(:,ip)
-    wake%wake_parts(ip)%vel = vpvels(:,ip)
-    wake%wake_parts(ip)%mag = norm2(vpvort(:,ip))
-    if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
-      wake%wake_parts(ip)%dir = vpvort(:,ip)/wake%wake_parts(ip)%mag
-    else
-      wake%wake_parts(ip)%dir = vpvort(:,ip)
-    endif
-    wake%wake_parts(ip)%free = .false.
-    wake%part_p(ip)%p => wake%wake_parts(ip)
-    if(.not.sim_param%use_fmm) wake%vort_p(ip)%p => wake%wake_parts(ip)
-  enddo
-  
-  deallocate(vppoints, vpvort, vpvels)
-  
-  call close_hdf5_file(floc)
-
-
-  if(wake%pan_wake_len .eq. wake%nmax_pan) wake%full_panels=.true.
-  !If the wake is full, attach the end vortex
-  if (wake%full_panels) then
-    do iw = 1,wake%n_pan_stripes
-      wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag
-      p1 = wake%i_start_points(1,iw)
-      p2 = wake%i_start_points(2,iw)
-      call wake%end_vorts(iw)%calc_geo_data( &
-          reshape((/wake%pan_w_points(:,p1,wake%pan_wake_len+1),  &
-                    wake%pan_w_points(:,p2,wake%pan_wake_len+1)/), (/3,2/)))
-    enddo
-  endif
-  
-  !If there are particles and the multipole is employed, i
-  !need to pre-compute the particles induced velocity now
-  if(sim_param%use_fmm .and. wake%n_prt .gt. 0) then
-!$omp parallel do private(ie, ip, vel)
-    do ie = 1, size(elems)
-      elems(ie)%p%uvort = 0.0
-      do ip = 1,wake%n_prt
-        call wake%part_p(ip)%p%compute_vel(elems(ie)%p%cen, &
-                                               sim_param%u_inf, vel)
-         elems(ie)%p%uvort = elems(ie)%p%uvort + vel/(4.0_wp*pi)
-      enddo
-    enddo
-!$omp end parallel do
-  endif
-
-
-end subroutine load_wake
-
-
-!----------------------------------------------------------------------
-
-!> Update the position and the intensities of the wake panels
-!!
-!! Note: at this subroutine is passed the whole array of elements,
-!! comprising both the implicit panels and the explicit (ll)
-!! elements
-subroutine update_wake(wake, elems, octree)
- type(t_wake), intent(inout), target :: wake
- type(t_pot_elem_p), intent(in) :: elems(:)
- type(t_octree), intent(inout) :: octree
-
- integer :: iw, ipan, ie, ip, np, iq
- integer :: id, ir
- real(wp) :: pos_p(3), vel_p(3)
- real(wp) :: str(3), stretch(3)
- real(wp) :: df(3), diff(3)
- type(t_pot_elem_p), allocatable :: pan_p_temp(:)
- real(wp), allocatable :: point_old(:,:,:)
- real(wp), allocatable :: points(:,:,:)
- logical :: increase_wake
- integer :: size_old
- character(len=*), parameter :: this_sub_name='update_wake'
-
-  wake%w_vel = 0.0_wp
-
-  if(wake%pan_wake_len .eq. wake%nmax_pan) wake%full_panels=.true.
-
-  !==> Panels:  Update the first row of vortex intensities:
-  !      it was already calculated (implicitly) in the linear system
-  do iw = 1,wake%n_pan_stripes
-    !
-    if      ( associated(wake%pan_gen_elems(2,iw)%p) ) then
-      wake%wake_panels(iw,1)%mag  = wake%pan_gen_elems(1,iw)%p%mag - &
-                                     wake%pan_gen_elems(2,iw)%p%mag
-    else if ( .not. associated(wake%pan_gen_elems(2,iw)%p) ) then
-      wake%wake_panels(iw,1)%mag  = wake%pan_gen_elems(1,iw)%p%mag
-    end if
-
-  enddo
-
-  !==> Panels: Update wake points position ==
-
-  !Save the old positions for the integration
-  allocate(point_old(size(wake%pan_w_points,1),size(wake%pan_w_points,2), &
-                                               size(wake%pan_w_points,3)))
-  point_old = wake%pan_w_points
-
-  !calculate the velocities at the old positions of the points and then
-  !update the positions (from the third row of points: the first is the
-  !trailing edge, the second is extrapolated from the trailing edge)
-  np = wake%pan_wake_len+1
-  !if(wake%pan_wake_len .lt. wake%nmax_pan) np = np + 1
-  if(.not.wake%full_panels) np = np + 1
-
-!$omp parallel do collapse(2) private(pos_p, vel_p, ie, ipan, iw) schedule(dynamic)
-  do ipan = 3,np
-    do iw = 1,wake%n_pan_points
-      pos_p = point_old(:,iw,ipan-1)
-      vel_p = 0.0_wp
-
-      !call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
-
-      !! for OUTPUT only -----
-      !wake%w_vel(:,iw,ipan-1) = vel_p
-
-      !vel_p    = vel_p   + sim_param%u_inf
-      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
-
-      !update the position in time
-      wake%pan_w_vel(   :,iw,ipan) = vel_p
-      wake%pan_w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + vel_p*sim_param%dt
-    enddo
-  enddo
-!$omp end parallel do
-  
-  !if the wake is full, calculate another row of points to generate the 
-  !particles
-  if(wake%full_panels) then
-    if(.not.allocated(points_end)) allocate(points_end(3,wake%n_pan_points)) 
-
-    ! create another row of points
-!$omp parallel do private(iw, pos_p, vel_p) schedule(dynamic)
-    do iw = 1,wake%n_pan_points
-      pos_p = point_old(:,iw,wake%pan_wake_len+1)
-      vel_p = 0.0_wp
-
-      !call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
-
-      !vel_p    = vel_p   + sim_param%u_inf
-      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
-
-      !update the position in time
-      points_end(:,iw) = pos_p + vel_p*sim_param%dt
-    enddo
-!$omp end parallel do
-  endif
-  
-
-  deallocate(point_old)
-
-  !==> Rings: Update wake points position ==
-
-  !Save the old positions for the integration
-  increase_wake = .false.
-  if(wake%rin_wake_len .lt. wake%nmax_rin) then
-    wake%rin_wake_len = wake%rin_wake_len+1
-    increase_wake = .true.
-  else
-    wake%full_rings = .true.
-  endif
-  allocate(points(3,wake%np_row,wake%rin_wake_len))
-
-  !Store at the beginning the disk points
-  ip=1
-  do id = 1,wake%ndisks
-    np = wake%rin_gen_elems(id)%p%n_ver
-    points(:,ip:ip+np-1,1) = wake%rin_gen_elems(id)%p%ver
-    ip = ip+np
-  enddo
-
-  !Then store the old points of the rest of the wake (the shift forward
-  ! of the points in the array is happening here)
-  do ir = 1,wake%rin_wake_len-1
-    ip=1
-    do id = 1,wake%ndisks
-      np = wake%wake_rings(id,ir)%n_ver
-      points(:,ip:ip+np-1,ir+1) = wake%wake_rings(id,ir)%ver(:,:)
-      ip = ip+np
-    enddo
-  enddo
-
-  !calculate the velocities at the old positions of the points and then
-  !update the positions
-
-!$omp parallel do private(pos_p, vel_p, ip, ir)
-  do ip = 1,size(points,2)
-    do ir = 1,size(points,3)
-      pos_p = points(:,ip,ir)
-      vel_p = 0.0_wp
-
-      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
-
-      !update the position in time
-      points(:,ip,ir) = points(:,ip,ir) + vel_p*sim_param%dt
-    enddo !ir
-  enddo !ip
-!$omp end parallel do
-
-  !if the wake is full, calculate another row of points to generate the 
-  !particles
-  if(wake%full_rings) then
-    if(.not.allocated(points_end_ring)) allocate(points_end_ring(3,wake%np_row)) 
-    !Store the end points
-    ip=1
-    do id = 1,wake%ndisks
-      np = wake%wake_rings(id,ir)%n_ver
-      points_end_ring(:,ip:ip+np-1) = wake%wake_rings(id,ir)%ver(:,:)
-      ip = ip+np
-    enddo
-    ! calculate velocity and evolve them
-    do ip = 1,wake%np_row
-      pos_p = points_end_ring(:,ip)
-      vel_p = 0.0_wp
-
-      !call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
-
-      !vel_p    = vel_p   + sim_param%u_inf
-      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
-
-      !update the position in time
-      points_end_ring(:,ip) = pos_p + vel_p*sim_param%dt
-    enddo
-  endif
-
-  !redistribute the points
-  do ir = 1,wake%rin_wake_len
-    ip = 1
-    do id = 1,wake%ndisks
-      np = wake%wake_rings(id,ir)%n_ver
-      wake%wake_rings(id,ir)%ver = points(:,ip:ip+np-1,ir)
-      ip = ip + np
-    enddo
-  enddo
-
-  deallocate(points)
-
-
-  !==>    Particles: evolve the position in time
-
-  allocate(wake%prt_vortevol(3,wake%n_prt))
-  wake%prt_vortevol = 0.0_wp
-
-  !if ( allocated(wake%prt_vel) ) deallocate(wake%prt_vel)
-  !allocate(wake%prt_vel(3,wake%n_prt))
-
-
-  !calculate the velocities at the points
-!$omp parallel do private(pos_p, vel_p, ip, iq,  stretch, diff, df, str)
-  do ip = 1, wake%n_prt
-
-    if (sim_param%use_vs .or. sim_param%use_vd) then
-      wake%part_p(ip)%p%stretch => wake%prt_vortevol(:,ip)
-    endif
-    
-    !If not using the fast multipole, update particles position now
-    if (.not.sim_param%use_fmm) then
-      pos_p = wake%part_p(ip)%p%cen
-
-      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
-
-      !wake%prt_vel(:,ip) = vel_p                            ! *****(old) vel_prt(:,ip) = vel_p
-      !wake%part_p(ip)%p%vel     =  wake%prt_vel(:,ip)       ! *****(old) vel_prt(:,ip)
-      wake%part_p(ip)%p%vel     =  vel_p
-
-      !if using vortex stretching, calculate it now
-      if(sim_param%use_vs) then
-        stretch = 0.0_wp
-        do iq = 1, wake%n_prt
-        if (ip.ne.iq) then
-          call wake%part_p(iq)%p%compute_stretch(wake%part_p(ip)%p%cen, &
-               wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, str)
-          !stretch = stretch + str/(4.0_wp*pi)
-           stretch = stretch +(str - &
-           sum(str*wake%part_p(ip)%p%dir)*wake%part_p(ip)%p%dir)/(4.0_wp*pi)
-          !removed the parallel component
-        endif 
-        enddo
-        !do ie=1,size(wake%end_vorts)
-        !  call wake%end_vorts(ie)%compute_stretch(wake%part_p(ip)%p%cen, &
-        !             wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, str)
-        !  stretch = stretch + str/(4.0_wp*pi)
-        !enddo
-        wake%prt_vortevol(:,ip) = wake%prt_vortevol(:,ip) + stretch
-      endif !use_vs
-
-      !if using the vortex diffusion, calculate it now
-      if(sim_param%use_vd) then
-        diff = 0.0_wp
-        do iq = 1, wake%n_prt
-        if (ip.ne.iq) then
-          call wake%part_p(iq)%p%compute_diffusion(wake%part_p(ip)%p%cen, &
-               wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, df)
-          diff = diff + df*sim_param%nu_inf
-        endif 
-        enddo !iq
-        wake%prt_vortevol(:,ip) = wake%prt_vortevol(:,ip) + diff
-      endif !use_vd
-    end if !use_fmm
-
-    
-  enddo
-!$omp end parallel do
-  
-  if (sim_param%use_fmm) then
-    t0 = dust_time()
-    call sort_particles(wake%part_p, wake%n_prt, elems, octree)
-    call calculate_multipole(wake%part_p, octree)
-    call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
-                         wake%end_vorts)
-    t1 = dust_time()
-    write(msg,'(A,F9.3,A)') 'Multipoles calculation: ' , t1 - t0,' s.'
-    if(sim_param%debug_level.ge.3) call printout(msg)
-    write(msg,'(A,I0)') 'Number of particles: ' , wake%n_prt
-    if(sim_param%debug_level.ge.5) call printout(msg)
-  endif
-
-  !Check the difference
-  !err = norm2(points_prt-points_prt_fmm)/norm2(points_prt)
-  !write(*,*) 'error',err
-
-  !!Assign the moved points, if they get outside the bounding box free the 
-  !!particles
-  !n_part = wake%n_prt
-  !do ip = 1, n_part
-  !  if(sim_param%use_pa) call avoid_collision(elems, wake, &
-  !                      wake%part_p(ip)%p, sim_param, wake%part_p(ip)%p%vel)
-  !                         !wake%part_p(ip)%p, sim_param, wake%prt_vel(:,ip))
-  !  if(.not. wake%part_p(ip)%p%free) then
-  !    !pos_p = wake%part_p(ip)%p%cen + wake%prt_vel(:,ip)*sim_param%dt
-  !    pos_p = wake%part_p(ip)%p%cen + wake%part_p(ip)%p%vel*sim_param%dt
-  !    if(all(pos_p .ge. wake%part_box_min) .and. &
-  !       all(pos_p .le. wake%part_box_max)) then
-  !      !wake%part_p(ip)%p%cen = points_prt(:,ip)
-  !      wake%part_p(ip)%p%cen = pos_p
-  !      if(sim_param%use_vs .or. sim_param%use_vd) then
-  !        alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
-  !                        vortevol_prt(:,ip)*sim_param%dt
-  !        wake%part_p(ip)%p%mag = norm2(alpha_p)
-  !        if(wake%part_p(ip)%p%mag .ne. 0.0_wp) &
-  !           wake%part_p(ip)%p%dir = alpha_p/wake%part_p(ip)%p%mag
-  !      endif
-  !    else
-  !      wake%part_p(ip)%p%free = .true.
-  !      wake%n_prt = wake%n_prt -1
-  !    endif
-  !  endif
-  !  !nullify(wake%part_p(ip)%p%npos)
-  !  !nullify(wake%part_p(ip)%p%vel)
-  !  if(sim_param%use_vs) nullify(wake%part_p(ip)%p%stretch)
-  !enddo
-
-  !==> Panels:  Increase the length of the wake, if it is necessary
-  !if (wake%pan_wake_len .lt. wake%nmax_pan) then
-  if (.not.wake%full_panels) then
-      wake%pan_wake_len = wake%pan_wake_len + 1
-      allocate(pan_p_temp(wake%n_pan_stripes*wake%pan_wake_len))
-
-      do ip = 1,size(wake%pan_p)
-        pan_p_temp(ip) = wake%pan_p(ip)
-      enddo
-      do iw = 1,wake%n_pan_stripes
-        pan_p_temp(wake%n_pan_stripes*(wake%pan_wake_len-1)+iw)%p &
-                                        => wake%wake_panels(iw,wake%pan_wake_len)
-      enddo
-      if(allocated(wake%pan_p)) deallocate(wake%pan_p)
-      allocate(wake%pan_p(size(pan_p_temp)))
-      do ip = 1,size(wake%pan_p)
-        wake%pan_p(ip) = pan_p_temp(ip)
-      enddo
-      deallocate(pan_p_temp)
-
-  endif
-
-
-  !==> Rings:  Increase the length of the wake, if it is necessary
-  if (increase_wake) then
-    allocate(pan_p_temp(wake%ndisks*wake%rin_wake_len))
-    size_old = 0; if(allocated(wake%rin_p)) size_old = size(wake%rin_p)
-
-    do ip = 1,size_old
-      pan_p_temp(ip) = wake%rin_p(ip)
-    enddo
-    do id = 1,wake%ndisks
-      pan_p_temp(size_old+id)%p => wake%wake_rings(id,wake%rin_wake_len)
-    enddo
-
-    !manual move alloc
-    if(allocated(wake%rin_p)) deallocate(wake%rin_p)
-    allocate(wake%rin_p(size(pan_p_temp)))
-    do ip = 1,size(wake%rin_p)
-      wake%rin_p(ip) = pan_p_temp(ip)
-    enddo
-    deallocate(pan_p_temp)
-  endif
-
-  !==> Panels:  Update the intensities of the panels
-  !       From the back, all the vortex intensities come from
-  !       the previous panel
-  do ipan = wake%pan_wake_len,2,-1
-    do iw = 1,wake%n_pan_stripes
-      wake%wake_panels(iw,ipan)%mag = wake%wake_panels(iw,ipan-1)%mag
-    enddo
-  enddo
-
-  !==> End vortices: If the wake is full, attach the end vortex
-  !if (wake%pan_wake_len .eq. wake%nmax_pan) then
-  if (wake%full_panels) then
-    do iw = 1,wake%n_pan_stripes
-      wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag
-    enddo
-  endif
-
-  !==> Rings: Update the intensities of the rings
-  !       From the back, all the vortex intensities come from the 
-  !       previous panel
-  do ir = wake%rin_wake_len,2,-1
-    do id = 1,wake%ndisks
-      wake%wake_rings(id,ir)%mag = wake%wake_rings(id,ir-1)%mag
-    enddo
-  enddo
-  do id = 1,wake%ndisks
-    wake%wake_rings(id,1)%mag  = wake%rin_gen_elems(id)%p%mag
-  enddo
-
-  !==> Rings: Update rings geometrical quantities
-  do ir = 1,wake%rin_wake_len
-    do id = 1,wake%ndisks
-      call wake%wake_rings(id,ir)%calc_geo_data( &
-                    wake%wake_rings(id,ir)%ver)
-    enddo
-  enddo
-
-  ! The geometrical quantities of the panels will be all updated in prepare
-  ! wake after the geometry have been updated
-
-
-end subroutine update_wake
+end subroutine complete_wake
 
 !----------------------------------------------------------------------
 
