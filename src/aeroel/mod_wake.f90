@@ -557,8 +557,7 @@ subroutine load_wake(filename, wake, elems)
  integer, allocatable :: start_points(:,:)
  integer, allocatable :: conn_pe(:)
  integer :: ipan, iw, p1, p2, ipt
- integer :: id, ir, ip, np, ie
- real(wp) :: vel(3)
+ integer :: id, ir, ip, np
  character(len=*), parameter :: this_sub_name = 'load_wake'
    
   call open_hdf5_file(filename, floc)
@@ -1204,17 +1203,16 @@ subroutine complete_wake(wake, geo, elems)
  type(t_geo), intent(in) :: geo
  type(t_pot_elem_p), intent(in) :: elems(:)
 
- integer :: p1, p2
- integer :: ip, iw, ipan, id, is, nprev
+ integer  :: p1, p2
+ integer  :: ip, iw, ipan, id, is, nprev
  real(wp) :: dist(3) , vel_te(3), pos_p(3)
  real(wp) :: dir(3), partvec(3), ave, alpha_p(3), alpha_p_n
- integer :: ir, k, n_part
+ integer  :: k, n_part
  real(wp) :: hcas_reltime
  real(wp) :: vel_in(3), vel_out(3)
 
  ! flow separation variables
  integer :: i_comp , i_elem , n_elem
- integer :: n_end_vort   ! for structure update (around l.750)
 
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name='prepare_wake'
@@ -1328,7 +1326,7 @@ subroutine complete_wake(wake, geo, elems)
       dir = wake%pan_w_points(:,p1,wake%nmax_pan+1)-points_end(:,p1)
       if (wake%pan_neigh(1,iw) .gt. 0) then
         ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
-              wake%pan_neigh_o(1,iw)* &
+              real(wake%pan_neigh_o(1,iw),wp)* &
               wake%wake_panels(wake%pan_neigh(1,iw),wake%pan_wake_len)%mag
         ave = ave/2.0_wp
       else !has no fixed neighbour
@@ -1344,7 +1342,8 @@ subroutine complete_wake(wake, geo, elems)
       dir = -wake%pan_w_points(:,p2,wake%nmax_pan+1)+points_end(:,p2)
       if (wake%pan_neigh(2,iw) .gt. 0) then
         ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
-              wake%pan_neigh_o(2,iw)*wake%wake_panels(wake%pan_neigh(2,iw),wake%pan_wake_len)%mag
+              real(wake%pan_neigh_o(2,iw),wp)* &
+              wake%wake_panels(wake%pan_neigh(2,iw),wake%pan_wake_len)%mag
         ave = ave/2.0_wp
       else
         if(sim_param%join_te) then

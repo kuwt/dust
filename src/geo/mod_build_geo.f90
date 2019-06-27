@@ -1771,7 +1771,7 @@ subroutine build_te_parametric ( ee , rr , ElType , &
 !  t_te(:,1) = 0.5 * ( rr(:,ee(2,e_te(1,1))) - rr(:,ee(3,e_te(1,1))) + & 
 !                      rr(:,ee(3,e_te(2,1))) - rr(:,ee(2,e_te(2,1)))     )
 ! >>>>>>>>>
-   t_te(:,1) = 0.5 * ( rr(:,ee(3,e_te(1,1))) - rr(:,ee(2,e_te(1,1))) + & 
+   t_te(:,1) = 0.5_wp * ( rr(:,ee(3,e_te(1,1))) - rr(:,ee(2,e_te(1,1))) + & 
                        rr(:,ee(2,e_te(2,1))) - rr(:,ee(3,e_te(2,1)))     )
    t_te(:,1) = t_te(:,1) / norm2(t_te(:,1))
 ! >>>>>>>>>
@@ -1780,15 +1780,15 @@ subroutine build_te_parametric ( ee , rr , ElType , &
 !    t_te(:,i1+1) = 0.5 * ( rr(:,ee(1,e_te(1,i1))) - rr(:,ee(4,e_te(1,i1))) + & 
 !                           rr(:,ee(4,e_te(2,i1))) - rr(:,ee(1,e_te(2,i1)))   )
 ! >>>>>>>>>
-     t_te(:,i1+1) = 0.5 * ( rr(:,ee(4,e_te(1,i1))) - rr(:,ee(1,e_te(1,i1))) + & 
+     t_te(:,i1+1) = 0.5_wp*( rr(:,ee(4,e_te(1,i1))) - rr(:,ee(1,e_te(1,i1))) + & 
                             rr(:,ee(1,e_te(2,i1))) - rr(:,ee(4,e_te(2,i1)))  )
      t_te(:,i1+1) = t_te(:,i1+1) / norm2(t_te(:,i1+1))
    end do
  else
-   t_te(:,1) = 0.5 * (  rr(:,ee(3,e_te(1,1))) - rr(:,ee(2,e_te(1,1))) )
+   t_te(:,1) = 0.5_wp * (  rr(:,ee(3,e_te(1,1))) - rr(:,ee(2,e_te(1,1))) )
    t_te(:,1) = t_te(:,1) / norm2(t_te(:,1))
    do i1 = 1 , nelems_span 
-     t_te(:,i1+1) = 0.5 * ( rr(:,ee(4,e_te(1,i1))) - rr(:,ee(1,e_te(1,i1))) )
+     t_te(:,i1+1) = 0.5_wp*( rr(:,ee(4,e_te(1,i1))) - rr(:,ee(1,e_te(1,i1))) )
      t_te(:,i1+1) = t_te(:,i1+1) / norm2(t_te(:,i1+1))
    end do
  

@@ -397,15 +397,18 @@ subroutine compute_der_ker(this,diff,delta,pexp)
   enddo; enddo; enddo
 
   do k=0,pexp%degree-1;  do j=0,pexp%degree-1-k; do i=0,pexp%degree-1-j-k;
-    this%D(1,pexp%idx(i,j,k)) = - (1+i)*bk(pexp%idx(i+1,j,k))
-    this%D(2,pexp%idx(i,j,k)) = - (1+j)*bk(pexp%idx(i,j+1,k))
-    this%D(3,pexp%idx(i,j,k)) = - (1+k)*bk(pexp%idx(i,j,k+1))
+    this%D(1,pexp%idx(i,j,k)) = - (1.0_wp+real(i,wp))*bk(pexp%idx(i+1,j,k))
+    this%D(2,pexp%idx(i,j,k)) = - (1.0_wp+real(j,wp))*bk(pexp%idx(i,j+1,k))
+    this%D(3,pexp%idx(i,j,k)) = - (1.0_wp+real(k,wp))*bk(pexp%idx(i,j,k+1))
   enddo; enddo; enddo
 
   do k=0,pexp%degree-2;  do j=0,pexp%degree-2-k; do i=0,pexp%degree-2-j-k;
-    this%Dc(:,1,pexp%idx(i,j,k)) = - (1+i)*this%D(:,pexp%idx(i+1,j,k))
-    this%Dc(:,2,pexp%idx(i,j,k)) = - (1+j)*this%D(:,pexp%idx(i,j+1,k))
-    this%Dc(:,3,pexp%idx(i,j,k)) = - (1+k)*this%D(:,pexp%idx(i,j,k+1))
+    this%Dc(:,1,pexp%idx(i,j,k)) = &
+                              - (1.0_wp+real(i,wp))*this%D(:,pexp%idx(i+1,j,k))
+    this%Dc(:,2,pexp%idx(i,j,k)) = &
+                              - (1.0_wp+real(j,wp))*this%D(:,pexp%idx(i,j+1,k))
+    this%Dc(:,3,pexp%idx(i,j,k)) = &
+                              - (1.0_wp+real(k,wp))*this%D(:,pexp%idx(i,j,k+1))
   enddo; enddo; enddo
 end subroutine
 

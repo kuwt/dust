@@ -226,7 +226,7 @@ subroutine potential_calc_sou_surfpan(this, sou, dou, pos)
      souLog = log( (R1+R2+this%edge_len(i1)) / (R1+R2-this%edge_len(i1)) )
 
 
-     if ( abs(R1+R2-this%edge_len(i1)) < 1e-6 ) then
+     if ( abs(R1+R2-this%edge_len(i1)) < 1e-6_wp ) then
        call error(this_sub_name, this_mod_name, 'Too small denominator in &
         &the calculation of sources')
      end if
@@ -295,19 +295,19 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
      R2 = norm2( pos - this%verp(:,indp1) )
      ! si = this%edge_len(i1)
      if(sim_param%debug_level .ge.5) then
-     if ( abs(R1+R2-this%edge_len(i1)) .lt. 1e-6 ) then
+     if ( abs(R1+R2-this%edge_len(i1)) .lt. 1e-6_wp ) then
       call warning(this_sub_name, this_mod_name, &
         'too small denominator in calculation of velocity')
       write(message,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
       call printout(message)
      end if
-     if ( abs(this%edge_len(i1) ) .lt. 1e-6 ) then
+     if ( abs(this%edge_len(i1) ) .lt. 1e-6_wp ) then
       call warning(this_sub_name, this_mod_name, &
         'too small edge length in calculation of velocity')
       write(message,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
       call printout(message)
      end if
-     if ( abs(R1+R2+this%edge_len(i1)) .lt. 1e-6 ) then
+     if ( abs(R1+R2+this%edge_len(i1)) .lt. 1e-6_wp ) then
       call warning(this_sub_name, this_mod_name, &
         'too small numerator in calculation of velocity')
       write(message,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
@@ -315,7 +315,7 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
      end if
      endif
      
-     if ( R1+R2-this%edge_len(i1) .lt. 1e-12 ) then
+     if ( R1+R2-this%edge_len(i1) .lt. 1e-12_wp ) then
        souLog = 0.0_wp
      else
        souLog = log( (R1+R2+this%edge_len(i1)) / (R1+R2-this%edge_len(i1)) )
@@ -804,7 +804,8 @@ subroutine compute_pres_surfpan(this, R_g)
 
 
    !New equation
-   this%pres = this%pres_sol - 0.5*sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp
+   this%pres = this%pres_sol - 0.5_wp*sim_param%rho_inf * &
+               norm2(this%surf_vel)**2.0_wp
 
   if (this%moving) then
     force_pres  = sim_param%P_inf &

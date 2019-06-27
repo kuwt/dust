@@ -329,7 +329,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
   !dive down  all the other levels
   do l = 2,nlevels
     !Set the quantities for the layer 
-    octree%layers(l)%cell_size = box_length/(2**(l-1))
+    octree%layers(l)%cell_size = box_length/real((2**(l-1)),wp)
     allocate(octree%layers(l)%&
                        lcells(octree%ncl(1,l),octree%ncl(2,l),octree%ncl(3,l)))
     !cycle on the parents (i.e. all the cells at the upper level)
@@ -701,7 +701,7 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
  integer :: ip, ipp
  integer :: idx(3)
  real(wp) :: csize
- integer :: l, i,j,k, child, ic,jc,kc, in,jn,kn
+ integer :: l, i,j,k, child, ic,jc,kc
  integer :: ll, nl
  logical :: got_leaves
  integer :: nprt, nprt2, iq
@@ -854,8 +854,9 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
 
             !redistribute it
             nprt2 = octree%layers(ll)%lcells(i,j,k)%npart
-            redistr = (octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag * &
-                    octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%dir) / nprt2
+            redistr = (octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag*&
+                       octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%dir)&
+                       / real(nprt2,wp)
             do iq=1,nprt
                 if(.not. octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%free) then
                   vort =  octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%mag*&
@@ -1346,11 +1347,8 @@ subroutine apply_multipole_panels(octree, elem)
  real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3), dir(3)
  real(wp), allocatable :: velv(:,:), stretchv(:,:)
  real(wp) :: grad(3,3)
- real(t_realtime) :: tsta , tend
+ real(t_realtime) :: tsta
  real(wp) :: turbvisc, ave_ros
-
- integer :: child, idx(3), l, ll
- real(wp) :: csize
 
  character(len=*), parameter :: this_sub_name = 'apply_multipole_panels'
 
