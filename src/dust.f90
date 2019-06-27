@@ -193,7 +193,7 @@ real(wp) , allocatable :: res_old(:)
 real(wp) , allocatable :: surf_vel_SurfPan_old(:,:)
 real(wp) , allocatable ::      nor_SurfPan_old(:,:)
 
-integer :: i_el , i, sel, ie
+integer :: i_el , i, sel
 
 !octree parameters
 type(t_octree) :: octree
@@ -293,10 +293,10 @@ call prms%CreateRealOption('LLReynoldsCorrectionsNfact', &
        'Exponent in (Re/Re_T)^n correction', '0.2')
 call prms%CreateIntOption('LLmaxIter', & 
        'Maximum number of iteration in LL algorithm', '100')
-call prms%CreateRealOption('LLtol', & 
-       'Tolerance for the relative error in fixed point iteration for LL','1.0e-6' )
-call prms%CreateRealOption('LLdamp', &
-       'Damping param in fixed point iteration for LL used to avoid oscillations','5.0')
+call prms%CreateRealOption('LLtol', 'Tolerance for the relative error in &
+                           &fixed point iteration for LL','1.0e-6' )
+call prms%CreateRealOption('LLdamp', 'Damping param in fixed point iteration &
+                           &for LL used to avoid oscillations','5.0')
 call prms%CreateLogicalOption('LLstallRegularisation', & 
        'Avoid "unphysical" separations in inner sections of LL?','T')
 call prms%CreateIntOption('LLstallRegularisationNelems', &
@@ -308,6 +308,8 @@ call prms%CreateRealOption('LLstallRegularisationAlphaStall', &
 
 !== Octree and multipole data == 
 call prms%CreateLogicalOption('FMM','Employ fast multipole method?','T')
+call prms%CreateLogicalOption('FMMPanels','Employ fast multipole method &
+                              &also for panels?','F')
 call prms%CreateRealOption('BoxLength','length of the octree box')
 call prms%CreateIntArrayOption('NBox','number of boxes in each direction')
 call prms%CreateRealArrayOption( 'OctreeOrigin', "rigid wake velocity" )
@@ -810,6 +812,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   !Octree and FMM parameters
   sim_param%use_fmm = getlogical(prms, 'FMM')
   if(sim_param%use_fmm) then
+    sim_param%use_fmm_pan = getlogical(prms, 'FMMPanels')
     sim_param%BoxLength = getreal(prms, 'BoxLength')
     sim_param%NBox = getintarray(prms, 'NBox',3)
     sim_param%OctreeOrigin = getrealarray(prms, 'OctreeOrigin',3)
@@ -826,14 +829,16 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     endif
   
     sim_param%use_pr = getlogical(prms, 'ParticlesRedistribution')
-  if(sim_param%use_pr) then
-    sim_param%part_redist_ratio = getreal(prms, 'ParticlesRedistributionRatio')
-    if ( countoption(prms,'OctreeLevelSolid') .gt. 0 ) then
-      sim_param%lvl_solid = getint(prms, 'OctreeLevelSolid')
-    else
-      sim_param%lvl_solid = max(sim_param%NOctreeLevels-2,1)
+    if(sim_param%use_pr) then
+      sim_param%part_redist_ratio = getreal(prms,'ParticlesRedistributionRatio')
+      if ( countoption(prms,'OctreeLevelSolid') .gt. 0 ) then
+        sim_param%lvl_solid = getint(prms, 'OctreeLevelSolid')
+      else
+        sim_param%lvl_solid = max(sim_param%NOctreeLevels-2,1)
+      endif
     endif
-  endif
+  else
+    sim_param%use_fmm_pan = .false.
   endif
 
   !HCAS
@@ -873,39 +878,39 @@ end subroutine init_sim_param
 !----------------------------------------------------------------------
 
 !DISCONTINUED: consider removing
-subroutine copy_geo(sim_param, geo_file, run_id)
- type(t_sim_param), intent(inout) :: sim_param
- character(len=*), intent(inout)     :: geo_file
- integer, intent(in)              :: run_id(10)
-
- character(len=max_char_len) :: target_file
- integer :: estat, cstat
- integer(h5loc) :: floc
-
-  !target file name: same as run basename with appendix
-  target_file = trim(sim_param%basename)//'_geo.h5'
-  
-  if (trim(geo_file) .ne. trim(target_file)) then
-  !Copy the geometry file
-  call execute_command_line('cp '//trim(geo_file)//' '//trim(target_file), &
-                                           exitstat=estat,cmdstat=cstat)
-  if((cstat .ne. 0) .or. (estat .ne. 0)) &
-    call error('dust','','System errors while trying to copy the geometry &
-    &to the output path')
-  endif
-
-
-  !Attach the run_id to the file as an attribute
-  call open_hdf5_file(trim(target_file), floc)
-  call write_hdf5_attr(run_id, 'run_id', floc)
-  call close_hdf5_file(floc)
-
-
-  !Overwrite the geo file name, so that the copy is going to be
-  !opened
-  geo_file = trim(target_file)
-
-end subroutine copy_geo
+!!subroutine copy_geo(sim_param, geo_file, run_id)
+!! type(t_sim_param), intent(inout) :: sim_param
+!! character(len=*), intent(inout)     :: geo_file
+!! integer, intent(in)              :: run_id(10)
+!!
+!! character(len=max_char_len) :: target_file
+!! integer :: estat, cstat
+!! integer(h5loc) :: floc
+!!
+!!  !target file name: same as run basename with appendix
+!!  target_file = trim(sim_param%basename)//'_geo.h5'
+!!  
+!!  if (trim(geo_file) .ne. trim(target_file)) then
+!!  !Copy the geometry file
+!!  call execute_command_line('cp '//trim(geo_file)//' '//trim(target_file), &
+!!                                           exitstat=estat,cmdstat=cstat)
+!!  if((cstat .ne. 0) .or. (estat .ne. 0)) &
+!!    call error('dust','','System errors while trying to copy the geometry &
+!!    &to the output path')
+!!  endif
+!!
+!!
+!!  !Attach the run_id to the file as an attribute
+!!  call open_hdf5_file(trim(target_file), floc)
+!!  call write_hdf5_attr(run_id, 'run_id', floc)
+!!  call close_hdf5_file(floc)
+!!
+!!
+!!  !Overwrite the geo file name, so that the copy is going to be
+!!  !opened
+!!  geo_file = trim(target_file)
+!!
+!!end subroutine copy_geo
 
 !----------------------------------------------------------------------
 

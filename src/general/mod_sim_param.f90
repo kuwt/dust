@@ -173,6 +173,8 @@ type t_sim_param
   !FMM parameters
   !> Employing the FMM method
   logical :: use_fmm
+    !> Employing the FMM method also for panels
+    logical :: use_fmm_pan
     !> Size of the Octree box
     real(wp) :: BoxLength
     !> Number of boxes in each direction
@@ -281,6 +283,7 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%use_ve, 'ViscosityEffects', loc)
   call write_hdf5_attr(this%use_fmm, 'use_fmm', loc)
   if(this%use_fmm) then
+    call write_hdf5_attr(this%use_fmm_pan, 'use_fmm_panels', loc)
     call write_hdf5_attr(this%BoxLength, 'BoxLength', loc)
     call write_hdf5_attr(this%Nbox, 'Nbox', loc)
     call write_hdf5_attr(this%OctreeOrigin, 'OctreeOrigin', loc)

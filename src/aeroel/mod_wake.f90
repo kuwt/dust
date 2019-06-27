@@ -678,14 +678,14 @@ subroutine load_wake(filename, wake, elems)
   allocate(wake%part_p(wake%n_prt))
   if(wake%n_prt .gt. 0) then
     deallocate(wake%vort_p)
-    if(sim_param%use_fmm) then
+    if(sim_param%use_fmm_pan) then ! particles treated in FMM
       allocate(wake%vort_p(wake%n_pan_stripes))
-    else
+    else ! particles velocity calculated alongside the end vortices
       allocate(wake%vort_p(wake%n_prt+wake%n_pan_stripes))
     endif
 
     do iw = 1, wake%n_pan_stripes 
-      if(sim_param%use_fmm) then
+      if(sim_param%use_fmm_pan) then
         wake%vort_p(iw)%p => wake%end_vorts(iw)
       else
         wake%vort_p(wake%n_prt+iw)%p => wake%end_vorts(iw)
@@ -704,7 +704,7 @@ subroutine load_wake(filename, wake, elems)
     endif
     wake%wake_parts(ip)%free = .false.
     wake%part_p(ip)%p => wake%wake_parts(ip)
-    if(.not.sim_param%use_fmm) wake%vort_p(ip)%p => wake%wake_parts(ip)
+    if(.not.sim_param%use_fmm_pan) wake%vort_p(ip)%p => wake%wake_parts(ip)
   enddo
   
   deallocate(vppoints, vpvort, vpvels)
@@ -777,9 +777,9 @@ subroutine prepare_wake(wake, elems, octree)
     if ( wake%full_panels .or. wake%full_rings ) then
       n_end_vort = wake%n_pan_stripes
     end if
-    if(sim_param%use_fmm) then
+    if(sim_param%use_fmm_pan) then ! particles vel treated in FMM
       allocate(wake%vort_p( n_end_vort))
-    else
+    else !particles velocity treated alongside the end vortices
       allocate(wake%vort_p(wake%n_prt + n_end_vort))
     endif
     !TODO: consider inverting these two cycles
@@ -789,7 +789,7 @@ subroutine prepare_wake(wake, elems, octree)
         if(.not. wake%wake_parts(ir)%free) then
           k = ir+1
           wake%part_p(ip)%p => wake%wake_parts(ir)
-          if(.not.sim_param%use_fmm) wake%vort_p(ip)%p => wake%wake_parts(ir)
+          if(.not.sim_param%use_fmm_pan) wake%vort_p(ip)%p => wake%wake_parts(ir)
           exit
         endif
       enddo
@@ -797,7 +797,7 @@ subroutine prepare_wake(wake, elems, octree)
     !Add the end vortex to the votical elements pointer
 !   if ( wake%full_panels .or. wake%full_rings ) then ! useless if ( n_end_vort may be 0 )
     do iw = 1, n_end_vort
-      if(sim_param%use_fmm) then
+      if(sim_param%use_fmm_pan) then
         wake%vort_p(iw)%p => wake%end_vorts(iw)
       else
         wake%vort_p(wake%n_prt+iw)%p => wake%end_vorts(iw)
