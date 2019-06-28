@@ -739,7 +739,8 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
     ipp = ipp + 1
     do while(wparts(ipp)%free)
         ipp = ipp +1
-        if(ipp .gt. n_prt) call internal_error(this_sub_name, this_mod_name, &
+        if(ipp .gt. size(wparts)) &
+        call internal_error(this_sub_name, this_mod_name, &
         'not enough non-free particles while sorting')
     enddo
     !check in which cell at the lowest level it is located

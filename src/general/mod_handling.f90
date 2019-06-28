@@ -216,7 +216,7 @@ recursive subroutine internal_error(caller,caller_mod,text)
   call put_msg( 1 , format_out_string(                            &
       !'ERROR in "', caller , caller_mod , '"!' , (/trim(text)/) ) )
       'Interna ERROR in "', caller , caller_mod , '"!' , gfortran_bug_text//&
-      'This should have never happened, please report this error so &
+      nl//'This should have never happened, please report this error so &
     &that  a team of professionals could travel back in time and fix this' ) )
 
   call dust_abort()
