@@ -58,7 +58,7 @@ use mod_math, only: &
   cross
 
 use mod_handling, only: &
-  error, warning, info, printout, dust_time, t_realtime
+  error, internal_error, warning, info, printout, dust_time, t_realtime
 
 use mod_vortpart, only: &
   t_vortpart, t_vortpart_p
@@ -219,24 +219,32 @@ end subroutine
 
 !----------------------------------------------------------------------
 
-subroutine leaf_M_multipole(this, cen, parts, pexp)
+subroutine leaf_M_multipole(this, cen, parts, nparts,  pexp)
  class(t_multipole) :: this
  real(wp), intent(in) :: cen(3)
  type(t_vortpart_p), intent(in) :: parts(:)
+ integer, intent(in) :: nparts
  type(t_polyexp), intent(in) :: pexp
 
  integer :: i, m
 
   this%a = 0.0_wp
-  do m=1,size(this%a,2) 
-    do i=1,size(parts)
-      if(.not. parts(i)%p%free) then
-        this%a(:,m) = this%a(:,m) + &
-        parts(i)%p%mag*product((parts(i)%p%cen-cen)**pexp%pwr(:,m))* &
-        parts(i)%p%dir
-      endif
+  if(nparts .gt. 0) then
+    do m=1,size(this%a,2) 
+      do i=1,nparts
+        if(.not. parts(i)%p%free) then
+          this%a(:,m) = this%a(:,m) + &
+          parts(i)%p%mag*product((parts(i)%p%cen-cen)**pexp%pwr(:,m))* &
+          parts(i)%p%dir
+        else
+          !Transitional error:
+          !IF NEVER TRIGGERED CONSIDER REMOVING
+          call internal_error('leaf_M_multipole','mod_multipole',&
+          'attempt to calculate M on a free particle')
+        endif
+      enddo
     enddo
-  enddo
+  endif
 
 end subroutine
 

@@ -235,6 +235,7 @@ real(t_realtime) :: t11, t00
 
 integer :: min_part_4_cell
 
+integer, parameter :: allocation_block = 32
 !----------------------------------------------------------------------
 contains
 !----------------------------------------------------------------------
@@ -767,8 +768,6 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
   
   !Sort also all the elements
   if(sim_param%use_pr .or. sim_param%use_fmm_pan) then
-  !DEBUG:
-  write(*,*) 'Mannaggia!', sim_param%use_pr, sim_param%use_fmm_pan
     do ip=1,size(elem)
       !check in which cell at the lowest level it is located
       idx = ceiling((elem(ip)%p%cen-octree%xmin)/csize)
@@ -1015,9 +1014,12 @@ subroutine calculate_multipole(part,octree)
   t0 = dust_time()
 !$omp parallel do private(lv) schedule(guided)
   do lv = 1, octree%nleaves
+  !DEBUG
+  !write(*,*) 'Leaf nr, nr_part, size cell_parts',lv,octree%leaves(lv)%p%npart,size(octree%leaves(lv)%p%cell_parts)
     call octree%leaves(lv)%p%mp%leaf_M(&
                octree%leaves(lv)%p%cen, &
                octree%leaves(lv)%p%cell_parts, &
+               octree%leaves(lv)%p%npart, &
                octree%pexp  )
   enddo
 !$omp end parallel do
@@ -1638,94 +1640,191 @@ end subroutine push_cell_ptr_vec
 !----------------------------------------------------------------------
 
 !> Push another pointer to a list of particles pointers
-subroutine push_part_ptr_scalar(pointers, particle)
+subroutine push_part_ptr_scalar(pointers, particle, last_elem)
  type(t_vortpart_p), allocatable, target, intent(inout) :: pointers(:)
  type(t_vortpart), intent(in), target :: particle
+ integer, optional :: last_elem
 
  type(t_vortpart_p) :: tmp_ptr(size(pointers)+1)
- integer :: i, l
-
+ integer :: i, l, ife
+  
   l = size(pointers)
-  do i=1,l
-    tmp_ptr(i)%p => pointers(i)%p
-  enddo
-  deallocate(pointers); allocate(pointers(l+1))
-  do i=1,l
-    pointers(i)%p => tmp_ptr(i)%p
-  enddo
-  pointers(l+1)%p => particle
+  !Get first empty element: receive from 
+  if(.not.present(last_elem)) then
+    ife = 1
+    do i=1,l
+      if(.not.associated(pointers(i)%p)) exit
+      ife = ife + 1
+    enddo
+  else
+    ife = last_elem+1
+  endif
+
+  if (ife .gt. l .or. ife .le. 0) then !the array is full, allocate new block
+    do i=1,l
+      tmp_ptr(i)%p => pointers(i)%p
+    enddo
+    deallocate(pointers); allocate(pointers(l+allocation_block))
+    do i=1,l
+      pointers(i)%p => tmp_ptr(i)%p
+    enddo
+    pointers(l+1)%p => particle
+    do i=l+2,size(pointers)
+      nullify(pointers(i)%p)
+    enddo
+
+  else !insert the pointer in the first available empty space
+
+    pointers(ife)%p => particle
+
+  endif
 
 end subroutine push_part_ptr_scalar
 
 !----------------------------------------------------------------------
 
 !> Push another pointer list to a list of particle pointers
-subroutine push_part_ptr_vec(pointers, elements)
+subroutine push_part_ptr_vec(pointers, elements, last_elem)
  type(t_vortpart_p), allocatable, target, intent(inout) :: pointers(:)
  type(t_vortpart_p), target, intent(in) :: elements(:)
+ integer, optional :: last_elem
 
  type(t_vortpart_p) :: tmp_ptr(size(pointers)+1)
- integer :: i, l, m
+ integer :: i, l, m, ife, nblck
 
   l = size(pointers)
+  !Get first empty element: receive from 
+  if(.not.present(last_elem)) then
+    ife = 1
+    do i=1,l
+      if(.not.associated(pointers(i)%p)) exit
+      ife = ife + 1
+    enddo
+  else
+    ife = last_elem+1
+  endif
+
   m = size(elements)
-  do i=1,l
-    tmp_ptr(i)%p => pointers(i)%p
-  enddo
-  deallocate(pointers); allocate(pointers(l+m))
-  do i=1,l
-    pointers(i)%p => tmp_ptr(i)%p
-  enddo
-  do i = 1,m
-    pointers(l+i)%p => elements(i)%p
-  enddo
+
+  if (ife+m-1 .gt. l .or. ife .le. 0) then !the array is full, allocate new blocks
+    do i=1,ife-1
+      tmp_ptr(i)%p => pointers(i)%p
+    enddo
+    nblck = ceiling(real(m-(l-ife+1))/real(allocation_block))
+    deallocate(pointers); allocate(pointers(l+nblck*allocation_block))
+    if(ife .le. 0) ife = 1
+    do i=1,(ife-1)
+      pointers(i)%p => tmp_ptr(i)%p
+    enddo
+    do i = 1,m
+      pointers(ife-1+i)%p => elements(i)%p
+    enddo
+    do i = ife+m,size(pointers)
+      nullify(pointers(i)%p)
+    enddo
+
+  else !there is enough space just to fill the additional array
+
+    do i = 1,m
+      pointers(ife-1+i)%p => elements(i)%p
+    enddo
+
+  endif
 
 end subroutine push_part_ptr_vec
 
 !----------------------------------------------------------------------
 
 !> Push another pointer to a list of panels pointers
-subroutine push_pan_ptr_scalar(pointers, particle)
+subroutine push_pan_ptr_scalar(pointers, particle, last_elem)
  type(t_pot_elem_p), allocatable, target, intent(inout) :: pointers(:)
  class(c_pot_elem), intent(in), target :: particle
+ integer, intent(in), optional :: last_elem
 
  type(t_pot_elem_p) :: tmp_ptr(size(pointers)+1)
- integer :: i, l
+ integer :: i, l, ife
 
   l = size(pointers)
-  do i=1,l
-    tmp_ptr(i)%p => pointers(i)%p
-  enddo
-  deallocate(pointers); allocate(pointers(l+1))
-  do i=1,l
-    pointers(i)%p => tmp_ptr(i)%p
-  enddo
-  pointers(l+1)%p => particle
+  !Get first empty element: receive from 
+  if(.not.present(last_elem)) then
+    ife = 1
+    do i=1,l
+      if(.not.associated(pointers(i)%p)) exit
+      ife = ife + 1
+    enddo
+  else
+    ife = last_elem+1
+  endif
+
+  if (ife .gt. l) then !the array is full, allocate new block
+    do i=1,l
+      tmp_ptr(i)%p => pointers(i)%p
+    enddo
+    deallocate(pointers); allocate(pointers(l+allocation_block))
+    do i=1,l
+      pointers(i)%p => tmp_ptr(i)%p
+    enddo
+    pointers(l+1)%p => particle
+    do i=l+2,size(pointers)
+      nullify(pointers(i)%p)
+    enddo
+
+  else !insert the pointer in the first available empty space
+
+    pointers(ife)%p => particle
+
+  endif
 
 end subroutine push_pan_ptr_scalar
 
 !----------------------------------------------------------------------
 
 !> Push another pointer list to a list of panels pointers
-subroutine push_pan_ptr_vec(pointers, elements)
+subroutine push_pan_ptr_vec(pointers, elements, last_elem)
  type(t_pot_elem_p), allocatable, target, intent(inout) :: pointers(:)
  type(t_pot_elem_p), target, intent(in) :: elements(:)
+ integer, optional :: last_elem
 
  type(t_pot_elem_p) :: tmp_ptr(size(pointers)+1)
- integer :: i, l, m
+ integer :: i, l, m, ife, nblck
 
   l = size(pointers)
+  !Get first empty element: receive from 
+  if(.not.present(last_elem)) then
+    ife = 1
+    do i=1,l
+      if(.not.associated(pointers(i)%p)) exit
+      ife = ife + 1
+    enddo
+  else
+    ife = last_elem+1
+  endif
+
   m = size(elements)
-  do i=1,l
-    tmp_ptr(i)%p => pointers(i)%p
-  enddo
-  deallocate(pointers); allocate(pointers(l+m))
-  do i=1,l
-    pointers(i)%p => tmp_ptr(i)%p
-  enddo
-  do i = 1,m
-    pointers(l+i)%p => elements(i)%p
-  enddo
+
+  if (ife+m-1 .gt. l) then !the array is full, allocate new blocks
+    do i=1,ife-1
+      tmp_ptr(i)%p => pointers(i)%p
+    enddo
+    nblck = ceiling(real(m-(l-ife+1))/real(allocation_block))
+    deallocate(pointers); allocate(pointers(l+nblck*allocation_block))
+    do i=1,(ife-1)
+      pointers(i)%p => tmp_ptr(i)%p
+    enddo
+    do i = 1,m
+      pointers(ife-1+i)%p => elements(i)%p
+    enddo
+    do i = ife+m,size(pointers)
+      nullify(pointers(i)%p)
+    enddo
+
+  else !there is enough space just to fill the additional array
+
+    do i = 1,m
+      pointers(ife-1+i)%p => elements(i)%p
+    enddo
+
+  endif
 
 end subroutine push_pan_ptr_vec
 
@@ -1738,20 +1837,38 @@ end subroutine push_pan_ptr_vec
 !! multipole data are allocated or not, will be set during sorting
 subroutine reset_cell(cell)
  type(t_cell), intent(inout) :: cell
+ integer :: i
 
- deallocate(cell%cell_parts)
- allocate(cell%cell_parts(0))
- cell%npart = 0
- deallocate(cell%cell_pans)
- allocate(cell%cell_pans(0))
- cell%npan = 0
- !cell%active = .true.
- cell%branch = .false.
- cell%leaf = .false.
- cell%near_wall = .false.
- cell%ave_vortmag = 0.0_wp
- deallocate(cell%leaf_neigh)
- allocate(cell%leaf_neigh(0))
+ !deallocate(cell%cell_parts)
+ !allocate(cell%cell_parts(0))
+ !cell%npart = 0
+ !deallocate(cell%cell_pans)
+ !allocate(cell%cell_pans(0))
+ !cell%npan = 0
+ !!cell%active = .true.
+ !cell%branch = .false.
+ !cell%leaf = .false.
+ !cell%near_wall = .false.
+ !cell%ave_vortmag = 0.0_wp
+ !deallocate(cell%leaf_neigh)
+ !allocate(cell%leaf_neigh(0))
+ 
+  do i=1,cell%npart
+    nullify(cell%cell_parts(i)%p) 
+  enddo
+  cell%npart = 0
+
+  do i=1,cell%npan
+    nullify(cell%cell_pans(i)%p) 
+  enddo
+  cell%npan = 0
+  !cell%active = .true.
+  cell%branch = .false.
+  cell%leaf = .false.
+  cell%near_wall = .false.
+  cell%ave_vortmag = 0.0_wp
+  deallocate(cell%leaf_neigh)
+  allocate(cell%leaf_neigh(0))
 
 end subroutine reset_cell
 
