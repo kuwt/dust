@@ -704,7 +704,7 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
  real(wp) :: csize
  integer :: l, i,j,k, child, ic,jc,kc
  integer :: ll, nl
- logical :: got_leaves
+ logical :: got_leaves, got_branches
  integer :: nprt, nprt2, iq
  real(wp) :: redistr(3), vort(3)
  character(len=*), parameter :: this_sub_name = 'sort_particles'
@@ -795,6 +795,7 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
     !From the second to last level upwards, add the panels
     do l = ll-1,1,-1
       !cycle on the elements on the level
+!!!!!$omp parallel do collapse(3) private(i,j,k,child)
       do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
 
         !cycle on the children, gather the number of particles and if are 
@@ -808,6 +809,7 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
           octree%layers(l)%lcells(i,j,k)%children(child)%p%cell_pans)
         enddo !child
       enddo; enddo; enddo !layer cells i,j,k
+!!!!!!$omp end parallel do
     enddo
   endif
 
@@ -879,6 +881,7 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
 
   nl = 0
   !Bottom level: just check if are leaves
+!$omp parallel do collapse(3) private(i,j,k)
   do k=1,octree%ncl(3,ll); do j=1,octree%ncl(2,ll); do i = 1,octree%ncl(1,ll)
     if( (octree%layers(ll)%lcells(i,j,k)%npart .ge. min_part_4_cell) .or. &
          ll .eq. 1) then !if last level is first, all are leaves
@@ -887,19 +890,24 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
                                                              octree%pexp)
     endif
   enddo; enddo; enddo !layer cells i,j,k
+!$omp end parallel do
 
 
   !From the second to last level upwards
   do l = ll-1,1,-1
     !cycle on the elements on the level
+!$omp parallel do collapse(3) private(i,j,k,got_leaves, got_branches, child)
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
 
       !cycle on the children, gather the number of particles and if are 
       !leaves
       got_leaves = .false.
+      got_branches = .false.
       do child = 1,8
         if(octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf) &
                                                           got_leaves = .true.
+        if(octree%layers(l)%lcells(i,j,k)%children(child)%p%branch) &
+                                                        got_branches = .true.
         octree%layers(l)%lcells(i,j,k)%npart = &
               octree%layers(l)%lcells(i,j,k)%npart + &
               octree%layers(l)%lcells(i,j,k)%children(child)%p%npart
@@ -909,51 +917,39 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
       enddo !child
       
       !check how we need to flag the cell
-      if (.not. octree%layers(l)%lcells(i,j,k)%branch) then
-        !if it is not a branch analyse the situation of the children
-        if(got_leaves) then
-          !Some of the children are leaves: set all children as leaves and then
-          !set the current cell and all the branch upwards as branch
-          do child = 1,8
-            if(.not. octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf) then
-              call set_leaf(octree%layers(l)%lcells(i,j,k)%children(child)%p, &
-                        octree%leaves, nl, octree%pexp)
-            endif
-          enddo
-          call set_branch(octree%layers(l)%lcells(i,j,k), octree%pexp)
-        else
-          !None of the children are leaves. Particles have alerady been 
-          !inherited, just flag the rest inactive
-          do child = 1,8
-            call set_inactive(octree%layers(l)%lcells(i,j,k)%children(child)%p)
-          enddo
-          !then check if itself it is a leaf
-          if( (octree%layers(l)%lcells(i,j,k)%npart .ge. min_part_4_cell) &
-          .or. l .eq. 1) then !if last level is first, all are leaves
-            call set_leaf(octree%layers(l)%lcells(i,j,k), &
-                        octree%leaves, nl, octree%pexp)
-          endif
-        endif
-
-      else
-        !if it is a branch we still need to check that one of the children
-        !is not orphaned, i.e. not a leaf nor a branch. Since it is a sibling
-        !of a branch it must become a leaf even if it has not enough particles
+      if(got_leaves .or. got_branches) then
+        !Some of the children are leaves or branches, all which is not
+        !set becomes leaf, the cell becomes branch
         do child = 1,8
-          if( .not. octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf &
-      .and. .not. octree%layers(l)%lcells(i,j,k)%children(child)%p%branch) then
+          if(.not. octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf &
+          .and. .not. octree%layers(l)%lcells(i,j,k)%children(child)&
+                                                          %p%branch) then
             call set_leaf(octree%layers(l)%lcells(i,j,k)%children(child)%p, &
-                        octree%leaves, nl, octree%pexp)
+                      octree%leaves, nl, octree%pexp)
           endif
-        enddo !child
+        enddo
+        call set_branch(octree%layers(l)%lcells(i,j,k), octree%pexp)
+      else
+        !None of the children are leaves nor branches
+        !Particles have alerady been inherited, just flag the rest inactive
+        do child = 1,8
+          call set_inactive(octree%layers(l)%lcells(i,j,k)%children(child)%p)
+        enddo
+        !then check if itself it is a leaf
+        if( (octree%layers(l)%lcells(i,j,k)%npart .ge. min_part_4_cell) &
+        .or. l .eq. 1) then !if last level is first, all are leaves
+          call set_leaf(octree%layers(l)%lcells(i,j,k), &
+                      octree%leaves, nl, octree%pexp)
+        endif
       endif
-
     enddo; enddo; enddo !layer cells i,j,k
+!$omp end parallel do
   enddo
   
   !Last dive down the levels to set the leaf neighbours
   do l = 2,ll
     !cycle on the elements on the level
+!$omp parallel do collapse(3) private(i,j,k,ic,kc,jc) schedule(dynamic)
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
     if(octree%layers(l)%lcells(i,j,k)%active) then
       !1) get the leaf neighbours from the parent if it exists
@@ -974,6 +970,7 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
       enddo; enddo; enddo !neighbour cells ic,jc,kc
     endif !active
     enddo; enddo; enddo !layer cells i,j,k
+!$omp end parallel do
   enddo
 
   octree%nleaves = nl
@@ -1499,8 +1496,10 @@ recursive subroutine set_leaf(cell,leaves,il,pexp)
   !I is a leaf
   cell%leaf = .true.
 
+!$omp critical
   il = il+1
   leaves(il)%p => cell
+!$omp end critical
 
   if(.not. cell%active) then
     !If it was not active, set active and allocate data
@@ -1534,7 +1533,7 @@ recursive subroutine set_branch(cell,pexp)
     call cell%mp%reset
   endif
 
-  if(associated(cell%parent%p)) call set_branch(cell%parent%p, pexp)
+!  if(associated(cell%parent%p)) call set_branch(cell%parent%p, pexp)
 
 end subroutine set_branch
 
@@ -1852,13 +1851,16 @@ subroutine reset_cell(cell)
  !cell%ave_vortmag = 0.0_wp
  !deallocate(cell%leaf_neigh)
  !allocate(cell%leaf_neigh(0))
- 
-  do i=1,cell%npart
+
+
+
+
+  do concurrent (i=1:cell%npart)
     nullify(cell%cell_parts(i)%p) 
   enddo
   cell%npart = 0
 
-  do i=1,cell%npan
+  do concurrent (i=1:cell%npan)
     nullify(cell%cell_pans(i)%p) 
   enddo
   cell%npan = 0
@@ -1871,7 +1873,6 @@ subroutine reset_cell(cell)
   allocate(cell%leaf_neigh(0))
 
 end subroutine reset_cell
-
 !----------------------------------------------------------------------
 
 end module mod_octree
