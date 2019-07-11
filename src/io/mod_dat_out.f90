@@ -102,8 +102,6 @@ subroutine dat_out_aa_header ( fid , t, P, rho, a, mu, u)
  integer , intent(in) :: fid
  real(wp), intent(in) :: t, P, rho, a, mu, u(3)
 
- character(len=max_char_len) :: istr
- 
   write(fid,'(A)') '# Aeroacustics data'
   write(fid,'(A)') '# Time, free stream: Pressure, density, sound speed, &
                   &dynamic viscosity, flow velocity'
@@ -122,9 +120,6 @@ subroutine dat_out_aa ( fid , cen, n, area, vel, surfvel, f)
  integer , intent(in) :: fid
  real(wp), intent(in) :: cen(3), n(3), area, vel(3), surfvel(3), f(3)
 
- character(len=max_char_len) :: istr
- 
-  
   write(fid,'(16'//ascii_real//')') cen, n, area, vel, surfvel, f
    
 

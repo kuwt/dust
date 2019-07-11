@@ -109,7 +109,7 @@ subroutine viscosity_effects( geo , elems , te )
  real(wp) :: c2_2
 
  real(wp) :: OmV(3) , OmV_free(3) , OmV_bound(3)
- real(wp) :: al_free , al_bound
+ real(wp) :: al_free
  real(wp) :: edge_te(3)
 
  ! preliminary "fixed" parameters

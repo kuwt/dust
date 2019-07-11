@@ -18,6 +18,18 @@ SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)
 SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)
 
 
+# =========== Options ========================
+SET(PRECISION "DOUBLE" CACHE STRING "Computation precision")
+SET_PROPERTY(CACHE PRECISION PROPERTY STRINGS "DOUBLE" "SINGLE")
+IF(PRECISION STREQUAL "SINGLE")
+  ADD_DEFINITIONS(-DDUST_PRECISION=1)
+ELSEIF(PRECISION STREQUAL "DOUBLE")
+  ADD_DEFINITIONS(-DDUST_PRECISION=2)
+ELSE()
+  MESSAGE(ERROR "Unknown computational precision")
+ENDIF()
+
+
 # =========== COMPILER ========================
 #SET(CMAKE_Fortran_COMPILER "/home/matteo/LocalUtils/gcc/install/bin/gfortran")
 
@@ -35,13 +47,14 @@ IF (NOT CMAKE_BUILD_TYPE)
 ENDIF (NOT CMAKE_BUILD_TYPE)
 
 IF (CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
+  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp ")
   set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS} -O3 -g -fopenmp")
   set(CMAKE_Fortran_FLAGS_PROFILE "${CMAKE_Fortran_FLAGS} -O3 -g -fopenmp")
   #set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS} -ggdb -g -O0 -pedantic -Wall -Wconversion -Wconversion-extra -fcheck=all -fcheck=bounds -std=f2008ts -fall-intrinsics -finit-real=snan -ffpe-trap=invalid -finit-integer=-666 -Wintrinsics-std -fbacktrace")
   set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS} -ggdb -g -O0 -fopenmp -pedantic -Wall -Wconversion -Wconversion-extra -fcheck=all -fcheck=bounds  -fall-intrinsics -finit-real=snan -ffpe-trap=invalid -finit-integer=-666 -Wintrinsics-std -fbacktrace -Wno-unused-dummy-argument")
 ELSEIF(CMAKE_Fortran_COMPILER_ID MATCHES "Intel") 
   #set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -standard-semantics")
-  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -heap-arrays 10")
+  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fpp -heap-arrays 10")
   set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS} -O2 -g -xHost")
   set(CMAKE_Fortran_FLAGS_PROFILE "${CMAKE_Fortran_FLAGS}  -O2 -g -xHost")
   set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS} -g -O0 -stand f08 -check all -check noarg_temp_created -warn all -fpe0 -traceback -ftrapuv -fp-stack-check -assume norealloc_lhs")

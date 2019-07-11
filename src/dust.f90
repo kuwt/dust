@@ -158,6 +158,7 @@ character(len=extended_char_len) :: message
 real(wp) :: time
 integer  :: it, nstep, nout
 real(wp) :: t_last_out, t_last_debug_out
+real(wp) :: time_no_out, time_no_out_debug
 logical  :: time_2_out, time_2_debug_out
 logical  :: output_start
 real(wp) :: dt_debug_out
@@ -493,6 +494,8 @@ endif
 call printout(nl//'////////// Performing Computations //////////')
 time = sim_param%t0
 t_last_out = time; t_last_debug_out = time
+time_no_out = 0.0_wp; time_no_out_debug = 0.0_wp
+
 
 allocate(surf_vel_SurfPan_old(geo%nSurfpan,3)) ; surf_vel_SurfPan_old = 0.0_wp
 allocate(     nor_SurfPan_old(geo%nSurfpan,3)) ;      nor_SurfPan_old = 0.0_wp
@@ -948,16 +951,20 @@ subroutine init_timestep(t)
   
   sim_param%time = t
 
-  if (real(t-t_last_out) .ge. real(sim_param%dt_out)) then
+  !if (real(t-t_last_out) .ge. real(sim_param%dt_out)) then
+  if (real(time_no_out) .ge. real(sim_param%dt_out)) then
     time_2_out = .true.
     t_last_out = t
+    time_no_out = 0.0_wp
   else
     time_2_out = .false.
   endif
 
-  if (real(t-t_last_debug_out) .ge. real(dt_debug_out)) then
+  !if (real(t-t_last_debug_out) .ge. real(dt_debug_out)) then
+  if (real(time_no_out_debug) .ge. real(dt_debug_out)) then
     time_2_debug_out = .true.
     t_last_debug_out = t
+    time_no_out_debug = 0.0_wp
   else
     time_2_debug_out = .false.
   endif
@@ -977,6 +984,9 @@ subroutine init_timestep(t)
     time_2_out = .true.
     time_2_debug_out = .true.
   endif
+
+  time_no_out = time_no_out + sim_param%dt
+  time_no_out_debug = time_no_out_debug + sim_param%dt
 
 end subroutine init_timestep
 

@@ -1328,7 +1328,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
   tend = dust_time()
   octree%t_lv = tend-tsta
   if(sim_param%use_dyn_layers) then
-    if(octree%t_lv/octree%t_mp .gt. sim_param%LeavesTimeRatio .and. &
+    if(real(octree%t_lv/octree%t_mp, wp) .gt. sim_param%LeavesTimeRatio .and. &
        octree%nlevels .lt. sim_param%NMaxOctreeLevels) then
       call add_layer(octree)
     endif

@@ -199,11 +199,11 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
   do i = 1 , n_splines
 
     if ( i .ne. n_splines ) then
-      tv1 = (/ ( dble(j) , j = 0,n_points1-1 ) /) / dble(n_points1)
+      tv1 = (/ ( real(j,wp) , j = 0,n_points1-1 ) /) / real(n_points1,wp)
     else
       if ( allocated(tv1) ) deallocate(tv1)
       allocate(tv1(n_points1+1))
-      tv1 = (/ ( dble(j) , j = 0,n_points1   ) /) / dble(n_points1)
+      tv1 = (/ ( real(j,wp) , j = 0,n_points1   ) /) / real(n_points1,wp)
     end if
    
     do j = 1 , size(tv1)
@@ -239,7 +239,7 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
   !  allocate(rr_spl(nelems+1,3)) <- passed as an input
   allocate(s_spl(nelems+1)) ! curvilinear coord of the output points
   if ( trim(type_span) .eq. 'uniform' ) then
-    s_spl = (/ ( dble(j) , j = 0,nelems ) /) / dble(nelems)
+    s_spl = (/ ( real(j,wp) , j = 0,nelems ) /) / real(nelems,wp)
   else
     write(*,*) ' error in hermite_spline. Only type_span = uniform '
     write(*,*) ' implemented so far. Stop. ' ; stop

@@ -1427,7 +1427,7 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
  allocate( i_el_nodes_tmp(2,n_p ) ) ;  i_el_nodes_tmp = 0
  allocate( i_te_tmp      (2,n_p ) ) ;  i_te_tmp = 0
  allocate(ii_te_tmp      (2,n_el) ) ; ii_te_tmp = 0
- allocate(rr_te_tmp      (3,n_p ) ) ; rr_te_tmp = 0.0d0
+ allocate(rr_te_tmp      (3,n_p ) ) ; rr_te_tmp = 0.0_wp
 
  ! initialise counters ------
  ne_te = 0 ; nn_te = 0
@@ -1448,7 +1448,7 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
    do i1 = 1 , nSides
      cen(:,i_e) = cen(:,i_e) + rr(:,ee(i1,i_e))
    end do
-   cen(:,i_e) = cen(:,i_e) / dble(nSides)
+   cen(:,i_e) = cen(:,i_e) / real(nSides,wp)
 
  end do
  
@@ -1511,7 +1511,7 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
            nn_te = nn_te + 1
            i_te_tmp(1,nn_te) = i_node2
            i_te_tmp(2,nn_te) = i_node2_max
-           rr_te_tmp(:,nn_te) = 0.5d0 * ( & 
+           rr_te_tmp(:,nn_te) = 0.5_wp * ( & 
                                  rr(:,i_node2) + rr(:,i_node2_max) )
            ii_te_tmp(1,ne_te) = nn_te
          else 
@@ -1525,7 +1525,7 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
            nn_te = nn_te + 1
            i_te_tmp(1,nn_te) = i_node1
            i_te_tmp(2,nn_te) = i_node1_max
-           rr_te_tmp(:,nn_te) = 0.5d0 * ( & 
+           rr_te_tmp(:,nn_te) = 0.5_wp * ( & 
                                  rr(:,i_node1) + rr(:,i_node1_max) )
            ii_te_tmp(2,ne_te) = nn_te
          else

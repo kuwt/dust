@@ -111,7 +111,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
  character(len=max_char_len) :: type_chord
  integer :: i1  
 
- integer :: i_first , iSec
+ integer :: iSec
  real(wp) :: dy_actual_airfoils , dy_sections , csi , twist_rad
 
  character(len=*), parameter :: this_sub_name = 'read_mesh_parametric'
@@ -237,8 +237,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
          &n_type_span .ne. nRegions. Stop.')
   end if
 
-  allocate(chord_list  (nSections))  ; chord_list = 0.0d0
-  allocate(twist_list  (nSections))  ; twist_list = 0.0d0
+  allocate(chord_list  (nSections))  ; chord_list = 0.0_wp
+  allocate(twist_list  (nSections))  ; twist_list = 0.0_wp
   allocate(airfoil_list(nSections)) 
   do iSection= 1,nSections
     chord_list(iSection)   = getreal(pmesh_prs,'chord')
@@ -394,11 +394,11 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     ! === new-2019-02-06 ===
 
 
-    if ( abs( sweep_list(iRegion) ) .gt. 60.0d0 ) then
-      write(*,*) ' WARNING. abs( sweep_list(iRegion) ) .gt. 60.0d0. '
+    if ( abs( sweep_list(iRegion) ) .gt. 60.0_wp ) then
+      write(*,*) ' WARNING. abs( sweep_list(iRegion) ) .gt. 60.0_wp. '
     end if
-    if ( abs( dihed_list(iRegion) ) .gt. 60.0d0 ) then
-      write(*,*) ' WARNING. abs( sweep_list(iRegion) ) .gt. 60.0d0. '
+    if ( abs( dihed_list(iRegion) ) .gt. 60.0_wp ) then
+      write(*,*) ' WARNING. abs( sweep_list(iRegion) ) .gt. 60.0_wp. '
     end if
 
     dx_ref = span_list(iRegion) * tan( sweep_list(iRegion)* pi / 180.0_wp ) + dx_ref 
@@ -416,23 +416,24 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
       if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then    
         ! uniform spacing in span
-        rr(:,ista:iend) = rrSection1 + dble(i1) / dble(nelem_span_list(iRegion)) * &
-                        ( rrSection2 - rrSection1 )
+        rr(:,ista:iend) = rrSection1 + real(i1,wp) / &
+                          real(nelem_span_list(iRegion),wp) * &
+                          ( rrSection2 - rrSection1 )
       else if ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then    
         ! cosine  spacing in span
         rr(:,ista:iend) = 0.5_wp * ( rrSection1 + rrSection2 ) - &
                           0.5_wp * ( rrSection2 - rrSection1 ) * &
-                                     cos(i1*pi/ dble(nelem_span_list(iRegion)) ) 
+                    cos( real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
       else if ( trim(type_span_list(iRegion)) .eq. 'cosineOB' ) then    
         ! cosine  spacing in span: outboard refinement
         rr(:,ista:iend) = rrSection1 + &
                         ( rrSection2 - rrSection1 ) * &
-                                     sin(0.5_wp*i1*pi/ dble(nelem_span_list(iRegion)) ) 
+            sin( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
       else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then    
         ! cosine  spacing in span: inboard refinement
         rr(:,ista:iend) = rrSection2 - &
                         ( rrSection2 - rrSection1 ) * &
-                                     cos(0.5_wp*i1*pi/ dble(nelem_span_list(iRegion)) ) 
+            cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
       else
         write(*,*) ' mesh_file   : ' , trim(mesh_file)
         write(*,*) ' type_span_list(',iRegion,') : ' , trim(type_span_list(iRegion)) 
@@ -566,9 +567,9 @@ subroutine naca4digits(airfoil_name, nelem_chord,&
   str2 = airfoil_name(3:4)
   read(str2,*,iostat=ierr) ss
 
-  m = dble(mm)/100.0_wp
-  p = dble(pp)/10.0_wp
-  s = dble(ss)/100.0_wp
+  m = real(mm,wp)/100.0_wp
+  p = real(pp,wp)/10.0_wp
+  s = real(ss,wp)/100.0_wp
 
   allocate(points_upper(2,nelem_chord+1)) ; points_upper = 0.0_wp
   allocate(points_lower(2,nelem_chord+1)) ; points_lower = 0.0_wp
@@ -644,7 +645,7 @@ subroutine naca5digits(airfoil_name, nelem_chord,&
   str2 = airfoil_name(4:5)
   read(str2,*,iostat=ierr) ss
 
-  s = dble(ss)/100.0_wp
+  s = real(ss,wp)/100.0_wp
 
   !A limited number of airfoils have been implemented, perform some checks...
   if(Q .ne. 0) call error(this_sub_name, this_mod_name, &
@@ -752,19 +753,21 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr )
  select case (trim(discr))
  case('uniform')
    do i1 = 1 , nelems_chord+1
-     csi_half(i1) = dble(i1-1)/dble(nelems_chord)
+     csi_half(i1) = real(i1-1,wp)/real(nelems_chord,wp)
    end do
  case('cosine')
    do i1 = 1 , nelems_chord+1
-     csi_half(i1) = (1.0_wp - cos(pi*dble(i1-1)/dble(nelems_chord)) ) / 2.0_wp
+     csi_half(i1) = (1.0_wp - cos(pi*real(i1-1,wp)/real(nelems_chord,wp)) )&
+                                                                    / 2.0_wp
    end do
  case('cosineLE' , 'cosineIB')
    do i1 = 1 , nelems_chord+1
-     csi_half(i1) = sin(pi/2.0_wp*dble(i1-1)/dble(nelems_chord))
+     csi_half(i1) = sin(pi/2.0_wp*real(i1-1,wp)/real(nelems_chord,wp))
    end do
  case('cosineTE' , 'cosineOB')
    do i1 = 1 , nelems_chord+1
-     csi_half(i1) = (1.0_wp - cos(pi/2.0_wp*dble(i1-1)/dble(nelems_chord)) ) 
+     csi_half(i1) = (1.0_wp - cos(pi/2.0_wp*real(i1-1,wp) &
+                                  /real(nelems_chord,wp)) ) 
    end do
  case default
  end select
@@ -832,25 +835,25 @@ subroutine define_division(type_mesh, nelem, division)
   integer :: iPoint
 
   division = 0.0_wp
-  step = 1.0_wp/dble(nelem)
+  step = 1.0_wp/real(nelem,wp)
 
   select case (trim(type_mesh))
   case ("uniform")
     do iPoint = 1,nelem+1
-      division(iPoint) = (iPoint-1)*step
+      division(iPoint) = (real(iPoint,wp)-1)*step
     enddo
   case ("cosine")
     do iPoint = 1,nelem+1
-      division(iPoint) = (1.0_wp - cos(pi*(iPoint-1)*step))/2.0_wp
+      division(iPoint) = (1.0_wp - cos(pi*(real(iPoint,wp)-1)*step))/2.0_wp
     enddo
   case ("cosineLE", "cosineIB")
     do iPoint = 1,nelem+1
-      division(iPoint) = 1.0_wp - cos(pi/2.0_wp*(iPoint-1)*step)
+      division(iPoint) = 1.0_wp - cos(pi/2.0_wp*(real(iPoint,wp)-1)*step)
     enddo
   case ("cosineTE", "cosineOB")
     do iPoint = 1,nelem+1
 !     division(iPoint) = - cos(pi/2.0_wp*((iPoint-1)*step+1.0_wp))
-      division(iPoint) = sin(pi/2.0_wp*((iPoint-1)*step))
+      division(iPoint) = sin(pi/2.0_wp*((real(iPoint,wp)-1)*step))
     enddo
   case default
     ! TODO: error in this case
