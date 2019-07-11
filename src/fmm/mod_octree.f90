@@ -1149,13 +1149,15 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
     allocate(velv(3,octree%leaves(lv)%p%npart),&
              stretchv(3,octree%leaves(lv)%p%npart))
 
+    ave_ros = 0.0_wp
+
+!$omp simd private(vel, stretch, str, grad, pos, alpha, dir, m) reduction(+:ave_ros)
     do ip = 1,octree%leaves(lv)%p%npart
     if(.not. octree%leaves(lv)%p%cell_parts(ip)%p%free) then
       
       vel = 0.0_wp
       stretch = 0.0_wp
       grad = 0.0_wp
-      ave_ros = 0.0_wp
       pos = octree%leaves(lv)%p%cell_parts(ip)%p%cen
       alpha = octree%leaves(lv)%p%cell_parts(ip)%p%mag * &
               octree%leaves(lv)%p%cell_parts(ip)%p%dir
@@ -1185,12 +1187,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       endif
     endif
     enddo
+!$omp end simd
 
     if(sim_param%use_vd)  then
       if(octree%leaves(lv)%p%npart .gt. 0) then
         ave_ros = ave_ros/real(octree%leaves(lv)%p%npart,wp)
-      else
-        ave_ros = 0.0_wp
       endif
       if(sim_param%use_tv) then
         turbvisc = (0.11_wp*sim_param%VortexRad)**2 * &
