@@ -287,7 +287,8 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
         write(fid_out,'(3'//ascii_real//')',advance='no') M_ref
         write(fid_out,'(9'//ascii_real//')',advance='no') refs_R(:,:, ref_id)
         write(fid_out,'(3'//ascii_real//')',advance='no') refs_off(:, ref_id)
-        write(fid_out,*) ' '
+        write(fid_out,'(A)',advance='no') nl
+        !write(fid_out,*) ' '
   
        case('tecplot')
         time(ires) = t

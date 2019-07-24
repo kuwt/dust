@@ -142,6 +142,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
  real(wp) :: u_inf(3)
  real(wp) :: P_inf , rho
  real(wp) :: vel_probe(3) = 0.0_wp , vort_probe(3) = 0.0_wp 
+ real(wp) :: vel(3)
  real(wp) :: v(3) = 0.0_wp !, w(3) = 0.0_wp
  real(wp), allocatable , target :: sol(:) 
  real(wp) :: pres_probe
@@ -329,18 +330,23 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 
       ! compute velocity
       do ic = 1,size(comps)
+!$omp parallel do private(ie, v) reduction(+:vel_probe) 
        do ie = 1 , size( comps(ic)%el )
 
         call comps(ic)%el(ie)%compute_vel( rr_probes(:,ip) , u_inf , v )
         vel_probe = vel_probe + v/(4*pi) 
        
        end do
+!$omp end parallel do
       end do
 
+
+!$omp parallel do private( ie, v) reduction(+:vel_probe) 
       do ie = 1, size(wake_elems)
         call wake_elems(ie)%p%compute_vel( rr_probes(:,ip) , u_inf , v )
         vel_probe = vel_probe + v/(4*pi) 
       enddo
+!$omp end parallel do
 
       vel_probe = vel_probe + u_inf
     end if
