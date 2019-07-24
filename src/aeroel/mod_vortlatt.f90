@@ -88,21 +88,28 @@ public :: t_vortlatt
 !! edges of the element.
 type, extends(c_impl_elem) :: t_vortlatt
 
-  !TODO: consider applying the correct element pointer here
-contains
+  real(wp) :: vel_ctr_pt(3) 
 
-procedure, pass(this) :: build_row        => build_row_vortlatt
-procedure, pass(this) :: build_row_static => build_row_static_vortlatt
-procedure, pass(this) :: add_wake         => add_wake_vortlatt
-procedure, pass(this) :: add_expl         => add_expl_vortlatt
-procedure, pass(this) :: compute_pot      => compute_pot_vortlatt
-procedure, pass(this) :: compute_vel      => compute_vel_vortlatt
-procedure, pass(this) :: compute_psi      => compute_psi_vortlatt
-procedure, pass(this) :: compute_pres     => compute_pres_vortlatt
-procedure, pass(this) :: compute_dforce   => compute_dforce_vortlatt
-procedure, pass(this) :: calc_geo_data    => calc_geo_data_vortlatt
-procedure, pass(this) :: get_vort_vel     => get_vort_vel_vortlatt
-procedure, pass(this) :: get_bernoulli_source => get_bernoulli_source_vortlatt
+  !TODO: consider applying the correct element pointer here
+  contains
+  
+  procedure, pass(this) :: build_row        => build_row_vortlatt
+  procedure, pass(this) :: build_row_static => build_row_static_vortlatt
+  procedure, pass(this) :: add_wake         => add_wake_vortlatt
+  procedure, pass(this) :: add_expl         => add_expl_vortlatt
+  procedure, pass(this) :: compute_pot      => compute_pot_vortlatt
+  procedure, pass(this) :: compute_vel      => compute_vel_vortlatt
+  procedure, pass(this) :: compute_psi      => compute_psi_vortlatt
+  procedure, pass(this) :: compute_pres     => compute_pres_vortlatt
+  procedure, pass(this) :: compute_dforce   => compute_dforce_vortlatt
+  procedure, pass(this) :: calc_geo_data    => calc_geo_data_vortlatt
+  procedure, pass(this) :: get_vort_vel     => get_vort_vel_vortlatt
+  procedure, pass(this) :: get_bernoulli_source => get_bernoulli_source_vortlatt
+  
+  procedure, pass(this) :: get_vel_ctr_pt   => get_vel_ctr_pt_vortlatt
+  procedure, pass(this) :: compute_dforce_jukowski => &
+                           compute_dforce_jukowski_vortlatt
+
 end type
 
 
@@ -119,7 +126,7 @@ contains
 !! subroutine.
 subroutine build_row_vortlatt(this, elems, linsys, uinf, ie, ista, iend)
  class(t_vortlatt), intent(inout) :: this
- type(t_impl_elem_p), intent(in)       :: elems(:)
+ type(t_impl_elem_p), intent(in)  :: elems(:)
  type(t_linsys), intent(inout)    :: linsys
  real(wp), intent(in)             :: uinf(:)
  integer, intent(in)              :: ie
@@ -456,6 +463,79 @@ end subroutine compute_dforce_vortlatt
 
 !----------------------------------------------------------------------
 
+!>Compute the elementary force on the on the actual element
+! using Kutta-Jukowski theorem as implemented in AVL:
+! the velocity
+! 
+subroutine compute_dforce_jukowski_vortlatt(this) 
+ class(t_vortlatt), intent(inout) :: this
+ real(wp) :: vel_w(3), gam(3)
+
+ integer :: i_stripe, j
+
+ gam = cross ( this % vel_ctr_pt, this%edge_vec(:,1) )
+
+ i_stripe = size(this%stripe_elem)
+
+ if ( i_stripe .gt. 1 ) then
+ 
+   this%dforce = sim_param%rho_inf * gam &
+               * ( this%mag - this%stripe_elem(i_stripe-1)%p%mag )
+ 
+ else
+ 
+   this%dforce = sim_param%rho_inf * gam * this%mag
+ 
+ end if
+
+end subroutine compute_dforce_jukowski_vortlatt
+
+!----------------------------------------------------------------------
+!> Compute an approximate value of the induced velocity at 1/4 of chord
+! of an element. This routine re-computes the contributions of the
+! potential elements only:
+! - body panels
+! - wake panels
+! ------------------------------------------------------------------- ! 
+! This routine uses the value in the centre of the panels of:       !!!
+! - the free-stream and the body velocity                           !!!
+! - the rotational part of the velocity, collected in this%uvort    !!!
+! ------------------------------------------------------------------- ! 
+subroutine get_vel_ctr_pt_vortlatt(this, elems, wake_elems)
+ class(t_vortlatt), intent(inout) :: this
+ type(t_pot_elem_p),intent(in):: elems(:)
+ type(t_pot_elem_p),intent(in):: wake_elems(:)
+ 
+ real(wp) :: v(3),x0(3)
+ integer :: j
+
+ ! Initialisation to zero
+ this%vel_ctr_pt = 0.0_wp
+
+ ! Control point at 1/4-fraction of the chord
+ x0 = this%cen + (this%edge_vec(:,4)-this%edge_vec(:,2))/4.0_wp
+
+ !=== Compute the velocity from all the elements ===
+ do j = 1,size(wake_elems)  ! wake panels
+ 
+   call wake_elems(j)%p%compute_vel(x0,sim_param%u_inf,v)
+   this%vel_ctr_pt = this%vel_ctr_pt + v
+ 
+ enddo
+
+ do j = 1,size(elems) ! body elements
+ 
+   call elems(j)%p%compute_vel(x0,sim_param%u_inf,v)
+   this%vel_ctr_pt = this%vel_ctr_pt + v
+ 
+ enddo
+
+ this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp*pi) &
+               + sim_param%u_inf + this%uvort - this%ub
+
+end subroutine get_vel_ctr_pt_vortlatt
+
+!----------------------------------------------------------------------
 !> Calculate the geometrical quantities of a vortex lattice
 !!
 !! The subroutine calculates all the relevant geometrical quantities of a
