@@ -74,6 +74,9 @@ use mod_doublet, only: &
 use mod_surfpan, only: &
   t_surfpan , initialize_surfpan
 
+use mod_vortlatt, only: &
+  t_vortlatt
+
 use mod_liftlin, only: &
  update_liftlin, solve_liftlin, t_liftlin_p
 
@@ -587,11 +590,30 @@ do it = 1,nstep
 
   !------ Compute loads -------
   ! Implicit elements: vortex rings and 3d-panels
+  ! 2019-07-23: D.Isola suggested to implement AVL formula for VL elements
+  ! so far, select type() to keep the old formulation for t_surfpan and 
+  ! use AVL formula for t_vortlatt
+
 !$omp parallel do private(i_el)
   do i_el = 1 , sel
-    call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
-             geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g)
-    call elems(i_el)%p%compute_dforce()
+
+    select type( el => elems(i_el)%p ) 
+      
+      type is(t_surfpan)  ! 
+        call el%compute_pres( &     ! update surf_vel field too
+                geo%refs( geo%components(el%comp_id)%ref_id )%R_g)
+        call el%compute_dforce()
+
+      type is(t_vortlatt)
+        ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
+        call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/) )
+        ! compute dforce using AVL formula
+        call el%compute_dforce_jukowski()
+        ! update the pressure field, p = df.n / area
+        el%pres = sum( el%dforce * el%nor ) / el%area
+
+    end select
+     
   end do
 !$omp end parallel do
   ! Explicit elements:
