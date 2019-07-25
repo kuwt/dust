@@ -71,12 +71,14 @@ private
 !----------------------------------------------------------------------
 ! Select here the working precision wp
 !
+#if (DUST_PRECISION==1)
 ! single precision
-!integer, parameter :: wp = selected_real_kind(6,35)
-!
+integer, parameter :: wp = selected_real_kind(6,35)
+#elif(DUST_PRECISION==2)
 ! double precision
 integer, parameter :: wp = selected_real_kind(12,307)
 !
+#endif /*DUST_PRECISION*/
 ! quadruple precision
 !integer, parameter :: wp = selected_real_kind(30,307)
 !----------------------------------------------------------------------

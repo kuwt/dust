@@ -204,7 +204,11 @@ subroutine compute_qr ( A , Q , R )
   lwork = n       ! <-- its size should be .ge. n*nb
                   ! with nb = optimal blocksize (???)
 
+#if (DUST_PRECISION==1)
+  call sgeqrf( m , n , A , m , tau , work , lwork , info )
+#elif(DUST_PRECISION==2)
   call dgeqrf( m , n , A , m , tau , work , lwork , info )
+#endif /*DUST_PRECISION*/
  
   ! build Q , R matrices
   ! allocataion and initialisation to 0.0 (useless for Q)

@@ -96,7 +96,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
  integer :: nelem_chord, nelem_chord_tot ! , nelem_span_tot <--- moved as an output
  integer :: npoint_chord_tot, npoint_span_tot
  integer :: nRegions, nSections, nAirfoils, rr_size , ee_size 
- integer :: iRegion , iSection , iAirfoil , Span , iChord , iElement , iPoint 
+ integer :: iRegion , iSection , iAirfoil , iChord , iElement , iPoint 
  real(wp):: ref_chord_fraction
  real(wp), allocatable :: ref_point(:)
  ! data read from file
@@ -352,51 +352,60 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
       
       if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then    
         ! uniform spacing in span
-        rr(:,ista:iend) = rrSection1 + dble(iSpan) / dble(nelem_span_list(iRegion)) * &
-                   ( rrSection2 - rrSection1 )
-        chord_p(ich) = chord_list(iRegion) + dble(iSpan) / dble(nelem_span_list(iRegion)) * &
-                   ( chord_list(iRegion+1) - chord_list(iRegion) )
-        theta_p(ich) = twist_list(iRegion) + dble(iSpan) / dble(nelem_span_list(iRegion)) * &
-                   ( twist_list(iRegion+1) - twist_list(iRegion) )
+        rr(:,ista:iend) = rrSection1 + real(iSpan,wp) / &
+                            real(nelem_span_list(iRegion),wp) * &
+                            ( rrSection2 - rrSection1 )
+        chord_p(ich) = chord_list(iRegion) + real(iSpan,wp) / &
+                         real(nelem_span_list(iRegion),wp) * &
+                         ( chord_list(iRegion+1) - chord_list(iRegion) )
+        theta_p(ich) = twist_list(iRegion) + real(iSpan,wp) / &
+                         real(nelem_span_list(iRegion),wp) * &
+                         ( twist_list(iRegion+1) - twist_list(iRegion) )
 
       else if ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then    
         ! cosine  spacing in span
         rr(:,ista:iend) = 0.5_wp * ( rrSection1 + rrSection2 ) - &
                           0.5_wp * ( rrSection2 - rrSection1 ) * &
-                                     cos(iSpan*pi/ dble(nelem_span_list(iRegion)) ) 
-        chord_p(ich) = 0.5_wp * ( chord_list(iRegion+1) + chord_list(iRegion) ) - &
-                       0.5_wp * ( chord_list(iRegion+1) - chord_list(iRegion) ) * &
-                                     cos(iSpan*pi/ dble(nelem_span_list(iRegion)) ) 
-        theta_p(ich) = 0.5_wp * ( twist_list(iRegion+1) + twist_list(iRegion) ) - &
-                       0.5_wp * ( twist_list(iRegion+1) - twist_list(iRegion) ) * &
-                                     cos(iSpan*pi/ dble(nelem_span_list(iRegion)) ) 
+                  cos( real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
+        chord_p(ich) = 0.5_wp * ( chord_list(iRegion+1) + &
+                                  chord_list(iRegion)   ) - &
+                       0.5_wp * ( chord_list(iRegion+1) - &
+                                  chord_list(iRegion)   ) * &
+                  cos( real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
+        theta_p(ich) = 0.5_wp * ( twist_list(iRegion+1) + &
+                                  twist_list(iRegion)   ) - &
+                       0.5_wp * ( twist_list(iRegion+1) - &
+                                  twist_list(iRegion)   ) * &
+                  cos( real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
       else if ( trim(type_span_list(iRegion)) .eq. 'cosineOB' ) then    
         ! cosine  spacing in span: outboard refinement
         rr(:,ista:iend) = rrSection1 + &
                         ( rrSection2 - rrSection1 ) * &
-                                     sin(0.5_wp*iSpan*pi/ dble(nelem_span_list(iRegion)) ) 
-        chord_p(ich) =          (                         chord_list(iRegion) ) + &
-                                ( chord_list(iRegion+1) - chord_list(iRegion) ) * &
-                                     sin(0.5_wp*iSpan*pi/ dble(nelem_span_list(iRegion)) ) 
-        theta_p(ich) =          (                         twist_list(iRegion) ) - &
-                                ( twist_list(iRegion+1) - twist_list(iRegion) ) * &
-                                     sin(0.5_wp*iSpan*pi/ dble(nelem_span_list(iRegion)) ) 
+           sin( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
+        chord_p(ich) = (  chord_list(iRegion) ) + &
+                       ( chord_list(iRegion+1) - chord_list(iRegion)  ) * &
+           sin( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
+        theta_p(ich) = ( twist_list(iRegion) ) - &
+                       ( twist_list(iRegion+1) - twist_list(iRegion) ) * &
+           sin( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
       else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then    
         ! cosine  spacing in span: inboard refinement
         rr(:,ista:iend) = rrSection2 - &
                         ( rrSection2 - rrSection1 ) * &
-                                     cos(0.5_wp*iSpan*pi/ dble(nelem_span_list(iRegion)) ) 
-        chord_p(ich) =          (                         chord_list(iRegion+1))- &
-                                ( chord_list(iRegion+1) - chord_list(iRegion) ) * &
-                                     cos(0.5_wp*iSpan*pi/ dble(nelem_span_list(iRegion)) ) 
-        theta_p(ich) =          (                         twist_list(iRegion+1))- &
-                                ( twist_list(iRegion+1) - twist_list(iRegion) ) * &
-                                     cos(0.5_wp*iSpan*pi/ dble(nelem_span_list(iRegion)) ) 
+           cos( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
+        chord_p(ich) = ( chord_list(iRegion+1))- &
+                       ( chord_list(iRegion+1) - chord_list(iRegion) ) * &
+           cos( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
+        theta_p(ich) = ( twist_list(iRegion+1) )- &
+                       ( twist_list(iRegion+1) - twist_list(iRegion) ) * &
+           cos( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
       else
         write(*,*) ' mesh_file   : ' , trim(mesh_file)
-        write(*,*) ' type_span_list(',iRegion,') : ' , trim(type_span_list(iRegion)) 
+        write(*,*) ' type_span_list(',iRegion,') : ' , &
+                     trim(type_span_list(iRegion)) 
         call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-              & type_span must be equal to uniform, cosine, cosineIB, cosineOB.')
+              & type_span must be equal to uniform, cosine, cosineIB,&
+              & cosineOB.')
       end if 
 
     end do

@@ -146,6 +146,9 @@ type, abstract, extends(c_elem) :: c_pot_elem
   !> Body velocity at the centre
   real(wp) :: ub(3)
 
+  !> Vorticity induced velocity at the centre
+  real(wp)          :: uvort(3)
+
   !> Is the element moving during simulation?
   logical :: moving
 
@@ -198,8 +201,6 @@ end type c_vort_elem
 type, abstract, extends(c_pot_elem) :: c_impl_elem
 
   real(wp)          :: didou_dt
-  !> Vorticity induced velocity at the centre
-  real(wp)          :: uvort(3)
 
   contains
 

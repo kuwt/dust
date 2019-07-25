@@ -118,7 +118,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
  type(t_wake), intent(inout) :: wake
  real(wp) :: uinf(3)
  real(wp) :: rhoinf , Pinf
- integer :: ie, ntot, info, nst
+ integer :: ie, ntot, info, nst, i, j
 
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name = 'initialize_linsys'
@@ -163,7 +163,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
   !Allocate matrix and rhs for pressure integral equation
   allocate( linsys%idSurfPan(geo%nSurfPan) )
   linsys%idSurfPan    = geo%idSurfPan
-  allocate( linsys%idSurfPanG2L(geo%nSurfPan) )
+  allocate( linsys%idSurfPanG2L(geo%nelem_impl) )
   linsys%idSurfPanG2L = geo%idSurfPanG2L
   allocate( linsys%A_pres(geo%nSurfPan,geo%nSurfPan) )
   linsys%A_pres = 0.0_wp
@@ -189,7 +189,13 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
   
   !! == Pressure
   !copy the matrix before it gets corrected for the wake contribution
-  linsys%A_pres = linsys%A( geo%idSurfPan , geo%idSurfPan )
+  !linsys%A_pres = linsys%A( geo%idSurfPan , geo%idSurfPan )
+  !ifort workaround
+  do i=1,geo%nSurfPan
+    do j=1,geo%nSurfPan
+      linsys%A_pres(i,j) = linsys%A( geo%idSurfPan(i) , geo%idSurfPan(j) )
+    enddo
+  enddo
   
   ! add the wake contribution
 !$omp parallel do private(ie) firstprivate(nst)
@@ -220,9 +226,17 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
   enddo
 
   !! == Pressure
-  linsys%b_static_pres = linsys%b_static( & 
-         geo%idSurfPan(1:geo%nstatic_SurfPan), &
-         geo%idSurfPan(1:geo%nstatic_SurfPan) )
+  !linsys%b_static_pres = linsys%b_static( & 
+  !       geo%idSurfPan(1:geo%nstatic_SurfPan), &
+  !       geo%idSurfPan(1:geo%nstatic_SurfPan) )
+  !ifort workaround
+  do i = 1, geo%nstatic_SurfPan
+    do j = 1, geo%nstatic_SurfPan
+      linsys%b_static_pres(i,j) = linsys%b_static( & 
+                                  geo%idSurfPan(i), &
+                                  geo%idSurfPan(j) )
+    enddo
+  enddo
   do ie = 1 , geo%nSurfpan
     select type( el => elems(geo%idSurfPan(ie))%p ) ; class is(t_surfpan)
       el%pres_sol => linsys%res_pres(ie) 
@@ -231,24 +245,36 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
 
   !Now perform a one-time LU decomposition of the static part of the system
   if (linsys%nstatic .gt. 0)  then
+#if (DUST_PRECISION==1)
+   call sgetrf(linsys%nstatic,linsys%nstatic, &
+           linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic, &
+           linsys%P(1:linsys%nstatic),info)
+#elif(DUST_PRECISION==2)
    call dgetrf(linsys%nstatic,linsys%nstatic, &
            linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic, &
            linsys%P(1:linsys%nstatic),info)
+#endif /*DUST_PRECISION*/
     if ( info .ne. 0 ) then
       write(msg,*) 'error while factorizing the static part of the linear &
-                    &system, Lapack DGETRF error code ', info
+                    &system, Lapack XGETRF error code ', info
       call error(this_sub_name, this_mod_name, trim(msg))
     end if
   endif
 
   !! == Pressure
   if (linsys%nstatic_sp .gt. 0)  then
+#if (DUST_PRECISION==1)
+   call sgetrf(linsys%nstatic_sp,linsys%nstatic_sp, &
+           linsys%A_pres(1:linsys%nstatic_sp,1:linsys%nstatic_sp), &
+           linsys%nstatic_sp, linsys%P_pres(1:linsys%nstatic_sp),info)
+#elif(DUST_PRECISION==2)
    call dgetrf(linsys%nstatic_sp,linsys%nstatic_sp, &
            linsys%A_pres(1:linsys%nstatic_sp,1:linsys%nstatic_sp), &
            linsys%nstatic_sp, linsys%P_pres(1:linsys%nstatic_sp),info)
+#endif /*DUST_PRECISION*/
     if ( info .ne. 0 ) then
       write(msg,*) 'error while factorizing the static part of the linear &
-                    &system for pressure, Lapack DGETRF error code ', info
+                    &system for pressure, Lapack XGETRF error code ', info
       call error(this_sub_name, this_mod_name, trim(msg))
     end if
   endif
@@ -381,25 +407,54 @@ subroutine solve_linsys(linsys)
 
     !=>Create the upper-diagonal block Usd
     !Swap in place Asd to get PssAsd
+#if (DUST_PRECISION==1)
+    call slaswp(linsys%nmoving, &
+           linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
+           linsys%nstatic,1,linsys%nstatic,linsys%P(1:linsys%nstatic),1)
+#elif (DUST_PRECISION==2)
     call dlaswp(linsys%nmoving, &
            linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
            linsys%nstatic,1,linsys%nstatic,linsys%P(1:linsys%nstatic),1)
+#endif /*DUST_PRECISION*/
 
     !Solve Lss Usd = Pss Asd to get Usd and put it in place of Asd
+#if (DUST_PRECISION==1)
+    call strsm('L','L','N','U',linsys%nstatic,linsys%nmoving,1.0d+0,   &
+           linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic, &
+           linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank),    &
+           linsys%nstatic)
+#elif (DUST_PRECISION==2)
     call dtrsm('L','L','N','U',linsys%nstatic,linsys%nmoving,1.0d+0,   &
            linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic, &
            linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank),    &
            linsys%nstatic)
+#endif /*DUST_PRECISION*/
     
     !==>Solve the lower-diagoal block Lds
     !Solve Pdd-1 Lds Uss = Ads for Pdd-1 Lds and put it in place of Ads
+#if (DUST_PRECISION==1)
+    call strsm('R','U','N','N',linsys%nmoving,linsys%nstatic,1.0d+0,   &
+           linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic,  &
+           linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic),    &
+           linsys%nmoving)
+#elif (DUST_PRECISION==2)
     call dtrsm('R','U','N','N',linsys%nmoving,linsys%nstatic,1.0d+0,   &
            linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic,  &
            linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic),    &
            linsys%nmoving)
+#endif /*DUST_PRECISION*/
 
     !==>Modify the dynamic square block
     !Modify the square block from Add to Add - Pdd-1Lds Usd
+#if (DUST_PRECISION==1)
+    call sgemm('N','N',linsys%nmoving,linsys%nmoving,linsys%nstatic,-1.0d+0, &
+           linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic), &
+           linsys%nmoving,&
+           linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
+           linsys%nstatic,1.0d+0,&
+           linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank),&
+           linsys%nmoving)
+#elif (DUST_PRECISION==2)
     call dgemm('N','N',linsys%nmoving,linsys%nmoving,linsys%nstatic,-1.0d+0, &
            linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic), &
            linsys%nmoving,&
@@ -407,6 +462,7 @@ subroutine solve_linsys(linsys)
            linsys%nstatic,1.0d+0,&
            linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank),&
            linsys%nmoving)
+#endif /*DUST_PRECISION*/
 
   endif
 
@@ -414,9 +470,15 @@ subroutine solve_linsys(linsys)
   if (linsys%nmoving .gt. 0) then
 
     !==>Factorize and put in place the square dynamic block
+#if (DUST_PRECISION==1)
+    call sgetrf(linsys%nmoving,linsys%nmoving, &
+           linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank), &
+           linsys%nmoving,linsys%P(linsys%nstatic+1:linsys%rank),info)
+#elif (DUST_PRECISION==2)
     call dgetrf(linsys%nmoving,linsys%nmoving, &
            linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank), &
            linsys%nmoving,linsys%P(linsys%nstatic+1:linsys%rank),info)
+#endif /*DUST_PRECISION*/
     if ( info .ne. 0 ) then
       write(msg,*) 'error while factorizing the dynamic  block of &
                    &the linear system, Lapack DGETRF error code ', info
@@ -428,10 +490,17 @@ subroutine solve_linsys(linsys)
   ! If the system is mixed finish the operation on the band blocks
   if (linsys%nstatic .gt. 0 .and. linsys%nmoving .gt.0) then
   !==> Permute the lower mixed bloc
+#if (DUST_PRECISION==1)
+  call slaswp(linsys%nstatic, &
+         linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic), &
+         linsys%nmoving,1,linsys%nmoving,&
+         linsys%P(linsys%nstatic+1:linsys%rank),1)
+#elif (DUST_PRECISION==2)
   call dlaswp(linsys%nstatic, &
          linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic), &
          linsys%nmoving,1,linsys%nmoving,&
          linsys%P(linsys%nstatic+1:linsys%rank),1)
+#endif /*DUST_PRECISION*/
   endif
 
   !==> Fix the lower part of the permutation matrix to make it global
@@ -440,8 +509,13 @@ subroutine solve_linsys(linsys)
 
   !==> Solve the factorized system
   linsys%res = linsys%b
+#if (DUST_PRECISION==1)
+  call sgetrs('N',linsys%rank,1,linsys%A,linsys%rank,linsys%P,linsys%res, &
+         linsys%rank,info)
+#elif (DUST_PRECISION==2)
   call dgetrs('N',linsys%rank,1,linsys%A,linsys%rank,linsys%P,linsys%res, &
          linsys%rank,info)
+#endif /*DUST_PRECISION*/
   if ( info .ne. 0 ) then
     write(msg,*) 'error while solving the factorized system &
       &Lapack DGETRS error code ', info

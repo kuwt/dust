@@ -192,6 +192,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  logical  :: te_proj_logical
  character(len=max_char_len) :: te_proj_dir
  real(wp) , allocatable :: te_proj_vec(:)
+ logical :: suppress_te
 
  ! trailing edge ------
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
@@ -250,6 +251,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                &ProjTeVector direction.','parallel') 
   call geo_prs%CreateRealArrayOption('ProjTeVector','Vector used for &
                &the te projection.')
+  call geo_prs%CreateLogicalOption('SuppressTe','Suppress the trailing edge &
+                                    &from the component','F')
 
   ! Section name from CGNS file
   call geo_prs%CreateStringOption('SectionName', &
@@ -275,6 +278,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   mesh_mirror   = getlogical(geo_prs, 'mesh_mirror')
   mirror_point  = getrealarray(geo_prs, 'mirror_point',3)
   mirror_normal = getrealarray(geo_prs, 'mirror_normal',3)
+
+  suppress_te = getlogical(geo_prs, 'SuppressTe')
 
   comp_el_type = getstr(geo_prs,'ElType')
   ElType = comp_el_type(1:1)
@@ -657,6 +662,13 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   call close_hdf5_group(geo_loc)
 
   if (ElType .ne. 'a') then
+    !supppress the trailing edge for the current component
+    if(suppress_te) then
+      !ignorance is strength, just kill all the trailing edge components
+      deallocate(e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te)
+      allocate(e_te(2,0), i_te(2,0), rr_te(3,0), ii_te(2,0), neigh_te(2,0))
+      allocate(o_te(2,0), t_te(3,0))
+    endif
     call new_hdf5_group(comp_loc, 'Trailing_Edge', te_loc)
     call write_hdf5(    e_te,    'e_te',te_loc)
     call write_hdf5(    i_te,    'i_te',te_loc)
@@ -1415,7 +1427,7 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
  allocate( i_el_nodes_tmp(2,n_p ) ) ;  i_el_nodes_tmp = 0
  allocate( i_te_tmp      (2,n_p ) ) ;  i_te_tmp = 0
  allocate(ii_te_tmp      (2,n_el) ) ; ii_te_tmp = 0
- allocate(rr_te_tmp      (3,n_p ) ) ; rr_te_tmp = 0.0d0
+ allocate(rr_te_tmp      (3,n_p ) ) ; rr_te_tmp = 0.0_wp
 
  ! initialise counters ------
  ne_te = 0 ; nn_te = 0
@@ -1436,7 +1448,7 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
    do i1 = 1 , nSides
      cen(:,i_e) = cen(:,i_e) + rr(:,ee(i1,i_e))
    end do
-   cen(:,i_e) = cen(:,i_e) / dble(nSides)
+   cen(:,i_e) = cen(:,i_e) / real(nSides,wp)
 
  end do
  
@@ -1499,7 +1511,7 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
            nn_te = nn_te + 1
            i_te_tmp(1,nn_te) = i_node2
            i_te_tmp(2,nn_te) = i_node2_max
-           rr_te_tmp(:,nn_te) = 0.5d0 * ( & 
+           rr_te_tmp(:,nn_te) = 0.5_wp * ( & 
                                  rr(:,i_node2) + rr(:,i_node2_max) )
            ii_te_tmp(1,ne_te) = nn_te
          else 
@@ -1513,7 +1525,7 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
            nn_te = nn_te + 1
            i_te_tmp(1,nn_te) = i_node1
            i_te_tmp(2,nn_te) = i_node1_max
-           rr_te_tmp(:,nn_te) = 0.5d0 * ( & 
+           rr_te_tmp(:,nn_te) = 0.5_wp * ( & 
                                  rr(:,i_node1) + rr(:,i_node1_max) )
            ii_te_tmp(2,ne_te) = nn_te
          else
@@ -1759,7 +1771,7 @@ subroutine build_te_parametric ( ee , rr , ElType , &
 !  t_te(:,1) = 0.5 * ( rr(:,ee(2,e_te(1,1))) - rr(:,ee(3,e_te(1,1))) + & 
 !                      rr(:,ee(3,e_te(2,1))) - rr(:,ee(2,e_te(2,1)))     )
 ! >>>>>>>>>
-   t_te(:,1) = 0.5 * ( rr(:,ee(3,e_te(1,1))) - rr(:,ee(2,e_te(1,1))) + & 
+   t_te(:,1) = 0.5_wp * ( rr(:,ee(3,e_te(1,1))) - rr(:,ee(2,e_te(1,1))) + & 
                        rr(:,ee(2,e_te(2,1))) - rr(:,ee(3,e_te(2,1)))     )
    t_te(:,1) = t_te(:,1) / norm2(t_te(:,1))
 ! >>>>>>>>>
@@ -1768,15 +1780,15 @@ subroutine build_te_parametric ( ee , rr , ElType , &
 !    t_te(:,i1+1) = 0.5 * ( rr(:,ee(1,e_te(1,i1))) - rr(:,ee(4,e_te(1,i1))) + & 
 !                           rr(:,ee(4,e_te(2,i1))) - rr(:,ee(1,e_te(2,i1)))   )
 ! >>>>>>>>>
-     t_te(:,i1+1) = 0.5 * ( rr(:,ee(4,e_te(1,i1))) - rr(:,ee(1,e_te(1,i1))) + & 
+     t_te(:,i1+1) = 0.5_wp*( rr(:,ee(4,e_te(1,i1))) - rr(:,ee(1,e_te(1,i1))) + & 
                             rr(:,ee(1,e_te(2,i1))) - rr(:,ee(4,e_te(2,i1)))  )
      t_te(:,i1+1) = t_te(:,i1+1) / norm2(t_te(:,i1+1))
    end do
  else
-   t_te(:,1) = 0.5 * (  rr(:,ee(3,e_te(1,1))) - rr(:,ee(2,e_te(1,1))) )
+   t_te(:,1) = 0.5_wp * (  rr(:,ee(3,e_te(1,1))) - rr(:,ee(2,e_te(1,1))) )
    t_te(:,1) = t_te(:,1) / norm2(t_te(:,1))
    do i1 = 1 , nelems_span 
-     t_te(:,i1+1) = 0.5 * ( rr(:,ee(4,e_te(1,i1))) - rr(:,ee(1,e_te(1,i1))) )
+     t_te(:,i1+1) = 0.5_wp*( rr(:,ee(4,e_te(1,i1))) - rr(:,ee(1,e_te(1,i1))) )
      t_te(:,i1+1) = t_te(:,i1+1) / norm2(t_te(:,i1+1))
    end do
  

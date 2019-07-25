@@ -1062,7 +1062,8 @@ subroutine build_references(refs, reference_file)
           refs(iref)%axis  = rot_axis
           refs(iref)%pole  = (/0.0_wp, 0.0_wp, 0.0_wp/)
           refs(iref)%Omega = rot_rate
-          refs(iref)%psi_0 = psi_0 - 2*pi*(i_mult_ref-1)/n_mult_refs    ! psi_0(i_mult_ref)     ! psi_0 *****
+          refs(iref)%psi_0 = psi_0 - 2*pi*real(i_mult_ref-1,wp)/&
+                                          real(n_mult_refs,wp)
           norm = -cross(refs(iref)%axis,(/0.0_wp, 1.0_wp, 0.0_wp/))
           if (norm2(norm) .le. eps) &
             norm = cross(refs(iref)%axis,(/1.0_wp, 0.0_wp, 0.0_wp/))
@@ -1202,7 +1203,8 @@ subroutine build_references(refs, reference_file)
                refs(iref)%axis  = rot_axis
                refs(iref)%pole  = (/0.0_wp, 0.0_wp, 0.0_wp/)
                refs(iref)%Omega = rot_rate
-               refs(iref)%psi_0 = psi_0 - 2*pi*(i_mult_blades-1)/n_mult_blades
+               refs(iref)%psi_0 = psi_0 - 2*pi*real(i_mult_blades-1,wp) &
+                                              /real(n_mult_blades,wp)
                !TODO: check the norm vector to define an origin of the psi angle 
                norm = -cross(refs(iref)%axis,(/0.0_wp, 1.0_wp, 0.0_wp/))
                if (norm2(norm) .le. eps) &
@@ -1249,7 +1251,8 @@ subroutine build_references(refs, reference_file)
                end if
                refs(iref)%pole  = hinge_offs(i_dof,:) ! (/ 0.0_wp , 0.0_wp , 0.0_wp /) ! *******
                refs(iref)%Omega = rot_rate
-               refs(iref)%psi_0 = psi_0 - 2*pi*(i_mult_blades-1)/n_mult_blades
+               refs(iref)%psi_0 = psi_0 - 2*pi*real(i_mult_blades-1,wp)&
+                                              /real(n_mult_blades,wp)
 
                ! position of the hinge. 
                ! Orientation is described by the motion only (frame = eye(3))
@@ -1569,23 +1572,23 @@ end subroutine update_all_references
 !! around an axis
 subroutine rot_mat_axis_angle ( axis, angle, R )
 
- real(kind=8)     , intent(in)  :: axis(3)
- real(kind=8)     , intent(in)  :: angle 
- real(kind=8)     , intent(out) :: R(3,3)
- real(kind=8)                   :: r0(9) , r1(9) , r2(9)
+ real(wp)     , intent(in)  :: axis(3)
+ real(wp)     , intent(in)  :: angle 
+ real(wp)     , intent(out) :: R(3,3)
+ real(wp)                   :: r0(9) , r1(9) , r2(9)
 
- real(kind=8) :: nx , ny , nz
+ real(wp) :: nx , ny , nz
 
  nx = axis(1)
  ny = axis(2)
  nz = axis(3)
 
- r0 = (/ 1.0d0 , 0.0d0 , 0.0d0 , &
-         0.0d0 , 1.0d0 , 0.0d0 , &
-         0.0d0 , 0.0d0 , 1.0d0     /)
- r1 = (/ 0.0d0 , - nz  ,   ny  , &
-           nz  , 0.0d0 , - nx  , &
-         - ny  ,   nx  , 0.0d0     /)
+ r0 = (/ 1.0_wp , 0.0_wp , 0.0_wp , &
+         0.0_wp , 1.0_wp , 0.0_wp , &
+         0.0_wp , 0.0_wp , 1.0_wp     /)
+ r1 = (/ 0.0_wp , - nz  ,   ny  , &
+           nz  , 0.0_wp , - nx  , &
+         - ny  ,   nx  , 0.0_wp     /)
 
  r2 = (/ nx*nx , nx*ny , nx*nz , &
          ny*nx , ny*ny , ny*nz , &

@@ -142,7 +142,6 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
  real(wp) :: u_inf(3)
  real(wp) :: P_inf , rho
  real(wp) :: vel_probe(3) = 0.0_wp , vort_probe(3) = 0.0_wp 
- real(wp) :: vel(3)
  real(wp) :: v(3) = 0.0_wp !, w(3) = 0.0_wp
  real(wp), allocatable , target :: sol(:) 
  real(wp) :: pres_probe

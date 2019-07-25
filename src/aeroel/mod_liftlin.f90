@@ -381,6 +381,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       call elems_vort(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
+    if(sim_param%use_fmm) vel_w(:,i_l) = vel_w(:,i_l) + elems_ll(i_l)%p%uvort*4.0_wp*pi
   enddo
 !$omp end parallel do
 

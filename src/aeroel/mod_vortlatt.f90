@@ -100,8 +100,11 @@ type, extends(c_impl_elem) :: t_vortlatt
   procedure, pass(this) :: compute_pot      => compute_pot_vortlatt
   procedure, pass(this) :: compute_vel      => compute_vel_vortlatt
   procedure, pass(this) :: compute_psi      => compute_psi_vortlatt
-  procedure, pass(this) :: compute_pres     => compute_pres_vortlatt
-  procedure, pass(this) :: compute_dforce   => compute_dforce_vortlatt
+  !procedure, pass(this) :: compute_pres     => compute_pres_vortlatt
+  !procedure, pass(this) :: compute_dforce   => compute_dforce_vortlatt
+  !Dummy for intel workaround
+  procedure, pass(this) :: compute_pres     => compute_pres_dummy
+  procedure, pass(this) :: compute_dforce   => compute_dforce_dummy
   procedure, pass(this) :: calc_geo_data    => calc_geo_data_vortlatt
   procedure, pass(this) :: get_vort_vel     => get_vort_vel_vortlatt
   procedure, pass(this) :: get_bernoulli_source => get_bernoulli_source_vortlatt
@@ -450,6 +453,15 @@ end subroutine compute_pres_vortlatt
 
 !----------------------------------------------------------------------
 
+!> Dummy version doing nothing
+subroutine compute_pres_dummy(this, R_g)
+  class(t_vortlatt), intent(inout) :: this
+  real(wp)         , intent(in)    :: R_g(3,3)
+
+end subroutine compute_pres_dummy
+
+!----------------------------------------------------------------------
+
 !>  Compute the elementary force on the on the actual element
 subroutine compute_dforce_vortlatt(this)
 class(t_vortlatt), intent(inout) :: this
@@ -463,6 +475,18 @@ end subroutine compute_dforce_vortlatt
 
 !----------------------------------------------------------------------
 
+!> Dummy version doing nothing
+subroutine compute_dforce_dummy(this)
+class(t_vortlatt), intent(inout) :: this
+!type(t_elem_p), intent(in) :: elems(:)
+
+this%dforce = this%pres * this%area * this%nor
+
+! TODO: add viscosity and compressibility corrections
+
+end subroutine compute_dforce_dummy
+
+!----------------------------------------------------------------------
 !>Compute the elementary force on the on the actual element
 ! using Kutta-Jukowski theorem as implemented in AVL:
 ! the velocity
@@ -611,7 +635,7 @@ subroutine get_vort_vel_vortlatt(this, vort_elems, uinf)
  integer :: iv
  real(wp) :: vel(3)
 
- this%uvort = 0.0_wp
+ !this%uvort = 0.0_wp
 
  do iv=1,size(vort_elems)
    call vort_elems(iv)%p%compute_vel(this%cen, uinf, vel)

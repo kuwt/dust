@@ -239,7 +239,11 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   
     !Load the results ! TODO: check this routine and the content of the files to be read
     ! TODO : compute the missing quantities
-    call load_res(floc, comps, vort, press, t, surfvel)
+    if(out_surfvel) then
+      call load_res(floc, comps, vort, press, t, surfvel)
+    else
+      call load_res(floc, comps, vort, press, t)
+    endif
   
     !Prepare the variable for output
     nelem_out = size(vort)
@@ -287,8 +291,12 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
       
       if (out_wake) then
         
-        call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort, &
+        if(out_turbvisc) then
+          call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort, &
                            vpturbvisc)
+        else
+          call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort)
+        endif
         nelem_w = size(welems,2)
         nelem_vp = size(vppoints,2)
         

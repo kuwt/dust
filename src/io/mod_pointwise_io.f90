@@ -934,8 +934,8 @@ subroutine straight_line( r1 , r2 , nelems , type_span , rr , nor , s , &
 
     !> rr
     if ( trim(type_span) .eq. 'uniform' ) then !> uniform spacing
-      rr(i,:) = r1 * dble(nelems+1-i)/dble(nelems) + &
-                r2 * dble(       i-1)/dble(nelems)
+      rr(i,:) = r1 * real(nelems+1-i,wp)/real(nelems,wp) + &
+                r2 * real(       i-1,wp)/real(nelems,wp)
     else
       write(*,*) ' error in straight_line. Only uniform spacing '
       write(*,*) ' implemented so far. Stop ' ; stop
