@@ -1,3 +1,14 @@
+0.5.10-b
+
+* Enabled the use of single precision in all the code
+* Enabled the interaction of particles on panels with FMM
+* Possibility to suppress the trailing edge of single components
+* Possibility to set penetration avoidance parameters
+* Introduced a turbulent viscosity for particles evolution
+* New loads computation on vortex lattice components
+* Fixing of minor bugs
+* Some minor optimizations
+
 0.5.9-b
 
 * introduced pointwise parametric geometry 
