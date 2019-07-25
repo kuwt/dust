@@ -341,7 +341,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
     
     ! Find the coordinate of the reference points on the axis --------------
     !  ( with coord. y_cen )
-    if ( abs(axis_dir(2)) .lt. 1e-6 ) then
+    if ( abs(axis_dir(2)) .lt. 1e-6_wp ) then
       call error('dust_post','','Wrong definition of the axis in&
            & sectional_loads analysis: abs(axis_dir(2)) .lt. 1e-6.&
            & STOP')

@@ -79,10 +79,14 @@ use mod_aeroel, only: &
 
 implicit none
 
-public :: t_liftlin, update_liftlin, solve_liftlin
+public :: t_liftlin, t_liftlin_p, update_liftlin, solve_liftlin
 
 
 !----------------------------------------------------------------------
+
+type :: t_liftlin_p
+  type(t_liftlin), pointer :: p
+end type
 
 type, extends(c_expl_elem) :: t_liftlin
   real(wp), allocatable :: tang_cen(:)
@@ -267,7 +271,8 @@ end subroutine compute_dforce_liftlin
 !!
 !! Here the extrapolation of the lifting line solution is performed
 subroutine update_liftlin(elems_ll, linsys)
- type(t_expl_elem_p), intent(inout) :: elems_ll(:)
+ type(t_liftlin_p), intent(inout) :: elems_ll(:)
+ !type(t_expl_elem_p), intent(inout) :: elems_ll(:)
  type(t_linsys), intent(inout) :: linsys
 
  real(wp), allocatable :: res_temp(:)
@@ -298,7 +303,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
                          elems_impl, elems_ad, &
                          elems_wake, elems_vort, &
                          airfoil_data, it)
- type(t_expl_elem_p), intent(inout) :: elems_ll(:)
+ !type(t_expl_elem_p), intent(inout) :: elems_ll(:)
+ type(t_liftlin_p), intent(inout) :: elems_ll(:)
  type(t_pot_elem_p),  intent(in)    :: elems_tot(:)
  type(t_impl_elem_p), intent(in)    :: elems_impl(:)
  type(t_expl_elem_p), intent(in)    :: elems_ad(:)
@@ -332,17 +338,9 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
  real(wp) :: max_mag_ll
 
-! debug ----
+ type(t_liftlin), pointer :: el
+
  integer, intent(in) :: it
-
-! debug ----
-
-! newton ---
-!integer, allocatable :: ipiv(:)
-!integer :: info
-!real(wp) :: res , res_old
-!real(wp) :: al0
-! newton ---
 
  
  character(len=max_char_len) :: msg
@@ -365,6 +363,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   !=== Compute the velocity from all the elements except for liftling elems ===
   ! and store it outside the loop, since it is constant
   allocate(vel_w(3,size(elems_ll))) ; vel_w = 0.0_wp 
+!$omp parallel do private(i_l, j, v) schedule(dynamic)
   do i_l = 1,size(elems_ll)
     do j = 1,size(elems_impl) ! body panels: liftlin, vor che tenga contotlat 
       call elems_impl(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
@@ -382,7 +381,9 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       call elems_vort(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
+    if(sim_param%use_fmm) vel_w(:,i_l) = vel_w(:,i_l) + elems_ll(i_l)%p%uvort*4.0_wp*pi
   enddo
+!$omp end parallel do
 
   vel_w = vel_w/(4.0_wp*pi)
 
@@ -391,22 +392,14 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   allocate( c_m( size(elems_ll),3)) ;   c_m = 0.0_wp
   allocate( u_v( size(elems_ll)  )) ;   u_v = 0.0_wp
 
-! ! debug ----
-! allocate(re_v( size(elems_ll)  )) ;  re_v = 0.0_wp
-! allocate(ma_v( size(elems_ll)  )) ;  ma_v = 0.0_wp
-! 
-! allocate(chord_v( size(elems_ll)  )) ; chord_v = 0.0_wp
-! allocate(   cl_v( size(elems_ll)  )) ;    cl_v = 0.0_wp
-! allocate(el_i_airfoil_m( size(elems_ll),2)) ; el_i_airfoil_m = 0.0_wp
-! allocate(el_csi_cen_v  ( size(elems_ll)  )) ; el_csi_cen_v   = 0.0_wp
-! ! debug ----
-
   ! Remove the "out-of-plane" component of the relative velocity:
   ! 2d-velocity to enter the airfoil look-up-tables
   ! IS THIS LOOP USED (u_v) seems to be overwritten few lines down)
+!$omp parallel do private(i_l, el) schedule(dynamic,4)
   do i_l=1,size(elems_ll)
-   select type(el => elems_ll(i_l)%p)
-   type is(t_liftlin)
+   !select type(el => elems_ll(i_l)%p)
+   !type is(t_liftlin)
+     el => elems_ll(i_l)%p
      u_v(i_l) = norm2((uinf-el%ub) - &
          el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub))) 
      el%vel_2d_isolated = norm2((uinf-el%ub) - &
@@ -414,12 +407,15 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
      el%vel_outplane_isolated = sum(el%bnorm_cen*(uinf-el%ub))
      el%alpha_isolated = atan2(sum((uinf-el%ub)*el%nor), &
                                sum((uinf-el%ub)*el%tang_cen))*180.0_wp/pi
-   end select
+   !end select
   end do
+!$omp end parallel do
 
   do ic = 1, fp_maxIter
     diff = 0.0_wp             ! max diff ("norm \infty")
     max_mag_ll = 0.0_wp
+!$omp parallel do private(i_l, el, j, v, vel, up, unorm, alpha, mach, &
+!$omp& reynolds, aero_coeff, cl) schedule(dynamic,4)
     do i_l = 1,size(elems_ll)
 
       ! compute velocity
@@ -429,7 +425,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
         vel = vel + v
       enddo
 
-      select type(el => elems_ll(i_l)%p) ; type is(t_liftlin)
+      !select type(el => elems_ll(i_l)%p) ; type is(t_liftlin)
+      el => elems_ll(i_l)%p
 
         ! overall relative velocity computed in the centre of the ll elem
         vel = vel/(4.0_wp*pi) + uinf - el%ub + vel_w(:,i_l)
@@ -448,11 +445,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
         reynolds = sim_param%rho_inf * unorm * & 
                    el%chord / sim_param%mu_inf    
 
-!       ! debug ----
-!       el_i_airfoil_m(i_l,:) = el%i_airfoil
-!       el_csi_cen_v(  i_l  ) = el%csi_cen
-!       ! debug ----
-
         ! Read the aero coeff from .c81 tables
         call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil , &
                                    (/alpha, mach, reynolds/) , sim_param , &
@@ -461,29 +453,18 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
         ! Compute the "equivalent" intensity of the vortex line 
         dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
+!$omp atomic
         diff = max(diff,abs(elems_ll(i_l)%p%mag-dou_temp(i_l)))
+!$omp end atomic
 
-!       ! debug ----
-!       chord_v(i_l) = el%chord 
-!       cl_v(i_l) = cl
-!       ! debug ----
-
-      !end select
-
-!       ! debug ----
-!     re_v(i_l) = reynolds
-!     ma_v(i_l) = mach
-!       ! debug ----
       c_m(i_l,:) = aero_coeff
       a_v(i_l)   = alpha * pi/180.0_wp ! [rad]
 
-      !select type(el => elems_ll(i_l)%p) ; type is(t_liftlin)
-        !el%alpha = a_v(i_l) * 180.0_wp / pi  ! [deg]
-        !el%vel_2d = unorm
         el%vel_outplane = sum(el%bnorm_cen*vel)
-      end select
+      !end select
 
     enddo  ! i_l
+!$omp end parallel do
 
 
     ! === Stall regularisation ===
@@ -581,8 +562,9 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   ! === Loads computation ===
   do i_l = 1,size(elems_ll)
-   select type(el => elems_ll(i_l)%p)
-   type is(t_liftlin)
+   !select type(el => elems_ll(i_l)%p)
+   !type is(t_liftlin)
+   el => elems_ll(i_l)%p
     ! avg delta_p = \vec{F}.\vec{n} / A = ( L*cos(al)+D*sin(al) ) / A
     el%pres   = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
                ( c_m(i_l,1) * cos(a_v(i_l)) +  c_m(i_l,2) * sin(a_v(i_l)) )
@@ -604,7 +586,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     el%aero_coeff = c_m(i_l,:)
 
 
-   end select
+   !end select
   end do
 
   if(sim_param%debug_level .ge. 3) then

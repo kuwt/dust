@@ -85,7 +85,7 @@ use mod_vortlatt, only: &
   t_vortlatt
 
 use mod_liftlin, only: &
-  t_liftlin
+  t_liftlin, t_liftlin_p
 
 use mod_actuatordisk, only: &
   t_actdisk
@@ -340,7 +340,8 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
  type(t_impl_elem_p), allocatable, intent(out) :: elems_impl(:)
  type(t_expl_elem_p), allocatable, intent(out) :: elems_expl(:)
  type(t_expl_elem_p), allocatable, intent(out) :: elems_ad(:)
- type(t_expl_elem_p), allocatable, intent(out) :: elems_ll(:)
+ !type(t_expl_elem_p), allocatable, intent(out) :: elems_ll(:)
+ type(t_liftlin_p), allocatable, intent(out) :: elems_ll(:)
  type(t_pot_elem_p),  allocatable, intent(out) :: elems_tot(:)
  type(t_tedge), intent(out) :: te
  type(t_aero_tab) , allocatable, intent(out) :: airfoil_data(:)
@@ -514,7 +515,8 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
         i_expl = i_expl+1
         i_tot = i_tot+1
         elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
-        select type(el => geo%components(i_comp)%el(j)); class is(c_expl_elem)
+        !select type(el => geo%components(i_comp)%el(j)); class is(c_expl_elem)
+        select type(el => geo%components(i_comp)%el(j)); class is(t_liftlin)
           elems_ll(i_ll)%p => el
           elems_expl(i_expl)%p => el
         end select

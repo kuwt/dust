@@ -178,7 +178,7 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
     call load_refs(floc, refs_R, refs_off, refs_G, refs_f)
   
     ! Move the points
-    call update_points_postpro(comps, points, refs_R, refs_off)
+    call update_points_postpro(comps, points, refs_R, refs_off, refs_G, refs_f)
   
     !Load the results
     call load_res(floc, comps, vort, press, t, surfvel)
@@ -214,6 +214,7 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
     enddo
 
     !close the file
+    close(fid_out)
     
   
   
@@ -222,7 +223,8 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
     if (allocated(vort ) ) deallocate(vort )
     if (allocated(press) ) deallocate(press)
     if (allocated(press) ) deallocate(surfvel)
-  
+
+    call close_hdf5_file(floc)
   
   end do ! Time loop
 

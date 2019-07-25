@@ -188,13 +188,17 @@ subroutine load_res(floc, comps, vort, press, t, surfvel)
     !call read_hdf5_al(cp_read,'Cp',gloc3)
     call read_hdf5_al(pres_read,'Pres',gloc3)
     call read_hdf5_al(dforce_read,'dF',gloc3)
-    select type(el =>comps(icomp)%el)
-     type is(t_surfpan)
-      call read_hdf5_al(surfvel_read,'surf_vel',gloc3)
-     class default
-      allocate(surfvel_read(3,nelems_comp))
-      surfvel_read = 0.0_wp
-    end select
+    if(got_surfvel) then
+      !DEBUG:
+      write(*,*) 'I got surfvel!'
+      select type(el =>comps(icomp)%el)
+       type is(t_surfpan)
+        call read_hdf5_al(surfvel_read,'surf_vel',gloc3)
+       class default
+        allocate(surfvel_read(3,nelems_comp))
+        surfvel_read = 0.0_wp
+      end select
+    endif
 
     !check consistency of geometry and solution
     if((size(vort_read,1) .ne. nelems_comp) .or. &
@@ -209,10 +213,12 @@ subroutine load_res(floc, comps, vort, press, t, surfvel)
     do ie = 1 , nelems_comp
       comps(icomp)%el(ie)%pres = pres_read(ie) 
       comps(icomp)%el(ie)%dforce = dforce_read(:,ie) 
-      select type(el =>comps(icomp)%el(ie))
-       type is(t_surfpan)
-        el%surf_vel = surfvel_read(:,ie)
-      end select
+      if(got_surfvel) then
+       select type(el =>comps(icomp)%el(ie))
+         type is(t_surfpan)
+          el%surf_vel = surfvel_read(:,ie)
+        end select
+      endif
     end do
 
     call close_hdf5_group(gloc3)
@@ -244,7 +250,8 @@ subroutine load_res(floc, comps, vort, press, t, surfvel)
       enddo
     end select
 
-    deallocate(vort_read, pres_read, dforce_read, surfvel_read)
+    deallocate(vort_read, pres_read, dforce_read)
+    if(got_surfvel) deallocate(surfvel_read)
 
 
   enddo
@@ -326,7 +333,7 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
  real(wp), allocatable, intent(out) :: wvort(:)
  real(wp), allocatable, intent(out) :: vppoints(:,:)
  real(wp), allocatable, intent(out) :: vpvort(:)
- real(wp), allocatable, intent(out) :: vpturbvisc(:)
+ real(wp), allocatable, intent(out), optional :: vpturbvisc(:)
 
  integer(h5loc) :: gloc
  logical :: got_dset 
@@ -466,7 +473,7 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
     call open_hdf5_group(floc,'ParticleWake',gloc)
     call read_hdf5_al(vppoints,'WakePoints',gloc)
     call read_hdf5_al(wvort_read,'WakeVort',gloc)
-    call read_hdf5_al(vpturbvisc,'turbvisc',gloc)
+    if(present(vpturbvisc)) call read_hdf5_al(vpturbvisc,'turbvisc',gloc)
     allocate(vpvort(size(wvort_read,2)))
     do ip = 1,size(vpvort)
       vpvort(ip) = norm2(wvort_read(:,ip))

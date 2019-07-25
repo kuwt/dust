@@ -166,10 +166,10 @@ subroutine potential_calc_doublet(this, dou, pos)
    end do
 
    ! Correct the result to obtain the solid angle (from Gauss-Bonnet theorem)
-   if     ( dou .lt. -(this%n_ver-2)*pi - eps_dou ) then
-     dou = dou + (this%n_ver-2) * pi
-   elseif ( dou .gt. +(this%n_ver-2)*pi + eps_dou ) then
-     dou = dou - (this%n_ver-2) * pi
+   if     ( dou .lt. -real(this%n_ver-2,wp)*pi - eps_dou ) then
+     dou = dou + real(this%n_ver-2,wp) * pi
+   elseif ( dou .gt. +real(this%n_ver-2,wp)*pi + eps_dou ) then
+     dou = dou - real(this%n_ver-2,wp) * pi
    else
      dou = 0.0_wp
    end if

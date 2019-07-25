@@ -233,24 +233,24 @@ maxxyz = getrealarray(sbprms,'Maxxyz',3)
 ! ... allocate 'box' and deal with inconsistent input
 if ( nxyz(1) .gt. 1 ) then ! x-coord
   allocate( xbox(nxyz(1)) )
-  dxbox = ( maxxyz(1) - minxyz(1) ) / dble( nxyz(1) - 1 ) 
-  xbox = (/ ( minxyz(1) + dble(i1-1) * dxbox , i1 = 1 , nxyz(1) )/) 
+  dxbox = ( maxxyz(1) - minxyz(1) ) / real(nxyz(1) - 1, wp) 
+  xbox = (/ ( minxyz(1) + real(i1-1,wp) * dxbox , i1 = 1 , nxyz(1) )/) 
 else
   allocate( xbox(1) )
   xbox(1) = minxyz(1)
 end if
 if ( nxyz(2) .gt. 1 ) then ! y-coord
   allocate( ybox(nxyz(2)) )
-  dybox = ( maxxyz(2) - minxyz(2) ) / dble( nxyz(2) - 1 ) 
-  ybox = (/ ( minxyz(2) + dble(i1-1) * dybox , i1 = 1 , nxyz(2) )/) 
+  dybox = ( maxxyz(2) - minxyz(2) ) / real(nxyz(2) - 1, wp) 
+  ybox = (/ ( minxyz(2) + real(i1-1, wp) * dybox , i1 = 1 , nxyz(2) )/) 
 else
   allocate( ybox(1) )
   ybox(1) = minxyz(2)
 end if
 if ( nxyz(3) .gt. 1 ) then ! z-coord
   allocate( zbox(nxyz(3)) )
-  dzbox = ( maxxyz(3) - minxyz(3) ) / dble( nxyz(3) - 1 ) 
-  zbox = (/ ( minxyz(3) + dble(i1-1) * dzbox , i1 = 1 , nxyz(3) )/) 
+  dzbox = ( maxxyz(3) - minxyz(3) ) / real(nxyz(3) - 1, wp) 
+  zbox = (/ ( minxyz(3) + real(i1-1, wp) * dzbox , i1 = 1 , nxyz(3) )/) 
 else
   allocate( zbox(1) )
   zbox(1) = minxyz(3)

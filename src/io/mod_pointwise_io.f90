@@ -420,6 +420,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
  real(wp) , allocatable, intent(out) :: normalised_coord_e(:,:)
  integer  , intent(out), optional    :: npoints_chord_tot, nelem_span_tot
  real(wp) , allocatable, intent(out), optional :: chord_p(:),theta_p(:)
+ real(wp) :: s_cen_e
 
  ! parser and sub-parsers
  type(t_parse) :: pmesh_prs
@@ -581,7 +582,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
    allocate( points(i)%xy ( 2 , 2 ) )
    points(i)%xy(:,1) = (/ 0.0_wp , 0.0_wp /)
    points(i)%xy(:,2) = matmul ( reshape( (/ cos(twist_rad) , -sin(twist_rad) , &
-                                       sin(twist_rad) ,  cos(twist_rad) /) , &
+                                            sin(twist_rad) ,  cos(twist_rad) /) , &
                            (/ 2 , 2 /) ) , (/ points(i)%chord , 0.0_wp /) )
 
    if ( points(i)%flip_sec ) points(i)%xy(2,:) = -points(i)%xy(2,:)
@@ -661,38 +662,43 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
  allocate(i_airfoil_e       (2,nelem_span_tot)) ; i_airfoil_e        = 0
  allocate(normalised_coord_e(2,nelem_span_tot)) ; normalised_coord_e = 0.0_wp
  
+ ! Find normalised_coord_e for ll interpolation ---
+ j = 1
+ do i = 1 , nelem_span_tot ! loop over the elements in the spanwise direction
 
- ! first point
- ! normalised_coord_e(1,1) = 0.0_wp
- ! i_airfoil_e(       1,:) = (/ 1 , 2 /)
- do i = 1 , nelem_span_tot
+   s_cen_e = 0.5 * ( ref_line_interp_s_all(i) + ref_line_interp_s_all(i+1) )
 
-   do j = 1 , size(airfoil_list_actual_s)
-     if ( ref_line_interp_s_all(i) .ge. airfoil_list_actual_s(j) ) then
+   ! scan airfoil_list_actual_s and update j, index of the lower bound for interpolation
+   if  ( s_cen_e .gt. airfoil_list_actual_s(j+1) ) then
+     j = j + 1
+     if ( j .eq. size(airfoil_list_actual_s) ) then
+       write(*,*) ' error in read_mesh_pointwise_ll: &
+                    &out of bounds while scanning line sectons; stop ' ; stop
+     endif 
+   end if
 
-       if ( ( j .lt. size(airfoil_list_actual_s)-1 ) ) then
-         if ( ( ref_line_interp_s_all(i+1) .gt. & 
-                                            airfoil_list_actual_s(j+2) ) ) then
+   ! check if the elem belongs to more than two sections of the reference line: if .t. -> error
+   if ( ( ref_line_interp_s_all(i  ) .lt. airfoil_list_actual_s(j  ) ) .and. & 
+        ( ref_line_interp_s_all(i+1) .gt. airfoil_list_actual_s(j+1) ) ) then
 
-           write(*,*) ' ref_line_interp_s_all(',i+1,') = ' , ref_line_interp_s_all(i+1)
-           write(*,*) ' airfoil_list_actual_s(',j+2,') = ' , airfoil_list_actual_s(j+2)
-           write(*,*) ' error in read_mesh_pointwise_ll: &
-                       &an element belong to more than 2 sections; stop ' ; stop
-         end if
-       end if
+     write(*,*) ' error in read_mesh_pointwise_ll: '
+     write(*,*) '  element i =', i , ' belongs to more than 2 sections: '
+     write(*,*) '  centre of the el.            : ' , s_cen_e
+     write(*,*) '  ref_line_interp_s_all(',i,':',i+1,') : ' , ref_line_interp_s_all(i:i+1)
+     write(*,*) '  airfoil_list_actual_s(',j,':',j+1,') : ' , airfoil_list_actual_s(j:j+1)
 
-       i_airfoil_e(1,i) = j
-       i_airfoil_e(2,i) = j + 1
+   end if
 
-       normalised_coord_e(1,i) = ( ref_line_interp_s_all(i)   - airfoil_list_actual_s(j) ) / &
-                                 ( airfoil_list_actual_s(j+1) - airfoil_list_actual_s(j) )
-       normalised_coord_e(2,i) = ( ref_line_interp_s_all(i+1) - airfoil_list_actual_s(j) ) / &
-                                 ( airfoil_list_actual_s(j+1) - airfoil_list_actual_s(j) )
+   ! i_airfoil_e and normalised_coord_e (of the edges of the element) for ll interpolation
+   i_airfoil_e(1,i) = j
+   i_airfoil_e(2,i) = j + 1
+ 
+   normalised_coord_e(1,i) = ( ref_line_interp_s_all(i)   - airfoil_list_actual_s(j) ) / &
+                             ( airfoil_list_actual_s(j+1) - airfoil_list_actual_s(j) )
+   normalised_coord_e(2,i) = ( ref_line_interp_s_all(i+1) - airfoil_list_actual_s(j) ) / &
+                             ( airfoil_list_actual_s(j+1) - airfoil_list_actual_s(j) )
 
-     end if
-   end do
-
- end do 
+ end do
 
  
  ! -- 0.75 chord -- look for other "0.75 chord" tag
@@ -782,6 +788,7 @@ subroutine build_reference_line( npoint_span_tot   , points, lines     , &
 
  allocate(  s_in(size(points)  )) ;   s_in = 0.0_wp
  allocate(nor_in(size(points),3)) ; nor_in = 0.0_wp
+
  
  !> Starting point
  ref_line_points(1,:) = points( lines(1)%end_points(1) ) % coord
@@ -927,8 +934,8 @@ subroutine straight_line( r1 , r2 , nelems , type_span , rr , nor , s , &
 
     !> rr
     if ( trim(type_span) .eq. 'uniform' ) then !> uniform spacing
-      rr(i,:) = r1 * dble(nelems+1-i)/dble(nelems) + &
-                r2 * dble(       i-1)/dble(nelems)
+      rr(i,:) = r1 * real(nelems+1-i,wp)/real(nelems,wp) + &
+                r2 * real(       i-1,wp)/real(nelems,wp)
     else
       write(*,*) ' error in straight_line. Only uniform spacing '
       write(*,*) ' implemented so far. Stop ' ; stop
@@ -1332,10 +1339,8 @@ subroutine read_points ( eltype , pmesh_prs , point_prs , points )
      points(i) % sec_nor = getrealarray(  point_prs, 'SectionNormalVector',3)
    end if
    !> flipSection for 'p' or 'v'
-   if ( ( eltype .eq. 'p' ) .or. ( eltype .eq. 'v' ) ) then
+   if ( ( eltype .eq. 'p' ) .or. ( eltype .eq. 'v' ) .or. ( eltype .eq. 'l' ) ) then
      points(i) % flip_sec  = getlogical(  point_prs, 'FlipSection', 'F' )
-!    write(*,*) ' points(',i,')%id       : ' , points(i)%id , &
-!               ' points(',i,')%flip_sec : ' , points(i)%flip_sec
    else
      points(i) % flip_sec    = .false.
    end if
@@ -1466,7 +1471,7 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
                &points', 'referenceLine' ) ! default y-axis
  call point_prs%CreateRealArrayOption('SectionNormalVector', &
                'normal vector of the plane section containing the airfoil' )
- if ( ( eltype .eq. 'p' ) .or. ( eltype .eq. 'v' ) ) then
+ if ( ( eltype .eq. 'p' ) .or. ( eltype .eq. 'v' ) .or. ( eltype .eq. 'l' ) ) then
    call point_prs%CreateLogicalOption('FlipSection', &
                  'flip section definition, e.g. for box wing configurations' , &
                  'F')

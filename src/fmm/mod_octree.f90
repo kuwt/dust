@@ -57,10 +57,10 @@ use mod_sim_param, only: &
   sim_param
 
 use mod_handling, only: &
-  error, warning, info, printout, dust_time, t_realtime
+  error, warning, info, printout, dust_time, t_realtime, internal_error
 
 use mod_aeroel, only: &
-  t_elem_p, t_pot_elem_p, c_elem
+  t_elem_p, t_pot_elem_p, c_pot_elem, c_elem
 
 use mod_vortpart, only: &
   t_vortpart, t_vortpart_p
@@ -73,7 +73,7 @@ use mod_multipole, only: &
 implicit none
 
 public :: initialize_octree, destroy_octree, sort_particles, t_octree, &
-          calculate_multipole, apply_multipole
+          calculate_multipole, apply_multipole, apply_multipole_panels
 
 private
 
@@ -224,6 +224,7 @@ end type
 interface push_ptr
   module procedure push_cell_ptr_scalar, push_cell_ptr_vec
   module procedure push_part_ptr_scalar, push_part_ptr_vec
+  module procedure push_pan_ptr_scalar,  push_pan_ptr_vec
 end interface
 
 !----------------------------------------------------------------------
@@ -234,6 +235,7 @@ real(t_realtime) :: t11, t00
 
 integer :: min_part_4_cell
 
+integer, parameter :: allocation_block = 32
 !----------------------------------------------------------------------
 contains
 !----------------------------------------------------------------------
@@ -328,7 +330,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
   !dive down  all the other levels
   do l = 2,nlevels
     !Set the quantities for the layer 
-    octree%layers(l)%cell_size = box_length/(2**(l-1))
+    octree%layers(l)%cell_size = box_length/real((2**(l-1)),wp)
     allocate(octree%layers(l)%&
                        lcells(octree%ncl(1,l),octree%ncl(2,l),octree%ncl(3,l)))
     !cycle on the parents (i.e. all the cells at the upper level)
@@ -691,18 +693,18 @@ end subroutine
 !----------------------------------------------------------------------
 
 !> Sort particles inside the octree grid
-subroutine sort_particles(part, n_prt, elem, octree)
- type(t_vortpart_p), intent(in), target :: part(:)
+subroutine sort_particles(wparts, n_prt, elem, octree)
+ type(t_vortpart), intent(inout), target :: wparts(:)
  integer, intent(inout) :: n_prt
  type(t_pot_elem_p), intent(in) :: elem(:)
  type(t_octree), intent(inout), target :: octree
 
- integer :: ip
+ integer :: ip, ipp
  integer :: idx(3)
  real(wp) :: csize
- integer :: l, i,j,k, child, ic,jc,kc, in,jn,kn
+ integer :: l, i,j,k, child, ic,jc,kc
  integer :: ll, nl
- logical :: got_leaves
+ logical :: got_leaves, got_branches
  integer :: nprt, nprt2, iq
  real(wp) :: redistr(3), vort(3)
  character(len=*), parameter :: this_sub_name = 'sort_particles'
@@ -733,62 +735,83 @@ subroutine sort_particles(part, n_prt, elem, octree)
   
   !cycle on all the particles
   !TODO: make this parallel too, but pay attention to the race conditions
-  do ip=1,size(part)
+  ipp = 0
+  do ip=1,n_prt
+    ipp = ipp + 1
+    do while(wparts(ipp)%free)
+        ipp = ipp +1
+        if(ipp .gt. size(wparts)) &
+        call internal_error(this_sub_name, this_mod_name, &
+        'not enough non-free particles while sorting')
+    enddo
     !check in which cell at the lowest level it is located
-    idx = ceiling((part(ip)%p%cen-octree%xmin)/csize)
+    idx = ceiling((wparts(ipp)%cen-octree%xmin)/csize)
 
     !check that we are not sorting things outside the octree
     if(any(idx.le.0).or.any(idx.gt.shape(octree%layers(ll)%lcells))) then
       write(msg,*) 'Sorted particle resulted outside octree box at: ',&
-                    part(ip)%p%cen
+                    wparts(ipp)%cen
       call error(this_sub_name, this_mod_name, msg) 
     endif
 
     !add the particle to the lowest level
     octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npart = &
                     octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npart + 1
-    call push_ptr(octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%cell_parts,part(ip)%p)
+    call push_ptr(octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%cell_parts, &
+                  wparts(ipp))
     octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%ave_vortmag =  &
       octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%ave_vortmag + &
-      part(ip)%p%mag
+      wparts(ipp)%mag
 
   enddo
 
+  
   !Sort also all the elements
-  do ip=1,size(elem)
-    !check in which cell at the lowest level it is located
-    idx = ceiling((elem(ip)%p%cen-octree%xmin)/csize)
+  if(sim_param%use_pr .or. sim_param%use_fmm_pan) then
+    do ip=1,size(elem)
+      !check in which cell at the lowest level it is located
+      idx = ceiling((elem(ip)%p%cen-octree%xmin)/csize)
 
-    !check that we are not sorting things outside the octree
-    if(any(idx.le.0).or.any(idx.gt.shape(octree%layers(ll)%lcells))) then
-      write(msg,*) 'Sorted element resulted outside octree box at: ',&
-                    elem(ip)%p%cen
-      call error(this_sub_name, this_mod_name, msg) 
-    endif
+      !check that we are not sorting things outside the octree
+      if(any(idx.le.0).or.any(idx.gt.shape(octree%layers(ll)%lcells))) then
+        write(msg,*) 'Sorted element resulted outside octree box at: ',&
+                      elem(ip)%p%cen
+        if(sim_param%use_fmm_pan) then
+          call error(this_sub_name, this_mod_name, msg) 
+        else
+          if(sim_param%debug_level.ge.5) &
+            call warning(this_sub_name, this_mod_name, msg) 
+          cycle
+        endif
+      endif
 
-    !add the particle to the lowest level
-    octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npan = &
-                    octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npan + 1
-    !call push_ptr(octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%cell_parts,part(ip)%p)
+      !add the particle to the lowest level
+      octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npan = &
+                      octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%npan + 1
+      call push_ptr(octree%layers(ll)%lcells(idx(1),idx(2),idx(3))%cell_pans&
+                    , elem(ip)%p)
 
-  enddo
-  !From the second to last level upwards, add the panels
-  do l = ll-1,1,-1
-    !cycle on the elements on the level
-    do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
+    enddo
+    !From the second to last level upwards, add the panels
+    do l = ll-1,1,-1
+      !cycle on the elements on the level
+!!!!!$omp parallel do collapse(3) private(i,j,k,child)
+      do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
 
-      !cycle on the children, gather the number of particles and if are 
-      !leaves
-      do child = 1,8
-        octree%layers(l)%lcells(i,j,k)%npan = &
-              octree%layers(l)%lcells(i,j,k)%npan + &
-              octree%layers(l)%lcells(i,j,k)%children(child)%p%npan
-        !push all the panels pointers
-        !call push_ptr(octree%layers(l)%lcells(i,j,k)%cell_parts, &
-        !octree%layers(l)%lcells(i,j,k)%children(child)%p%cell_parts)
-      enddo !child
-    enddo; enddo; enddo !layer cells i,j,k
-  enddo
+        !cycle on the children, gather the number of particles and if are 
+        !leaves
+        do child = 1,8
+          octree%layers(l)%lcells(i,j,k)%npan = &
+                octree%layers(l)%lcells(i,j,k)%npan + &
+                octree%layers(l)%lcells(i,j,k)%children(child)%p%npan
+          !push all the panels pointers
+          call push_ptr(octree%layers(l)%lcells(i,j,k)%cell_pans, &
+          octree%layers(l)%lcells(i,j,k)%children(child)%p%cell_pans)
+        enddo !child
+      enddo; enddo; enddo !layer cells i,j,k
+!!!!!!$omp end parallel do
+    enddo
+  endif
 
 
 
@@ -833,8 +856,9 @@ subroutine sort_particles(part, n_prt, elem, octree)
 
             !redistribute it
             nprt2 = octree%layers(ll)%lcells(i,j,k)%npart
-            redistr = (octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag * &
-                    octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%dir) / nprt2
+            redistr = (octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag*&
+                       octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%dir)&
+                       / real(nprt2,wp)
             do iq=1,nprt
                 if(.not. octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%free) then
                   vort =  octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%mag*&
@@ -857,6 +881,7 @@ subroutine sort_particles(part, n_prt, elem, octree)
 
   nl = 0
   !Bottom level: just check if are leaves
+!$omp parallel do collapse(3) private(i,j,k)
   do k=1,octree%ncl(3,ll); do j=1,octree%ncl(2,ll); do i = 1,octree%ncl(1,ll)
     if( (octree%layers(ll)%lcells(i,j,k)%npart .ge. min_part_4_cell) .or. &
          ll .eq. 1) then !if last level is first, all are leaves
@@ -865,19 +890,24 @@ subroutine sort_particles(part, n_prt, elem, octree)
                                                              octree%pexp)
     endif
   enddo; enddo; enddo !layer cells i,j,k
+!$omp end parallel do
 
 
   !From the second to last level upwards
   do l = ll-1,1,-1
     !cycle on the elements on the level
+!$omp parallel do collapse(3) private(i,j,k,got_leaves, got_branches, child)
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
 
       !cycle on the children, gather the number of particles and if are 
       !leaves
       got_leaves = .false.
+      got_branches = .false.
       do child = 1,8
         if(octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf) &
                                                           got_leaves = .true.
+        if(octree%layers(l)%lcells(i,j,k)%children(child)%p%branch) &
+                                                        got_branches = .true.
         octree%layers(l)%lcells(i,j,k)%npart = &
               octree%layers(l)%lcells(i,j,k)%npart + &
               octree%layers(l)%lcells(i,j,k)%children(child)%p%npart
@@ -887,51 +917,39 @@ subroutine sort_particles(part, n_prt, elem, octree)
       enddo !child
       
       !check how we need to flag the cell
-      if (.not. octree%layers(l)%lcells(i,j,k)%branch) then
-        !if it is not a branch analyse the situation of the children
-        if(got_leaves) then
-          !Some of the children are leaves: set all children as leaves and then
-          !set the current cell and all the branch upwards as branch
-          do child = 1,8
-            if(.not. octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf) then
-              call set_leaf(octree%layers(l)%lcells(i,j,k)%children(child)%p, &
-                        octree%leaves, nl, octree%pexp)
-            endif
-          enddo
-          call set_branch(octree%layers(l)%lcells(i,j,k), octree%pexp)
-        else
-          !None of the children are leaves. Particles have alerady been 
-          !inherited, just flag the rest inactive
-          do child = 1,8
-            call set_inactive(octree%layers(l)%lcells(i,j,k)%children(child)%p)
-          enddo
-          !then check if itself it is a leaf
-          if( (octree%layers(l)%lcells(i,j,k)%npart .ge. min_part_4_cell) &
-          .or. l .eq. 1) then !if last level is first, all are leaves
-            call set_leaf(octree%layers(l)%lcells(i,j,k), &
-                        octree%leaves, nl, octree%pexp)
-          endif
-        endif
-
-      else
-        !if it is a branch we still need to check that one of the children
-        !is not orphaned, i.e. not a leaf nor a branch. Since it is a sibling
-        !of a branch it must become a leaf even if it has not enough particles
+      if(got_leaves .or. got_branches) then
+        !Some of the children are leaves or branches, all which is not
+        !set becomes leaf, the cell becomes branch
         do child = 1,8
-          if( .not. octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf &
-      .and. .not. octree%layers(l)%lcells(i,j,k)%children(child)%p%branch) then
+          if(.not. octree%layers(l)%lcells(i,j,k)%children(child)%p%leaf &
+          .and. .not. octree%layers(l)%lcells(i,j,k)%children(child)&
+                                                          %p%branch) then
             call set_leaf(octree%layers(l)%lcells(i,j,k)%children(child)%p, &
-                        octree%leaves, nl, octree%pexp)
+                      octree%leaves, nl, octree%pexp)
           endif
-        enddo !child
+        enddo
+        call set_branch(octree%layers(l)%lcells(i,j,k), octree%pexp)
+      else
+        !None of the children are leaves nor branches
+        !Particles have alerady been inherited, just flag the rest inactive
+        do child = 1,8
+          call set_inactive(octree%layers(l)%lcells(i,j,k)%children(child)%p)
+        enddo
+        !then check if itself it is a leaf
+        if( (octree%layers(l)%lcells(i,j,k)%npart .ge. min_part_4_cell) &
+        .or. l .eq. 1) then !if last level is first, all are leaves
+          call set_leaf(octree%layers(l)%lcells(i,j,k), &
+                      octree%leaves, nl, octree%pexp)
+        endif
       endif
-
     enddo; enddo; enddo !layer cells i,j,k
+!$omp end parallel do
   enddo
   
   !Last dive down the levels to set the leaf neighbours
   do l = 2,ll
     !cycle on the elements on the level
+!$omp parallel do collapse(3) private(i,j,k,ic,kc,jc) schedule(dynamic)
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
     if(octree%layers(l)%lcells(i,j,k)%active) then
       !1) get the leaf neighbours from the parent if it exists
@@ -952,6 +970,7 @@ subroutine sort_particles(part, n_prt, elem, octree)
       enddo; enddo; enddo !neighbour cells ic,jc,kc
     endif !active
     enddo; enddo; enddo !layer cells i,j,k
+!$omp end parallel do
   enddo
 
   octree%nleaves = nl
@@ -992,9 +1011,12 @@ subroutine calculate_multipole(part,octree)
   t0 = dust_time()
 !$omp parallel do private(lv) schedule(guided)
   do lv = 1, octree%nleaves
+  !DEBUG
+  !write(*,*) 'Leaf nr, nr_part, size cell_parts',lv,octree%leaves(lv)%p%npart,size(octree%leaves(lv)%p%cell_parts)
     call octree%leaves(lv)%p%mp%leaf_M(&
                octree%leaves(lv)%p%cen, &
                octree%leaves(lv)%p%cell_parts, &
+               octree%leaves(lv)%p%npart, &
                octree%pexp  )
   enddo
 !$omp end parallel do
@@ -1121,19 +1143,21 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
   !for all the leaves apply the local expansion and then local interactions 
   t0 = dust_time()
 !$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, &
-!$omp& v, stretch, str, grad, alpha, dir, velv, stretchv) schedule(dynamic)
+!$omp& v, stretch, str, grad, alpha, dir, velv, stretchv, ave_ros, turbvisc, iln) schedule(dynamic)
   do lv = 1, octree%nleaves
     !I am on a leaf, cycle on all the particles inside the leaf
     allocate(velv(3,octree%leaves(lv)%p%npart),&
              stretchv(3,octree%leaves(lv)%p%npart))
 
+    ave_ros = 0.0_wp
+
+!$omp simd private(vel, stretch, str, grad, pos, alpha, dir, m) reduction(+:ave_ros)
     do ip = 1,octree%leaves(lv)%p%npart
     if(.not. octree%leaves(lv)%p%cell_parts(ip)%p%free) then
       
       vel = 0.0_wp
       stretch = 0.0_wp
       grad = 0.0_wp
-      ave_ros = 0.0_wp
       pos = octree%leaves(lv)%p%cell_parts(ip)%p%cen
       alpha = octree%leaves(lv)%p%cell_parts(ip)%p%mag * &
               octree%leaves(lv)%p%cell_parts(ip)%p%dir
@@ -1163,12 +1187,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       endif
     endif
     enddo
+!$omp end simd
 
     if(sim_param%use_vd)  then
       if(octree%leaves(lv)%p%npart .gt. 0) then
         ave_ros = ave_ros/real(octree%leaves(lv)%p%npart,wp)
-      else
-        ave_ros = 0.0_wp
       endif
       if(sim_param%use_tv) then
         turbvisc = (0.11_wp*sim_param%VortexRad)**2 * &
@@ -1306,7 +1329,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
   tend = dust_time()
   octree%t_lv = tend-tsta
   if(sim_param%use_dyn_layers) then
-    if(octree%t_lv/octree%t_mp .gt. sim_param%LeavesTimeRatio .and. &
+    if(real(octree%t_lv/octree%t_mp, wp) .gt. sim_param%LeavesTimeRatio .and. &
        octree%nlevels .lt. sim_param%NMaxOctreeLevels) then
       call add_layer(octree)
     endif
@@ -1314,6 +1337,86 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
   
 end subroutine apply_multipole
 
+!----------------------------------------------------------------------
+
+!> Apply multipole to the panels
+subroutine apply_multipole_panels(octree, elem)
+ type(t_octree), intent(inout) :: octree
+ type(t_pot_elem_p), intent(in) :: elem(:)
+
+ integer :: i, j, k, lv, ip, ipp, m, ie, iln
+ real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3), dir(3)
+ real(wp), allocatable :: velv(:,:), stretchv(:,:)
+ real(wp) :: grad(3,3)
+ real(t_realtime) :: tsta
+ real(wp) :: turbvisc, ave_ros
+
+ character(len=*), parameter :: this_sub_name = 'apply_multipole_panels'
+
+
+  tsta = dust_time()
+  !for all the leaves apply the local expansion and then local interactions 
+  t0 = dust_time()
+!$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, &
+!$omp& v, stretch, str, grad, alpha, dir, velv, stretchv, ave_ros, turbvisc, iln) schedule(dynamic)
+  do lv = 1, octree%nleaves
+    !I am on a leaf, cycle on all the particles inside the leaf
+
+    do ip = 1,octree%leaves(lv)%p%npan
+      
+      vel = 0.0_wp
+      pos = octree%leaves(lv)%p%cell_pans(ip)%p%cen
+
+      !first apply the local multipole expansion
+      do m = 1,size(octree%leaves(lv)%p%mp%b,2)
+        !velocity
+        vel = vel + &
+          octree%leaves(lv)%p%mp%b(:,m)* &
+          product((pos-octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
+      enddo
+
+      !then interact with all the neighbouring cell particles
+      do k=-1,1; do j=-1,1; do i=-1,1
+        if(associated(octree%leaves(lv)%p%neighbours(i,j,k)%p)) then
+        if(octree%leaves(lv)%p%neighbours(i,j,k)%p%active) then
+          do ipp = 1,octree%leaves(lv)%p%neighbours(i,j,k)%p%npart
+
+            call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
+                 %compute_vel(pos, sim_param%u_inf, v)
+            vel = vel +v/(4.0_wp*pi)
+          enddo
+        endif
+        endif
+      enddo; enddo; enddo
+
+      !interact with the leaf neighbours
+      do iln = 1,size(octree%leaves(lv)%p%leaf_neigh)
+       do ipp = 1,octree%leaves(lv)%p%leaf_neigh(iln)%p%npart
+
+         call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
+              %compute_vel(pos, sim_param%u_inf, v)
+         vel = vel +v/(4.0_wp*pi)
+       enddo
+      enddo
+
+      !finally interact with the particles inside the cell 
+      do ipp = 1,octree%leaves(lv)%p%npart
+        call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_vel(pos, &
+                                                      sim_param%u_inf, v)
+        vel = vel +v/(4.0_wp*pi)
+      enddo
+
+      octree%leaves(lv)%p%cell_pans(ip)%p%uvort = &
+      octree%leaves(lv)%p%cell_pans(ip)%p%uvort + vel
+    enddo
+  enddo
+!Don't ask me why, but without this pragma it is much faster!
+!$omp end parallel do
+  t1 = dust_time()
+  write(msg,'(A,F9.3,A)') 'Calculated panels interactions in: ' , t1 - t0,' s.'
+  if(sim_param%debug_level.ge.5) call printout(msg)
+  
+end subroutine apply_multipole_panels
 !----------------------------------------------------------------------
 
 !! DISCONTINUED
@@ -1394,8 +1497,10 @@ recursive subroutine set_leaf(cell,leaves,il,pexp)
   !I is a leaf
   cell%leaf = .true.
 
+!$omp critical
   il = il+1
   leaves(il)%p => cell
+!$omp end critical
 
   if(.not. cell%active) then
     !If it was not active, set active and allocate data
@@ -1429,7 +1534,7 @@ recursive subroutine set_branch(cell,pexp)
     call cell%mp%reset
   endif
 
-  if(associated(cell%parent%p)) call set_branch(cell%parent%p, pexp)
+!  if(associated(cell%parent%p)) call set_branch(cell%parent%p, pexp)
 
 end subroutine set_branch
 
@@ -1535,49 +1640,193 @@ end subroutine push_cell_ptr_vec
 !----------------------------------------------------------------------
 
 !> Push another pointer to a list of particles pointers
-subroutine push_part_ptr_scalar(pointers, particle)
+subroutine push_part_ptr_scalar(pointers, particle, last_elem)
  type(t_vortpart_p), allocatable, target, intent(inout) :: pointers(:)
  type(t_vortpart), intent(in), target :: particle
+ integer, optional :: last_elem
 
  type(t_vortpart_p) :: tmp_ptr(size(pointers)+1)
- integer :: i, l
-
+ integer :: i, l, ife
+  
   l = size(pointers)
-  do i=1,l
-    tmp_ptr(i)%p => pointers(i)%p
-  enddo
-  deallocate(pointers); allocate(pointers(l+1))
-  do i=1,l
-    pointers(i)%p => tmp_ptr(i)%p
-  enddo
-  pointers(l+1)%p => particle
+  !Get first empty element: receive from 
+  if(.not.present(last_elem)) then
+    ife = 1
+    do i=1,l
+      if(.not.associated(pointers(i)%p)) exit
+      ife = ife + 1
+    enddo
+  else
+    ife = last_elem+1
+  endif
+
+  if (ife .gt. l .or. ife .le. 0) then !the array is full, allocate new block
+    do i=1,l
+      tmp_ptr(i)%p => pointers(i)%p
+    enddo
+    deallocate(pointers); allocate(pointers(l+allocation_block))
+    do i=1,l
+      pointers(i)%p => tmp_ptr(i)%p
+    enddo
+    pointers(l+1)%p => particle
+    do i=l+2,size(pointers)
+      nullify(pointers(i)%p)
+    enddo
+
+  else !insert the pointer in the first available empty space
+
+    pointers(ife)%p => particle
+
+  endif
 
 end subroutine push_part_ptr_scalar
 
 !----------------------------------------------------------------------
 
 !> Push another pointer list to a list of particle pointers
-subroutine push_part_ptr_vec(pointers, elements)
+subroutine push_part_ptr_vec(pointers, elements, last_elem)
  type(t_vortpart_p), allocatable, target, intent(inout) :: pointers(:)
  type(t_vortpart_p), target, intent(in) :: elements(:)
+ integer, optional :: last_elem
 
  type(t_vortpart_p) :: tmp_ptr(size(pointers)+1)
- integer :: i, l, m
+ integer :: i, l, m, ife, nblck
 
   l = size(pointers)
+  !Get first empty element: receive from 
+  if(.not.present(last_elem)) then
+    ife = 1
+    do i=1,l
+      if(.not.associated(pointers(i)%p)) exit
+      ife = ife + 1
+    enddo
+  else
+    ife = last_elem+1
+  endif
+
   m = size(elements)
-  do i=1,l
-    tmp_ptr(i)%p => pointers(i)%p
-  enddo
-  deallocate(pointers); allocate(pointers(l+m))
-  do i=1,l
-    pointers(i)%p => tmp_ptr(i)%p
-  enddo
-  do i = 1,m
-    pointers(l+i)%p => elements(i)%p
-  enddo
+
+  if (ife+m-1 .gt. l .or. ife .le. 0) then !the array is full, allocate new blocks
+    do i=1,ife-1
+      tmp_ptr(i)%p => pointers(i)%p
+    enddo
+    nblck = ceiling(real(m-(l-ife+1))/real(allocation_block))
+    deallocate(pointers); allocate(pointers(l+nblck*allocation_block))
+    if(ife .le. 0) ife = 1
+    do i=1,(ife-1)
+      pointers(i)%p => tmp_ptr(i)%p
+    enddo
+    do i = 1,m
+      pointers(ife-1+i)%p => elements(i)%p
+    enddo
+    do i = ife+m,size(pointers)
+      nullify(pointers(i)%p)
+    enddo
+
+  else !there is enough space just to fill the additional array
+
+    do i = 1,m
+      pointers(ife-1+i)%p => elements(i)%p
+    enddo
+
+  endif
 
 end subroutine push_part_ptr_vec
+
+!----------------------------------------------------------------------
+
+!> Push another pointer to a list of panels pointers
+subroutine push_pan_ptr_scalar(pointers, particle, last_elem)
+ type(t_pot_elem_p), allocatable, target, intent(inout) :: pointers(:)
+ class(c_pot_elem), intent(in), target :: particle
+ integer, intent(in), optional :: last_elem
+
+ type(t_pot_elem_p) :: tmp_ptr(size(pointers)+1)
+ integer :: i, l, ife
+
+  l = size(pointers)
+  !Get first empty element: receive from 
+  if(.not.present(last_elem)) then
+    ife = 1
+    do i=1,l
+      if(.not.associated(pointers(i)%p)) exit
+      ife = ife + 1
+    enddo
+  else
+    ife = last_elem+1
+  endif
+
+  if (ife .gt. l) then !the array is full, allocate new block
+    do i=1,l
+      tmp_ptr(i)%p => pointers(i)%p
+    enddo
+    deallocate(pointers); allocate(pointers(l+allocation_block))
+    do i=1,l
+      pointers(i)%p => tmp_ptr(i)%p
+    enddo
+    pointers(l+1)%p => particle
+    do i=l+2,size(pointers)
+      nullify(pointers(i)%p)
+    enddo
+
+  else !insert the pointer in the first available empty space
+
+    pointers(ife)%p => particle
+
+  endif
+
+end subroutine push_pan_ptr_scalar
+
+!----------------------------------------------------------------------
+
+!> Push another pointer list to a list of panels pointers
+subroutine push_pan_ptr_vec(pointers, elements, last_elem)
+ type(t_pot_elem_p), allocatable, target, intent(inout) :: pointers(:)
+ type(t_pot_elem_p), target, intent(in) :: elements(:)
+ integer, optional :: last_elem
+
+ type(t_pot_elem_p) :: tmp_ptr(size(pointers)+1)
+ integer :: i, l, m, ife, nblck
+
+  l = size(pointers)
+  !Get first empty element: receive from 
+  if(.not.present(last_elem)) then
+    ife = 1
+    do i=1,l
+      if(.not.associated(pointers(i)%p)) exit
+      ife = ife + 1
+    enddo
+  else
+    ife = last_elem+1
+  endif
+
+  m = size(elements)
+
+  if (ife+m-1 .gt. l) then !the array is full, allocate new blocks
+    do i=1,ife-1
+      tmp_ptr(i)%p => pointers(i)%p
+    enddo
+    nblck = ceiling(real(m-(l-ife+1))/real(allocation_block))
+    deallocate(pointers); allocate(pointers(l+nblck*allocation_block))
+    do i=1,(ife-1)
+      pointers(i)%p => tmp_ptr(i)%p
+    enddo
+    do i = 1,m
+      pointers(ife-1+i)%p => elements(i)%p
+    enddo
+    do i = ife+m,size(pointers)
+      nullify(pointers(i)%p)
+    enddo
+
+  else !there is enough space just to fill the additional array
+
+    do i = 1,m
+      pointers(ife-1+i)%p => elements(i)%p
+    enddo
+
+  endif
+
+end subroutine push_pan_ptr_vec
 
 !----------------------------------------------------------------------
 
@@ -1588,23 +1837,43 @@ end subroutine push_part_ptr_vec
 !! multipole data are allocated or not, will be set during sorting
 subroutine reset_cell(cell)
  type(t_cell), intent(inout) :: cell
+ integer :: i
 
- deallocate(cell%cell_parts)
- allocate(cell%cell_parts(0))
- cell%npart = 0
- deallocate(cell%cell_pans)
- allocate(cell%cell_pans(0))
- cell%npan = 0
- !cell%active = .true.
- cell%branch = .false.
- cell%leaf = .false.
- cell%near_wall = .false.
- cell%ave_vortmag = 0.0_wp
- deallocate(cell%leaf_neigh)
- allocate(cell%leaf_neigh(0))
+ !deallocate(cell%cell_parts)
+ !allocate(cell%cell_parts(0))
+ !cell%npart = 0
+ !deallocate(cell%cell_pans)
+ !allocate(cell%cell_pans(0))
+ !cell%npan = 0
+ !!cell%active = .true.
+ !cell%branch = .false.
+ !cell%leaf = .false.
+ !cell%near_wall = .false.
+ !cell%ave_vortmag = 0.0_wp
+ !deallocate(cell%leaf_neigh)
+ !allocate(cell%leaf_neigh(0))
+
+
+
+
+  do concurrent (i=1:cell%npart)
+    nullify(cell%cell_parts(i)%p) 
+  enddo
+  cell%npart = 0
+
+  do concurrent (i=1:cell%npan)
+    nullify(cell%cell_pans(i)%p) 
+  enddo
+  cell%npan = 0
+  !cell%active = .true.
+  cell%branch = .false.
+  cell%leaf = .false.
+  cell%near_wall = .false.
+  cell%ave_vortmag = 0.0_wp
+  deallocate(cell%leaf_neigh)
+  allocate(cell%leaf_neigh(0))
 
 end subroutine reset_cell
-
 !----------------------------------------------------------------------
 
 end module mod_octree
