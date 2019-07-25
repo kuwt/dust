@@ -163,7 +163,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
   !Allocate matrix and rhs for pressure integral equation
   allocate( linsys%idSurfPan(geo%nSurfPan) )
   linsys%idSurfPan    = geo%idSurfPan
-  allocate( linsys%idSurfPanG2L(geo%nSurfPan) )
+  allocate( linsys%idSurfPanG2L(geo%nelem_impl) )
   linsys%idSurfPanG2L = geo%idSurfPanG2L
   allocate( linsys%A_pres(geo%nSurfPan,geo%nSurfPan) )
   linsys%A_pres = 0.0_wp
