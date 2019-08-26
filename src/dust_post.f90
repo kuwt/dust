@@ -319,7 +319,7 @@ do ia = 1,n_analyses
   !Fork the different kind of analyses
   select case(trim(an_type))
 
-   !//////////////// Integral Loads  \\\\\\\\\\\\\\\\
+   !//////////////// Integral Loads  \\\\\\\\\\\\\\\\!
    case('integral_loads')
 
     ! look in mod_post_integral
@@ -327,35 +327,35 @@ do ia = 1,n_analyses
                         out_frmt , components_names , all_comp , &
                         an_start , an_end , an_step, average)
 
-   !//////////////////Visualizations\\\\\\\\\\\\\\\\\
+   !//////////////////Visualizations\\\\\\\\\\\\\\\\\!
    case('viz') 
 
     call post_viz( sbprms , basename , data_basename , an_name , ia , &
                    out_frmt , components_names , all_comp , &
                    an_start , an_end , an_step, average )
 
-   !//////////////////Domain probes \\\\\\\\\\\\\\\\\
+   !//////////////////Domain probes \\\\\\\\\\\\\\\\\!
    case('probes')
 
     call post_probes( sbprms , basename , data_basename , an_name , ia , &
                       out_frmt , components_names , all_comp , &
                       an_start , an_end , an_step )
 
-   !////////////////// Flow Field  \\\\\\\\\\\\\\\\\\
+   !////////////////// Flow Field  \\\\\\\\\\\\\\\\\\!
    case('flow_field')
 
     call post_flowfield ( sbprms , basename , data_basename , an_name , ia , &
                           out_frmt , components_names , all_comp , &
                           an_start , an_end , an_step, average)
 
-   !///////////////  Sectional Loads  \\\\\\\\\\\\\\\
+   !///////////////  Sectional Loads  \\\\\\\\\\\\\\\!
    case('sectional_loads')
     
     call post_sectional ( sbprms , bxprms , basename , data_basename , an_name , ia , &
                           out_frmt , components_names , all_comp , &
                           an_start , an_end , an_step, average )
 
-   !///////////////   Aeroacoustics   \\\\\\\\\\\\\\\
+   !///////////////   Aeroacoustics   \\\\\\\\\\\\\\\!
    case('aeroacoustics')
     
     call post_aeroacoustics ( sbprms, basename, data_basename, &
