@@ -1,0 +1,14 @@
+CompName = Wing1
+GeoFile = wing1.in
+RefTag = Wing1 
+
+CompName = Wing2
+GeoFile = wing2.in
+RefTag = Wing2
+
+CompName = Wing3
+GeoFile = wing3.in
+RefTag = Wing3
+
+FileName = geo_input.h5 
+
