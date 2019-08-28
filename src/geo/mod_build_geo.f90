@@ -418,8 +418,10 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
 
    case('parametric')
+
     mesh_file = geo_file
     if ( (ElType .eq. 'v') .or. (ElType .eq. 'p')  ) then
+
       ! TODO : actually it is possible to define the parameters in the GeoFile 
       !directly, find a good way to do this
       call read_mesh_parametric(trim(mesh_file),ee, rr, &
@@ -428,6 +430,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       nelems_span_tot =   nelems_span
 
     elseif(ElType .eq. 'l') then ! LIFTING LINE element
+
       call read_mesh_ll(trim(mesh_file),ee,rr, &
                         airfoil_list   , nelem_span_list   , &
                         i_airfoil_e    , normalised_coord_e, &
