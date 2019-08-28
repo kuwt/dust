@@ -608,22 +608,30 @@ do it = 1,nstep
                 geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g)
         call elems(i_el)%p%compute_dforce()
 
-    select type( el => elems(i_el)%p ) 
-      class is(t_vortlatt)
-        ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
-        call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/) )
-        ! compute dforce using AVL formula
-        call el%compute_dforce_jukowski()
-        ! update the pressure field, p = df.n / area
-        !el%pres = sum( el%dforce * el%nor ) / el%area
-        !ifort bug workaround
-        elems(i_el)%p%pres = sum( elems(i_el)%p%dforce * elems(i_el)%p%nor )&
-                             / elems(i_el)%p%area
-
-    end select
-     
   end do
 !$omp end parallel do
+
+  ! ifort bugs workaround:
+  ! since even if the following calls looks thread safe, they mess up with 
+  ! ifort and parallel runs, so the cycle is executed another time just for the
+  ! vortex lattices
+  if ( geo%nVortLatt .gt. 0) then
+    do i_el = 1 , sel
+      select type( el => elems(i_el)%p ) 
+        class is(t_vortlatt)
+          ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
+          call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/) )
+          ! compute dforce using AVL formula
+          call el%compute_dforce_jukowski()
+          ! update the pressure field, p = df.n / area
+          !el%pres = sum( el%dforce * el%nor ) / el%area
+          !ifort bug workaround
+          elems(i_el)%p%pres = sum( elems(i_el)%p%dforce * elems(i_el)%p%nor )&
+                               / elems(i_el)%p%area
+      end select
+    end do
+  endif
+     
   ! Explicit elements:
   ! - liftlin: _pres and _dforce computed in solve_liftin()
   ! - actdisk: avg delta_pressure and force computed here,

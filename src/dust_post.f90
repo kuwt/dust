@@ -319,6 +319,10 @@ do ia = 1,n_analyses
   !Fork the different kind of analyses
   select case( trim(an_type) )
 
+<<<<<<< HEAD
+=======
+   !//////////////// Integral Loads  \\\\\\\\\\\\\\\\!
+>>>>>>> 61e49193c0c44f0707146d44208abf222ab485dc
    case('integral_loads')
   ! if ( trim(an_type) .eq. 'integral_loads' ) then
    ! Integral Loads
@@ -328,31 +332,48 @@ do ia = 1,n_analyses
                         out_frmt , components_names , all_comp , &
                         an_start , an_end , an_step, average )
 
+<<<<<<< HEAD
    ! Visualizations
 ! elseif ( trim(an_type) .eq. 'viz' ) then
+=======
+   !//////////////////Visualizations\\\\\\\\\\\\\\\\\!
+>>>>>>> 61e49193c0c44f0707146d44208abf222ab485dc
    case('viz') 
 
     call post_viz( sbprms , basename , data_basename , an_name , ia , &
                    out_frmt , components_names , all_comp , &
                    an_start , an_end , an_step, average )
 
+<<<<<<< HEAD
    ! Domain probes
 ! elseif ( trim(an_type) .eq. 'probes' ) then
+=======
+   !//////////////////Domain probes \\\\\\\\\\\\\\\\\!
+>>>>>>> 61e49193c0c44f0707146d44208abf222ab485dc
    case('probes')
 
     call post_probes( sbprms , basename , data_basename , an_name , ia , &
                       out_frmt , components_names , all_comp , &
                       an_start , an_end , an_step )
 
+<<<<<<< HEAD
    ! Flow Field
     case('flow_field')
 ! elseif ( trim(an_type) .eq. 'flow_field' ) then
+=======
+   !////////////////// Flow Field  \\\\\\\\\\\\\\\\\\!
+   case('flow_field')
+>>>>>>> 61e49193c0c44f0707146d44208abf222ab485dc
 
     call post_flowfield ( sbprms , basename , data_basename , an_name , ia , &
                           out_frmt , components_names , all_comp , &
                           an_start , an_end , an_step, average)
 
+<<<<<<< HEAD
    ! Sectional Loads
+=======
+   !///////////////  Sectional Loads  \\\\\\\\\\\\\\\!
+>>>>>>> 61e49193c0c44f0707146d44208abf222ab485dc
    case('sectional_loads')
 ! elseif ( trim(an_type) .eq. 'sectional_loads' ) then
     
@@ -360,7 +381,11 @@ do ia = 1,n_analyses
                           out_frmt , components_names , all_comp , &
                           an_start , an_end , an_step, average )
 
+<<<<<<< HEAD
    ! Aeroacoustics
+=======
+   !///////////////   Aeroacoustics   \\\\\\\\\\\\\\\!
+>>>>>>> 61e49193c0c44f0707146d44208abf222ab485dc
    case('aeroacoustics')
 ! elseif ( trim(an_type) .eq. 'aeroacoustics' ) then
     
