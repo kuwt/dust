@@ -149,8 +149,10 @@ subroutine load_res(floc, comps, vort, press, t, surfvel)
  character(len=max_char_len) :: cname
  real(wp), allocatable :: vort_read(:)!, cp_read(:)
  real(wp), allocatable :: pres_read(:), dforce_read(:,:), surfvel_read(:,:)
+ real(wp), allocatable :: dmom_read(:,:)
  integer :: ncomps_sol
  logical :: got_surfvel
+ logical :: saved_dmom
 
  character(len=*), parameter :: this_sub_name = 'load_res'
   
@@ -189,8 +191,6 @@ subroutine load_res(floc, comps, vort, press, t, surfvel)
     call read_hdf5_al(pres_read,'Pres',gloc3)
     call read_hdf5_al(dforce_read,'dF',gloc3)
     if(got_surfvel) then
-      !DEBUG:
-      write(*,*) 'I got surfvel!'
       select type(el =>comps(icomp)%el)
        type is(t_surfpan)
         call read_hdf5_al(surfvel_read,'surf_vel',gloc3)
@@ -198,6 +198,10 @@ subroutine load_res(floc, comps, vort, press, t, surfvel)
         allocate(surfvel_read(3,nelems_comp))
         surfvel_read = 0.0_wp
       end select
+    endif
+    saved_dmom = check_dset_hdf5('dMom',gloc3)
+    if (saved_dmom) then
+      call read_hdf5_al(dmom_read,'dMom',gloc3)
     endif
 
     !check consistency of geometry and solution
@@ -218,6 +222,11 @@ subroutine load_res(floc, comps, vort, press, t, surfvel)
          type is(t_surfpan)
           el%surf_vel = surfvel_read(:,ie)
         end select
+      endif
+      if(saved_dmom) then
+        comps(icomp)%el(ie)%dmom = dmom_read(:,ie)
+      else
+        comps(icomp)%el(ie)%dmom = (/0.0_wp, 0.0_wp, 0.0_wp/)
       endif
     end do
 
@@ -252,6 +261,7 @@ subroutine load_res(floc, comps, vort, press, t, surfvel)
 
     deallocate(vort_read, pres_read, dforce_read)
     if(got_surfvel) deallocate(surfvel_read)
+    if(saved_dmom) deallocate(dmom_read)
 
 
   enddo
