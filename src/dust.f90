@@ -928,9 +928,11 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     endif
   else
     !get number of steps, compute dt
-    sim_param%n_timesteps = getint(prms, 'timesteps')+1
+    sim_param%n_timesteps = getint(prms, 'timesteps')
     sim_param%dt =  (sim_param%tend-sim_param%t0)/&
                      real(sim_param%n_timesteps,wp)
+    sim_param%n_timesteps = sim_param%n_timesteps + 1 
+                            !add one for the first step
   endif
   
 end subroutine init_sim_param
