@@ -1,0 +1,44 @@
+! Simulation names
+basename       = ./Output/test_static_base
+basename_debug =  ./Debug/test_static_base
+!basename       = ./Output/ref_static_base
+!basename_debug =  ./Debug/ref_static_base
+
+! geometry input -----------------
+GeometryFile = geo_input.h5
+ReferenceFile = References_static.in
+
+! Timings ---------------------
+tstart = 0.0
+tend = 5.0
+dt = 0.1
+dt_out = 0.5
+dt_debug_out = 0.5
+output_start = T
+debug_level= 5
+
+! restart -----------------------------
+restart_from_file = F
+
+! reference values ---------------------
+u_inf = (/2.0, 0.0, 0.0/)
+p_inf = 101325
+mu_inf = 1.81e-5
+
+! Model parameters -------------------
+FMM = F
+Vortstretch = F
+Diffusion = F
+PenetrationAvoidance = F
+
+! wake parameters  -------------
+n_wake_panels = 5
+RankineRad = 0.0001
+CutoffRad  = 0.000001
+rigid_wake = F
+
+! Particles ----------------------------------------
+VortexRad = 0.10
+n_wake_particles = 10000
+particles_box_min = (/ -1.0 , -10.0 , -10.0 /)
+particles_box_max = (/ 20.0 ,  10.0 ,  10.0 /)

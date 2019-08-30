@@ -1,0 +1,69 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Reference_Tag = Wing1
+Parent_Tag = 0
+Origin = (/0.0, 0.0, 0.0/)
+Orientation = (/1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0/)
+Multiple = F
+Moving = F
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Reference_Tag = Wing2
+Parent_Tag = 0
+Origin = (/0.5, 4.0, 0.5/)
+Orientation = (/1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0/)
+Multiple = F
+Moving = T
+Motion = {
+  Pole = {
+    Input = position
+    Input_Type = simple_function
+    Function = (/0 , 0 , 1/)
+    Amplitude = 1.0
+    Vector = (/ 0.0, 0.0, 0.5/)
+    Omega  = (/ 0.0, 0.0, 3.1416/)
+    Phase  = (/ 0.0, 0.0, 0.0/)
+    Offset = (/ 0.0, 0.0, 0.0/)
+  }
+  Rotation = {
+    Input = position
+    Input_Type = simple_function
+    Function = 0
+    Axis = (/0.0, 1.0, 0.0/)
+    Amplitude = 0.0
+    Omega = 0.0
+    Phase = 0.0
+    Offset = 0.0
+    Psi_0 = 0.0
+  }
+}
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Reference_Tag = Wing3
+Parent_Tag = 0
+Origin = (/0.5, -4.0, 0.5/)
+Orientation = (/1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0/)
+Multiple = F
+Moving = T
+Motion = {
+  Pole = {
+    Input = position
+    Input_Type = simple_function
+    Function = (/0 , 0 , 0/)
+    Amplitude = 1.0
+    Vector = (/ 0.5, -4.0, 0.5/)
+    Omega  = (/ 0.0,  0.0, 0.0/)
+    Phase  = (/ 0.0,  0.0, 0.0/)
+    Offset = (/ 0.0,  0.0, 0.0/)
+  }
+  Rotation = {
+    Input = position
+    Input_Type = simple_function
+    Function = 1
+    Axis = (/1.0, 0.0, 0.0/)
+    Amplitude = 0.1
+    Omega = 3.1416
+    Phase = 0.0
+    Offset = 0.0
+    Psi_0 = 0.0
+  }
+}

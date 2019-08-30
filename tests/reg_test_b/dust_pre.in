@@ -1,0 +1,10 @@
+CompName = rotor
+GeoFile = blade_ll.in
+RefTag = Hub01
+
+CompName = nacelle
+GeoFile = nacelle.in
+RefTag = nacelle
+
+FileName = ./geo_input.h5 
+
