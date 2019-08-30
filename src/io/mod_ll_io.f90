@@ -460,13 +460,13 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
         if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then    
           interp_weight = real(iSpan,wp) / real(nelem_span_list(iRegion),wp)
         else if ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then    
-          ! todo : fix it
-          ! interp_weight = cos( real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) )
-          ! 
+          interp_weight = 0.5_wp * ( &
+                        1.0_wp - cos( real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) )
         else if ( trim(type_span_list(iRegion)) .eq. 'cosineOB' ) then    
           interp_weight = sin( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
         else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then    
-          interp_weight = cos( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
+          interp_weight = 1.0_wp - cos( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
+          ! interp_weight = cos( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
         else
           write(*,*) ' mesh_file   : ' , trim(mesh_file)
           write(*,*) ' type_span_list(',iRegion,') : ' , trim(type_span_list(iRegion)) 
