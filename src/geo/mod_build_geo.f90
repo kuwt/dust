@@ -59,7 +59,7 @@ use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime, check_file_exists
 
 use mod_basic_io, only: &
-  read_mesh_basic, write_basic
+  read_real_array_from_file, read_mesh_basic, write_basic
 
 use mod_cgns_io, only: &
   read_mesh_cgns
@@ -69,6 +69,9 @@ use mod_parametric_io, only: &
 
 use mod_pointwise_io, only: &
   read_mesh_pointwise , read_mesh_pointwise_ll
+
+use mod_stringtools, only : &
+  isempty
 
 use mod_ll_io, only: &
   read_mesh_ll
@@ -172,7 +175,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  integer , allocatable                    :: nelem_span_list(:)
  integer , allocatable                    :: i_airfoil_e(:,:)
  real(wp), allocatable                    :: normalised_coord_e(:,:)
- real(wp) :: trac, radius
+ real(wp) :: trac, radius, length
 
  ! Section names for CGNS
  integer :: nSections, iSection
@@ -263,7 +266,19 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
          'Offset the points coordinates (before scaling)','(/0.0, 0.0, 0.0/)')
   call geo_prs%CreateRealOption('ScalingFactor', &
                                 'Scaling of the points coordinates.', '1.0')
-  
+
+  ! Body of revolution
+  call geo_prs%CreateRealOption('Length',&
+         'Length of the non-lifting body measured from nose to nose','1.0')
+  call geo_prs%CreateRealOption('Radius', &
+         'Radius of the non-lifting body section.', '1.0')
+  call geo_prs%CreateRealOption('NoseRadius', &
+         'Radius of the non-lifting body nose.', '1.0')
+  call geo_prs%CreateIntOption('Nelem_long', &
+         'Number of elements along the length of the non-lifting body.', '10')
+  call geo_prs%CreateIntOption('Nelem_rev', &
+         'Number of elements around the non-lifting body circumference.', '10')
+
   !read the parameters
   call check_file_exists(geo_file,this_sub_name,this_mod_name)
   call geo_prs%read_options(geo_file,printout_val=.false.)
@@ -416,6 +431,54 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       rr = rr * scaling
     endif
 
+   case('revolution')
+
+      ! Optional mesh file type
+      mesh_file = getstr(geo_prs,'MeshFile')
+
+      if ( isempty ( mesh_file ) ) then
+
+        ! size of the body of revolution
+        length = getreal(geo_prs, 'Length');
+        radius = getreal(geo_prs, 'Radius');
+        trac   = getreal(geo_prs, 'NoseRadius');
+        nelems_span = getint (geo_prs, 'Nelem_long');
+
+        ! Generate 2D mesh
+        allocate ( rr_te(nelems_span+1,2)  )
+        call cigar2D(length,radius,trac,nSections,rr_te(:,1),rr_te(:,2))
+
+      else
+
+        call read_real_array_from_file ( 2, mesh_file, rr_te )
+        nelems_span = size(rr_te)-1
+
+      endif
+
+      ! discretization of the body of revolution
+      nSections = getint (geo_prs, 'Nelem_rev');
+
+      ! 3D section
+      allocate ( rr (3,nSections*(nelems_span-1)+2), &
+                 ee (4,nSections*nelems_span) )
+
+      call meshbyrev ( rr_te(:,1),rr_te(:,2), nSections, rr, ee )
+
+      deallocate ( rr_te )
+
+      ! scale 
+      offset   = getrealarray(geo_prs, 'Offset',3)
+      scaling  = getreal(geo_prs, 'ScalingFactor')
+
+      if (any(offset .ne. 0.0_wp)) then
+        do i = 1,size(rr,2)
+          rr(:,i) = rr(:,i) + offset
+        enddo
+      endif 
+
+      if (scaling .ne. 1.0_wp) then
+        rr = rr * scaling
+      endif
 
    case('parametric')
 
@@ -527,7 +590,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   ! ==== SYMMETRY ==== only half of the component has been defined 
   if ( mesh_symmetry ) then
     select case (trim(mesh_file_type))
-      case('cgns', 'basic' )  ! TODO: check basic
+      case('cgns', 'basic', 'revolution' )  ! TODO: check basic
         call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
       case('parametric','pointwise')
 !! !    if ( ElType .ne. 'l' ) then
@@ -549,7 +612,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       case default
        call error(this_sub_name, this_mod_name,&
              'Symmetry routines implemented for MeshFileType = &
-             & "cgns", "pointwise", "parametric", "basic".'//nl// &
+             & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
              'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
     end select
   end if
@@ -566,7 +629,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   if ( mesh_mirror ) then
 
     select case (trim(mesh_file_type))
-      case('cgns', 'basic' )  ! TODO: check basic
+      case('cgns', 'basic', 'revolution' )  ! TODO: check basic
         call mirror_mesh(ee, rr, mirror_point, mirror_normal)
       case('parametric','pointwise')
         call mirror_mesh_structured(ee, rr,  &
@@ -576,7 +639,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       case default
         call error(this_sub_name, this_mod_name,&
              'Mirror routines implemented for MeshFileType = &
-             & "cgns", "pointwise", "parametric", "basic".'//nl// &
+             & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
              'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
     end select
 
@@ -594,7 +657,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   !  -> create_local_velocity_stencil ( 3dP )  ||     is defined
   !  -> create_strip_connecivity      ( vr )   ||
   selectcase(trim(mesh_file_type))
-    case( 'basic' )
+    case( 'basic', 'revolution' )
 
 ! TODO: add WARNING and CHECK conventions if ElType = 'v'
 
@@ -1939,5 +2002,163 @@ subroutine mirror_update_ll_lists ( nelem_span_list , &
 end subroutine mirror_update_ll_lists 
 
 !----------------------------------------------------------------------
+
+!> [X,Y] = cigar2D(L,R,RN,N)
+!!
+!! Generate the 2D curve describing half of the boom geometry. The boom is
+!! composed of three parts a left nose, a central straight section and a
+!! right nose. The geometry is symmetric and the nose is described by a NACA
+!! 4-digit equation taken from the leading edge to the maximum thickness
+!! coordinate (~30! of the chord).
+!!
+!!      left          straight        right
+!!      nose          section          nose
+!!
+!!   |---RN---|----------L----------|---RN---|
+!!
+!! The overall length is 2*RN + L, and the thickness to chord ratio of the
+!! corresponding NACA for digit airfoil is given by 2*st*R/RN. With st 
+!! roughly equal to 0.3.
+!!
+!! Inputs
+!!  L    length of the central straight section 
+!!  R    radius of the cross section of the boom
+!!  RN   length of the nose fairing
+!!
+!! Outputs
+!! X    longitudinal coordinates of the boom geometry
+!! Y    transversal coordinates of the boom geometry
+
+subroutine cigar2D(L,R,RN,n,x,y)
+
+  real(wp),               intent(in)  :: L, R, RN
+  integer,                intent(in)  :: n
+  real(wp), dimension(:), intent(out) :: x, y
+
+  real(wp) :: tc, lhalf, cc, dphi, phi, s
+  integer  :: i
+
+  real(wp), parameter :: st = 0.29983, &
+                         pi = acos(-1.0_wp)
+
+  tc    = 2.0_wp*R/RN*st
+  cc    = 2.0_wp*R/tc
+  lhalf = ( st*cc + 0.5_wp*L )
+
+  dphi = pi/real(n,wp)
+
+  do i = 1,(n+1)
+    phi = dphi*real(i-1,wp)
+
+    x(i) = lhalf*cos(phi)
+
+    s = ( lhalf-abs(x(i)) ) / cc
+    
+    if ( (s-st) .lt. 0.0_wp ) then
+      y(i)= cc * 5.0_wp*tc*( 0.2969_wp*sqrt(s)-0.1260_wp*s  &
+          -0.3516_wp*s**2 + 0.2843_wp*s**3 -0.1015_wp*s**4 )
+    else
+      y(i) = R
+    endif
+  enddo
+  
+end subroutine cigar2D
+
+!----------------------------------------------------------------------
+
+!> [RR,EE] = meshbyrev ( X, Y, NPHI )
+!!
+!! Generate a mesh by revolution around the x-axis of the input curve, 
+!! expressed by the input coordinates Y and Y. 
+!!
+!! Inputs
+!! X    longitudinal coordinates of the generating curve
+!! Y    transversal coordinates of the generating curve, the first and the
+!!      last point must be zero
+!! NPHI number of points in the angular direction
+!!
+!! Outputs
+!! RR   coordinates of the mesh nodes, size (3,nphi*nc+2)
+!! EE   element to node connectivity, size (4,nphi*(n-1))
+
+subroutine meshbyrev ( x, y, nphi, rr, ee )
+
+  real(wp), dimension(:),   intent(in)  :: x, y
+  integer,                  intent(in)  :: nphi
+  real(wp), dimension(:,:), intent(out) :: rr
+  integer,  dimension(:,:), intent(out) :: ee
+
+  real(wp) :: dphi, phi
+  integer  :: i, ip, j, e, n, nc
+
+  real(wp), parameter :: pi = acos(-1.0_wp)
+  character(len=*), parameter :: this_sub_name = 'meshbyrev'
+
+  n    = size(x)
+  nc   = n-2
+  dphi = 2.0*pi/nphi
+
+  if ( any( y .lt. -1e-16 ) ) then
+      call error(this_sub_name, this_mod_name, &
+        'invalid mesh, input curve has negative points')
+  endif
+
+  ! Generation of the nodes
+
+  e = 1
+  do i = 1,nphi
+    phi = dphi*(i-1)
+    do j = 2,nc+1
+      e = e + 1
+      rr(1,e) = x(j)
+      rr(2,e) = y(j)*sin(phi)
+      rr(3,e) = y(j)*cos(phi)
+    enddo
+  enddo
+  rr(1,1)          = x(1)
+  rr(1,size(rr,2)) = x(n)
+
+  if ( y(1) .gt. 1.0e-16 .or. y(n) .gt. 1.0e-16 ) then
+      call warning(this_sub_name, this_mod_name, &
+         'closing input curve, check the extrema')
+
+      rr(2,1)          = 0.0_wp
+      rr(2,size(rr,2)) = 0.0_wp
+      rr(3,1)          = 0.0_wp
+      rr(3,size(rr,2)) = 0.0_wp
+  endif
+
+
+  ! generation of the elements
+
+  e = 0
+  do i = 1,nphi
+  
+    ip = i+1
+    if ( ip > nphi ) ip = 1
+
+    ! left triangular elements
+    e = e+1
+    ee(2,e) = 1
+    ee(1,e) = 2 + nc*(i-1)
+    ee(3,e) = 2 + nc*(ip-1)
+
+    ! center of the body quadragles
+    do j = 1,nc-1
+      e = e+1
+      ee(2,e) = 1 + nc*(i-1)  + j
+      ee(1,e) = 2 + nc*(i-1)  + j
+      ee(4,e) = 2 + nc*(ip-1) + j
+      ee(3,e) = 1 + nc*(ip-1) + j
+    enddo
+
+    ! right triangular elements
+    e = e+1
+    ee(2,e) = 1 + nc*i
+    ee(1,e) = size(rr,2)
+    ee(3,e) = 1 + nc*ip
+  enddo
+
+end subroutine meshbyrev
 
 end module mod_build_geo
