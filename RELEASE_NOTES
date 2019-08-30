@@ -1,3 +1,9 @@
+0.5.11-b
+* Added angle interpolation option in parametric
+* Added the possibility to specify timesteps instead of dt
+* Added rudimentary regression tests
+* Fixed some bugs
+
 0.5.10-b
 
 * Enabled the use of single precision in all the code

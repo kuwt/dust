@@ -65,7 +65,7 @@ private
 ! Version handling
 
 character(len=*), parameter :: git_sha1="@GIT_SHA1@"
-character(len=*), parameter :: version ='0.5.10-b-development'
+character(len=*), parameter :: version ='0.5.11-b-development'
 
 !----------------------------------------------------------------------
 
