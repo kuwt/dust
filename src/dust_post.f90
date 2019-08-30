@@ -317,53 +317,55 @@ do ia = 1,n_analyses
   endif
 
   !Fork the different kind of analyses
-  select case(trim(an_type))
+  select case( trim(an_type) )
 
-   !//////////////// Integral Loads  \\\\\\\\\\\\\\\\
+   ! Integral Loads
    case('integral_loads')
+  ! if ( trim(an_type) .eq. 'integral_loads' ) then
 
     ! look in mod_post_integral
     call post_integral( sbprms , basename , data_basename , an_name , ia , &
                         out_frmt , components_names , all_comp , &
-                        an_start , an_end , an_step, average)
+                        an_start , an_end , an_step, average )
 
-   !//////////////////Visualizations\\\\\\\\\\\\\\\\\
+   ! Visualizations
    case('viz') 
 
     call post_viz( sbprms , basename , data_basename , an_name , ia , &
                    out_frmt , components_names , all_comp , &
                    an_start , an_end , an_step, average )
 
-   !//////////////////Domain probes \\\\\\\\\\\\\\\\\
+   ! Domain probes
    case('probes')
 
     call post_probes( sbprms , basename , data_basename , an_name , ia , &
                       out_frmt , components_names , all_comp , &
                       an_start , an_end , an_step )
 
-   !////////////////// Flow Field  \\\\\\\\\\\\\\\\\\
+   ! Flow Field
    case('flow_field')
 
     call post_flowfield ( sbprms , basename , data_basename , an_name , ia , &
                           out_frmt , components_names , all_comp , &
                           an_start , an_end , an_step, average)
 
-   !///////////////  Sectional Loads  \\\\\\\\\\\\\\\
+   ! Sectional Loads
    case('sectional_loads')
     
     call post_sectional ( sbprms , bxprms , basename , data_basename , an_name , ia , &
                           out_frmt , components_names , all_comp , &
                           an_start , an_end , an_step, average )
 
-   !///////////////   Aeroacoustics   \\\\\\\\\\\\\\\
+   ! Aeroacoustics
    case('aeroacoustics')
     
     call post_aeroacoustics ( sbprms, basename, data_basename, &
                               an_name, ia, out_frmt, components_names, &
                               all_comp, an_start, an_end, an_step, average )
    case default
+! else
     call error('dust_post','','Unknown type of analysis: '//trim(an_type))
-
+! end if
   end select
   
   if(allocated(var_names)) deallocate(var_names)

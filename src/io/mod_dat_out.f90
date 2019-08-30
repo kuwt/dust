@@ -79,18 +79,20 @@ subroutine dat_out_loads_header ( fid , comps_meas , ref_sys , average)
  n_comps = size(comps_meas)
 
  write(istr,'(I0)') n_comps 
- write(fid,*) '# comments ... n.components: ' , trim(istr)
- write(fid,*) '# comments ... ref.sys     : ' , trim(ref_sys)
+ write(fid,*) '# Integral loads: N.components: ' , trim(istr)
+ write(fid,*) '#                 Ref.sys     : ' , trim(ref_sys)
  ! three-dimensional space
+ write(fid,'(A)',advance='no') ' #                 Components  : '
  do ic = 1 , n_comps - 1
    write(fid,'(A)',advance='no') trim(comps_meas(ic))//' , '
  end do
  write(fid,'(A)') trim(comps_meas(n_comps))
  if (.not. average)  then
-   write(fid,*) '#  t  Fx  Fy  Fz  Mx  My  Mz  ' 
+   write(fid,*) '#  t , Fx , Fy , Fz , Mx , My , Mz , ref_mat(9) , ref_off(3) ' 
  else
-   write(fid,*) '# Fx_average  Fy_average  Fz_average &
-                    & Mx_average  My_average  Mz_average ' 
+   write(fid,*) '# Fx_average , Fy_average , Fz_average ,&
+                 & Mx_average , My_average , Mz_average ,&
+                 & ref_mat(9) , ref_off(3) ' 
  endif
    
 
@@ -143,7 +145,7 @@ subroutine dat_out_probes_header ( fid , rr_probes , vars_str )
             & size(rr_probes,1) .ne. 3. Stop ')
   end if
  
-  write(fid,*) '# comments ...' , n_probes
+  write(fid,*) '# N. of point probes:' , n_probes
   ! three-dimensional space
   do ic = 1 , 3
     write(nnum,'(I0)') size(rr_probes,2)

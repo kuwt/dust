@@ -223,6 +223,7 @@ endif
 call prms%CreateRealOption( 'tstart', "Starting time")
 call prms%CreateRealOption( 'tend',   "Ending time")
 call prms%CreateRealOption( 'dt',     "time step")
+call prms%CreateIntOption ( 'timesteps', "number of timesteps")
 call prms%CreateRealOption( 'dt_out', "output time interval")
 call prms%CreateRealOption( 'dt_debug_out', "debug output time interval")
 
@@ -406,9 +407,10 @@ endif
     call check_basename(trim(basename_debug),'dust main')
 
 !---- Simulation parameters ----
-nstep = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1 
-       !(+1 for the zero time step)
-sim_param%n_timesteps = nstep
+!!nstep = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1 
+!!       !(+1 for the zero time step)
+!!sim_param%n_timesteps = nstep
+nstep = sim_param%n_timesteps
 allocate(sim_param%time_vec(sim_param%n_timesteps))
 sim_param%time_vec = (/ ( sim_param%t0 + &
          real(i-1,wp)*sim_param%dt, i=1,sim_param%n_timesteps ) /)
@@ -608,22 +610,30 @@ do it = 1,nstep
                 geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g)
         call elems(i_el)%p%compute_dforce()
 
-    select type( el => elems(i_el)%p ) 
-      class is(t_vortlatt)
-        ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
-        call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/) )
-        ! compute dforce using AVL formula
-        call el%compute_dforce_jukowski()
-        ! update the pressure field, p = df.n / area
-        !el%pres = sum( el%dforce * el%nor ) / el%area
-        !ifort bug workaround
-        elems(i_el)%p%pres = sum( elems(i_el)%p%dforce * elems(i_el)%p%nor )&
-                             / elems(i_el)%p%area
-
-    end select
-     
   end do
 !$omp end parallel do
+
+  ! ifort bugs workaround:
+  ! since even if the following calls looks thread safe, they mess up with 
+  ! ifort and parallel runs, so the cycle is executed another time just for the
+  ! vortex lattices
+  if ( geo%nVortLatt .gt. 0) then
+    do i_el = 1 , sel
+      select type( el => elems(i_el)%p ) 
+        class is(t_vortlatt)
+          ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
+          call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/) )
+          ! compute dforce using AVL formula
+          call el%compute_dforce_jukowski()
+          ! update the pressure field, p = df.n / area
+          !el%pres = sum( el%dforce * el%nor ) / el%area
+          !ifort bug workaround
+          elems(i_el)%p%pres = sum( elems(i_el)%p%dforce * elems(i_el)%p%nor )&
+                               / elems(i_el)%p%area
+      end select
+    end do
+  endif
+     
   ! Explicit elements:
   ! - liftlin: _pres and _dforce computed in solve_liftin()
   ! - actdisk: avg delta_pressure and force computed here,
@@ -767,10 +777,10 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   !timing
   sim_param%t0     = getreal(prms, 'tstart')
   sim_param%tend   = getreal(prms, 'tend')
-  sim_param%dt     = getreal(prms, 'dt')
   sim_param%dt_out = getreal(prms,'dt_out')
   sim_param%debug_level = getint(prms, 'debug_level')
   sim_param%output_detailed_geo = getlogical(prms, 'output_detailed_geo')
+
   !Reference values
   sim_param%P_inf = getreal(prms,'P_inf')
   sim_param%rho_inf  = getreal(prms,'rho_inf')
@@ -900,7 +910,29 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     endif
     if(.not. sim_param%reset_time) call load_time(sim_param%restart_file, sim_param%t0)
   
-  
+  endif
+
+
+  !Check the number of timesteps
+  if(CountOption(prms,'dt') .gt. 0) then
+    if( CountOption(prms,'timesteps') .gt. 0) then
+      !error
+      call error('init_sim_param','dust','Both number of timesteps and dt are&
+      & set, but only one of the two can be specified')
+    else
+      !get dt and compute number of timesteps
+      sim_param%dt     = getreal(prms, 'dt')
+      sim_param%n_timesteps = ceiling((sim_param%tend-sim_param%t0)/&
+                                       sim_param%dt) + 1 
+       !(+1 for the zero time step)
+    endif
+  else
+    !get number of steps, compute dt
+    sim_param%n_timesteps = getint(prms, 'timesteps')
+    sim_param%dt =  (sim_param%tend-sim_param%t0)/&
+                     real(sim_param%n_timesteps,wp)
+    sim_param%n_timesteps = sim_param%n_timesteps + 1 
+                            !add one for the first step
   endif
   
 end subroutine init_sim_param

@@ -206,7 +206,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
     probe_vel = .true. ; probe_p = .true. ; probe_vort = .true.
   else
    do i_var = 1 , n_vars
-    var_name = getstr(sbprms,'Variable')
+    var_name = getstr(sbprms,'Variable') ; call LowCase(var_name)
     select case(trim(var_name))
      case ( 'velocity' ) ; probe_vel = .true.
      case ( 'pressure' ) ; probe_p   = .true.
