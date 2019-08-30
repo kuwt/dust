@@ -32,10 +32,10 @@ sol_dsets = ['/ParticleWake/WakePoints', '/ParticleWake/WakeVort',
       '/Components/Comp001/Solution/Vort', '/Components/Comp001/Solution/Pres',
       '/Components/Comp002/Solution/Vort', '/Components/Comp002/Solution/Pres',
       '/Components/Comp003/Solution/Vort', '/Components/Comp003/Solution/Pres']
-sol_descr = ['Particles position', 'Particles Intensity', 
-             'Component 1 Intensity', 'Component 1 Pressure',
-             'Component 2 Intensity', 'Component 2 Pressure',
-             'Component 3 Intensity', 'Component 3 Pressure']
+sol_descr = ['Particles position   ', 'Particles Intensity  ', 
+             'Component 1 Intensity', 'Component 1 Pressure ',
+             'Component 2 Intensity', 'Component 2 Pressure ',
+             'Component 3 Intensity', 'Component 3 Pressure ']
 errors = np.zeros([len(runs),len(sol_dsets)])
 for i, run in enumerate(runs):
   solv_ret = sbprc.call([solver,run])
@@ -65,11 +65,11 @@ for file in files:
 os.remove('geo_input.h5')
 
 #print the errors:
-print('Errors:')
+print('Difference w.r.t. reference:')
 for i, run in enumerate(descr):
   print('In run ',run,':')
   for j, dset in enumerate(sol_descr):
-    print('Error on ',dset,': ',errors[i,j])
+    print('Difference on ',dset,': ',errors[i,j])
 
 
 #whatever happened, get back to the previous folder
