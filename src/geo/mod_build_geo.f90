@@ -446,12 +446,12 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
         ! Generate 2D mesh
         allocate ( rr_te(nelems_span+1,2)  )
-        call cigar2D(length,radius,trac,nSections,rr_te(:,1),rr_te(:,2))
+        call cigar2D(length,radius,trac,nelems_span,rr_te(:,1),rr_te(:,2))
 
       else
 
         call read_real_array_from_file ( 2, mesh_file, rr_te )
-        nelems_span = size(rr_te)-1
+        nelems_span = size(rr_te,1)-1
 
       endif
 
@@ -2044,7 +2044,6 @@ subroutine cigar2D(L,R,RN,n,x,y)
   tc    = 2.0_wp*R/RN*st
   cc    = 2.0_wp*R/tc
   lhalf = ( st*cc + 0.5_wp*L )
-
   dphi = pi/real(n,wp)
 
   do i = 1,(n+1)
