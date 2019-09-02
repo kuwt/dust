@@ -433,10 +433,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
    case('revolution')
 
-      ! Optional mesh file type
-      mesh_file = getstr(geo_prs,'MeshFile')
 
-      if ( isempty ( mesh_file ) ) then
+      if ( countoption(geo_prs,'MeshFile') .lt. 1 ) then
 
         ! size of the body of revolution
         length = getreal(geo_prs, 'Length');
@@ -450,6 +448,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
       else
 
+        mesh_file = getstr(geo_prs,'MeshFile')
         call read_real_array_from_file ( 2, mesh_file, rr_te )
         nelems_span = size(rr_te,1)-1
 
