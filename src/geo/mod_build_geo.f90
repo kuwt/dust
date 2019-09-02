@@ -268,8 +268,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                                 'Scaling of the points coordinates.', '1.0')
 
   ! Body of revolution
-  call geo_prs%CreateStringOption('Rev_2DMeshFile', &
-         'File describing the 2D curve of a body of revolution','')
   call geo_prs%CreateRealOption('Rev_Length',&
          'Length of the body of revolution measured from nose to nose','1.0')
   call geo_prs%CreateRealOption('Rev_Radius', &
@@ -435,10 +433,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
    case('revolution')
 
-      ! Optional mesh file type
-      mesh_file = getstr(geo_prs,'Rev_2DMeshFile')
-
-      if ( isempty ( mesh_file ) ) then
+      if ( countoption(geo_prs,'MeshFile') .lt. 1 ) then
 
         ! size of the body of revolution
         trac   = getreal(geo_prs, 'Rev_Nose_Radius');
@@ -472,6 +467,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
       else
 
+        mesh_file = getstr(geo_prs,'MeshFile')
         call read_real_array_from_file ( 2, mesh_file, rr_te )
         nelems_span = size(rr_te,1)-1
 
