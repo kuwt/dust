@@ -268,16 +268,18 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                                 'Scaling of the points coordinates.', '1.0')
 
   ! Body of revolution
-  call geo_prs%CreateRealOption('Length',&
-         'Length of the non-lifting body measured from nose to nose','1.0')
-  call geo_prs%CreateRealOption('Radius', &
-         'Radius of the non-lifting body section.', '1.0')
-  call geo_prs%CreateRealOption('NoseRadius', &
-         'Radius of the non-lifting body nose.', '1.0')
-  call geo_prs%CreateIntOption('Nelem_long', &
-         'Number of elements along the length of the non-lifting body.', '10')
-  call geo_prs%CreateIntOption('Nelem_rev', &
-         'Number of elements around the non-lifting body circumference.', '10')
+  call geo_prs%CreateStringOption('Rev_2DMeshFile', &
+         'File describing the 2D curve of a body of revolution','')
+  call geo_prs%CreateRealOption('Rev_Length',&
+         'Length of the body of revolution measured from nose to nose','1.0')
+  call geo_prs%CreateRealOption('Rev_Radius', &
+         'Radius of the body of revolution section.', '1.0')
+  call geo_prs%CreateRealOption('Rev_Nose_Radius', &
+         'Radius of the body of revolution nose.', '1.0')
+  call geo_prs%CreateIntOption('Rev_Nelem_long', &
+         'Number of elements along the length of the body revolution.', '10')
+  call geo_prs%CreateIntOption('Rev_Nelem_rev', &
+         'Number of elements around the body of revolution circumference.', '10')
 
   !read the parameters
   call check_file_exists(geo_file,this_sub_name,this_mod_name)
@@ -434,15 +436,35 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
    case('revolution')
 
       ! Optional mesh file type
-      mesh_file = getstr(geo_prs,'MeshFile')
+      mesh_file = getstr(geo_prs,'Rev_2DMeshFile')
 
       if ( isempty ( mesh_file ) ) then
 
         ! size of the body of revolution
-        length = getreal(geo_prs, 'Length');
-        radius = getreal(geo_prs, 'Radius');
-        trac   = getreal(geo_prs, 'NoseRadius');
-        nelems_span = getint (geo_prs, 'Nelem_long');
+        trac   = getreal(geo_prs, 'Rev_Nose_Radius');
+        length = getreal(geo_prs, 'Rev_Length') - 2.0_wp*trac;
+        radius = getreal(geo_prs, 'Rev_Radius');
+        nelems_span = getint (geo_prs, 'Rev_Nelem_long');
+
+        if ( trac <= 0.0_wp ) then
+          call error(this_sub_name, this_mod_name,  &
+            'Input Rev_Nose_Radius lower than zero.')
+        endif
+
+        if ( radius <= 0.0_wp ) then
+          call error(this_sub_name, this_mod_name,  &
+            'Input Rev_Radius lower than zero.')
+        endif
+
+        if ( length <= 0.0_wp ) then
+          call error(this_sub_name, this_mod_name,  &
+            'Input Rev_Length is lower than 2*Rev_Nose_Radius.')
+        endif
+
+        if ( nelems_span < 1 ) then
+          call error(this_sub_name, this_mod_name,  &
+            'Input Rev_Nelem_long is lower than zero.')
+        endif
 
         ! Generate 2D mesh
         allocate ( rr_te(nelems_span+1,2)  )
@@ -456,7 +478,12 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       endif
 
       ! discretization of the body of revolution
-      nSections = getint (geo_prs, 'Nelem_rev');
+      nSections = getint (geo_prs, 'Rev_Nelem_rev');
+
+      if ( nSections < 1 ) then
+        call error(this_sub_name, this_mod_name,  &
+          'Input Rev_Nelem_rev is lower than zero.')
+      endif
 
       ! 3D section
       allocate ( rr (3,nSections*(nelems_span-1)+2), &
@@ -2022,12 +2049,12 @@ end subroutine mirror_update_ll_lists
 !!
 !! Inputs
 !!  L    length of the central straight section 
-!!  R    radius of the cross section of the boom
+!!  R    radius of the cross section of the body of revolution
 !!  RN   length of the nose fairing
 !!
 !! Outputs
-!! X    longitudinal coordinates of the boom geometry
-!! Y    transversal coordinates of the boom geometry
+!! X    longitudinal coordinates of the body of revolution geometry
+!! Y    transversal coordinates of the body of revolution  geometry
 
 subroutine cigar2D(L,R,RN,n,x,y)
 
