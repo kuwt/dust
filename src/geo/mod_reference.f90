@@ -1363,6 +1363,9 @@ subroutine build_references(refs, reference_file)
     
   enddo
 
+  ! check reference frame input
+  call check_references(refs)
+
   !transverse the tree to set which things are moving and which are not
   call set_movement(refs, 0, .false.)
 
@@ -1406,14 +1409,101 @@ end subroutine set_movement
 subroutine check_references(refs)
  type(t_ref), intent(inout) :: refs(0:)
 
- !TODO:TODO:TODO:
- !TODO:TODO:TODO:
- !TODO:TODO:TODO:
- !check that the orientation is orthogonal
+ real(wp) :: rot(3,3)
+ integer :: i_ref , n_refs
 
- !chech that the orientation is unitarian, otherwise normalize
+ real(wp) :: det
+ real(wp) :: eps = 1.0e-6_wp
+ character(len=max_char_len) :: msg
 
- !chech that the rotation axis is unitarian, otherwise normalize
+ character(len=*), parameter :: this_sub_name = 'check_references'
+
+
+ n_refs = ubound(refs,1)
+
+ do i_ref = 0 , n_refs
+
+   ! Orientation matrix
+   rot = refs(i_ref)%frame
+
+   ! === check that the orientation is orthogonal ===
+   
+   !> Unitary determinant
+   det = rot(1,1)*rot(2,2)*rot(3,3) &
+       + rot(1,2)*rot(2,3)*rot(3,1) &
+       + rot(1,3)*rot(2,1)*rot(3,2) &
+       - rot(1,1)*rot(2,3)*rot(3,2) &
+       - rot(1,2)*rot(2,1)*rot(3,3) &
+       - rot(1,3)*rot(2,2)*rot(3,1)
+   !> Orthogonal columns
+   if ( abs( det - 1.0_wp ) .gt. eps ) then
+     write(msg,'(F12.6)') det
+     call error(this_sub_name, this_mod_name, 'Input Orientation matrix &
+                   &of reference frame'//trim(refs(i_ref)%tag)//' has determinant &
+                   &equal to det = '//trim(msg)//' instead of (approximately) 1.0')
+   end if
+
+   !> Orthogonal columns
+   if ( abs( sum( rot(:,1)* rot(:,2) ) ) .gt. eps ) then
+     write(msg,'(F12.6)') sum( rot(:,1)* rot(:,2) )
+     call error(this_sub_name, this_mod_name, 'Input Orientation matrix &
+                   &of reference frame'//trim(refs(i_ref)%tag)//' is not &
+                   &orthogonal: sum( rot(:,1) * rot(:,2) ) = '//trim(msg))
+   end if
+
+   if ( abs( sum( rot(:,1)* rot(:,3) ) ) .gt. eps ) then
+     write(msg,'(F12.6)') sum( rot(:,1)* rot(:,3) )
+     call error(this_sub_name, this_mod_name, 'Input Orientation matrix &
+                   &of reference frame'//trim(refs(i_ref)%tag)//' is not &
+                   &orthogonal: sum( rot(:,1) * rot(:,3) ) = '//trim(msg))
+   end if
+
+   if ( abs( sum( rot(:,2)* rot(:,3) ) ) .gt. eps ) then
+     write(msg,'(F12.6)') sum( rot(:,2)* rot(:,3) )
+     call error(this_sub_name, this_mod_name, 'Input Orientation matrix &
+                   &of reference frame'//trim(refs(i_ref)%tag)//' is not &
+                   &orthogonal: sum( rot(:,2) * rot(:,3) ) = '//trim(msg))
+   end if
+
+   !> Unitary columns
+   if ( abs( sum( rot(:,1)* rot(:,1) ) - 1.0_wp ) .gt. eps ) then
+     write(msg,'(F12.6)') sum( rot(:,1)* rot(:,1) )
+     call error(this_sub_name, this_mod_name, 'Input Orientation matrix &
+                   &of reference frame'//trim(refs(i_ref)%tag)//' does not have &
+                   &unitary columns: sum( rot(:,1) * rot(:,1) ) = '//trim(msg))
+   end if
+   if ( abs( sum( rot(:,2)* rot(:,2) ) - 1.0_wp ) .gt. eps ) then
+     write(msg,'(F12.6)') sum( rot(:,2)* rot(:,2) )
+     call error(this_sub_name, this_mod_name, 'Input Orientation matrix &
+                   &of reference frame'//trim(refs(i_ref)%tag)//' does not have &
+                   &unitary columns: sum( rot(:,2) * rot(:,2) ) = '//trim(msg))
+   end if
+   if ( abs( sum( rot(:,3)* rot(:,3) ) - 1.0_wp ) .gt. eps ) then
+     write(msg,'(F12.6)') sum( rot(:,3)* rot(:,3) )
+     call error(this_sub_name, this_mod_name, 'Input Orientation matrix &
+                   &of reference frame'//trim(refs(i_ref)%tag)//' does not have &
+                   &unitary columns: sum( rot(:,3) * rot(:,3) ) = '//trim(msg))
+   end if
+
+
+   ! === check that the rotation axis is unitary, otherwise normalize ===
+   if ( refs(i_ref)%moving ) then
+
+     if ( norm2(refs(i_ref)%axis - 1.0_wp ) .gt. eps ) then
+
+       write(msg,'(F12.6)') norm2(refs(i_ref)%axis)
+       call warning(this_sub_name, this_mod_name, 'Input Rotational axis &
+                     &of reference frame'//trim(refs(i_ref)%tag)//' had norm2() = &
+                     &'//trim(msg)//'. Normalised.')
+
+       refs(i_ref)%axis = refs(i_ref)%axis / norm2(refs(i_ref)%axis)
+       
+     end if
+ 
+   end if   
+
+
+  end do
 
 end subroutine check_references
 
