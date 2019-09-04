@@ -11,6 +11,11 @@ if(POLICY CMP0012)
   cmake_policy(SET CMP0012 NEW)
 endif()
 
+#CMake 3.15.2 raises blocking warnings unless setting:
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
+
 #Set folders
 SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
 SET(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/include)
