@@ -196,27 +196,34 @@ subroutine read_real_array_from_file ( n_cols , filen , A )
 
  integer :: n_rows
  integer :: fid , fid_err , io_error , i1
+ logical :: file_exists
+ character(len=*), parameter :: this_sub_name = 'read_real_array_from_file'
   
- ! read # of lines
- call new_file_unit(fid, fid_err)
- write(*,*) trim(adjustl(filen))
- open(unit=fid, file=trim(adjustl(filen)), action='read', iostat=io_error )
- do i1 = 1 , 1000000
-   read(fid,*,iostat=io_error) ! dummy
-   if ( io_error  .lt. 0 ) then
-     n_rows = i1-1
-     exit
-   end if
- end do
- close(fid)
+  !chech if the file exists
+  inquire(file=trim(adjustl(filen)), exist=file_exists)
+  if (.not. file_exists) then
+   call error(this_sub_name, this_mod_name, &
+        'File '//trim(filen)//' does not exist')
+  endif
 
- allocate(A(n_rows, n_cols)) ; A = 0.0_wp 
- call new_file_unit(fid, fid_err)
- open(unit=fid, file=trim(adjustl(filen)), action='read', iostat=io_error )
- do i1 = 1 , n_rows
-   read(fid,*) A(i1,:)
- end do
- close(fid)
+  call new_file_unit(fid, fid_err)
+  open(unit=fid, file=trim(adjustl(filen)), action='read', iostat=io_error )
+  do i1 = 1 , 1000000
+    read(fid,*,iostat=io_error) ! dummy
+    if ( io_error  .lt. 0 ) then
+      n_rows = i1-1
+      exit
+    end if
+  end do
+  close(fid)
+ 
+  allocate(A(n_rows, n_cols)) ; A = 0.0_wp 
+  call new_file_unit(fid, fid_err)
+  open(unit=fid, file=trim(adjustl(filen)), action='read', iostat=io_error )
+  do i1 = 1 , n_rows
+    read(fid,*) A(i1,:)
+  end do
+  close(fid)
 
 end subroutine read_real_array_from_file
 

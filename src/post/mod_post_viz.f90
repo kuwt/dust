@@ -397,11 +397,11 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     !deallocate(print_var_names, print_vars)
     call clear_output_vars(out_vars)
   
-    if (allocated(vort ) ) deallocate(vort )
-    if (allocated(press) ) deallocate(press)
-    if (allocated(press) ) deallocate(surfvel)
-    if (allocated(vel  ) ) deallocate(vel  )
-    if (allocated(cp   ) ) deallocate(cp   )
+    if (allocated(vort   ) ) deallocate(vort )
+    if (allocated(press  ) ) deallocate(press)
+    if (allocated(surfvel) ) deallocate(surfvel)
+    if (allocated(vel    ) ) deallocate(vel  )
+    if (allocated(cp     ) ) deallocate(cp   )
   
   
   end do ! Time loop
