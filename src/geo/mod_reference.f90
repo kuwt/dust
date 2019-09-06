@@ -1413,7 +1413,7 @@ subroutine check_references(refs)
  integer :: i_ref , n_refs
 
  real(wp) :: det
- real(wp) :: eps = 1.0e-6_wp
+ real(wp) :: eps = 1.0e-4_wp
  character(len=max_char_len) :: msg
 
  character(len=*), parameter :: this_sub_name = 'check_references'
@@ -1439,7 +1439,7 @@ subroutine check_references(refs)
    if ( abs( det - 1.0_wp ) .gt. eps ) then
      write(msg,'(F12.6)') det
      call error(this_sub_name, this_mod_name, 'Input Orientation matrix &
-                   &of reference frame'//trim(refs(i_ref)%tag)//' has determinant &
+                   &of reference frame "'//trim(refs(i_ref)%tag)//'" has determinant &
                    &equal to det = '//trim(msg)//' instead of (approximately) 1.0')
    end if
 
@@ -1447,21 +1447,21 @@ subroutine check_references(refs)
    if ( abs( sum( rot(:,1)* rot(:,2) ) ) .gt. eps ) then
      write(msg,'(F12.6)') sum( rot(:,1)* rot(:,2) )
      call error(this_sub_name, this_mod_name, 'Input Orientation matrix &
-                   &of reference frame'//trim(refs(i_ref)%tag)//' is not &
+                   &of reference frame "'//trim(refs(i_ref)%tag)//'" is not &
                    &orthogonal: sum( rot(:,1) * rot(:,2) ) = '//trim(msg))
    end if
 
    if ( abs( sum( rot(:,1)* rot(:,3) ) ) .gt. eps ) then
      write(msg,'(F12.6)') sum( rot(:,1)* rot(:,3) )
      call error(this_sub_name, this_mod_name, 'Input Orientation matrix &
-                   &of reference frame'//trim(refs(i_ref)%tag)//' is not &
+                   &of reference frame "'//trim(refs(i_ref)%tag)//'" is not &
                    &orthogonal: sum( rot(:,1) * rot(:,3) ) = '//trim(msg))
    end if
 
    if ( abs( sum( rot(:,2)* rot(:,3) ) ) .gt. eps ) then
      write(msg,'(F12.6)') sum( rot(:,2)* rot(:,3) )
      call error(this_sub_name, this_mod_name, 'Input Orientation matrix &
-                   &of reference frame'//trim(refs(i_ref)%tag)//' is not &
+                   &of reference frame "'//trim(refs(i_ref)%tag)//'" is not &
                    &orthogonal: sum( rot(:,2) * rot(:,3) ) = '//trim(msg))
    end if
 
@@ -1469,19 +1469,19 @@ subroutine check_references(refs)
    if ( abs( sum( rot(:,1)* rot(:,1) ) - 1.0_wp ) .gt. eps ) then
      write(msg,'(F12.6)') sum( rot(:,1)* rot(:,1) )
      call error(this_sub_name, this_mod_name, 'Input Orientation matrix &
-                   &of reference frame'//trim(refs(i_ref)%tag)//' does not have &
+                   &of reference frame "'//trim(refs(i_ref)%tag)//'" does not have &
                    &unitary columns: sum( rot(:,1) * rot(:,1) ) = '//trim(msg))
    end if
    if ( abs( sum( rot(:,2)* rot(:,2) ) - 1.0_wp ) .gt. eps ) then
      write(msg,'(F12.6)') sum( rot(:,2)* rot(:,2) )
      call error(this_sub_name, this_mod_name, 'Input Orientation matrix &
-                   &of reference frame'//trim(refs(i_ref)%tag)//' does not have &
+                   &of reference frame "'//trim(refs(i_ref)%tag)//'" does not have &
                    &unitary columns: sum( rot(:,2) * rot(:,2) ) = '//trim(msg))
    end if
    if ( abs( sum( rot(:,3)* rot(:,3) ) - 1.0_wp ) .gt. eps ) then
      write(msg,'(F12.6)') sum( rot(:,3)* rot(:,3) )
      call error(this_sub_name, this_mod_name, 'Input Orientation matrix &
-                   &of reference frame'//trim(refs(i_ref)%tag)//' does not have &
+                   &of reference frame "'//trim(refs(i_ref)%tag)//'" does not have &
                    &unitary columns: sum( rot(:,3) * rot(:,3) ) = '//trim(msg))
    end if
 
@@ -1493,7 +1493,7 @@ subroutine check_references(refs)
 
        write(msg,'(F12.6)') norm2(refs(i_ref)%axis)
        call warning(this_sub_name, this_mod_name, 'Input Rotational axis &
-                     &of reference frame'//trim(refs(i_ref)%tag)//' had norm2() = &
+                     &of reference frame "'//trim(refs(i_ref)%tag)//'" had norm2() = &
                      &'//trim(msg)//'. Normalised.')
 
        refs(i_ref)%axis = refs(i_ref)%axis / norm2(refs(i_ref)%axis)
