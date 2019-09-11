@@ -868,7 +868,7 @@ subroutine parse(this, rest_in, is_default)
   end select
   if(stat.gt.0)then
     call error(this_sub_name, this_mod_name, 'Error while parsing the option "'&
-               //trim(rest_in))
+               //trim(this%name)//' " with value: '//trim(rest_in))
   end if
 
 end subroutine parse

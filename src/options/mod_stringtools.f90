@@ -80,7 +80,7 @@ use mod_handling, only: &
   error, warning, info, unit_stdout, printout
 
 use mod_param, only: &
-  max_char_len
+  max_char_len, wp
 
 use MOD_ISO_VARYING_STRING
 
@@ -110,6 +110,14 @@ interface isint
   module procedure isint
 end interface
 
+interface isreal
+  module procedure isreal
+end interface
+
+interface isempty
+  module procedure isempty
+end interface
+
 interface set_formatting
   module procedure set_formatting
 end interface
@@ -123,6 +131,8 @@ public :: stricmp
 public :: StripSpaces
 public :: inttostr
 public :: isint
+public :: isreal
+public :: isempty
 public :: set_formatting
 public :: clear_formatting
 public :: IsInList, strip_mult_appendix
@@ -276,6 +286,28 @@ integer                    :: i,stat
 read(value, *, iostat=stat) i
 isint=(stat.eq.0)
 end function isint
+
+!----------------------------------------------------------------------
+
+!> Checks if a string is a real
+pure function isreal(value) 
+character(len=*),intent(in)  :: value
+logical                      :: isreal
+! local variables
+integer  :: stat
+real(wp) :: i
+read(value, *, iostat=stat) i
+isreal=(stat.eq.0)
+end function isreal
+
+!----------------------------------------------------------------------
+
+!> Checks if a string is a empty
+pure function isempty(value) 
+character(len=*),intent(in)  :: value
+logical                      :: isempty
+isempty = ( LEN_TRIM(value) == 0 )
+end function isempty
 
 !----------------------------------------------------------------------
 
