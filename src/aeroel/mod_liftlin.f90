@@ -457,8 +457,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
         diff = max(diff,abs(elems_ll(i_l)%p%mag-dou_temp(i_l)))
 !$omp end atomic
 
-      c_m(i_l,:) = aero_coeff
-      a_v(i_l)   = alpha * pi/180.0_wp ! [rad]
+        c_m(i_l,:) = aero_coeff
+        a_v(i_l)   = alpha * pi/180.0_wp ! [rad]
 
         el%vel_outplane = sum(el%bnorm_cen*vel)
       !end select
@@ -662,14 +662,13 @@ subroutine calc_geo_data_liftlin(this, vert)
   this%tang_cen = this%edge_vec(:,2) - this%edge_vec(:,4)
   this%tang_cen = this%tang_cen / norm2(this%tang_cen)
 
-! this%bnorm_cen = cross(this%tang_cen, this%nor)  ! old
-  this%bnorm_cen = this%ver(:,2) - this%ver(:,1)
+  this%bnorm_cen = cross(this%tang_cen, this%nor)  ! old
+! this%bnorm_cen = this%ver(:,2) - this%ver(:,1)
   this%bnorm_cen = this%bnorm_cen / norm2(this%bnorm_cen)
-
-  this%chord = sum(this%edge_len((/2,4/)))*0.5_wp
 
   ! -- 0.75 chord -- look for other "0.75 chord" tag
   ! correct the chord value ----
+  this%chord = sum(this%edge_len((/2,4/)))*0.5_wp
   this%chord = this%chord / 0.75_wp
 
   this%ctr_pt = this%cen + this%tang_cen * this%chord / 2.0_wp
@@ -708,5 +707,7 @@ subroutine calc_geo_data_liftlin(this, vert)
 ! this%ver(:,4) = this%ver(:,4) - ( this%ver(:,4) - this%ver(:,1) ) / 4.0_wp
 
 end subroutine calc_geo_data_liftlin
+
+!----------------------------------------------------------------------
 
 end module mod_liftlin
