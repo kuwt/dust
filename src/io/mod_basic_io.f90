@@ -192,7 +192,7 @@ end subroutine write_basic_int
 subroutine read_real_array_from_file ( n_cols , filen , A )
  integer         , intent(in)  :: n_cols 
  character(len=*), intent(in)  :: filen
- real(wp)        , allocatable :: A(:,:) 
+ real(wp)        , intent(out), allocatable :: A(:,:) 
 
  integer :: n_rows
  integer :: fid , fid_err , io_error , i1

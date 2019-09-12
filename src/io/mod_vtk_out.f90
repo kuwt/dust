@@ -663,6 +663,7 @@ subroutine vtk_out_viz (out_filename, &
     buffer = '<VTKFile type="UnstructuredGrid" version="0.1" byte_order="LittleEndian">'//lf
     write(fu) trim(buffer)
     buffer = ' <UnstructuredGrid>'//lf; write(fu) trim(buffer)
+    offset = 0
 
     call vtk_print_piece_header(fu,offset,npoints_w,nw,nquad_w,ntria_w,0,w_vars)
 
