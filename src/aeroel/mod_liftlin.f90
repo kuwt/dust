@@ -95,6 +95,7 @@ type, extends(c_expl_elem) :: t_liftlin
   integer               :: i_airfoil(2)
   real(wp)              :: chord
   real(wp)              :: ctr_pt(3)
+  real(wp)              :: d_2pi_coslambda
   real(wp)              :: nor_zeroLift(3)
   real(wp)              :: alpha
   real(wp)              :: vel_2d
@@ -315,10 +316,13 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
  integer  :: i_l, j, ic
  real(wp) :: vel(3), v(3), up(3)
  real(wp), allocatable :: vel_w(:,:)
- real(wp) :: unorm, alpha
+ real(wp) :: unorm, alpha, alpha_2d
  real(wp) :: cl
  real(wp), allocatable :: aero_coeff(:)
  real(wp), allocatable :: dou_temp(:)
+ ! debug ---
+ real(wp), allocatable :: al2d_v(:)
+ ! debug ---
 
  ! mach and reynolds number for each el
  real(wp) :: mach , reynolds
@@ -370,7 +374,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
     do j = 1,size(elems_ad) ! actuator disks 
-      call elems_ad(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
+      call elems_ad(j)%p%compute_vel(  elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
     do j = 1,size(elems_wake) ! wake panels
@@ -391,6 +395,10 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   allocate( a_v( size(elems_ll)  )) ;   a_v = 0.0_wp
   allocate( c_m( size(elems_ll),3)) ;   c_m = 0.0_wp
   allocate( u_v( size(elems_ll)  )) ;   u_v = 0.0_wp
+
+  ! debug ---
+  allocate( al2d_v( size(elems_ll) ) ) ; al2d_v = 0.0_wp 
+  ! debug ---
 
   ! Remove the "out-of-plane" component of the relative velocity:
   ! 2d-velocity to enter the airfoil look-up-tables
@@ -414,7 +422,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   do ic = 1, fp_maxIter
     diff = 0.0_wp             ! max diff ("norm \infty")
     max_mag_ll = 0.0_wp
-!$omp parallel do private(i_l, el, j, v, vel, up, unorm, alpha, mach, &
+!$omp parallel do private(i_l, el, j, v, vel, up, unorm, alpha, alpha_2d, mach, &
 !$omp& reynolds, aero_coeff, cl) schedule(dynamic,4)
     do i_l = 1,size(elems_ll)
 
@@ -438,6 +446,18 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
         ! Angle of incidence (full velocity)
         alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
         alpha = alpha * 180.0_wp/pi  ! .c81 tables defined with angles in [deg]
+
+        ! === Piszkin, Lewinski (1976) LL model for swept wings ===
+        ! the control point is approximately at 3/4 of the chord, but the induced
+        ! angle of incidence needs to be modified, introducing a "2D correction"
+        !
+        !> "2D correction" of the induced angle
+        alpha_2d = el%mag / ( pi * el%chord * unorm ) *180.0_wp/pi
+        alpha = alpha - alpha_2d 
+
+        al2d_v(i_l) = alpha_2d
+
+        ! === Piszkin, Lewinski (1976) LL model for swept wings ===
 
         ! compute local Reynolds and Mach numbers for the section
         ! needed to enter the LUT (.c81) of aerodynamic loads (2d airfoil)
@@ -553,15 +573,27 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   enddo !solver iterations
 
 ! ! todo: assign a proper debug_level to this screen output
-! ! debug ----
-!   write(*,*) '     i_l      ,        ll_alpha  ,          ll_ma  '
-!   do i_l = 1 , size(elems_ll)
-!     write(*,*) i_l , a_v(i_l)*180.0_wp / pi , ma_v(i_l)
-!   end do
-! ! debug ----
+  ! debug ----
+    write(*,*) '     i_l      ,        ll_alpha  ,          ll_alpha_2d '
+    do i_l = 1 , size(elems_ll)
+      write(*,*) i_l , a_v(i_l)*180.0_wp/pi , al2d_v(i_l)
+    end do
+  ! debug ----
+
+! ! debug ---
+! write(*,*) ' i_l , u_v , al , cl , cd , chord , area ' 
+! ! debug ---
 
   ! === Loads computation ===
   do i_l = 1,size(elems_ll)
+
+!   ! debug ---
+!   write(*,*) i_l , u_v(i_l) , a_v(i_l) *180.0_wp/pi , &
+!              c_m(i_l,1) , c_m(i_l,2) , &
+!              elems_ll(i_l)%p%chord , &
+!              elems_ll(i_l)%p%area
+!   ! debug ---
+
    !select type(el => elems_ll(i_l)%p)
    !type is(t_liftlin)
    el => elems_ll(i_l)%p
@@ -611,8 +643,9 @@ subroutine calc_geo_data_liftlin(this, vert)
  class(t_liftlin), intent(inout) :: this
  real(wp), intent(in) :: vert(:,:)
 
- integer :: is, nsides
- real(wp):: nor(3), tanl(3) , cen(3)
+ integer  :: is, nsides
+ real(wp) :: nor(3), tanl(3) , cen(3)
+ real(wp) :: cos_lambda
 
   this%ver = vert
   nsides = this%n_ver
@@ -671,7 +704,30 @@ subroutine calc_geo_data_liftlin(this, vert)
   this%chord = sum(this%edge_len((/2,4/)))*0.5_wp
   this%chord = this%chord / 0.75_wp
 
-  this%ctr_pt = this%cen + this%tang_cen * this%chord / 2.0_wp
+  ! === Piszkin, Lewinski (1976) LL model for swept wings ===
+  ! - cos_lambda = cos(lambda) , where lambda is the local sweep angle
+  ! - %cen is overwritten and set = to %cen, because the fmm routines
+  !   compute velocity on the %cen of the elems, so far.
+  ! - %d_2pi_coslambda = x_CP - x_{1/4*c} * 2*pi * cos(lambda)
+  !
+  !> sweep angle
+  cos_lambda  = norm2( cross( this%tang_cen , -this%edge_uni(:,1) ) )
+
+! ! debug ---
+! write(*,*) ' cos_lambda : ' , cos_lambda
+! ! debug --- 
+ 
+  !> modified ~3/4 control point
+  this%ctr_pt = this%cen + this%tang_cen * this%chord / 2.0_wp 
+  ! this%ctr_pt = this%cen + this%tang_cen * this%chord / ( 2.0_wp * cos_lambda )
+
+  !> 2 * pi * | x_CP - x{1/4*c} | * cos(lambda)
+  this%d_2pi_coslambda = norm2( this%cen - this%ctr_pt ) * &
+                         2.0_wp * pi * cos_lambda
+  ! !> overwrite centre
+  this%cen    = this%ctr_pt
+  !
+  ! === Piszkin, Lewinski (1976) LL model for swept wings ===
 
   ! overwrite nor
   this%nor = cross( this%bnorm_cen , this%tang_cen )
