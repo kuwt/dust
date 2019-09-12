@@ -104,6 +104,11 @@ type, extends(c_expl_elem) :: t_liftlin
   real(wp)              :: alpha_isolated
   real(wp)              :: vel_2d_isolated
   real(wp)              :: vel_outplane_isolated
+
+  !> new field for load computations
+  real(wp) :: vel_ctr_pt(3)
+  real(wp) ::  al_ctr_pt
+
 contains
 
   procedure, pass(this) :: compute_pot      => compute_pot_liftlin
@@ -112,6 +117,12 @@ contains
   procedure, pass(this) :: compute_pres     => compute_pres_liftlin
   procedure, pass(this) :: compute_dforce   => compute_dforce_liftlin
   procedure, pass(this) :: calc_geo_data    => calc_geo_data_liftlin
+
+  !> new routines for load computations
+  procedure, pass(this) :: get_vel_ctr_pt   => get_vel_ctr_pt_liftlin
+  procedure, pass(this) :: compute_dforce_jukowski => &
+                           compute_dforce_jukowski_liftlin
+
 end type
 
 character(len=*), parameter :: this_mod_name='mod_liftlin'
@@ -320,9 +331,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
  real(wp) :: cl
  real(wp), allocatable :: aero_coeff(:)
  real(wp), allocatable :: dou_temp(:)
- ! debug ---
- real(wp), allocatable :: al2d_v(:)
- ! debug ---
 
  ! mach and reynolds number for each el
  real(wp) :: mach , reynolds
@@ -331,7 +339,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
  real(wp) , allocatable :: c_m(:,:) ! size(elems_ll) , 3
  real(wp) , allocatable :: u_v(:)   ! size(elems_ll)
 
- ! fixed point algorithm for ll ----
+ !> sim_param
+ ! fixed point algorithm for ll
  real(wp) :: fp_tol , fp_damp , diff
  integer  :: fp_maxIter
  ! stall regularisation: params read as inputs
@@ -339,6 +348,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
  real(wp):: al_stall 
  integer :: i_do , i , nn_stall , n_stall
  integer :: n_iter_reg
+ ! load computation
+ logical :: load_avl
 
  real(wp) :: max_mag_ll
 
@@ -359,6 +370,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   n_stall    = sim_param%llStallRegularisationNelems
   n_iter_reg = sim_param%llStallRegularisationNiters
   al_stall   = sim_param%llStallRegularisationAlphaStall * pi / 180.0_wp
+  ! param for load computation
+  load_avl   = sim_param%llLoadAVL
 
   uinf = sim_param%u_inf
 
@@ -391,18 +404,14 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   vel_w = vel_w/(4.0_wp*pi)
 
-  ! allocate arrasy containing aoa, aero coeffs and relative velocity
+  ! allocate array containing aoa, aero coeffs and relative velocity
   allocate( a_v( size(elems_ll)  )) ;   a_v = 0.0_wp
   allocate( c_m( size(elems_ll),3)) ;   c_m = 0.0_wp
   allocate( u_v( size(elems_ll)  )) ;   u_v = 0.0_wp
 
-  ! debug ---
-  allocate( al2d_v( size(elems_ll) ) ) ; al2d_v = 0.0_wp 
-  ! debug ---
-
   ! Remove the "out-of-plane" component of the relative velocity:
   ! 2d-velocity to enter the airfoil look-up-tables
-  ! IS THIS LOOP USED (u_v) seems to be overwritten few lines down)
+  ! IS THIS LOOP USED? (u_v) seems to be overwritten few lines down)
 !$omp parallel do private(i_l, el) schedule(dynamic,4)
   do i_l=1,size(elems_ll)
    !select type(el => elems_ll(i_l)%p)
@@ -454,10 +463,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
         !> "2D correction" of the induced angle
         alpha_2d = el%mag / ( pi * el%chord * unorm ) *180.0_wp/pi
         alpha = alpha - alpha_2d 
-
-        al2d_v(i_l) = alpha_2d
-
-        ! === Piszkin, Lewinski (1976) LL model for swept wings ===
+        ! =========================================================
 
         ! compute local Reynolds and Mach numbers for the section
         ! needed to enter the LUT (.c81) of aerodynamic loads (2d airfoil)
@@ -572,27 +578,10 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   enddo !solver iterations
 
-! ! todo: assign a proper debug_level to this screen output
-  ! debug ----
-    write(*,*) '     i_l      ,        ll_alpha  ,          ll_alpha_2d '
-    do i_l = 1 , size(elems_ll)
-      write(*,*) i_l , a_v(i_l)*180.0_wp/pi , al2d_v(i_l)
-    end do
-  ! debug ----
-
-! ! debug ---
-! write(*,*) ' i_l , u_v , al , cl , cd , chord , area ' 
-! ! debug ---
 
   ! === Loads computation ===
+  ! compute LL sectional loads from singularity intensities. 
   do i_l = 1,size(elems_ll)
-
-!   ! debug ---
-!   write(*,*) i_l , u_v(i_l) , a_v(i_l) *180.0_wp/pi , &
-!              c_m(i_l,1) , c_m(i_l,2) , &
-!              elems_ll(i_l)%p%chord , &
-!              elems_ll(i_l)%p%area
-!   ! debug ---
 
    !select type(el => elems_ll(i_l)%p)
    !type is(t_liftlin)
@@ -600,12 +589,28 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     ! avg delta_p = \vec{F}.\vec{n} / A = ( L*cos(al)+D*sin(al) ) / A
     el%pres   = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
                ( c_m(i_l,1) * cos(a_v(i_l)) +  c_m(i_l,2) * sin(a_v(i_l)) )
-    ! elementary force = p*n + tangential contribution from L,D
-    el%dforce = ( el%nor * el%pres + &
-                  el%tang_cen * &
-                  0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * ( &
-                 -c_m(i_l,1) * sin(a_v(i_l)) + c_m(i_l,2) * cos(a_v(i_l)) &
-                 ) ) * el%area
+
+    if ( load_avl ) then
+
+      ! === Kutta-Joukowski theorem ~ AVL ===
+      !> Inviscid contribution ~ AVL
+      call el % compute_dforce_jukowski ( elems_tot , elems_wake )
+
+      !> Add viscous contribution
+      el % dforce = el % dforce + &
+           0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * el%area * &
+           c_m(i_l,2) * ( sin(el%al_ctr_pt) * el%nor      +  &
+                          cos(el%al_ctr_pt) * el%tang_cen )
+    else
+
+      ! === elementary force = p*n + tangential contribution from L,D ===
+      el%dforce = ( el%nor * el%pres + &
+                    el%tang_cen * &
+                    0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * ( &
+                   -c_m(i_l,1) * sin(a_v(i_l)) + c_m(i_l,2) * cos(a_v(i_l)) &
+                   ) ) * el%area
+    end if
+
     ! elementary moment = 0.5 * rho * v^2 * A * c * cm, 
     ! - around bnorm_cen (always? TODO: check)
     ! - referred to the ref.point of the elem,
@@ -616,7 +621,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     el%alpha = a_v(i_l) * 180_wp/pi
     el%vel_2d = u_v(i_l)
     el%aero_coeff = c_m(i_l,:)
-
 
    !end select
   end do
@@ -631,11 +635,79 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   deallocate(dou_temp, vel_w)
   deallocate(a_v,c_m,u_v)
   
-! ! debug ----
-! deallocate(re_v, ma_vm chord_v, cl_v, el_i_airfoil_m, el_csi_cen_v)
-! ! debug ----
 
 end subroutine solve_liftlin
+
+!----------------------------------------------------------------------
+!> Compute the inviscid contribution of the elementary force on the on
+! the actual element using Kutta-Jukowski theorem as implemented in AVL,
+! using the velocity computed at the ctr_pt on the LL, in the subroutine
+! get_vel_ctr_cp_liftlin. The viscous contribution is performed in
+! the subroutine solve_liftlin
+! 
+subroutine compute_dforce_jukowski_liftlin(this, elems, wake_elems) 
+ class(t_liftlin), intent(inout) :: this
+ type(t_pot_elem_p),intent(in):: elems(:)
+ type(t_pot_elem_p),intent(in):: wake_elems(:)
+
+ real(wp) :: vel_w(3), gam(3)
+
+ call this % get_vel_ctr_pt( elems , wake_elems )
+
+ gam = cross ( this % vel_ctr_pt, this % edge_vec(:,1) )
+
+ this%dforce = sim_param%rho_inf * gam * this%mag
+
+! ! debug ---
+! write(*,*) ' this % vel_ctr_pt : ' , this % vel_ctr_pt
+! write(*,*) ' sim_param%rho_inf : ' , sim_param%rho_inf 
+! write(*,*) ' gam               : ' , gam               
+! write(*,*) ' this%mag          : ' , this%mag          
+! ! debug ---
+
+end subroutine compute_dforce_jukowski_liftlin
+
+!----------------------------------------------------------------------
+!> Compute the velocity and the "induced" incidence angle at ctr_pt
+! located on the LL. These quantities are used in the inviscid load 
+! computation, using AVL expression (~ VL elements)
+!
+subroutine get_vel_ctr_pt_liftlin(this, elems, wake_elems)
+ class(t_liftlin), intent(inout) :: this
+ type(t_pot_elem_p),intent(in):: elems(:)
+ type(t_pot_elem_p),intent(in):: wake_elems(:)
+ 
+ real(wp) :: v(3),x0(3)
+ integer :: j
+
+ ! Initialisation to zero
+ this%vel_ctr_pt = 0.0_wp
+
+ ! Control point at 1/4-fraction of the chord
+ x0 = this%cen - this%tang_cen * this%chord / 2.0_wp
+
+ !=== Compute the velocity from all the elements ===
+ do j = 1,size(wake_elems)  ! wake panels
+ 
+   call wake_elems(j)%p%compute_vel(x0,sim_param%u_inf,v)
+   this%vel_ctr_pt = this%vel_ctr_pt + v
+ 
+ enddo
+
+ do j = 1,size(elems) ! body elements
+ 
+   call elems(j)%p%compute_vel(x0,sim_param%u_inf,v)
+   this%vel_ctr_pt = this%vel_ctr_pt + v
+ 
+ enddo
+
+ this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp*pi) &
+               + sim_param%u_inf + this%uvort - this%ub
+
+ this%al_ctr_pt = atan2( sum(this%vel_ctr_pt * this%nor     ) , & 
+                         sum(this%vel_ctr_pt * this%tang_cen) )
+
+end subroutine get_vel_ctr_pt_liftlin
 
 !----------------------------------------------------------------------
 
@@ -712,10 +784,6 @@ subroutine calc_geo_data_liftlin(this, vert)
   !
   !> sweep angle
   cos_lambda  = norm2( cross( this%tang_cen , -this%edge_uni(:,1) ) )
-
-! ! debug ---
-! write(*,*) ' cos_lambda : ' , cos_lambda
-! ! debug --- 
  
   !> modified ~3/4 control point
   this%ctr_pt = this%cen + this%tang_cen * this%chord / 2.0_wp 

@@ -169,6 +169,8 @@ type t_sim_param
   integer  :: llStallRegularisationNiters
   !> Reference stall AOA for regularisation
   real(wp) :: llStallRegularisationAlphaStall
+  !> Use AVL expression for inviscid load computation ( ~ VL )
+  logical  :: llLoadAVL
 
   !FMM parameters
   !> Employing the FMM method
