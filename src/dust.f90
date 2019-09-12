@@ -310,7 +310,7 @@ call prms%CreateIntOption('LLstallRegularisationNiters', &
        'Number of timesteps between two regularisations', '1' )
 call prms%CreateRealOption('LLstallRegularisationAlphaStall', &
        'Stall angle used as threshold for regularisation [deg]', '15.0' )
-call prms%CreateLogicalOption('LLLoadAVL', & 
+call prms%CreateLogicalOption('LLloadsAVL', & 
        'Use AVL expression for inviscid load computation','T')
 
 !== Octree and multipole data == 
@@ -850,7 +850,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%llStallRegularisationNelems     = getint(    prms, 'LLstallRegularisationNelems')
   sim_param%llStallRegularisationNiters     = getint(    prms, 'LLstallRegularisationNiters')
   sim_param%llStallRegularisationAlphaStall = getreal(   prms, 'LLstallRegularisationAlphaStall')
-  sim_param%llLoadAVL                       = getlogical(prms, 'LLloadAVL')
+  sim_param%llLoadsAVL                      = getlogical(prms, 'LLloadsAVL')
   
   !Octree and FMM parameters
   sim_param%use_fmm = getlogical(prms, 'FMM')

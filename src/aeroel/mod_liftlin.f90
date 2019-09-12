@@ -371,7 +371,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   n_iter_reg = sim_param%llStallRegularisationNiters
   al_stall   = sim_param%llStallRegularisationAlphaStall * pi / 180.0_wp
   ! param for load computation
-  load_avl   = sim_param%llLoadAVL
+  load_avl   = sim_param%llLoadsAVL
 
   uinf = sim_param%u_inf
 
