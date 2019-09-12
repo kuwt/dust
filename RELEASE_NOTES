@@ -1,3 +1,8 @@
+0.5.12-b
+* Added body of revolution type of input
+* Updates in the lifting lines models
+* Several bugs fixed
+
 0.5.11-b
 * Added angle interpolation option in parametric
 * Added the possibility to specify timesteps instead of dt
