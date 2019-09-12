@@ -419,10 +419,16 @@ subroutine put_msg( msg_type , msg )
    case(1) ! error
 
       write(erru,'(a)') msg
+      !without flush call, sometimes, gfortran does not output to the
+      !correct file if the output is redirected
+      call flush(erru)
 
    case(2) ! info
 
       write(outu,'(a)') msg
+      !without flush call, sometimes, gfortran does not output to the
+      !correct file if the output is redirected
+      call flush(outu)
 
    case default
     call error(this_sub_name,this_mod_name,         &
