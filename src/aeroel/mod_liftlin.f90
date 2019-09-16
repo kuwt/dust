@@ -818,7 +818,13 @@ subroutine calc_geo_data_liftlin(this, vert)
   this%dmom   = 0.0_wp
 
   ! Apply twist (for non flat elements)
-  rm = rotation_matrix ( this%bnorm_cen, -this%twist )
+  ! 
+  ! For flat elements the wing panels are not twisted, only account for
+  ! sweep and dihedral angles. In order to account for twist the normal
+  ! and tangential vectors are rotated with the input twist angle.
+  !
+  ! NOTE Rotations prescribed in the Reference file (e.g. Angle of Attack)
+  ! are not included in this
 
   ct = cos(-this%twist)
   st = sin(-this%twist)
