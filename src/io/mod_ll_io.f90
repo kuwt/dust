@@ -78,7 +78,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
                         airfoil_list_actual, nelem_span_list, &
                         i_airfoil_e , normalised_coord_e    , &
                         npoints_chord_tot , nelem_span_tot  , &
-                                            chord_p,theta_p)
+                                            chord_p,theta_p,theta_e)
 
  character(len=*), intent(in) :: mesh_file
  integer  , allocatable, intent(out) :: ee(:,:) 
@@ -88,8 +88,8 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
  integer  , allocatable, intent(out) :: nelem_span_list(:)
  integer  , allocatable, intent(out) :: i_airfoil_e(:,:)
  real(wp) , allocatable, intent(out) :: normalised_coord_e(:,:)
- integer  , intent(out), optional    :: npoints_chord_tot, nelem_span_tot
- real(wp) , allocatable, intent(out), optional :: chord_p(:),theta_p(:)
+ integer  ,              intent(out) :: npoints_chord_tot, nelem_span_tot
+ real(wp) , allocatable, intent(out) :: chord_p(:),theta_p(:),theta_e(:)
 
  type(t_parse) :: pmesh_prs
 
@@ -97,7 +97,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
  real(wp):: twist_rad
  integer :: nelem_chord, nelem_chord_tot ! , nelem_span_tot <--- moved as an output
  integer :: npoint_chord_tot, npoint_span_tot
- integer :: nRegions, nSections, nAirfoils, rr_size , ee_size 
+ integer :: nRegions, nSections, nAirfoils, rr_size , ee_size , ispace
  integer :: iRegion , iSection , iAirfoil , iChord , iElement , iPoint 
  real(wp):: ref_chord_fraction
  real(wp), allocatable :: ref_point(:)
@@ -111,7 +111,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
  character(len=max_char_len), allocatable :: type_span_list(:)
  integer :: n_type_span
  character :: ElType
- logical :: symmetry
+ logical :: symmetry, mesh_flat
  ! Sections 1. 2.
  real(wp), allocatable :: rrSection1(:,:) , rrSection2(:,:) 
 !real(wp) :: th1 , th2 , ch1 , ch2 
@@ -121,7 +121,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
  ! Linear interpolation of the twist angle
  real(wp), allocatable :: rr_tw(:,:) , rr_tw_1(:,:) , rr_tw_2(:,:)
  real(wp) :: dx_ref_1, dy_ref_1, dz_ref_1
- real(wp) :: interp_weight
+ real(wp) :: w1, w2
 
  integer :: i_aero1, i_aero2, iSpan, i
 
@@ -134,6 +134,8 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
                 'element type (temporary) p panel v vortex ring')
   call pmesh_prs%CreateLogicalOption('mesh_symmetry', &
                 'symmetry yes/no','F' )
+  call pmesh_prs%CreateLogicalOption('mesh_flat', &
+                'flat mesh yes/no','F' )
 ! !!! USELESS !!! for LIFTING LINE components !!!!!!!!!!!!
 ! call pmesh_prs%CreateIntOption('nelem_chord',&
 !               'number of chord-wise elements', &
@@ -193,7 +195,13 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   nelem_chord_tot = 1          !  getint(pmesh_prs,'nelem_chord')   !!! USELESS !!!
   ElType  = getstr(pmesh_prs,'ElType')
   symmetry= getlogical(pmesh_prs,'mesh_symmetry')
-   
+  mesh_flat= getlogical(pmesh_prs,'mesh_flat')
+
+  if ( mesh_flat .and. trim(ElType) .ne. 'l' ) then
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         &flat mesh option is available only for lifting line elements.')
+  end if 
+
   nSections = countoption(pmesh_prs,'chord')
   nRegions  = countoption(pmesh_prs,'span')
 
@@ -308,6 +316,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
   allocate(i_airfoil_e       (2,nelem_span_tot)) ; i_airfoil_e        = 0
   allocate(normalised_coord_e(2,nelem_span_tot)) ; normalised_coord_e = 0.0_wp
+  allocate(theta_e           (  nelem_span_tot)) ; theta_e            = 0.0_wp
 ! old
 ! allocate(airfoil_table_p (2,npoint_span_tot)) ;
 ! allocate(normalised_coord_p(npoint_span_tot)) ; normalised_coord_p = 0.0_wp
@@ -335,8 +344,22 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
       rrSection1 = rrSection2
     else                        ! build points
       rrSection1(:,1) = ref_point
-      rrSection1(:,2) = rrSection1(:,1) + chord_list(iRegion) * &
-                (/ cos(twist_list(iRegion)) , 0.0_wp , -sin(twist_list(iRegion)) /)
+
+      ! Rotate the section around the reference line with the twist angle
+      !
+      ! For flat meshes the section is not rotated, but the
+      ! normal/tangent vector are
+
+      if ( mesh_flat ) then
+        rrSection1(1,2) = rrSection1(1,1) + chord_list(iRegion)
+        rrSection1(2,2) = rrSection1(2,1)
+        rrSection1(3,2) = rrSection1(3,1)
+      else
+        rrSection1(1,2) = rrSection1(1,1) + chord_list(iRegion) * cos(twist_list(iRegion))
+        rrSection1(2,2) = rrSection1(2,1)
+        rrSection1(3,2) = rrSection1(3,1) - chord_list(iRegion) * sin(twist_list(iRegion))
+      endif
+
       chord_p(ich) = chord_list(1)
       theta_p(ich) = twist_list(1)
 
@@ -351,6 +374,28 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
       rr(:,ista:iend) = rrSection1
 
     end if
+
+    ! Define the spacing type based on the input string
+    if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then
+      ispace = 0
+
+    else if ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then
+      ispace = 1
+
+    else if ( trim(type_span_list(iRegion)) .eq. 'cosineOB' ) then
+      ispace = 2
+
+    else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then
+      ispace = 3
+
+    else
+      write(*,*) ' mesh_file   : ' , trim(mesh_file)
+      write(*,*) ' type_span_list(',iRegion,') : ' , &
+                    trim(type_span_list(iRegion)) 
+      call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+            & type_span must be equal to uniform, cosine, cosineIB,&
+            & cosineOB.')
+    end if
   
     !> save before update
     dx_ref_1 = dx_ref ;  dy_ref_1 = dy_ref ;  dz_ref_1 = dz_ref
@@ -358,11 +403,26 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     dx_ref =  span_list(iRegion) * tan( sweep_list(iRegion)* pi / 180.0_wp ) ! + dx_ref 
     dy_ref =  span_list(iRegion)                                             ! + dy_ref 
     dz_ref =  span_list(iRegion) * tan( dihed_list(iRegion)* pi / 180.0_wp ) ! + dz_ref 
-  
-    rrSection2(:,1) = rrSection1(:,1) + (/ dx_ref , dy_ref , dz_ref /)
-    rrSection2(:,2) = rrSection2(:,1) + chord_list(iRegion+1) * &
-              (/ cos(twist_list(iRegion+1)) , 0.0_wp , -sin(twist_list(iRegion+1)) /)
- 
+
+    ! Rotate the section around the reference line with the twist angle
+    !
+    ! For flat meshes the section is not rotated, but the
+    ! normal/tangent vector are
+
+    rrSection2(1,1) = rrSection1(1,1) + dx_ref
+    rrSection2(2,1) = rrSection1(2,1) + dy_ref
+    rrSection2(3,1) = rrSection1(3,1) + dz_ref
+
+    if ( mesh_flat ) then
+      rrSection2(1,2) = rrSection2(1,1) + chord_list(iRegion+1)
+      rrSection2(2,2) = rrSection2(2,1)
+      rrSection2(3,2) = rrSection2(3,1)
+    else
+      rrSection2(1,2) = rrSection2(1,1) + chord_list(iRegion+1) * cos(twist_list(iRegion+1))
+      rrSection2(2,2) = rrSection2(2,1)
+      rrSection2(3,2) = rrSection2(3,1) - chord_list(iRegion+1) * sin(twist_list(iRegion+1))
+    endif
+
     ! Interpolation of the nodes of the region i (between sections i and i+1)
     do iSpan = 1 , nelem_span_list(iRegion)
 
@@ -370,63 +430,12 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
       iend = iend + npoint_chord_tot
       ich = ich + 1
 
-      if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then    
-        ! uniform spacing in span
-        rr(:,ista:iend) = rrSection1 + real(iSpan,wp) / &
-                            real(nelem_span_list(iRegion),wp) * &
-                            ( rrSection2 - rrSection1 )
-        chord_p(ich) = chord_list(iRegion) + real(iSpan,wp) / &
-                         real(nelem_span_list(iRegion),wp) * &
-                         ( chord_list(iRegion+1) - chord_list(iRegion) )
-        theta_p(ich) = twist_list(iRegion) + real(iSpan,wp) / &
-                         real(nelem_span_list(iRegion),wp) * &
-                         ( twist_list(iRegion+1) - twist_list(iRegion) )
+      w2 = spacing_weights ( ispace, iSpan, nelem_span_list(iRegion) )
+      w1 = 1.0_wp - w2
 
-      else if ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then    
-        ! cosine  spacing in span
-        rr(:,ista:iend) = 0.5_wp * ( rrSection1 + rrSection2 ) - &
-                          0.5_wp * ( rrSection2 - rrSection1 ) * &
-                  cos( real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
-        chord_p(ich) = 0.5_wp * ( chord_list(iRegion+1) + &
-                                  chord_list(iRegion)   ) - &
-                       0.5_wp * ( chord_list(iRegion+1) - &
-                                  chord_list(iRegion)   ) * &
-                  cos( real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
-        theta_p(ich) = 0.5_wp * ( twist_list(iRegion+1) + &
-                                  twist_list(iRegion)   ) - &
-                       0.5_wp * ( twist_list(iRegion+1) - &
-                                  twist_list(iRegion)   ) * &
-                  cos( real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
-      else if ( trim(type_span_list(iRegion)) .eq. 'cosineOB' ) then    
-        ! cosine  spacing in span: outboard refinement
-        rr(:,ista:iend) = rrSection1 + &
-                        ( rrSection2 - rrSection1 ) * &
-           sin( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
-        chord_p(ich) = (  chord_list(iRegion) ) + &
-                       ( chord_list(iRegion+1) - chord_list(iRegion)  ) * &
-           sin( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
-        theta_p(ich) = ( twist_list(iRegion) ) - &
-                       ( twist_list(iRegion+1) - twist_list(iRegion) ) * &
-           sin( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
-      else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then    
-        ! cosine  spacing in span: inboard refinement
-        rr(:,ista:iend) = rrSection2 - &
-                        ( rrSection2 - rrSection1 ) * &
-           cos( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
-        chord_p(ich) = ( chord_list(iRegion+1))- &
-                       ( chord_list(iRegion+1) - chord_list(iRegion) ) * &
-           cos( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
-        theta_p(ich) = ( twist_list(iRegion+1) )- &
-                       ( twist_list(iRegion+1) - twist_list(iRegion) ) * &
-           cos( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
-      else
-        write(*,*) ' mesh_file   : ' , trim(mesh_file)
-        write(*,*) ' type_span_list(',iRegion,') : ' , &
-                     trim(type_span_list(iRegion)) 
-        call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-              & type_span must be equal to uniform, cosine, cosineIB,&
-              & cosineOB.')
-      end if 
+      rr(:,ista:iend) = w1*rrSection1          + w2*rrSection2
+      chord_p(ich)    = w1*chord_list(iRegion) + w2*chord_list(iRegion+1)
+      theta_p(ich)    = w1*twist_list(iRegion) + w2*twist_list(iRegion+1)
 
       ! if linear twist -> overwrite the coordinates of the points, rr
       if ( twist_linear_interp ) then
@@ -434,7 +443,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
         allocate(rr_tw(  2,npoint_chord_tot))
         allocate(rr_tw_1(2,npoint_chord_tot))
         allocate(rr_tw_2(2,npoint_chord_tot))
-         
+
         ! === Transform sections back to local reference frames === 
         ! Section 1
         !> remove offset in x,z 
@@ -456,47 +465,37 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
              reshape( (/ cos(twist_rad), sin(twist_rad) , &
                         -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
                                                                rr_tw_2 )
-        ! === Interpolation weight ===
-        if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then    
-          interp_weight = real(iSpan,wp) / real(nelem_span_list(iRegion),wp)
-        else if ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then    
-          interp_weight = 0.5_wp * ( &
-                        1.0_wp - cos( real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) )
-        else if ( trim(type_span_list(iRegion)) .eq. 'cosineOB' ) then    
-          interp_weight = sin( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
-        else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then    
-          interp_weight = 1.0_wp - cos( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
-          ! interp_weight = cos( 0.5_wp*real(iSpan,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
-        else
-          write(*,*) ' mesh_file   : ' , trim(mesh_file)
-          write(*,*) ' type_span_list(',iRegion,') : ' , trim(type_span_list(iRegion)) 
-          call error(this_sub_name, this_mod_name, 'Unconsistent input: &
-                & type_span must be equal to uniform, cosine, cosineIB, cosineOB.')
-        end if
 
         ! === x,z coordinates ===
-        rr_tw = rr_tw_1 + ( rr_tw_2 - rr_tw_1 ) * interp_weight
+        rr_tw = w1*rr_tw_1 + w2*rr_tw_2
         !> rotation ( linear interpolation of the twist angle )
-        twist_rad = pi/180.0_wp * ( twist_list(iRegion) + &
-            ( twist_list(iRegion+1)-twist_list(iRegion) ) * interp_weight )
+        twist_rad = theta_p(ich)
         rr_tw = matmul( &
              reshape( (/ cos(twist_rad),-sin(twist_rad) , &
                          sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
                                                                  rr_tw )
-        rr(1,ista:iend) = rr_tw(1,:) + dx_ref_1 + &
-                            ( dx_ref - dx_ref_1 ) * interp_weight
-        rr(3,ista:iend) = rr_tw(2,:) + dz_ref_1 + &
-                            ( dz_ref - dz_ref_1 ) * interp_weight
+        rr(1,ista:iend) = rr_tw(1,:) + w1*dx_ref_1 + w2*dx_ref
+        rr(3,ista:iend) = rr_tw(2,:) + w1*dz_ref_1 + w2*dz_ref
         ! === y coordinate ===
-        rr(2,ista:iend) = rrSection1(2,:) + &
-                        ( rrSection2(2,:) - rrSection1(2,:) ) * interp_weight
+        rr(2,ista:iend) = w1*rrSection1(2,:) + w2*rrSection2(2,:)
 
         deallocate(rr_tw, rr_tw_1, rr_tw_2)
 
       end if
 
+      w2 = spacing_weights ( ispace, iSpan-1, nelem_span_list(iRegion) )
+      w1 = 1.0_wp - w2
+
+      ! For flat meshes the section is not rotated, but the
+      ! normal/tangent vector are
+
+      if ( mesh_flat ) then
+        theta_e(ich-1) = 0.5_wp*(w1*twist_list(iRegion) + w2*twist_list(iRegion+1)) &
+                       + 0.5_wp*theta_p(ich)
+      endif
+
     end do
-  
+
   end do
 
   ! -- 0.75 chord -- look for other "0.75 chord" tag
@@ -593,5 +592,53 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 end subroutine read_mesh_ll
 
 !----------------------------------------------------------------------
+
+!> Function that computes the weights used to interpolate date between
+!! two points.
+!! 
+!! The interval defined by the extrema A and B, is discretized by N segments
+!! and N+1 points such that
+!! 
+!!    x_i = A + w_i*(B-A)     with i in (0,N)
+!!
+!! where `w_i` is the weight generated by this function for the i-th point.
+!!
+!! If a uniform spacing is used the distribution becomes
+!! 
+!!    x_i = A + i/N*(B*A)
+!! 
+!! such that x_0 = A and x_N = B
+!!
+!! Four options are currently available
+!! 
+!!   ISPACE = 0    Uniform spacing
+!!   ISPACE = 1    cosine spacing
+!!   ISPACE = 2    left cosine spacing
+!!   ISPACE = 3    right cosine spacing
+
+function spacing_weights ( itype, i, n ) result(w)
+
+ integer,      intent(in)  :: itype, i, n
+ real(wp)                  :: w
+
+
+  select case (itype)
+
+  case(1)
+    w = 0.5_wp - 0.5_wp * cos( real(i,wp)*pi/ real(n,wp) ) 
+
+  case(2)
+    w = sin( 0.5_wp*real(i,wp)*pi/ real(n,wp) )
+
+  case(3)
+    w = 1.0_wp - cos( 0.5_wp*real(i,wp)*pi/ real(n,wp) )
+
+  case default
+    w = real(i,wp) / real(n,wp)
+
+  end select
+
+end function spacing_weights
+
 
 end module mod_ll_io

@@ -97,6 +97,7 @@ type, extends(c_expl_elem) :: t_liftlin
   real(wp)              :: ctr_pt(3)
   real(wp)              :: d_2pi_coslambda
   real(wp)              :: nor_zeroLift(3)
+  real(wp)              :: twist
   real(wp)              :: alpha
   real(wp)              :: vel_2d
   real(wp)              :: vel_outplane
@@ -684,7 +685,7 @@ subroutine get_vel_ctr_pt_liftlin(this, elems, wake_elems)
  this%vel_ctr_pt = 0.0_wp
 
  ! Control point at 1/4-fraction of the chord
- x0 = this%cen - this%tang_cen * this%chord / 2.0_wp
+ x0 = 0.5_wp*( this%ver(:,1) + this%ver(:,2) )
 
  !=== Compute the velocity from all the elements ===
  do j = 1,size(wake_elems)  ! wake panels
@@ -716,8 +717,8 @@ subroutine calc_geo_data_liftlin(this, vert)
  real(wp), intent(in) :: vert(:,:)
 
  integer  :: is, nsides
- real(wp) :: nor(3), tanl(3) , cen(3)
- real(wp) :: cos_lambda
+ real(wp) :: rm(3,3), nor(3), tanl(3) , cen(3)
+ real(wp) :: cos_lambda, st, ct, mc
 
   this%ver = vert
   nsides = this%n_ver
@@ -815,6 +816,31 @@ subroutine calc_geo_data_liftlin(this, vert)
   !TODO: is it necessary to initialize it here?
   this%dforce = 0.0_wp
   this%dmom   = 0.0_wp
+
+  ! Apply twist (for non flat elements)
+  rm = rotation_matrix ( this%bnorm_cen, -this%twist )
+
+  ct = cos(-this%twist)
+  st = sin(-this%twist)
+  mc = 1.0_wp - ct
+
+  rm(2,1) = this%bnorm_cen(1)*this%bnorm_cen(2)*mc
+  rm(3,1) = this%bnorm_cen(1)*this%bnorm_cen(3)*mc
+  rm(3,2) = this%bnorm_cen(2)*this%bnorm_cen(3)*mc
+
+  rm(1,2) = rm(2,1) - this%bnorm_cen(3)*st
+  rm(2,1) = rm(2,1) + this%bnorm_cen(3)*st
+  rm(1,3) = rm(3,1) + this%bnorm_cen(2)*st
+  rm(3,1) = rm(3,1) - this%bnorm_cen(2)*st
+  rm(2,3) = rm(3,2) - this%bnorm_cen(1)*st
+  rm(3,2) = rm(3,2) + this%bnorm_cen(1)*st
+  
+  rm(1,1) = this%bnorm_cen(1)*this%bnorm_cen(1)*mc + ct
+  rm(2,2) = this%bnorm_cen(2)*this%bnorm_cen(2)*mc + ct
+  rm(3,3) = this%bnorm_cen(3)*this%bnorm_cen(3)*mc + ct
+
+  this%nor = matmul ( rm, this%nor )
+  this%tang_cen = matmul ( rm, this%tang_cen )
 
 ! ! debug ----
 ! write(*,*) ' this%cen       :' , this%cen   

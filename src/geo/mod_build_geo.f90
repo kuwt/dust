@@ -161,7 +161,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  character(len=max_char_len) :: mesh_file
  integer, allocatable :: ee(:,:)
  real(wp), allocatable :: rr(:,:)
- real(wp), allocatable :: theta_p(:) , chord_p(:)
+ real(wp), allocatable :: theta_e(:), theta_p(:), chord_p(:)
  character(len=max_char_len) :: comp_el_type
  character :: ElType
  character(len=max_char_len) :: mesh_file_type
@@ -521,18 +521,18 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                         airfoil_list   , nelem_span_list   , &
                         i_airfoil_e    , normalised_coord_e, &
                                 npoints_chord_tot, nelems_span, &
-                                chord_p,theta_p )
+                                chord_p,theta_p,theta_e )
       ! nelems_span_tot will be overwritten if symmetry is required (around l.220)
       nelems_span_tot =   nelems_span
 
       ! correction of the following list, if symmetry is required ---------
       if ( mesh_symmetry ) then
         call symmetry_update_ll_lists( nelem_span_list , &
-                       theta_p , chord_p , i_airfoil_e , normalised_coord_e )
+              theta_e, theta_p , chord_p , i_airfoil_e , normalised_coord_e )
       end if
       if ( mesh_mirror ) then
         call mirror_update_ll_lists( nelem_span_list , &
-                       theta_p , chord_p , i_airfoil_e , normalised_coord_e )
+              theta_e, theta_p , chord_p , i_airfoil_e , normalised_coord_e )
       end if
 
       ! -------------------------------------------------------------------
@@ -541,6 +541,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call write_hdf5(nelem_span_list,'nelem_span_list',geo_loc)
       call write_hdf5(theta_p,'theta_p',geo_loc)
       call write_hdf5(chord_p,'chord_p',geo_loc)
+      call write_hdf5(theta_e,'theta_e',geo_loc)
       call write_hdf5(i_airfoil_e,'i_airfoil_e',geo_loc)
       call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
 
@@ -574,7 +575,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                                   airfoil_list   , nelem_span_list   , &
                                   i_airfoil_e    , normalised_coord_e, &
                                   npoints_chord_tot, nelems_span, &
-                                  chord_p,theta_p )
+                                  chord_p,theta_p,theta_e )
       ! nelems_span_tot will be overwritten if symmetry is required (around l.220)
       nelems_span_tot =   nelems_span
 
@@ -582,11 +583,11 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       ! correction of the following list, if symmetry is required ---------
       if ( mesh_symmetry ) then
         call symmetry_update_ll_lists( nelem_span_list , &
-                       theta_p , chord_p , i_airfoil_e , normalised_coord_e )
+              theta_e, theta_p , chord_p , i_airfoil_e , normalised_coord_e )
       end if
       if ( mesh_mirror ) then
         call mirror_update_ll_lists( nelem_span_list , &
-                       theta_p , chord_p , i_airfoil_e , normalised_coord_e )
+              theta_e, theta_p , chord_p , i_airfoil_e , normalised_coord_e )
       end if
 
       ! -------------------------------------------------------------------
@@ -595,6 +596,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call write_hdf5(nelem_span_list,'nelem_span_list',geo_loc)
       call write_hdf5(theta_p,'theta_p',geo_loc)
       call write_hdf5(chord_p,'chord_p',geo_loc)
+      call write_hdf5(theta_e,'theta_e',geo_loc)
       call write_hdf5(i_airfoil_e,'i_airfoil_e',geo_loc)
       call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
 
@@ -1890,17 +1892,17 @@ end subroutine build_te_parametric
 
 !> Updates lifting lines fields in case of symmetry
 subroutine symmetry_update_ll_lists ( nelem_span_list , &
-                 theta_p , chord_p , i_airfoil_e , normalised_coord_e )
+                 theta_e, theta_p , chord_p , i_airfoil_e , normalised_coord_e )
 
  integer , allocatable , intent(inout) :: nelem_span_list(:)
  integer , allocatable , intent(inout) :: i_airfoil_e(:,:)
  real(wp), allocatable , intent(inout) :: normalised_coord_e(:,:)
- real(wp), allocatable , intent(inout) :: theta_p(:) , chord_p(:)
+ real(wp), allocatable , intent(inout) :: theta_e(:), theta_p(:), chord_p(:)
 
  integer , allocatable :: nelem_span_list_tmp(:)
  integer , allocatable :: i_airfoil_e_tmp(:,:)
  real(wp), allocatable :: normalised_coord_e_tmp(:,:)
- real(wp), allocatable :: theta_p_tmp(:) , chord_p_tmp(:)
+ real(wp), allocatable :: theta_e_tmp(:), theta_p_tmp(:), chord_p_tmp(:)
 
  integer :: nelem_span_section
  integer :: nelems
@@ -1935,6 +1937,13 @@ subroutine symmetry_update_ll_lists ( nelem_span_list , &
    normalised_coord_e_tmp( 1:2 , siz-i+1 ) = 1.0_wp - normalised_coord_e( 2:1:-1 , i )
  end do
 
+ allocate(theta_e_tmp( nelems ))
+ siz = size(theta_e)
+ do i = 1 , siz
+   theta_e_tmp( siz+i   ) = theta_e( i )
+   theta_e_tmp( siz-i+1 ) = theta_e( i )
+ end do
+
  allocate(theta_p_tmp( npts ))
  allocate(chord_p_tmp( npts ))
  siz = size(theta_p)
@@ -1948,6 +1957,7 @@ subroutine symmetry_update_ll_lists ( nelem_span_list , &
  call move_alloc(    nelem_span_list_tmp ,     nelem_span_list ) 
  call move_alloc(        i_airfoil_e_tmp ,         i_airfoil_e )
  call move_alloc( normalised_coord_e_tmp ,  normalised_coord_e )
+ call move_alloc(            theta_e_tmp ,             theta_e )
  call move_alloc(            theta_p_tmp ,             theta_p )
  call move_alloc(            chord_p_tmp ,             chord_p )
 
@@ -1957,17 +1967,17 @@ end subroutine symmetry_update_ll_lists
 
 !> Updates lifting lines fields in case of mirroring
 subroutine mirror_update_ll_lists ( nelem_span_list , &
-                 theta_p , chord_p , i_airfoil_e , normalised_coord_e )
+                 theta_e, theta_p, chord_p , i_airfoil_e , normalised_coord_e )
 
  integer , allocatable , intent(inout) :: nelem_span_list(:)
  integer , allocatable , intent(inout) :: i_airfoil_e(:,:)
  real(wp), allocatable , intent(inout) :: normalised_coord_e(:,:)
- real(wp), allocatable , intent(inout) :: theta_p(:) , chord_p(:)
+ real(wp), allocatable , intent(inout) :: theta_e(:), theta_p(:), chord_p(:)
 
  integer , allocatable :: nelem_span_list_tmp(:)
  integer , allocatable :: i_airfoil_e_tmp(:,:)
  real(wp), allocatable :: normalised_coord_e_tmp(:,:)
- real(wp), allocatable :: theta_p_tmp(:) , chord_p_tmp(:)
+ real(wp), allocatable :: theta_e_tmp(:), theta_p_tmp(:), chord_p_tmp(:)
 
  integer :: nelem_span_section
  integer :: nelem
@@ -2006,6 +2016,12 @@ subroutine mirror_update_ll_lists ( nelem_span_list , &
  do i = 1 , siz
    normalised_coord_e_tmp( 1:2 , siz-i+1 ) = 1.0_wp - normalised_coord_e( 2:1:-1 , i )
  end do
+ 
+ allocate(theta_e_tmp( size(theta_e) ))
+ siz = size(theta_e) 
+ do i = 1 , siz
+   theta_e_tmp( siz-i+1 ) = theta_e( i )
+ end do
 
  allocate(theta_p_tmp( npts ))
  allocate(chord_p_tmp( npts ))
@@ -2021,6 +2037,7 @@ subroutine mirror_update_ll_lists ( nelem_span_list , &
  call move_alloc( normalised_coord_e_tmp ,  normalised_coord_e )
  call move_alloc(            theta_p_tmp ,             theta_p )
  call move_alloc(            chord_p_tmp ,             chord_p )
+ call move_alloc(            theta_e_tmp ,             theta_e )
 
 end subroutine mirror_update_ll_lists 
 
