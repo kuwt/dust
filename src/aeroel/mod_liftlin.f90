@@ -350,6 +350,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
  integer :: n_iter_reg
  ! load computation
  logical :: load_avl
+ real(wp) :: e_l(3) , e_d(3)
 
  real(wp) :: max_mag_ll
 
@@ -601,6 +602,19 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
            0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * el%area * &
            c_m(i_l,2) * ( sin(el%al_ctr_pt) * el%nor      +  &
                           cos(el%al_ctr_pt) * el%tang_cen )
+
+      !> Update AOAs and aerodynamic coefficients
+      e_l =   el%nor * cos( el%al_ctr_pt ) - el%tang_cen * sin( el%al_ctr_pt )
+      e_d =   el%nor * sin( el%al_ctr_pt ) + el%tang_cen * cos( el%al_ctr_pt )
+      e_l = e_l / norm2(e_l)
+      e_d = e_d / norm2(e_d)
+
+      c_m(i_l,1) = sum( el % dforce * e_l ) / &
+        ( 0.5_wp * sim_param%rho_inf * u_v(i_l) ** 2.0_wp * el%area )
+      c_m(i_l,2) = sum( el % dforce * e_d ) / &
+        ( 0.5_wp * sim_param%rho_inf * u_v(i_l) ** 2.0_wp * el%area )
+      a_v(i_l) = el % al_ctr_pt
+
     else
 
       ! === elementary force = p*n + tangential contribution from L,D ===
@@ -609,6 +623,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
                     0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * ( &
                    -c_m(i_l,1) * sin(a_v(i_l)) + c_m(i_l,2) * cos(a_v(i_l)) &
                    ) ) * el%area
+
     end if
 
     ! elementary moment = 0.5 * rho * v^2 * A * c * cm, 
