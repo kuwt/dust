@@ -484,6 +484,16 @@ if (sim_param%restart_from_file) then
 !! Update the initial relative position of the ref.sys.
 !call update_relative_initial_conditions(restart_file, sim_param%ReferenceFile, geo%refs) 
 
+else ! Set to zero the intensity of all the singularities
+
+  
+  do i_el = 1 , size(elems)      ! implicit elements (vr, sp)
+     elems(i_el)%p%mag = 0.0_wp
+  end do 
+  do i_el = 1 , size(elems_expl) ! explicit elements (ll, ad)
+     elems_expl(i_el)%p%mag = 0.0_wp
+  end do 
+
 endif
 
 t22 = dust_time()
@@ -499,7 +509,6 @@ call printout(nl//'////////// Performing Computations //////////')
 time = sim_param%t0
 t_last_out = time; t_last_debug_out = time
 time_no_out = 0.0_wp; time_no_out_debug = 0.0_wp
-
 
 allocate(surf_vel_SurfPan_old(geo%nSurfpan,3)) ; surf_vel_SurfPan_old = 0.0_wp
 allocate(     nor_SurfPan_old(geo%nSurfpan,3)) ;      nor_SurfPan_old = 0.0_wp

@@ -467,7 +467,7 @@ subroutine compute_dforce_vortlatt(this)
 class(t_vortlatt), intent(inout) :: this
 !type(t_elem_p), intent(in) :: elems(:)
 
-this%dforce = this%pres * this%area * this%nor
+! this%dforce = this%pres * this%area * this%nor
 
 ! TODO: add viscosity and compressibility corrections
 
@@ -480,7 +480,7 @@ subroutine compute_dforce_dummy(this)
 class(t_vortlatt), intent(inout) :: this
 !type(t_elem_p), intent(in) :: elems(:)
 
-this%dforce = this%pres * this%area * this%nor
+! this%dforce = this%pres * this%area * this%nor
 
 ! TODO: add viscosity and compressibility corrections
 
@@ -497,6 +497,7 @@ subroutine compute_dforce_jukowski_vortlatt(this)
 
  integer :: i_stripe, j
 
+ ! === Steady contribution (KJ) ===
  gam = cross ( this % vel_ctr_pt, this%edge_vec(:,1) )
 
  i_stripe = size(this%stripe_elem)
@@ -511,6 +512,20 @@ subroutine compute_dforce_jukowski_vortlatt(this)
    this%dforce = sim_param%rho_inf * gam * this%mag
  
  end if
+
+ ! === Unsteady contribution ===
+ ! if statement to avoid singularities
+ if ( norm2( this % vel_ctr_pt ) .gt. &
+        max( 0.001_wp, 0.001_wp *norm2(sim_param%u_inf) ) ) then
+   this%dforce = this%dforce &
+               + sim_param%rho_inf * this%area * this%didou_dt &
+               * gam / norm2(gam)  ! direction
+ else
+   this%dforce = this%dforce &
+               + sim_param%rho_inf * this%area * this%didou_dt &
+               * this%nor
+ end if
+
 
 end subroutine compute_dforce_jukowski_vortlatt
 

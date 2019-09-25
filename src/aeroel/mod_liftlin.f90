@@ -109,6 +109,9 @@ type, extends(c_expl_elem) :: t_liftlin
   real(wp) :: vel_ctr_pt(3)
   real(wp) ::  al_ctr_pt
 
+  !> time derivative of the LL intensity (for unsteady loads)
+  real(wp) :: dGamma_dt
+
 contains
 
   procedure, pass(this) :: compute_pot      => compute_pot_liftlin
@@ -351,6 +354,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
  ! load computation
  logical :: load_avl
  real(wp) :: e_l(3) , e_d(3)
+ real(wp), allocatable :: Gamma_old(:)
 
  real(wp) :: max_mag_ll
 
@@ -376,6 +380,13 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   uinf = sim_param%u_inf
 
+  !> allocate and fill Gamma_old array of the ll intensity at previous dt
+  allocate(Gamma_old(size(elems_ll)))
+  do i_l = 1 , size(elems_ll)
+    Gamma_old(i_l) = elems_ll(i_l)%p%mag
+  end do
+
+  !> allocate temporary arrays
   allocate(dou_temp(size(elems_ll))) ; dou_temp = 0.0_wp
 
   !=== Compute the velocity from all the elements except for liftling elems ===
@@ -579,6 +590,11 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   enddo !solver iterations
 
+  ! === Update dGamma_dt field ===
+  do i_l = 1,size(elems_ll)
+    elems_ll(i_l)%p%dGamma_dt = ( elems_ll(i_l)%p%mag - Gamma_old(i_l) ) / &
+                                  sim_param%dt 
+  end do
 
   ! === Loads computation ===
   ! compute LL sectional loads from singularity intensities. 
@@ -588,6 +604,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
    !type is(t_liftlin)
    el => elems_ll(i_l)%p
     ! avg delta_p = \vec{F}.\vec{n} / A = ( L*cos(al)+D*sin(al) ) / A
+    !> steady pressure contribution ( overwritten below )
     el%pres   = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
                ( c_m(i_l,1) * cos(a_v(i_l)) +  c_m(i_l,2) * sin(a_v(i_l)) )
 
@@ -603,17 +620,28 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
            c_m(i_l,2) * ( sin(el%al_ctr_pt) * el%nor      +  &
                           cos(el%al_ctr_pt) * el%tang_cen )
 
-      !> Update AOAs and aerodynamic coefficients
-      e_l =   el%nor * cos( el%al_ctr_pt ) - el%tang_cen * sin( el%al_ctr_pt )
-      e_d =   el%nor * sin( el%al_ctr_pt ) + el%tang_cen * cos( el%al_ctr_pt )
+      ! === Update AOAs and aerodynamic coefficients ===
+      !> unit vector in the direction of the relative velocity (_d for drag)
+      !  and in the direction of the lift (_l for lift)
+      e_l = el%nor * cos( el%al_ctr_pt ) - el%tang_cen * sin( el%al_ctr_pt )
+      e_d = el%nor * sin( el%al_ctr_pt ) + el%tang_cen * cos( el%al_ctr_pt )
       e_l = e_l / norm2(e_l)
       e_d = e_d / norm2(e_d)
 
+      !> Unsteady contribution
+      el%dforce = el%dforce &
+                  - sim_param%rho_inf * el%area * el%dGamma_dt &
+                  * e_l ! lift direction
+
+      !> Update aerodynamic coefficients and AOA, and pressure
       c_m(i_l,1) = sum( el % dforce * e_l ) / &
         ( 0.5_wp * sim_param%rho_inf * u_v(i_l) ** 2.0_wp * el%area )
       c_m(i_l,2) = sum( el % dforce * e_d ) / &
         ( 0.5_wp * sim_param%rho_inf * u_v(i_l) ** 2.0_wp * el%area )
       a_v(i_l) = el % al_ctr_pt
+
+      !> overwrite pressure field to take into account unsteady contributions
+      el%pres = sum( el%dforce * el%nor ) / el%area
 
     else
 
@@ -623,6 +651,28 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
                     0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * ( &
                    -c_m(i_l,1) * sin(a_v(i_l)) + c_m(i_l,2) * cos(a_v(i_l)) &
                    ) ) * el%area
+
+      ! === Update AOAs and aerodynamic coefficients ===
+      !> unit vector in the direction of the relative velocity (_d for drag)
+      !  and in the direction of the lift (_l for lift)
+      e_l = el%nor * cos( a_v(i_l) ) - el%tang_cen * sin( a_v(i_l) )
+      e_d = el%nor * sin( a_v(i_l) ) + el%tang_cen * cos( a_v(i_l) )
+      e_l = e_l / norm2(e_l)
+      e_d = e_d / norm2(e_d)
+
+      !> Unsteady contribution
+      el%dforce = el%dforce &
+                  - sim_param%rho_inf * el%area * el%dGamma_dt &
+                  * e_l ! lift direction
+
+      !> Update aerodynamic coefficients and AOA, and pressure
+      c_m(i_l,1) = sum( el % dforce * e_l ) / &
+        ( 0.5_wp * sim_param%rho_inf * u_v(i_l) ** 2.0_wp * el%area )
+      c_m(i_l,2) = sum( el % dforce * e_d ) / &
+        ( 0.5_wp * sim_param%rho_inf * u_v(i_l) ** 2.0_wp * el%area )
+
+      !> overwrite pressure field to take into account unsteady contributions
+      el%pres = sum( el%dforce * el%nor ) / el%area
 
     end if
 
@@ -753,7 +803,8 @@ subroutine calc_geo_data_liftlin(this, vert)
                this%ver(:,4) - this%ver(:,2)     )
 
   ! -- 0.75 chord -- look for other "0.75 chord" tag
-  this%area = 0.5_wp * norm2(nor) / 0.75_wp 
+! this%area = 0.5_wp * norm2(nor) / 0.75_wp 
+  this%area = 0.5_wp * norm2(nor)
   this%nor = nor / norm2(nor)   ! then overwritten
 
   ! *** 2019-02-27 ***
@@ -789,7 +840,7 @@ subroutine calc_geo_data_liftlin(this, vert)
   ! -- 0.75 chord -- look for other "0.75 chord" tag
   ! correct the chord value ----
   this%chord = sum(this%edge_len((/2,4/)))*0.5_wp
-  this%chord = this%chord / 0.75_wp
+! this%chord = this%chord / 0.75_wp
 
   ! === Piszkin, Lewinski (1976) LL model for swept wings ===
   ! - cos_lambda = cos(lambda) , where lambda is the local sweep angle
