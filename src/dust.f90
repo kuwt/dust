@@ -78,7 +78,8 @@ use mod_vortlatt, only: &
   t_vortlatt
 
 use mod_liftlin, only: &
- update_liftlin, solve_liftlin, t_liftlin_p
+ update_liftlin, solve_liftlin, t_liftlin_p, &
+ build_ll_array_optim, solve_liftlin_optim
 
 use mod_actuatordisk, only: &
  update_actdisk
@@ -196,6 +197,8 @@ character(len=max_char_len) :: basename_debug
 real(wp) , allocatable :: res_old(:)
 real(wp) , allocatable :: surf_vel_SurfPan_old(:,:)
 real(wp) , allocatable ::      nor_SurfPan_old(:,:)
+
+real(wp) , allocatable :: M_array(:,:)
 
 integer :: i_el , i, sel
 
@@ -503,6 +506,17 @@ if(sim_param%debug_level .ge. 1) then
   call printout(message)
 endif
 
+! === LL derivative array for solution as an optimisation problem ===
+if ( size(elems_ll) .gt. 0 ) then 
+  call build_ll_array_optim( elems_ll , M_array )
+end if
+
+! ! debug ---
+! do it = 1 , size(elems_ll)
+!   write(*,*) it , M_array( it , max(1,it-3) : min(it+3,size(elems_ll)) )
+! end do
+! write(*,*) ' stop in dust.f90, l.516.' ; stop
+! debug ---
 
 !====== Time Cycle ======
 call printout(nl//'////////// Performing Computations //////////')
@@ -600,8 +614,11 @@ do it = 1,nstep
 
   !------ Update the explicit part ------  % v-----implicit elems: p,v
   if ( size(elems_ll) .gt. 0 ) then
-    call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
-            (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it)
+!   call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
+!           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it)
+    call solve_liftlin_optim(elems_ll, elems_tot, elems , elems_ad , &
+            (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it, &
+            M_array )
   end if
 
   !------ Compute loads -------

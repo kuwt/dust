@@ -79,7 +79,8 @@ use mod_aeroel, only: &
 
 implicit none
 
-public :: t_liftlin, t_liftlin_p, update_liftlin, solve_liftlin
+public :: t_liftlin, t_liftlin_p, update_liftlin, solve_liftlin ,  &
+          build_ll_array_optim, solve_liftlin_optim
 
 
 !----------------------------------------------------------------------
@@ -308,6 +309,331 @@ subroutine update_liftlin(elems_ll, linsys)
 end subroutine update_liftlin
 
 !----------------------------------------------------------------------
+subroutine build_ll_array_optim( elems_ll , M )
+ type(t_liftlin_p)     , intent(in)  :: elems_ll(:)
+ real(wp), allocatable , intent(out) :: M(:,:)
+
+ integer, allocatable :: global_to_local_ll(:)
+
+ integer :: i_l , n_l , j , n_neigh , max_ll_id
+
+ n_l = size(elems_ll)
+
+ allocate(M(n_l,n_l)) 
+
+ !> array linking global id of ll to ll-indexing
+ max_ll_id = elems_ll(1)%p%id
+ do i_l = 1 , n_l
+   max_ll_id = max( max_ll_id , elems_ll(i_l)%p%id )
+ end do 
+
+ allocate(global_to_local_ll(max_ll_id)) ; global_to_local_ll = 0
+ do i_l = 1 , n_l
+   global_to_local_ll( elems_ll(i_l)%p%id ) = i_l
+ end do
+
+ do i_l = 1 , n_l
+
+   n_neigh = 0
+
+   !> Out-Of-Diagonal elements
+   do j = 1 , size( elems_ll(i_l)%p%neigh )
+     if ( associated(elems_ll(i_l)%p%neigh(j)%p) ) then
+       M(i_l, &
+         global_to_local_ll( elems_ll(i_l)%p%neigh(j)%p%id ) ) = 1.0_wp
+       n_neigh = n_neigh + 1
+     end if
+   end do 
+
+   !> Diagonal element
+   if ( n_neigh .eq. 1 ) then
+       M(i_l,i_l) = -1.0_wp
+   elseif ( n_neigh .eq. 2 ) then
+       M(i_l,i_l) = -2.0_wp
+   else
+     write(*,*) ' Warning: elems_ll(', i_l , ') has no neighbor.'
+   end if
+
+ end do
+
+ M = matmul( M , M )
+
+ deallocate(global_to_local_ll)
+
+end subroutine build_ll_array_optim
+
+!----------------------------------------------------------------------
+subroutine solve_liftlin_optim( &
+                         elems_ll, elems_tot, &
+                         elems_impl, elems_ad, &
+                         elems_wake, elems_vort, &
+                         airfoil_data, it, M_array )
+
+  type(t_liftlin_p)  , intent(inout) :: elems_ll(:)
+  type(t_pot_elem_p) , intent(in)    :: elems_tot(:)
+  type(t_impl_elem_p), intent(in)    :: elems_impl(:)
+  type(t_expl_elem_p), intent(in)    :: elems_ad(:)
+  type(t_pot_elem_p) , intent(in)    :: elems_wake(:)
+  type(t_vort_elem_p), intent(in)    :: elems_vort(:)
+  type(t_aero_tab)   , intent(in)    :: airfoil_data(:)
+  integer            , intent(in)    :: it
+  real(wp)           , intent(in)    :: M_array(:,:)
+
+  real(wp) :: vel(3) , v(3) , up(3)
+  real(wp), allocatable :: vel_w(:,:)
+  real(wp) :: unorm , alpha , alpha_2d
+  !> Gam, Lam, grad_Gam, grad_Lam (for gradient descent)
+  real(wp), allocatable :: Gam(:) , Lam(:) , Gamma_old(:)
+  real(wp), allocatable :: grad_Gam(:) , grad_Lam(:) , df_dGam(:,:) , f_Gam(:)
+  real(wp), allocatable :: a_ik(:,:,:)
+  !> uinf
+  real(wp) :: uinf(3)
+  real(wp) :: mach , reynolds ! mach and reynolds number for each el
+  ! arrays used to store aoa, aero coeff and vel
+  real(wp) , allocatable :: a_v(:)   ! size(elems_ll)
+  real(wp) , allocatable :: c_m(:,:) ! size(elems_ll) , 3
+  real(wp) , allocatable :: u_v(:)   ! size(elems_ll)
+  real(wp) , allocatable :: dcl_v(:) ! size(elems_ll)
+  real(wp) , allocatable :: aero_coeff(:)
+  real(wp) :: dcl_da
+  real(wp) :: diff , max_mag_ll
+  !> sim_param: fixed point algorithm for ll
+  real(wp) :: fp_tol , fp_damp
+  integer  :: fp_maxIter
+  !> sim_param: load computation
+  logical :: load_avl
+
+  type(t_liftlin), pointer :: el
+  integer :: i_l , j , ic
+ 
+  ! params of the fixed point iterations
+  fp_tol     = sim_param%llTol
+  fp_damp    = sim_param%llDamp
+  fp_maxIter = sim_param%llMaxIter
+  ! param for load computation
+  load_avl   = sim_param%llLoadsAVL
+ 
+  uinf = sim_param%u_inf
+
+  !> allocate and fill Gamma_old array of the ll intensity at previous dt
+  allocate(Gamma_old(size(elems_ll)))
+  do i_l = 1 , size(elems_ll)
+    Gamma_old(i_l) = elems_ll(i_l)%p%mag
+  end do
+
+  !=== Compute the velocity from all the elements except for liftling elems ===
+  ! and store it outside the loop, since it is constant
+  allocate(vel_w(3,size(elems_ll))) ; vel_w = 0.0_wp 
+!$omp parallel do private(i_l, j, v) schedule(dynamic)
+  do i_l = 1,size(elems_ll)
+    do j = 1,size(elems_impl) ! body panels: liftlin, vor che tenga contotlat 
+      call elems_impl(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
+      vel_w(:,i_l) = vel_w(:,i_l) + v
+    enddo
+    do j = 1,size(elems_ad) ! actuator disks 
+      call elems_ad(j)%p%compute_vel(  elems_ll(i_l)%p%cen,uinf,v)
+      vel_w(:,i_l) = vel_w(:,i_l) + v
+    enddo
+    do j = 1,size(elems_wake) ! wake panels
+      call elems_wake(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
+      vel_w(:,i_l) = vel_w(:,i_l) + v
+    enddo
+    do j = 1,size(elems_vort) ! wake vort
+      call elems_vort(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
+      vel_w(:,i_l) = vel_w(:,i_l) + v
+    enddo
+    if(sim_param%use_fmm) vel_w(:,i_l) = vel_w(:,i_l) + elems_ll(i_l)%p%uvort*4.0_wp*pi
+  enddo
+!$omp end parallel do
+
+  vel_w = vel_w/(4.0_wp*pi)
+
+  ! allocate array containing aoa, aero coeffs and relative velocity
+  allocate(   a_v( size(elems_ll)  )) ;   a_v = 0.0_wp
+  allocate(   c_m( size(elems_ll),3)) ;   c_m = 0.0_wp
+  allocate(   u_v( size(elems_ll)  )) ;   u_v = 0.0_wp
+  allocate( dcl_v( size(elems_ll)  )) ; dcl_v = 0.0_wp
+
+  ! Remove the "out-of-plane" component of the relative velocity:
+  ! 2d-velocity to enter the airfoil look-up-tables
+  ! IS THIS LOOP USED? (u_v) seems to be overwritten few lines down)
+!$omp parallel do private(i_l, el) schedule(dynamic,4)
+  do i_l=1,size(elems_ll)
+   !select type(el => elems_ll(i_l)%p)
+   !type is(t_liftlin)
+     el => elems_ll(i_l)%p
+     u_v(i_l) = norm2((uinf-el%ub) - &
+         el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub))) 
+     el%vel_2d_isolated = norm2((uinf-el%ub) - &
+                          el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
+     el%vel_outplane_isolated = sum(el%bnorm_cen*(uinf-el%ub))
+     el%alpha_isolated = atan2(sum((uinf-el%ub)*el%nor), &
+                               sum((uinf-el%ub)*el%tang_cen))*180.0_wp/pi
+   !end select
+  end do
+!$omp end parallel do
+
+  ! === Allocate and initialize Gam and Lam arrays ===
+  allocate(     Gam(size(elems_ll))) ;      Gam = Gamma_old 
+  allocate(     Lam(size(elems_ll))) ;      Lam = 1.0_wp
+  allocate(grad_Gam(size(elems_ll))) ; grad_Gam = 0.0_wp
+  allocate(grad_Lam(size(elems_ll))) ; grad_Lam = 0.0_wp
+  allocate(   f_Gam(size(elems_ll))) ;    f_Gam = 0.0_wp
+  allocate( df_dGam(size(elems_ll),size(elems_ll))) ;  df_dGam = 0.0_wp
+
+  ! === Save AIC for derivatives d(alpha)/d(gamma) ===
+  allocate( a_ik( size(elems_ll) , size(elems_ll) , 3 ) ) ; a_ik = 0.0_wp
+  !> set intensity of the ll elems to 1, to compute AICs
+  do i_l = 1 , size(elems_ll)
+    elems_ll(i_l)%p%mag = 1.0_wp
+  end do 
+  !> compute AICs for derivatives
+  do i_l = 1 , size(elems_ll)
+    do j = 1 , size(elems_ll)
+      call elems_ll(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf, a_ik(i_l,j,:) )
+    end do
+  end do
+  !> set intensity of the ll elems to their actual value
+  do i_l = 1 , size(elems_ll)
+    elems_ll(i_l)%p%mag = Gamma_old(i_l)
+  end do 
+
+  ! === Iterative algorithm ===
+  do ic = 1 , fp_maxIter
+
+    !> Reset diff and max_mag_ll variables
+    diff = 0.0_wp ; max_mag_ll = 0.0_wp
+
+!$omp parallel do private(i_l, el, j, v, vel, up, unorm, alpha, alpha_2d, mach, &
+!$omp& reynolds, aero_coeff, dcl_da) schedule(dynamic,4)
+    do i_l = 1 , size(elems_ll)
+ 
+      ! === Compute velocity ===
+      !> LL influence ( to be divided by 4*pi )
+      vel = 0.0_wp
+      do j = 1 , size(elems_ll)
+        call elems_ll(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
+        vel = vel + v
+      enddo
+
+      el => elems_ll(i_l)%p
+
+      !> overall relative velocity computed in the centre of the ll elem
+      vel = vel/(4.0_wp*pi) + uinf - el%ub + vel_w(:,i_l)
+      !> "effective" velocity = proj. of vel in the n-t plane
+      up =  el%nor*sum(el%nor*vel) + el%tang_cen*sum(el%tang_cen*vel)
+      unorm = norm2(up)      ! velocity w/o induced velocity
+      
+      ! === Angle of incidence (full velocity) ===
+      alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
+      alpha = alpha * 180.0_wp/pi  ! .c81 tables defined with angles in [deg]
+
+      ! === Piszkin, Lewinski (1976) LL model for swept wings ===
+      ! the control point is approximately at 3/4 of the chord, but the induced
+      ! angle of incidence needs to be modified, introducing a "2D correction"
+      !
+      !> "2D correction" of the induced angle
+      alpha_2d = el%mag / ( pi * el%chord * unorm ) *180.0_wp/pi
+      alpha = alpha - alpha_2d 
+      ! =========================================================
+
+      ! === Mach and Reynolds numbers ===
+      mach     = unorm / sim_param%a_inf      
+      reynolds = sim_param%rho_inf * unorm * el%chord / sim_param%mu_inf    
+
+      ! === Read the aero coeff from .c81 tables ===
+      call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil , &
+                                 (/alpha, mach, reynolds/) , sim_param , &
+                                                  aero_coeff ,  dcl_da )
+
+      ! === Fill arrays for iterative method ===
+      u_v(  i_l)   = unorm
+      a_v(  i_l)   = alpha * pi / 180.0_wp
+      c_m(  i_l,:) = aero_coeff
+      dcl_v(i_l)   = dcl_da
+
+    end do
+!$omp end parallel do
+
+    ! debug ---
+    write(*,*) ' i_l , alpha[rad] , alpha[deg] , cl , dcl_da '
+    do i_l = 1 , size(elems_ll)
+      write(*,*) i_l , a_v(i_l) , a_v(i_l)*180.0_wp/pi , c_m(i_l,1) , dcl_v(i_l) 
+    end do
+    write(*,*) ' stop in mod_liftlin.f90, l.563' ; stop
+    ! debug ---
+
+    !> Compute gradient
+    df_dGam = 0.0_wp ! compute_df_dlam()
+    f_Gam   = 0.0_wp ! compute_f_lam()
+    do i_l = 1 , size(elems_ll)
+      f_Gam(i_l) = 0.5_wp * u_v(i_l) * c_m(i_l,1) * elems_ll(i_l)%p%chord  
+    end do
+    do i_l = 1 , size(elems_ll)
+      do j = 1 , size(elems_ll)
+        df_dGam(i_l,j) = 0.5_wp * elems_ll(i_l)%p%chord * &
+                         dcl_v(i_l) * &
+                         sum( a_ik(i_l,j,:) * ( &
+                         elems_ll(i_l)%p%nor      * cos(a_v(i_l)) &
+                       - elems_ll(i_l)%p%tang_cen * sin(a_v(i_l)) ) )
+      end do
+    end do
+
+    grad_Gam = matmul( M_array , Gam ) + Lam + matmul(transpose(df_dGam), Lam)
+    grad_Lam = Gam + f_Gam
+
+!   ! debug ---
+!   write(*,*) ' minval , maxval : '
+!   write(*,*) ' M_array : ' , minval(M_array ) , maxval(M_array )
+!   write(*,*) ' Gam     : ' , minval(Gam     ) , maxval(Gam     )
+!   write(*,*) ' Lam     : ' , minval(Lam     ) , maxval(Lam     )
+!   write(*,*) ' grad_Gam: ' , minval(grad_Gam) , maxval(grad_Gam)
+!   write(*,*) ' grad_Lam: ' , minval(grad_Lam) , maxval(grad_Lam)
+!   ! debug ---
+
+    diff = 0.0_wp
+    !> Update ll intensity
+    do i_l = 1 , size(elems_ll)
+
+      diff = max( diff ,               0.001_wp * abs(grad_Gam(i_l) ) )
+      !>> Gradient descent
+      !> Update ll intensity
+      Gam(i_l) = Gam(i_l)            - 0.001_wp * grad_Gam(i_l)
+      elems_ll(i_l)%p%mag = Gam(i_l)
+      !> Update constraint value
+      Lam(i_l) = Lam(i_l)            - 0.001_wp * grad_Lam(i_l)
+      
+      !>> Other optimization algorithms ???
+      ! ...
+
+      !> Update max_mag_ll 
+      max_mag_ll = max(max_mag_ll,abs(elems_ll(i_l)%p%mag))
+
+    enddo
+
+    !> Stopping criterion
+    write(*,*) diff
+    write(*,*) max_mag_ll
+    write(*,*) fp_tol
+    if ( diff .lt. fp_tol*max_mag_ll ) exit ! convergence
+
+    write(*,*) ' J(',ic,'): ' , 0.5_wp*sum( Gam*matmul(M_array,Gam) )
+
+  end do
+
+  ! === Load computations === ( same as solve_liftlin() routine )
+  ! ...
+
+
+  ! === Deallocations ==
+  deallocate(Gam, Lam, grad_Gam, grad_Lam, df_dGam, f_Gam, Gamma_old)
+  deallocate(a_v, c_m, u_v, dcl_v)
+  deallocate(a_ik)
+
+
+end subroutine solve_liftlin_optim
+
+!----------------------------------------------------------------------
 
 !> Solve the lifting line, in an iterative way
 !!
@@ -362,9 +688,23 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
  integer, intent(in) :: it
 
- 
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name = 'solve_liftlin'
+
+!! debug ---
+!do i_l = 1 , size(elems_ll)
+!  if ( ( allocated(elems_ll(i_l)%p%neigh  ) ) .and. &
+!       (associated(elems_ll(i_l)%p        ) ) ) then 
+!    do i = 1 , size(elems_ll(i_l)%p%neigh)
+!      if ( associated( elems_ll(i_l)%p%neigh(i)%p ) ) then
+!        write(*,*) elems_ll(i_l)%p%neigh(i)%p%id
+!      end if
+!    end do
+!  end if
+!end do
+!write(*,*) ' stop in mod_liftlin.f90, around l. 370' ; stop
+!! debug ---
+
 
   ! params of the fixed point iterations
   fp_tol     = sim_param%llTol
@@ -697,7 +1037,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   endif
 
   ! useful arrays ---
-  deallocate(dou_temp, vel_w)
+  deallocate(dou_temp, vel_w, Gamma_old)
   deallocate(a_v,c_m,u_v)
   
 
