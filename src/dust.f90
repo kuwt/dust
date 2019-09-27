@@ -79,7 +79,8 @@ use mod_vortlatt, only: &
 
 use mod_liftlin, only: &
  update_liftlin, solve_liftlin, t_liftlin_p, &
- build_ll_array_optim, solve_liftlin_optim
+ build_ll_array_optim, solve_liftlin_optim , &
+ solve_liftlin_newton, solve_liftlin_piszkin
 
 use mod_actuatordisk, only: &
  update_actdisk
@@ -616,9 +617,13 @@ do it = 1,nstep
   if ( size(elems_ll) .gt. 0 ) then
 !   call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
 !           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it)
-    call solve_liftlin_optim(elems_ll, elems_tot, elems , elems_ad , &
-            (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it, &
-            M_array )
+!   call solve_liftlin_optim(elems_ll, elems_tot, elems , elems_ad , &
+!           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it, &
+!           M_array )
+!   call solve_liftlin_newton(elems_ll, elems_tot, elems , elems_ad , &
+!           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it)
+    call solve_liftlin_piszkin(elems_ll, elems_tot, elems , elems_ad , &
+            (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it)
   end if
 
   !------ Compute loads -------

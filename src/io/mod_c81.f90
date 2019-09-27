@@ -369,7 +369,7 @@ subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
       
       ! Some checks ----
       if ( nRe .eq. 1 ) then ! .c81 defined just for one Reynolds number
-    
+
         call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(1)%coeff , &
                                                    aero_par(1:2) , coeff1 , &
                                                                   dcl_da1 )
@@ -382,9 +382,12 @@ subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
         end if
 
         coeff_airfoil(i_a,:) = coeff1
-    
+
+        ! === dcl_da derivative ===
+        dcl_da_airfoil(i_a) = dcl_da1
+
       else ! .c81 defined for more than one Reynolds number 
-    
+
         ! Some checks ----
         if ( reyn .lt. airfoil_data(id_a)%aero_coeff(1)%Re ) then
           reyn1 = airfoil_data(id_a)%aero_coeff(1)%Re
@@ -421,6 +424,7 @@ subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
 
         ! === dcl_da derivative ===
         if ( present( dcl_da ) ) then
+          if ( .not. allocated(dcl_da_airfoil) ) allocate(dcl_da_airfoil(2))
           dcl_da_airfoil(i_a) = ( dcl_da1 * ( reyn2 - reyn ) + dcl_da2 * ( reyn - reyn1 ) ) /  &
                                 ( reyn2 - reyn1 )
         end if
