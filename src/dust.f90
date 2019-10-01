@@ -897,6 +897,9 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   
     sim_param%reset_time = getlogical(prms,'reset_time')
     sim_param%restart_file = getstr(prms,'restart_file')
+    !Removing leading "./" if present to avoid issues when restarting
+    if(sim_param%basename(1:2) .eq. './') sim_param%basename = sim_param%basename(3:)
+    if(sim_param%restart_file(1:2) .eq. './') sim_param%restart_file = sim_param%restart_file(3:)
     call printout('RESTART: restarting from file: '//trim(sim_param%restart_file))
     sim_param%GeometryFile = sim_param%restart_file(1:len(trim(sim_param%restart_file))-11)&
                                                              &//'geo.h5'
