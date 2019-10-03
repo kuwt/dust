@@ -80,7 +80,8 @@ use mod_vortlatt, only: &
 use mod_liftlin, only: &
  update_liftlin, solve_liftlin, t_liftlin_p, &
  build_ll_array_optim, solve_liftlin_optim , &
- solve_liftlin_newton, solve_liftlin_piszkin
+ solve_liftlin_newton, solve_liftlin_piszkin, &
+ solve_liftlin_optim_regul
 
 use mod_actuatordisk, only: &
  update_actdisk
@@ -199,7 +200,7 @@ real(wp) , allocatable :: res_old(:)
 real(wp) , allocatable :: surf_vel_SurfPan_old(:,:)
 real(wp) , allocatable ::      nor_SurfPan_old(:,:)
 
-real(wp) , allocatable :: M_array(:,:)
+real(wp) , allocatable :: M_array(:,:) , al_kernel(:,:)
 
 integer :: i_el , i, sel
 
@@ -374,6 +375,7 @@ call init_sim_param(sim_param, prms, nout, output_start)
 dt_debug_out = getreal(prms, 'dt_debug_out')
 basename_debug = getstr(prms,'basename_debug')
 
+sim_param%basename_debug = basename_debug
 
 !-- Parameters Initializations --
 call initialize_doublet()
@@ -509,7 +511,7 @@ endif
 
 ! === LL derivative array for solution as an optimisation problem ===
 if ( size(elems_ll) .gt. 0 ) then 
-  call build_ll_array_optim( elems_ll , M_array )
+  call build_ll_array_optim( elems_ll , M_array , al_kernel )
 end if
 
 ! ! debug ---
@@ -532,7 +534,7 @@ allocate(res_old(size(elems))) ; res_old = 0.0_wp
 
 t11 = dust_time()
 do it = 1,nstep
-  
+ 
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
                                         nstep, ' simulation time: ', time
@@ -553,7 +555,6 @@ do it = 1,nstep
   call update_liftlin(elems_ll,linsys)
   call update_actdisk(elems_ad,linsys)
 
-  
   !debug geometry printing
   if((sim_param%debug_level .ge. 16).and.time_2_debug_out)&
             call debug_printout_geometry(elems, geo, basename_debug, it)
@@ -581,7 +582,7 @@ do it = 1,nstep
                          trim(basename_debug)//'Apres_'//trim(frmt)//'.dat', &
                          trim(basename_debug)//'bpres_'//trim(frmt)//'.dat')
   endif
-      
+
   !------ Solve the pressure system ------
   if ( it .gt. 1 .and. geo%nSurfPan .gt. 0 ) then
     call solve_pressure_sys(linsys)
@@ -594,7 +595,6 @@ do it = 1,nstep
   endif
   t1 = dust_time()
 
-
   sel = size(elems) 
   ! compute time derivative of the result ( = i_vortex = -i_doublet ) -------
 !$omp parallel do private(i_el)
@@ -603,7 +603,7 @@ do it = 1,nstep
   end do
 !$omp end parallel do
   res_old = linsys%res
-  
+
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
     call printout(message)
@@ -620,10 +620,15 @@ do it = 1,nstep
 !   call solve_liftlin_optim(elems_ll, elems_tot, elems , elems_ad , &
 !           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it, &
 !           M_array )
+!   call solve_liftlin_optim_regul(elems_ll, elems_tot, elems , elems_ad , &
+!           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it, &
+!           M_array )
 !   call solve_liftlin_newton(elems_ll, elems_tot, elems , elems_ad , &
-!           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it)
+!           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it, &
+!           M_array )
     call solve_liftlin_piszkin(elems_ll, elems_tot, elems , elems_ad , &
-            (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it)
+            (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it,&
+             al_kernel )
   end if
 
   !------ Compute loads -------
@@ -666,7 +671,7 @@ do it = 1,nstep
       end select
     end do
   endif
-     
+
   ! Explicit elements:
   ! - liftlin: _pres and _dforce computed in solve_liftin()
   ! - actdisk: avg delta_pressure and force computed here,

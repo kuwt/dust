@@ -68,6 +68,10 @@ public :: t_sim_param, sim_param
 private
 
 type t_sim_param
+
+  !For debugging purpose
+  character(max_char_len) :: basename_debug
+
   !Time:
   !> Start time
   real(wp) :: t0
