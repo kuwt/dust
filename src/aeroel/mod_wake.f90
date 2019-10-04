@@ -235,12 +235,6 @@ type :: t_wake
  !> Magnitude of particles vorticity
  real(wp), allocatable :: prt_ivort(:)
 
- !> Rate of change of the particles vorticity
- real(wp), allocatable :: prt_vortevol(:,:)
-
- !> Velocity of the particles !!!! now used for rotational effects on pressure !!!!
- !real(wp), allocatable :: prt_vel(:,:)
-
  !> Wake particles pointer
  type(t_vortpart_p), allocatable :: part_p(:)
 
@@ -997,21 +991,11 @@ subroutine update_wake(wake, elems, octree)
 
   !==>    Particles: evolve the position in time
 
-  allocate(wake%prt_vortevol(3,wake%n_prt))
-  wake%prt_vortevol = 0.0_wp
-
-  !if ( allocated(wake%prt_vel) ) deallocate(wake%prt_vel)
-  !allocate(wake%prt_vel(3,wake%n_prt))
-
-
   !calculate the velocities at the points
 !$omp parallel do private(pos_p, vel_p, ip, iq,  stretch, diff, df, str)
   do ip = 1, wake%n_prt
+    wake%part_p(ip)%p%stretch = 0.0_wp
 
-    if (sim_param%use_vs .or. sim_param%use_vd) then
-      wake%part_p(ip)%p%stretch => wake%prt_vortevol(:,ip)
-    endif
-    
     !If not using the fast multipole, update particles position now
     if (.not.sim_param%use_fmm) then
       pos_p = wake%part_p(ip)%p%cen
@@ -1040,7 +1024,8 @@ subroutine update_wake(wake, elems, octree)
         !             wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, str)
         !  stretch = stretch + str/(4.0_wp*pi)
         !enddo
-        wake%prt_vortevol(:,ip) = wake%prt_vortevol(:,ip) + stretch
+        wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch + stretch
+
       endif !use_vs
 
       !if using the vortex diffusion, calculate it now
@@ -1053,7 +1038,7 @@ subroutine update_wake(wake, elems, octree)
           diff = diff + df*sim_param%nu_inf
         endif 
         enddo !iq
-        wake%prt_vortevol(:,ip) = wake%prt_vortevol(:,ip) + diff
+        wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch + diff
       endif !use_vd
     end if !use_fmm
 
@@ -1293,7 +1278,7 @@ subroutine complete_wake(wake, geo, elems)
         wake%part_p(ip)%p%cen = pos_p
         if(sim_param%use_vs .or. sim_param%use_vd) then
           alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
-                          wake%prt_vortevol(:,ip)*sim_param%dt
+                          wake%part_p(ip)%p%stretch*sim_param%dt
           alpha_p_n = norm2(alpha_p)
           if(alpha_p_n .le. wake%part_p(ip)%p%mag) then
             wake%part_p(ip)%p%mag = alpha_p_n
@@ -1310,10 +1295,9 @@ subroutine complete_wake(wake, geo, elems)
     endif
     !nullify(wake%part_p(ip)%p%npos)
     !nullify(wake%part_p(ip)%p%vel)
-    if(sim_param%use_vs) nullify(wake%part_p(ip)%p%stretch)
+    !if(sim_param%use_vs) nullify(wake%part_p(ip)%p%stretch)
   enddo
 !$omp end parallel do
-  deallocate(wake%prt_vortevol)
 
   !==> Particles: if the panel wake is at the end, create a particle
   if(wake%full_panels) then

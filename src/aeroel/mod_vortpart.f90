@@ -84,7 +84,8 @@ type, extends(c_vort_elem) :: t_vortpart
   !> Orientation of the vorticity vector
   real(wp) :: dir(3)
   real(wp) :: vel(3)
-  real(wp), pointer :: stretch(:)
+  real(wp) :: vel_old(3)
+  real(wp) :: stretch(3)
   logical :: free=.true.
   real(wp) :: turbvisc
 contains
