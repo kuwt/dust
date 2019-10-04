@@ -315,6 +315,10 @@ call prms%CreateIntOption('LLstallRegularisationNiters', &
        'Number of timesteps between two regularisations', '1' )
 call prms%CreateRealOption('LLstallRegularisationAlphaStall', &
        'Stall angle used as threshold for regularisation [deg]', '15.0' )
+call prms%CreateRealOption('LLartificialViscosity', &
+       'Constant artificial viscosity for regularisation', '0.0' )
+call prms%CreateLogicalOption('LLartificialViscosityAdaptive', &
+       'Adaptive artificial viscosity algorithm', 'F' )
 call prms%CreateLogicalOption('LLloadsAVL', & 
        'Use AVL expression for inviscid load computation','T')
 
@@ -510,8 +514,10 @@ if(sim_param%debug_level .ge. 1) then
 endif
 
 ! === LL derivative array for solution as an optimisation problem ===
-if ( size(elems_ll) .gt. 0 ) then 
+if ( size(elems_ll) .gt. 0 ) then
+  write(*,*) ' caaaazzo ' 
   call build_ll_array_optim( elems_ll , M_array , al_kernel )
+  write(*,*) ' culo ' 
 end if
 
 ! ! debug ---
@@ -886,8 +892,10 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%llStallRegularisationNelems     = getint(    prms, 'LLstallRegularisationNelems')
   sim_param%llStallRegularisationNiters     = getint(    prms, 'LLstallRegularisationNiters')
   sim_param%llStallRegularisationAlphaStall = getreal(   prms, 'LLstallRegularisationAlphaStall')
+  sim_param%llArtificialViscosity           = getreal(   prms, 'LLartificialViscosity')
+  sim_param%llArtificialViscosityAdaptive   = getlogical(prms, 'LLartificialViscosityAdaptive')
   sim_param%llLoadsAVL                      = getlogical(prms, 'LLloadsAVL')
-  
+ 
   !Octree and FMM parameters
   sim_param%use_fmm = getlogical(prms, 'FMM')
   if(sim_param%use_fmm) then

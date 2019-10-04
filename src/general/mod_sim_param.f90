@@ -173,6 +173,10 @@ type t_sim_param
   integer  :: llStallRegularisationNiters
   !> Reference stall AOA for regularisation
   real(wp) :: llStallRegularisationAlphaStall
+  !> Constant Artificial Viscosity for regularisation
+  real(wp) :: llArtificialViscosity
+  !> Adaptive Artificial Viscosity algorithm
+  logical  :: llArtificialViscosityAdaptive
   !> Use AVL expression for inviscid load computation ( ~ VL )
   logical  :: llLoadsAVL
 

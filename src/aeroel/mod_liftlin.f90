@@ -734,21 +734,108 @@ subroutine solve_liftlin_newton( &
 end subroutine solve_liftlin_newton
 
 !----------------------------------------------------------------------
+subroutine update_kernel( elems_ll , kernel_in , dcl_v , kernel_out , f_chord_v )
+ type(t_liftlin_p)     , intent(in)  :: elems_ll(:)
+ real(wp), allocatable , intent(in)  :: dcl_v(:)
+ real(wp), allocatable , intent(in)  :: kernel_in(:,:)
+ real(wp), allocatable , intent(out) :: kernel_out(:,:)
+
+ integer , allocatable :: global_to_local_ll(:)
+ real(wp), allocatable :: p_v(:)
+
+ real(wp), allocatable , intent(out) :: f_chord_v(:)
+ real(wp) :: sigma
+
+ integer :: i_l , j_l , n_l , j , n_neigh , max_ll_id
+
+ real(wp) :: p_tilde = 0.5_wp
+
+ n_l = size(elems_ll)
+
+ allocate( f_chord_v(n_l) ) ; f_chord_v = 0.0_wp
+ allocate(p_v(n_l))
+ p_v = matmul( kernel_in , dcl_v )
+ p_v = abs( dcl_v - p_v )
+
+ p_v = p_v / p_tilde
+ 
+ do i_l = 1 , n_l ! cubic function
+   if ( p_v(i_l) .lt. 1.0_wp ) then
+     f_chord_v(i_l) = sim_param%llArtificialViscosity * ( &
+                   3.0_wp * p_v(i_l)**2.0_wp - 2.0_wp * p_v(i_l)**3.0_wp ) 
+   else
+     f_chord_v(i_l) = sim_param%llArtificialViscosity
+   end if 
+ end do
+ 
+ deallocate(p_v)
+
+ !> array linking global id of ll to ll-indexing
+ max_ll_id = elems_ll(1)%p%id
+ do i_l = 1 , n_l
+   max_ll_id = max( max_ll_id , elems_ll(i_l)%p%id )
+ end do 
+
+ allocate(global_to_local_ll(max_ll_id)) ; global_to_local_ll = 0
+ do i_l = 1 , n_l
+   global_to_local_ll( elems_ll(i_l)%p%id ) = i_l
+ end do
+
+ ! === Kernel ===
+ allocate(kernel_out(n_l,n_l)) ; kernel_out = 0.0_wp 
+
+ !> Normal distribution
+ do i_l = 1 , n_l
+
+   if ( f_chord_v(i_l) .eq. 0.0_wp ) then
+
+     kernel_out(i_l,i_l) = 1.0_wp 
+
+   else
+
+     sigma = 2.0_wp * f_chord_v(i_l) * elems_ll(i_l)%p%chord
+     do j_l = 1 , n_l
+    
+       kernel_out(i_l,j_l) = exp( - 0.5_wp * norm2( elems_ll(j_l)%p%cen &
+                                                  - elems_ll(i_l)%p%cen )**2.0_wp / &
+                              sigma**2.0_wp )
+    
+     end do
+
+   end if
+
+   !> normalisation
+   kernel_out(i_l,:) = kernel_out(i_l,:) / sum(kernel_out(i_l,:))
+
+ end do
+
+ ! Deallocations
+ deallocate(global_to_local_ll) !,f_chord_v)
+
+end subroutine update_kernel
+
+!----------------------------------------------------------------------
+
 subroutine build_ll_array_optim( elems_ll , M , kernel )
  type(t_liftlin_p)     , intent(in)  :: elems_ll(:)
  real(wp), allocatable , intent(out) :: M(:,:)
  real(wp), allocatable , intent(out) :: kernel(:,:)
 
- integer, allocatable :: global_to_local_ll(:)
+ integer , allocatable :: global_to_local_ll(:)
+ real(wp), allocatable :: p_v(:)
 
- real(wp) :: f_chord = 0.50_wp
+ real(wp), allocatable :: f_chord_v(:)
  real(wp) :: sigma
 
  integer :: i_l , j_l , n_l , j , n_neigh , max_ll_id
 
+
  n_l = size(elems_ll)
 
- allocate(     M(n_l,n_l)) ;      M = 0.0_wp 
+ allocate(     M(n_l,n_l) ) ;         M = 0.0_wp 
+ allocate( f_chord_v(n_l) ) ; f_chord_v = 0.0_wp
+
+ f_chord_v = sim_param%llArtificialViscosity
 
  !> array linking global id of ll to ll-indexing
  max_ll_id = elems_ll(1)%p%id
@@ -830,14 +917,22 @@ subroutine build_ll_array_optim( elems_ll , M , kernel )
  !> Normal distribution
  do i_l = 1 , n_l
 
-   sigma = 2.0_wp * f_chord * elems_ll(i_l)%p%chord
-   do j_l = 1 , n_l
-  
-     kernel(i_l,j_l) = exp( - 0.5_wp * norm2( elems_ll(j_l)%p%cen &
-                                            - elems_ll(i_l)%p%cen )**2.0_wp / &
-                            sigma**2.0_wp )
-  
-   end do
+   if ( f_chord_v(i_l) .eq. 0.0_wp ) then
+
+     kernel(i_l,i_l) = 1.0_wp 
+
+   else
+
+     sigma = 2.0_wp * f_chord_v(i_l) * elems_ll(i_l)%p%chord
+     do j_l = 1 , n_l
+    
+       kernel(i_l,j_l) = exp( - 0.5_wp * norm2( elems_ll(j_l)%p%cen &
+                                              - elems_ll(i_l)%p%cen )**2.0_wp / &
+                              sigma**2.0_wp )
+    
+     end do
+
+   end if
 
    !> normalisation
    kernel(i_l,:) = kernel(i_l,:) / sum(kernel(i_l,:))
@@ -845,7 +940,7 @@ subroutine build_ll_array_optim( elems_ll , M , kernel )
  end do
 
  ! Deallocations
- deallocate(global_to_local_ll)
+ deallocate(global_to_local_ll,f_chord_v)
 
 
 end subroutine build_ll_array_optim
@@ -1592,7 +1687,8 @@ subroutine solve_liftlin_piszkin( &
  type(t_pot_elem_p),  intent(in)    :: elems_wake(:)
  type(t_vort_elem_p), intent(in)    :: elems_vort(:)
  type(t_aero_tab),    intent(in)    :: airfoil_data(:)
- real(wp)           , intent(in)    :: al_kernel(:,:)
+ real(wp)           , allocatable, intent(inout) :: al_kernel(:,:)
+ real(wp)           , allocatable                :: al_kernel_out(:,:)
  real(wp) :: uinf(3)
  integer  :: i_l, j, ic
  real(wp) :: vel(3), v(3), up(3)
@@ -1610,6 +1706,10 @@ subroutine solve_liftlin_piszkin( &
  real(wp) , allocatable :: c_m(:,:) ! size(elems_ll) , 3
  real(wp) , allocatable :: u_v(:)   ! size(elems_ll)
  real(wp) , allocatable :: ui_v(:,:) ! size(elems_ll)
+ real(wp) , allocatable :: dcl_v(:) ! size(elems_ll)
+ real(wp) , allocatable :: f_chord_v(:)
+
+ real(wp) , allocatable :: M(:,:)
 
  !> sim_param
  ! fixed point algorithm for ll
@@ -1621,7 +1721,7 @@ subroutine solve_liftlin_piszkin( &
  integer :: i_do , i , nn_stall , n_stall
  integer :: n_iter_reg
  ! load computation
- logical :: load_avl
+ logical :: load_avl , adaptive_reg
  real(wp) :: e_l(3) , e_d(3)
  real(wp), allocatable :: Gamma_old(:)
 
@@ -1663,6 +1763,8 @@ subroutine solve_liftlin_piszkin( &
   al_stall   = sim_param%llStallRegularisationAlphaStall * pi / 180.0_wp
   ! param for load computation
   load_avl   = sim_param%llLoadsAVL
+  ! adaptive ll regularisation
+  adaptive_reg = sim_param%llArtificialViscosityAdaptive 
 
   uinf = sim_param%u_inf
 
@@ -1703,12 +1805,15 @@ subroutine solve_liftlin_piszkin( &
   vel_w = vel_w/(4.0_wp*pi)
 
   ! allocate array containing aoa, aero coeffs and relative velocity
-  allocate( a_v( size(elems_ll)  )) ;   a_v = 0.0_wp
-  allocate( c_m( size(elems_ll),3)) ;   c_m = 0.0_wp
-  allocate( u_v( size(elems_ll)  )) ;   u_v = 0.0_wp
-  allocate(ui_v( size(elems_ll),3)) ;  ui_v = 0.0_wp
+  allocate(  a_v( size(elems_ll)  )) ;   a_v = 0.0_wp
+  allocate(  c_m( size(elems_ll),3)) ;   c_m = 0.0_wp
+  allocate(  u_v( size(elems_ll)  )) ;   u_v = 0.0_wp
+  allocate( ui_v( size(elems_ll),3)) ;  ui_v = 0.0_wp
+  allocate(dcl_v( size(elems_ll)  )) ; dcl_v = 0.0_wp
   allocate(alpha_avg_v(    size(elems_ll))) ; alpha_avg_v     = 0.0_wp
   allocate(alpha_avg_new_v(size(elems_ll))) ; alpha_avg_new_v = 0.0_wp
+  allocate(al_kernel_out(size(elems_ll),size(elems_ll)))
+  al_kernel_out = al_kernel
 
   ! Remove the "out-of-plane" component of the relative velocity:
   ! 2d-velocity to enter the airfoil look-up-tables
@@ -1749,16 +1854,16 @@ subroutine solve_liftlin_piszkin( &
     diff = 0.0_wp             ! max diff ("norm \infty")
 
     ! === Average value of AOA (regularisation?) ===
-    alpha_avg_v = matmul( al_kernel , a_v )
+    alpha_avg_v = matmul( al_kernel_out , a_v )
 
-    ! debug ---
-    if ( ic .eq. 1 ) then
-      write(*,*) '%> First iteration : i_l , al[deg] , avg al[deg]' 
-      do i_l = 1 , size(elems_ll)
-        write(*,*) i_l , a_v(i_l)*180.0_wp/pi , alpha_avg_v(i_l) 
-      end do
-    end if
-    ! debug ---
+!   ! debug ---
+!   if ( ic .eq. 1 ) then
+!     write(*,*) '%> First iteration : i_l , al[deg] , avg al[deg]' 
+!     do i_l = 1 , size(elems_ll)
+!       write(*,*) i_l , a_v(i_l)*180.0_wp/pi , alpha_avg_v(i_l) 
+!     end do
+!   end if
+!   ! debug ---
  
     ! === Update LL intensity ===
 !$omp parallel do private(i_l, el, j, v, vel, up, unorm, alpha, alpha_avg, alpha_2d, mach, &
@@ -1789,7 +1894,7 @@ subroutine solve_liftlin_piszkin( &
         ! Read the aero coeff from .c81 tables
         call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil , &
                                    (/alpha_avg, mach, reynolds/) , sim_param , &
-                                                              aero_coeff )
+                                                      aero_coeff , dcl_v(i_l) )
         cl = aero_coeff(1)   ! cl needed for the iterative process
 
         ! Compute the "equivalent" intensity of the vortex line 
@@ -1856,23 +1961,39 @@ subroutine solve_liftlin_piszkin( &
 !$omp end parallel do
 
     ! === Average value of AOA (regularisation?) ===
-    alpha_avg_new_v = matmul( al_kernel , a_v )
+    alpha_avg_new_v = matmul( al_kernel_out , a_v )
     diff = maxval( abs( alpha_avg_new_v - alpha_avg_v ) )
 
     diff_v(ic) = diff
- 
+
+    ! === Update kernel ( for adaptive algorithm ) ===
+    ! call build_ll_array_optim( elems_ll , M , al_kernel )
+    if ( adaptive_reg ) then
+      call update_kernel( elems_ll , al_kernel , dcl_v , al_kernel_out , f_chord_v ) 
+    end if
+
     !> Stopping criterion
-    if ( diff .le. fp_tol * pi/180.0_wp ) exit ! convergence
+    if ( diff .le. fp_tol * pi/180.0_wp ) then
+      exit ! convergence
+    end if
 !   if ( diff .le. 0.1_wp * pi/180.0_wp ) exit ! convergence
 
   enddo !solver iterations
 
   ! debug ---
-  write(*,*) '%> Last iteration : i_l , al[deg] , avg al[deg]' 
-  do i_l = 1 , size(elems_ll)
-    write(*,*) i_l , a_v(i_l)*180.0_wp/pi , alpha_avg_new_v(i_l) 
-  end do
+  if ( adaptive_reg ) then
+    do i_l = 1 , size(elems_ll)
+      write(*,*) f_chord_v(i_l)
+    end do
+  end if
   ! debug ---
+
+! ! debug ---
+! write(*,*) '%> Last iteration : i_l , al[deg] , avg al[deg]' 
+! do i_l = 1 , size(elems_ll)
+!   write(*,*) i_l , a_v(i_l)*180.0_wp/pi , alpha_avg_new_v(i_l) 
+! end do
+! ! debug ---
 
   write(msg_4,'(I4.4)') it
   open(unit=21,file=trim(sim_param%basename_debug)//'_conv_'//msg_4//'.dat')
