@@ -86,6 +86,7 @@ type, extends(c_vort_elem) :: t_vortpart
   real(wp) :: vel(3)
   real(wp) :: vel_old(3)
   real(wp) :: stretch(3)
+  real(wp) :: stretch_old(3)
   logical :: free=.true.
   real(wp) :: turbvisc
 contains

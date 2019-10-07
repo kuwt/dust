@@ -994,6 +994,8 @@ subroutine update_wake(wake, elems, octree)
   !calculate the velocities at the points
 !$omp parallel do private(pos_p, vel_p, ip, iq,  stretch, diff, df, str)
   do ip = 1, wake%n_prt
+    wake%part_p(ip)%p%vel_old = wake%part_p(ip)%p%vel
+    wake%part_p(ip)%p%stretch_old = wake%part_p(ip)%p%stretch
     wake%part_p(ip)%p%stretch = 0.0_wp
 
     !If not using the fast multipole, update particles position now
@@ -1270,15 +1272,20 @@ subroutine complete_wake(wake, geo, elems)
       wake%part_p(ip)%p%vel = vel_out
     endif
     if(.not. wake%part_p(ip)%p%free) then
-      !pos_p = wake%part_p(ip)%p%cen + wake%prt_vel(:,ip)*sim_param%dt
-      pos_p = wake%part_p(ip)%p%cen + wake%part_p(ip)%p%vel*sim_param%dt
+      !pos_p = wake%part_p(ip)%p%cen + wake%part_p(ip)%p%vel*sim_param%dt
+      pos_p = wake%part_p(ip)%p%cen &
+            + 1.5_wp*wake%part_p(ip)%p%vel*sim_param%dt &
+            - 0.5_wp*wake%part_p(ip)%p%vel_old*sim_param%dt
       if(all(pos_p .ge. wake%part_box_min) .and. &
          all(pos_p .le. wake%part_box_max)) then
         !wake%part_p(ip)%p%cen = points_prt(:,ip)
         wake%part_p(ip)%p%cen = pos_p
         if(sim_param%use_vs .or. sim_param%use_vd) then
+          !alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
+          !                wake%part_p(ip)%p%stretch*sim_param%dt
           alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
-                          wake%part_p(ip)%p%stretch*sim_param%dt
+                          1.5_wp*wake%part_p(ip)%p%stretch*sim_param%dt &
+                        - 0.5_wp*wake%part_p(ip)%p%stretch*sim_param%dt
           alpha_p_n = norm2(alpha_p)
           if(alpha_p_n .le. wake%part_p(ip)%p%mag) then
             wake%part_p(ip)%p%mag = alpha_p_n
