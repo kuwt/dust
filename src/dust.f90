@@ -515,9 +515,7 @@ endif
 
 ! === LL derivative array for solution as an optimisation problem ===
 if ( size(elems_ll) .gt. 0 ) then
-  write(*,*) ' caaaazzo ' 
   call build_ll_array_optim( elems_ll , M_array , al_kernel )
-  write(*,*) ' culo ' 
 end if
 
 ! ! debug ---

@@ -111,6 +111,7 @@ type, extends(c_expl_elem) :: t_liftlin
   !> new field for load computations
   real(wp) :: vel_ctr_pt(3)
   real(wp) ::  al_ctr_pt
+  real(wp) :: dn_dt(3)
 
   !> time derivative of the LL intensity (for unsteady loads)
   real(wp) :: dGamma_dt

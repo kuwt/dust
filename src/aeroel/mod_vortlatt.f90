@@ -89,6 +89,7 @@ public :: t_vortlatt
 type, extends(c_impl_elem) :: t_vortlatt
 
   real(wp) :: vel_ctr_pt(3) 
+  real(wp) :: dn_dt(3)
 
   !TODO: consider applying the correct element pointer here
   contains
