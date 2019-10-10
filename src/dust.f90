@@ -78,10 +78,12 @@ use mod_vortlatt, only: &
   t_vortlatt
 
 use mod_liftlin, only: &
- update_liftlin, solve_liftlin, t_liftlin_p, &
- build_ll_array_optim, solve_liftlin_optim , &
- solve_liftlin_newton, solve_liftlin_piszkin, &
- solve_liftlin_optim_regul
+ update_liftlin, t_liftlin_p, &
+ build_ll_kernel, &
+ solve_liftlin, solve_liftlin_piszkin
+!solve_liftlin_optim , &
+!solve_liftlin_newton, &
+!solve_liftlin_optim_regul
 
 use mod_actuatordisk, only: &
  update_actdisk
@@ -200,7 +202,7 @@ real(wp) , allocatable :: res_old(:)
 real(wp) , allocatable :: surf_vel_SurfPan_old(:,:)
 real(wp) , allocatable ::      nor_SurfPan_old(:,:)
 
-real(wp) , allocatable :: M_array(:,:) , al_kernel(:,:)
+real(wp) , allocatable :: al_kernel(:,:) , al_v(:)
 
 integer :: i_el , i, sel
 
@@ -297,6 +299,8 @@ call prms%CreateRealOption( 'CutoffRad', &
       "Radius of complete cutoff  for vortex induction near core", '0.001')
 
 ! --- lifting line elements ---
+call prms%CreateStringOption('LLsolver','Solver for the LL elements', &
+        'GammaMethod')
 call prms%CreateLogicalOption('LLReynoldsCorrections', &
        'Use Reynolds corrections for the .c81 tables?', 'F')
 call prms%CreateRealOption('LLReynoldsCorrectionsNfact', &
@@ -319,6 +323,10 @@ call prms%CreateRealOption('LLartificialViscosity', &
        'Constant artificial viscosity for regularisation', '0.0' )
 call prms%CreateLogicalOption('LLartificialViscosityAdaptive', &
        'Adaptive artificial viscosity algorithm', 'F' )
+call prms%CreateRealOption('LLartificialViscosityAdaptive_Alpha', &
+       'Adaptive Artificial Viscosity algorithm, reference AOA [deg]')
+call prms%CreateRealOption('LLartificialViscosityAdaptive_dAlpha', &
+       'Adaptive Artificial Viscosity algorithm, reference AOA [deg]')
 call prms%CreateLogicalOption('LLloadsAVL', & 
        'Use AVL expression for inviscid load computation','T')
 
@@ -513,17 +521,13 @@ if(sim_param%debug_level .ge. 1) then
   call printout(message)
 endif
 
-! === LL derivative array for solution as an optimisation problem ===
-if ( size(elems_ll) .gt. 0 ) then
-  call build_ll_array_optim( elems_ll , M_array , al_kernel )
+! === build kernel for regularisation (averaging) process for LL === 
+if ( ( size(elems_ll) .gt. 0 ) ) then
+  allocate(al_v(size(elems_ll))) ; al_v = 0.0_wp
+  call build_ll_kernel( elems_ll , al_v , al_kernel )
+  deallocate(al_v)
 end if
 
-! ! debug ---
-! do it = 1 , size(elems_ll)
-!   write(*,*) it , M_array( it , max(1,it-3) : min(it+3,size(elems_ll)) )
-! end do
-! write(*,*) ' stop in dust.f90, l.516.' ; stop
-! debug ---
 
 !====== Time Cycle ======
 call printout(nl//'////////// Performing Computations //////////')
@@ -619,8 +623,18 @@ do it = 1,nstep
 
   !------ Update the explicit part ------  % v-----implicit elems: p,v
   if ( size(elems_ll) .gt. 0 ) then
-!   call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
-!           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it)
+   if ( trim(sim_param%llSolver) .eq. 'GammaMethod' ) then ! Gamma-method
+    call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
+            (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it)
+   elseif ( trim(sim_param%llSolver) .eq. 'AlphaMethod' ) then
+    call solve_liftlin_piszkin(elems_ll, elems_tot, elems , elems_ad , &
+            (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it,&
+             al_kernel )
+   else
+    call error('dust','dust',' Wrong string for LLsolver. &
+         &This parameter should have been set equal to "GammaMethod" (default) &
+         &in init_sim_param() routine. Something went wrong. Stop')
+
 !   call solve_liftlin_optim(elems_ll, elems_tot, elems , elems_ad , &
 !           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it, &
 !           M_array )
@@ -630,9 +644,7 @@ do it = 1,nstep
 !   call solve_liftlin_newton(elems_ll, elems_tot, elems , elems_ad , &
 !           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it, &
 !           M_array )
-    call solve_liftlin_piszkin(elems_ll, elems_tot, elems , elems_ad , &
-            (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it,&
-             al_kernel )
+   end if
   end if
 
   !------ Compute loads -------
@@ -881,6 +893,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   endif
   sim_param%use_ve = getlogical(prms, 'ViscosityEffects')
   !Lifting line elements
+  sim_param%llSolver                        = getstr(    prms, 'LLsolver')
   sim_param%llReynoldsCorrections           = getlogical(prms, 'LLreynoldsCorrections')
   sim_param%llReynoldsCorrectionsNfact      = getreal(   prms, 'LLreynoldsCorrectionsNfact')
   sim_param%llMaxIter                       = getint(    prms, 'LLmaxIter'            )
@@ -893,6 +906,51 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%llArtificialViscosity           = getreal(   prms, 'LLartificialViscosity')
   sim_param%llArtificialViscosityAdaptive   = getlogical(prms, 'LLartificialViscosityAdaptive')
   sim_param%llLoadsAVL                      = getlogical(prms, 'LLloadsAVL')
+  !> check LL inputs
+  if ( ( trim(sim_param%llSolver) .ne. 'GammaMethod' ) .or. &
+       ( trim(sim_param%llSolver) .ne. 'AlphaMethod' ) ) then
+
+    call warning('dust','init_sim_param',' Wrong string for LLsolver. &
+         &This parameter is set equal to "GammaMethod" (default) &
+         &in init_sim_param() routine.')
+
+    sim_param%llSolver = 'GammaMethod'
+
+  end if
+  if ( trim(sim_param%llSolver) .eq. 'GammaMethod' ) then 
+    if ( sim_param%llArtificialViscosity .gt. 0.0_wp ) then
+      call warning('dust','init_sim_param','LLartificialViscoisty set as an input, &
+         & different from zero, but ll regularisation available only if&
+         & LLsolver = AlphaMethod. LLartificialViscosity = 0.0')
+         sim_param%llArtificialViscosity = 0.0_wp 
+         sim_param%llArtificialViscosityAdaptive = .false.
+         sim_param%llArtificialViscosityAdaptive_Alpha  = 0.0_wp
+         sim_param%llArtificialViscosityAdaptive_dAlpha = 0.0_wp
+    end if
+    if ( sim_param%llArtificialViscosityAdaptive ) then
+      call warning('dust','init_sim_param','LLartificialViscosityAdaptive set&
+         & as an input, but ll adaptive regularisation available only if&
+         & LLsolver = AlphaMethod')
+    end if
+  end if 
+  !> The user is required to set _Alpha and _dAlpha for ll adaptive regularisation
+  if ( trim(sim_param%llSolver) .eq. 'AlphaMethod' ) then
+    if ( sim_param%llArtificialViscosityAdaptive) then
+      if ( ( countoption(prms,'LLartificialViscosityAdaptive_Alpha')  .eq. 0 ) .or. &
+           ( countoption(prms,'LLartificialViscosityAdaptive_dAlpha') .eq. 0 ) ) then
+
+        call warning('dust','init_sim_param','LLartificialViscosityAdaptive_Alpha or&
+           & LLartificialViscosity_dAlpha not set as an input, while LLartificialViscosityAdaptive&
+           & is set equal to T. Set these parameters [deg].')
+  
+      else
+        sim_param%llArtificialViscosityAdaptive_Alpha = &
+                  getreal(prms,'LLartificialViscosityAdaptive_Alpha')
+        sim_param%llArtificialViscosityAdaptive_dAlpha= &
+                  getreal(prms,'LLartificialViscosityAdaptive_dAlpha')
+      end if 
+    end if 
+  end if
  
   !Octree and FMM parameters
   sim_param%use_fmm = getlogical(prms, 'FMM')

@@ -155,6 +155,7 @@ type t_sim_param
   logical :: use_ve
 
   !Lifting Lines
+  character(len=max_char_len) :: llSolver
   !> Reynolds corrections of .c81 tables
   logical  :: llReynoldsCorrections
   !> n factor for Reynolds corrections of .c81 tables: (Re/Re_T)^n
@@ -177,6 +178,11 @@ type t_sim_param
   real(wp) :: llArtificialViscosity
   !> Adaptive Artificial Viscosity algorithm
   logical  :: llArtificialViscosityAdaptive
+  !> Adaptive Artificial Viscosity algorithm, reference AOA
+  real(wp) :: llArtificialViscosityAdaptive_Alpha
+  !> Adaptive Artificial Viscosity algorithm, blending interval
+  ! between full regularisation and no regularisation ( AOA )
+  real(wp) :: llArtificialViscosityAdaptive_dAlpha
   !> Use AVL expression for inviscid load computation ( ~ VL )
   logical  :: llLoadsAVL
 
