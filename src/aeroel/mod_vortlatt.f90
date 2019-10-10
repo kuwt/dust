@@ -89,7 +89,6 @@ public :: t_vortlatt
 type, extends(c_impl_elem) :: t_vortlatt
 
   real(wp) :: vel_ctr_pt(3) 
-  real(wp) :: dn_dt(3)
 
   !TODO: consider applying the correct element pointer here
   contains
@@ -515,17 +514,20 @@ subroutine compute_dforce_jukowski_vortlatt(this)
  end if
 
  ! === Unsteady contribution ===
- ! if statement to avoid singularities
- if ( norm2( this % vel_ctr_pt ) .gt. &
-        max( 0.001_wp, 0.001_wp *norm2(sim_param%u_inf) ) ) then
-   this%dforce = this%dforce &
-               + sim_param%rho_inf * this%area * this%didou_dt &
-               * gam / norm2(gam)  ! direction
- else
-   this%dforce = this%dforce &
-               + sim_param%rho_inf * this%area * this%didou_dt &
-               * this%nor
- end if
+ this%dforce = this%dforce &
+             - sim_param%rho_inf * this%area * ( &
+               this%didou_dt * this%nor + this%mag * this%dn_dt )
+ ! ! if statement to avoid singularities
+ ! if ( norm2( this % vel_ctr_pt ) .gt. &
+ !        max( 0.001_wp, 0.001_wp *norm2(sim_param%u_inf) ) ) then
+ !   this%dforce = this%dforce &
+ !               + sim_param%rho_inf * this%area * this%didou_dt &
+ !               * gam / norm2(gam)  ! direction
+ ! else
+ !   this%dforce = this%dforce &
+ !               + sim_param%rho_inf * this%area * this%didou_dt &
+ !               * this%nor
+ ! end if
 
 
 end subroutine compute_dforce_jukowski_vortlatt

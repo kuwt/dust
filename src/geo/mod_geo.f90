@@ -1713,6 +1713,15 @@ subroutine update_geometry(geo, t, update_static)
   associate(comp => geo%components(i_comp))
 
     if (comp%moving .or. update_static) then
+
+      !> compute dn_dt: store %nor at previous time step, for moving
+      ! components
+      if ( .not. update_static ) then
+        do ie = 1 , size(comp%el)
+          comp%el(ie)%nor_old = comp%el(ie)%nor
+        end do
+      end if
+
       geo%points(:,comp%i_points) = move_points(comp%loc_points, &
                            geo%refs(comp%ref_id)%R_g, &
                            geo%refs(comp%ref_id)%of_g)
@@ -1724,6 +1733,19 @@ subroutine update_geometry(geo, t, update_static)
 
         call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
       enddo
+
+      !> compute dn_dt: set %nor_old = %nor for static elements 
+      ! and first time step
+      if ( update_static ) then
+        do ie = 1 , size(comp%el)
+          comp%el(ie)%nor_old = comp%el(ie)%nor
+        end do
+      end if
+
+      do ie = 1 , size(comp%el)
+        comp%el(ie)%dn_dt = ( comp%el(ie)%nor - comp%el(ie)%nor_old ) / &
+                              sim_param % dt
+      end do
 
 ! 2018.11.15 Moved outside, at the end of create_geometry
 ! !     !in the first pass compute also the velocity stencil for surfpans

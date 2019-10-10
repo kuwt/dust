@@ -504,7 +504,6 @@ if (sim_param%restart_from_file) then
 
 else ! Set to zero the intensity of all the singularities
 
-  
   do i_el = 1 , size(elems)      ! implicit elements (vr, sp)
      elems(i_el)%p%mag = 0.0_wp
   end do 
@@ -538,7 +537,15 @@ time_no_out = 0.0_wp; time_no_out_debug = 0.0_wp
 allocate(surf_vel_SurfPan_old(geo%nSurfpan,3)) ; surf_vel_SurfPan_old = 0.0_wp
 allocate(     nor_SurfPan_old(geo%nSurfpan,3)) ;      nor_SurfPan_old = 0.0_wp
 
-allocate(res_old(size(elems))) ; res_old = 0.0_wp
+allocate(res_old(size(elems)))
+if ( sim_param % restart_from_file ) then
+  do i_el = 1 , size(elems)
+    res_old(i_el) = elems(i_el)%p%mag
+  end do 
+else
+ res_old = 0.0_wp
+end if
+
 
 t11 = dust_time()
 do it = 1,nstep
@@ -907,8 +914,10 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%llArtificialViscosityAdaptive   = getlogical(prms, 'LLartificialViscosityAdaptive')
   sim_param%llLoadsAVL                      = getlogical(prms, 'LLloadsAVL')
   !> check LL inputs
-  if ( ( trim(sim_param%llSolver) .ne. 'GammaMethod' ) .or. &
+  if ( ( trim(sim_param%llSolver) .ne. 'GammaMethod' ) .and. &
        ( trim(sim_param%llSolver) .ne. 'AlphaMethod' ) ) then
+
+    write(*,*) ' sim_param%llSolver : ' , trim(sim_param%llSolver)
 
     call warning('dust','init_sim_param',' Wrong string for LLsolver. &
          &This parameter is set equal to "GammaMethod" (default) &
@@ -939,7 +948,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
       if ( ( countoption(prms,'LLartificialViscosityAdaptive_Alpha')  .eq. 0 ) .or. &
            ( countoption(prms,'LLartificialViscosityAdaptive_dAlpha') .eq. 0 ) ) then
 
-        call warning('dust','init_sim_param','LLartificialViscosityAdaptive_Alpha or&
+        call error('dust','init_sim_param','LLartificialViscosityAdaptive_Alpha or&
            & LLartificialViscosity_dAlpha not set as an input, while LLartificialViscosityAdaptive&
            & is set equal to T. Set these parameters [deg].')
   
@@ -951,6 +960,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
       end if 
     end if 
   end if
+  write(*,*) ' sim_param%llSolver : ' , trim(sim_param%llSolver)
  
   !Octree and FMM parameters
   sim_param%use_fmm = getlogical(prms, 'FMM')

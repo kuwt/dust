@@ -113,7 +113,6 @@ type, extends(c_expl_elem) :: t_liftlin
   !> new field for load computations
   real(wp) :: vel_ctr_pt(3)
   real(wp) ::  al_ctr_pt
-  real(wp) :: dn_dt(3)
 
   !> time derivative of the LL intensity (for unsteady loads)
   real(wp) :: dGamma_dt
@@ -331,8 +330,8 @@ subroutine build_ll_kernel( elems_ll , alpha , kernel )
   real(wp) :: dal_regul
   real(wp) ::  al_regul
 
-  dal_regul = sim_param%llArtificialViscosityAdaptive_Alpha
-   al_regul = sim_param%llArtificialViscosityAdaptive_dAlpha
+   al_regul = sim_param%llArtificialViscosityAdaptive_Alpha
+  dal_regul = sim_param%llArtificialViscosityAdaptive_dAlpha
 
   n_l = size(elems_ll)
 
@@ -679,12 +678,6 @@ subroutine solve_liftlin_piszkin( &
     ! === Overwrite new to current value, for next iteration ===
     alpha_avg_v = alpha_avg_new_v
 
-!   ! === Update kernel ( for adaptive algorithm ) ===
-!   ! call build_ll_array_optim( elems_ll , M , al_kernel )
-!   if ( adaptive_reg ) then
-!     call update_kernel( elems_ll , al_kernel , dcl_v , al_kernel_out , f_chord_v ) 
-!   end if
-
     !> Stopping criterion
     if ( diff .le. fp_tol ) then
       exit ! convergence
@@ -693,12 +686,12 @@ subroutine solve_liftlin_piszkin( &
 
   enddo !solver iterations
 
-  write(msg_4,'(I4.4)') it
-  open(unit=21,file=trim(sim_param%basename_debug)//'_conv_'//msg_4//'.dat')
-  do i_l = 1 , ic-1
-    write(21,*) diff_v(i_l)
-  end do
-  close(21)
+! write(msg_4,'(I4.4)') it
+! open(unit=21,file=trim(sim_param%basename_debug)//'_conv_'//msg_4//'.dat')
+! do i_l = 1 , ic-1
+!   write(21,*) diff_v(i_l)
+! end do
+! close(21)
 
   ! Overwrite a_v, a_v = alpha_avg_v, because load computation uses a_v
   a_v = alpha_avg_v * pi/180.0_wp
@@ -748,8 +741,11 @@ subroutine solve_liftlin_piszkin( &
 
       !> Unsteady contribution
       el%dforce = el%dforce &
-                  - sim_param%rho_inf * el%area * el%dGamma_dt &
-                  * e_l ! lift direction
+                  - sim_param%rho_inf * el%area * ( &
+                  el%dGamma_dt  * el%nor + el%mag * el%dn_dt )
+      ! el%dforce = el%dforce &
+      !             - sim_param%rho_inf * el%area * el%dGamma_dt &
+      !             * e_l ! lift direction
 
       !> Update aerodynamic coefficients and AOA, and pressure
       c_m(i_l,1) = sum( el % dforce * e_l ) / &
@@ -757,10 +753,6 @@ subroutine solve_liftlin_piszkin( &
       c_m(i_l,2) = sum( el % dforce * e_d ) / &
         ( 0.5_wp * sim_param%rho_inf * u_v(i_l) ** 2.0_wp * el%area )
       a_v(i_l) = el % al_ctr_pt
-
-      ! debug ---
-      write(*,*) el % alpha , el % al_ctr_pt*180.0_wp/pi
-      ! debug ---
 
       !> overwrite pressure field to take into account unsteady contributions
       el%pres = sum( el%dforce * el%nor ) / el%area
@@ -784,8 +776,11 @@ subroutine solve_liftlin_piszkin( &
 
       !> Unsteady contribution
       el%dforce = el%dforce &
-                  - sim_param%rho_inf * el%area * el%dGamma_dt &
-                  * e_l ! lift direction
+                  - sim_param%rho_inf * el%area * ( &
+                  el%dGamma_dt  * el%nor + el%mag * el%dn_dt )
+      ! el%dforce = el%dforce &
+      !             - sim_param%rho_inf * el%area * el%dGamma_dt &
+      !             * e_l ! lift direction
 
       !> Update aerodynamic coefficients and AOA, and pressure
       c_m(i_l,1) = sum( el % dforce * e_l ) / &
@@ -1127,12 +1122,12 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   enddo !solver iterations
 
-  write(msg_4,'(I4.4)') it
-  open(unit=21,file=trim(sim_param%basename_debug)//'_conv_'//msg_4//'.dat')
-  do i_l = 1 , ic-1
-    write(21,*) diff_v(i_l)
-  end do
-  close(21)
+! write(msg_4,'(I4.4)') it
+! open(unit=21,file=trim(sim_param%basename_debug)//'_conv_'//msg_4//'.dat')
+! do i_l = 1 , ic-1
+!   write(21,*) diff_v(i_l)
+! end do
+! close(21)
 
   ! === Update dGamma_dt field ===
   do i_l = 1,size(elems_ll)
@@ -1442,7 +1437,13 @@ subroutine calc_geo_data_liftlin(this, vert)
 
 end subroutine calc_geo_data_liftlin
 
-!----------------------------------------------------------------------
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+!                                                                     +
+! The routines below must not be included in the master branch        +
+!                                                                     +
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 subroutine solve_liftlin_newton( &
                          elems_ll, elems_tot, &
                          elems_impl, elems_ad, &
