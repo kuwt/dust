@@ -87,12 +87,14 @@ type, extends(c_vort_elem) :: t_vortpart
   real(wp) :: vel_old(3)
   real(wp) :: stretch(3)
   real(wp) :: stretch_old(3)
-  logical :: free=.true.
+  logical  :: free=.true.
   real(wp) :: turbvisc
+  real(wp) :: rotu(3)
 contains
 
   procedure, pass(this) :: compute_vel       => compute_vel_vortpart
   procedure, pass(this) :: compute_stretch   => compute_stretch_vortpart  
+  procedure, pass(this) :: compute_rotu      => compute_rotu_vortpart  
   procedure, pass(this) :: compute_diffusion => compute_diffusion_vortpart  
   procedure, pass(this) :: calc_geo_data     => calc_geo_data_vortpart
 
@@ -196,6 +198,30 @@ end subroutine compute_stretch_vortpart
 
 !----------------------------------------------------------------------
 
+!> Compute the vorticity created by a particle in a prescibed position
+!!
+!! WARNING: the calculated term, to be consistent with the formulation of
+!! the equations is multiplied by 4*pi, to obtain the actual velocity the
+!! result of the present subroutine MUST be DIVIDED by 4*pi
+subroutine compute_rotu_vortpart (this, pos, alpha, rotu)
+ class(t_vortpart), intent(in) :: this
+ real(wp), intent(in) :: pos(:)
+ real(wp), intent(in) :: alpha(3)
+ real(wp), intent(out) :: rotu(3)
+
+ real(wp) :: dist(3), distn
+
+  !TODO: add far field approximations
+
+  dist = pos-this%cen
+  distn = sqrt(sum(dist**2)+r_Vortex**2)
+
+  rotu = 2.0_wp*this%dir*this%mag/(distn)**3 &
+       +3.0_wp/(distn)**5 * cross(dist, cross(dist, this%dir*this%mag))
+
+end subroutine compute_rotu_vortpart
+
+!----------------------------------------------------------------------
 !> Compute the vorticity diffusion induced by a vortex particle 
 !! in a prescribed position with a prescribed vorticity (i.e. another particle)
 !!

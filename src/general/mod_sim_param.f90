@@ -137,6 +137,8 @@ type t_sim_param
   real(wp) :: CutoffRad
   !> use the vortex stretching or not
   logical :: use_vs
+    !> time scale of the divergence filter
+    real(wp) :: filt_eta
   !> use the vorticity diffusion or not
   logical :: use_vd
   !> use turbulent viscosity or not

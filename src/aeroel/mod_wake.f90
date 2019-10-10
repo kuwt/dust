@@ -1281,11 +1281,17 @@ subroutine complete_wake(wake, geo, elems)
         !wake%part_p(ip)%p%cen = points_prt(:,ip)
         wake%part_p(ip)%p%cen = pos_p
         if(sim_param%use_vs .or. sim_param%use_vd) then
+        !add filtering
+          wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
+            sim_param%filt_eta*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
+            wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))
+          !Explicit Euler
           !alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
           !                wake%part_p(ip)%p%stretch*sim_param%dt
+          !Adams Bashforth
           alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
                           1.5_wp*wake%part_p(ip)%p%stretch*sim_param%dt &
-                        - 0.5_wp*wake%part_p(ip)%p%stretch*sim_param%dt
+                        - 0.5_wp*wake%part_p(ip)%p%stretch_old*sim_param%dt
           alpha_p_n = norm2(alpha_p)
           if(alpha_p_n .le. wake%part_p(ip)%p%mag) then
             wake%part_p(ip)%p%mag = alpha_p_n
