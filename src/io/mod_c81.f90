@@ -308,15 +308,16 @@ end subroutine read_c81_table
 !       clear implementation
 !       ...
 subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
-                                           aero_par , sim_param , &
+                                           aero_par_in , sim_param , &
                                                      aero_coeff , &
                                                      dcl_da )
   type(t_aero_tab) , intent(in) :: airfoil_data(:)
   real(wp) , intent(in) :: csi
   integer  , intent(in) :: airfoil_id(2)
-  real(wp) , intent(in) :: aero_par(3) ! (/al,M,Re/)
+  real(wp) , intent(in) :: aero_par_in(3) ! (/al,M,Re/)
   type(t_sim_param) , intent(in) :: sim_param
   real(wp) , allocatable , intent(out) :: aero_coeff(:)
+  real(wp) :: aero_par(3) ! (/al,M,Re/)
 
   real(wp) , optional    , intent(out) :: dcl_da
   real(wp) :: dcl_da1,  dcl_da2 
@@ -353,10 +354,17 @@ subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
     n_fact = 0.0_wp
   end if
 
+  ! workaround to keep IN/OUT/INOUT old declarations
+  aero_par = aero_par_in
+
   al   = aero_par(1)
   mach = aero_par(2)
   reyn = aero_par(3)
 
+  ! al must be cyclic in [-180.0,180.0]
+  al = -floor((al+180.0_wp)/360.0_wp) * 360.0_wp + al
+  aero_par(1) = al
+ 
   cf1 = 0.0_wp
   cf2 = 0.0_wp
 
