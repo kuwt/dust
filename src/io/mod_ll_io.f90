@@ -94,7 +94,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
  type(t_parse) :: pmesh_prs
 
  logical :: twist_linear_interp
- real(wp):: twist_rad
  integer :: nelem_chord, nelem_chord_tot ! , nelem_span_tot <--- moved as an output
  integer :: npoint_chord_tot, npoint_span_tot
  integer :: nRegions, nSections, nAirfoils, rr_size , ee_size , ispace
@@ -119,8 +118,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
  integer :: ista , iend , ich
 
  ! Linear interpolation of the twist angle
- real(wp), allocatable :: rr_tw(:,:) , rr_tw_1(:,:) , rr_tw_2(:,:)
- real(wp) :: dx_ref_1, dy_ref_1, dz_ref_1
  real(wp) :: w1, w2
 
  integer :: i_aero1, i_aero2, iSpan, i
@@ -398,8 +395,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     end if
   
     !> save before update
-    dx_ref_1 = dx_ref ;  dy_ref_1 = dy_ref ;  dz_ref_1 = dz_ref
-
     dx_ref =  span_list(iRegion) * tan( sweep_list(iRegion)* pi / 180.0_wp ) ! + dx_ref 
     dy_ref =  span_list(iRegion)                                             ! + dy_ref 
     dz_ref =  span_list(iRegion) * tan( dihed_list(iRegion)* pi / 180.0_wp ) ! + dz_ref 
@@ -433,53 +428,25 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
       w2 = spacing_weights ( ispace, iSpan, nelem_span_list(iRegion) )
       w1 = 1.0_wp - w2
 
-      rr(:,ista:iend) = w1*rrSection1          + w2*rrSection2
-      chord_p(ich)    = w1*chord_list(iRegion) + w2*chord_list(iRegion+1)
-      theta_p(ich)    = w1*twist_list(iRegion) + w2*twist_list(iRegion+1)
+      chord_p(ich) = w1*chord_list(iRegion) + w2*chord_list(iRegion+1)
+      theta_p(ich) = w1*twist_list(iRegion) + w2*twist_list(iRegion+1)
 
-      ! if linear twist -> overwrite the coordinates of the points, rr
+
+      ! if linear twist -> interpolate twist
+      !        othrwise -> interpolate coordinates
       if ( twist_linear_interp ) then
 
-        allocate(rr_tw(  2,npoint_chord_tot))
-        allocate(rr_tw_1(2,npoint_chord_tot))
-        allocate(rr_tw_2(2,npoint_chord_tot))
+        rr(1,ista) = rrSection1(1,1) + w2*dx_ref
+        rr(2,ista) = rrSection1(2,1) + w2*dy_ref
+        rr(3,ista) = rrSection1(3,1) + w2*dz_ref
 
-        ! === Transform sections back to local reference frames === 
-        ! Section 1
-        !> remove offset in x,z 
-        rr_tw_1(1,:) = rrSection1(1,:) - dx_ref_1 
-        rr_tw_1(2,:) = rrSection1(3,:) - dz_ref_1 
-        !> rotate section back ( coord. in the local ref. frame )
-        twist_rad = twist_list(iRegion) * pi/180.0_wp
-        rr_tw_1 = matmul( &
-             reshape( (/ cos(twist_rad), sin(twist_rad) , &
-                        -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
-                                                               rr_tw_1 )
-        ! Section 2
-        !> remove offset in x,z 
-        rr_tw_2(1,:) = rrSection2(1,:) - dx_ref
-        rr_tw_2(2,:) = rrSection2(3,:) - dz_ref
-        !> rotate section back ( coord. in the local ref. frame )
-        twist_rad = twist_list(iRegion+1) * pi/180.0_wp
-        rr_tw_2 = matmul( &
-             reshape( (/ cos(twist_rad), sin(twist_rad) , &
-                        -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
-                                                               rr_tw_2 )
+        rr(1,iend) = rr(1,ista) + cos(theta_p(ich)) * chord_p(ich)
+        rr(2,iend) = rr(2,ista)
+        rr(3,iend) = rr(3,ista) - sin(theta_p(ich)) * chord_p(ich)
 
-        ! === x,z coordinates ===
-        rr_tw = w1*rr_tw_1 + w2*rr_tw_2
-        !> rotation ( linear interpolation of the twist angle )
-        twist_rad = theta_p(ich)
-        rr_tw = matmul( &
-             reshape( (/ cos(twist_rad),-sin(twist_rad) , &
-                         sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
-                                                                 rr_tw )
-        rr(1,ista:iend) = rr_tw(1,:) + w1*dx_ref_1 + w2*dx_ref
-        rr(3,ista:iend) = rr_tw(2,:) + w1*dz_ref_1 + w2*dz_ref
-        ! === y coordinate ===
-        rr(2,ista:iend) = w1*rrSection1(2,:) + w2*rrSection2(2,:)
+      else
 
-        deallocate(rr_tw, rr_tw_1, rr_tw_2)
+        rr(:,ista:iend) = w1*rrSection1 + w2*rrSection2
 
       end if
 
