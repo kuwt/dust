@@ -1141,8 +1141,11 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
       !> Unsteady contribution
       el%dforce = el%dforce &
-                  - sim_param%rho_inf * el%area * el%dGamma_dt &
-                  * e_l ! lift direction
+                  - sim_param%rho_inf * el%area * ( &
+                  el%dGamma_dt  * el%nor + el%mag * el%dn_dt )
+      !el%dforce = el%dforce &
+      !            - sim_param%rho_inf * el%area * el%dGamma_dt &
+      !            * e_l ! lift direction
 
       !> Update aerodynamic coefficients and AOA, and pressure
       c_m(i_l,1) = sum( el % dforce * e_l ) / &
@@ -1173,8 +1176,11 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
       !> Unsteady contribution
       el%dforce = el%dforce &
-                  - sim_param%rho_inf * el%area * el%dGamma_dt &
-                  * e_l ! lift direction
+                  - sim_param%rho_inf * el%area * ( &
+                  el%dGamma_dt  * el%nor + el%mag * el%dn_dt )
+      !el%dforce = el%dforce &
+      !            - sim_param%rho_inf * el%area * el%dGamma_dt &
+      !            * e_l ! lift direction
 
       !> Update aerodynamic coefficients and AOA, and pressure
       c_m(i_l,1) = sum( el % dforce * e_l ) / &
