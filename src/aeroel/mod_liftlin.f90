@@ -51,7 +51,7 @@ use mod_param, only: &
   wp, pi, max_char_len, prev_tri, next_tri, prev_qua, next_qua
 
 use mod_handling, only: &
-  error, printout
+  error, warning, printout
 
 use mod_doublet, only: &
   potential_calc_doublet , &
@@ -679,6 +679,11 @@ subroutine solve_liftlin_piszkin( &
 !   if ( diff .le. 0.1_wp * pi/180.0_wp ) exit ! convergence
 
   enddo !solver iterations
+  if(ic .ge. fp_maxIter) then
+    write(msg,'(A,I0,A)') 'Lifting lines iterative solution NOT CONVERGED &
+                           &after ',fp_maxIter,' iterations'
+    call warning(this_sub_name, this_mod_name, msg)
+  endif
 
   ! Overwrite a_v, a_v = alpha_avg_v, because load computation uses a_v
   a_v = alpha_avg_v * pi/180.0_wp
@@ -1093,6 +1098,11 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     if ( diff/max_mag_ll .le. fp_tol ) exit ! convergence
 
   enddo !solver iterations
+  if(ic .ge. fp_maxIter) then
+    write(msg,'(A,I0,A)') 'Lifting lines iterative solution NOT CONVERGED &
+                           &after ',fp_maxIter,' iterations'
+    call warning(this_sub_name, this_mod_name, msg)
+  endif
 
 ! write(msg_4,'(I4.4)') it
 ! open(unit=21,file=trim(sim_param%basename_debug)//'_conv_'//msg_4//'.dat')
