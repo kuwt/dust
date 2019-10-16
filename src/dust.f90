@@ -310,7 +310,7 @@ call prms%CreateIntOption('LLmaxIter', &
 call prms%CreateRealOption('LLtol', 'Tolerance for the relative error in &
                            &fixed point iteration for LL','1.0e-6' )
 call prms%CreateRealOption('LLdamp', 'Damping param in fixed point iteration &
-                           &for LL used to avoid oscillations','5.0')
+                           &for LL used to avoid oscillations','25.0')
 call prms%CreateLogicalOption('LLstallRegularisation', & 
        'Avoid "unphysical" separations in inner sections of LL?','T')
 call prms%CreateIntOption('LLstallRegularisationNelems', &
