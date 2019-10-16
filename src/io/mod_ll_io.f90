@@ -434,7 +434,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
       ! if linear twist -> interpolate twist
       !        othrwise -> interpolate coordinates
-      if ( twist_linear_interp ) then
+      if ( twist_linear_interp .and. .not mesh_flat ) then
 
         rr(1,ista) = rrSection1(1,1) + w2*dx_ref
         rr(2,ista) = rrSection1(2,1) + w2*dy_ref
