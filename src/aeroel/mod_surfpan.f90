@@ -106,7 +106,6 @@ type, extends(c_impl_elem) :: t_surfpan
 
   !> surface quantities for Bernoulli integral equation
   real(wp) :: dUn_dt
-  real(wp) :: dn_dt(3)
   real(wp) :: bernoulli_source
   real(wp), pointer :: pres_sol
 

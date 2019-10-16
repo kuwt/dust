@@ -276,11 +276,11 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     airfoil_list(iSection) = getstr(pmesh_prs,'airfoil_table')
   enddo
 
-  ! -- 0.75 chord -- look for other "0.75 chord" tag
-  ! set the te 0.75*chord far from the ll
-  do iSection= 1,nSections
-    chord_list(iSection)   = chord_list(iSection) * 0.75_wp 
-  end do 
+! ! -- 0.75 chord -- look for other "0.75 chord" tag
+! ! set the te 0.75*chord far from the ll
+! do iSection= 1,nSections
+!   chord_list(iSection)   = chord_list(iSection) * 0.75_wp 
+! end do 
 
 
   npoint_chord_tot = nelem_chord_tot + 1
@@ -499,11 +499,11 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   
   end do
 
-  ! -- 0.75 chord -- look for other "0.75 chord" tag
-  ! correct the chord value ----
-  do ich = 1 , size(chord_p)
-    chord_p(ich) = chord_p(ich) / 0.75_wp
-  end do 
+! ! -- 0.75 chord -- look for other "0.75 chord" tag
+! ! correct the chord value ----
+! do ich = 1 , size(chord_p)
+!   chord_p(ich) = chord_p(ich) / 0.75_wp
+! end do 
 
 
 ! === new-2019-02-06 ===
