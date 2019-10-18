@@ -638,6 +638,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
              & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
              'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
     end select
+
   end if
 
   if ( ( trim(mesh_file_type) .eq. 'parametric' ) .or. &
@@ -686,6 +687,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
       call build_connectivity_general( ee , neigh )
 
+      if ( mesh_symmetry ) call update_connectivity_symmetry( ee , rr , neigh )
+
       if ( ElType .eq. 'v' ) then
         write(*,*) nl//' WARNING: component with id.', comp_id
         write(*,*) '  defined as ''basic'' with ''vortex ring'' elements:'
@@ -706,6 +709,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     case( 'cgns' )
 
       call build_connectivity_general( ee , neigh )
+
+      if ( mesh_symmetry ) call update_connectivity_symmetry( ee , rr , neigh )
 
       call build_te_general ( ee , rr , ElType , &
                 tol_sewing , inner_product_threshold , &
@@ -1237,6 +1242,74 @@ subroutine build_connectivity_general ( ee , neigh )
  end do
 
 end subroutine build_connectivity_general
+
+!----------------------------------------------------------------------
+!> Find if neighboring elements at the symmetry plane of the component:
+! one elem belongs to the first half of the elem list, one belongs to the
+! second half.
+subroutine update_connectivity_symmetry( ee , rr , neigh )
+ integer , allocatable, intent(in)    :: ee(:,:)
+ real(wp), allocatable, intent(in)    :: rr(:,:)
+ integer , allocatable, intent(inout) :: neigh(:,:)
+
+ integer :: nelem , nelem_2 , nsides1 , nsides2
+
+ integer :: i , j , k , l , n_sew_sym
+
+ real(wp) :: tol = 1e-6_wp ! hardcoded
+
+ ! write(*,'(A)',advance='no') 'Update_connectivity_symmetry() ... ' 
+
+ nelem = size(ee,2)
+ nelem_2 = nelem / 2
+
+ n_sew_sym = 0
+ do i = 1 , nelem_2
+
+   ! QUAD or TRIA
+   nsides1 = 4
+   if ( ee(4,i) .eq. 0 ) nsides1 = 3
+
+   do k = 1 , nsides1
+
+     if ( neigh(k,i) .eq. 0 ) then ! missing neighbor
+  
+       do j = nelem_2+1 , nelem
+      
+         ! QUAD or TRIA
+         nsides2 = 4
+         if ( ee(4,j) .eq. 0 ) nsides2 = 3
+         
+           do l = 1 , nsides2
+           
+             if ( neigh(l,j) .eq. 0 ) then
+               if ( sqrt( &
+                   norm2( rr(:,ee(k,i)) - rr(:,ee(mod(l,nsides2)+1,j)) )**2.0_wp + &
+                   norm2( rr(:,ee(l,j)) - rr(:,ee(mod(k,nsides1)+1,i)) )**2.0_wp ) .lt. tol ) then
+
+                 !> update neigh array
+                 neigh(k,i) = j
+                 neigh(l,j) = i
+
+                 ! debug ---
+                 n_sew_sym = n_sew_sym + 1 
+!                write(*,*) n_sew_sym , ': ' , i , j
+!                ! debug ---
+           
+               end if
+             end if
+           
+           end do 
+      
+       end do 
+
+     end if
+   end do
+ end do 
+
+ ! write(*,*)' ... done.' 
+
+end subroutine update_connectivity_symmetry
 
 !----------------------------------------------------------------------
 

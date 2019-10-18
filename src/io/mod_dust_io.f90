@@ -154,7 +154,7 @@ subroutine save_status(geo, wake, it, time, run_id)
   write(sit,'(I4.4)') it
   call new_hdf5_file(trim(sim_param%basename)//'_res_'//trim(sit)//'.h5', &
                      floc)
-  call write_hdf5_attr(run_id, 'run_id', floc)
+  !call write_hdf5_attr(run_id, 'run_id', floc)
   call write_hdf5_attr(git_sha1, 'git_sha1', floc)
   call write_hdf5_attr(version, 'version', floc)
   call sim_param%save_param(floc)

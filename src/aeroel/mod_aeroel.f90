@@ -131,6 +131,12 @@ type, abstract, extends(c_elem) :: c_pot_elem
   !> Element normal vector
   real(wp) :: nor(3)
 
+  !> Element normal vector (at previous dt, to compute dn_dt)
+  real(wp) :: nor_old(3)
+
+  !> Element normal vector (at previous dt, to compute dn_dt)
+  real(wp) :: dn_dt(3)
+
   !> Element tangential vectors
   real(wp) :: tang(3,2) ! tangent unit vectors as in PANAIR
   

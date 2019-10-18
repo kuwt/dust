@@ -555,11 +555,11 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
  allocate(chord_p(npoint_span_tot)) ; chord_p = 0.0_wp
  allocate(theta_p(npoint_span_tot)) ; theta_p = 0.0_wp
 
- ! -- 0.75 chord -- look for other "0.75 chord" tag
- ! set the TE 0.75*chord far from the ll
- do i = 1 , size(points)
-   points(i)%chord = points(i)%chord * 0.75_wp 
- end do
+!! -- 0.75 chord -- look for other "0.75 chord" tag
+!! set the TE 0.75*chord far from the ll
+!do i = 1 , size(points)
+!  points(i)%chord = points(i)%chord * 0.75_wp 
+!end do
 
 
  ! === define the coordinates of the sections at all the input points === 
@@ -701,14 +701,14 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
  end do
 
  
- ! -- 0.75 chord -- look for other "0.75 chord" tag
- ! set the TE 0.75*chord far from the ll
- do i = 1 , size(points)
-   points(i)%chord = points(i)%chord / 0.75_wp 
- end do
- do i = 1 , size(chord_p)
-   chord_p(i) = chord_p(i) / 0.75_wp
- end do
+! ! -- 0.75 chord -- look for other "0.75 chord" tag
+! ! set the TE 0.75*chord far from the ll
+! do i = 1 , size(points)
+!   points(i)%chord = points(i)%chord / 0.75_wp 
+! end do
+! do i = 1 , size(chord_p)
+!   chord_p(i) = chord_p(i) / 0.75_wp
+! end do
  
  ! optional output ----
  npoints_chord_tot = npoint_chord_tot
