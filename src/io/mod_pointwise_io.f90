@@ -604,7 +604,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
      points(i)%xy(2,2) = 0.0_wp
    else
      points(i)%xy(1,2) = cos(twist_rad)*points(i)%chord
-     points(i)%xy(2,2) = sin(twist_rad)*points(i)%chord
+     points(i)%xy(2,2) = -sin(twist_rad)*points(i)%chord
    endif
 
    if ( points(i)%flip_sec ) points(i)%xy(2,:) = -points(i)%xy(2,:)
