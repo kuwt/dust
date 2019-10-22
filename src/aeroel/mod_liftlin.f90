@@ -126,6 +126,7 @@ contains
   procedure, pass(this) :: compute_pres     => compute_pres_liftlin
   procedure, pass(this) :: compute_dforce   => compute_dforce_liftlin
   procedure, pass(this) :: calc_geo_data    => calc_geo_data_liftlin
+  ! procedure, pass(this) :: get_vort_vel     => get_vort_vel_liftlin
 
   !> new routines for load computations
   procedure, pass(this) :: get_vel_ctr_pt   => get_vel_ctr_pt_liftlin
@@ -415,7 +416,7 @@ subroutine solve_liftlin_piszkin( &
  real(wp) :: uinf(3)
  integer  :: i_l, j, ic
  real(wp) :: vel(3), v(3), up(3)
- real(wp), allocatable :: vel_w(:,:)
+ real(wp), allocatable :: vel_w(:,:) , vel_w_vort(:,:)
  real(wp) :: unorm, alpha, alpha_2d, alpha_avg
  real(wp) , allocatable :: alpha_avg_v(:) , alpha_avg_new_v(:)
  real(wp) :: cl
@@ -483,7 +484,8 @@ subroutine solve_liftlin_piszkin( &
 
   !=== Compute the velocity from all the elements except for liftling elems ===
   ! and store it outside the loop, since it is constant
-  allocate(vel_w(3,size(elems_ll))) ; vel_w = 0.0_wp 
+  allocate(vel_w     (3,size(elems_ll))) ; vel_w      = 0.0_wp 
+  allocate(vel_w_vort(3,size(elems_ll))) ; vel_w_vort = 0.0_wp 
 !$omp parallel do private(i_l, j, v) schedule(dynamic)
   do i_l = 1,size(elems_ll)
     do j = 1,size(elems_impl) ! body panels: liftlin, vor che tenga contotlat 
@@ -500,9 +502,28 @@ subroutine solve_liftlin_piszkin( &
     enddo
     do j = 1,size(elems_vort) ! wake vort
       call elems_vort(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
-      vel_w(:,i_l) = vel_w(:,i_l) + v
+      vel_w     (:,i_l) = vel_w     (:,i_l) + v
+      vel_w_vort(:,i_l) = vel_w_vort(:,i_l) + v
     enddo
-    if(sim_param%use_fmm) vel_w(:,i_l) = vel_w(:,i_l) + elems_ll(i_l)%p%uvort*4.0_wp*pi
+
+    if(sim_param%use_fmm_pan) then
+
+      ! === FMM from particles to panels ===
+      !> Update %uvort field
+      ! so far,     %uvort contains the induced velocity of fmm (particle elems)
+      !         vel_w_vort contains 4*pi*induced velocity of other vortical elems
+      elems_ll(i_l)%p%uvort = elems_ll(i_l)%p%uvort*4.0_wp*pi + vel_w_vort(:,i_l) 
+      !> Update the induced velocity from particles
+      vel_w(:,i_l) = vel_w(:,i_l) + elems_ll(i_l)%p%uvort
+
+    else
+
+      ! === no FMM from particles to panels ===
+      !> Assign %uvort field only (never computed before for LL)
+      elems_ll(i_l)%p%uvort = vel_w_vort(:,i_l) / ( 4.0_wp * pi )
+
+    end if
+
   enddo
 !$omp end parallel do
 
@@ -807,7 +828,7 @@ subroutine solve_liftlin_piszkin( &
   endif
 
   ! useful arrays ---
-  deallocate(dou_temp, vel_w, Gamma_old)
+  deallocate(dou_temp, vel_w, vel_w_vort, Gamma_old)
   deallocate(a_v,c_m,u_v, alpha_avg_v)
   
 
@@ -835,7 +856,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
  real(wp) :: uinf(3)
  integer  :: i_l, j, ic
  real(wp) :: vel(3), v(3), up(3)
- real(wp), allocatable :: vel_w(:,:)
+ real(wp), allocatable :: vel_w(:,:) , vel_w_vort(:,:)
  real(wp) :: unorm, alpha, alpha_2d
  real(wp) :: cl
  real(wp), allocatable :: aero_coeff(:)
@@ -899,7 +920,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   !=== Compute the velocity from all the elements except for liftling elems ===
   ! and store it outside the loop, since it is constant
-  allocate(vel_w(3,size(elems_ll))) ; vel_w = 0.0_wp 
+  allocate(vel_w     (3,size(elems_ll))) ; vel_w      = 0.0_wp 
+  allocate(vel_w_vort(3,size(elems_ll))) ; vel_w_vort = 0.0_wp 
 !$omp parallel do private(i_l, j, v) schedule(dynamic)
   do i_l = 1,size(elems_ll)
     do j = 1,size(elems_impl) ! body panels: liftlin, vor che tenga contotlat 
@@ -916,9 +938,28 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     enddo
     do j = 1,size(elems_vort) ! wake vort
       call elems_vort(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
-      vel_w(:,i_l) = vel_w(:,i_l) + v
+      vel_w     (:,i_l) = vel_w(:,i_l) + v
+      vel_w_vort(:,i_l) = vel_w_vort(:,i_l) + v
     enddo
-    if(sim_param%use_fmm) vel_w(:,i_l) = vel_w(:,i_l) + elems_ll(i_l)%p%uvort*4.0_wp*pi
+    
+    if(sim_param%use_fmm_pan) then
+
+      ! === FMM from particles to panels ===
+      !> Update %uvort field
+      ! so far,     %uvort contains the induced velocity of fmm (particle elems)
+      !         vel_w_vort contains 4*pi*induced velocity of other vortical elems
+      elems_ll(i_l)%p%uvort = elems_ll(i_l)%p%uvort*4.0_wp*pi + vel_w_vort(:,i_l) 
+      !> Update the induced velocity from particles
+      vel_w(:,i_l) = vel_w(:,i_l) + elems_ll(i_l)%p%uvort
+
+    else
+
+      ! === no FMM from particles to panels ===
+      !> Assign %uvort field only (never computed before for LL)
+      elems_ll(i_l)%p%uvort = vel_w_vort(:,i_l) / ( 4.0_wp * pi )
+
+    end if
+
   enddo
 !$omp end parallel do
 
@@ -1061,7 +1102,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
               end do
 
 ! ! todo: assign a proper debug_level to this screen output
-! ! debug ---- 
+! ! debug ----
+
 !               write(*,*) ' a_v(i_l:i_l+nn_stall-1) new: ' , a_v(i_l:i_l+nn_stall-1)
 ! ! debug ---- 
 
@@ -1082,6 +1124,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
         a_v = a_v * pi / 180.0_wp
         al_stall = al_stall * pi / 180.0_wp
+
 
       end if ! *** if ic/n_iter_reg integer, and ... ***
 
@@ -1123,7 +1166,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   do i_l = 1,size(elems_ll)
 
    !select type(el => elems_ll(i_l)%p)
-   !type is(t_liftlin)
+   !type is(t_liftlin)      vel_w_vort(:,i_l) = vel_w_vort(:,i_l) + v
+
    el => elems_ll(i_l)%p
     ! avg delta_p = \vec{F}.\vec{n} / A = ( L*cos(al)+D*sin(al) ) / A
     !> steady pressure contribution ( overwritten below )
@@ -1225,7 +1269,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   endif
 
   ! useful arrays ---
-  deallocate(dou_temp, vel_w, Gamma_old)
+  deallocate(dou_temp, vel_w, vel_w_vort, Gamma_old)
   deallocate(a_v,c_m,u_v)
   
 
@@ -1431,6 +1475,31 @@ subroutine calc_geo_data_liftlin(this, vert)
   this%tang_cen = matmul ( rm, this%tang_cen )
 
 end subroutine calc_geo_data_liftlin
+
+
+!----------------------------------------------------------------------
+! TODO: use this function to compute the induced velocity from 
+! vortex elements (vortex particles, vortex lines at TE) on the
+! LL. In order to correctly use this function, the field %uvort
+! should not be overwritten, when the use_fmm_option is set .T.
+! 
+! !> Calculate the vorticity induced velocity from vortical elements
+! subroutine get_vort_vel_liftlin(this, vort_elems, uinf)
+!  class(t_liftlin), intent(inout)    :: this
+!  type(t_vort_elem_p), intent(in)    :: vort_elems(:)
+!  real(wp), intent(in) :: uinf(3)
+! 
+!  integer :: iv
+!  real(wp) :: vel(3)
+! 
+!  !this%uvort = 0.0_wp
+! 
+!  do iv=1,size(vort_elems)
+!    call vort_elems(iv)%p%compute_vel(this%cen, uinf, vel)
+!    this%uvort = this%uvort + vel/(4*pi)
+!  enddo
+! 
+! end subroutine 
 
 !----------------------------------------------------------------------
 
