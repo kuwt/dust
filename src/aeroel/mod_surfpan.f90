@@ -329,9 +329,9 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
    call potential_calc_doublet(this, pdou, pos)
 
    ! debug : it seems that ONLY the near-field formulas had the wrong sign !!! CHECK it again !!!
-   phix = - phix
-   phiy = - phiy
-   pdou = - pdou
+   phix = - phix ! * ( -1.0_wp ) 
+   phiy = - phiy ! * ( -1.0_wp )
+   pdou = - pdou ! * ( -1.0_wp )
 
  end if
 
@@ -525,6 +525,11 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, uinf, &
 
     linsys%b(ie) = linsys%b(ie) - a*wake_elems(j1)%p%mag
 
+    ! debug ---
+    if ( ie .eq. 42 ) then
+      write(*,*) 'wake_elems(' , j1 , '): ' , a
+    end if
+    ! debug ---
 
   end do
 
@@ -710,7 +715,8 @@ subroutine compute_vel_surfpan(this, pos , uinf, vel )
   ! source ----
   call velocity_calc_sou_surfpan(this, vsou, pos)
 
-  vel = vdou*this%mag - vsou*( sum(this%nor*(this%ub-uinf)) )
+  vel = vdou*this%mag - vsou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
+  ! vel = - vsou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
 
 end subroutine compute_vel_surfpan
 
