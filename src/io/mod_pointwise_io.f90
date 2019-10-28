@@ -409,7 +409,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
                         airfoil_list_actual, nelem_span_list, &
                         i_airfoil_e , normalised_coord_e    , &
                         npoints_chord_tot , nelem_span_tot  , &
-                        chord_p,theta_p )
+                        chord_p,theta_p,theta_e )
 
  character(len=*), intent(in) :: mesh_file
  integer  , allocatable, intent(out) :: ee(:,:) 
@@ -418,8 +418,8 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
  integer  , allocatable, intent(out) :: nelem_span_list(:)
  integer  , allocatable, intent(out) :: i_airfoil_e(:,:)
  real(wp) , allocatable, intent(out) :: normalised_coord_e(:,:)
- integer  , intent(out), optional    :: npoints_chord_tot, nelem_span_tot
- real(wp) , allocatable, intent(out), optional :: chord_p(:),theta_p(:)
+ integer  ,              intent(out) :: npoints_chord_tot, nelem_span_tot
+ real(wp) , allocatable, intent(out) :: chord_p(:),theta_p(:),theta_e(:)
  real(wp) :: s_cen_e
 
  ! parser and sub-parsers
@@ -428,6 +428,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
  !>
  integer   :: nelem_chord
  character :: ElType
+ logical   :: mesh_flat
 
  !> point and line structures
  type(t_point) , allocatable :: points(:)
@@ -474,7 +475,16 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
    write(*,*) ' expected ElType = "l", but got: ', Eltype
    write(*,*) ' Stop. ' ; stop
  end if
- 
+
+ !> Option for flat meshes: panels are not rotated, but normals and 
+ !! tangent vectors are rotated with the twist
+ mesh_flat = getlogical(pmesh_prs,'mesh_flat')
+
+ if ( mesh_flat .and. trim(ElType) .ne. 'l' ) then
+   call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+        &flat mesh option is available only for lifting line elements.')
+ end if 
+
  !> Read points and lines 
  call read_points ( 'l' , pmesh_prs , point_prs , points )
  call read_lines  (       pmesh_prs ,  line_prs , lines  , nelem_span_tot )
@@ -554,12 +564,13 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
  allocate(rr   (3,rr_size)) ; rr      = 0.0_wp
  allocate(chord_p(npoint_span_tot)) ; chord_p = 0.0_wp
  allocate(theta_p(npoint_span_tot)) ; theta_p = 0.0_wp
+ allocate(theta_e(nelem_span_tot )) ; theta_e = 0.0_wp
 
- ! -- 0.75 chord -- look for other "0.75 chord" tag
- ! set the TE 0.75*chord far from the ll
- do i = 1 , size(points)
-   points(i)%chord = points(i)%chord * 0.75_wp 
- end do
+!! -- 0.75 chord -- look for other "0.75 chord" tag
+!! set the TE 0.75*chord far from the ll
+!do i = 1 , size(points)
+!  points(i)%chord = points(i)%chord * 0.75_wp 
+!end do
 
 
  ! === define the coordinates of the sections at all the input points === 
@@ -580,10 +591,21 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
    twist_rad = points(i) % theta * pi / 180.0_wp
 
    allocate( points(i)%xy ( 2 , 2 ) )
-   points(i)%xy(:,1) = (/ 0.0_wp , 0.0_wp /)
-   points(i)%xy(:,2) = matmul ( reshape( (/ cos(twist_rad) , -sin(twist_rad) , &
-                                            sin(twist_rad) ,  cos(twist_rad) /) , &
-                           (/ 2 , 2 /) ) , (/ points(i)%chord , 0.0_wp /) )
+
+   ! Rotate the section around the reference line with the twist angle
+   !
+   ! For flat meshes the section is not rotated, but the
+   ! normal/tangent vector are
+
+   points(i)%xy(1,1) = 0.0_wp
+   points(i)%xy(2,1) = 0.0_wp
+   if ( mesh_flat ) then
+     points(i)%xy(1,2) = points(i)%chord
+     points(i)%xy(2,2) = 0.0_wp
+   else
+     points(i)%xy(1,2) = cos(twist_rad)*points(i)%chord
+     points(i)%xy(2,2) = -sin(twist_rad)*points(i)%chord
+   endif
 
    if ( points(i)%flip_sec ) points(i)%xy(2,:) = -points(i)%xy(2,:)
    
@@ -626,6 +648,14 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
 
  end do
 
+ ! For flat meshes the section is not rotated, but the
+ ! normal/tangent vector are
+
+ if ( mesh_flat ) then
+   do i = 1,nelem_span_tot 
+     theta_e(i) = 0.5_wp*(theta_p(i)+theta_p(i+1))
+   enddo
+ endif
 
  ! === from the output of the read_mesh_pointwise-like section of the  ===
  ! === routine to the desired format (~ read_mesh_ll)                  ===
@@ -701,14 +731,14 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
  end do
 
  
- ! -- 0.75 chord -- look for other "0.75 chord" tag
- ! set the TE 0.75*chord far from the ll
- do i = 1 , size(points)
-   points(i)%chord = points(i)%chord / 0.75_wp 
- end do
- do i = 1 , size(chord_p)
-   chord_p(i) = chord_p(i) / 0.75_wp
- end do
+! ! -- 0.75 chord -- look for other "0.75 chord" tag
+! ! set the TE 0.75*chord far from the ll
+! do i = 1 , size(points)
+!   points(i)%chord = points(i)%chord / 0.75_wp 
+! end do
+! do i = 1 , size(chord_p)
+!   chord_p(i) = chord_p(i) / 0.75_wp
+! end do
  
  ! optional output ----
  npoints_chord_tot = npoint_chord_tot
@@ -1464,6 +1494,9 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
    call point_prs%CreateStringOption(  'airfoil_table', 'section airfoil' )
  endif
  
+ if ( eltype .eq. 'l' ) then
+   call pmesh_prs%CreateLogicalOption('mesh_flat', 'flat mesh yes/no','F' )
+ endif
  call point_prs%CreateRealOption(      'chord', 'section chord' )
  call point_prs%CreateRealOption(      'twist', 'section twist angle' )
  call point_prs%CreateStringOption('SectionNormal', &

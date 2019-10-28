@@ -192,6 +192,8 @@ type :: t_geo_component
  !> Normalised coordinate of sections in each wing region.
  !! Size(...) = nRegions+1
  real(wp),allocatable :: normalised_coord_e(:,:)
+ !> twist angle for flat elements
+ real(wp),allocatable :: theta_e(:)
  !> Id of the airfoil elements (index in airfoil_list char array)
  integer ,allocatable :: i_airfoil_e(:,:)
 
@@ -652,7 +654,7 @@ subroutine load_components(geo, in_file, out_file, te)
  ! Connectivity and te structures
  integer , allocatable :: neigh(:,:)
  ! Lifting Line elements
- real(wp), allocatable :: normalised_coord_e(:,:)
+ real(wp), allocatable :: normalised_coord_e(:,:), theta_e(:)
  integer                 , allocatable :: i_airfoil_e(:,:)
  character(max_char_len) , allocatable :: airfoil_list(:)
  integer                 , allocatable :: nelem_span_list(:)
@@ -829,6 +831,7 @@ subroutine load_components(geo, in_file, out_file, te)
         call read_hdf5_al(nelem_span_list   ,'nelem_span_list'   ,geo_loc)!(:)
         call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)!(:,:)
         call read_hdf5_al(normalised_coord_e,'normalised_coord_e',geo_loc)!(:,:)
+        call read_hdf5_al(theta_e,           'theta_e'           ,geo_loc)
         allocate(geo%components(i_comp)%airfoil_list(size(airfoil_list)))
         geo%components(i_comp)%airfoil_list = airfoil_list
         allocate(geo%components(i_comp)%nelem_span_list(size(nelem_span_list)))
@@ -839,6 +842,8 @@ subroutine load_components(geo, in_file, out_file, te)
         allocate(geo%components(i_comp)%normalised_coord_e( &
               size(normalised_coord_e,1),size(normalised_coord_e,2)))
         geo%components(i_comp)%normalised_coord_e = normalised_coord_e
+        allocate(geo%components(i_comp)%theta_e(size(theta_e)))
+        geo%components(i_comp)%theta_e = theta_e
       else if (comp_el_type(1:1) .eq. 'a') then
         call read_hdf5(trac,'Traction',cloc)
         call read_hdf5(rad,'Radius',cloc)
@@ -898,6 +903,7 @@ subroutine load_components(geo, in_file, out_file, te)
           call write_hdf5(nelem_span_list   ,'nelem_span_list'   ,geo_loc)
           call write_hdf5(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
           call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
+          call write_hdf5(theta_e           ,'theta_e'           ,geo_loc)
 
         else if (comp_el_type(1:1) .eq. 'a') then
           call write_hdf5(trac,'Traction',cloc2)
@@ -1287,7 +1293,7 @@ subroutine prepare_geometry(geo)
        elem%csi_cen = 0.5_wp * &
                       sum(geo%components(i_comp)%normalised_coord_e(:,ie))
        elem%i_airfoil =  geo%components(i_comp)%i_airfoil_e(:,ie)
-
+       elem%twist     =  geo%components(i_comp)%theta_e(ie)
       class is(t_vortlatt)
 
       class is(t_actdisk)
@@ -1713,6 +1719,15 @@ subroutine update_geometry(geo, t, update_static)
   associate(comp => geo%components(i_comp))
 
     if (comp%moving .or. update_static) then
+
+      !> compute dn_dt: store %nor at previous time step, for moving
+      ! components
+      if ( .not. update_static ) then
+        do ie = 1 , size(comp%el)
+          comp%el(ie)%nor_old = comp%el(ie)%nor
+        end do
+      end if
+
       geo%points(:,comp%i_points) = move_points(comp%loc_points, &
                            geo%refs(comp%ref_id)%R_g, &
                            geo%refs(comp%ref_id)%of_g)
@@ -1724,6 +1739,19 @@ subroutine update_geometry(geo, t, update_static)
 
         call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
       enddo
+
+      !> compute dn_dt: set %nor_old = %nor for static elements 
+      ! and first time step
+      if ( update_static ) then
+        do ie = 1 , size(comp%el)
+          comp%el(ie)%nor_old = comp%el(ie)%nor
+        end do
+      end if
+
+      do ie = 1 , size(comp%el)
+        comp%el(ie)%dn_dt = ( comp%el(ie)%nor - comp%el(ie)%nor_old ) / &
+                              sim_param % dt
+      end do
 
 ! 2018.11.15 Moved outside, at the end of create_geometry
 ! !     !in the first pass compute also the velocity stencil for surfpans

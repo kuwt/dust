@@ -265,12 +265,13 @@ type, abstract :: c_wake_mov
 end type
 
 abstract interface 
- subroutine i_get_vel(this, elems, wake, pos, vel)
+ subroutine i_get_vel(this, elems, wake, pos, vel_hcas, vel)
    import :: c_wake_mov, wp, t_pot_elem_p, t_wake
    class(c_wake_mov) :: this
    type(t_pot_elem_p), intent(in) :: elems(:)
    type(t_wake), intent(in) :: wake
    real(wp), intent(in) :: pos(3)
+   real(wp), intent(in) :: vel_hcas(3)
    real(wp), intent(out) :: vel(3)
  end subroutine
 end interface
@@ -818,6 +819,7 @@ subroutine update_wake(wake, elems, octree)
  real(wp) :: pos_p(3), vel_p(3)
  real(wp) :: str(3), stretch(3)
  real(wp) :: df(3), diff(3)
+ real(wp) :: hcas_vel(3)
  type(t_pot_elem_p), allocatable :: pan_p_temp(:)
  real(wp), allocatable :: point_old(:,:,:)
  real(wp), allocatable :: points(:,:,:)
@@ -826,6 +828,7 @@ subroutine update_wake(wake, elems, octree)
  character(len=*), parameter :: this_sub_name='update_wake'
 
   wake%w_vel = 0.0_wp
+  if(sim_param%HCAS) hcas_vel = get_vel_hcas()
 
   if(wake%pan_wake_len .eq. wake%nmax_pan) wake%full_panels=.true.
 
@@ -868,7 +871,7 @@ subroutine update_wake(wake, elems, octree)
       !wake%w_vel(:,iw,ipan-1) = vel_p
 
       !vel_p    = vel_p   + sim_param%u_inf
-      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
+      call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
 
       !update the position in time
       wake%pan_w_vel(   :,iw,ipan) = vel_p
@@ -891,7 +894,7 @@ subroutine update_wake(wake, elems, octree)
       !call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
 
       !vel_p    = vel_p   + sim_param%u_inf
-      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
+      call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
 
       !update the position in time
       points_end(:,iw) = pos_p + vel_p*sim_param%dt
@@ -942,7 +945,7 @@ subroutine update_wake(wake, elems, octree)
       pos_p = points(:,ip,ir)
       vel_p = 0.0_wp
 
-      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
+      call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
 
       !update the position in time
       points(:,ip,ir) = points(:,ip,ir) + vel_p*sim_param%dt
@@ -969,7 +972,7 @@ subroutine update_wake(wake, elems, octree)
       !call compute_vel_from_all(elems, wake, pos_p, sim_param, vel_p)
 
       !vel_p    = vel_p   + sim_param%u_inf
-      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
+      call wake_movement%get_vel(elems, wake, pos_p, hcas_vel,  vel_p)
 
       !update the position in time
       points_end_ring(:,ip) = pos_p + vel_p*sim_param%dt
@@ -1002,7 +1005,7 @@ subroutine update_wake(wake, elems, octree)
     if (.not.sim_param%use_fmm) then
       pos_p = wake%part_p(ip)%p%cen
 
-      call wake_movement%get_vel(elems, wake, pos_p, vel_p)
+      call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
 
       !wake%prt_vel(:,ip) = vel_p    ! *****(old) vel_prt(:,ip) = vel_p
       !wake%part_p(ip)%p%vel =  wake%prt_vel(:,ip)  ! *****(old) vel_prt(:,ip)
@@ -1052,6 +1055,11 @@ subroutine update_wake(wake, elems, octree)
     t0 = dust_time()
     call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
                          wake%end_vorts)
+    if (sim_param%HCAS) then
+      do ip = 1, wake%n_prt
+        wake%part_p(ip)%p%vel = wake%part_p(ip)%p%vel + hcas_vel
+      enddo
+    endif
     t1 = dust_time()
     write(msg,'(A,F9.3,A)') 'Multipoles calculation: ' , t1 - t0,' s.'
     if(sim_param%debug_level.ge.3) call printout(msg)
@@ -1195,7 +1203,6 @@ subroutine complete_wake(wake, geo, elems)
  real(wp) :: dist(3) , vel_te(3), pos_p(3)
  real(wp) :: dir(3), partvec(3), ave, alpha_p(3), alpha_p_n
  integer  :: k, n_part
- real(wp) :: hcas_reltime
  real(wp) :: vel_in(3), vel_out(3)
 
  ! flow separation variables
@@ -1257,13 +1264,13 @@ subroutine complete_wake(wake, geo, elems)
   n_part = wake%n_prt
 !$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n,vel_in,vel_out)
   do ip = 1, n_part
-    if(sim_param%HCAS) then
-      hcas_reltime = (sim_param%time-sim_param%t0)/sim_param%hcas_time
-      if(hcas_reltime .le. 1.0_wp) then
-        wake%part_p(ip)%p%vel = wake%part_p(ip)%p%vel + &
-          sim_param%hcas_vel*(1.0_wp-hcas_reltime) !linear reduction
-      endif
-    endif
+    !if(sim_param%HCAS) then
+    !  hcas_reltime = (sim_param%time-sim_param%t0)/sim_param%hcas_time
+    !  if(hcas_reltime .le. 1.0_wp) then
+    !    wake%part_p(ip)%p%vel = wake%part_p(ip)%p%vel + &
+    !      sim_param%hcas_vel*(1.0_wp-hcas_reltime) !linear reduction
+    !  endif
+    !endif
     if(sim_param%use_pa) then
       vel_in = wake%part_p(ip)%p%vel
       call avoid_collision_2(elems, wake, &
@@ -1577,32 +1584,47 @@ end subroutine compute_vel_from_all
 
 !----------------------------------------------------------------------
 
-subroutine get_vel_free(this, elems, wake, pos, vel)
+subroutine get_vel_free(this, elems, wake, pos, vel_hcas, vel)
  class(t_free_wake) :: this
  type(t_pot_elem_p), intent(in) :: elems(:)
  type(t_wake), intent(in) :: wake
  real(wp), intent(in) :: pos(3)
+ real(wp), intent(in) :: vel_hcas(3)
  real(wp), intent(out) :: vel(3)
 
   call compute_vel_from_all(elems, wake, pos, vel)
   
   vel = vel + sim_param%u_inf
-
+  if (sim_param%HCAS) vel = vel + vel_hcas
+  
 end subroutine get_vel_free
 
 !----------------------------------------------------------------------
 
-subroutine get_vel_rigid(this, elems, wake, pos, vel)
+subroutine get_vel_rigid(this, elems, wake, pos, vel_hcas, vel)
  class(t_rigid_wake) :: this
  type(t_pot_elem_p), intent(in) :: elems(:)
  type(t_wake), intent(in) :: wake
  real(wp), intent(in) :: pos(3)
+ real(wp), intent(in) :: vel_hcas(3)
  real(wp), intent(out) :: vel(3)
 
 ! vel = sim_param%u_inf
  vel = sim_param%rigid_wake_vel
 
 end subroutine get_vel_rigid
+
+!----------------------------------------------------------------------
+
+function get_vel_hcas() result(vel_hcas)
+ real(wp) :: vel_hcas(3)
+
+ real(wp) :: hcas_reltime
+
+  hcas_reltime = (sim_param%time-sim_param%t0)/sim_param%hcas_time
+  vel_hcas = sim_param%hcas_vel*max(0.0_wp, (1.0_wp-hcas_reltime)) !linear reduction
+
+end function get_vel_hcas
 
 !----------------------------------------------------------------------
 
