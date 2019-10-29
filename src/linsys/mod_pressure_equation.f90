@@ -256,8 +256,13 @@ subroutine assemble_pressure_sys(linsys, geo, elems, wake)
 !$omp end parallel do
 
   ! (a) far field contribution
-  linsys%b_pres = linsys%b_pres + &
-                    4*pi * ( Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp ) ! H_inf
+  !> (a.1) original implementation ===
+  ! linsys%b_pres = linsys%b_pres + &
+  !     4.0_wp*pi * ( Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp ) ! H_inf
+  !> (a.2) trick of setting B_inf = P_inf + 0.5 * rhoinf * uinf^2 = 0 ===
+  ! with the proper value of dPres to be subtracted and added to the Pressure
+  ! field.
+  linsys%b_pres = linsys%b_pres + 0.0    ! <- useless line!
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !
   ! END Assemble the RHS of the linear system for the Bernoulli polynomial !
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !
