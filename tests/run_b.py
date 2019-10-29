@@ -12,7 +12,7 @@ pars.add_argument("exe_path",help='path to the executables')
 pars.add_argument('-t','--tolerance', nargs='?', help='tolerance for the test',
                   required=False, default=1e-10, type=float)
 pars.add_argument('-r','--release', nargs='?', help='release to check with',
-                  required=False, default='0.5.13')
+                  required=False, default='0.5.14')
 args = pars.parse_args()
 exe_path = args.exe_path
 exe_path = os.path.abspath(exe_path)
@@ -21,7 +21,8 @@ solver = exe_path+'/dust'
 post   = exe_path+'/dust_post'
 tol = args.tolerance
 
-vers_dic ={'0.5.11':'0-5-11', '0.5.12':'0-5-12','0.5.13':'0-5-13'}
+vers_dic ={'0.5.11':'0-5-11', '0.5.12':'0-5-12','0.5.13':'0-5-13',
+           '0.5.14':'0-5-14'}
 try:
   vers = '_'+vers_dic[args.release]
 except:

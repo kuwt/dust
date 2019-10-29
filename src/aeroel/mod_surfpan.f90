@@ -329,9 +329,9 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
    call potential_calc_doublet(this, pdou, pos)
 
    ! debug : it seems that ONLY the near-field formulas had the wrong sign !!! CHECK it again !!!
-   phix = - phix
-   phiy = - phiy
-   pdou = - pdou
+   phix = - phix ! * ( -1.0_wp ) 
+   phiy = - phiy ! * ( -1.0_wp )
+   pdou = - pdou ! * ( -1.0_wp )
 
  end if
 
@@ -525,6 +525,11 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, uinf, &
 
     linsys%b(ie) = linsys%b(ie) - a*wake_elems(j1)%p%mag
 
+!   ! debug ---
+!   if ( ie .eq. 42 ) then
+!     write(*,*) 'wake_elems(' , j1 , '): ' , a
+!   end if
+!   ! debug ---
 
   end do
 
@@ -710,7 +715,8 @@ subroutine compute_vel_surfpan(this, pos , uinf, vel )
   ! source ----
   call velocity_calc_sou_surfpan(this, vsou, pos)
 
-  vel = vdou*this%mag - vsou*( sum(this%nor*(this%ub-uinf)) )
+  vel = vdou*this%mag - vsou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
+  ! vel = - vsou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
 
 end subroutine compute_vel_surfpan
 
@@ -802,14 +808,24 @@ subroutine compute_pres_surfpan(this, R_g)
 !!!             + sim_param%rho_inf * this%didou_dt
 
 
-   !New equation
-   this%pres = this%pres_sol - 0.5_wp*sim_param%rho_inf * &
-               norm2(this%surf_vel)**2.0_wp
+  ! === Using result of the Uhlman's equation for pressure ===
+  ! See linsys/mod_pressure_equation.f90:assemble_pressure_linsys
+  ! as a reference for the 2 different implementations
+  !> (a.1) original implementation ===
+  ! this%pres = this%pres_sol - 0.5_wp*sim_param%rho_inf * &
+  !             norm2(this%surf_vel)**2.0_wp 
+  !> (a.2) trick of setting B_inf = P_inf + 0.5 * rhoinf * uinf^2.0 ===
+  this%pres = this%pres_sol &
+            - 0.5_wp*sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp & 
+            + 0.5_wp*sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp & 
+            + sim_param%P_inf
 
   if (this%moving) then
+    ! old computation of the loads, expoliting Bernoulli
+    ! TODO: to be updated and treated w/ Uhlman's equation formulation
     force_pres  = sim_param%P_inf &
+      - 0.5_wp * sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp  &
       + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
-      - 0.5_wp * sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp  &
                + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
                + sim_param%rho_inf * this%didou_dt
   else

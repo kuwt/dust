@@ -686,7 +686,12 @@ subroutine naca4digits(airfoil_name, nelem_chord,&
     endif
 
     ! Thickness
-    thickness = 5.0_wp*s*(0.2969_wp*sqrt(xa) - 0.1260_wp*xa - 0.3516_wp*(xa**2) + 0.2843_wp*(xa**3) - 0.1015_wp*(xa**4))
+    thickness = 5.0_wp*s*( 0.2969_wp*sqrt(xa)  &
+                         - 0.1260_wp* xa       &
+                         - 0.3516_wp*(xa**2)   &
+                         + 0.2843_wp*(xa**3)   &
+                         - 0.1036_wp*(xa**4))     ! closed TE
+!                        - 0.1015_wp*(xa**4))     !   open TE
 
     points_mean_line(1,iPoint) = xa
     points_mean_line(2,iPoint) = ml

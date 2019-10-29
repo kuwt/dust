@@ -120,11 +120,17 @@ subroutine potential_calc_doublet(this, dou, pos)
  real(wp), dimension(3) :: ei , ap1 , am1
  real(wp) :: ap1n , am1n , sinB , cosB , beta
 
- integer :: indm1 , indp1
+ integer :: ind0 , indm1 , indp1
+
+ ! QUAD elem as 2 TRIA elems
+ integer :: indexm1(3) , indexp1(3) , index0(3)
+ real(wp):: nor_vec(3) , v1(3) , v2(3)
+ real(wp):: tol_z_dou = 1.0e-6_wp
+ real(wp):: pos_z
 
  real(wp) :: radius
 
- integer :: i1
+ integer :: i1 , i2
 
  radius = norm2(pos-this%cen)
 
@@ -143,40 +149,145 @@ subroutine potential_calc_doublet(this, dou, pos)
    ! initialisation
    dou = 0.0_wp
 
-   Qp = pos - zQ * e3
 
-   do i1 = 1 , this%n_ver
+!    if ( this%n_ver .eq. 3 ) then
+! 
+!      ! === TRIA elements ===
+!      !> old implmentation that did not distinguish TRIA from QUAD
+!      do i1 = 1 , this%n_ver
+!   
+!        !This is ugly but should be general and work...
+!        indp1 = 1+mod(i1,this%n_ver)
+!        indm1 = this%n_ver - mod(this%n_ver-i1+1, this%n_ver)
+!   
+!        ! doublet  -----
+!        ! it is possible to use ver, instead of ver_p for the doublet
+!        ei = - ( pos - this%ver (:,i1) ) ; ei = ei / norm2(ei)
+!        ap1 =   this%edge_vec(:,i1   ) - ei * sum( ei * this%edge_vec(:,i1   ) )
+!        am1 = - this%edge_vec(:,indm1) + ei * sum( ei * this%edge_vec(:,indm1) )
+!        ap1n= norm2(ap1)
+!        am1n= norm2(am1)
+!        sinB = sum ( ei * cross(am1,ap1) ) / ( ap1n * am1n )
+!        cosB = sum ( am1 * ap1 ) / ( ap1n * am1n )
+!        beta = datan2( sinB , cosB )
+!        dou = dou + beta
+!   
+!      end do
+!   
+!      ! Correct the result to obtain the solid angle (from Gauss-Bonnet theorem)
+!      if     ( dou .lt. -real(this%n_ver-2,wp)*pi + 1.0e-5_wp ) then
+!        dou = dou + real(this%n_ver-2,wp) * pi
+!      elseif ( dou .gt. +real(this%n_ver-2,wp)*pi - 1.0e-5_wp ) then
+!        dou = dou - real(this%n_ver-2,wp) * pi
+!      else
+!        ! debug ---
+!        write(*,*) ' dou : ' , dou
+!        ! debug ---
+!        dou = 0.0_wp
+!      end if
+! 
+!    elseif ( this%n_ver .eq. 4 ) then
 
-     !This is ugly but should be general and work...
-     indp1 = 1+mod(i1,this%n_ver)
-     indm1 = this%n_ver - mod(this%n_ver-i1+1, this%n_ver)
+     !> old implmentation that did not distinguish TRIA from QUAD
+     do i1 = 1 , this%n_ver
+  
+       !This is ugly but should be general and work...
+       indp1 = 1+mod(i1,this%n_ver)
+       indm1 = this%n_ver - mod(this%n_ver-i1+1, this%n_ver)
+  
+       ! doublet  -----
+       ! it is possible to use ver, instead of ver_p for the doublet
+       ei = - ( pos - this%ver (:,i1) ) ; ei = ei / norm2(ei)
+       ap1 =   this%edge_vec(:,i1   ) - ei * sum( ei * this%edge_vec(:,i1   ) )
+       am1 = - this%edge_vec(:,indm1) + ei * sum( ei * this%edge_vec(:,indm1) )
+       ap1n= norm2(ap1)
+       am1n= norm2(am1)
+       sinB = sum ( ei * cross(am1,ap1) ) / ( ap1n * am1n )
+       cosB = sum ( am1 * ap1 ) / ( ap1n * am1n )
+       beta = datan2( sinB , cosB )
+       dou = dou + beta
+  
+     end do
+  
+     ! Correct the result to obtain the solid angle (from Gauss-Bonnet theorem)
+     if     ( dou .lt. -real(this%n_ver-2,wp)*pi + 1.0e-5_wp ) then
+       dou = dou + real(this%n_ver-2,wp) * pi
+     elseif ( dou .gt. +real(this%n_ver-2,wp)*pi - 1.0e-5_wp ) then
+       dou = dou - real(this%n_ver-2,wp) * pi
+     else
+!      ! debug ---
+!      write(*,*) ' dou : ' , dou
+!      ! debug ---
+!      ! dou = 0.0_wp
+     end if
 
-     ! doublet  -----
-     ! it is possible to use ver, instead of ver_p for the doublet
-     ei = - ( pos - this%ver (:,i1) ) ; ei = ei / norm2(ei)
-     ap1 =   this%edge_vec(:,i1   ) - ei * sum( ei * this%edge_vec(:,i1   ) )
-     am1 = - this%edge_vec(:,indm1) + ei * sum( ei * this%edge_vec(:,indm1) )
-     ap1n= norm2(ap1)
-     am1n= norm2(am1)
-     sinB = sum ( ei * cross(am1,ap1) ) / ( ap1n * am1n )
-     cosB = sum ( am1 * ap1 ) / ( ap1n * am1n )
-     beta = atan2( sinB , cosB )
-     dou = dou + beta
+!      ! === Latest (partial) implementation ===
+!      do i2 = 1 , 2  ! QUAD elem split in 2 TRIA elems
+! 
+!        if ( i2 .eq. 1 ) then
+!          indexm1 = (/ 3 , 1 , 2 /)
+!          index0  = (/ 1 , 2 , 3 /)
+!          indexp1 = (/ 2 , 3 , 1 /)
+!        else
+!          indexm1 = (/ 4 , 1 , 3 /)
+!          index0  = (/ 1 , 3 , 4 /)
+!          indexp1 = (/ 3 , 4 , 1 /)
+!        end if 
+! 
+!        do i1 = 1 , 3
+! 
+!          v1 = this%ver(:,index0 (i1)) - this%ver(:,indexm1(i1))
+!          v2 = this%ver(:,indexp1(i1)) - this%ver(:,index0 (i1))
+!          nor_vec = cross( v1 , v2 ) ; nor_vec = nor_vec / norm2(nor_vec)
+!          pos_z = sum( nor_vec * ( pos - this%ver(:,index0(i1)) ) )
+! 
+!          if ( abs(pos_z) .gt. tol_z_dou ) then
+! 
+!            ind0  = index0 (i1)
+!            ! indp1 = indexp1(i1)
+!            ! indm1 = indexm1(i1)
+!             
+!            ei = - ( pos - this%ver (:,ind0) ) ; ei = ei / norm2(ei)
+!            ap1 =   v2 - ei * sum( ei * v2 )
+!            am1 = - v1 + ei * sum( ei * v1 )
+!            ap1n= norm2(ap1)
+!            am1n= norm2(am1)
+!            sinB = sum ( ei * cross(am1,ap1) ) / ( ap1n * am1n )
+!            cosB = sum ( am1 * ap1 ) / ( ap1n * am1n )
+!            beta = datan2( sinB , cosB )
+!            dou = dou + beta
+! 
+!          else
+! 
+!            ! TODO: write regularisation
+! !          ! debug ---
+! !          write(*,*) ' pos_z : ' , pos_z
+! !          ! debug ---
+! 
+!          end if
+! 
+!        end do
+! 
+!      end do
+!   
+!      ! Correct the result to obtain the solid angle (from Gauss-Bonnet theorem)
+!      if     ( dou .lt. -real(this%n_ver-2,wp)*pi + 1.0e-5_wp ) then
+!        dou = dou + real(this%n_ver-2,wp) * pi
+!      elseif ( dou .gt. +real(this%n_ver-2,wp)*pi - 1.0e-5_wp ) then
+!        dou = dou - real(this%n_ver-2,wp) * pi
+!      else
+! !      ! debug ---
+! !      write(*,*) ' dou : ' , dou
+! !      ! debug ---
+!        dou = 0.0_wp
+!      end if
+! 
+!    end if
 
-   end do
-
-   ! Correct the result to obtain the solid angle (from Gauss-Bonnet theorem)
-   if     ( dou .lt. -real(this%n_ver-2,wp)*pi - eps_dou ) then
-     dou = dou + real(this%n_ver-2,wp) * pi
-   elseif ( dou .gt. +real(this%n_ver-2,wp)*pi + eps_dou ) then
-     dou = dou - real(this%n_ver-2,wp) * pi
-   else
-     dou = 0.0_wp
-   end if
-   ! Check on the proj of r_i-r normal to the panel (useless?)
-!  if ( abs(zQ) .lt. eps_dou ) then
-!    dou = 0.0_wp
-!  end if
+   ! ! Check on the proj of r_i-r normal to the panel (useless?)
+   ! if ( abs(zQ) .lt. eps_dou ) then
+   !   dou = 0.0_wp
+   ! end if
 
  end if
 
@@ -197,9 +308,11 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
 
  real(wp) :: phix , phiy , pdou
  integer  :: indp1 , indm1
- real(wp) :: av(3) , hv(3)
+ real(wp) :: av(3) , hv(3) , v1(3) , v2(3)
  real(wp) :: ai    , hi
  real(wp) :: R1 , R2
+
+ real(wp) :: th1 , th2
 
  real(wp) :: radius_v(3)
  real(wp) :: radius , rati
@@ -233,6 +346,26 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
 
   else
 
+!    ! === Rosenhead kernel ===
+!    do i1 = 1 , this%n_ver
+! 
+!      indp1 = 1+mod(i1,this%n_ver)
+!      av = cross( this%edge_uni(:,i1) , pos - this%ver(:,i1) )
+!      hi = norm2( av )
+!      v1 = pos - this%ver(:,i1)
+!      v2 = pos - this%ver(:,indp1)
+!      th1 = datan2( hi , sum( this%edge_uni(:,i1) * v1 ) )
+!      th2 = datan2( hi , sum( this%edge_uni(:,i1) * v2 ) )
+! 
+!      v_dou = v_dou + av * hi / ( hi**2.0_wp + sim_param%RankineRad**2.0_wp ) * ( &
+!       - cos(th2) / ( hi**2.0_wp + sim_param%RankineRad**2.0_wp * &
+!                                           max(sin(th2)**2.0_wp,0.001_wp) )**0.5_wp &
+!       + cos(th1) / ( hi**2.0_wp + sim_param%RankineRad**2.0_wp * &
+!                                           max(sin(th1)**2.0_wp,0.001_wp) )**0.5_wp )
+! 
+!    end do
+
+   ! === Original DUST regularisation ===
    do i1 = 1 , this%n_ver
 
      !if ( this%n_ver .eq. 3 ) then
@@ -254,14 +387,23 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
      R2 = norm2(pos-this%ver(:,indp1))
      hv = av - ai*this%edge_uni(:,i1)
      hi = norm2(hv)
+     ! === TEST THRESHOLDS ===
+     !> Relative threshold ---
      if ( hi .gt. this%edge_len(i1)*r_Rankine ) then
+     !> Absolute threshold ---
+     ! if ( hi .gt. r_Rankine ) then
        ! (a/r+(s-a)/r)/h
        v_dou = v_dou + ( (this%edge_len(i1)-ai)/r2 + ai/r1 )/(hi**2.0_wp) * &
                        cross(this%edge_uni(:,i1),hv)
      else
 !      ! (a/r+(s-a)/r)* h/r_Rankine^2.
+       ! === TEST THRESHOLDS ===
+       !> Relative threshold ---
        if ( ( R1 .gt. this%edge_len(i1)*r_cutoff ) .and. &! avoid singularity
             ( R2 .gt. this%edge_len(i1)*r_cutoff )   ) then
+       !> Absolute threshold ---
+       ! if ( ( R1 .gt. this%edge_len(i1)*r_cutoff ) .and. &! avoid singularity
+       !      ( R2 .gt. this%edge_len(i1)*r_cutoff )   ) then
          r_Ran = r_Rankine * this%edge_len(i1)
          v_dou = v_dou + ((this%edge_len(i1)-ai)/R2 + ai/R1)/(r_Ran**2.0_wp)* &
                           cross(this%edge_uni(:,i1),hv)
