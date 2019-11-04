@@ -512,9 +512,10 @@ subroutine solve_liftlin_piszkin( &
       !> Update %uvort field
       ! so far,     %uvort contains the induced velocity of fmm (particle elems)
       !         vel_w_vort contains 4*pi*induced velocity of other vortical elems
-      elems_ll(i_l)%p%uvort = elems_ll(i_l)%p%uvort*4.0_wp*pi + vel_w_vort(:,i_l) 
+      elems_ll(i_l)%p%uvort = elems_ll(i_l)%p%uvort +  &
+                              vel_w_vort(:,i_l) / (4.0_wp * pi)
       !> Update the induced velocity from particles
-      vel_w(:,i_l) = vel_w(:,i_l) + elems_ll(i_l)%p%uvort
+      vel_w(:,i_l) = vel_w(:,i_l) + elems_ll(i_l)%p%uvort * 4.0_wp*pi
 
     else
 
@@ -948,9 +949,10 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       !> Update %uvort field
       ! so far,     %uvort contains the induced velocity of fmm (particle elems)
       !         vel_w_vort contains 4*pi*induced velocity of other vortical elems
-      elems_ll(i_l)%p%uvort = elems_ll(i_l)%p%uvort*4.0_wp*pi + vel_w_vort(:,i_l) 
+      elems_ll(i_l)%p%uvort = elems_ll(i_l)%p%uvort + &
+                              vel_w_vort(:,i_l) / (4.0_wp*pi)
       !> Update the induced velocity from particles
-      vel_w(:,i_l) = vel_w(:,i_l) + elems_ll(i_l)%p%uvort
+      vel_w(:,i_l) = vel_w(:,i_l) + elems_ll(i_l)%p%uvort * 4.0_wp*pi
 
     else
 
