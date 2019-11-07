@@ -1170,11 +1170,12 @@ subroutine update_wake(wake, elems, octree)
 
   !==> End vortices: If the wake is full, attach the end vortex
   !if (wake%pan_wake_len .eq. wake%nmax_pan) then
-  if (wake%full_panels) then
-    do iw = 1,wake%n_pan_stripes
-      wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag
-    enddo
-  endif
+  ! Should be done in complete wake
+  !if (wake%full_panels) then
+  !  do iw = 1,wake%n_pan_stripes
+  !    wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag
+  !  enddo
+  !endif
 
   !==> Rings: Update the intensities of the rings
   !       From the back, all the vortex intensities come from the 
@@ -1524,7 +1525,8 @@ subroutine complete_wake(wake, geo, elems)
   !If the wake is full, attach the end vortex
   if (wake%full_panels) then
     do iw = 1,wake%n_pan_stripes
-      wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag
+      !wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag
+      wake%end_vorts(iw)%mag => wake%last_pan_idou(iw)
       p1 = wake%i_start_points(1,iw)
       p2 = wake%i_start_points(2,iw)
       call wake%end_vorts(iw)%calc_geo_data( &
