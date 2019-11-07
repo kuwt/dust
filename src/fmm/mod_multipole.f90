@@ -285,6 +285,7 @@ subroutine M2L_multipole(this, ker_der, pexp, pexp_der, multipol_int)
  type(t_multipole), intent(in) :: multipol_int
 
  real(wp) :: sum_v(3), sum_g(3,3), mult
+ real(wp) :: Der(3)
 
  integer :: n, m, idx(3), idx_der
  
@@ -302,21 +303,30 @@ subroutine M2L_multipole(this, ker_der, pexp, pexp_der, multipol_int)
                 pexp%nfact(pexp%pwr(1,m),pexp%pwr(2,m),pexp%pwr(3,m))*&
                 pexp%nfact(pexp%pwr(1,n),pexp%pwr(2,n),pexp%pwr(3,n)),wp)
       
-      sum_v = sum_v + mult * cross(ker_der%D(:,idx_der), multipol_int%a(:,n))
+      !sum_v = sum_v + mult * cross(ker_der%D(:,idx_der), multipol_int%a(:,n))
+      Der = ker_der%D(:,idx_der)
+      sum_v = sum_v + mult * cross(Der, multipol_int%a(:,n))
       
       if(multipole_use_vs) then
-        !sum_g(:,1) = sum_g(:,1) + mult * &
-        !             cross(ker_der%Dc(:,1,idx_der), multipol_int%a(:,n))
-        !sum_g(:,2) = sum_g(:,2) + mult * &
-        !             cross(ker_der%Dc(:,2,idx_der), multipol_int%a(:,n))
-        !sum_g(:,3) = sum_g(:,3) + mult * &
-        !             cross(ker_der%Dc(:,3,idx_der), multipol_int%a(:,n))
-        sum_g(1,:) = sum_g(1,:) + mult * &
-                     cross(ker_der%Dc(1,:,idx_der), multipol_int%a(:,n))
-        sum_g(2,:) = sum_g(2,:) + mult * &
-                     cross(ker_der%Dc(2,:,idx_der), multipol_int%a(:,n))
-        sum_g(3,:) = sum_g(3,:) + mult * &
-                     cross(ker_der%Dc(3,:,idx_der), multipol_int%a(:,n))
+        !/!sum_g(:,1) = sum_g(:,1) + mult * &
+        !/!             cross(ker_der%Dc(:,1,idx_der), multipol_int%a(:,n))
+        !/!sum_g(:,2) = sum_g(:,2) + mult * &
+        !/!             cross(ker_der%Dc(:,2,idx_der), multipol_int%a(:,n))
+        !/!sum_g(:,3) = sum_g(:,3) + mult * &
+        !/!             cross(ker_der%Dc(:,3,idx_der), multipol_int%a(:,n))
+
+        !sum_g(1,:) = sum_g(1,:) + mult * &
+        !             cross(ker_der%Dc(1,:,idx_der), multipol_int%a(:,n))
+        !sum_g(2,:) = sum_g(2,:) + mult * &
+        !             cross(ker_der%Dc(2,:,idx_der), multipol_int%a(:,n))
+        !sum_g(3,:) = sum_g(3,:) + mult * &
+        !             cross(ker_der%Dc(3,:,idx_der), multipol_int%a(:,n))
+        Der = ker_der%Dc(1,:,idx_der)
+        sum_g(1,:) = sum_g(1,:) + mult * cross(Der, multipol_int%a(:,n))
+        Der = ker_der%Dc(2,:,idx_der)
+        sum_g(2,:) = sum_g(2,:) + mult * cross(Der, multipol_int%a(:,n))
+        Der = ker_der%Dc(3,:,idx_der)
+        sum_g(3,:) = sum_g(3,:) + mult * cross(Der, multipol_int%a(:,n))
       endif
       !sum1 = sum1 +  &
       !pexp_der%nfact(idx(1),idx(2),idx(3))/( &
