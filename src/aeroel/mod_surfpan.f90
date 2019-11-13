@@ -67,7 +67,8 @@ use mod_aeroel, only: &
 
 use mod_doublet, only: &
   potential_calc_doublet , &
-  velocity_calc_doublet
+  velocity_calc_doublet  , &
+  gradient_calc_doublet
 
 use mod_linsys_vars, only: &
   t_linsys
@@ -123,6 +124,7 @@ contains
   procedure, pass(this) :: add_expl         => add_expl_surfpan
   procedure, pass(this) :: compute_pot      => compute_pot_surfpan
   procedure, pass(this) :: compute_vel      => compute_vel_surfpan
+  procedure, pass(this) :: compute_grad     => compute_grad_surfpan
   procedure, pass(this) :: compute_psi      => compute_psi_surfpan
   procedure, pass(this) :: compute_pres     => compute_pres_surfpan
   procedure, pass(this) :: compute_dforce   => compute_dforce_surfpan
@@ -344,6 +346,18 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
 !!!!! ! vel = - vel
 
 end subroutine velocity_calc_sou_surfpan
+
+!----------------------------------------------------------------------
+!> TODO: compute the gradient of the velocity induced by a source and 
+!        write this routine 
+subroutine gradient_calc_sou_surfpan(this, grad, pos)
+ class(t_surfpan), intent(in) :: this
+ real(wp), intent(out) :: grad(3,3)
+ real(wp), intent(in) :: pos(:)
+
+ grad = 0.0_wp 
+
+end subroutine gradient_calc_sou_surfpan
 
 !----------------------------------------------------------------------
 
@@ -719,6 +733,37 @@ subroutine compute_vel_surfpan(this, pos , uinf, vel )
   ! vel = - vsou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
 
 end subroutine compute_vel_surfpan
+
+!----------------------------------------------------------------------
+
+!> Compute the gradient of the induced velocity in the position pos
+!!
+!! The velocity in the position is calculated considering the influece of
+!! both the doublets and the sources
+!!
+!! WARNING: the velocity calculated, to be consistent with the formulation of
+!! the equations is multiplied by 4*pi, to obtain the actual velocity the
+!! result of the present subroutine MUST be DIVIDED by 4*pi
+subroutine compute_grad_surfpan(this, pos , uinf, grad )
+  class(t_surfpan), intent(in) :: this
+  real(wp), intent(in) :: pos(:)
+  real(wp), intent(in) :: uinf(3)
+  real(wp), intent(out) :: grad(3,3)
+
+  real(wp) :: grad_dou(3,3) , grad_sou(3,3)
+
+  ! doublet ---
+  call gradient_calc_doublet(this, grad_dou, pos)
+
+  ! source ----
+  call gradient_calc_sou_surfpan(this, grad_sou, pos)
+
+  grad = grad_dou*this%mag &
+       - grad_sou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
+
+  ! vel = - vsou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
+
+end subroutine compute_grad_surfpan
 
 !----------------------------------------------------------------------
 

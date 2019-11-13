@@ -69,7 +69,10 @@ use mod_sim_param, only: &
 
 implicit none
 
-public :: initialize_doublet, velocity_calc_doublet, potential_calc_doublet
+public ::    initialize_doublet, &
+         potential_calc_doublet, &
+          velocity_calc_doublet, &
+          gradient_calc_doublet
 
 private
 
@@ -417,6 +420,84 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
   end if
 
 end subroutine velocity_calc_doublet
+
+!----------------------------------------------------------------------
+
+!> Compute gradient of the velcoity field using the Rosenhead kernel
+!>
+subroutine gradient_calc_doublet(this, grad_dou, pos)
+ class(c_pot_elem), intent(in) :: this
+ real(wp), intent(out) :: grad_dou(3,3)
+ real(wp), intent(in) :: pos(:)
+
+ integer :: indp1 , indm1 , i1 , i2 , i
+ real(wp) :: R1(3) , R2(3) , a1(3) , a2(3) , l(3) , a
+ real(wp) :: R1v(3,1) , R2v(3,1) , a1v(3,1) , a2v(3,1) , lv(3,1)
+ real(wp) :: lx(3,3) , aa1(3,3) , aa2(3,3) , ax1(3,3) , ax2(3,3) , al1(3,3) , al2(3,3)
+ real(wp) :: del , a2del2
+
+ del = sim_param % RankineRad
+ ! ff_ratio = sim_param % VortRad
+
+ grad_dou = 0.0_wp
+
+ do i = 1 , this%n_ver
+
+   !This is ugly but should be general and work...
+   indp1 = 1+mod(i,this%n_ver)
+   indm1 = this%n_ver - mod(this%n_ver-i1+1, this%n_ver)
+   i1 = i
+   i2 = indp1
+
+   l = this%edge_uni(:,i) 
+   lv(:,1) = l
+
+! ! debug ---
+!    write(*,*) ' this%n_ver : ' , this%n_ver
+!    write(*,*) ' i1 : ' , i1
+!    write(*,*) ' i2 : ' , i2
+! ! debug ---
+   R1 = pos-this%ver(:,i1) ;   a1 = cross( l , R1 )
+   R2 = pos-this%ver(:,i2) ;   a2 = cross( l , R2 )
+   a = norm2(a1)  ! = norm(a2)
+   a2del2 = a**2.0_wp + del**2.0_wp
+
+   R1v(:,1) = R1 ;  a1v(:,1) = a1
+   R2v(:,1) = R2 ;  a2v(:,1) = a2
+
+   lx(:,1) = (/  0.0_wp ,  l(3)   , -l(2)   /)
+   lx(:,2) = (/ -l(3)   ,  0.0_wp ,  l(1)   /)
+   lx(:,3) = (/  l(2)   , -l(1)   ,  0.0_wp /)
+
+   aa1 = matmul( a1v , transpose(a1v) ) 
+   ax1 = matmul( a1v , transpose(R1v) )
+   al1 = matmul( a1v , transpose( lv) )
+   aa2 = matmul( a2v , transpose(a2v) )
+   ax2 = matmul( a2v , transpose(R2v) )
+   al2 = matmul( a2v , transpose( lv) )
+   
+   grad_dou = grad_dou &
+    + 1.0_wp / ( a2del2**1.5_wp * norm2(R1) ) * &
+      ( (   a * lx &
+          + ( 1.0_wp/a - 3.0_wp*a/a2del2 ) * matmul(aa1,lx) ) * sum(l*R1) &
+      + a * ( al1 - ax1 * sum( l * R1 ) / norm2(R1)**2.0_wp ) )  &
+    - 1.0_wp / ( a2del2**1.5_wp * norm2(R2) ) * &
+      ( (   a * lx &
+          + ( 1.0_wp/a - 3.0_wp*a/a2del2 ) * matmul(aa2,lx) ) * sum(l*R2) &
+      + a * ( al2 - ax2 * sum( l * R2 ) / norm2(R2)**2.0_wp ) ) 
+     
+ end do
+
+! debug ---
+! write(*,*)
+! write(*,*) grad_dou(1,:)
+! write(*,*) grad_dou(2,:)
+! write(*,*) grad_dou(3,:)
+! write(*,*)
+! stop
+! debug ---
+
+end subroutine gradient_calc_doublet
 
 !----------------------------------------------------------------------
 

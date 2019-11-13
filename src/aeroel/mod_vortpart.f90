@@ -90,6 +90,7 @@ type, extends(c_vort_elem) :: t_vortpart
 contains
 
   procedure, pass(this) :: compute_vel       => compute_vel_vortpart
+  procedure, pass(this) :: compute_grad      => compute_grad_vortpart
   procedure, pass(this) :: compute_stretch   => compute_stretch_vortpart  
   procedure, pass(this) :: compute_diffusion => compute_diffusion_vortpart  
   procedure, pass(this) :: calc_geo_data     => calc_geo_data_vortpart
@@ -153,6 +154,18 @@ subroutine compute_vel_vortpart (this, pos, uinf, vel)
 
 
 end subroutine compute_vel_vortpart
+
+!----------------------------------------------------------------------
+
+subroutine compute_grad_vortpart(this, pos, uinf, grad)
+ class(t_vortpart), intent(in) :: this
+ real(wp), intent(in) :: pos(:)
+ real(wp), intent(in) :: uinf(3)
+ real(wp), intent(out) :: grad(3,3)
+
+ grad = 0.0_wp
+
+end subroutine compute_grad_vortpart
 
 !----------------------------------------------------------------------
 

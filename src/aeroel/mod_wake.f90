@@ -1303,9 +1303,12 @@ subroutine complete_wake(wake, geo, elems)
           alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
                           wake%prt_vortevol(:,ip)*sim_param%dt
           alpha_p_n = norm2(alpha_p)
+
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
           if(alpha_p_n .le. wake%part_p(ip)%p%mag) then
             wake%part_p(ip)%p%mag = alpha_p_n
           endif
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
           if(alpha_p_n .ne. 0.0_wp) &
              wake%part_p(ip)%p%dir = alpha_p/alpha_p_n
         endif

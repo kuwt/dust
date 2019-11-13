@@ -1321,9 +1321,9 @@ subroutine build_references(refs, reference_file)
                             transient_time &
                           + refs(iref)%Omega * ( sim_param%time_vec(it) - transient_time )
                      end if
-                     ! debug ---
-                     write(*,*) refs(iref)%rot_vel(it) , refs(iref)%rot_pos(it)
-                     ! debug ---
+!                    ! debug ---
+!                    write(*,*) refs(iref)%rot_vel(it) , refs(iref)%rot_pos(it)
+!                    ! debug ---
                    end do
                  end if
                end if

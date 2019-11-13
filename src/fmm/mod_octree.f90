@@ -1139,11 +1139,14 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
  real(t_realtime) :: tsta , tend
  real(wp) :: turbvisc, ave_ros
 
+ real(wp) :: grad_elem(3,3) , stretch_elem(3)
+
   tsta = dust_time()
   !for all the leaves apply the local expansion and then local interactions 
   t0 = dust_time()
 !$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, &
-!$omp& v, stretch, str, grad, alpha, dir, velv, stretchv, ave_ros, turbvisc, iln) schedule(dynamic)
+!$omp& v, stretch, str, grad, alpha, dir, velv, stretchv, ave_ros, turbvisc, &
+!$omp& grad_elem, stretch_elem, iln) schedule(dynamic)
   do lv = 1, octree%nleaves
     !I am on a leaf, cycle on all the particles inside the leaf
     allocate(velv(3,octree%leaves(lv)%p%npart),&
@@ -1270,8 +1273,10 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
           if(sim_param%use_vs) then
             call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_stretch(pos, &
                                                           alpha, str)
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
+            !> removed the parallel component ( proj to avoid numerical instability ? ) 
             stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
-              !removed the parallel component
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
           endif
 
           if(sim_param%use_vd) then
@@ -1312,11 +1317,40 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       vel = vel + sim_param%u_inf
       octree%leaves(lv)%p%cell_parts(ip)%p%vel = vel
 
+
+      !> Vortex stretching
+      stretch_elem = 0.0_wp
+      ! Influence of the body elements
+      do ie=1,size(elem)
+        call elem(ie)%p%compute_grad(pos, sim_param%u_inf, grad_elem)
+        stretch_elem = stretch_elem + & 
+            matmul(transpose(grad_elem),alpha)/(4*pi)
+      enddo
+      ! Influence of the wake panels
+      do ie=1,size(wpan)
+        call wpan(ie)%p%compute_grad(pos, sim_param%u_inf, grad_elem)
+        stretch_elem = stretch_elem + & 
+            matmul(transpose(grad_elem),alpha)/(4*pi)
+      enddo
+      ! Influence of the end vortex
+      do ie=1,size(wvort)
+        call wvort(ie)%compute_grad(pos, sim_param%u_inf, grad_elem)
+        stretch_elem = stretch_elem + & 
+            matmul(transpose(grad_elem),alpha)/(4*pi)
+      enddo
+
+!     ! debug ---
+!     write(*,*) ' stretch, stretch_elem : ' , stretch, stretch_elem
+!     ! debug ---
+
       !evolve the position in time
       if(sim_param%use_vs .or. sim_param%use_vd) then
         !evolve the intensity in time
-        octree%leaves(lv)%p%cell_parts(ip)%p%stretch = stretch
+        octree%leaves(lv)%p%cell_parts(ip)%p%stretch = stretch + &
+                                                       stretch_elem
       endif
+
+
     endif
     enddo
     deallocate(velv, stretchv)
