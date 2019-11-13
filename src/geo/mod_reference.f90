@@ -79,9 +79,11 @@ use mod_sim_param, only: &
 
 use mod_parse, only: &
   t_parse, getstr, getint, getintarray, getreal, getrealarray, getlogical, countoption, &
-  getsuboption,&
+  getsuboption, &
   finalizeparameters, t_link, check_opt_consistency
   
+use mod_stringtools, only: &
+  lowcase
 
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
@@ -289,6 +291,11 @@ subroutine build_references(refs, reference_file)
  integer :: i_dof , n_dofs
  character(len=max_char_len), allocatable :: hinge_type(:)
  real(wp) , allocatable :: hinge_offs(:,:) , hinge_coll(:) , hinge_cyAm(:) , hinge_cyPh(:)
+
+ !> Transient option
+ logical                     :: transient_logical
+ character(len=max_char_len) :: transient_fun
+ real(wp)                    :: transient_time, init_rot_rate
  
  integer :: i1
 
@@ -372,6 +379,13 @@ subroutine build_references(refs, reference_file)
                &reference frame')
   call sbprms%CreateRealOption('Hub_Offset','Offset from the pole')
   call sbprms%CreateRealOption('Rot_Rate','Rate of rotation around axis')
+  call sbprms%CreateLogicalOption('Transient','Starting transient, .t. or .f.','F')
+  call sbprms%CreateStringOption('Transient_Fun', &
+                                 'Linear or cosine (1-cosine) transient','linear')
+  call sbprms%CreateRealOption('Transient_Time','Time interval of the &
+                               &transient','1.0')
+  call sbprms%CreateRealOption('Init_Rot_Rate','Initial value of the angular velocity', &
+                               '1.0')
   call sbprms%CreateRealOption('Psi_0','Starting rotation angle') 
   call sbprms%CreateIntOption('N_Dofs', 'Number of dofs for each blade')
   ! for complex rotor configurations ---------
@@ -1131,6 +1145,25 @@ subroutine build_references(refs, reference_file)
          !2) Read the inputs
          rot_axis = getrealarray(sbprms,'Rot_Axis',3)
          rot_rate = getreal(sbprms,'Rot_Rate')
+         transient_logical = getlogical(sbprms,'Transient')
+         transient_fun     = getstr( sbprms,'Transient_Fun' ) ; call LowCase(transient_fun)
+         transient_time    = getreal(sbprms,'Transient_Time')
+         init_rot_rate     = getreal(sbprms,'Init_Rot_Rate')
+         if ( transient_logical ) then
+           if ( ( countoption(sbprms,'Transient_Time') .eq. 0 ) .or. &
+                ( countoption(sbprms,'Transient_Fun ') .eq. 0 ) ) then
+             call error(this_sub_name, this_mod_name, '"Transient" set as .TRUE.,&
+                   & but no "Transient_Time or Transient_Fun is defined. Stop')
+           else
+             if ( ( trim(transient_fun) .ne. 'linear' ) .and. &
+                  ( trim(transient_fun) .ne. 'cosine' ) ) then
+               call error(this_sub_name, this_mod_name, '"Transient_Fun" &
+                     & must be "Linear" or "Cosine", while input is "'// &
+                     trim(transient_fun)//'". Stop')
+             end if
+           end if
+         end if
+
          psi_0 = getreal(sbprms,'Psi_0')
          hub_offset = getreal(sbprms,'Hub_Offset')
 
@@ -1222,17 +1255,78 @@ subroutine build_references(refs, reference_file)
                allocate(refs(iref)%pol_tim(  sim_param%n_timesteps)) 
                allocate(refs(iref)%rot_pos(  sim_param%n_timesteps)) 
                allocate(refs(iref)%rot_vel(  sim_param%n_timesteps)) 
-               allocate(refs(iref)%rot_tim(  sim_param%n_timesteps)) 
-               do it = 1,sim_param%n_timesteps
-                 refs(iref)%pol_pos(:,it) = refs(iref)%pole
-                 refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
-                 refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
-                 refs(iref)%rot_pos(  it) = refs(iref)%psi_0 + &
-                      refs(iref)%Omega * ( sim_param%time_vec(it) )  ! <---- CHECK !!!!
-                      !refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1) )  ! <---- CHECK !!!!
-                 refs(iref)%rot_vel(  it) = refs(iref)%Omega
-                 refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
-               end do
+               allocate(refs(iref)%rot_tim(  sim_param%n_timesteps))
+
+               if ( .not. transient_logical ) then ! default: no transient
+                 do it = 1,sim_param%n_timesteps
+                   refs(iref)%pol_pos(:,it) = refs(iref)%pole
+                   refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
+                   refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
+                   refs(iref)%rot_pos(  it) = refs(iref)%psi_0 + &
+                        refs(iref)%Omega * ( sim_param%time_vec(it) )  ! <---- CHECK !!!!
+                        !refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1) )  ! <---- CHECK !!!!
+                   refs(iref)%rot_vel(  it) = refs(iref)%Omega
+                   refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
+                 end do
+               else
+                 if ( trim(transient_fun) .eq. 'linear' ) then
+!                  ! debug ---
+!                  write(*,*) ' transient time: ' , transient_time
+!                  ! debug ---
+                   do it = 1,sim_param%n_timesteps
+                     refs(iref)%pol_pos(:,it) = refs(iref)%pole
+                     refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
+                     refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
+                     refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
+                     if ( sim_param%time_vec(it) .lt. transient_time ) then
+                       refs(iref)%rot_vel(  it) = &
+                          ( refs(iref)%Omega - init_rot_rate ) * &
+                            sim_param%time_vec(it) / transient_time  &
+                          + init_rot_rate
+                       refs(iref)%rot_pos(  it) = refs(iref)%psi_0 &
+                          + init_rot_rate * sim_param%time_vec(it) &  
+                          + 0.5_wp * ( refs(iref)%Omega - init_rot_rate ) * &
+                            sim_param%time_vec(it)**2.0_wp / transient_time
+                     else
+                       refs(iref)%rot_vel(  it) = refs(iref)%Omega
+                       refs(iref)%rot_pos(  it) = refs(iref)%psi_0 &
+                          + 0.5_wp * ( refs(iref)%Omega + init_rot_rate ) * &
+                            transient_time &
+                          + refs(iref)%Omega * ( sim_param%time_vec(it) - transient_time )
+                     end if
+!                    ! debug ---
+!                    write(*,*) refs(iref)%rot_vel(it) , refs(iref)%rot_pos(it)
+!                    ! debug ---
+                   end do
+                 elseif ( trim(transient_fun) .eq. 'cosine' ) then
+                   do it = 1,sim_param%n_timesteps
+                     refs(iref)%pol_pos(:,it) = refs(iref)%pole
+                     refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
+                     refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
+                     refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
+                     if ( sim_param%time_vec(it) .lt. transient_time ) then
+                       refs(iref)%rot_vel(  it) = &
+                            0.5_wp * ( refs(iref)%Omega - init_rot_rate ) * &
+                          ( 1.0_wp - cos( pi * sim_param%time_vec(it) / transient_time ) ) &
+                          + init_rot_rate
+                       refs(iref)%rot_pos(  it) = refs(iref)%psi_0 &
+                          + init_rot_rate * sim_param%time_vec(it) &
+                          + 0.5_wp * ( refs(iref)%Omega - init_rot_rate ) * &
+                          ( sim_param%time_vec(it) - transient_time / pi * &
+                            sin( pi*sim_param%time_vec(it)/transient_time) )
+                     else
+                       refs(iref)%rot_vel(  it) = refs(iref)%Omega
+                       refs(iref)%rot_pos(  it) = refs(iref)%psi_0 &
+                          + 0.5_wp * ( refs(iref)%Omega + init_rot_rate ) * &
+                            transient_time &
+                          + refs(iref)%Omega * ( sim_param%time_vec(it) - transient_time )
+                     end if
+                     ! debug ---
+                     write(*,*) refs(iref)%rot_vel(it) , refs(iref)%rot_pos(it)
+                     ! debug ---
+                   end do
+                 end if
+               end if
  
                allocate(refs(iref)%orig_pol_0(3))
                refs(iref)%orig_pol_0 = refs(iref)%orig - refs(iref)%pol_pos(:,1)
