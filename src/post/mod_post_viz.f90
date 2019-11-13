@@ -125,13 +125,13 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
  type(t_geo_component), allocatable :: comps(:)
  character(len=max_char_len) :: filename
  integer(h5loc) :: floc , ploc
- logical :: out_vort, out_vel, out_cp, out_press , out_wake, out_surfvel
+ logical :: out_vort, out_vort_vec, out_vel, out_cp, out_press , out_wake, out_surfvel
  logical :: out_turbvisc
  logical :: separate_wake
  integer :: n_var , i_var
  character(len=max_char_len), allocatable :: var_names(:)
  real(wp), allocatable :: points(:,:), points_exp(:,:) , wpoints(:,:)
- real(wp), allocatable :: vppoints(:,:), vpvort(:), vpturbvisc(:)
+ real(wp), allocatable :: vppoints(:,:), vpvort(:), vpvort_v(:,:), vpturbvisc(:)
  integer , allocatable :: elems(:,:) , welems(:,:)
  integer :: nelem , nelem_w, nelem_vp
 
@@ -167,6 +167,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     var_names(i_var) = getstr(sbprms, 'Variable') ; call LowCase(var_names(i_var))
   enddo
   out_vort = isInList('vorticity',var_names) ! Always lower case string in the code !
+  out_vort_vec = isInList('vorticity_vector',var_names) ! Always lower case string in the code !
   out_vel  = isInList('velocity' ,var_names)
   out_surfvel= isInList('surface_velocity' ,var_names)
   out_press= isInList('pressure' ,var_names)
@@ -174,6 +175,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   out_turbvisc = isInList('turbulent_viscosity',var_names)
   nprint = 0; nprint_w = 0
   if(out_vort)  nprint = nprint+1
+  if(out_vort_vec)  nprint = nprint+1
   if(out_cp)    nprint = nprint+1
   if(out_surfvel)   nprint = nprint+1
   if(out_vel)   nprint = nprint+1  !<--- *** TODO ***
@@ -293,9 +295,9 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
         
         if(out_turbvisc) then
           call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort, &
-                           vpturbvisc)
+                           vpvort_v, vpturbvisc)
         else
-          call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort)
+          call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort, vpvort_v)
         endif
         nelem_w = size(welems,2)
         nelem_vp = size(vppoints,2)
@@ -343,6 +345,15 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                  'Turbulent_Viscosity',.false.)
           call add_output_var(out_vars(i_var), vpturbvisc, &
                  'Turbulent_Viscosity',.true.)
+          i_var = i_var +1
+        endif
+        if(out_vort_vec) then
+          call add_output_var(out_vars_vp(i_var), vpvort_v, &
+                 'Vorticity',.false.)
+          call add_output_var(out_vars_w(i_var), vpvort_v, &
+                 'Vorticity',.true.)
+          call add_output_var(out_vars(i_var), vpvort_v, &
+                 'Vorticity',.true.)
           i_var = i_var +1
         endif
   
