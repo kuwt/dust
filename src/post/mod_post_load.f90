@@ -336,13 +336,14 @@ end subroutine load_ll
 !----------------------------------------------------------------------
 
 subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
-                         vpturbvisc)
+                         vpvort_v, vpturbvisc)
  integer(h5loc), intent(in) :: floc 
  real(wp), allocatable, intent(out) :: wpoints(:,:)
  integer, allocatable, intent(out)  :: welems(:,:)
  real(wp), allocatable, intent(out) :: wvort(:)
  real(wp), allocatable, intent(out) :: vppoints(:,:)
  real(wp), allocatable, intent(out) :: vpvort(:)
+ real(wp), allocatable, intent(out) :: vpvort_v(:,:)
  real(wp), allocatable, intent(out), optional :: vpturbvisc(:)
 
  integer(h5loc) :: gloc
@@ -488,7 +489,8 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
     do ip = 1,size(vpvort)
       vpvort(ip) = norm2(wvort_read(:,ip))
     enddo
-    deallocate(wvort_read)
+    !deallocate(wvort_read)
+    call move_alloc(wvort_read, vpvort_v)
     call close_hdf5_group(gloc)
   endif
 
