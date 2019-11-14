@@ -877,7 +877,11 @@ subroutine load_components(geo, in_file, out_file, te)
         call read_hdf5_al(    o_te,    'o_te',te_loc)
         call read_hdf5_al(    t_te,    't_te',te_loc)
         !call read_hdf5_al(  ref_te,  'ref_te',te_loc)
-        call read_hdf5(scale_te, 'scale_te',te_loc)
+        if(check_dset_hdf5('scale_te',te_loc)) then
+          call read_hdf5(scale_te, 'scale_te',te_loc)
+        else
+          scale_te = 1.0_wp
+        endif
         call close_hdf5_group(te_loc)
       else
         allocate(e_te(0,0), i_te(2,0), ii_te(2,0), neigh_te(2,0), o_te(2,0),&
