@@ -436,8 +436,8 @@ subroutine gradient_calc_doublet(this, grad_dou, pos)
  real(wp) :: lx(3,3) , aa1(3,3) , aa2(3,3) , ax1(3,3) , ax2(3,3) , al1(3,3) , al2(3,3)
  real(wp) :: del , a2del2
 
- del = sim_param % RankineRad
- ! ff_ratio = sim_param % VortRad
+ ! del = sim_param % RankineRad
+ del = sim_param % VortexRad
 
  grad_dou = 0.0_wp
 

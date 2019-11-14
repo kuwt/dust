@@ -224,8 +224,8 @@ subroutine compute_diffusion_vortpart (this, pos, alpha, diff)
 
   volp = 4.0_wp/3.0_wp*pi*r_Vortex**3
   volq = 4.0_wp/3.0_wp*pi*r_Vortex**3
-  diff = 1/(r_Vortex**2)*(volp*this%dir*this%mag - volq*alpha) &
-                                      *etaeps(distn,r_Vortex)
+  diff = 1.0_wp/(r_Vortex**2)*(volp*this%dir*this%mag - volq*alpha) &
+                                            *etaeps(distn,r_Vortex)
   !diff = 1/(r_Vortex**2)*( - volq*alpha) &
   !                                              *etaeps(distn,r_Vortex)
 

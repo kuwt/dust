@@ -185,7 +185,8 @@ subroutine compute_grad_vortline(this, pos, uinf, grad)
  !TODO: add far field approximations
  !radius_v = pos-this%cen
  !radius   = norm2(radius_v)
- del = sim_param % RankineRad
+ ! del = sim_param % RankineRad
+ del = sim_param % VortexRad
 
  if(associated(this%mag)) then
 

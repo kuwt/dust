@@ -1230,8 +1230,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
             if(sim_param%use_vs) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
                  %compute_stretch(pos, alpha, str)
-              stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
-              !removed the parallel component
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
+              stretch = stretch + str/(4.0_wp*pi)
+!             !removed the parallel component
+!             stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
             endif
             if(sim_param%use_vd) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
@@ -1253,8 +1256,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
          if(sim_param%use_vs) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
               %compute_stretch(pos, alpha, str)
-           stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
-              !removed the parallel component
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
+           stretch = stretch + str/(4.0_wp*pi)
+!          !removed the parallel component
+!          stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
          endif
          if(sim_param%use_vd) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
@@ -1274,8 +1280,9 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
             call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_stretch(pos, &
                                                           alpha, str)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-            !> removed the parallel component ( proj to avoid numerical instability ? ) 
-            stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+            stretch = stretch + str/(4.0_wp*pi)
+!           !> removed the parallel component ( proj to avoid numerical instability ? ) 
+!           stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
           endif
 
