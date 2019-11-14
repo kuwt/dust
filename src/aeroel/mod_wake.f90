@@ -161,6 +161,9 @@ type :: t_wake
  !! (n_pan_points)
  integer, allocatable :: pan_gen_ref(:)
 
+ !> Individual scaling of the firs element of the wake
+ real(wp), allocatable :: pan_gen_scaling(:)
+
  !> Panels neighbours in wake numbering
  integer, allocatable :: pan_neigh(:,:)
 
@@ -332,6 +335,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   allocate(wake%pan_gen_points(2,wake%n_pan_points))
   allocate(wake%pan_gen_dir(3,wake%n_pan_points))
   allocate(wake%pan_gen_ref(wake%n_pan_points))
+  allocate(wake%pan_gen_scaling(wake%n_pan_points))
   allocate(wake%w_start_points(3,wake%n_pan_points))
   allocate(wake%i_start_points(2,wake%n_pan_stripes))
   allocate(wake%pan_neigh(2,wake%n_pan_stripes))
@@ -417,6 +421,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   wake%pan_gen_points = te%i
   wake%pan_gen_dir = te%t
   wake%pan_gen_ref = te%ref
+  wake%pan_gen_scaling = te%scaling
   wake%i_start_points = te%ii
   wake%pan_neigh = te%neigh
   wake%pan_neigh_o = te%o
@@ -468,7 +473,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
       dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
 
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-                  dist*sim_param%first_panel_scaling* &
+                  dist*wake%pan_gen_scaling(ip)* &
                   norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist)
   ! normalisation occurs here! --------------------------------------^
 
@@ -477,7 +482,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
       dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
 
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-                  dist*sim_param%first_panel_scaling * & ! next line may be commented
+                  dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
                   sim_param%min_vel_at_te*sim_param%dt
     end if
 
@@ -1243,12 +1248,12 @@ subroutine complete_wake(wake, geo, elems)
             vel_te )
     if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) + &
-                          dist*sim_param%first_panel_scaling* &
+                          dist*wake%pan_gen_scaling(ip)* &
                           norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist)
   ! normalisation occurs here! -------------------------------------------^
     else
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-                  dist*sim_param%first_panel_scaling * & ! next line may be commented
+                  dist*wake%pan_gen_scaling(ip)* & ! next line may be commented
                   sim_param%min_vel_at_te*sim_param%dt / norm2(dist)
     end if
   enddo
