@@ -1191,7 +1191,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       if(sim_param%use_vs)  then
         str = matmul(alpha, grad)
         !str = matmul(alpha, transpose(grad))
-        stretch = stretch + str - sum(str*dir)*dir !remove the parallel comp.
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
+        stretch = stretch + str
+        !remove the parallel component
+!       stretch = stretch + str - sum(str*dir)*dir
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
         stretchv(:,ip) = stretch
       endif
       if(sim_param%use_vd)  then
@@ -1340,19 +1344,19 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       do ie=1,size(elem)
         call elem(ie)%p%compute_grad(pos, sim_param%u_inf, grad_elem)
         stretch_elem = stretch_elem + & 
-            matmul(transpose(grad_elem),alpha)/(4*pi)
+            matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
       enddo
       ! Influence of the wake panels
       do ie=1,size(wpan)
         call wpan(ie)%p%compute_grad(pos, sim_param%u_inf, grad_elem)
         stretch_elem = stretch_elem + & 
-            matmul(transpose(grad_elem),alpha)/(4*pi)
+            matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
       enddo
       ! Influence of the end vortex
       do ie=1,size(wvort)
         call wvort(ie)%compute_grad(pos, sim_param%u_inf, grad_elem)
         stretch_elem = stretch_elem + & 
-            matmul(transpose(grad_elem),alpha)/(4*pi)
+            matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
       enddo
 
 !     ! debug ---

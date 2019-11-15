@@ -321,12 +321,24 @@ subroutine M2L_multipole(this, ker_der, pexp, pexp_der, multipol_int)
         !             cross(ker_der%Dc(2,:,idx_der), multipol_int%a(:,n))
         !sum_g(3,:) = sum_g(3,:) + mult * &
         !             cross(ker_der%Dc(3,:,idx_der), multipol_int%a(:,n))
-        Der = ker_der%Dc(1,:,idx_der)
+
+        !> Check the implementatoin of the VS in the Cartesian FMM ===
+        ! !> === up to 2019.11.19 ===
+        ! Der = ker_der%Dc(1,:,idx_der)
+        ! sum_g(1,:) = sum_g(1,:) + mult * cross(Der, multipol_int%a(:,n))
+        ! Der = ker_der%Dc(2,:,idx_der)
+        ! sum_g(2,:) = sum_g(2,:) + mult * cross(Der, multipol_int%a(:,n))
+        ! Der = ker_der%Dc(3,:,idx_der)
+        ! sum_g(3,:) = sum_g(3,:) + mult * cross(Der, multipol_int%a(:,n))
+        !> === transpose ( 2019.11.19 ) ===
+        Der = ker_der%Dc(:,1,idx_der)
         sum_g(1,:) = sum_g(1,:) + mult * cross(Der, multipol_int%a(:,n))
-        Der = ker_der%Dc(2,:,idx_der)
+        Der = ker_der%Dc(:,2,idx_der)
         sum_g(2,:) = sum_g(2,:) + mult * cross(Der, multipol_int%a(:,n))
-        Der = ker_der%Dc(3,:,idx_der)
+        Der = ker_der%Dc(:,3,idx_der)
         sum_g(3,:) = sum_g(3,:) + mult * cross(Der, multipol_int%a(:,n))
+        !> Check the implementatoin of the VS in the Cartesian FMM ===
+
       endif
       !sum1 = sum1 +  &
       !pexp_der%nfact(idx(1),idx(2),idx(3))/( &
@@ -339,7 +351,7 @@ subroutine M2L_multipole(this, ker_der, pexp, pexp_der, multipol_int)
       this%c(:,:,m) = this%c(:,:,m) + real((-1)**(sum(pexp%pwr(:,m))),wp)*sum_g
   enddo 
 
-end subroutine
+end subroutine M2L_multipole
 
 !----------------------------------------------------------------------
 
