@@ -67,7 +67,8 @@ use mod_aeroel, only: &
 
 use mod_doublet, only: &
   potential_calc_doublet , &
-  velocity_calc_doublet
+  velocity_calc_doublet  , &
+  gradient_calc_doublet
 
 use mod_linsys_vars, only: &
   t_linsys
@@ -123,6 +124,7 @@ contains
   procedure, pass(this) :: add_expl         => add_expl_surfpan
   procedure, pass(this) :: compute_pot      => compute_pot_surfpan
   procedure, pass(this) :: compute_vel      => compute_vel_surfpan
+  procedure, pass(this) :: compute_grad     => compute_grad_surfpan
   procedure, pass(this) :: compute_psi      => compute_psi_surfpan
   procedure, pass(this) :: compute_pres     => compute_pres_surfpan
   procedure, pass(this) :: compute_dforce   => compute_dforce_surfpan
@@ -329,9 +331,9 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
    call potential_calc_doublet(this, pdou, pos)
 
    ! debug : it seems that ONLY the near-field formulas had the wrong sign !!! CHECK it again !!!
-   phix = - phix
-   phiy = - phiy
-   pdou = - pdou
+   phix = - phix ! * ( -1.0_wp ) 
+   phiy = - phiy ! * ( -1.0_wp )
+   pdou = - pdou ! * ( -1.0_wp )
 
  end if
 
@@ -344,6 +346,18 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
 !!!!! ! vel = - vel
 
 end subroutine velocity_calc_sou_surfpan
+
+!----------------------------------------------------------------------
+!> TODO: compute the gradient of the velocity induced by a source and 
+!        write this routine 
+subroutine gradient_calc_sou_surfpan(this, grad, pos)
+ class(t_surfpan), intent(in) :: this
+ real(wp), intent(out) :: grad(3,3)
+ real(wp), intent(in) :: pos(:)
+
+ grad = 0.0_wp 
+
+end subroutine gradient_calc_sou_surfpan
 
 !----------------------------------------------------------------------
 
@@ -525,6 +539,11 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, uinf, &
 
     linsys%b(ie) = linsys%b(ie) - a*wake_elems(j1)%p%mag
 
+!   ! debug ---
+!   if ( ie .eq. 42 ) then
+!     write(*,*) 'wake_elems(' , j1 , '): ' , a
+!   end if
+!   ! debug ---
 
   end do
 
@@ -710,9 +729,41 @@ subroutine compute_vel_surfpan(this, pos , uinf, vel )
   ! source ----
   call velocity_calc_sou_surfpan(this, vsou, pos)
 
-  vel = vdou*this%mag - vsou*( sum(this%nor*(this%ub-uinf)) )
+  vel = vdou*this%mag - vsou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
+  ! vel = - vsou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
 
 end subroutine compute_vel_surfpan
+
+!----------------------------------------------------------------------
+
+!> Compute the gradient of the induced velocity in the position pos
+!!
+!! The velocity in the position is calculated considering the influece of
+!! both the doublets and the sources
+!!
+!! WARNING: the velocity calculated, to be consistent with the formulation of
+!! the equations is multiplied by 4*pi, to obtain the actual velocity the
+!! result of the present subroutine MUST be DIVIDED by 4*pi
+subroutine compute_grad_surfpan(this, pos , uinf, grad )
+  class(t_surfpan), intent(in) :: this
+  real(wp), intent(in) :: pos(:)
+  real(wp), intent(in) :: uinf(3)
+  real(wp), intent(out) :: grad(3,3)
+
+  real(wp) :: grad_dou(3,3) , grad_sou(3,3)
+
+  ! doublet ---
+  call gradient_calc_doublet(this, grad_dou, pos)
+
+  ! source ----
+  call gradient_calc_sou_surfpan(this, grad_sou, pos)
+
+  grad = grad_dou*this%mag &
+       - grad_sou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
+
+  ! vel = - vsou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
+
+end subroutine compute_grad_surfpan
 
 !----------------------------------------------------------------------
 
@@ -802,14 +853,24 @@ subroutine compute_pres_surfpan(this, R_g)
 !!!             + sim_param%rho_inf * this%didou_dt
 
 
-   !New equation
-   this%pres = this%pres_sol - 0.5_wp*sim_param%rho_inf * &
-               norm2(this%surf_vel)**2.0_wp
+  ! === Using result of the Uhlman's equation for pressure ===
+  ! See linsys/mod_pressure_equation.f90:assemble_pressure_linsys
+  ! as a reference for the 2 different implementations
+  !> (a.1) original implementation ===
+  ! this%pres = this%pres_sol - 0.5_wp*sim_param%rho_inf * &
+  !             norm2(this%surf_vel)**2.0_wp 
+  !> (a.2) trick of setting B_inf = P_inf + 0.5 * rhoinf * uinf^2.0 ===
+  this%pres = this%pres_sol &
+            - 0.5_wp*sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp & 
+            + 0.5_wp*sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp & 
+            + sim_param%P_inf
 
   if (this%moving) then
+    ! old computation of the loads, expoliting Bernoulli
+    ! TODO: to be updated and treated w/ Uhlman's equation formulation
     force_pres  = sim_param%P_inf &
+      - 0.5_wp * sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp  &
       + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
-      - 0.5_wp * sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp  &
                + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
                + sim_param%rho_inf * this%didou_dt
   else

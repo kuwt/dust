@@ -61,7 +61,8 @@ use mod_math, only: &
 
 use mod_doublet, only: &
   potential_calc_doublet , &
-  velocity_calc_doublet
+  velocity_calc_doublet  , &
+  gradient_calc_doublet
 
 use mod_linsys_vars, only: &
   t_linsys
@@ -91,6 +92,7 @@ contains
 
   procedure, pass(this) :: compute_pot      => compute_pot_actdisk
   procedure, pass(this) :: compute_vel      => compute_vel_actdisk
+  procedure, pass(this) :: compute_grad     => compute_grad_actdisk
   procedure, pass(this) :: compute_psi      => compute_psi_actdisk
   procedure, pass(this) :: compute_pres     => compute_pres_actdisk
   procedure, pass(this) :: compute_dforce   => compute_dforce_actdisk
@@ -188,6 +190,31 @@ subroutine compute_vel_actdisk (this, pos, uinf, vel)
 
 
 end subroutine compute_vel_actdisk
+
+!----------------------------------------------------------------------
+
+!> Compute the velocity induced by an actuator disk in a prescribed position
+!!
+!! WARNING: the velocity calculated, to be consistent with the formulation of
+!! the equations is multiplied by 4*pi, to obtain the actual velocity the
+!! result of the present subroutine MUST be DIVIDED by 4*pi
+subroutine compute_grad_actdisk (this, pos, uinf, grad)
+ class(t_actdisk), intent(in) :: this
+ real(wp), intent(in) :: pos(:)
+ real(wp), intent(in) :: uinf(3)
+ real(wp), intent(out) :: grad(3,3)
+
+ real(wp) :: grad_dou(3,3)
+
+
+  ! doublet ---
+  call gradient_calc_doublet(this, grad_dou, pos)
+
+
+  grad = grad_dou*this%mag
+
+
+end subroutine compute_grad_actdisk
 
 !----------------------------------------------------------------------
 subroutine compute_cp_actdisk (this, elems, uinf)
