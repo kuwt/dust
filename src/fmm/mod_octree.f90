@@ -227,6 +227,10 @@ interface push_ptr
   module procedure push_pan_ptr_scalar,  push_pan_ptr_vec
 end interface
 
+interface pull_ptr
+  module procedure pull_part_ptr_scalar
+end interface
+
 !----------------------------------------------------------------------
 character(len=*), parameter :: this_mod_name='mod_octree'
 character(len=max_char_len) :: msg
@@ -839,26 +843,31 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
     do k=1,octree%ncl(3,ll); do j=1,octree%ncl(2,ll); do i = 1,octree%ncl(1,ll)
       if(.not. octree%layers(ll)%lcells(i,j,k)%near_wall) then
         nprt = octree%layers(ll)%lcells(i,j,k)%npart
-        octree%layers(ll)%lcells(i,j,k)%ave_vortmag =  &
-          octree%layers(ll)%lcells(i,j,k)%ave_vortmag/real(nprt,wp)
-
-        do ip=1,nprt
+        if (nprt .gt. 0) then
+          octree%layers(ll)%lcells(i,j,k)%ave_vortmag =  &
+             octree%layers(ll)%lcells(i,j,k)%ave_vortmag/real(nprt,wp)
+        endif
+        
+        ip = 1 
+        !do ip=1,nprt
+        do while (ip.lt.nprt+1)
           if(octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag .lt. &
              1.0_wp/sim_param%part_redist_ratio *&
              octree%layers(ll)%lcells(i,j,k)%ave_vortmag) then
             !the particle is significantly smaller than the average in the cell
+            !redistribute it
+            redistr = (octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag*&
+                       octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%dir)&
+                       / real(nprt,wp)
             !free
             octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%free = .true.
+            call pull_ptr(octree%layers(ll)%lcells(i,j,k)%cell_parts, ip)
             octree%layers(ll)%lcells(i,j,k)%npart = &
                                       octree%layers(ll)%lcells(i,j,k)%npart - 1
+            nprt = nprt -1
             !lower also the global counter
             n_prt = n_prt -1
 
-            !redistribute it
-            nprt2 = octree%layers(ll)%lcells(i,j,k)%npart
-            redistr = (octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag*&
-                       octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%dir)&
-                       / real(nprt2,wp)
             do iq=1,nprt
                 if(.not. octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%free) then
                   vort =  octree%layers(ll)%lcells(i,j,k)%cell_parts(iq)%p%mag*&
@@ -873,6 +882,8 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
                   endif
                 endif !not free particle
             enddo !iq, rest of the particles
+          else
+            ip = ip + 1
           endif !too small particle
         enddo !ip, particles in cell
       endif !near wall
@@ -1011,8 +1022,6 @@ subroutine calculate_multipole(part,octree)
   t0 = dust_time()
 !$omp parallel do private(lv) schedule(guided)
   do lv = 1, octree%nleaves
-  !DEBUG
-  !write(*,*) 'Leaf nr, nr_part, size cell_parts',lv,octree%leaves(lv)%p%npart,size(octree%leaves(lv)%p%cell_parts)
     call octree%leaves(lv)%p%mp%leaf_M(&
                octree%leaves(lv)%p%cen, &
                octree%leaves(lv)%p%cell_parts, &
@@ -1139,11 +1148,14 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
  real(t_realtime) :: tsta , tend
  real(wp) :: turbvisc, ave_ros
 
+ real(wp) :: grad_elem(3,3) , stretch_elem(3)
+
   tsta = dust_time()
   !for all the leaves apply the local expansion and then local interactions 
   t0 = dust_time()
 !$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, &
-!$omp& v, stretch, str, grad, alpha, dir, velv, stretchv, ave_ros, turbvisc, iln) schedule(dynamic)
+!$omp& v, stretch, str, grad, alpha, dir, velv, stretchv, ave_ros, turbvisc, &
+!$omp& grad_elem, stretch_elem, iln) schedule(dynamic)
   do lv = 1, octree%nleaves
     !I am on a leaf, cycle on all the particles inside the leaf
     allocate(velv(3,octree%leaves(lv)%p%npart),&
@@ -1179,7 +1191,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       if(sim_param%use_vs)  then
         str = matmul(alpha, grad)
         !str = matmul(alpha, transpose(grad))
-        stretch = stretch + str - sum(str*dir)*dir !remove the parallel comp.
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
+        stretch = stretch + str
+        !remove the parallel component
+!       stretch = stretch + str - sum(str*dir)*dir
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
         stretchv(:,ip) = stretch
       endif
       if(sim_param%use_vd)  then
@@ -1227,8 +1243,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
             if(sim_param%use_vs) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
                  %compute_stretch(pos, alpha, str)
-              stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
-              !removed the parallel component
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
+              stretch = stretch + str/(4.0_wp*pi)
+!             !removed the parallel component
+!             stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
             endif
             if(sim_param%use_vd) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
@@ -1250,8 +1269,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
          if(sim_param%use_vs) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
               %compute_stretch(pos, alpha, str)
-           stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
-              !removed the parallel component
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
+           stretch = stretch + str/(4.0_wp*pi)
+!          !removed the parallel component
+!          stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
          endif
          if(sim_param%use_vd) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
@@ -1270,8 +1292,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
           if(sim_param%use_vs) then
             call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_stretch(pos, &
                                                           alpha, str)
-            stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
-              !removed the parallel component
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
+            stretch = stretch + str/(4.0_wp*pi)
+!           !> removed the parallel component ( proj to avoid numerical instability ? ) 
+!           stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
           endif
 
           if(sim_param%use_vd) then
@@ -1312,11 +1337,40 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       vel = vel + sim_param%u_inf
       octree%leaves(lv)%p%cell_parts(ip)%p%vel = vel
 
+
+      !> Vortex stretching
+      stretch_elem = 0.0_wp
+      ! Influence of the body elements
+      do ie=1,size(elem)
+        call elem(ie)%p%compute_grad(pos, sim_param%u_inf, grad_elem)
+        stretch_elem = stretch_elem + & 
+            matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
+      enddo
+      ! Influence of the wake panels
+      do ie=1,size(wpan)
+        call wpan(ie)%p%compute_grad(pos, sim_param%u_inf, grad_elem)
+        stretch_elem = stretch_elem + & 
+            matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
+      enddo
+      ! Influence of the end vortex
+      do ie=1,size(wvort)
+        call wvort(ie)%compute_grad(pos, sim_param%u_inf, grad_elem)
+        stretch_elem = stretch_elem + & 
+            matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
+      enddo
+
+!     ! debug ---
+!     write(*,*) ' stretch, stretch_elem : ' , stretch, stretch_elem
+!     ! debug ---
+
       !evolve the position in time
       if(sim_param%use_vs .or. sim_param%use_vd) then
         !evolve the intensity in time
-        octree%leaves(lv)%p%cell_parts(ip)%p%stretch = stretch
+        octree%leaves(lv)%p%cell_parts(ip)%p%stretch = stretch + &
+                                                       stretch_elem
       endif
+
+
     endif
     enddo
     deallocate(velv, stretchv)
@@ -1732,6 +1786,25 @@ subroutine push_part_ptr_vec(pointers, elements, last_elem)
   endif
 
 end subroutine push_part_ptr_vec
+
+!----------------------------------------------------------------------
+
+subroutine pull_part_ptr_scalar(pointers, idx)
+ type(t_vortpart_p), allocatable, target, intent(inout) :: pointers(:)
+ integer, intent(in) :: idx
+
+ integer :: i
+
+ !simply shift all the arrray to remove the pointer in position idx
+ !the number of elements should be decreased outside here
+
+ !pointers(idx:size(pointers)-1) = pointers(idx+1:size(pointers))
+ !nullify(pointers(size(pointers))%p)
+  do i=idx,size(pointers)-1
+    pointers(i)%p => pointers(i+1)%p
+  enddo
+
+end subroutine pull_part_ptr_scalar
 
 !----------------------------------------------------------------------
 

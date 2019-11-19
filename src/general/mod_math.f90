@@ -69,7 +69,7 @@ contains
 
 ! ----------------------------------------------------------------------
 
-function cross(a, b)
+pure function cross(a, b)
   real(wp), dimension(3) :: cross
   real(wp), dimension(3), intent(in) :: a, b
 
