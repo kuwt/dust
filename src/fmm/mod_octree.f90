@@ -1193,8 +1193,8 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       enddo
       velv(:,ip) = vel
       if(sim_param%use_vs)  then
-        str = matmul(alpha, grad)
-        !str = matmul(alpha, transpose(grad))
+        !str = matmul(alpha, grad)
+        str = matmul(alpha, transpose(grad))
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
         stretch = stretch + str
         !remove the parallel component
@@ -1312,7 +1312,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
 !           !> removed the parallel component ( proj to avoid numerical instability ? ) 
 !           stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-            call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_stretch(pos, &
+            call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_rotu(pos, &
                                                           alpha, ru)
               rotu = rotu + ru/(4.0_wp*pi)
           endif
