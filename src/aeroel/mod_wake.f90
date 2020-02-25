@@ -1363,7 +1363,11 @@ subroutine complete_wake(wake, geo, elems)
         if(sim_param%join_te) then
           ave = get_joined_intensity(wake, iw, 1)
         else
-
+          !ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+          ave = wake%end_pan_idou(iw)
+        endif
+      endif
+      partvec = partvec + dir*ave
 
       !Right side
       dir = -wake%pan_w_points(:,p2,wake%nmax_pan+1)+points_end(:,p2)
