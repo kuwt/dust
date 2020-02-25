@@ -4,21 +4,18 @@ basename =     ./Postpro/robin
 Analysis = {
 
 Type = viz  
-Name = viz        ! appears in the filename
+Name = viz  
 StartRes = 1
 EndRes   = 41
 StepRes  = 1
 Format = vtk
-!Format = tecplot
 
 Wake = T
-
 Component = Rotor 
 Component = Fuselage 
 
 Variable = vorticity 
 Variable = pressure  
-!Variable = cp
 
 }
 
