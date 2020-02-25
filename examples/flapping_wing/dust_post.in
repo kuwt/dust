@@ -6,14 +6,13 @@ Analysis = {
   Type = Viz
 
   Format = vtk
-  !Format = tecplot
 
   StartRes = 1
   EndRes = 61
   StepRes = 1
   Wake = T
 
-  Variable = Vort
+  Variable = Vorticity
 
 }
 

@@ -1,16 +1,12 @@
-! Simulation names
+! Simulation name
 basename       = ./Output/flapwing
-basename_debug = ./Debug/flapwing
 
 ! --- Time parameters ---
 tstart = 0.0
 tend  = 30.0
 dt = 0.5
 dt_out = 0.5 
-dt_debug_out = 0.5
 output_start = T
-debug_level= 3
-
 
 ! --- Restart ---
 restart_from_file = F
@@ -23,10 +19,9 @@ GeometryFile = geo_input.h5
 ReferenceFile = References.in
 
 ! Wake parameters -------------
-n_wake_panels = 60
+n_wake_panels = 65
 
 ! Model parameters -------------------
 FMM = F
 Vortstretch = F
 Diffusion = F
-PenetrationAvoidance = F

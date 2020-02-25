@@ -9,29 +9,27 @@ Moving = T
 Motion = {
 
  Pole = {
-  Input      = position                      ! position , velocity
-  Input_Type = simple_function               ! from_file , simple_function
-  Function   = (/  0  ,  0  ,  1  /)         ! File = xxx.dat (nt,4) , Function = (/ ... , ... , ... /)
-  !File       = xxx.dat                   
-  Amplitude  = 0.5                          ! Amplitude of motion on all axis
-  Vector     = (/ 0.0 , 0.0 , 1.0 /)         ! Amplitude on the single axis 
-  Omega      = (/ 1.2 , 0.62832 , 0.62832 /) ! Rate on the single axis
-  Phase      = (/ -1.5708 , 0.0 , 0.0 /)     ! Phase on the single axis
-  Offset     = (/ 0.0 , 0.0 , 0.0 /)         ! constant offset of the pole
-  !Position_0 = ...                          ! Initial position: needed if the input is velocity (Default = (/0.0,0.0,0.0/) )
+  Input      = position                      
+  Input_Type = simple_function               
+  Function   = (/  0  ,  0  ,  1  /)         
+  Amplitude  = 0.5                          
+  Vector     = (/ 0.0 , 0.0 , 1.0 /)         
+  Omega      = (/ 1.2 , 0.62832 , 0.62832 /) 
+  Phase      = (/ -1.5708 , 0.0 , 0.0 /)     
+  Offset     = (/ 0.0 , 0.0 , 0.0 /)         
+  !Position_0 = ...                          
  }
 
  Rotation   = {
-  Input      = position                      ! position, velocity
-  Input_Type = simple_function               ! from_file , simple_function
-  Function   =  0                            ! File = xxx.dat (nt,2) , Function = ... 0:uniform,1:sin 
-  !File       = Omega_1.dat                  ! File = xxx.dat (nt,2) , Function = ... 0:uniform,1:sin 
-  Axis       = (/ 0.0 , 1.0 , 0.0 /)         ! No Default --> ERROR
-  Amplitude  = 0.0                           ! Default = 1.0
-  Omega      = 2.0                           ! Default = 1.0 + Warning (if sin)
-  Phase      = 0.0                           ! Default = 0.0
-  Offset     = 0.0                          ! Default = 0.0
-  Psi_0      = 0.0                          ! Initial position: needed if the input is velocity (Default = 0.0)
+  Input      = position                     
+  Input_Type = simple_function              
+  Function   =  0                           
+  Axis       = (/ 0.0 , 1.0 , 0.0 /)        
+  Amplitude  = 0.0                          
+  Omega      = 2.0                          
+  Phase      = 0.0                          
+  Offset     = 0.0                          
+  Psi_0      = 0.0                          
  }
 
 }
@@ -54,29 +52,28 @@ Moving = T
 Motion = {
 
  Pole = {
-  Input      = position                      ! position , velocity
-  Input_Type = simple_function               ! from_file , simple_function
-  Function   = (/  0  ,  0  ,  0  /)         ! File = xxx.dat (nt,4) , Function = (/ ... , ... , ... /)
-  !File       = xxx.dat                   
-  Amplitude  = 1.0                          ! Amplitude of motion on all axis
-  Vector     = (/ 0.0 , 0.0 , 0.0 /)         ! Amplitude on the single axis 
-  Omega      = (/ 1.2 , 0.62832 , 0.62832 /) ! Rate on the single axis
-  Phase      = (/ -1.5708 , 0.0 , 0.0 /)     ! Phase on the single axis
-  Offset     = (/ 0.0 , 0.0 , 0.0 /)         ! constant offset of the pole
-  !Position_0 = ...                          ! Initial position: needed if the input is velocity (Default = (/0.0,0.0,0.0/) )
+  Input      = position                      
+  Input_Type = simple_function               
+  Function   = (/  0  ,  0  ,  0  /)         
+  Amplitude  = 1.0                          
+  Vector     = (/ 0.0 , 0.0 , 0.0 /)         
+  Omega      = (/ 1.2 , 0.62832 , 0.62832 /) 
+  Phase      = (/ -1.5708 , 0.0 , 0.0 /)     
+  Offset     = (/ 0.0 , 0.0 , 0.0 /)         
+  !Position_0 = ...                          
  }
 
  Rotation   = {
-  Input      = position                      ! position, velocity
-  Input_Type = simple_function               ! from_file , simple_function
-  Function   =  1                            ! File = xxx.dat (nt,2) , Function = ... 0:uniform,1:sin 
-  !File       = Omega_1.dat                  ! File = xxx.dat (nt,2) , Function = ... 0:uniform,1:sin 
-  Axis       = (/ 1.0 , 0.0 , 0.0 /)         ! No Default --> ERROR
-  Amplitude  = 0.349                           ! Default = 1.0
-  Omega      = 0.62832                           ! Default = 1.0 + Warning (if sin)
-  Phase      = 3.14                           ! Default = 0.0
-  Offset     = 0.0                          ! Default = 0.0
-  Psi_0      = 0.0                          ! Initial position: needed if the input is velocity (Default = 0.0)
+  Input      = position                      
+  Input_Type = simple_function               
+  Function   =  1                            
+  !File       = Omega_1.dat                  
+  Axis       = (/ 1.0 , 0.0 , 0.0 /)         
+  Amplitude  = 0.349                         
+  Omega      = 0.62832                       
+  Phase      = 3.14                          
+  Offset     = 0.0                          
+  Psi_0      = 0.0                          
  }
 
 }
@@ -92,29 +89,27 @@ Moving = T
 Motion = {
 
  Pole = {
-  Input      = position                      ! position , velocity
-  Input_Type = simple_function               ! from_file , simple_function
-  Function   = (/  0  ,  0  ,  0  /)         ! File = xxx.dat (nt,4) , Function = (/ ... , ... , ... /)
-  !File       = xxx.dat                   
-  Amplitude  = 1.0                           ! Amplitude of motion on all axis
-  Vector     = (/ 0.0 , 0.0 , 0.0 /)         ! Amplitude on the single axis 
-  Omega      = (/ 1.2 , 0.62832 , 0.62832 /) ! Rate on the single axis
-  Phase      = (/ -1.5708 , 0.0 , 0.0 /)     ! Phase on the single axis
-  Offset     = (/ 0.0 , 0.0 , 0.0 /)         ! constant offset of the pole
-  !Position_0 = ...                          ! Initial position: needed if the input is velocity (Default = (/0.0,0.0,0.0/) )
+  Input      = position                      
+  Input_Type = simple_function               
+  Function   = (/  0  ,  0  ,  0  /)         
+  Amplitude  = 1.0                           
+  Vector     = (/ 0.0 , 0.0 , 0.0 /)         
+  Omega      = (/ 1.2 , 0.62832 , 0.62832 /) 
+  Phase      = (/ -1.5708 , 0.0 , 0.0 /)     
+  Offset     = (/ 0.0 , 0.0 , 0.0 /)         
  }
 
  Rotation   = {
-  Input      = position                      ! position, velocity
-  Input_Type = simple_function               ! from_file , simple_function
-  Function   =  1                            ! File = xxx.dat (nt,2) , Function = ... 0:uniform,1:sin 
-  !File       = Omega_1.dat                  ! File = xxx.dat (nt,2) , Function = ... 0:uniform,1:sin 
-  Axis       = (/ 0.0 , 1.0 , 0.0 /)         ! No Default --> ERROR
-  Amplitude  = 0.17453                          ! Default = 1.0
-  Omega      = 0.62832                           ! Default = 1.0 + Warning (if sin)
-  Phase      = -1.5708                       ! Default = 0.0
-  Offset     = 0.0                          ! Default = 0.0
-  Psi_0      = 0.0                          ! Initial position: needed if the input is velocity (Default = 0.0)
+  Input      = position                      
+  Input_Type = simple_function               
+  Function   =  1                            
+  !File       = Omega_1.dat                  
+  Axis       = (/ 0.0 , 1.0 , 0.0 /)         
+  Amplitude  = 0.17453                       
+  Omega      = 0.62832                       
+  Phase      = -1.5708                       
+  Offset     = 0.0                          
+  Psi_0      = 0.0                         
  }
 
 }
