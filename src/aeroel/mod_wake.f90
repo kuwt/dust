@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!! Copyright (C) 2018-2020 Davide   Montagnani, 
 !!                         Matteo   Tugnoli, 
 !!                         Federico Fonte
 !!
@@ -161,6 +161,9 @@ type :: t_wake
  !! (n_pan_points)
  integer, allocatable :: pan_gen_ref(:)
 
+ !> Individual scaling of the firs element of the wake
+ real(wp), allocatable :: pan_gen_scaling(:)
+
  !> Panels neighbours in wake numbering
  integer, allocatable :: pan_neigh(:,:)
 
@@ -252,6 +255,9 @@ type :: t_wake
  !> Last vortex intensity from removed panels
  real(wp), allocatable :: last_pan_idou(:)
 
+ !> Last vortex intensity from removed panels
+ real(wp), allocatable :: end_pan_idou(:)
+
  !> Are the panels full? (and so need to produce particles...)
  logical :: full_panels=.false.
 
@@ -332,6 +338,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   allocate(wake%pan_gen_points(2,wake%n_pan_points))
   allocate(wake%pan_gen_dir(3,wake%n_pan_points))
   allocate(wake%pan_gen_ref(wake%n_pan_points))
+  allocate(wake%pan_gen_scaling(wake%n_pan_points))
   allocate(wake%w_start_points(3,wake%n_pan_points))
   allocate(wake%i_start_points(2,wake%n_pan_stripes))
   allocate(wake%pan_neigh(2,wake%n_pan_stripes))
@@ -417,6 +424,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   wake%pan_gen_points = te%i
   wake%pan_gen_dir = te%t
   wake%pan_gen_ref = te%ref
+  wake%pan_gen_scaling = te%scaling
   wake%i_start_points = te%ii
   wake%pan_neigh = te%neigh
   wake%pan_neigh_o = te%o
@@ -468,7 +476,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
       dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
 
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-                  dist*sim_param%first_panel_scaling* &
+                  dist*wake%pan_gen_scaling(ip)* &
                   norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist)
   ! normalisation occurs here! --------------------------------------^
 
@@ -477,7 +485,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
       dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
 
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-                  dist*sim_param%first_panel_scaling * & ! next line may be commented
+                  dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
                   sim_param%min_vel_at_te*sim_param%dt
     end if
 
@@ -525,6 +533,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
 
   allocate(wake%vort_p(0))
   allocate(wake%last_pan_idou(wake%n_pan_stripes))
+  allocate(wake%end_pan_idou(wake%n_pan_stripes))
   wake%last_pan_idou = 0.0_wp
 
   wake%full_panels = .false.
@@ -1032,10 +1041,12 @@ subroutine update_wake(wake, elems, octree)
         if (ip.ne.iq) then
           call wake%part_p(iq)%p%compute_stretch(wake%part_p(ip)%p%cen, &
                wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, str)
-          !stretch = stretch + str/(4.0_wp*pi)
-           stretch = stretch +(str - &
-           sum(str*wake%part_p(ip)%p%dir)*wake%part_p(ip)%p%dir)/(4.0_wp*pi)
-          !removed the parallel component
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
+          stretch = stretch + str/(4.0_wp*pi)
+!         !>removed the parallel component
+!         stretch = stretch +(str - &
+!         sum(str*wake%part_p(ip)%p%dir)*wake%part_p(ip)%p%dir)/(4.0_wp*pi)
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
         endif 
         enddo
         !do ie=1,size(wake%end_vorts)
@@ -1162,6 +1173,11 @@ subroutine update_wake(wake, elems, octree)
   !==> Panels:  Update the intensities of the panels
   !       From the back, all the vortex intensities come from
   !       the previous panel
+
+  !QUICK AND DIRTY
+  do iw = 1,wake%n_pan_stripes
+    wake%end_pan_idou(iw) = wake%wake_panels(iw,wake%pan_wake_len)%mag
+  enddo
   do ipan = wake%pan_wake_len,2,-1
     do iw = 1,wake%n_pan_stripes
       wake%wake_panels(iw,ipan)%mag = wake%wake_panels(iw,ipan-1)%mag
@@ -1170,11 +1186,12 @@ subroutine update_wake(wake, elems, octree)
 
   !==> End vortices: If the wake is full, attach the end vortex
   !if (wake%pan_wake_len .eq. wake%nmax_pan) then
-  if (wake%full_panels) then
-    do iw = 1,wake%n_pan_stripes
-      wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag
-    enddo
-  endif
+  ! Should be done in complete wake
+  !if (wake%full_panels) then
+  !  do iw = 1,wake%n_pan_stripes
+  !    wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag
+  !  enddo
+  !endif
 
   !==> Rings: Update the intensities of the rings
   !       From the back, all the vortex intensities come from the 
@@ -1240,12 +1257,12 @@ subroutine complete_wake(wake, geo, elems)
             vel_te )
     if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) + &
-                          dist*sim_param%first_panel_scaling* &
+                          dist*wake%pan_gen_scaling(ip)* &
                           norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist)
   ! normalisation occurs here! -------------------------------------------^
     else
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-                  dist*sim_param%first_panel_scaling * & ! next line may be commented
+                  dist*wake%pan_gen_scaling(ip)* & ! next line may be commented
                   sim_param%min_vel_at_te*sim_param%dt / norm2(dist)
     end if
   enddo
@@ -1302,9 +1319,12 @@ subroutine complete_wake(wake, geo, elems)
           alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
                           wake%prt_vortevol(:,ip)*sim_param%dt
           alpha_p_n = norm2(alpha_p)
-          if(alpha_p_n .le. wake%part_p(ip)%p%mag) then
-            wake%part_p(ip)%p%mag = alpha_p_n
-          endif
+
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
+!         if(alpha_p_n .le. wake%part_p(ip)%p%mag) then
+!           wake%part_p(ip)%p%mag = alpha_p_n
+!         endif
+! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
           if(alpha_p_n .ne. 0.0_wp) &
              wake%part_p(ip)%p%dir = alpha_p/alpha_p_n
         endif
@@ -1332,15 +1352,19 @@ subroutine complete_wake(wake, geo, elems)
       !Left side
       dir = wake%pan_w_points(:,p1,wake%nmax_pan+1)-points_end(:,p1)
       if (wake%pan_neigh(1,iw) .gt. 0) then
-        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
+        !ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
+        !      real(wake%pan_neigh_o(1,iw),wp)* &
+        !      wake%wake_panels(wake%pan_neigh(1,iw),wake%pan_wake_len)%mag
+        ave = wake%end_pan_idou(iw) - &
               real(wake%pan_neigh_o(1,iw),wp)* &
-              wake%wake_panels(wake%pan_neigh(1,iw),wake%pan_wake_len)%mag
+              wake%end_pan_idou(wake%pan_neigh(1,iw))
         ave = ave/2.0_wp
       else !has no fixed neighbour
         if(sim_param%join_te) then
           ave = get_joined_intensity(wake, iw, 1)
         else
-          ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+          !ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+          ave = wake%end_pan_idou(iw)
         endif
       endif
       partvec = partvec + dir*ave
@@ -1348,23 +1372,29 @@ subroutine complete_wake(wake, geo, elems)
       !Right side
       dir = -wake%pan_w_points(:,p2,wake%nmax_pan+1)+points_end(:,p2)
       if (wake%pan_neigh(2,iw) .gt. 0) then
-        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
+        !ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
+        !      real(wake%pan_neigh_o(2,iw),wp)* &
+        !      wake%wake_panels(wake%pan_neigh(2,iw),wake%pan_wake_len)%mag
+        ave = wake%end_pan_idou(iw) - &
               real(wake%pan_neigh_o(2,iw),wp)* &
-              wake%wake_panels(wake%pan_neigh(2,iw),wake%pan_wake_len)%mag
+              wake%end_pan_idou(wake%pan_neigh(2,iw))
         ave = ave/2.0_wp
       else
         if(sim_param%join_te) then
           ave = get_joined_intensity(wake, iw, 2)
         else
-          ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+          !ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+          ave = wake%end_pan_idou(iw)
         endif
       endif
       partvec = partvec + dir*ave
 
       !End side
       dir = points_end(:,p1) - points_end(:,p2)
-      ave = wake%wake_panels(iw,wake%pan_wake_len)%mag-wake%last_pan_idou(iw)
-      wake%last_pan_idou(iw) = wake%wake_panels(iw,wake%pan_wake_len)%mag
+      !ave = wake%wake_panels(iw,wake%pan_wake_len)%mag-wake%last_pan_idou(iw)
+      ave = wake%end_pan_idou(iw)-wake%last_pan_idou(iw)
+      !wake%last_pan_idou(iw) = wake%wake_panels(iw,wake%pan_wake_len)%mag
+      wake%last_pan_idou(iw) = wake%end_pan_idou(iw)
       partvec = partvec + dir*ave
 
       !Calculate the center
@@ -1524,7 +1554,8 @@ subroutine complete_wake(wake, geo, elems)
   !If the wake is full, attach the end vortex
   if (wake%full_panels) then
     do iw = 1,wake%n_pan_stripes
-      wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag
+      !wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag
+      wake%end_vorts(iw)%mag => wake%last_pan_idou(iw)
       p1 = wake%i_start_points(1,iw)
       p2 = wake%i_start_points(2,iw)
       call wake%end_vorts(iw)%calc_geo_data( &

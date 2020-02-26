@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!! Copyright (C) 2018-2020 Davide   Montagnani, 
 !!                         Matteo   Tugnoli, 
 !!                         Federico Fonte
 !!
@@ -99,7 +99,8 @@ type, abstract :: c_elem
 
   contains
 
-  procedure(i_compute_vel), deferred, pass(this) :: compute_vel
+  procedure(i_compute_vel) , deferred, pass(this) :: compute_vel
+  procedure(i_compute_grad), deferred, pass(this) :: compute_grad
 
 end type c_elem
 
@@ -412,6 +413,25 @@ abstract interface
     real(wp), intent(in) :: pos(:)
     real(wp), intent(in) :: uinf(3)
     real(wp), intent(out) :: vel(3)
+  end subroutine
+end interface
+
+!----------------------------------------------------------------------
+
+!> Compute the velocity induced by an aerodynamic element in a certain 
+!! position
+!!
+!! WARNING: the velocity calculated, to be consistent with the formulation of 
+!! the equations is multiplied by 4*pi, to obtain the actual velocity the 
+!! result of the present subroutine MUST be DIVIDED by 4*pi
+abstract interface
+  subroutine i_compute_grad(this, pos, uinf, grad)
+    import :: c_elem , wp
+    implicit none
+    class(c_elem), intent(in) :: this
+    real(wp), intent(in) :: pos(:)
+    real(wp), intent(in) :: uinf(3)
+    real(wp), intent(out) :: grad(3,3)
   end subroutine
 end interface
 

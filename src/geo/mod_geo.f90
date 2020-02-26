@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!! Copyright (C) 2018-2020 Davide   Montagnani, 
 !!                         Matteo   Tugnoli, 
 !!                         Federico Fonte
 !!
@@ -298,6 +298,9 @@ type t_tedge
 
  !> Reference frame of the TE nodes
  integer , allocatable :: ref(:)
+
+ !> Individual scaling for each component
+ real(wp), allocatable :: scaling(:)
 
 
 end type t_tedge
@@ -664,6 +667,7 @@ subroutine load_components(geo, in_file, out_file, te)
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
  integer , allocatable :: neigh_te(:,:) , o_te(:,:)
  real(wp), allocatable :: t_te(:,:)
+ real(wp) :: scale_te
  integer :: ne_te , nn_te
  ! tmp arrays --------
  type(t_pot_elem_p) , allocatable :: e_te_tmp(:,:)
@@ -671,6 +675,7 @@ subroutine load_components(geo, in_file, out_file, te)
  integer , allocatable :: neigh_te_tmp(:,:) , o_te_tmp(:,:)
  real(wp), allocatable :: t_te_tmp(:,:)
  integer , allocatable :: ref_te_tmp(:)
+ real(wp), allocatable :: scale_te_tmp(:)
  ! # n. elements and nodes at TE ( of the prev. comps)
  integer :: ne_te_prev , nn_te_prev
  real(wp) :: trac, rad
@@ -872,6 +877,11 @@ subroutine load_components(geo, in_file, out_file, te)
         call read_hdf5_al(    o_te,    'o_te',te_loc)
         call read_hdf5_al(    t_te,    't_te',te_loc)
         !call read_hdf5_al(  ref_te,  'ref_te',te_loc)
+        if(check_dset_hdf5('scale_te',te_loc)) then
+          call read_hdf5(scale_te, 'scale_te',te_loc)
+        else
+          scale_te = 1.0_wp
+        endif
         call close_hdf5_group(te_loc)
       else
         allocate(e_te(0,0), i_te(2,0), ii_te(2,0), neigh_te(2,0), o_te(2,0),&
@@ -929,6 +939,7 @@ subroutine load_components(geo, in_file, out_file, te)
           call write_hdf5(neigh_te,'neigh_te',te_loc)
           call write_hdf5(    o_te,    'o_te',te_loc)
           call write_hdf5(    t_te,    't_te',te_loc)
+          call write_hdf5(scale_te,'scale_te',te_loc)
           call close_hdf5_group(te_loc)
         endif
 
@@ -1047,6 +1058,8 @@ subroutine load_components(geo, in_file, out_file, te)
         allocate(te%o    (2,ne_te) ) ; te%o     =     o_te
         allocate(te%t    (3,nn_te) ) ; te%t     =     t_te
         allocate(te%ref  (  nn_te) ) ; te%ref   = geo%components(i_comp)%ref_id
+        allocate(te%scaling(  nn_te) )
+        te%scaling =  scale_te*sim_param%first_panel_scaling
 
       elseif (ne_te .gt. 0) then
         nn_te_prev = size(te%i,2)
@@ -1096,6 +1109,12 @@ subroutine load_components(geo, in_file, out_file, te)
                                                   geo%components(i_comp)%ref_id
 
         call move_alloc(ref_te_tmp,te%ref)
+        allocate( scale_te_tmp(size(te%scaling)+nn_te))
+        scale_te_tmp(1:size(te%scaling )    ) = te%scaling
+        scale_te_tmp(size(te%scaling )+1:size( scale_te_tmp)) = &
+                                       scale_te*sim_param%first_panel_scaling
+
+        call move_alloc(scale_te_tmp,te%scaling )
 
 
 

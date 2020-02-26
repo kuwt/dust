@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!! Copyright (C) 2018-2020 Davide   Montagnani, 
 !!                         Matteo   Tugnoli, 
 !!                         Federico Fonte
 !!
@@ -196,6 +196,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  character(len=max_char_len) :: te_proj_dir
  real(wp) , allocatable :: te_proj_vec(:)
  logical :: suppress_te
+ real(wp) :: scale_te
 
  ! trailing edge ------
  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
@@ -256,6 +257,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                &the te projection.')
   call geo_prs%CreateLogicalOption('SuppressTe','Suppress the trailing edge &
                                     &from the component','F')
+  call geo_prs%CreateRealOption('ScaleTe','Scale the t.e. individually in &
+               &each component','1.0')
 
   ! Section name from CGNS file
   call geo_prs%CreateStringOption('SectionName', &
@@ -295,6 +298,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   mirror_normal = getrealarray(geo_prs, 'mirror_normal',3)
 
   suppress_te = getlogical(geo_prs, 'SuppressTe')
+  scale_te    = getreal(geo_prs, 'ScaleTe')
 
   comp_el_type = getstr(geo_prs,'ElType')
   ElType = comp_el_type(1:1)
@@ -773,6 +777,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     call write_hdf5(neigh_te,'neigh_te',te_loc)
     call write_hdf5(    o_te,    'o_te',te_loc)
     call write_hdf5(    t_te,    't_te',te_loc)
+    call write_hdf5(scale_te,'scale_te',te_loc)
     call close_hdf5_group(te_loc)
   endif
 

@@ -7,16 +7,22 @@ All the levels are CUMULATIVE (i.e. a certain level produced also ALL the lower
 levels effects)
 
 level    effect
-1        standard detailed info output with timing
+0        Almost no screen output
 
-3        Extended info output
+1        Minimal Screen output (default)
+
+3        Detailed info output with timing
+
+5        Extended verbose screen output
+
+7        Extra warning, can lead to potential false negative warnings
+
+8        Super extra verbose output
 
 15       print out files with debug geometry details at the beginning of the 
          simulation
 
 16       print out files with debug geometry at each timestep
-
-17       print out debug wake data
 
 20       print out the array of debug linear system results
 

@@ -7,29 +7,28 @@ Multiple = F
 Moving = T
 Motion = {
  Pole = {
- Input      = position                              ! position , velocity
- Input_Type = simple_function                       ! from_file , simple_function
- Function   = (/  0  ,  0  ,  0  /)                 !  Function = (/ ... , ... , ... /) 0:uniform,1:sin 
-!File       = xxx.dat                               !  File = xxx.dat (nt,4) 
+ Input      = position                ! position , velocity
+ Input_Type = simple_function         ! from_file , simple_function
+ Function   = (/  0  ,  0  ,  0  /)   ! 0:uniform,1:sin 
+ !File       = xxx.dat                 ! File = xxx.dat (nt,4) 
  Amplitude  = 0.00
  Vector     = (/ 0.0 , 0.0 , 0.0 /)
  Omega      = (/ 0.0 , 0.0 , 0.0 /)
  Phase      = (/ 0.0 , 0.0 , 0.0 /)
  Offset     = (/ 0.0 , 0.0 , 0.0 /)
-!Position_0 = ...                                   ! Initial position: needed if the input is velocity (Default = (/0.0,0.0,0.0/) )
+!Position_0 = ...                     ! Initial position: needed if the input is velocity
  }
  Rotation   = {
  Input      = position
- Input_Type = simple_function                       ! from_file , simple_function
- !Input_Type = from_file                       ! from_file , simple_function
- Function   =  1                                    !  Function = ... 0:uniform,1:sin 
- File       = rot.in                           !  File = xxx.dat (nt,2)
- Axis       = (/ 0.0 , 1.0 , 0.0 /)                 ! No Default --> ERROR
- Amplitude  = 0.1                                   ! Default = 1.0 + Warning
- Omega      = 0.5                               ! Default = 1.0 + Warning
- Phase      = 0.0                                   ! Default = 0.0 + Warning
- Offset     = 0.0                                   ! Default = 0.0 + Warning
- Psi_0      = 0.0                                   ! Initial position: needed if the input is velocity (Default = 0.0)
+ Input_Type = simple_function         !
+ Function   =  1                      ! 0:uniform,1:sin 
+ !File       = rot.in                 ! File = xxx.dat (nt,2)
+ Axis       = (/ 0.0 , 1.0 , 0.0 /)   
+ Amplitude  = 0.1                     
+ Omega      = 0.5                   
+ Phase      = 0.0                     
+ Offset     = 0.0                     
+ !Psi_0      = 0.0                    ! Initial position: needed if the input is velocity
  }
 }
 

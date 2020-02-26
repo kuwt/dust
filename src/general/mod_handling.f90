@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!! Copyright (C) 2018-2020 Davide   Montagnani, 
 !!                         Matteo   Tugnoli, 
 !!                         Federico Fonte
 !!
@@ -208,17 +208,25 @@ recursive subroutine internal_error(caller,caller_mod,text)
  ! compiler bug -- gfortran bug
  ! https://gcc.gnu.org/bugzilla/show_bug.cgi?id=77649
  character(len=len_trim(text)) :: gfortran_bug_text(1)
+ character(len=*), parameter :: message_of_the_day = &
+    nl//'What you experienced never happened. Please report this error and &
+    &let our highly trained space raccoons overwrite this timeline'
+ character(len=len_trim(text)+len(message_of_the_day)) :: another_text(1)
  character(len=*), parameter :: &
    this_sub_name = 'internal_error'
 
 
   gfortran_bug_text(1) = trim(text)
+  another_text(1) = gfortran_bug_text(1)//message_of_the_day
+  !call put_msg( 1 , format_out_string(                            &
+  !    'Interna ERROR in "', caller , caller_mod , '"!' , &
+  !    gfortran_bug_text//nl//'This should have never happened, please &
+  !    &report this error so that  a team of professionals could travel &
+  !    &back in time and fix this' ) )
+
   call put_msg( 1 , format_out_string(                            &
       !'ERROR in "', caller , caller_mod , '"!' , (/trim(text)/) ) )
-      'Interna ERROR in "', caller , caller_mod , '"!' , gfortran_bug_text//&
-      nl//'This should have never happened, please report this error so &
-    &that  a team of professionals could travel back in time and fix this' ) )
-
+      'ERROR in "', caller , caller_mod , '"!' , another_text ) )
   call dust_abort()
 
 end subroutine internal_error
@@ -369,7 +377,8 @@ function format_out_string(msg,caller,caller_mod,end, text ) result(s)
    len = 1+len(msg)+len(caller)+14+len(caller_mod)+len(end)    &
         +1+sum((/( 2+len_trim(text(i))+1 , i=1,size(text) )/)) &
           ) :: s
-
+  
+  !DEBUG: 
   ! See ifort bug
   ! DPD200411297
   ! https://software.intel.com/en-us/forums/intel-fortran-compiler-for-linux-and-mac-os-x/topic/629432

@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!! Copyright (C) 2018-2020 Davide   Montagnani, 
 !!                         Matteo   Tugnoli, 
 !!                         Federico Fonte
 !!
@@ -69,7 +69,7 @@ contains
 
 ! ----------------------------------------------------------------------
 
-function cross(a, b)
+pure function cross(a, b)
   real(wp), dimension(3) :: cross
   real(wp), dimension(3), intent(in) :: a, b
 

@@ -1,10 +1,10 @@
 
 CompName = right_wing
-GeoFile = vv_wing_rect.in
+GeoFile = wing.in
 RefTag = Right
 
 CompName = left_wing
-GeoFile = vv_wing_rect.in
+GeoFile = wing.in
 RefTag = Left
 
 FileName = geo_input.h5 

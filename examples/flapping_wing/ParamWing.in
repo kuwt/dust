@@ -40,12 +40,3 @@ type_span = uniform
 chord = 0.2
 twist = -2.0
 airfoil = NACA0012
-
-!Mesh reflection parameters
-mesh_mirror = F
-mirror_point = (/0.0,0.0,0.0/)
-mirror_normal = (/0.0,1.0,0.0/)
-mesh_symmetry = F
-symmetry_point = (/0.0,0.0,0.0/)
-symmetry_normal = (/0.0,1.0,0.0/)
-                                                                               

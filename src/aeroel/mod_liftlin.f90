@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!! Copyright (C) 2018-2020 Davide   Montagnani, 
 !!                         Matteo   Tugnoli, 
 !!                         Federico Fonte
 !!
@@ -55,7 +55,8 @@ use mod_handling, only: &
 
 use mod_doublet, only: &
   potential_calc_doublet , &
-  velocity_calc_doublet
+  velocity_calc_doublet  , &
+  gradient_calc_doublet
 
 use mod_linsys_vars, only: &
   t_linsys
@@ -122,6 +123,7 @@ contains
 
   procedure, pass(this) :: compute_pot      => compute_pot_liftlin
   procedure, pass(this) :: compute_vel      => compute_vel_liftlin
+  procedure, pass(this) :: compute_grad     => compute_grad_liftlin
   procedure, pass(this) :: compute_psi      => compute_psi_liftlin
   procedure, pass(this) :: compute_pres     => compute_pres_liftlin
   procedure, pass(this) :: compute_dforce   => compute_dforce_liftlin
@@ -226,6 +228,31 @@ subroutine compute_vel_liftlin (this, pos, uinf, vel)
 
 
 end subroutine compute_vel_liftlin
+
+!----------------------------------------------------------------------
+
+!> Compute the velocity induced by a lifting line in a prescribed position
+!!
+!! WARNING: the velocity calculated, to be consistent with the formulation of
+!! the equations is multiplied by 4*pi, to obtain the actual velocity the
+!! result of the present subroutine MUST be DIVIDED by 4*pi
+subroutine compute_grad_liftlin (this, pos, uinf, grad)
+ class(t_liftlin), intent(in) :: this
+ real(wp), intent(in) :: pos(:)
+
+ real(wp), intent(in) :: uinf(3)
+ real(wp), intent(out) :: grad(3,3)
+
+ real(wp) :: grad_dou(3,3)
+
+
+  ! doublet ---
+  call gradient_calc_doublet(this, grad_dou, pos)
+
+  grad = grad_dou*this%mag
+
+
+end subroutine compute_grad_liftlin
 
 !----------------------------------------------------------------------
 
@@ -512,9 +539,10 @@ subroutine solve_liftlin_piszkin( &
       !> Update %uvort field
       ! so far,     %uvort contains the induced velocity of fmm (particle elems)
       !         vel_w_vort contains 4*pi*induced velocity of other vortical elems
-      elems_ll(i_l)%p%uvort = elems_ll(i_l)%p%uvort*4.0_wp*pi + vel_w_vort(:,i_l) 
+      elems_ll(i_l)%p%uvort = elems_ll(i_l)%p%uvort +  &
+                              vel_w_vort(:,i_l) / (4.0_wp * pi)
       !> Update the induced velocity from particles
-      vel_w(:,i_l) = vel_w(:,i_l) + elems_ll(i_l)%p%uvort
+      vel_w(:,i_l) = vel_w(:,i_l) + elems_ll(i_l)%p%uvort * 4.0_wp*pi
 
     else
 
@@ -948,9 +976,10 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       !> Update %uvort field
       ! so far,     %uvort contains the induced velocity of fmm (particle elems)
       !         vel_w_vort contains 4*pi*induced velocity of other vortical elems
-      elems_ll(i_l)%p%uvort = elems_ll(i_l)%p%uvort*4.0_wp*pi + vel_w_vort(:,i_l) 
+      elems_ll(i_l)%p%uvort = elems_ll(i_l)%p%uvort + &
+                              vel_w_vort(:,i_l) / (4.0_wp*pi)
       !> Update the induced velocity from particles
-      vel_w(:,i_l) = vel_w(:,i_l) + elems_ll(i_l)%p%uvort
+      vel_w(:,i_l) = vel_w(:,i_l) + elems_ll(i_l)%p%uvort * 4.0_wp*pi
 
     else
 

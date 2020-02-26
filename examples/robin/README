@@ -3,11 +3,12 @@ vortex particle method and fast multipole.
 
 To execute copy or link the executables, and then 
 
-./dust_pre
 ./dust
 ./dust_post
 
-The geometry is created, then the simulation is restarted from a previous result
-and advanced in time.
+The simulation is restarted from a previous result loading the previous 
+geometry and advanced in time. For this reason it should not be necessary to 
+run the preprocessor. The input files for the preprocessor and the needed 
+items to create the mesh are however present.
 
 Finally visualizations and loads are computed

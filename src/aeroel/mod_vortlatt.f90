@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!! Copyright (C) 2018-2020 Davide   Montagnani, 
 !!                         Matteo   Tugnoli, 
 !!                         Federico Fonte
 !!
@@ -53,7 +53,8 @@ use mod_handling, only: &
 
 use mod_doublet, only: &
   potential_calc_doublet , &
-  velocity_calc_doublet
+  velocity_calc_doublet  , &
+  gradient_calc_doublet
 
 use mod_linsys_vars, only: &
   t_linsys
@@ -99,6 +100,7 @@ type, extends(c_impl_elem) :: t_vortlatt
   procedure, pass(this) :: add_expl         => add_expl_vortlatt
   procedure, pass(this) :: compute_pot      => compute_pot_vortlatt
   procedure, pass(this) :: compute_vel      => compute_vel_vortlatt
+  procedure, pass(this) :: compute_grad     => compute_grad_vortlatt
   procedure, pass(this) :: compute_psi      => compute_psi_vortlatt
   !procedure, pass(this) :: compute_pres     => compute_pres_vortlatt
   !procedure, pass(this) :: compute_dforce   => compute_dforce_vortlatt
@@ -404,6 +406,32 @@ call velocity_calc_doublet(this, vdou, pos)
 vel = vdou*this%mag
 
 end subroutine compute_vel_vortlatt
+
+!----------------------------------------------------------------------
+
+!> Compute the gradient induced by a vortex ring in a prescribed position
+!!
+!! The velocity in the position is calculated considering the influece of
+!! doublets
+!!
+!! WARNING: the velocity calculated, to be consistent with the formulation of
+!! the equations is multiplied by 4*pi, to obtain the actual velocity the
+!! result of the present subroutine MUST be DIVIDED by 4*pi
+subroutine compute_grad_vortlatt(this, pos, uinf, grad)
+class(t_vortlatt), intent(in) :: this
+real(wp), intent(in) :: pos(:)
+real(wp), intent(in) :: uinf(3)
+real(wp), intent(out) :: grad(3,3)
+
+real(wp) :: grad_dou(3,3)
+
+
+! doublet ---
+call gradient_calc_doublet(this, grad_dou, pos)
+
+grad = grad_dou*this%mag
+
+end subroutine compute_grad_vortlatt
 
 !----------------------------------------------------------------------
 
