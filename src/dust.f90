@@ -349,6 +349,8 @@ call prms%CreateRealOption('LeavesTimeRatio','Ratio that triggers the &
 
 ! models options
 call prms%CreateLogicalOption('Vortstretch','Employ vortex stretching','T')
+call prms%CreateLogicalOption('VortstretchFromElems','Employ vortex stretching&
+                                     & from geometry elements','F')
 call prms%CreateLogicalOption('Diffusion','Employ vorticity diffusion','T')
 call prms%CreateLogicalOption('TurbulentViscosity','Employ turbulent &
                                &viscosity','F')
@@ -905,6 +907,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%first_panel_scaling = getreal(prms,'ImplicitPanelScale')
   sim_param%min_vel_at_te  = getreal(prms,'ImplicitPanelMinVel')
   sim_param%use_vs = getlogical(prms, 'Vortstretch')
+  sim_param%vs_elems = getlogical(prms, 'VortstretchFromElems')
   sim_param%use_vd = getlogical(prms, 'Diffusion')
   sim_param%use_tv = getlogical(prms, 'TurbulentViscosity')
   sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
