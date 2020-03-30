@@ -34,6 +34,16 @@ ELSE()
   MESSAGE(ERROR "Unknown computational precision")
 ENDIF()
 
+SET(WITH_PRECICE "NO" CACHE STRING "Compile with PreCICE")
+SET_PROPERTY(CACHE WITH_PRECICE PROPERTY STRINGS "NO" "YES")
+IF(WITH_PRECICE STREQUAL "YES")
+  ADD_DEFINITIONS(-DUSE_PRECICE)
+ELSEIF(WITH_PRECICE STREQUAL "NO")
+  # Do nothing
+ELSE()
+  MESSAGE(ERROR "Unknown choice for WITH_PRECICE")
+ENDIF()
+
 
 # =========== COMPILER ========================
 #SET(CMAKE_Fortran_COMPILER "/home/matteo/LocalUtils/gcc/install/bin/gfortran")
@@ -83,7 +93,7 @@ ENDIF()
 
 # +++++++++++++++++++
 
-#Lapack
+#> Lapack -------------------------------------------------------
 OPTION(DUST_MKL "Use MKL libraries instead of BLAS/LAPACK" OFF)
 IF (DUST_MKL)
 #  SET(BLA_VENDOR "Intel") #search only for intel libraries
@@ -100,20 +110,28 @@ ELSE()
   LIST(APPEND linkedlibs ${LAPACK_LIBRARIES})
 ENDIF()
 
-#HDF5
+#> HDF5 ---------------------------------------------------------
 find_package(HDF5 REQUIRED COMPONENTS C Fortran)
 LIST(APPEND linkedlibs ${HDF5_LIBRARIES})
 
+#> CGNS ---------------------------------------------------------
 # Add CGNS installation (for the moment could not make it look for it autonomously)
 SET(CGNS_INC "/usr/include" CACHE STRING "Include path for cgns headers") 
 SET(CGNS_LIB "/usr/lib" CACHE STRING "Path of the cgns library") 
 LIST(APPEND linkedlibs cgns)
 
+#> PreCICE ------------------------------------------------------
+IF(WITH_PRECICE STREQUAL "YES")
+  SET(PRECICE_INC "/usr/include"   CACHE STRING "Include path for PreCICE fortran interface") 
+  SET(PRECICE_LIB "/usr/local/lib" CACHE STRING "Path of the PreCICE library") 
+  LIST(APPEND linkedlibs precice)
+ENDIF()
+
 #set the includes
-include_directories(${incldirs} ${CGNS_INC} ${HDF5_INCLUDE_DIRS})
+include_directories(${incldirs} ${PRECICE_INC} ${CGNS_INC} ${HDF5_INCLUDE_DIRS})
 
 #set the link path
-link_directories(${CGNS_LIB} ${HDF5_LIBRARY_DIRS})
+link_directories(${PRECICE_LIB} ${CGNS_LIB} ${HDF5_LIBRARY_DIRS})
 
 #Generate the version
 execute_process(COMMAND

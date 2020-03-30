@@ -209,6 +209,34 @@ integer :: i_el , i, sel
 !octree parameters
 type(t_octree) :: octree
 
+!> --- Initialize PreCICE ---------------------------------------
+#if USE_PRECICE
+  integer, parameter :: precice_mcl = 50
+  character(len=precice_mcl) :: config_file_name = './../precice-config.xml'
+  character(len=precice_mcl) :: solver_name = 'dust'
+  character(len=precice_mcl) ::   mesh_name = 'dust_mesh'
+  character(len=precice_mcl) :: write_initial_data, read_it_checkp, write_it_checkp
+  integer :: comm_rank = 0, comm_size = 1
+
+  write(*,*) ' Using PreCICE '
+
+  !> Initialize some strings
+  write_initial_data(1:precice_mcl)='                                                  '
+  read_it_checkp(    1:precice_mcl)='                                                  '
+  write_it_checkp(   1:precice_mcl)='                                                  '
+
+  call precicef_action_write_initial_data(write_initial_data)
+  call precicef_action_read_iter_checkp(  read_it_checkp)
+  call precicef_action_write_iter_checkp(write_it_checkp)
+  ! call precicef_create( solver_name, config_file_name, &
+  !                       comm_rank, comm_size )
+#else
+  write(*,*) ' Not using PreCICE '
+#endif
+
+write(*,*) ' stop in dust.f90, to check if PreCICE is used or not'
+stop
+
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
 t00 = dust_time()
 
@@ -218,7 +246,6 @@ call get_run_id(run_id)
 call initialize_hdf5()
 
 !------ Input reading ------
-
 if(command_argument_count().gt.0) then
   call get_command_argument(1,value=input_file_name)
 else
