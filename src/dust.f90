@@ -598,8 +598,15 @@ end if
 
 
 t11 = dust_time()
-do it = 1,nstep
- 
+it = 0
+#if USE_PRECICE
+do while ( ( it .lt. nstep ) )
+  it = it + 1
+#else
+do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .ne. 0 ) )
+  it = it + 1
+#endif
+
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
                                         nstep, ' simulation time: ', time
