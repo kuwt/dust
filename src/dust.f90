@@ -483,11 +483,16 @@ call finalizeParameters(prms)
 
 !> --- Initialize PreCICE mesh and fields -----------------------
 #if USE_PRECICE
+  call precice % initialize_mesh( geo )
   call precice % initialize_fields()
-  call precice % initialize_mesh()
 
-  write(*,*) ' Using PreCICE: stop in dust.f90, after the initialization '
-  write(*,*) ' of the fields and the mesh, used for coupling, l.490.'; stop
+  !> check ---
+  do i = 1, size(precice%fields)
+    write(*,*) trim(precice%fields(i)%fname), precice%fields(i)%fid
+  end do
+
+  ! write(*,*) ' Using PreCICE: stop in dust.f90, after the initialization '
+  ! write(*,*) ' of the fields and the mesh, used for coupling, l.490.'; stop
 #endif
 !> --- Initialize PreCICE mesh and fields: done -----------------
 
@@ -558,6 +563,19 @@ if ( ( size(elems_ll) .gt. 0 ) ) then
   call build_ll_kernel( elems_ll , al_v , al_kernel )
   deallocate(al_v)
 end if
+
+
+!> --- Initialize PreCICE mesh and fields -----------------------
+#if USE_PRECICE
+  call precicef_ongoing(   precice % is_ongoing)
+  write(*,*) ' is coupling ongoing: ', precice % is_ongoing
+  call precicef_initialize(precice % dt_precice) 
+  call precicef_ongoing(   precice % is_ongoing)
+
+  write(*,*) ' is coupling ongoing: ', precice % is_ongoing
+  write(*,*) ' stop '; stop
+#endif
+!> --- Initialize PreCICE mesh and fields: done -----------------
 
 
 !====== Time Cycle ======
@@ -813,6 +831,11 @@ call printout(nl//'\\\\\\\\\\  Computations Finished \\\\\\\\\\')
 deallocate( res_old )
 !===== End Time Cycle ======
 
+!> --- Finalize PreCICE -----------------------------------------
+#if USE_PRECICE
+  call precicef_finalize()
+#endif
+!> --- Finalize PreCICE: done -----------------------------------
 
 !------ Cleanup ------
 !call destroy_wake_panels(wake_panels)

@@ -3,6 +3,9 @@ module mod_precice
 use mod_param, only: &
     wp
 
+use mod_geometry, only: &
+    t_geo
+
 implicit none
 
 private
@@ -34,14 +37,11 @@ end type t_precice_field
 !> PreCICE type -------------------------------------------------
 type :: t_precice
 
+  !> PreCICE configuration
   character(len=precice_mcl) :: config_file_name
   character(len=precice_mcl) :: solver_name
-  character(len=precice_mcl) :: mesh_name
+  character(len=precice_mcl) :: mesh_name     ! *** to do *** just one mesh?
   integer :: comm_rank, comm_size
-
-  !> PreCICE variables
-  character(len=precice_mcl) :: write_initial_data, &
-                                read_it_checkp, write_it_checkp
 
   !> PreCICE mesh
   type(t_precice_mesh) :: mesh
@@ -49,6 +49,12 @@ type :: t_precice
   !> PreCICE fields
   integer :: n_fields
   type(t_precice_field), allocatable :: fields(:)
+
+  !> PreCICE variables
+  real(wp) :: dt_precice
+  integer  :: is_ongoing
+  character(len=precice_mcl) :: write_initial_data, &
+                                read_it_checkp, write_it_checkp
 
   contains
 
@@ -98,13 +104,77 @@ end subroutine initialize
 
 !----------------------------------------------------------------
 !> 
-subroutine initialize_mesh( this )
+subroutine initialize_mesh( this, geo )
   class(t_precice), intent(inout) :: this
+  type(t_geo), intent(in) :: geo
 
+  integer :: i, i_comp, n_comp
+  integer :: dnnodes, nnodes
 
-! call precicef_set_vertices( mesh_id, nnodes, rr, node_ids )
-! rr(nd, nnodes)
-! node_ids(nnodes)
+  !> TODO: add component field, that describe if the component
+  ! participates to the coupling. So far, all the components 
+  ! participate.
+  logical :: comp_coupling = .true.
+
+  n_comp = size(geo%components)
+
+  !> Count n. of nodes ==========================================
+  nnodes = 0
+  do i_comp = 1, n_comp
+    if ( comp_coupling ) then
+      select case( trim(geo%components(i_comp)%comp_el_type) )
+        case('l')
+          !> Set PreCICE nodes with LE only! ***to do***
+          dnnodes = size(geo%components(i_comp)%i_points) / 2
+          !> Increment number of nodes
+          nnodes = nnodes + dnnodes
+      ! case('v')
+      ! case('p')
+        case default
+      end select
+    end if
+  end do
+
+  !> Allocate participant%mesh fields ===========================
+  allocate(this%mesh%node_ids(nnodes)); this%mesh%node_ids = 0
+  allocate(this%mesh%nodes( this%mesh%ndim, nnodes ))
+  nnodes = 0
+  do i_comp = 1, n_comp
+    if ( comp_coupling ) then
+      select case( trim(geo%components(i_comp)%comp_el_type) )
+        case('l')
+          
+          dnnodes = size(geo%components(i_comp)%i_points) / 2
+          !> Here in the local reference frame ! ***to do***
+          this%mesh%nodes(:,nnodes+1:nnodes+dnnodes) = &
+            geo%components(i_comp)%loc_points(:,1:2*dnnodes:2)
+          nnodes = nnodes + dnnodes
+
+      ! case('v')
+      ! case('p')
+        case default
+      end select
+    end if
+  end do
+
+  !> check ---
+  write(*,*) ' PreCICE, mesh % nodes: '
+  do i = 1 , nnodes
+    write(*,*) this%mesh%nodes(:,i)
+  end do
+
+  !> Initialize mesh ============================================
+  !> Nodes
+  call precicef_set_vertices( this%mesh%mesh_id, nnodes,  &
+                              this%mesh%nodes, this%mesh%node_ids )
+  this%mesh%nnodes = nnodes
+
+  !> Connectivity
+  !> Edges
+  ! ...
+  !> Elements
+  ! ...
+
 
 end subroutine initialize_mesh
 
@@ -142,10 +212,20 @@ subroutine initialize_fields( this )
     call precicef_has_data( trim(field_list(i)), this%mesh%mesh_id, hasdata )
     if ( hasdata .eq. 1 ) then
       nf = nf + 1
-      this%fields(nf)%fid   = nf
       this%fields(nf)%fname = trim(field_list(i))
       this%fields(nf)%fio   = trim(   io_list(i))
       this%fields(nf)%ftype = trim( type_list(i))
+      call precicef_get_data_id( trim(this%fields(nf)%fname), &
+                                 this%mesh%mesh_id, this%fields(nf)%fid )
+      !> Allocate and initialize fields to zero *** to do *** where to write initial data?
+      if ( trim(this%fields(nf)%ftype) .eq. 'scalar' ) then
+        allocate( this%fields(nf)%fdata(1, this%mesh%nnodes) )
+        this%fields(nf)%fdata = 0.0_wp
+      else if ( trim(this%fields(nf)%ftype) .eq. 'vector' ) then
+        allocate( this%fields(nf)%fdata( this%mesh%ndim, &
+                                         this%mesh%nnodes) )
+        this%fields(nf)%fdata = 0.0_wp
+      end if
     end if
   end do
 
