@@ -154,6 +154,10 @@ file(GLOB_RECURSE sources ${PROJECT_SOURCE_DIR}/src/geo/*.f90
                           ${PROJECT_SOURCE_DIR}/src/options/*.f90 
                           ${PROJECT_SOURCE_DIR}/src/viscosity/*.f90
                           ${PROJECT_SOURCE_DIR}/src/fmm/*.f90)
+IF (WITH_PRECICE STREQUAL "YES")
+  file(GLOB sources_precice ${PROJECT_SOURCE_DIR}/src/precice/*.f90)
+  list(APPEND sources ${sources_precice} )
+ENDIF()
 
 
 #create a library

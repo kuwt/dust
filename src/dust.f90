@@ -142,6 +142,11 @@ use mod_octree, only: &
   initialize_octree, destroy_octree, sort_particles, t_octree, &
   apply_multipole_panels
 
+#if USE_PRECICE
+  use mod_precice, only: &
+      t_precice
+#endif
+
 implicit none
 
 !run-id
@@ -209,33 +214,14 @@ integer :: i_el , i, sel
 !octree parameters
 type(t_octree) :: octree
 
+!> PreCICE participant
+type(t_precice) :: precice
+
 !> --- Initialize PreCICE ---------------------------------------
 #if USE_PRECICE
-  integer, parameter :: precice_mcl = 50
-  character(len=precice_mcl) :: config_file_name = './../precice-config.xml'
-  character(len=precice_mcl) :: solver_name = 'dust'
-  character(len=precice_mcl) ::   mesh_name = 'dust_mesh'
-  character(len=precice_mcl) :: write_initial_data, read_it_checkp, write_it_checkp
-  integer :: comm_rank = 0, comm_size = 1
-
-  write(*,*) ' Using PreCICE '
-
-  !> Initialize some strings
-  write_initial_data(1:precice_mcl)='                                                  '
-  read_it_checkp(    1:precice_mcl)='                                                  '
-  write_it_checkp(   1:precice_mcl)='                                                  '
-
-  call precicef_action_write_initial_data(write_initial_data)
-  call precicef_action_read_iter_checkp(  read_it_checkp)
-  call precicef_action_write_iter_checkp(write_it_checkp)
-  ! call precicef_create( solver_name, config_file_name, &
-  !                       comm_rank, comm_size )
-#else
-  write(*,*) ' Not using PreCICE '
+  call precice % initialize()
 #endif
-
-write(*,*) ' stop in dust.f90, to check if PreCICE is used or not'
-stop
+!> --- Initialize PreCICE: done ---------------------------------
 
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
 t00 = dust_time()
@@ -495,6 +481,15 @@ if(sim_param%debug_level .ge. 15) &
 if(sim_param%debug_level .ge. 7) call ignoredParameters(prms)
 call finalizeParameters(prms)
 
+!> --- Initialize PreCICE mesh and fields -----------------------
+#if USE_PRECICE
+  call precice % initialize_fields()
+  call precice % initialize_mesh()
+
+  write(*,*) ' Using PreCICE: stop in dust.f90, after the initialization '
+  write(*,*) ' of the fields and the mesh, used for coupling, l.490.'; stop
+#endif
+!> --- Initialize PreCICE mesh and fields: done -----------------
 
 !------ Initialization ------
 
