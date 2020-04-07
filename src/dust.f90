@@ -214,8 +214,12 @@ integer :: i_el , i, sel
 !octree parameters
 type(t_octree) :: octree
 
-!> PreCICE participant
+!> --- PreCICE data ---------------------------------------------
+#if USE_PRECICE
 type(t_precice) :: precice
+integer :: bool
+#endif
+!> --- PreCICE --------------------------------------------------
 
 !> --- Initialize PreCICE ---------------------------------------
 #if USE_PRECICE
@@ -573,7 +577,6 @@ end if
   call precicef_ongoing(   precice % is_ongoing)
 
   write(*,*) ' is coupling ongoing: ', precice % is_ongoing
-  write(*,*) ' stop '; stop
 #endif
 !> --- Initialize PreCICE mesh and fields: done -----------------
 
@@ -636,6 +639,49 @@ do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .ne. 0 ) )
   !------ Assemble the system ------
   !call prepare_wake(wake, geo, sim_param)
   t0 = dust_time()
+
+#if USE_PRECICE
+  !> --- Initialize PreCICE mesh and fields -----------------------
+  call precicef_action_required( precice%write_it_checkp , bool )
+  if ( bool .eq. 1 ) then ! Save old state
+    !> Save old state: forces and moments
+    ! ... *** to do ***
+    !
+    !> PreCICE action fulfilled
+    call precicef_mark_action_fulfilled( precice%write_it_checkp )
+
+  else ! ???
+    ! ... *** to do *** anything to to?
+  end if
+
+  !> Read data from structural solver
+  do i = 1, size(precice%fields)
+    if ( trim(precice%fields(i)%fio) .eq. 'read' ) then
+      if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
+        call precicef_read_bsdata( precice%fields(i)%fid, &
+                                   precice%mesh%node_ids, &
+                                   precice%fields(i)%fdata(1,:) )
+      elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
+        call precicef_read_bvdata( precice%fields(i)%fid, &
+                                   precice%mesh%node_ids, &
+                                   precice%fields(i)%fdata )
+      endif
+    end if
+  end do
+
+  !> Update dust geometry ( elems and first wake panels )
+  ! ... *** to do ***
+
+  !> Update dt
+  ! *** to do *** : change the way of treating time integration.
+  ! So far, only explicit fixed-dt integration is available.
+  ! The law of motion of the rigid components is evaluated before
+  ! the time loop starts
+  !
+  ! dt = min ( dt_dust, dt_precice )
+
+#else
+#endif
 
   call assemble_linsys(linsys, geo, elems, elems_expl, wake)
   call assemble_pressure_sys(linsys, geo, elems, wake)
@@ -791,6 +837,44 @@ do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .ne. 0 ) )
 
   ! pres_IE +++++
 
+#if USE_PRECICE
+  !> Update force and moments to be passed to the structural solver
+  do i = 1, size(precice%fields)
+    if ( trim(precice%fields(i)%fio) .eq. 'write' ) then
+      if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
+        precice%fields(i)%fdata = 0.0_wp
+      elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
+        precice%fields(i)%fdata = 0.0_wp
+      endif
+    end if
+  end do
+
+  !> Write force and moments to structural solver
+  do i = 1, size(precice%fields)
+    if ( trim(precice%fields(i)%fio) .eq. 'write' ) then
+      if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
+        call precicef_write_bsdata( precice%fields(i)%fid, &
+                                    precice%mesh%node_ids, &
+                                    precice%fields(i)%fdata(1,:) )
+      elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
+        call precicef_write_bvdata( precice%fields(i)%fid, &
+                                    precice%mesh%node_ids, &
+                                    precice%fields(i)%fdata )
+      endif
+    end if
+  end do
+
+  call precicef_action_required( precice%read_it_checkp, bool )
+  if ( bool .eq. 1 ) then ! timestep not converged
+    !> Reload checkpoint state
+    ! ...
+    call precicef_mark_action_fulfilled( precice%read_it_checkp )
+  else ! timestep converged
+    !> Finalize timestep
+    ! Do the same actions as a simulation w/o coupling
+#else
+#endif
+
 
   !----- Print the results -----
   if(time_2_out)  then
@@ -830,6 +914,15 @@ do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .ne. 0 ) )
     call update_geometry(geo, time, .false.)
     call complete_wake(wake, geo, elems_tot)
   endif
+
+#if USE_PRECICE
+  endif ! End of the if statement that check whether the timestep
+        ! has converged or not
+
+  call precicef_advance( precice%dt_precice )
+  call precicef_ongoing( precice%is_ongoing )
+
+#endif
 
 enddo
 call printout(nl//'\\\\\\\\\\  Computations Finished \\\\\\\\\\')
