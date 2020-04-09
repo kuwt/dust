@@ -577,6 +577,7 @@ end if
   call precicef_ongoing(   precice % is_ongoing)
 
   write(*,*) ' is coupling ongoing: ', precice % is_ongoing
+  write(*,*) ' dt_precice         : ', precice % dt_precice
 #endif
 !> --- Initialize PreCICE mesh and fields: done -----------------
 
@@ -603,10 +604,13 @@ end if
 t11 = dust_time()
 it = 0
 #if USE_PRECICE
-do while ( ( it .lt. nstep ) )
+do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .eq. 1 ) )
   it = it + 1
+  write(*,*) ' +++ time evolution, printout ++++++++++++++++++++ '
+  write(*,*) '   it/nstep   : ', it , ' / ', nstep
+  write(*,*) '   is_ongoing : ', precice%is_ongoing
 #else
-do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .ne. 0 ) )
+do while ( ( it .lt. nstep ) )
   it = it + 1
 #endif
 
@@ -641,7 +645,7 @@ do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .ne. 0 ) )
   t0 = dust_time()
 
 #if USE_PRECICE
-  !> --- Initialize PreCICE mesh and fields -----------------------
+  !> -------------------------------------------------------------
   call precicef_action_required( precice%write_it_checkp , bool )
   if ( bool .eq. 1 ) then ! Save old state
     !> Save old state: forces and moments
@@ -658,14 +662,27 @@ do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .ne. 0 ) )
   do i = 1, size(precice%fields)
     if ( trim(precice%fields(i)%fio) .eq. 'read' ) then
       if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
+        ! check ---
+        write(*,*) ' read scalar field: ', trim(precice%fields(i)%fname)
+        ! check ---
         call precicef_read_bsdata( precice%fields(i)%fid, &
+                                   precice%mesh%nnodes  , &
                                    precice%mesh%node_ids, &
                                    precice%fields(i)%fdata(1,:) )
       elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
+        ! check ---
+        write(*,*) ' read vector field: ', trim(precice%fields(i)%fname)
+        ! check ---
         call precicef_read_bvdata( precice%fields(i)%fid, &
+                                   precice%mesh%nnodes  , &
                                    precice%mesh%node_ids, &
                                    precice%fields(i)%fdata )
       endif
+      ! check ---
+      do i_el = 1, size(precice%fields(i)%fdata,2)
+        write(*,*) precice%fields(i)%fdata(:,i_el)
+      end do
+      ! check ---
     end if
   end do
 
@@ -786,6 +803,7 @@ do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .ne. 0 ) )
       select type( el => elems(i_el)%p ) 
         class is(t_vortlatt)
           ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
+  call precicef_ongoing( precice%is_ongoing )
           call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/) )
           ! compute dforce using AVL formula
           call el%compute_dforce_jukowski()
@@ -841,10 +859,11 @@ do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .ne. 0 ) )
   !> Update force and moments to be passed to the structural solver
   do i = 1, size(precice%fields)
     if ( trim(precice%fields(i)%fio) .eq. 'write' ) then
+      precice%fields(i)%fdata = 0.0_wp
       if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
-        precice%fields(i)%fdata = 0.0_wp
+        precice%fields(i)%fdata = -0.01_wp
       elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
-        precice%fields(i)%fdata = 0.0_wp
+        precice%fields(i)%fdata(3,:) = -0.01_wp
       endif
     end if
   end do
@@ -854,10 +873,12 @@ do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .ne. 0 ) )
     if ( trim(precice%fields(i)%fio) .eq. 'write' ) then
       if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
         call precicef_write_bsdata( precice%fields(i)%fid, &
+                                    precice%mesh%nnodes  , &
                                     precice%mesh%node_ids, &
                                     precice%fields(i)%fdata(1,:) )
       elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
         call precicef_write_bvdata( precice%fields(i)%fid, &
+                                    precice%mesh%nnodes  , &
                                     precice%mesh%node_ids, &
                                     precice%fields(i)%fdata )
       endif
@@ -867,11 +888,12 @@ do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .ne. 0 ) )
   call precicef_action_required( precice%read_it_checkp, bool )
   if ( bool .eq. 1 ) then ! timestep not converged
     !> Reload checkpoint state
-    ! ...
+    ! ... *** to do ***
     call precicef_mark_action_fulfilled( precice%read_it_checkp )
   else ! timestep converged
     !> Finalize timestep
     ! Do the same actions as a simulation w/o coupling
+    ! *** to do *** check if something special is needed
 #else
 #endif
 
@@ -919,8 +941,26 @@ do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .ne. 0 ) )
   endif ! End of the if statement that check whether the timestep
         ! has converged or not
 
-  call precicef_advance( precice%dt_precice )
+  ! check ---
+  !> Mesh
+  write(*,*) ' node id., node coordinates ---------------------- '
+  do i = 1, precice%mesh%nnodes
+    write(*,*) precice%mesh%node_ids(i), precice%mesh%nodes(:,i)
+  end do
+  !> Fields
+  write(*,*) ' Fields ------------------------------------------ '
+  do i_el = 1, size(precice%fields)
+    write(*,*) trim(precice%fields(i_el)%fname)
+    do i = 1, precice%mesh%nnodes
+      write(*,*) precice%mesh%node_ids(i), precice%fields(i_el)%fdata(:,i)
+    end do
+  end do
+  ! check ---
+
   call precicef_ongoing( precice%is_ongoing )
+  if ( precice%is_ongoing .eq. 1 ) then
+    call precicef_advance( precice%dt_precice )
+  end if
 
 #endif
 

@@ -147,7 +147,7 @@ subroutine initialize_mesh( this, geo )
           dnnodes = size(geo%components(i_comp)%i_points) / 2
           !> Here in the local reference frame ! ***to do***
           this%mesh%nodes(:,nnodes+1:nnodes+dnnodes) = &
-            geo%components(i_comp)%loc_points(:,1:2*dnnodes:2)
+            geo%components(i_comp)%loc_points(:,1:2*dnnodes:2) + 0.001_wp
           nnodes = nnodes + dnnodes
 
       ! case('v')
