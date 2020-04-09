@@ -330,12 +330,6 @@ subroutine update_elems( this, geo, elems )
     end if
   end do
 
-  ! check ---
-  write(*,*) ' i, geo%points(:,i): '
-  do i = 1, size(geo%points,2)
-    write(*,*) i, geo%points(:,i)
-  end do
-
   !> Velocity 
   do j = 1, size(this%fields)
     if ( trim(this%fields(j)%fname) .eq. 'Velocity' ) then

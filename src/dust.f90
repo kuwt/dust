@@ -940,7 +940,10 @@ do while ( ( it .lt. nstep ) )
   if(it .lt. nstep) then 
     !time = min(sim_param%tend, time+sim_param%dt)
     time = min(sim_param%tend, sim_param%time_vec(it+1))
-    call update_geometry(geo, time, .false.)
+    ! *** to do *** use flag to avoid updating components, whose
+    ! motion is read from the external software, and uncomment the
+    ! following line
+    ! call update_geometry(geo, time, .false.)
     call complete_wake(wake, geo, elems_tot)
   endif
 
