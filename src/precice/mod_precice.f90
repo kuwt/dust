@@ -1,10 +1,16 @@
 module mod_precice
 
 use mod_param, only: &
-    wp
+    wp, pi
 
 use mod_geometry, only: &
     t_geo
+
+use mod_aeroel, only: &
+    t_pot_elem_p
+
+use mod_liftlin, only: &
+    t_liftlin
 
 implicit none
 
@@ -23,6 +29,7 @@ type t_precice_mesh
   real(wp), allocatable      :: nodes(:,:)
   integer                    :: nnodes
   integer                    :: ndim
+  integer , allocatable      :: elem_ids(:)
 end type t_precice_mesh
 
 !> PreCICE field ------------------------------------------------
@@ -32,6 +39,7 @@ type :: t_precice_field
   character(len=precice_mcl) :: fio    ! 'read'/'write'
   character(len=precice_mcl) :: ftype  ! 'scalar'/'vector'
   real(wp), allocatable :: fdata(:,:)  ! (1,nnodes)/(nd,nnodes)
+  real(wp), allocatable :: cdata(:,:)  ! data for storing/reloading fields
 end type t_precice_field
 
 !> PreCICE type -------------------------------------------------
@@ -61,6 +69,8 @@ type :: t_precice
   procedure, pass(this) :: initialize
   procedure, pass(this) :: initialize_mesh
   procedure, pass(this) :: initialize_fields
+  procedure, pass(this) :: update_force
+  procedure, pass(this) :: update_elems
 
 end type t_precice
 !> --------------------------------------------------------------
@@ -106,7 +116,7 @@ end subroutine initialize
 !> 
 subroutine initialize_mesh( this, geo )
   class(t_precice), intent(inout) :: this
-  type(t_geo), intent(in) :: geo
+  type(t_geo)     , intent(in)    :: geo
 
   integer :: i, i_comp, n_comp
   integer :: dnnodes, nnodes
@@ -136,6 +146,11 @@ subroutine initialize_mesh( this, geo )
   end do
 
   !> Allocate participant%mesh fields ===========================
+  ! *** to do *** 
+  ! dust may need two grids:
+  ! - node-centered for reading position from MBDyn
+  ! - cell-centered for writing force to MBDyn
+  ! *** to do ***
   allocate(this%mesh%node_ids(nnodes)); this%mesh%node_ids = 0
   allocate(this%mesh%nodes( this%mesh%ndim, nnodes ))
   nnodes = 0
@@ -147,7 +162,7 @@ subroutine initialize_mesh( this, geo )
           dnnodes = size(geo%components(i_comp)%i_points) / 2
           !> Here in the local reference frame ! ***to do***
           this%mesh%nodes(:,nnodes+1:nnodes+dnnodes) = &
-            geo%components(i_comp)%loc_points(:,1:2*dnnodes:2) + 0.001_wp
+            geo%components(i_comp)%loc_points(:,1:2*dnnodes:2)
           nnodes = nnodes + dnnodes
 
       ! case('v')
@@ -229,8 +244,114 @@ subroutine initialize_fields( this )
     end if
   end do
 
+  !> Allocate cdata for storing/reloading data in implicit coupling
+  ! and initialize it
+  do i = 1, nf
+    if ( trim(this%fields(i)%fio) .eq. 'write' ) then
+      allocate( this%fields(i)%cdata( size(this%fields(i)%fdata,1), &
+                                      size(this%fields(i)%fdata,2) ) )
+      this%fields(i)%cdata = this%fields(i)%fdata
+    end if
+  end do
+
 
 end subroutine initialize_fields
+
+!----------------------------------------------------------------
+!> Update force/moment fields
+subroutine update_force( this, elems )
+  class(t_precice)  , intent(inout) :: this
+  type(t_pot_elem_p), intent(in)    :: elems(:)
+
+  integer :: i, j
+
+  ! check ---
+  write(*,*) ' elem id.,  force ---------------- '
+  do i = 1, size(elems)
+    write(*,*) i, elems(i)%p%dforce
+  end do
+
+  !> From dust elems to PreCICE mesh
+  ! *** to do *** build and exploit the connectivity preCICE-dust
+  do j = 1, size(this%fields)
+    if ( trim(this%fields(j)%fname) .eq. 'Force' ) then
+       this%fields(j)%fdata = 0.0_wp   ! reset
+      do i = 1, size(elems)
+        this%fields(j)%fdata(:,i  ) = this%fields(j)%fdata(:,i  ) + 0.5_wp * elems(i)%p%dforce
+        this%fields(j)%fdata(:,i+1) = this%fields(j)%fdata(:,i+1) + 0.5_wp * elems(i)%p%dforce
+      end do
+    end if
+  end do
+
+ 
+end subroutine update_force
+
+!----------------------------------------------------------------
+!> Update force/moment fields
+subroutine update_elems( this, geo, elems )
+  class(t_precice)  , intent(inout) :: this
+  type(t_geo)       , intent(inout) :: geo
+  type(t_pot_elem_p), intent(inout) :: elems(:)
+ 
+  integer :: i,j
+  real(wp) :: chord, theta ! hardcoded
+
+  chord = 0.1_wp
+  theta = 8.0_wp * pi / 180.0_wp
+
+! ! check ---
+! write(*,*) ' +++++++++++++++++++ '
+! write(*,*) ' +++++++++++++++++++ '
+! write(*,*) ' +++++++++++++++++++ '
+! do i = 1, size(this%fields)
+!   write(*,*) ' vector field: ', trim(this%fields(i)%fname)
+!   do j = 1, size(this%fields(i)%fdata,2)
+!     write(*,*) this%fields(i)%fdata(:,j)
+!   end do
+! end do
+! write(*,*) ' +++++++++++++++++++ '
+! write(*,*) ' +++++++++++++++++++ '
+! write(*,*) ' +++++++++++++++++++ '
+
+  !> Update elems
+  ! *** to do *** build and exploit the connectivity preCICE-dust
+  !> Position
+  do j = 1, size(this%fields)
+    if ( trim(this%fields(j)%fname) .eq. 'Position' ) then
+      ! this%fields(j)%fdata = 0.0_wp   ! reset
+      do i = 1, size(this%fields(j)%fdata,2)
+        write(*,*) i, this%fields(j)%fdata(:,i)
+        geo%points(:,1+(i-1)*2) = &
+                                    this%fields(j)%fdata(:,i)
+        geo%points(:,i*2) = &
+               geo%points(:,1+(i-1)*2) + &
+               chord * (/ cos(theta), 0.0_wp, -sin(theta) /)
+      end do
+    end if
+  end do
+
+  ! check ---
+  write(*,*) ' i, geo%points(:,i): '
+  do i = 1, size(geo%points,2)
+    write(*,*) i, geo%points(:,i)
+  end do
+
+  !> Velocity 
+  do j = 1, size(this%fields)
+    if ( trim(this%fields(j)%fname) .eq. 'Velocity' ) then
+       this%fields(j)%fdata = 0.0_wp   ! reset
+      do i = 1, size(this%fields(j)%fdata,2)-1
+       select type( el => elems(i)%p ); type is(t_liftlin)
+        el%vel_ctr_pt = 0.5_wp * ( &
+                                this%fields(j)%fdata(:,i  ) + &
+                                this%fields(j)%fdata(:,i+1) )
+       end select
+      end do
+    end if
+  end do
+
+
+end subroutine update_elems
 
 !----------------------------------------------------------------
 

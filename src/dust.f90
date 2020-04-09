@@ -209,7 +209,7 @@ real(wp) , allocatable ::      nor_SurfPan_old(:,:)
 
 real(wp) , allocatable :: al_kernel(:,:) , al_v(:)
 
-integer :: i_el , i, sel
+integer :: i_el , i, j, sel
 
 !octree parameters
 type(t_octree) :: octree
@@ -605,14 +605,11 @@ t11 = dust_time()
 it = 0
 #if USE_PRECICE
 do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .eq. 1 ) )
-  it = it + 1
-  write(*,*) ' +++ time evolution, printout ++++++++++++++++++++ '
-  write(*,*) '   it/nstep   : ', it , ' / ', nstep
-  write(*,*) '   is_ongoing : ', precice%is_ongoing
 #else
 do while ( ( it .lt. nstep ) )
   it = it + 1
 #endif
+  it = it + 1
 
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
@@ -640,17 +637,16 @@ do while ( ( it .lt. nstep ) )
   if((sim_param%debug_level .ge. 16).and.time_2_debug_out)&
             call debug_ll_printout_geometry(elems_ll, geo, basename_debug, it)
 
-  !------ Assemble the system ------
-  !call prepare_wake(wake, geo, sim_param)
-  t0 = dust_time()
-
 #if USE_PRECICE
   !> -------------------------------------------------------------
   call precicef_action_required( precice%write_it_checkp , bool )
   if ( bool .eq. 1 ) then ! Save old state
     !> Save old state: forces and moments
-    ! ... *** to do ***
-    !
+    do j = 1, size(precice%fields)
+      if ( trim(precice%fields(j)%fio) .eq. 'write' ) then
+        precice%fields(j)%cdata = precice%fields(j)%fdata
+      end if
+    end do
     !> PreCICE action fulfilled
     call precicef_mark_action_fulfilled( precice%write_it_checkp )
 
@@ -687,19 +683,27 @@ do while ( ( it .lt. nstep ) )
   end do
 
   !> Update dust geometry ( elems and first wake panels )
-  ! ... *** to do ***
+  call precice % update_elems( geo, elems_tot )
+  do i_el = 1, size(elems_tot)
+    call elems_tot(i_el)%p%calc_geo_data( &
+                           geo%points(:,elems_tot(i_el)%p%i_ver) )
+  end do
+  !> Update near-field wake
+  ! *** to do ***
 
   !> Update dt
   ! *** to do *** : change the way of treating time integration.
   ! So far, only explicit fixed-dt integration is available.
   ! The law of motion of the rigid components is evaluated before
   ! the time loop starts
-  !
   ! dt = min ( dt_dust, dt_precice )
 
 #else
 #endif
 
+  !------ Assemble the system ------
+  !call prepare_wake(wake, geo, sim_param)
+  t0 = dust_time()
   call assemble_linsys(linsys, geo, elems, elems_expl, wake)
   call assemble_pressure_sys(linsys, geo, elems, wake)
   t1 = dust_time()
@@ -803,7 +807,6 @@ do while ( ( it .lt. nstep ) )
       select type( el => elems(i_el)%p ) 
         class is(t_vortlatt)
           ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
-  call precicef_ongoing( precice%is_ongoing )
           call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/) )
           ! compute dforce using AVL formula
           call el%compute_dforce_jukowski()
@@ -852,21 +855,21 @@ do while ( ( it .lt. nstep ) )
   !!  end do
   !!end if
 
-
   ! pres_IE +++++
 
 #if USE_PRECICE
   !> Update force and moments to be passed to the structural solver
-  do i = 1, size(precice%fields)
-    if ( trim(precice%fields(i)%fio) .eq. 'write' ) then
-      precice%fields(i)%fdata = 0.0_wp
-      if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
-        precice%fields(i)%fdata = -0.01_wp
-      elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
-        precice%fields(i)%fdata(3,:) = -0.01_wp
-      endif
-    end if
-  end do
+  ! do i = 1, size(precice%fields)
+  !   if ( trim(precice%fields(i)%fio) .eq. 'write' ) then
+  !     precice%fields(i)%fdata = 0.0_wp
+  !     if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
+  !       precice%fields(i)%fdata = -0.01_wp
+  !     elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
+  !       precice%fields(i)%fdata(3,:) = -0.01_wp
+  !     endif
+  !   end if
+  ! end do
+  call precice % update_force( elems_tot )
 
   !> Write force and moments to structural solver
   do i = 1, size(precice%fields)
@@ -888,7 +891,11 @@ do while ( ( it .lt. nstep ) )
   call precicef_action_required( precice%read_it_checkp, bool )
   if ( bool .eq. 1 ) then ! timestep not converged
     !> Reload checkpoint state
-    ! ... *** to do ***
+    do j = 1, size(precice%fields)
+      if ( trim(precice%fields(j)%fio) .eq. 'write' ) then
+        precice%fields(j)%fdata = precice%fields(j)%cdata
+      end if
+    end do
     call precicef_mark_action_fulfilled( precice%read_it_checkp )
   else ! timestep converged
     !> Finalize timestep
