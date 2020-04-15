@@ -250,6 +250,7 @@ call prms%CreateRealOption( 'dt',     "time step")
 call prms%CreateIntOption ( 'timesteps', "number of timesteps")
 call prms%CreateRealOption( 'dt_out', "output time interval")
 call prms%CreateRealOption( 'dt_debug_out', "debug output time interval")
+call prms%CreateIntOption ( 'ndt_update_wake', 'n. dt between two wake updates', '1')
 
 ! input:
 call prms%CreateStringOption('GeometryFile','Main geometry definition file')
@@ -609,10 +610,9 @@ do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .eq. 1 ) )
 do while ( ( it .lt. nstep ) )
   it = it + 1
 #endif
-  it = it + 1
 
   if(sim_param%debug_level .ge. 1) then
-    write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
+    write(message,'(A,I5,A,I5,A,F9.4)') nl//'--> Step ',it,' of ', &
                                         nstep, ' simulation time: ', time
     call printout(message)
     t22 = dust_time()
@@ -626,7 +626,9 @@ do while ( ( it .lt. nstep ) )
   !time related checks
   call init_timestep(time)
 
-  call prepare_wake(wake, elems_tot, octree)
+  if ( mod( it-1, sim_param%ndt_update_wake ) .eq. 0 ) then
+    call prepare_wake(wake, elems_tot, octree)
+  end if
  
   call update_liftlin(elems_ll,linsys)
   call update_actdisk(elems_ad,linsys)
@@ -649,9 +651,6 @@ do while ( ( it .lt. nstep ) )
     end do
     !> PreCICE action fulfilled
     call precicef_mark_action_fulfilled( precice%write_it_checkp )
-
-  else ! ???
-    ! ... *** to do *** anything to to?
   end if
 
   !> Read data from structural solver
@@ -659,7 +658,7 @@ do while ( ( it .lt. nstep ) )
     if ( trim(precice%fields(i)%fio) .eq. 'read' ) then
       if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
         ! check ---
-        write(*,*) ' read scalar field: ', trim(precice%fields(i)%fname)
+        ! write(*,*) ' read scalar field: ', trim(precice%fields(i)%fname)
         ! check ---
         call precicef_read_bsdata( precice%fields(i)%fid, &
                                    precice%mesh%nnodes  , &
@@ -667,7 +666,7 @@ do while ( ( it .lt. nstep ) )
                                    precice%fields(i)%fdata(1,:) )
       elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
         ! check ---
-        write(*,*) ' read vector field: ', trim(precice%fields(i)%fname)
+        ! write(*,*) ' read vector field: ', trim(precice%fields(i)%fname)
         ! check ---
         call precicef_read_bvdata( precice%fields(i)%fid, &
                                    precice%mesh%nnodes  , &
@@ -675,9 +674,9 @@ do while ( ( it .lt. nstep ) )
                                    precice%fields(i)%fdata )
       endif
       ! check ---
-      do i_el = 1, size(precice%fields(i)%fdata,2)
-        write(*,*) precice%fields(i)%fdata(:,i_el)
-      end do
+      ! do i_el = 1, size(precice%fields(i)%fdata,2)
+      !   write(*,*) precice%fields(i)%fdata(:,i_el)
+      ! end do
       ! check ---
     end if
   end do
@@ -832,31 +831,6 @@ do while ( ( it .lt. nstep ) )
   end do
 !$omp end parallel do
 
-  ! pres_IE +++++
-  !!if ( it .gt. 1 ) then
-  !!  do i_el = 1 , geo%nSurfPan
-  !!    select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
-  !!     ! check UHLMAN's EQN -----
-  !!     el%pres = &
-  !!      linsys%res_pres(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp 
-! !!     el%pres = &
-! !!      surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp + &
-! !!         sim_param%rho_inf * sum(el%surf_vel*el%ub)
-  !!     ! check UHLMAN's EQN -----
-  !!    end select
-  !!  end do
-  !!  
-
-  !!else
-  !!  do i_el = 1 , geo%nSurfPan
-  !!    select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
-  !!     el%pres = 0.0_wp
-  !!    end select
-  !!  end do
-  !!end if
-
-  ! pres_IE +++++
-
 #if USE_PRECICE
   !> Update force and moments to be passed to the structural solver
   ! do i = 1, size(precice%fields)
@@ -870,6 +844,12 @@ do while ( ( it .lt. nstep ) )
   !   end if
   ! end do
   call precice % update_force( elems_tot )
+
+  call precicef_ongoing( precice%is_ongoing )
+  if ( precice%is_ongoing .eq. 1 ) then
+    call precicef_advance( precice%dt_precice )
+    write(*,*) ' ++++ dt_precice: ', precice%dt_precice
+  end if
 
   !> Write force and moments to structural solver
   do i = 1, size(precice%fields)
@@ -901,6 +881,7 @@ do while ( ( it .lt. nstep ) )
     !> Finalize timestep
     ! Do the same actions as a simulation w/o coupling
     ! *** to do *** check if something special is needed
+    it = it + 1
 #else
 #endif
 
@@ -920,7 +901,9 @@ do while ( ( it .lt. nstep ) )
   ! (this needs to be done after output, in practice the update is for the
   !  next iteration)
   t0 = dust_time()
-  call update_wake(wake, elems_tot, octree)
+  if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
+    call update_wake(wake, elems_tot, octree)
+  end if
   t1 = dust_time()
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,F9.3,A)') 'Updated wake in: ' , t1 - t0,' s.'
@@ -944,7 +927,9 @@ do while ( ( it .lt. nstep ) )
     ! motion is read from the external software, and uncomment the
     ! following line
     ! call update_geometry(geo, time, .false.)
-    call complete_wake(wake, geo, elems_tot)
+    if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
+      call complete_wake(wake, geo, elems_tot)
+    end if
   endif
 
 #if USE_PRECICE
@@ -952,25 +937,20 @@ do while ( ( it .lt. nstep ) )
         ! has converged or not
 
   ! check ---
-  !> Mesh
-  write(*,*) ' node id., node coordinates ---------------------- '
-  do i = 1, precice%mesh%nnodes
-    write(*,*) precice%mesh%node_ids(i), precice%mesh%nodes(:,i)
-  end do
-  !> Fields
-  write(*,*) ' Fields ------------------------------------------ '
-  do i_el = 1, size(precice%fields)
-    write(*,*) trim(precice%fields(i_el)%fname)
-    do i = 1, precice%mesh%nnodes
-      write(*,*) precice%mesh%node_ids(i), precice%fields(i_el)%fdata(:,i)
-    end do
-  end do
-  ! check ---
-
-  call precicef_ongoing( precice%is_ongoing )
-  if ( precice%is_ongoing .eq. 1 ) then
-    call precicef_advance( precice%dt_precice )
-  end if
+  ! !> Mesh
+  ! write(*,*) ' node id., node coordinates ---------------------- '
+  ! do i = 1, precice%mesh%nnodes
+  !   write(*,*) precice%mesh%node_ids(i), precice%mesh%nodes(:,i)
+  ! end do
+  ! !> Fields
+  ! write(*,*) ' Fields ------------------------------------------ '
+  ! do i_el = 1, size(precice%fields)
+  !   write(*,*) trim(precice%fields(i_el)%fname)
+  !   do i = 1, precice%mesh%nnodes
+  !     write(*,*) precice%mesh%node_ids(i), precice%fields(i_el)%fdata(:,i)
+  !   end do
+  ! end do
+  ! ! check ---
 
 #endif
 
@@ -1046,6 +1026,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%dt_out = getreal(prms,'dt_out')
   sim_param%debug_level = getint(prms, 'debug_level')
   sim_param%output_detailed_geo = getlogical(prms, 'output_detailed_geo')
+  sim_param%ndt_update_wake = getint(prms, 'ndt_update_wake')
 
   !Reference values
   sim_param%P_inf = getreal(prms,'P_inf')

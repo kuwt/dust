@@ -265,11 +265,11 @@ subroutine update_force( this, elems )
 
   integer :: i, j
 
-  ! check ---
-  write(*,*) ' elem id.,  force ---------------- '
-  do i = 1, size(elems)
-    write(*,*) i, elems(i)%p%dforce
-  end do
+! ! check ---
+! write(*,*) ' elem id.,  force ---------------- '
+! do i = 1, size(elems)
+!   write(*,*) i, elems(i)%p%dforce
+! end do
 
   !> From dust elems to PreCICE mesh
   ! *** to do *** build and exploit the connectivity preCICE-dust
@@ -279,6 +279,8 @@ subroutine update_force( this, elems )
       do i = 1, size(elems)
         this%fields(j)%fdata(:,i  ) = this%fields(j)%fdata(:,i  ) + 0.5_wp * elems(i)%p%dforce
         this%fields(j)%fdata(:,i+1) = this%fields(j)%fdata(:,i+1) + 0.5_wp * elems(i)%p%dforce
+        ! this%fields(j)%fdata(3,i  ) = this%fields(j)%fdata(3,i  )
+        ! this%fields(j)%fdata(3,i+1) = this%fields(j)%fdata(3,i+1)
       end do
     end if
   end do
@@ -299,28 +301,25 @@ subroutine update_elems( this, geo, elems )
   chord = 0.1_wp
   theta = 8.0_wp * pi / 180.0_wp
 
-! ! check ---
-! write(*,*) ' +++++++++++++++++++ '
-! write(*,*) ' +++++++++++++++++++ '
-! write(*,*) ' +++++++++++++++++++ '
-! do i = 1, size(this%fields)
-!   write(*,*) ' vector field: ', trim(this%fields(i)%fname)
-!   do j = 1, size(this%fields(i)%fdata,2)
-!     write(*,*) this%fields(i)%fdata(:,j)
-!   end do
-! end do
-! write(*,*) ' +++++++++++++++++++ '
-! write(*,*) ' +++++++++++++++++++ '
-! write(*,*) ' +++++++++++++++++++ '
+  ! check ---
+  write(*,*) ' +++++++++++++++++++ '
+  write(*,*) ' +++++++++++++++++++ '
+  do i = 1, size(this%fields)
+    write(*,*) ' vector field: ', trim(this%fields(i)%fname)
+    do j = 1, size(this%fields(i)%fdata,2)
+      write(*,*) this%fields(i)%fdata(:,j)
+    end do
+  end do
+  write(*,*) ' +++++++++++++++++++ '
+  write(*,*) ' +++++++++++++++++++ '
 
   !> Update elems
   ! *** to do *** build and exploit the connectivity preCICE-dust
   !> Position
   do j = 1, size(this%fields)
     if ( trim(this%fields(j)%fname) .eq. 'Position' ) then
-      ! this%fields(j)%fdata = 0.0_wp   ! reset
       do i = 1, size(this%fields(j)%fdata,2)
-        write(*,*) i, this%fields(j)%fdata(:,i)
+        ! write(*,*) i, this%fields(j)%fdata(:,i)
         geo%points(:,1+(i-1)*2) = &
                                     this%fields(j)%fdata(:,i)
         geo%points(:,i*2) = &
@@ -330,16 +329,19 @@ subroutine update_elems( this, geo, elems )
     end if
   end do
 
+  ! *** to do *** build and exploit the connectivity preCICE-dust
   !> Velocity 
   do j = 1, size(this%fields)
     if ( trim(this%fields(j)%fname) .eq. 'Velocity' ) then
-       this%fields(j)%fdata = 0.0_wp   ! reset
       do i = 1, size(this%fields(j)%fdata,2)-1
-       select type( el => elems(i)%p ); type is(t_liftlin)
-        el%vel_ctr_pt = 0.5_wp * ( &
+        elems(i)%p%ub = 0.5_wp * ( &
                                 this%fields(j)%fdata(:,i  ) + &
                                 this%fields(j)%fdata(:,i+1) )
-       end select
+        select type( el => elems(i)%p ); type is(t_liftlin)
+         el%vel_ctr_pt = 0.5_wp * ( &
+                                this%fields(j)%fdata(:,i  ) + &
+                                this%fields(j)%fdata(:,i+1) )
+        end select
       end do
     end if
   end do

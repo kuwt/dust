@@ -85,6 +85,8 @@ type t_sim_param
   real(wp) , allocatable :: time_vec(:)
   !> Actual time
   real(wp) :: time
+  !> ndt between 2 wake updates
+  integer :: ndt_update_wake
 
   !> Output detailed geometry each timestep
   logical :: output_detailed_geo
