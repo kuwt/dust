@@ -218,12 +218,13 @@ type(t_octree) :: octree
 #if USE_PRECICE
 type(t_precice) :: precice
 integer :: bool
+integer :: bool_prepare_wake = .true.
 #endif
 !> --- PreCICE --------------------------------------------------
 
 !> --- Initialize PreCICE ---------------------------------------
 #if USE_PRECICE
-  call precice % initialize()
+call precice % initialize()
 #endif
 !> --- Initialize PreCICE: done ---------------------------------
 
@@ -605,6 +606,7 @@ end if
 t11 = dust_time()
 it = 0
 #if USE_PRECICE
+it = 1
 do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .eq. 1 ) )
 #else
 do while ( ( it .lt. nstep ) )
@@ -627,7 +629,11 @@ do while ( ( it .lt. nstep ) )
   call init_timestep(time)
 
   if ( mod( it-1, sim_param%ndt_update_wake ) .eq. 0 ) then
+    write(*,*) ' =================== call update_wake ==================== '
     call prepare_wake(wake, elems_tot, octree)
+#if USE_PRECICE
+    bool_prepare_wake = .true.
+#endif
   end if
  
   call update_liftlin(elems_ll,linsys)
@@ -881,7 +887,6 @@ do while ( ( it .lt. nstep ) )
     !> Finalize timestep
     ! Do the same actions as a simulation w/o coupling
     ! *** to do *** check if something special is needed
-    it = it + 1
 #else
 #endif
 
@@ -902,6 +907,7 @@ do while ( ( it .lt. nstep ) )
   !  next iteration)
   t0 = dust_time()
   if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
+    write(*,*) ' =================== call update_wake ==================== '
     call update_wake(wake, elems_tot, octree)
   end if
   t1 = dust_time()
@@ -928,30 +934,17 @@ do while ( ( it .lt. nstep ) )
     ! following line
     ! call update_geometry(geo, time, .false.)
     if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
+      write(*,*) ' =================== call complete_wake ==================== '
       call complete_wake(wake, geo, elems_tot)
     end if
   endif
 
+  it = it + 1
+  bool_prepare_wake = .true.
+
 #if USE_PRECICE
   endif ! End of the if statement that check whether the timestep
         ! has converged or not
-
-  ! check ---
-  ! !> Mesh
-  ! write(*,*) ' node id., node coordinates ---------------------- '
-  ! do i = 1, precice%mesh%nnodes
-  !   write(*,*) precice%mesh%node_ids(i), precice%mesh%nodes(:,i)
-  ! end do
-  ! !> Fields
-  ! write(*,*) ' Fields ------------------------------------------ '
-  ! do i_el = 1, size(precice%fields)
-  !   write(*,*) trim(precice%fields(i_el)%fname)
-  !   do i = 1, precice%mesh%nnodes
-  !     write(*,*) precice%mesh%node_ids(i), precice%fields(i_el)%fdata(:,i)
-  !   end do
-  ! end do
-  ! ! check ---
-
 #endif
 
 enddo

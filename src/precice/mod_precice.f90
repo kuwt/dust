@@ -301,17 +301,17 @@ subroutine update_elems( this, geo, elems )
   chord = 0.1_wp
   theta = 8.0_wp * pi / 180.0_wp
 
-  ! check ---
-  write(*,*) ' +++++++++++++++++++ '
-  write(*,*) ' +++++++++++++++++++ '
-  do i = 1, size(this%fields)
-    write(*,*) ' vector field: ', trim(this%fields(i)%fname)
-    do j = 1, size(this%fields(i)%fdata,2)
-      write(*,*) this%fields(i)%fdata(:,j)
-    end do
-  end do
-  write(*,*) ' +++++++++++++++++++ '
-  write(*,*) ' +++++++++++++++++++ '
+! ! check ---
+! write(*,*) ' +++++++++++++++++++ '
+! write(*,*) ' +++++++++++++++++++ '
+! do i = 1, size(this%fields)
+!   write(*,*) ' vector field: ', trim(this%fields(i)%fname)
+!   do j = 1, size(this%fields(i)%fdata,2)
+!     write(*,*) this%fields(i)%fdata(:,j)
+!   end do
+! end do
+! write(*,*) ' +++++++++++++++++++ '
+! write(*,*) ' +++++++++++++++++++ '
 
   !> Update elems
   ! *** to do *** build and exploit the connectivity preCICE-dust

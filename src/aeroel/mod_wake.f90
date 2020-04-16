@@ -775,6 +775,12 @@ subroutine prepare_wake(wake, elems, octree)
     call apply_multipole_panels(octree, elems)
   endif
 
+  !> Debug ---
+  write(*,*) ' ####### debug in prepare_wake() ######### '
+  write(*,*) ' wake%full_panels : ' , wake%full_panels
+  write(*,*) ' wake%n_prt       : ' , wake%n_prt      
+  !> Debug ---
+
   !==>Recreate sturctures and pointers, if particles are present
   if(wake%full_panels .or. wake%full_rings .or. (wake%n_prt.gt.0) ) then
     !Recreate the pointer vector
@@ -845,7 +851,18 @@ subroutine update_wake(wake, elems, octree)
   wake%w_vel = 0.0_wp
   if(sim_param%HCAS) hcas_vel = get_vel_hcas()
 
+  !> debug ---
+  write(*,*) ' *** In update_wake *** '
+  write(*,*) '    wake%pan_wake_len : ' , wake%pan_wake_len
+  write(*,*) '    wake%nmax_pan     : ' , wake%nmax_pan    
+  write(*,*) '    wake%full_panels  : ' , wake%full_panels 
+  !> debug ---
+
   if(wake%pan_wake_len .eq. wake%nmax_pan) wake%full_panels=.true.
+
+  !> debug ---
+  write(*,*) '    wake%full_panels  : ' , wake%full_panels 
+  !> debug ---
 
   !==> Panels:  Update the first row of vortex intensities:
   !      it was already calculated (implicitly) in the linear system
