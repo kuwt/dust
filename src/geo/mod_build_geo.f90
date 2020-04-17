@@ -165,6 +165,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  character(len=max_char_len) :: comp_el_type
  character :: ElType
  character(len=max_char_len) :: mesh_file_type
+ logical :: coupled_comp
+ character(len=max_char_len) :: coupled_str  ! there is no hdf_write for logical
  logical :: mesh_symmetry , mesh_mirror
  real(wp) :: symmetry_point(3), symmetry_normal(3)
  real(wp) ::   mirror_point(3),   mirror_normal(3)
@@ -215,6 +217,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   !element types
   call geo_prs%CreateStringOption('ElType', &
               'element type (temporary) p:panel, v:vortex ring, l:lifting line')
+  !coupled simulation component
+  call geo_prs%CreateLogicalOption('Coupled', &
+              'Component of a coupled simulation, w/ a structural solver?', 'F')
   !symmtery
   call geo_prs%CreateLogicalOption('mesh_symmetry',&
                'Reflect and double the geometry?', 'F')
@@ -309,6 +314,11 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
          ', defined in file: '//trim(geo_file)//'. ElType must be:'// &
          ' p,v,l,a.')
   end if
+  coupled_comp = getlogical(geo_prs, 'Coupled')
+  if ( coupled_comp) then ; coupled_str = 'true'
+  else                    ; coupled_str = 'false'
+  end if
+
 
   ! Parameters for gap sewing and edge identification ------------------
   ! TolSewing --------------------------------------
@@ -397,6 +407,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   call write_hdf5(ref_tag,'RefTag',comp_loc)
 
   call write_hdf5(trim(comp_el_type),'ElType',comp_loc)
+  call write_hdf5(trim(coupled_str),'Coupled',comp_loc)
 
   call new_hdf5_group(comp_loc, 'Geometry', geo_loc)
 
@@ -2156,7 +2167,7 @@ subroutine cigar2D(L,R,RN,n,x,y)
   real(wp) :: tc, lhalf, cc, dphi, phi, s
   integer  :: i
 
-  real(wp), parameter :: st = 0.29983, &
+  real(wp), parameter :: st = 0.29983_wp, &
                          pi = acos(-1.0_wp)
 
   tc    = 2.0_wp*R/RN*st
@@ -2213,9 +2224,9 @@ subroutine meshbyrev ( x, y, nphi, rr, ee )
 
   n    = size(x)
   nc   = n-2
-  dphi = 2.0*pi/nphi
+  dphi = 2.0_wp*pi/dble(nphi)
 
-  if ( any( y .lt. -1e-16 ) ) then
+  if ( any( y .lt. -1.0e-16_wp ) ) then
       call error(this_sub_name, this_mod_name, &
         'invalid mesh, input curve has negative points')
   endif
@@ -2224,7 +2235,7 @@ subroutine meshbyrev ( x, y, nphi, rr, ee )
 
   e = 1
   do i = 1,nphi
-    phi = dphi*(i-1)
+    phi = dphi*dble(i-1)
     do j = 2,nc+1
       e = e + 1
       rr(1,e) = x(j)
@@ -2235,7 +2246,7 @@ subroutine meshbyrev ( x, y, nphi, rr, ee )
   rr(1,1)          = x(1)
   rr(1,size(rr,2)) = x(n)
 
-  if ( y(1) .gt. 1.0e-16 .or. y(n) .gt. 1.0e-16 ) then
+  if ( y(1) .gt. 1.0e-16_wp .or. y(n) .gt. 1.0e-16_wp ) then
       call warning(this_sub_name, this_mod_name, &
          'closing input curve, check the extrema')
 

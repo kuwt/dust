@@ -150,6 +150,9 @@ type :: t_geo_component
  !> Type of input: basic, cgns, parametric
  character(len=max_char_len) :: comp_input
 
+ !> Coupling w/ external structural code: .true., .false.
+ logical :: coupling
+
  !> Id of the component (warning: not always defined)
  integer :: comp_id
 
@@ -643,6 +646,8 @@ subroutine load_components(geo, in_file, out_file, te)
  integer, allocatable :: ee(:,:)
  real(wp), allocatable :: rr(:,:)
  character(len=max_char_len) :: comp_el_type, comp_name, comp_input
+ character(len=max_char_len) :: comp_coupling_str
+ logical :: comp_coupling
  integer :: points_offset, n_vert , elems_offset
  real(wp), allocatable :: points_tmp(:,:)
  character(len=max_char_len) :: ref_tag, ref_tag_m
@@ -778,6 +783,10 @@ subroutine load_components(geo, in_file, out_file, te)
     call read_hdf5(comp_el_type,'ElType',cloc)
     call read_hdf5(comp_name,'CompName',cloc)
     call read_hdf5(comp_input,'CompInput',cloc)
+    call read_hdf5(comp_coupling_str,'Coupled',cloc)
+    if ( trim(comp_coupling_str) .eq. 'true' ) then; comp_coupling = .true.
+    else                                           ; comp_coupling = .false.
+    endif
 
     if(mult) then
       n_mult = geo%refs(ref_id)%n_mult
@@ -808,11 +817,11 @@ subroutine load_components(geo, in_file, out_file, te)
         endif
       endif
 
-
       geo%components(i_comp)%ref_id  = ref_id
       geo%components(i_comp)%ref_tag = trim(ref_tag_m)
       geo%components(i_comp)%moving  = geo%refs(ref_id)%moving
 
+      geo%components(i_comp)%coupling = comp_coupling
 
 !     ! ====== READING =====
       geo%components(i_comp)%comp_el_type = trim(comp_el_type)
@@ -1665,7 +1674,7 @@ subroutine create_strip_connectivity(geo)
                       comp%el(i_el)%ver(:,1) - comp%el(i_el)%ver(:,3) ) * &
                comp%el(i_el)%nor )
 
-     if ( abs( h2 - comp%el(i_el)%dy ) .gt. 1e-4 .and. &
+     if ( abs( h2 - comp%el(i_el)%dy ) .gt. 1.0e-4_wp .and. &
           sim_param%debug_level .ge. 7) then
        call warning(this_sub_name, this_mod_name, 'non parallel stripe edges (rough check)')
      end if
@@ -1784,8 +1793,7 @@ subroutine update_geometry(geo, t, update_static)
 
 
       do ie = 1,size(comp%el)
-        !Calculate the velocity of the centers to impose
-        !the boundary condition
+        !Calculate the velocity of the centers to assing b.c.
         call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &
                                 geo%refs(comp%ref_id)%f_g)
       enddo

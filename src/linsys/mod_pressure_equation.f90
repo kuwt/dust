@@ -262,7 +262,7 @@ subroutine assemble_pressure_sys(linsys, geo, elems, wake)
   !> (a.2) trick of setting B_inf = P_inf + 0.5 * rhoinf * uinf^2 = 0 ===
   ! with the proper value of dPres to be subtracted and added to the Pressure
   ! field.
-  linsys%b_pres = linsys%b_pres + 0.0    ! <- useless line!
+  linsys%b_pres = linsys%b_pres + 0.0_wp    ! <- useless line!
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !
   ! END Assemble the RHS of the linear system for the Bernoulli polynomial !
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !
