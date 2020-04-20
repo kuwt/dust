@@ -3,6 +3,9 @@ module mod_precice
 use mod_param, only: &
     wp, pi
 
+use mod_handling, only: &
+    error
+
 use mod_geometry, only: &
     t_geo
 
@@ -207,12 +210,12 @@ subroutine initialize_fields( this )
   integer :: i, nf, hasdata
 
   !> Fields that can be exchanged through PreCICE. Add a field if needed
-  field_list(1) = 'Position'        ; type_list(1) = 'vector' ; io_list(1) = 'read' 
-  field_list(2) = 'Velocity'        ; type_list(2) = 'vector' ; io_list(2) = 'read' 
-  field_list(3) = 'Rotation'        ; type_list(3) = 'vector' ; io_list(3) = 'read' 
-  field_list(4) = 'AngularVelocity' ; type_list(4) = 'vector' ; io_list(4) = 'read' 
-  field_list(5) = 'Force'           ; type_list(5) = 'vector' ; io_list(5) = 'write'
-  field_list(6) = 'Moment'          ; type_list(6) = 'vector' ; io_list(6) = 'write'
+  field_list(1) = 'Position'       ; type_list(1) = 'vector'; io_list(1) = 'read' 
+  field_list(2) = 'Velocity'       ; type_list(2) = 'vector'; io_list(2) = 'read' 
+  field_list(3) = 'Rotation'       ; type_list(3) = 'vector'; io_list(3) = 'read' 
+  field_list(4) = 'AngularVelocity'; type_list(4) = 'vector'; io_list(4) = 'read' 
+  field_list(5) = 'Force'          ; type_list(5) = 'vector'; io_list(5) = 'write'
+  field_list(6) = 'Moment'         ; type_list(6) = 'vector'; io_list(6) = 'write'
 
   !> Count n. of exchanged fields
   nf = 0
@@ -295,7 +298,7 @@ subroutine update_elems( this, geo, elems )
   type(t_geo)       , intent(inout) :: geo
   type(t_pot_elem_p), intent(inout) :: elems(:)
  
-  integer :: i,j
+  integer :: i,j, i_comp
   real(wp) :: chord, theta ! hardcoded
 
   chord = 0.1_wp
@@ -303,37 +306,57 @@ subroutine update_elems( this, geo, elems )
 
   !> Update elems
   ! *** to do *** build and exploit the connectivity preCICE-dust
-  !> Position
-  do j = 1, size(this%fields)
-    if ( trim(this%fields(j)%fname) .eq. 'Position' ) then
-      do i = 1, size(this%fields(j)%fdata,2)
-        ! write(*,*) i, this%fields(j)%fdata(:,i)
-        geo%points(:,1+(i-1)*2) = &
-                                    this%fields(j)%fdata(:,i)
-        geo%points(:,i*2) = &
-               geo%points(:,1+(i-1)*2) + &
-               chord * (/ cos(theta), 0.0_wp, -sin(theta) /)
-      end do
-    end if
-  end do
+  do i_comp = 1, size(geo%components)
+    associate( comp => geo%components(i_comp) )
 
-  ! *** to do *** build and exploit the connectivity preCICE-dust
-  !> Velocity 
-  do j = 1, size(this%fields)
-    if ( trim(this%fields(j)%fname) .eq. 'Velocity' ) then
-      do i = 1, size(this%fields(j)%fdata,2)-1
-        elems(i)%p%ub = 0.5_wp * ( &
-                                this%fields(j)%fdata(:,i  ) + &
-                                this%fields(j)%fdata(:,i+1) )
-        select type( el => elems(i)%p ); type is(t_liftlin)
-         el%vel_ctr_pt = 0.5_wp * ( &
-                                this%fields(j)%fdata(:,i  ) + &
-                                this%fields(j)%fdata(:,i+1) )
-        end select
+    if ( comp%comp_el_type(1:1) .eq. 'l' ) then
+      !> Position
+      do j = 1, size(this%fields)
+        if ( trim(this%fields(j)%fname) .eq. 'Position' ) then
+          do i = 1, size(this%fields(j)%fdata,2)
+            ! write(*,*) i, this%fields(j)%fdata(:,i)
+            geo%points(:,1+(i-1)*2) = &
+                                        this%fields(j)%fdata(:,i)
+            geo%points(:,i*2) = &
+                   geo%points(:,1+(i-1)*2) + &
+                   comp%c_ref_p(:,i)   ! *** to do *** read rotation
+                                       ! and apply rotation
+          end do
+        end if
       end do
-    end if
-  end do
 
+      ! ! debug ---
+      ! write(*,*) ' debug in update_elems: '
+      ! do  i = 1, size(comp%c_ref_p,2)
+      !   write(*,*) comp%c_ref_p(:,i)
+      ! end do
+      ! write(*,*) ' stop '; stop
+
+      ! *** to do *** build and exploit the connectivity preCICE-dust
+      !> Velocity 
+      do j = 1, size(this%fields)
+        if ( trim(this%fields(j)%fname) .eq. 'Velocity' ) then
+          do i = 1, size(this%fields(j)%fdata,2)-1
+            elems(i)%p%ub = 0.5_wp * ( &
+                                    this%fields(j)%fdata(:,i  ) + &
+                                    this%fields(j)%fdata(:,i+1) )
+            select type( el => elems(i)%p ); type is(t_liftlin)
+             el%vel_ctr_pt = 0.5_wp * ( &
+                                    this%fields(j)%fdata(:,i  ) + &
+                                    this%fields(j)%fdata(:,i+1) )
+            end select
+          end do
+        end if
+      end do
+
+    else ! not a lifting line elements -> Error *** to do ***
+      call error('update_elems','mod_precice', &
+                 ' So far, coupling w/ structural solver is implemented &
+                  &for lifting lines only. Stop.'); stop
+    end if
+
+    end associate
+  end do
 
 end subroutine update_elems
 

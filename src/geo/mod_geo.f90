@@ -199,6 +199,11 @@ type :: t_geo_component
  real(wp),allocatable :: theta_e(:)
  !> Id of the airfoil elements (index in airfoil_list char array)
  integer ,allocatable :: i_airfoil_e(:,:)
+#if USE_PRECICE
+ !> Chord vector reference, required to assign the motion ot the 
+ ! TE of a deformable LL element, knowing the LE motion
+ real(wp), allocatable :: c_ref_p(:,:)
+#endif
 
  !> Dimensions of parametric elements only
  integer :: parametric_nelems_span , parametric_nelems_chor 
@@ -646,8 +651,6 @@ subroutine load_components(geo, in_file, out_file, te)
  integer, allocatable :: ee(:,:)
  real(wp), allocatable :: rr(:,:)
  character(len=max_char_len) :: comp_el_type, comp_name, comp_input
- character(len=max_char_len) :: comp_coupling_str
- logical :: comp_coupling
  integer :: points_offset, n_vert , elems_offset
  real(wp), allocatable :: points_tmp(:,:)
  character(len=max_char_len) :: ref_tag, ref_tag_m
@@ -666,6 +669,11 @@ subroutine load_components(geo, in_file, out_file, te)
  integer                 , allocatable :: i_airfoil_e(:,:)
  character(max_char_len) , allocatable :: airfoil_list(:)
  integer                 , allocatable :: nelem_span_list(:)
+#if USE_PRECICE
+ character(len=max_char_len) :: comp_coupling_str
+ logical :: comp_coupling
+ real(wp), allocatable :: c_ref_p(:,:)
+#endif 
  ! Parametric elements
  integer :: par_nelems_span , par_nelems_chor
  ! trailing edge ------
@@ -685,6 +693,8 @@ subroutine load_components(geo, in_file, out_file, te)
  integer :: ne_te_prev , nn_te_prev
  real(wp) :: trac, rad
  logical :: rewrite_geo
+
+ integer :: i
 
  character(len=*), parameter :: this_sub_name = 'load_components'
 
@@ -784,9 +794,26 @@ subroutine load_components(geo, in_file, out_file, te)
     call read_hdf5(comp_name,'CompName',cloc)
     call read_hdf5(comp_input,'CompInput',cloc)
     call read_hdf5(comp_coupling_str,'Coupled',cloc)
-    if ( trim(comp_coupling_str) .eq. 'true' ) then; comp_coupling = .true.
-    else                                           ; comp_coupling = .false.
+    comp_coupling = .false.
+#if USE_PRECICE
+    if ( trim(comp_coupling_str) .eq. 'true' ) comp_coupling = .true.
+
+    if ( trim(comp_coupling_str) .eq. 'true' ) then
+      if ( comp_el_type(1:1) .ne. 'l' ) then
+        call error (this_sub_name, this_mod_name, &
+           ' Coupled = T for component'//trim(comp_name)// &
+           ', but it is not a LL element. So far, coupling is implemented &
+              for lifting line elements only. Stop'//nl)
+      end if
+    end if
+#else
+    if ( trim(comp_coupling_str) .eq. 'true' ) then
+      call error (this_sub_name, this_mod_name, &
+         ' Coupled = T for component'//trim(comp_name)// &
+         ', but no coupled simulation is expected, since dust &
+           has been compiled without #USE_PRECICE option. Stop'//nl)
     endif
+#endif
 
     if(mult) then
       n_mult = geo%refs(ref_id)%n_mult
@@ -858,6 +885,14 @@ subroutine load_components(geo, in_file, out_file, te)
         geo%components(i_comp)%normalised_coord_e = normalised_coord_e
         allocate(geo%components(i_comp)%theta_e(size(theta_e)))
         geo%components(i_comp)%theta_e = theta_e
+#if USE_PRECICE
+        if ( trim(comp_coupling_str) .eq. 'true' ) then
+          call read_hdf5_al(c_ref_p, 'c_ref_p', geo_loc)
+          allocate(geo%components(i_comp)%c_ref_p( size(c_ref_p,1) , &
+                                                   size(c_ref_p,2) ) )
+          geo%components(i_comp)%c_ref_p = c_ref_p
+        end if
+#endif
       else if (comp_el_type(1:1) .eq. 'a') then
         call read_hdf5(trac,'Traction',cloc)
         call read_hdf5(rad,'Radius',cloc)
@@ -967,6 +1002,13 @@ subroutine load_components(geo, in_file, out_file, te)
       !store the read points into the local points
       allocate(geo%components(i_comp)%loc_points(3,size(rr,2)))
       geo%components(i_comp)%loc_points = rr
+
+!     ! debug ---
+!     write(*,*) ' debug in mod_geo, l.1009. rr, i_comp: ', i_comp
+!     do i = 1, size(rr,2)
+!       write(*,*) rr(:,i), '           ', &
+!                  geo%components(i_comp)%loc_points(:,i)
+!     end do
 
       !Now for the moments the points are stored here without moving them,
       !will be moved later, consider not storing them here at all
@@ -1746,6 +1788,10 @@ subroutine update_geometry(geo, t, update_static)
  do i_comp = 1,size(geo%components)
   associate(comp => geo%components(i_comp))
 
+  ! Update only rigid components, or update at first timestep
+  ! *** to do *** quite a dirty implementation
+  if ( ( .not. comp%coupling ) .or. update_static ) then
+  
     if (comp%moving .or. update_static) then
 
       !> compute dn_dt: store %nor at previous time step, for moving
@@ -1755,6 +1801,10 @@ subroutine update_geometry(geo, t, update_static)
           comp%el(ie)%nor_old = comp%el(ie)%nor
         end do
       end if
+
+      ! ! debug ---
+      ! write(*,*) ' comp%loc_points : '
+      ! write(*,*)   comp%loc_points    
 
       geo%points(:,comp%i_points) = move_points(comp%loc_points, &
                            geo%refs(comp%ref_id)%R_g, &
@@ -1800,6 +1850,7 @@ subroutine update_geometry(geo, t, update_static)
 
     end if
 
+  end if  ! if ( .not. comp%coupling )
   end associate
  enddo
 

@@ -207,6 +207,10 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
  integer :: i
 
+#if USE_PRECICE
+ real(wp), allocatable :: c_ref_p(:,:)
+#endif
+
  character(len=*), parameter :: this_sub_name = 'build_component'
 
 
@@ -315,9 +319,17 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
          ' p,v,l,a.')
   end if
   coupled_comp = getlogical(geo_prs, 'Coupled')
-  if ( coupled_comp) then ; coupled_str = 'true'
-  else                    ; coupled_str = 'false'
+  coupled_str = 'false'
+#if USE_PRECICE
+  if ( coupled_comp ) coupled_str = 'true'
+#else
+  if ( coupled_comp ) then
+      call error (this_sub_name, this_mod_name, &
+         ' Coupled = T for component'//trim(comp_tag)// &
+         ', but no coupled simulation is expected, since dust &
+           has been compiled without #USE_PRECICE option. Stop'//nl)
   end if
+#endif
 
 
   ! Parameters for gap sewing and edge identification ------------------
@@ -559,6 +571,29 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call write_hdf5(theta_e,'theta_e',geo_loc)
       call write_hdf5(i_airfoil_e,'i_airfoil_e',geo_loc)
       call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
+
+#if USE_PRECICE
+      !> *** to do *** symmetry and mirror. So far, finalize run with an error
+      if ( coupled_comp ) then
+        if ( mesh_symmetry .or. mesh_mirror ) then
+          call error(this_sub_name, this_mod_name, &
+                      'So far, mesh_symmetry and mesh_mirror &
+                      &not implemented for coupled components')
+        end if
+      end if
+      if ( coupled_comp ) then
+        !> Compute the reference chord vector, for geometry transformation
+        ! of the deformable component. Meant for blades, wings defined using
+        ! the local y-axis as the spanwise direction and the x-axis as the
+        ! streamwise direction, pointing from the LE towards the TE
+        allocate(c_ref_p(3, nelems_span+1)); c_ref_p = 0.0_wp
+        do i = 1, size(c_ref_p,2)
+          c_ref_p(:,i) = chord_p(i) * &
+                  (/ cos(theta_p(i)), 0.0_wp, -sin(theta_p(i)) /)
+        end do
+        call write_hdf5(c_ref_p,'c_ref_p',geo_loc)
+      end if
+#endif
 
     elseif(ElType .eq. 'a') then ! ACTUATOR DISK
       call read_actuatordisk_parametric(trim(mesh_file),ee,rr)

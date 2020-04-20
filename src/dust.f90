@@ -218,7 +218,6 @@ type(t_octree) :: octree
 #if USE_PRECICE
 type(t_precice) :: precice
 integer :: bool
-integer :: bool_prepare_wake = .true.
 #endif
 !> --- PreCICE --------------------------------------------------
 
@@ -629,11 +628,8 @@ do while ( ( it .lt. nstep ) )
   call init_timestep(time)
 
   if ( mod( it-1, sim_param%ndt_update_wake ) .eq. 0 ) then
-    write(*,*) ' =================== call update_wake ==================== '
+!   write(*,*) ' =================== call update_wake ==================== '
     call prepare_wake(wake, elems_tot, octree)
-#if USE_PRECICE
-    bool_prepare_wake = .true.
-#endif
   end if
  
   call update_liftlin(elems_ll,linsys)
@@ -907,7 +903,7 @@ do while ( ( it .lt. nstep ) )
   !  next iteration)
   t0 = dust_time()
   if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
-    write(*,*) ' =================== call update_wake ==================== '
+!   write(*,*) ' =================== call update_wake ==================== '
     call update_wake(wake, elems_tot, octree)
   end if
   t1 = dust_time()
@@ -929,18 +925,15 @@ do while ( ( it .lt. nstep ) )
   if(it .lt. nstep) then 
     !time = min(sim_param%tend, time+sim_param%dt)
     time = min(sim_param%tend, sim_param%time_vec(it+1))
-    ! *** to do *** use flag to avoid updating components, whose
-    ! motion is read from the external software, and uncomment the
-    ! following line
-    ! call update_geometry(geo, time, .false.)
+    !> Update geometry
+    call update_geometry(geo, time, .false.)
     if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
-      write(*,*) ' =================== call complete_wake ==================== '
+!     write(*,*) ' =================== call complete_wake ==================== '
       call complete_wake(wake, geo, elems_tot)
     end if
   endif
 
   it = it + 1
-  bool_prepare_wake = .true.
 
 #if USE_PRECICE
   endif ! End of the if statement that check whether the timestep
@@ -1043,8 +1036,8 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   if(sim_param%n_wake_panels .lt. 1) then
     sim_param%n_wake_panels = 1
     call warning('dust','dust','imposed a number of wake panels rows &
-                 LOWER THAN 1. At least one row of panels is mandatory, &
-                 the simulation will proceed with "n_wake_panels = 1"')
+                &LOWER THAN 1. At least one row of panels is mandatory, &
+                &the simulation will proceed with "n_wake_panels = 1"')
   endif
   sim_param%n_wake_particles = getint(prms, 'n_wake_particles')
   sim_param%particles_box_min = getrealarray(prms, 'particles_box_min',3)
