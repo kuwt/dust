@@ -313,14 +313,15 @@ subroutine update_elems( this, geo, elems )
       !> Position
       do j = 1, size(this%fields)
         if ( trim(this%fields(j)%fname) .eq. 'Position' ) then
-          do i = 1, size(this%fields(j)%fdata,2)
-            ! write(*,*) i, this%fields(j)%fdata(:,i)
-            geo%points(:,1+(i-1)*2) = &
-                                        this%fields(j)%fdata(:,i)
-            geo%points(:,i*2) = &
-                   geo%points(:,1+(i-1)*2) + &
-                   comp%c_ref_p(:,i)   ! *** to do *** read rotation
-                                       ! and apply rotation
+          do i = 1, size(comp%i_points_precice)
+            geo%points(:, comp%i_points( 2*i-1 ) ) = &
+               this%fields(j)%fdata(:, comp%i_points_precice( i ) )
+
+            geo%points(:, comp%i_points( 2*i ) ) = &
+               geo%points(:, comp%i_points( 2*i-1 ) ) + &
+               comp%c_ref_p(:,i)   ! *** to do *** read rotation
+                                   ! and apply rotation
+
           end do
         end if
       end do

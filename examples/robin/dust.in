@@ -14,7 +14,7 @@ output_start = T
 GeometryFile = geo_input.h5
 
 ! restart ------------------------------
-restart_from_file= T
+restart_from_file= F
 restart_file = ./Output/starting_res.h5
 reset_time = F
 

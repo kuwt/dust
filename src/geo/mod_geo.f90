@@ -167,6 +167,11 @@ type :: t_geo_component
  !> Global indexes of the points in the component
  integer, allocatable :: i_points(:)
 
+#if USE_PRECICE
+ !> Global PreCICE indices of the points for coupling
+ integer, allocatable :: i_points_precice(:)
+#endif
+
  !> Reference frame tag
  character(len=max_char_len) :: ref_tag
 
@@ -673,6 +678,7 @@ subroutine load_components(geo, in_file, out_file, te)
  logical :: comp_coupling
 #if USE_PRECICE
  real(wp), allocatable :: c_ref_p(:,:)
+ integer :: points_offset_precice, np_precice
 #endif 
  ! Parametric elements
  integer :: par_nelems_span , par_nelems_chor
@@ -756,6 +762,9 @@ subroutine load_components(geo, in_file, out_file, te)
   !TODO check this
   n_comp_write = n_comp
   
+#if USE_PRECICE
+  points_offset_precice = 0
+#endif
 
   i_comp = 1
   do i_comp_input = 1,n_comp_input
@@ -891,6 +900,17 @@ subroutine load_components(geo, in_file, out_file, te)
           allocate(geo%components(i_comp)%c_ref_p( size(c_ref_p,1) , &
                                                    size(c_ref_p,2) ) )
           geo%components(i_comp)%c_ref_p = c_ref_p
+          
+          !> PreCICE connectivity for LL
+          np_precice = size(rr,2)/2    ! <--- only LE
+          allocate(geo%components(i_comp)%i_points_precice( np_precice ))
+          geo%components(i_comp)%i_points_precice = &
+                           (/((i3),i3=points_offset_precice+1, &
+                                      points_offset_precice+np_precice)/)
+          points_offset_precice = points_offset_precice + np_precice
+        else
+          np_precice = 0
+          allocate(geo%components(i_comp)%i_points_precice( np_precice ))
         end if
 #endif
       else if (comp_el_type(1:1) .eq. 'a') then
@@ -957,6 +977,10 @@ subroutine load_components(geo, in_file, out_file, te)
         call write_hdf5(ee   ,'ee'   ,geo_loc)
         call write_hdf5(rr   ,'rr'   ,geo_loc)
         call write_hdf5(neigh,'neigh',geo_loc)
+#if USE_PRECICE
+        call write_hdf5(geo%components(i_comp)%i_points_precice, &
+                        'i_points_PreCICE', geo_loc)
+#endif
         if ( comp_el_type(1:1) .eq. 'l' ) then
           call write_hdf5(airfoil_list      ,'airfoil_list'      ,geo_loc)
           call write_hdf5(nelem_span_list   ,'nelem_span_list'   ,geo_loc)
