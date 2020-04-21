@@ -126,7 +126,8 @@ subroutine build_geometry(geo_files, ref_tags, comp_names, output_file, &
  integer(h5loc) :: file_loc, group_loc
 
   n_geo = size(geo_files)
-  
+
+  write(*,*) ' in build_geometry. output_file: ', trim(output_file)
   call new_hdf5_file(output_file, file_loc)
   call new_hdf5_group(file_loc, 'Components', group_loc)
   call write_hdf5(n_geo,'NComponents',group_loc)

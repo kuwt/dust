@@ -218,6 +218,7 @@ type(t_octree) :: octree
 #if USE_PRECICE
 type(t_precice) :: precice
 integer :: bool
+logical :: precice_convergence
 #endif
 !> --- PreCICE --------------------------------------------------
 
@@ -577,6 +578,8 @@ end if
   call precicef_initialize(precice % dt_precice) 
   call precicef_ongoing(   precice % is_ongoing)
 
+  precice_convergence = .true.
+
   write(*,*) ' is coupling ongoing: ', precice % is_ongoing
   write(*,*) ' dt_precice         : ', precice % dt_precice
 #endif
@@ -623,9 +626,15 @@ do while ( ( it .lt. nstep ) )
 
   !Calculate the normal velocity derivative for the pressure equation
   call press_normvel_der(geo, elems, surf_vel_SurfPan_old)
-  
-  !time related checks
+
+#if USE_PRECICE
+  if ( precice_convergence ) then
+#endif
   call init_timestep(time)
+#if USE_PRECICE
+  precice_convergence = .false.
+  end if
+#endif
 
   if ( mod( it-1, sim_param%ndt_update_wake ) .eq. 0 ) then
 !   write(*,*) ' =================== call update_wake ==================== '
@@ -880,6 +889,7 @@ do while ( ( it .lt. nstep ) )
     end do
     call precicef_mark_action_fulfilled( precice%read_it_checkp )
   else ! timestep converged
+    precice_convergence = .true.
     !> Finalize timestep
     ! Do the same actions as a simulation w/o coupling
     ! *** to do *** check if something special is needed
@@ -1275,7 +1285,7 @@ end subroutine init_sim_param
 !! to perform output or not
 subroutine init_timestep(t)
  real(wp), intent(in) :: t
-  
+ 
   sim_param%time = t
 
   !if (real(t-t_last_out) .ge. real(sim_param%dt_out)) then

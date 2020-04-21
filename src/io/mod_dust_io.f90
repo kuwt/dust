@@ -252,6 +252,18 @@ subroutine save_status(geo, wake, it, time, run_id)
       call close_hdf5_group(gloc3)
     endif
 
+#if USE_PRECICE
+    if ( geo%components(icomp)%coupling ) then
+      write(*,*) ' ************************************************* '
+      write(*,*) ' * write position of coupled component: ', icomp
+      write(*,*) ' ************************************************* '
+      call new_hdf5_group(gloc2, 'Geometry', gloc3)
+      call write_hdf5(geo%points(:,geo%components(icomp)%i_points), &
+                      'rr',gloc3)
+      call close_hdf5_group(gloc3)
+    end if
+#endif
+
     call close_hdf5_group(gloc2)
   enddo
   call close_hdf5_group(gloc1)

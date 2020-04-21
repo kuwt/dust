@@ -170,6 +170,8 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
  character(len=max_char_len), allocatable :: components(:) , components_tmp(:)
  character(len=max_char_len) :: component_stripped
 
+ character(len=max_char_len) :: comp_coupling_str
+
  character(len=*), parameter :: this_sub_name = 'load_components_postpro'
 
   ! Read all the components
@@ -264,7 +266,6 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
     call read_hdf5(comp_name,'CompName',cloc)
     call read_hdf5(comp_input,'CompInput',cloc)
 
-
     !Strip the appendix of multiple components, to load all the multiple
     !components at once
     call strip_mult_appendix(comp_name, comp_name_stripped, '__') 
@@ -291,6 +292,13 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
 
       comps(i_comp)%comp_name = trim(comp_name)
       comps(i_comp)%comp_input = trim(comp_input)
+
+      call read_hdf5(comp_coupling_str,'Coupled',cloc)
+      if ( trim(comp_coupling_str) .eq. 'true' ) then
+        comps(i_comp)%coupling = .true.
+      else
+        comps(i_comp)%coupling = .false.
+      end if
 
       ! Geometry --------------------------
       call open_hdf5_group(cloc,'Geometry',geo_loc)
@@ -622,22 +630,54 @@ function move_points(pp, R, of)  result(rot_pp)
 end function move_points
 
 !----------------------------------------------------------------------
-
-subroutine update_points_postpro(comps, points, refs_R, refs_off, refs_G , refs_f)
+#if USE_PRECICE
+subroutine update_points_postpro(comps, points, refs_R, refs_off, &
+                                 refs_G , refs_f, filen)
+#else
+subroutine update_points_postpro(comps, points, refs_R, refs_off, &
+                                 refs_G , refs_f)
+#endif
  type(t_geo_component), intent(inout) :: comps(:)
  real(wp), intent(inout) :: points(:,:)
  real(wp), intent(in)    :: refs_R(:,:,0:)
  real(wp), intent(in)    :: refs_off(:,0:)
  real(wp), optional , intent(in)    :: refs_G(:,:,0:)
  real(wp), optional , intent(in)    :: refs_f(:,0:)
+#if USE_PRECICE
+ character(max_char_len), optional, intent(in) :: filen
+ character(max_char_len) :: cname
+ integer(h5loc) :: floc, gloc, cloc, rloc
+ real(wp), allocatable :: rr(:,:)
+#endif
 
  integer :: i_comp, ie
 
  do i_comp = 1,size(comps)
   associate(comp => comps(i_comp))
+#if USE_PRECICE
+  if ( .not. comp%coupling ) then
+#endif
   points(:,comp%i_points) = move_points(comp%loc_points, &
                            refs_R(:,:,comp%ref_id), &
                            refs_off(:,comp%ref_id))
+#if USE_PRECICE
+  else
+    !> Open result hdf5 file and read points coordinates
+    call open_hdf5_file( trim(filen), floc )
+    call open_hdf5_group( floc, 'Components', gloc )
+    write(cname,'(A,I3.3)') 'Comp', i_comp
+    call open_hdf5_group( gloc, trim(cname), cloc )
+    call open_hdf5_group( cloc, 'Geometry', rloc )
+    call read_hdf5_al(rr, 'rr', rloc)
+    points(:,comp%i_points) = rr
+
+    !> Quite dirty: open and close for each component
+    call close_hdf5_group(rloc)
+    call close_hdf5_group(cloc)
+    call close_hdf5_group(gloc)
+    call close_hdf5_file(floc)
+  endif
+#endif
 
   do ie = 1,size(comp%el)
     call calc_geo_data_postpro(comp%el(ie),points(:,comp%el(ie)%i_ver))

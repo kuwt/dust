@@ -669,9 +669,9 @@ subroutine load_components(geo, in_file, out_file, te)
  integer                 , allocatable :: i_airfoil_e(:,:)
  character(max_char_len) , allocatable :: airfoil_list(:)
  integer                 , allocatable :: nelem_span_list(:)
-#if USE_PRECICE
  character(len=max_char_len) :: comp_coupling_str
  logical :: comp_coupling
+#if USE_PRECICE
  real(wp), allocatable :: c_ref_p(:,:)
 #endif 
  ! Parametric elements
@@ -947,6 +947,11 @@ subroutine load_components(geo, in_file, out_file, te)
                                                             'CompName',cloc2)
         call write_hdf5(trim(geo%components(i_comp)%comp_input),&
                                                            'CompInput',cloc2)
+        if ( geo%components(i_comp)%coupling ) then
+          call write_hdf5('true','Coupled',cloc2)
+        else
+          call write_hdf5('false','Coupled',cloc2)
+        end if
         call new_hdf5_group(cloc2,'Geometry',geo_loc)
 
         call write_hdf5(ee   ,'ee'   ,geo_loc)
