@@ -272,29 +272,81 @@ end subroutine initialize_fields
 
 !----------------------------------------------------------------
 !> Update force/moment fields
-subroutine update_force( this, elems )
+subroutine update_force( this, geo, elems )
   class(t_precice)  , intent(inout) :: this
+  type(t_geo)       , intent(inout) :: geo
   type(t_pot_elem_p), intent(in)    :: elems(:)
 
-  integer :: i, j
+  integer :: i, j, i_comp, ip
 
   integer :: j_for, j_mom
 
-
-
-  !> From dust elems to PreCICE mesh
-  ! *** to do *** build and exploit the connectivity preCICE-dust
   do j = 1, size(this%fields)
-    if ( trim(this%fields(j)%fname) .eq. 'Force' ) then
-       this%fields(j)%fdata = 0.0_wp   ! reset
-      do i = 1, size(elems)
-        this%fields(j)%fdata(:,i  ) = this%fields(j)%fdata(:,i  ) + 0.5_wp * elems(i)%p%dforce
-        this%fields(j)%fdata(:,i+1) = this%fields(j)%fdata(:,i+1) + 0.5_wp * elems(i)%p%dforce
-        ! this%fields(j)%fdata(3,i  ) = this%fields(j)%fdata(3,i  )
-        ! this%fields(j)%fdata(3,i+1) = this%fields(j)%fdata(3,i+1)
-      end do
-    end if
+    if ( trim(this%fields(j)%fname) .eq. 'Force'  ) j_for = j
+    if ( trim(this%fields(j)%fname) .eq. 'Moment' ) j_mom = j
   end do
+
+  do i_comp = 1, size(geo%components)
+    associate( comp => geo%components(i_comp) )
+
+    if ( comp%coupling ) then
+
+      !> Reset force and moment fields, to be filled by accumulation
+      do i = 1, size(comp%i_points_precice)
+        this%fields(j_for)%fdata(:, comp%i_points_precice(i) ) = 0.0_wp
+        this%fields(j_mom)%fdata(:, comp%i_points_precice(i) ) = 0.0_wp
+      end do
+
+      if ( comp%comp_el_type(1:1) .eq. 'l' ) then
+        do i = 1, size(comp%i_points_precice)-1
+
+          ip = comp%i_points_precice(i)
+
+          !> Accumulation of forces
+          this%fields(j_for)%fdata(:, ip)   = this%fields(j_for)%fdata(:, ip) + &
+                                   0.5_wp * comp%el(i)%dforce
+          this%fields(j_for)%fdata(:, ip+1) = this%fields(j_for)%fdata(:, ip+1) + &
+                                   0.5_wp * comp%el(i)%dforce
+
+          !> Accumulation of moments
+          this%fields(j_mom)%fdata(:, ip)   = this%fields(j_mom)%fdata(:, ip) + &
+                                   0.5_wp * comp%el(i)%dmom
+          this%fields(j_mom)%fdata(:, ip+1) = this%fields(j_mom)%fdata(:, ip+1) + &
+                                   0.5_wp * comp%el(i)%dmom
+        end do
+      end if
+
+    end if
+
+    end associate
+  end do
+! ! debug ---
+! write(*,*) ' debug in mod_precice '
+! write(*,*) ' Force and moments '
+! write(*,*) ' j_for, j_mom: ', j_for, j_mom
+! write(*,*) trim(this%fields(j_for)%fname), trim(this%fields(j_mom)%fname)
+! write(*,*) ' shape(geo%components): ', shape(geo%components)
+! do i = 1, size(geo%components(1)%i_points_precice)
+!   write(*,*) this%fields(j_for)%fdata(:,i), &
+!              this%fields(j_mom)%fdata(:,i)
+! end do
+! stop
+! ! debug ---
+
+! *** old *** harcoded for 1 components only
+!   do j = 1, size(this%fields)
+!     if ( trim(this%fields(j)%fname) .eq. 'Force' ) then
+!        this%fields(j)%fdata = 0.0_wp   ! reset
+!       do i = 1, size(elems)
+!         this%fields(j)%fdata(:,i  ) = &
+!         this%fields(j)%fdata(:,i  ) + 0.5_wp * elems(i)%p%dforce
+!         this%fields(j)%fdata(:,i+1) = &
+!         this%fields(j)%fdata(:,i+1) + 0.5_wp * elems(i)%p%dforce
+!         ! this%fields(j)%fdata(3,i  ) = this%fields(j)%fdata(3,i  )
+!         ! this%fields(j)%fdata(3,i+1) = this%fields(j)%fdata(3,i+1)
+!       end do
+!     end if
+!   end do
 
  
 end subroutine update_force
@@ -320,7 +372,6 @@ subroutine update_elems( this, geo, elems )
     if ( trim(this%fields(j)%fname) .eq. 'Rotation' )       j_rot = j
     if ( trim(this%fields(j)%fname) .eq. 'AngularVelocity') j_ome = j
   end do
-
 
   !> Update elems
   ! *** to do *** build and exploit the connectivity preCICE-dust

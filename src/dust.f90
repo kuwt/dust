@@ -858,7 +858,7 @@ do while ( ( it .lt. nstep ) )
   !     endif
   !   end if
   ! end do
-  call precice % update_force( elems_tot )
+  call precice % update_force( geo, elems_tot )
 
   call precicef_ongoing( precice%is_ongoing )
   if ( precice%is_ongoing .eq. 1 ) then
