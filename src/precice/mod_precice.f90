@@ -278,6 +278,10 @@ subroutine update_force( this, elems )
 
   integer :: i, j
 
+  integer :: j_for, j_mom
+
+
+
   !> From dust elems to PreCICE mesh
   ! *** to do *** build and exploit the connectivity preCICE-dust
   do j = 1, size(this%fields)
@@ -345,6 +349,8 @@ subroutine update_elems( this, geo, elems )
         else
           n_rot = n_rot / theta
         end if
+        !> Angular velocity of the point at the LE
+        omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(i))
 
         !> Position of the LE
         geo%points(:, comp%i_points( 2*i-1 ) ) = &
@@ -364,7 +370,6 @@ subroutine update_elems( this, geo, elems )
            this%fields(j_vel)%fdata(:, comp%i_points_precice( i ) )
 
         !> Velocity of the TE
-        omega = 0.0_wp
         geo%points_vel(:, comp%i_points( 2*i ) ) = &
            this%fields(j_vel)%fdata(:, comp%i_points_precice( i ) ) + &
            cross( omega, chord_rot )
