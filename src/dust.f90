@@ -676,18 +676,22 @@ do while ( ( it .lt. nstep ) )
                                    precice%mesh%node_ids, &
                                    precice%fields(i)%fdata(1,:) )
       elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
-        ! check ---
+        ! ! check ---
         ! write(*,*) ' read vector field: ', trim(precice%fields(i)%fname)
-        ! check ---
+        ! write(*,*) '    mesh%nnodes  : ' , precice%mesh%nnodes  
+        ! write(*,*) '    mesh%nodes_ids: ', precice%mesh%node_ids
+        ! ! check ---
         call precicef_read_bvdata( precice%fields(i)%fid, &
                                    precice%mesh%nnodes  , &
                                    precice%mesh%node_ids, &
                                    precice%fields(i)%fdata )
       endif
       ! check ---
-      ! do i_el = 1, size(precice%fields(i)%fdata,2)
-      !   write(*,*) precice%fields(i)%fdata(:,i_el)
-      ! end do
+      write(*,*) i, precice%fields(i)%fid, precice%fields(i)%fname
+      do i_el = 1, size(precice%fields(i)%fdata,2)
+        write(*,*) precice%fields(i)%fdata(:,i_el)
+      end do
+      write(*,*)
       ! check ---
     end if
   end do

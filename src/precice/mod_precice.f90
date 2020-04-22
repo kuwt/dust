@@ -1,10 +1,20 @@
 module mod_precice
 
+! *** to do ***
+!> update position of the TE, using the rotation of the LE
+!> update velocity field, exploiting connectivity
+!> update velocity field, including the contribution of the angular vel
+!> update force    field, exploiting connectivity
+! *** to do ***
+
 use mod_param, only: &
     wp, pi
 
 use mod_handling, only: &
     error
+
+use mod_math, only: &
+    cross
 
 use mod_geometry, only: &
     t_geo
@@ -268,12 +278,6 @@ subroutine update_force( this, elems )
 
   integer :: i, j
 
-! ! check ---
-! write(*,*) ' elem id.,  force ---------------- '
-! do i = 1, size(elems)
-!   write(*,*) i, elems(i)%p%dforce
-! end do
-
   !> From dust elems to PreCICE mesh
   ! *** to do *** build and exploit the connectivity preCICE-dust
   do j = 1, size(this%fields)
@@ -299,55 +303,98 @@ subroutine update_elems( this, geo, elems )
   type(t_pot_elem_p), intent(inout) :: elems(:)
  
   integer :: i,j, i_comp
-  real(wp) :: chord, theta ! hardcoded
+  real(wp) :: n_rot(3), chord(3), chord_rot(3), omega(3)
+  real(wp) :: theta
+  real(wp) :: eps = 1.0e-9_wp
+  integer :: j_pos, j_vel, j_rot, j_ome
 
-  chord = 0.1_wp
-  theta = 8.0_wp * pi / 180.0_wp
+  ! Find rotation and angular velocity field id
+  j_rot = 0; j_ome = 0
+  do j = 1, size(this%fields)
+    if ( trim(this%fields(j)%fname) .eq. 'Position' )       j_pos = j
+    if ( trim(this%fields(j)%fname) .eq. 'Velocity' )       j_vel = j
+    if ( trim(this%fields(j)%fname) .eq. 'Rotation' )       j_rot = j
+    if ( trim(this%fields(j)%fname) .eq. 'AngularVelocity') j_ome = j
+  end do
+
 
   !> Update elems
   ! *** to do *** build and exploit the connectivity preCICE-dust
   do i_comp = 1, size(geo%components)
     associate( comp => geo%components(i_comp) )
 
-    if ( comp%comp_el_type(1:1) .eq. 'l' ) then
-      !> Position
-      do j = 1, size(this%fields)
-        if ( trim(this%fields(j)%fname) .eq. 'Position' ) then
-          do i = 1, size(comp%i_points_precice)
-            geo%points(:, comp%i_points( 2*i-1 ) ) = &
-               this%fields(j)%fdata(:, comp%i_points_precice( i ) )
-
-            geo%points(:, comp%i_points( 2*i ) ) = &
-               geo%points(:, comp%i_points( 2*i-1 ) ) + &
-               comp%c_ref_p(:,i)   ! *** to do *** read rotation
-                                   ! and apply rotation
-
-          end do
-        end if
+    if ( comp%coupling ) then
+      !> Reset comp%el()%ub, vel_ctr_pt: these fields are the average value of the
+      ! velocity of the neighboring points and they will be filled "by accumulation"
+      do i = 1, size(comp%el)
+        select type( el => comp%el(i) ); type is(t_liftlin)
+          el%ub = 0.0_wp ;  el%vel_ctr_pt = 0.0_wp
+        end select
       end do
 
-      ! ! debug ---
-      ! write(*,*) ' debug in update_elems: '
-      ! do  i = 1, size(comp%c_ref_p,2)
-      !   write(*,*) comp%c_ref_p(:,i)
-      ! end do
-      ! write(*,*) ' stop '; stop
+    if ( comp%comp_el_type(1:1) .eq. 'l' ) then
+      do i = 1, size(comp%i_points_precice)
 
-      ! *** to do *** build and exploit the connectivity preCICE-dust
-      !> Velocity 
-      do j = 1, size(this%fields)
-        if ( trim(this%fields(j)%fname) .eq. 'Velocity' ) then
-          do i = 1, size(this%fields(j)%fdata,2)-1
-            elems(i)%p%ub = 0.5_wp * ( &
-                                    this%fields(j)%fdata(:,i  ) + &
-                                    this%fields(j)%fdata(:,i+1) )
-            select type( el => elems(i)%p ); type is(t_liftlin)
-             el%vel_ctr_pt = 0.5_wp * ( &
-                                    this%fields(j)%fdata(:,i  ) + &
-                                    this%fields(j)%fdata(:,i+1) )
-            end select
-          end do
+        !> Position of LE and TE -----------------------------------------------
+        !> Rotation matrix
+        n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(i))
+        theta = norm2( n_rot )
+        if ( theta .lt. eps ) then
+          n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
+          theta = 0.0_wp
+        else
+          n_rot = n_rot / theta
         end if
+
+        !> Position of the LE
+        geo%points(:, comp%i_points( 2*i-1 ) ) = &
+           this%fields(j_pos)%fdata(:, comp%i_points_precice( i ) )
+
+        chord = comp%c_ref_p(:,i)
+        chord_rot =  cos(theta) * chord + &
+                     sin(theta) * cross( n_rot, chord ) + &
+                   ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
+
+        !> Position of the TE
+        geo%points(:, comp%i_points( 2*i ) ) = &
+           geo%points(:, comp%i_points( 2*i-1 ) ) + chord_rot
+
+        !> Velocity of the LE
+        geo%points_vel(:, comp%i_points( 2*i-1 ) ) = &
+           this%fields(j_vel)%fdata(:, comp%i_points_precice( i ) )
+
+        !> Velocity of the TE
+        omega = 0.0_wp
+        geo%points_vel(:, comp%i_points( 2*i ) ) = &
+           this%fields(j_vel)%fdata(:, comp%i_points_precice( i ) ) + &
+           cross( omega, chord_rot )
+
+        !> Velocity of the control point on the LL ( accumulation ), vel_ctr_pt
+        ! and velocity of the center of the QUAD el, ub
+        ! These velocities are evaluated as the average of the points of the 
+        ! elements, exploiting the implicit connectivity of the LL components
+        ! *** to do *** for general elements, an explicit definition of the
+        ! connectivity may be required
+        if ( i .lt. size(comp%i_points_precice) ) then
+          select type( el => comp%el(i) ); type is(t_liftlin)
+           el%vel_ctr_pt = el%vel_ctr_pt + &
+                          0.5_wp * geo%points_vel(:, comp%i_points( 2*i-1 ) )
+           el%ub = el%ub + &
+                  0.25_wp * ( geo%points_vel(:, comp%i_points( 2*i-1 ) ) + &
+                              geo%points_vel(:, comp%i_points( 2*i   ) ) )
+          end select
+        end if
+        if ( i .gt. 1 ) then
+          select type( el => comp%el(i-1) ); type is(t_liftlin)
+           el%vel_ctr_pt = el%vel_ctr_pt + &
+                          0.5_wp * geo%points_vel(:, comp%i_points( 2*i-1 ) )
+           el%ub = el%ub + &
+                  0.25_wp * ( geo%points_vel(:, comp%i_points( 2*i-1 ) ) + &
+                              geo%points_vel(:, comp%i_points( 2*i   ) ) )
+          end select
+        end if
+
+
       end do
 
     else ! not a lifting line elements -> Error *** to do ***
@@ -355,6 +402,8 @@ subroutine update_elems( this, geo, elems )
                  ' So far, coupling w/ structural solver is implemented &
                   &for lifting lines only. Stop.'); stop
     end if
+
+    end if ! if coupling
 
     end associate
   end do

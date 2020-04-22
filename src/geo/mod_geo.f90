@@ -274,6 +274,12 @@ type :: t_geo
  !> Points (element vertexes)
  real(wp), allocatable :: points(:,:)
 
+#if USE_PRECICE
+ !> Velocity of the points (element vertexes), to be used by 
+ ! coupled components
+ real(wp), allocatable :: points_vel(:,:)
+#endif
+
  !> All the reference frames of the geometry
  type(t_ref), allocatable :: refs(:)
 
@@ -1247,6 +1253,11 @@ subroutine load_components(geo, in_file, out_file, te)
       geo%components(i_comp)%el(i1)%comp_id = i_comp
     end do
   end do
+
+#if USE_PRECICE
+  allocate(geo%points_vel(3, size(geo%points,2))); geo%points_vel = 0.0_wp
+#endif
+
 
 end subroutine load_components
 
