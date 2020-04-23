@@ -38,7 +38,7 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !! 
 !! Authors: 
-!!          Federico Fonte             <federico.fonte@outlook.com>
+!!          Federico Fonte           <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
 !!=========================================================================
@@ -160,6 +160,9 @@ type :: t_wake
  !> Reference frame of the generating points (id)
  !! (n_pan_points)
  integer, allocatable :: pan_gen_ref(:)
+
+ !> Component of the generating points
+ integer, allocatable :: pan_gen_icomp(:)
 
  !> Individual scaling of the firs element of the wake
  real(wp), allocatable :: pan_gen_scaling(:)
@@ -338,6 +341,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   allocate(wake%pan_gen_points(2,wake%n_pan_points))
   allocate(wake%pan_gen_dir(3,wake%n_pan_points))
   allocate(wake%pan_gen_ref(wake%n_pan_points))
+  allocate(wake%pan_gen_icomp(wake%n_pan_points))
   allocate(wake%pan_gen_scaling(wake%n_pan_points))
   allocate(wake%w_start_points(3,wake%n_pan_points))
   allocate(wake%i_start_points(2,wake%n_pan_stripes))
@@ -424,6 +428,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   wake%pan_gen_points = te%i
   wake%pan_gen_dir = te%t
   wake%pan_gen_ref = te%ref
+  wake%pan_gen_icomp = te%icomp
   wake%pan_gen_scaling = te%scaling
   wake%i_start_points = te%ii
   wake%pan_neigh = te%neigh

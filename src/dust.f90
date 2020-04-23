@@ -632,7 +632,7 @@ do while ( ( it .lt. nstep ) )
 #endif
   call init_timestep(time)
 #if USE_PRECICE
-  precice_convergence = .false.
+    precice_convergence = .false.
   end if
 #endif
 
@@ -703,7 +703,7 @@ do while ( ( it .lt. nstep ) )
                            geo%points(:,elems_tot(i_el)%p%i_ver) )
   end do
   !> Update near-field wake
-  ! *** to do ***
+  call precice % update_near_field_wake( geo, wake )
 
   !> Update dt
   ! *** to do *** : change the way of treating time integration.
@@ -848,16 +848,6 @@ do while ( ( it .lt. nstep ) )
 
 #if USE_PRECICE
   !> Update force and moments to be passed to the structural solver
-  ! do i = 1, size(precice%fields)
-  !   if ( trim(precice%fields(i)%fio) .eq. 'write' ) then
-  !     precice%fields(i)%fdata = 0.0_wp
-  !     if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
-  !       precice%fields(i)%fdata = -0.01_wp
-  !     elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
-  !       precice%fields(i)%fdata(3,:) = -0.01_wp
-  !     endif
-  !   end if
-  ! end do
   call precice % update_force( geo, elems_tot )
 
   call precicef_ongoing( precice%is_ongoing )
@@ -899,6 +889,8 @@ do while ( ( it .lt. nstep ) )
     ! *** to do *** check if something special is needed
 #else
 #endif
+
+  !> 
 
 
   !----- Print the results -----

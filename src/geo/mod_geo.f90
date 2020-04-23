@@ -318,6 +318,9 @@ type t_tedge
  !> Reference frame of the TE nodes
  integer , allocatable :: ref(:)
 
+ !> Component of the TE
+ integer , allocatable :: icomp(:)
+
  !> Individual scaling for each component
  real(wp), allocatable :: scaling(:)
 
@@ -700,6 +703,7 @@ subroutine load_components(geo, in_file, out_file, te)
  integer , allocatable :: neigh_te_tmp(:,:) , o_te_tmp(:,:)
  real(wp), allocatable :: t_te_tmp(:,:)
  integer , allocatable :: ref_te_tmp(:)
+ integer , allocatable :: icomp_te_tmp(:)
  real(wp), allocatable :: scale_te_tmp(:)
  ! # n. elements and nodes at TE ( of the prev. comps)
  integer :: ne_te_prev , nn_te_prev
@@ -1144,6 +1148,7 @@ subroutine load_components(geo, in_file, out_file, te)
         allocate(te%o    (2,ne_te) ) ; te%o     =     o_te
         allocate(te%t    (3,nn_te) ) ; te%t     =     t_te
         allocate(te%ref  (  nn_te) ) ; te%ref   = geo%components(i_comp)%ref_id
+        allocate(te%icomp(  nn_te) ) ; te%icomp = i_comp
         allocate(te%scaling(  nn_te) )
         te%scaling =  scale_te*sim_param%first_panel_scaling
 
@@ -1193,16 +1198,17 @@ subroutine load_components(geo, in_file, out_file, te)
         ref_te_tmp(                 1:size(te%ref   )   ) =  te%ref
         ref_te_tmp(  size(te%ref  )+1:size(ref_te_tmp  )) = &
                                                   geo%components(i_comp)%ref_id
-
         call move_alloc(ref_te_tmp,te%ref)
+        allocate(icomp_te_tmp(size(te%icomp)+nn_te))
+        icomp_te_tmp(               1:size(te%icomp    )) = te%icomp
+        icomp_te_tmp(size(te%icomp)+1:size(icomp_te_tmp)) = i_comp
+        call move_alloc(icomp_te_tmp,te%icomp)
         allocate( scale_te_tmp(size(te%scaling)+nn_te))
         scale_te_tmp(1:size(te%scaling )    ) = te%scaling
         scale_te_tmp(size(te%scaling )+1:size( scale_te_tmp)) = &
                                        scale_te*sim_param%first_panel_scaling
 
         call move_alloc(scale_te_tmp,te%scaling )
-
-
 
       end if
 

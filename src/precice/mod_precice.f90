@@ -10,6 +10,9 @@ module mod_precice
 use mod_param, only: &
     wp, pi
 
+use mod_sim_param, only: &
+    sim_param
+
 use mod_handling, only: &
     error
 
@@ -21,6 +24,9 @@ use mod_geometry, only: &
 
 use mod_aeroel, only: &
     t_pot_elem_p
+
+use mod_wake, only: &
+    t_wake
 
 use mod_liftlin, only: &
     t_liftlin
@@ -84,6 +90,7 @@ type :: t_precice
   procedure, pass(this) :: initialize_fields
   procedure, pass(this) :: update_force
   procedure, pass(this) :: update_elems
+  procedure, pass(this) :: update_near_field_wake
 
 end type t_precice
 !> --------------------------------------------------------------
@@ -465,6 +472,90 @@ subroutine update_elems( this, geo, elems )
   end do
 
 end subroutine update_elems
+
+!----------------------------------------------------------------
+!> Update near field wake
+subroutine update_near_field_wake( this, geo, wake )
+  class(t_precice)  , intent(inout) :: this
+  type(t_geo)       , intent(in)    :: geo
+  type(t_wake)      , intent(inout) :: wake
+
+  real(wp) :: dist(3), vel_te(3)
+
+  integer :: ip, ir, i_point, p1, p2
+
+  !> First row of points of the panel wake
+  wake%w_start_points = 0.5_wp * (geo%points(:,wake%pan_gen_points(1,:)) + &
+                                  geo%points(:,wake%pan_gen_points(2,:)))
+
+  wake%pan_w_points(:,:,1) = wake%w_start_points
+
+  !> Second row of points: first row + 0.3*|uinf|*t with t = R*t0
+  do ip=1,wake%n_pan_points
+
+   if ( .not. geo%components( wake%pan_gen_icomp(ip) )%coupling ) then
+     ! Rigid-body component -> do nothing
+!    call calc_node_vel( wake%w_start_points(:,ip), &
+!             geo%refs(wake%pan_gen_ref(ip))%G_g, &
+!             geo%refs(wake%pan_gen_ref(ip))%f_g, &
+!             vel_te )
+!     dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
+! 
+!     if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
+!       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
+!                   dist*wake%pan_gen_scaling(ip)* &
+!                   norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist)
+!     else
+!       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
+!                   dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
+!                   sim_param%min_vel_at_te*sim_param%dt
+!     end if
+  
+    else ! Coupled component
+      
+      !> LL components
+      if ( geo%components( wake%pan_gen_icomp(ip) )%comp_el_type(1:1) .eq. 'l' ) then
+        i_point = wake%pan_gen_points(1,ip)
+        dist = geo%points(:,i_point) - geo%points(:,i_point-1)
+        dist = dist/norm2(dist)
+
+        !> debug ---
+        write(*,*) i_point, dist
+        !> debug ---
+        
+        vel_te = geo%points_vel(:, wake%pan_gen_icomp(ip))
+
+        if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
+          wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
+             dist*wake%pan_gen_scaling(ip)* &
+             norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist)
+        else
+          wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
+             dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
+             sim_param%min_vel_at_te*sim_param%dt
+        end if
+      end if
+
+    end if
+
+  enddo
+  ! *** to do ***
+
+
+  write(*,*) ' wake%pan_wake_len: ', wake%pan_wake_len
+  ! Calculate geometrical quantities of first 2 rows
+  do ip = 1,wake%n_pan_stripes
+    do ir = 1, min(2, wake%pan_wake_len)
+      p1 = wake%i_start_points(1,ip)
+      p2 = wake%i_start_points(2,ip)
+      call wake%wake_panels(ip,ir)%calc_geo_data( &
+        reshape((/wake%pan_w_points(:,p1,ir),   wake%pan_w_points(:,p2,ir), &
+                  wake%pan_w_points(:,p2,ir+1), wake%pan_w_points(:,p1,ir+1)/),&
+                                                                     (/3,4/)))
+    enddo
+  enddo
+
+end subroutine update_near_field_wake
 
 !----------------------------------------------------------------
 
