@@ -890,9 +890,6 @@ do while ( ( it .lt. nstep ) )
 #else
 #endif
 
-  !> 
-
-
   !----- Print the results -----
   if(time_2_out)  then
     nout = nout+1

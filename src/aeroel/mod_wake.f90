@@ -482,7 +482,8 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
 
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                   dist*wake%pan_gen_scaling(ip)* &
-                  norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist)
+                  norm2(sim_param%u_inf-vel_te)* &
+                  sim_param%dt*sim_param%ndt_update_wake / norm2(dist)
   ! normalisation occurs here! --------------------------------------^
 
     else
@@ -491,7 +492,8 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
 
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                   dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
-                  sim_param%min_vel_at_te*sim_param%dt
+                  sim_param%min_vel_at_te* &
+                  sim_param%dt*sim_param%ndt_update_wake
     end if
 
   enddo
@@ -912,7 +914,8 @@ subroutine update_wake(wake, elems, octree)
 
       !update the position in time
       wake%pan_w_vel(   :,iw,ipan) = vel_p
-      wake%pan_w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + vel_p*sim_param%dt
+      wake%pan_w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + &
+                                     vel_p*sim_param%dt*sim_param%ndt_update_wake
     enddo
   enddo
 !$omp end parallel do
@@ -934,7 +937,7 @@ subroutine update_wake(wake, elems, octree)
       call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
 
       !update the position in time
-      points_end(:,iw) = pos_p + vel_p*sim_param%dt
+      points_end(:,iw) = pos_p + vel_p*sim_param%dt*sim_param%ndt_update_wake
     enddo
 !$omp end parallel do
   endif
@@ -985,7 +988,8 @@ subroutine update_wake(wake, elems, octree)
       call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
 
       !update the position in time
-      points(:,ip,ir) = points(:,ip,ir) + vel_p*sim_param%dt
+      points(:,ip,ir) = points(:,ip,ir) + &
+                        vel_p*sim_param%dt*sim_param%ndt_update_wake
     enddo !ir
   enddo !ip
 !$omp end parallel do
@@ -1012,7 +1016,8 @@ subroutine update_wake(wake, elems, octree)
       call wake_movement%get_vel(elems, wake, pos_p, hcas_vel,  vel_p)
 
       !update the position in time
-      points_end_ring(:,ip) = pos_p + vel_p*sim_param%dt
+      points_end_ring(:,ip) = pos_p + &
+                              vel_p*sim_param%dt*sim_param%ndt_update_wake
     enddo
   endif
 
@@ -1280,12 +1285,14 @@ subroutine complete_wake(wake, geo, elems)
     if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) + &
                           dist*wake%pan_gen_scaling(ip)* &
-                          norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist)
+                          norm2(sim_param%u_inf-vel_te)* &
+                          sim_param%dt*sim_param%ndt_update_wake / norm2(dist)
   ! normalisation occurs here! -------------------------------------------^
     else
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                   dist*wake%pan_gen_scaling(ip)* & ! next line may be commented
-                  sim_param%min_vel_at_te*sim_param%dt / norm2(dist)
+                  sim_param%min_vel_at_te* &
+                  sim_param%dt*sim_param%ndt_update_wake / norm2(dist)
     end if
   enddo
   
@@ -1332,14 +1339,16 @@ subroutine complete_wake(wake, geo, elems)
     endif
     if(.not. wake%part_p(ip)%p%free) then
       !pos_p = wake%part_p(ip)%p%cen + wake%prt_vel(:,ip)*sim_param%dt
-      pos_p = wake%part_p(ip)%p%cen + wake%part_p(ip)%p%vel*sim_param%dt
+      pos_p = wake%part_p(ip)%p%cen + wake%part_p(ip)%p%vel* &
+              sim_param%dt*sim_param%ndt_update_wake
       if(all(pos_p .ge. wake%part_box_min) .and. &
          all(pos_p .le. wake%part_box_max)) then
         !wake%part_p(ip)%p%cen = points_prt(:,ip)
         wake%part_p(ip)%p%cen = pos_p
         if(sim_param%use_vs .or. sim_param%use_vd) then
           alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
-                          wake%prt_vortevol(:,ip)*sim_param%dt
+                          wake%prt_vortevol(:,ip)* & 
+                          sim_param%dt*sim_param%ndt_update_wake
           alpha_p_n = norm2(alpha_p)
 
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
@@ -1533,7 +1542,7 @@ subroutine complete_wake(wake, geo, elems)
           ! flow separation
           if ( el % al_free .gt. 0.0_wp ) then 
             pos_p = el%cen + el%nor * el%h_bl + & 
-                       el % surf_vel * sim_param%dt
+                       el % surf_vel * sim_param%dt*sim_param%ndt_update_wake
 
             if(all(pos_p .ge. wake%part_box_min) .and. &
                all(pos_p .le. wake%part_box_max)) then
@@ -1968,7 +1977,8 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
       !Get the position of the particle with respect to the element
       dist1 = pos1-(elem%cen + blthick*elem%nor )
       elrad = maxval(elem%edge_len)*r2d2
-      check_radius = sim_param%dt*sim_param%u_ref*rad_mult + elrad
+      check_radius = sim_param%dt*sim_param%ndt_update_wake* &
+                     sim_param%u_ref*rad_mult + elrad
       distn = norm2(dist1)
 
       !if it is in the check radius perform calculations
@@ -1996,7 +2006,7 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
           dist1_tan = norm2(dist1-(n*dist1_nor))
           !make sure not to go back in time
           dt_part = max(-dist1_nor/normvel,0.0_wp) 
-          if(dt_part .le. sim_param%dt) then
+          if(dt_part .le. sim_param%dt*sim_param%ndt_update_wake) then
             
             !Get the position at the time in which the particle hits the 
             !surface plane
@@ -2013,7 +2023,8 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
                                            !a smaller radius
               !correct the normal velocity to avoid penetration
 !             normvel_corr = -dist1_nor*(1-tol)/sim_param%dt
-              normvel_corr = -dist1_nor*(1.0_wp-0.0_wp)/sim_param%dt
+              normvel_corr = -dist1_nor*(1.0_wp-0.0_wp)/ &
+                             (sim_param%dt*sim_param%ndt_update_wake)
                
               ! should be 
               ! vel = relvel + (normvel_corr-normvel)*n + elem%ub
@@ -2044,7 +2055,7 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
         dt_part = max(-dist1_nor/normvel,0.0_wp) 
         !if it is lower than the timestep (i.e. the particles hits the surface 
         !within next step) start the correction
-        if(dt_part .le. sim_param%dt) then
+        if(dt_part .le. sim_param%dt*sim_param%ndt_update_wake) then
           
           !Get the position at the time in which the particle hits the 
           !surface plane
@@ -2060,7 +2071,8 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
             
             !correct the normal velocity to avoid penetration
 !           normvel_corr = -dist1_nor*(1-tol)/sim_param%dt
-            normvel_corr = -dist1_nor*(1.0_wp-0.0_wp)/sim_param%dt
+            normvel_corr = -dist1_nor*(1.0_wp-0.0_wp)/ &
+                           (sim_param%dt*sim_param%ndt_update_wake)
              
             ! should be 
             ! vel = relvel + (normvel_corr-normvel)*n + elem%ub
@@ -2186,10 +2198,12 @@ subroutine avoid_collision_2(elems, wake, part, vel_in, vel_out)
             !correct the normal velocity to avoid penetration
 !           normvel_corr = -dist1_nor*(1-tol)/sim_param%dt
             if (dt_part .lt. sim_param%dt) then
-              normvel_corr = -dist1_nor/sim_param%dt
+              normvel_corr = -dist1_nor/ &
+                             (sim_param%dt*sim_param%ndt_update_wake)
             else
               dampf = (dist2_nor/blthick)
-              normvel_corr = normvel + (blthick-dist2_nor)/sim_param%dt * dampf
+              normvel_corr = normvel + (blthick-dist2_nor)/ &
+                            (sim_param%dt*sim_param%ndt_update_wake) * dampf
             endif
              
             ! should be 
