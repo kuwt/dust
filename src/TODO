@@ -1,0 +1,7 @@
+=== Coupling dust/MBDyn w/ PreCICE ===
+> mod_build_geo.f90/build_component()
+  So far, coupling implmented only for parametric components.
+  TODO: make coupling available also for other types of components
+> mod_build_geo.f90/build_component() / component.in
+  So far, CouplingNode is defined in the component reference frame,
+  that is meant to be coincident with the global reference frame

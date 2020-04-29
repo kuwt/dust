@@ -166,8 +166,12 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  character(len=max_char_len) :: comp_el_type
  character :: ElType
  character(len=max_char_len) :: mesh_file_type
+ !> Coupling ---
  logical :: coupled_comp
  character(len=max_char_len) :: coupled_str  ! there is no hdf_write for logical
+ character(len=max_char_len) :: coupling_type
+ real(wp)                    :: coupling_node(3)
+ !> Symmetry and mirror ---
  logical :: mesh_symmetry , mesh_mirror
  real(wp) :: symmetry_point(3), symmetry_normal(3)
  real(wp) ::   mirror_point(3),   mirror_normal(3)
@@ -225,6 +229,13 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   !coupled simulation component
   call geo_prs%CreateLogicalOption('Coupled', &
               'Component of a coupled simulation, w/ a structural solver?', 'F')
+  call geo_prs%CreateStringOption('CouplingType', &
+              'Type of the coupling: &
+              ll   : ll/beam coupling, &
+              rigid: rigid component/node', 'none')
+  call geo_prs%CreateRealArrayOption('CouplingNode', &
+              'Node for rigid coupling in the reference configuration (x, y, z)', &
+              '(/0.0, 0.0, 0.0/)')
   !symmtery
   call geo_prs%CreateLogicalOption('mesh_symmetry',&
                'Reflect and double the geometry?', 'F')
@@ -322,7 +333,21 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   coupled_comp = getlogical(geo_prs, 'Coupled')
   coupled_str = 'false'
 #if USE_PRECICE
-  if ( coupled_comp ) coupled_str = 'true'
+  if ( coupled_comp ) then
+    coupled_str = 'true'
+    coupling_type = getstr(geo_prs, 'CouplingType')
+    coupling_node = getrealarray(geo_prs, 'CouplingNode', 3)
+    if ( ( trim(coupling_type) .ne. 'll'    ) .and. &
+         ( trim(coupling_type) .ne. 'rigid' ) ) then
+      call error (this_sub_name, this_mod_name, &
+         ' Coupled = T for component'//trim(comp_tag)// &
+         ', but CouplingType is equal to: '//trim(coupling_type)// &
+         ', it is not assigned, or it is assigned &
+           as ''none''. Assign a valid CouplingType:'//nl// &
+           '  ll   : ll/beam coupling'//nl// &
+           '  rigid: rigid component/node'//nl//'Stop'//nl)
+    end if
+  end if
 #else
   if ( coupled_comp ) then
       call error (this_sub_name, this_mod_name, &
@@ -421,6 +446,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   call write_hdf5(trim(comp_el_type),'ElType',comp_loc)
   call write_hdf5(trim(coupled_str),'Coupled',comp_loc)
+  call write_hdf5(trim(coupling_type),'CouplingType',comp_loc)
+  call write_hdf5(     coupling_node ,'CouplingNode',comp_loc)
 
   call new_hdf5_group(comp_loc, 'Geometry', geo_loc)
 
@@ -583,16 +610,42 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         end if
       end if
       if ( coupled_comp ) then
-        !> Compute the reference chord vector, for geometry transformation
-        ! of the deformable component. Meant for blades, wings defined using
-        ! the local y-axis as the spanwise direction and the x-axis as the
-        ! streamwise direction, pointing from the LE towards the TE
-        allocate(c_ref_p(3, nelems_span+1)); c_ref_p = 0.0_wp
-        do i = 1, size(c_ref_p,2)
-          c_ref_p(:,i) = chord_p(i) * &
-                  (/ cos(theta_p(i)), 0.0_wp, -sin(theta_p(i)) /)
-        end do
-        call write_hdf5(c_ref_p,'c_ref_p',geo_loc)
+        write(*,*) ' coupling_type: ', trim(coupling_type) 
+        if ( trim(coupling_type) .eq. 'll' ) then
+          !> Compute the reference chord vector, for geometry transformation
+          ! of the deformable component. Meant for blades, wings defined using
+          ! the local y-axis as the spanwise direction and the x-axis as the
+          ! streamwise direction, pointing from the LE towards the TE
+          allocate(c_ref_p(3, nelems_span+1)); c_ref_p = 0.0_wp
+          do i = 1, size(c_ref_p,2)
+            c_ref_p(:,i) = chord_p(i) * &
+                    (/ cos(theta_p(i)), 0.0_wp, -sin(theta_p(i)) /)
+          end do
+          !> Write to hdf5 geo file
+          call write_hdf5(c_ref_p,'c_ref_p',geo_loc)
+
+        elseif ( trim(coupling_type) .eq. 'rigid' ) then
+          !> Rigid coupling between a rigid component and a "structural" node,
+          ! defined as an input, coupling_node. This node represents the 
+          ! reference configuration for data communication between the aerodynamic
+          ! and the structural solvers
+
+          ! debug ---
+          write(*,*) ' rr: '
+          do i = 1, size(rr,2)
+            write(*,*) i, rr(:,i)
+          end do
+          ! debug ---
+
+          allocate(c_ref_p(3, size(rr,2))); c_ref_p = 0.0_wp
+          do i =1, size(c_ref_p,2)
+            c_ref_p(:,i) = rr(:,i) - coupling_node
+          end do
+
+          !> Write to hdf5 geo file
+          call write_hdf5(c_ref_p,'c_ref_p',geo_loc)
+
+        end if
       end if
 #endif
 
