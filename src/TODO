@@ -5,3 +5,20 @@
 > mod_build_geo.f90/build_component() / component.in
   So far, CouplingNode is defined in the component reference frame,
   that is meant to be coincident with the global reference frame
+
+> TODO: parallel loops in coupling routines
+
+> Restart for coupled simulation
+  So far, no restart is implemented, since our target dynamical 
+  solver (MBDyn) has no restart capability (at least, a working 
+  restart).
+  ...
+  Restart could be implemented, exploiting PreCICE write_initial_data
+  for communicating aerodynamic restart data to the structural solver,
+  but up to now there is no way to pass position and rotation to 
+  MBDyn (MBDyn passes position and rotation and reads forces and
+  moments)
+
+> Moment contributions to loads in mod_precice.f90/update_force()
+  So far, the contribution to the moment of the elementary forces
+  is not implemented. 

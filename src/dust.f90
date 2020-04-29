@@ -497,8 +497,8 @@ call finalizeParameters(prms)
     write(*,*) trim(precice%fields(i)%fname), precice%fields(i)%fid
   end do
 
-  write(*,*) ' Using PreCICE: stop in dust.f90, after the initialization '
-  write(*,*) ' of the fields and the mesh, used for coupling, l.490.'; stop
+  ! write(*,*) ' Using PreCICE: stop in dust.f90, after the initialization '
+  ! write(*,*) ' of the fields and the mesh, used for coupling, l.490.'; stop
 #endif
 !> --- Initialize PreCICE mesh and fields: done -----------------
 

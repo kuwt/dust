@@ -316,31 +316,57 @@ subroutine update_force( this, geo, elems )
 
     if ( comp%coupling ) then
 
-      !> Reset force and moment fields, to be filled by accumulation
-      do i = 1, size(comp%i_points_precice)
-        this%fields(j_for)%fdata(:, comp%i_points_precice(i) ) = 0.0_wp
-        this%fields(j_mom)%fdata(:, comp%i_points_precice(i) ) = 0.0_wp
-      end do
+      if ( trim(comp%coupling_type) .eq. 'll' ) then
+        !> ll coupling
 
-      if ( comp%comp_el_type(1:1) .eq. 'l' ) then
-        do i = 1, size(comp%i_points_precice)-1
-
-          ip = comp%i_points_precice(i)
-
-          !> Accumulation of forces
-          this%fields(j_for)%fdata(:, ip)   = this%fields(j_for)%fdata(:, ip) + &
-                                   0.5_wp * comp%el(i)%dforce
-          this%fields(j_for)%fdata(:, ip+1) = this%fields(j_for)%fdata(:, ip+1) + &
-                                   0.5_wp * comp%el(i)%dforce
-
-          !> Accumulation of moments
-          this%fields(j_mom)%fdata(:, ip)   = this%fields(j_mom)%fdata(:, ip) + &
-                                   0.5_wp * comp%el(i)%dmom
-          this%fields(j_mom)%fdata(:, ip+1) = this%fields(j_mom)%fdata(:, ip+1) + &
-                                   0.5_wp * comp%el(i)%dmom
+        !> Reset force and moment fields, to be filled by accumulation
+        do i = 1, size(comp%i_points_precice)
+          this%fields(j_for)%fdata(:, comp%i_points_precice(i) ) = 0.0_wp
+          this%fields(j_mom)%fdata(:, comp%i_points_precice(i) ) = 0.0_wp
         end do
-      end if
+  
+        if ( comp%comp_el_type(1:1) .eq. 'l' ) then
+          do i = 1, size(comp%i_points_precice)-1
+  
+            ip = comp%i_points_precice(i)
+  
+            !> Accumulation of forces
+            this%fields(j_for)%fdata(:, ip)   = this%fields(j_for)%fdata(:, ip) + &
+                                     0.5_wp * comp%el(i)%dforce
+            this%fields(j_for)%fdata(:, ip+1) = this%fields(j_for)%fdata(:, ip+1) + &
+                                     0.5_wp * comp%el(i)%dforce
+  
+            !> Accumulation of moments
+            this%fields(j_mom)%fdata(:, ip)   = this%fields(j_mom)%fdata(:, ip) + &
+                                     0.5_wp * comp%el(i)%dmom
+            this%fields(j_mom)%fdata(:, ip+1) = this%fields(j_mom)%fdata(:, ip+1) + &
+                                     0.5_wp * comp%el(i)%dmom
+          end do
+        end if
 
+      elseif ( trim(comp%coupling_type) .eq. 'rigid' ) then
+        !> rigid coupling. All the forces and moments are reduced to
+        ! the coupling_node
+        ip = comp%i_points_precice(1)
+
+        !> Reset force and moment fields, to be filled by accumulation
+        this%fields(j_for)%fdata(:, ip ) = 0.0_wp
+        this%fields(j_mom)%fdata(:, ip ) = 0.0_wp
+
+        !> Forces
+        do i = 1, size(comp%i_points_precice)-1
+  
+          this%fields(j_for)%fdata(:,ip) = this%fields(j_for)%fdata(:,ip) + &
+                                           comp%el(i)%dforce
+        end do
+
+        !> Moments (distinguish between 'l' (and 'v') and 'p' elements)
+        ! *** to do ***
+        ! ...
+        ! ...
+        ! ...
+
+      end if
     end if
 
     end associate
@@ -384,7 +410,7 @@ subroutine update_elems( this, geo, elems )
   type(t_pot_elem_p), intent(inout) :: elems(:)
  
   integer :: i,j, i_comp
-  real(wp) :: n_rot(3), chord(3), chord_rot(3), omega(3)
+  real(wp) :: n_rot(3), chord(3), chord_rot(3), omega(3), pos(3), vel(3)
   real(wp) :: theta
   real(wp) :: eps = 1.0e-9_wp
   integer :: j_pos, j_vel, j_rot, j_ome
@@ -404,20 +430,95 @@ subroutine update_elems( this, geo, elems )
     associate( comp => geo%components(i_comp) )
 
     if ( comp%coupling ) then
-      !> Reset comp%el()%ub, vel_ctr_pt: these fields are the average value of the
-      ! velocity of the neighboring points and they will be filled "by accumulation"
-      do i = 1, size(comp%el)
-        select type( el => comp%el(i) ); type is(t_liftlin)
-          el%ub = 0.0_wp ;  el%vel_ctr_pt = 0.0_wp
-        end select
-      end do
 
-    if ( comp%comp_el_type(1:1) .eq. 'l' ) then
-      do i = 1, size(comp%i_points_precice)
+      if ( trim(comp%coupling_type) .eq. 'll' ) then
+        !> ll coupling
 
-        !> Position of LE and TE -----------------------------------------------
-        !> Rotation matrix
-        n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(i))
+        !> Reset comp%el()%ub, vel_ctr_pt: these fields are the average value of the
+        ! velocity of the neighboring points and they will be filled "by accumulation"
+        do i = 1, size(comp%el)
+          select type( el => comp%el(i) ); type is(t_liftlin)
+            el%ub = 0.0_wp ;  el%vel_ctr_pt = 0.0_wp
+          end select
+        end do
+
+        do i = 1, size(comp%i_points_precice)
+  
+          !> === Position of LE and TE ===
+          !> Rotation matrix
+          n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(i))
+          theta = norm2( n_rot )
+          if ( theta .lt. eps ) then
+            n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
+            theta = 0.0_wp
+          else
+            n_rot = n_rot / theta
+          end if
+          !> Angular velocity of the point at the LE
+          omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(i))
+  
+          !> Position of the LE
+          geo%points(:, comp%i_points( 2*i-1 ) ) = &
+             this%fields(j_pos)%fdata(:, comp%i_points_precice( i ) )
+  
+          chord = comp%c_ref_p(:,i)
+          chord_rot =  cos(theta) * chord + &
+                       sin(theta) * cross( n_rot, chord ) + &
+                     ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
+  
+          !> Position of the TE
+          geo%points(:, comp%i_points( 2*i ) ) = &
+             geo%points(:, comp%i_points( 2*i-1 ) ) + chord_rot
+  
+          !> Velocity of the LE
+          geo%points_vel(:, comp%i_points( 2*i-1 ) ) = &
+             this%fields(j_vel)%fdata(:, comp%i_points_precice( i ) )
+  
+          !> Velocity of the TE
+          geo%points_vel(:, comp%i_points( 2*i ) ) = &
+             this%fields(j_vel)%fdata(:, comp%i_points_precice( i ) ) + &
+             cross( omega, chord_rot )
+  
+          !> Velocity of the control point on the LL ( accumulation ), vel_ctr_pt
+          ! and velocity of the center of the QUAD el, ub
+          ! These velocities are evaluated as the average of the points of the 
+          ! elements, exploiting the implicit connectivity of the LL components
+          ! *** to do *** for general elements, an explicit definition of the
+          ! connectivity may be required
+          if ( i .lt. size(comp%i_points_precice) ) then
+            select type( el => comp%el(i) ); type is(t_liftlin)
+             el%vel_ctr_pt = el%vel_ctr_pt + &
+                            0.5_wp * geo%points_vel(:, comp%i_points( 2*i-1 ) )
+             el%ub = el%ub + &
+                    0.25_wp * ( geo%points_vel(:, comp%i_points( 2*i-1 ) ) + &
+                                geo%points_vel(:, comp%i_points( 2*i   ) ) )
+            end select
+          end if
+          if ( i .gt. 1 ) then
+            select type( el => comp%el(i-1) ); type is(t_liftlin)
+             el%vel_ctr_pt = el%vel_ctr_pt + &
+                            0.5_wp * geo%points_vel(:, comp%i_points( 2*i-1 ) )
+             el%ub = el%ub + &
+                    0.25_wp * ( geo%points_vel(:, comp%i_points( 2*i-1 ) ) + &
+                                geo%points_vel(:, comp%i_points( 2*i   ) ) )
+            end select
+          end if
+  
+  
+        end do ! precice points associated to the component
+
+      elseif ( trim(comp%coupling_type) .eq. 'rigid' ) then
+        !> rigid coupling
+
+        !> === Coupling node ===
+        !> Position
+        pos = this%fields(j_pos)%fdata(:, comp%i_points_precice(1))
+
+        !> Velocity
+        vel = this%fields(j_vel)%fdata(:, comp%i_points_precice(1))
+
+        !> Rotation
+        n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(1))
         theta = norm2( n_rot )
         if ( theta .lt. eps ) then
           n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
@@ -425,64 +526,56 @@ subroutine update_elems( this, geo, elems )
         else
           n_rot = n_rot / theta
         end if
+
         !> Angular velocity of the point at the LE
-        omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(i))
+        omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(1))
 
-        !> Position of the LE
-        geo%points(:, comp%i_points( 2*i-1 ) ) = &
-           this%fields(j_pos)%fdata(:, comp%i_points_precice( i ) )
+        !> === Grid nodes of the component ===
+        ! Rigid motion of the component, defined by:
+        ! - the motion of the coupling node,
+        ! - the relative position of the component nodes and the
+        !   coupling node.
+        do i = 1, size(comp%c_ref_p,2) ! loop over comp points
+          chord = comp%c_ref_p(:,i)
+          chord_rot =  cos(theta) * chord + &
+                       sin(theta) * cross( n_rot, chord ) + &
+                     ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
 
-        chord = comp%c_ref_p(:,i)
-        chord_rot =  cos(theta) * chord + &
-                     sin(theta) * cross( n_rot, chord ) + &
-                   ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
+          !> Position and velocity of the nodes of the grid
+          geo%points(    :, comp%i_points(i)) = pos + chord_rot
+          geo%points_vel(:, comp%i_points(i)) = vel + cross( omega, chord_rot )
 
-        !> Position of the TE
-        geo%points(:, comp%i_points( 2*i ) ) = &
-           geo%points(:, comp%i_points( 2*i-1 ) ) + chord_rot
+        end do
 
-        !> Velocity of the LE
-        geo%points_vel(:, comp%i_points( 2*i-1 ) ) = &
-           this%fields(j_vel)%fdata(:, comp%i_points_precice( i ) )
-
-        !> Velocity of the TE
-        geo%points_vel(:, comp%i_points( 2*i ) ) = &
-           this%fields(j_vel)%fdata(:, comp%i_points_precice( i ) ) + &
-           cross( omega, chord_rot )
-
-        !> Velocity of the control point on the LL ( accumulation ), vel_ctr_pt
-        ! and velocity of the center of the QUAD el, ub
-        ! These velocities are evaluated as the average of the points of the 
-        ! elements, exploiting the implicit connectivity of the LL components
-        ! *** to do *** for general elements, an explicit definition of the
-        ! connectivity may be required
-        if ( i .lt. size(comp%i_points_precice) ) then
+        !> === Control nodes of the elements ===
+        ! *** to do *** avoid computing element quantities as the 
+        ! average value of node quantities
+        do i = 1, size(comp%el)
+          comp%el(i)%ub = 0.0_wp
+          !> Compute the velocity of the element centre as the 
+          ! average value of the velocity of its nodes, by
+          ! accumulation
+          do j = 1, comp%el(i)%n_ver
+            comp%el(i)%ub = comp%el(i)%ub + &
+               1.0_wp / dble(comp%el(i)%n_ver) * &
+               geo%points_vel(:, comp%el(i)%i_ver(j) )
+          end do
+          !> Velocity of the control point for LL components
+          !> (exploit implicit connectivity of LL components)
           select type( el => comp%el(i) ); type is(t_liftlin)
-           el%vel_ctr_pt = el%vel_ctr_pt + &
-                          0.5_wp * geo%points_vel(:, comp%i_points( 2*i-1 ) )
-           el%ub = el%ub + &
-                  0.25_wp * ( geo%points_vel(:, comp%i_points( 2*i-1 ) ) + &
-                              geo%points_vel(:, comp%i_points( 2*i   ) ) )
+            el%vel_ctr_pt = 0.5_wp * ( &
+                 geo%points_vel(:, comp%i_points( 2*i-1 ) ) &
+               + geo%points_vel(:, comp%i_points( 2*i+1 ) ) ) 
           end select
-        end if
-        if ( i .gt. 1 ) then
-          select type( el => comp%el(i-1) ); type is(t_liftlin)
-           el%vel_ctr_pt = el%vel_ctr_pt + &
-                          0.5_wp * geo%points_vel(:, comp%i_points( 2*i-1 ) )
-           el%ub = el%ub + &
-                  0.25_wp * ( geo%points_vel(:, comp%i_points( 2*i-1 ) ) + &
-                              geo%points_vel(:, comp%i_points( 2*i   ) ) )
-          end select
-        end if
+        end do
 
-
-      end do
-
-    else ! not a lifting line elements -> Error *** to do ***
-      call error('update_elems','mod_precice', &
-                 ' So far, coupling w/ structural solver is implemented &
-                  &for lifting lines only. Stop.'); stop
-    end if
+      else ! not a lifting line elements -> Error *** to do ***
+        call error('update_elems','mod_precice', &
+                   ' Wrong CouplingType: '//trim(comp%coupling_type)// &
+                   ' for component: '//trim(comp%comp_name)// &
+                   '. So far, available CouplingType inputs are: ll, rigid.'// &
+                   ' Stop.'); stop
+      end if
 
     end if ! if coupling
 
