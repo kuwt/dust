@@ -497,8 +497,8 @@ call finalizeParameters(prms)
     write(*,*) trim(precice%fields(i)%fname), precice%fields(i)%fid
   end do
 
-  ! write(*,*) ' Using PreCICE: stop in dust.f90, after the initialization '
-  ! write(*,*) ' of the fields and the mesh, used for coupling, l.490.'; stop
+  write(*,*) ' Using PreCICE: stop in dust.f90, after the initialization '
+  write(*,*) ' of the fields and the mesh, used for coupling, l.490.'; stop
 #endif
 !> --- Initialize PreCICE mesh and fields: done -----------------
 
@@ -571,7 +571,7 @@ if ( ( size(elems_ll) .gt. 0 ) ) then
 end if
 
 
-!> --- Initialize PreCICE mesh and fields -----------------------
+!> --- Initialize coupling --------------------------------------
 #if USE_PRECICE
   call precicef_ongoing(   precice % is_ongoing)
   write(*,*) ' is coupling ongoing: ', precice % is_ongoing

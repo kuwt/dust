@@ -144,24 +144,38 @@ subroutine initialize_mesh( this, geo )
   !> TODO: add component field, that describe if the component
   ! participates to the coupling. So far, all the components 
   ! participate.
-  logical :: comp_coupling = .true.
+  logical :: coupling = .true.
+  character(len=precice_mcl) :: coupling_type
 
   n_comp = size(geo%components)
 
   !> Count n. of nodes ==========================================
   nnodes = 0
   do i_comp = 1, n_comp
-    if ( comp_coupling ) then
-      select case( trim(geo%components(i_comp)%comp_el_type) )
-        case('l')
+    coupling      = geo%components(i_comp)%coupling
+    coupling_type = geo%components(i_comp)%coupling_type
+    if ( coupling ) then
+      if ( trim(coupling_type) .eq. 'll' ) then
+        !> ll coupling
+        if ( trim(geo%components(i_comp)%comp_el_type) .eq. 'l' ) then
           !> Set PreCICE nodes with LE only! ***to do***
           dnnodes = size(geo%components(i_comp)%i_points) / 2
           !> Increment number of nodes
           nnodes = nnodes + dnnodes
-      ! case('v')
-      ! case('p')
-        case default
-      end select
+        else
+          write(*,*) ' Error in initialize mesh. CouplingType=ll '&
+                     'while comp_el_type .ne. l. Stop'; stop
+        end if
+      elseif ( trim(coupling_type) .eq. 'rigid' ) then 
+        !> rigid coupling
+        !> Increment number of nodes
+        dnnodes = 1
+        nnodes = nnodes + dnnodes
+      else
+        write(*,*) ' Error in initialize mesh. CouplingType= '// &
+                   trim(coupling_type)//', while only ll, rigid'&
+                   ' CouplingType are implemented. Stop'; stop
+      end if
     end if
   end do
 
@@ -175,20 +189,24 @@ subroutine initialize_mesh( this, geo )
   allocate(this%mesh%nodes( this%mesh%ndim, nnodes ))
   nnodes = 0
   do i_comp = 1, n_comp
-    if ( comp_coupling ) then
-      select case( trim(geo%components(i_comp)%comp_el_type) )
-        case('l')
-          
-          dnnodes = size(geo%components(i_comp)%i_points) / 2
-          !> Here in the local reference frame ! ***to do***
-          this%mesh%nodes(:,nnodes+1:nnodes+dnnodes) = &
-            geo%components(i_comp)%loc_points(:,1:2*dnnodes:2)
-          nnodes = nnodes + dnnodes
-
-      ! case('v')
-      ! case('p')
-        case default
-      end select
+    coupling      = geo%components(i_comp)%coupling
+    coupling_type = geo%components(i_comp)%coupling_type
+    if ( coupling ) then
+      if ( trim(coupling_type) .eq. 'll' ) then
+        !> ll coupling
+        dnnodes = size(geo%components(i_comp)%i_points) / 2
+        !> Here in the local reference frame ! ***to do***
+        this%mesh%nodes(:,nnodes+1:nnodes+dnnodes) = &
+          geo%components(i_comp)%loc_points(:,1:2*dnnodes:2)
+        nnodes = nnodes + dnnodes
+      elseif ( trim(coupling_type) .eq. 'rigid' ) then 
+        !> ll coupling
+        dnnodes = 1
+        !> Here in the local reference frame ! ***to do***
+        this%mesh%nodes(:,nnodes+1) = &
+          geo%components(i_comp)%coupling_node
+        nnodes = nnodes + dnnodes
+      end if
     end if
   end do
 

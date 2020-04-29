@@ -153,6 +153,12 @@ type :: t_geo_component
  !> Coupling w/ external structural code: .true., .false.
  logical :: coupling
 
+ !> Coupling type: 'll', 'rigid'
+ character(len=max_char_len) :: coupling_type
+
+ !> Coupling w/ external structural code: .true., .false.
+ real(wp) :: coupling_node(3) = 0.0_wp
+
  !> Id of the component (warning: not always defined)
  integer :: comp_id
 
@@ -684,6 +690,8 @@ subroutine load_components(geo, in_file, out_file, te)
  character(max_char_len) , allocatable :: airfoil_list(:)
  integer                 , allocatable :: nelem_span_list(:)
  character(len=max_char_len) :: comp_coupling_str
+ character(len=max_char_len) :: comp_coupling_type
+ real(wp) :: comp_coupling_node(3) = 0.0_wp    ! <- Initialization
  logical :: comp_coupling
 #if USE_PRECICE
  real(wp), allocatable :: c_ref_p(:,:)
@@ -812,7 +820,9 @@ subroutine load_components(geo, in_file, out_file, te)
     call read_hdf5(comp_el_type,'ElType',cloc)
     call read_hdf5(comp_name,'CompName',cloc)
     call read_hdf5(comp_input,'CompInput',cloc)
-    call read_hdf5(comp_coupling_str,'Coupled',cloc)
+    call read_hdf5(comp_coupling_str ,'Coupled',cloc)
+    call read_hdf5(comp_coupling_type,'CouplingType',cloc)
+    call read_hdf5(comp_coupling_node,'CouplingNode',cloc)
     comp_coupling = .false.
 #if USE_PRECICE
     if ( trim(comp_coupling_str) .eq. 'true' ) comp_coupling = .true.
@@ -867,9 +877,11 @@ subroutine load_components(geo, in_file, out_file, te)
       geo%components(i_comp)%ref_tag = trim(ref_tag_m)
       geo%components(i_comp)%moving  = geo%refs(ref_id)%moving
 
-      geo%components(i_comp)%coupling = comp_coupling
+      geo%components(i_comp)%coupling      =      comp_coupling
+      geo%components(i_comp)%coupling_type = trim(comp_coupling_type)
+      geo%components(i_comp)%coupling_node =      comp_coupling_node
 
-!     ! ====== READING =====
+      ! ====== READING =====
       geo%components(i_comp)%comp_el_type = trim(comp_el_type)
       geo%components(i_comp)%comp_input   = trim(comp_input  )
  
@@ -911,8 +923,18 @@ subroutine load_components(geo, in_file, out_file, te)
                                                    size(c_ref_p,2) ) )
           geo%components(i_comp)%c_ref_p = c_ref_p
           
-          !> PreCICE connectivity for LL
-          np_precice = size(rr,2)/2    ! <--- only LE
+          !> === PreCICE connectivity for LL ===
+          if ( trim(comp_coupling_type) .eq. 'll' ) then
+            ! For ll/beam coupling, only LE nodes are coupled with structural
+            ! nodes, while each TE node follows its LE node with a rigid motion
+            np_precice = size(rr,2)/2
+          elseif ( trim(comp_coupling_type) .eq. 'rigid' ) then
+            ! For rigid coupling, the motion of all the nodes of the components
+            ! is defined through the motion of the coupling_node
+            np_precice = 1 
+          end if
+          !> Allocate and fill i_points_precice array containing the 
+          ! connectivity between dust with PreCICE nodes
           allocate(geo%components(i_comp)%i_points_precice( np_precice ))
           geo%components(i_comp)%i_points_precice = &
                            (/((i3),i3=points_offset_precice+1, &
@@ -979,8 +1001,14 @@ subroutine load_components(geo, in_file, out_file, te)
                                                            'CompInput',cloc2)
         if ( geo%components(i_comp)%coupling ) then
           call write_hdf5('true','Coupled',cloc2)
+          call write_hdf5(trim(geo%components(i_comp)%coupling_type), &
+                          'CouplingType',cloc2)
+          call write_hdf5(geo%components(i_comp)%coupling_node, &
+                          'CouplingNode',cloc2)
         else
           call write_hdf5('false','Coupled',cloc2)
+          call write_hdf5('none', 'CouplingType',cloc2)
+          call write_hdf5((/0.0_wp,0.0_wp,0.0_wp/), 'CouplingNode',cloc2)
         end if
         call new_hdf5_group(cloc2,'Geometry',geo_loc)
 
