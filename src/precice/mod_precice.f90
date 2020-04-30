@@ -354,7 +354,7 @@ subroutine update_force( this, geo, elems )
         this%fields(j_mom)%fdata(:, ip ) = 0.0_wp
 
         !> Forces
-        do i = 1, size(comp%i_points_precice)-1
+        do i = 1, size(comp%el)
   
           this%fields(j_for)%fdata(:,ip) = this%fields(j_for)%fdata(:,ip) + &
                                            comp%el(i)%dforce
@@ -604,35 +604,18 @@ subroutine update_near_field_wake( this, geo, wake )
   !> Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1,wake%n_pan_points
 
-   if ( .not. geo%components( wake%pan_gen_icomp(ip) )%coupling ) then
-     ! Rigid-body component -> do nothing
-!    call calc_node_vel( wake%w_start_points(:,ip), &
-!             geo%refs(wake%pan_gen_ref(ip))%G_g, &
-!             geo%refs(wake%pan_gen_ref(ip))%f_g, &
-!             vel_te )
-!     dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
-! 
-!     if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
-!       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-!                   dist*wake%pan_gen_scaling(ip)* &
-!                   norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist)
-!     else
-!       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-!                   dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
-!                   sim_param%min_vel_at_te*sim_param%dt
-!     end if
+    if ( geo%components( wake%pan_gen_icomp(ip) )%coupling ) then
   
-    else ! Coupled component
-      
-      !> LL components
-      if ( geo%components( wake%pan_gen_icomp(ip) )%comp_el_type(1:1) .eq. 'l' ) then
+      if ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) .eq. 'll' ) then
+       
+        !> LL coupling
         i_point = wake%pan_gen_points(1,ip)
         dist = geo%points(:,i_point) - geo%points(:,i_point-1)
         dist = dist/norm2(dist)
 
-        !> debug ---
-        write(*,*) i_point, dist
-        !> debug ---
+        ! !> debug ---
+        ! write(*,*) i_point, dist
+        ! !> debug ---
         
         vel_te = geo%points_vel(:, wake%pan_gen_icomp(ip))
 
@@ -645,6 +628,13 @@ subroutine update_near_field_wake( this, geo, wake )
              dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
              sim_param%min_vel_at_te*sim_param%dt
         end if
+      elseif ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) .eq. 'rigid' ) then
+        !> rigid coupling
+        ! do nothing
+        ! *** to do *** check if somehting must be done
+      else
+        !> other coupling
+        ! not implemented, so far
       end if
 
     end if
@@ -653,7 +643,7 @@ subroutine update_near_field_wake( this, geo, wake )
   ! *** to do ***
 
 
-  write(*,*) ' wake%pan_wake_len: ', wake%pan_wake_len
+  ! write(*,*) ' wake%pan_wake_len: ', wake%pan_wake_len
   ! Calculate geometrical quantities of first 2 rows
   do ip = 1,wake%n_pan_stripes
     do ir = 1, min(2, wake%pan_wake_len)

@@ -21,4 +21,11 @@
 
 > Moment contributions to loads in mod_precice.f90/update_force()
   So far, the contribution to the moment of the elementary forces
-  is not implemented. 
+  is not implemented.
+
+> Fix PreCICE bug producing Segfault in cplscheme/BaseCoupling.cpp
+  around l.752. So far, the library has been re-compiled with a 
+  workaround.
+  The segfault seems to be produced by an output message occurring
+  at the first timestep of a 1-node communication. Line l.752 now
+  define a constant avgConvRate = 666.6, to avoid dividing by inf
