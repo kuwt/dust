@@ -627,9 +627,23 @@ subroutine update_near_field_wake( this, geo, wake )
   type(t_geo)       , intent(in)    :: geo
   type(t_wake)      , intent(inout) :: wake
 
-  real(wp) :: dist(3), vel_te(3)
+  real(wp) :: n_rot(3), dist(3), vel_te(3)
+  real(wp) :: theta
+  real(wp) :: eps = 1.0e-9_wp
 
-  integer :: ip, ir, i_point, p1, p2
+  integer :: ip, ir, i_point, p1, p2, j, j_rot
+
+  ! write(*,*) ' Debug in mod_precice.f90/update_near_field_wake '
+  ! write(*,*) ' geo%points: '
+  ! do ip = 1, size(geo%points,2)
+  !   write(*,*) geo%points(:,ip)
+  ! end do
+
+  ! Find rotation and angular velocity field id
+  j_rot = 0
+  do j = 1, size(this%fields)
+    if ( trim(this%fields(j)%fname) .eq. 'Rotation' )  j_rot = j
+  end do
 
   !> First row of points of the panel wake
   wake%w_start_points = 0.5_wp * (geo%points(:,wake%pan_gen_points(1,:)) + &
@@ -664,10 +678,34 @@ subroutine update_near_field_wake( this, geo, wake )
              dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
              sim_param%min_vel_at_te*sim_param%dt
         end if
+
       elseif ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) .eq. 'rigid' ) then
+        
         !> rigid coupling
-        ! do nothing
-        ! *** to do *** check if somehting must be done
+        !> Rotation
+        n_rot = this%fields(j_rot)%fdata(:, &
+                 geo%components( wake%pan_gen_icomp(ip) )%i_points_precice(1) )
+        theta = norm2( n_rot )
+        if ( theta .lt. eps ) then;  n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /);  theta = 0.0_wp
+        else                      ;  n_rot = n_rot / theta
+        end if
+
+        dist =  cos(theta) * wake%pan_gen_dir(:,ip) + &
+                sin(theta) * cross( n_rot, wake%pan_gen_dir(:,ip) ) + &
+              ( 1.0_wp - cos(theta) ) * sum( wake%pan_gen_dir(:,ip)*n_rot ) * n_rot
+
+        vel_te = geo%points_vel(:, wake%pan_gen_icomp(ip))
+
+        if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
+          wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
+             dist*wake%pan_gen_scaling(ip)* &
+             norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist)
+        else
+          wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
+             dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
+             sim_param%min_vel_at_te*sim_param%dt
+        end if
+
       else
         !> other coupling
         ! not implemented, so far
@@ -677,6 +715,25 @@ subroutine update_near_field_wake( this, geo, wake )
 
   enddo
   ! *** to do ***
+
+  ! !> debug ---
+  ! write(*,*) ' Debug in mod_precice.f90/update_near_field_wake '
+  ! write(*,*) ' wake%pan_w_points: '
+  ! do ip = 1, wake%n_pan_stripes
+  !   do ir = 1, min(2, wake%pan_wake_len)
+  !     p1 = wake%i_start_points(1,ip)
+  !     p2 = wake%i_start_points(2,ip)
+  !     write(*,*) wake%pan_w_points(1,p1,ir),   wake%pan_w_points(1,p2,ir), &
+  !                wake%pan_w_points(1,p2,ir+1), wake%pan_w_points(1,p1,ir+1)
+  !     write(*,*) wake%pan_w_points(2,p1,ir),   wake%pan_w_points(2,p2,ir), &
+  !                wake%pan_w_points(2,p2,ir+1), wake%pan_w_points(2,p1,ir+1)
+  !     write(*,*) wake%pan_w_points(3,p1,ir),   wake%pan_w_points(3,p2,ir), &
+  !                wake%pan_w_points(3,p2,ir+1), wake%pan_w_points(3,p1,ir+1)
+  !   end do
+  !   write(*,*)
+  ! end do
+  ! write(*,*) 
+  ! stop
 
 
   ! write(*,*) ' wake%pan_wake_len: ', wake%pan_wake_len

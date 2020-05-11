@@ -633,6 +633,10 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
           do i = 1, size(c_ref_p,2)
             c_ref_p(:,i) = chord_p(i) * &
                     (/ cos(theta_p(i)), 0.0_wp, -sin(theta_p(i)) /)
+            ! !> Orientation
+            ! ! *** to do *** needed for beam/ll coupling?
+            ! c_ref_p(:,i) = matmul( transpose(coupling_node_rot), &
+            !                        c_ref_p(:,i) )
           end do
 
           allocate(c_ref_c(3, size(ee,2))); c_ref_c = 0.0_wp
@@ -644,7 +648,12 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                 c_ref_c(:,i) = c_ref_c(:,i) + rr(:,ee(i,j))
               end if
             end do
-            c_ref_c(:,j) = c_ref_c(:,j)/dble(n_non_zero) - coupling_node
+            !> Offset
+            c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero) - coupling_node
+            ! !> Orientation
+            ! ! *** to do *** needed for beam/ll coupling?
+            ! c_ref_c(:,i) = matmul( transpose(coupling_node_rot), &
+            !                        c_ref_c(:,i) )
           end do
 
           !> Write to hdf5 geo file
@@ -659,7 +668,11 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
           allocate(c_ref_p(3, size(rr,2))); c_ref_p = 0.0_wp
           do i =1, size(c_ref_p,2)
+            !> Offset
             c_ref_p(:,i) = rr(:,i) - coupling_node
+            !> Orientation
+            c_ref_p(:,i) = matmul( transpose(coupling_node_rot), &
+                                   c_ref_p(:,i) )
           end do
 
           allocate(c_ref_c(3, size(ee,2))); c_ref_c = 0.0_wp
@@ -671,7 +684,11 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                 c_ref_c(:,i) = c_ref_c(:,i) + rr(:,ee(j,i))
               end if
             end do
+            !> Offset
             c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero) - coupling_node
+            !> Orientation
+            c_ref_c(:,i) = matmul( transpose(coupling_node_rot), &
+                                   c_ref_c(:,i) )
           end do
 
           ! debug ---
@@ -880,6 +897,14 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
        allocate(neigh(size(ee,1), size(ee,2)))
        neigh = 0 !All actuator disk are isolated
      endif
+
+#if USE_PRECICE
+     !> Rotate t_te, if needed
+     do i = 1, size(t_te,2)
+       t_te(:,i) = matmul( transpose(coupling_node_rot), &
+                                   t_te(:,i) )
+     end do
+#endif
 
 
 !! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !!
