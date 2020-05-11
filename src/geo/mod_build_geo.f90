@@ -171,6 +171,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  character(len=max_char_len) :: coupled_str  ! there is no hdf_write for logical
  character(len=max_char_len) :: coupling_type
  real(wp)                    :: coupling_node(3)
+ real(wp)                    :: coupling_node_rot(3,3)
  !> Symmetry and mirror ---
  logical :: mesh_symmetry , mesh_mirror
  real(wp) :: symmetry_point(3), symmetry_normal(3)
@@ -210,10 +211,12 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  integer , allocatable :: neigh_te(:,:) , o_te(:,:)
  real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
 
- integer :: i
+ integer :: i, j
 
 #if USE_PRECICE
  real(wp), allocatable :: c_ref_p(:,:)
+ real(wp), allocatable :: c_ref_c(:,:)
+ integer :: n_non_zero
 #endif
 
  character(len=*), parameter :: this_sub_name = 'build_component'
@@ -236,6 +239,12 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   call geo_prs%CreateRealArrayOption('CouplingNode', &
               'Node for rigid coupling in the reference configuration (x, y, z)', &
               '(/0.0, 0.0, 0.0/)')
+  call geo_prs%CreateRealArrayOption('CouplingNodeOrientation', &
+              'Orientation of the node for rigid coupling. This array contains the &
+              &local components (in the local reference frame of the geometrical &
+              &component) of the unit vectors of the coupling node ref.frame: &
+              &A = (/ I_nod_1^loc, I_nod_2^loc, I_nod_3^loc /)', &
+              '(/ 1.,0.,0., 0.,1.,0., 0.,0.,1. /)')
   !symmtery
   call geo_prs%CreateLogicalOption('mesh_symmetry',&
                'Reflect and double the geometry?', 'F')
@@ -334,9 +343,12 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   coupled_str = 'false'
 #if USE_PRECICE
   if ( coupled_comp ) then
-    coupled_str = 'true'
-    coupling_type = getstr(geo_prs, 'CouplingType')
-    coupling_node = getrealarray(geo_prs, 'CouplingNode', 3)
+    coupled_str       = 'true'
+    coupling_type     = getstr(geo_prs, 'CouplingType')
+    coupling_node     = getrealarray(geo_prs, 'CouplingNode', 3)
+    coupling_node_rot = reshape( &
+                        getrealarray(geo_prs, 'CouplingNodeOrientation', 9), &
+                        (/3,3/) )
     if ( ( trim(coupling_type) .ne. 'll'    ) .and. &
          ( trim(coupling_type) .ne. 'rigid' ) ) then
       call error (this_sub_name, this_mod_name, &
@@ -446,8 +458,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   call write_hdf5(trim(comp_el_type),'ElType',comp_loc)
   call write_hdf5(trim(coupled_str),'Coupled',comp_loc)
-  call write_hdf5(trim(coupling_type),'CouplingType',comp_loc)
-  call write_hdf5(     coupling_node ,'CouplingNode',comp_loc)
+  call write_hdf5(trim(coupling_type)    ,'CouplingType',comp_loc)
+  call write_hdf5(     coupling_node     ,'CouplingNode',comp_loc)
+  call write_hdf5(     coupling_node_rot ,'CouplingNodeOrientation',comp_loc)
 
   call new_hdf5_group(comp_loc, 'Geometry', geo_loc)
 
@@ -621,8 +634,22 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
             c_ref_p(:,i) = chord_p(i) * &
                     (/ cos(theta_p(i)), 0.0_wp, -sin(theta_p(i)) /)
           end do
+
+          allocate(c_ref_c(3, size(ee,2))); c_ref_c = 0.0_wp
+          do i =1, size(c_ref_c,2)
+            do j = 1, 4
+              n_non_zero = 0
+              if ( ee(i,j) .ne. 0 ) then
+                n_non_zero = n_non_zero + 1
+                c_ref_c(:,i) = c_ref_c(:,i) + rr(:,ee(i,j))
+              end if
+            end do
+            c_ref_c(:,j) = c_ref_c(:,j)/dble(n_non_zero) - coupling_node
+          end do
+
           !> Write to hdf5 geo file
           call write_hdf5(c_ref_p,'c_ref_p',geo_loc)
+          call write_hdf5(c_ref_c,'c_ref_c',geo_loc)
 
         elseif ( trim(coupling_type) .eq. 'rigid' ) then
           !> Rigid coupling between a rigid component and a "structural" node,
@@ -630,20 +657,37 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
           ! reference configuration for data communication between the aerodynamic
           ! and the structural solvers
 
-          ! debug ---
-          write(*,*) ' rr: '
-          do i = 1, size(rr,2)
-            write(*,*) i, rr(:,i)
-          end do
-          ! debug ---
-
           allocate(c_ref_p(3, size(rr,2))); c_ref_p = 0.0_wp
           do i =1, size(c_ref_p,2)
             c_ref_p(:,i) = rr(:,i) - coupling_node
           end do
 
+          allocate(c_ref_c(3, size(ee,2))); c_ref_c = 0.0_wp
+          do i =1, size(c_ref_c,2)
+            n_non_zero = 0
+            do j = 1, 4
+              if ( ee(j,i) .ne. 0 ) then
+                n_non_zero = n_non_zero + 1
+                c_ref_c(:,i) = c_ref_c(:,i) + rr(:,ee(j,i))
+              end if
+            end do
+            c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero) - coupling_node
+          end do
+
+          ! debug ---
+          write(*,*) ' ip, rr, c_ref_p: '
+          do i = 1, size(rr,2)
+            write(*,*) i, rr(:,i), c_ref_p(:,i)
+          end do
+          write(*,*) ' ie, c_ref_c: '
+          do i = 1, size(ee,2)
+            write(*,*) i, c_ref_c(:,i)
+          end do
+          ! debug ---
+
           !> Write to hdf5 geo file
           call write_hdf5(c_ref_p,'c_ref_p',geo_loc)
+          call write_hdf5(c_ref_c,'c_ref_c',geo_loc)
 
         end if
       end if

@@ -199,6 +199,7 @@ subroutine read_c81_table ( filen , coeff )
       allocate(coeff%aero_coeff(iRe)%coeff(i_c)%cf(cp1(i_c),cp2(i_c)))
     end do
 
+
     do i_c = 1 , n_coeff
       read(fid,*) coeff%aero_coeff(iRe)%coeff(i_c)%par2   ! Mach numbers
       do i1 = 1 , cp1(i_c)

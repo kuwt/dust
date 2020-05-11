@@ -301,14 +301,18 @@ subroutine update_force( this, geo, elems )
   class(t_precice)  , intent(inout) :: this
   type(t_geo)       , intent(inout) :: geo
   type(t_pot_elem_p), intent(in)    :: elems(:)
+  real(wp) :: n_rot(3), chord(3), chord_rot(3), omega(3), pos(3), vel(3)
+  real(wp) :: theta
+  real(wp) :: eps = 1.0e-9_wp
 
   integer :: i, j, i_comp, ip
 
-  integer :: j_for, j_mom
+  integer :: j_for, j_mom, j_rot
 
   do j = 1, size(this%fields)
-    if ( trim(this%fields(j)%fname) .eq. 'Force'  ) j_for = j
-    if ( trim(this%fields(j)%fname) .eq. 'Moment' ) j_mom = j
+    if ( trim(this%fields(j)%fname) .eq. 'Rotation') j_rot = j
+    if ( trim(this%fields(j)%fname) .eq. 'Force'   ) j_for = j
+    if ( trim(this%fields(j)%fname) .eq. 'Moment'  ) j_mom = j
   end do
 
   do i_comp = 1, size(geo%components)
@@ -360,11 +364,43 @@ subroutine update_force( this, geo, elems )
                                            comp%el(i)%dforce
         end do
 
-        !> Moments (distinguish between 'l' (and 'v') and 'p' elements)
-        ! *** to do ***
-        ! ...
-        ! ...
-        ! ...
+        !> Moments
+        ! *** to do *** distinguish between 'l' (and 'v') and 'p' elements???
+
+        !> Rotation
+        n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(1))
+        theta = norm2( n_rot )
+        !> debug ---
+        write(*,*) ' THETA: ', theta
+        write(*,*) ' N_ROT: ', n_rot
+        !> debug ---
+        if ( theta .lt. eps ) then
+          n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
+          theta = 0.0_wp
+        else
+          n_rot = n_rot / theta
+        end if
+
+        do i = 1, size(comp%el)
+          !> vector between the center of the elements and the coupling node
+          chord = comp%c_ref_c(:,i)
+          chord_rot =  cos(theta) * chord + &
+                       sin(theta) * cross( n_rot, chord ) + &
+                     ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
+ 
+          ! debug ---
+          write(*,*) i, &
+                    chord, &
+                    chord_rot !, &
+!                   comp%el(i)%dforce, &
+!                   cross( chord_rot, comp%el(i)%dforce)
+          ! debug ---
+
+          this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) + &
+            comp%el(i)%dmom + &
+            cross( chord_rot, comp%el(i)%dforce)
+
+        end do
 
       end if
     end if

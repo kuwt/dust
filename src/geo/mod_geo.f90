@@ -156,8 +156,13 @@ type :: t_geo_component
  !> Coupling type: 'll', 'rigid'
  character(len=max_char_len) :: coupling_type
 
- !> Coupling w/ external structural code: .true., .false.
+ !> Coupling node: local coordinates (in the component local ref.frame) 
+ ! of the coupling node (why initilized?)
  real(wp) :: coupling_node(3) = 0.0_wp
+
+ !> Coupling node orientation: orientation of the coupling node, w.r.t.
+ ! the local ref.rame of the geometrical component (why initialized?)
+ real(wp) :: coupling_node_rot(3,3) = 0.0_wp
 
  !> Id of the component (warning: not always defined)
  integer :: comp_id
@@ -214,6 +219,8 @@ type :: t_geo_component
  !> Chord vector reference, required to assign the motion ot the 
  ! TE of a deformable LL element, knowing the LE motion
  real(wp), allocatable :: c_ref_p(:,:)
+ !> "Chord" vector reference, referred to the center of the elements
+ real(wp), allocatable :: c_ref_c(:,:)
 #endif
 
  !> Dimensions of parametric elements only
@@ -691,10 +698,12 @@ subroutine load_components(geo, in_file, out_file, te)
  integer                 , allocatable :: nelem_span_list(:)
  character(len=max_char_len) :: comp_coupling_str
  character(len=max_char_len) :: comp_coupling_type
- real(wp) :: comp_coupling_node(3) = 0.0_wp    ! <- Initialization
+ real(wp) :: comp_coupling_node(3)       = 0.0_wp    ! <- Initialization(?)
+ real(wp) :: comp_coupling_node_rot(3,3) = 0.0_wp    ! <- Initialization(?)
  logical :: comp_coupling
 #if USE_PRECICE
  real(wp), allocatable :: c_ref_p(:,:)
+ real(wp), allocatable :: c_ref_c(:,:)
  integer :: points_offset_precice, np_precice
 #endif 
  ! Parametric elements
@@ -820,9 +829,10 @@ subroutine load_components(geo, in_file, out_file, te)
     call read_hdf5(comp_el_type,'ElType',cloc)
     call read_hdf5(comp_name,'CompName',cloc)
     call read_hdf5(comp_input,'CompInput',cloc)
-    call read_hdf5(comp_coupling_str ,'Coupled',cloc)
-    call read_hdf5(comp_coupling_type,'CouplingType',cloc)
-    call read_hdf5(comp_coupling_node,'CouplingNode',cloc)
+    call read_hdf5(comp_coupling_str     ,'Coupled',cloc)
+    call read_hdf5(comp_coupling_type    ,'CouplingType',cloc)
+    call read_hdf5(comp_coupling_node    ,'CouplingNode',cloc)
+    call read_hdf5(comp_coupling_node_rot,'CouplingNodeOrientation',cloc)
     comp_coupling = .false.
 #if USE_PRECICE
     if ( trim(comp_coupling_str) .eq. 'true' ) comp_coupling = .true.
@@ -877,9 +887,10 @@ subroutine load_components(geo, in_file, out_file, te)
       geo%components(i_comp)%ref_tag = trim(ref_tag_m)
       geo%components(i_comp)%moving  = geo%refs(ref_id)%moving
 
-      geo%components(i_comp)%coupling      =      comp_coupling
-      geo%components(i_comp)%coupling_type = trim(comp_coupling_type)
-      geo%components(i_comp)%coupling_node =      comp_coupling_node
+      geo%components(i_comp)%coupling          =      comp_coupling
+      geo%components(i_comp)%coupling_type     = trim(comp_coupling_type)
+      geo%components(i_comp)%coupling_node     =      comp_coupling_node
+      geo%components(i_comp)%coupling_node_rot =      comp_coupling_node_rot
 
       ! ====== READING =====
       geo%components(i_comp)%comp_el_type = trim(comp_el_type)
@@ -919,9 +930,13 @@ subroutine load_components(geo, in_file, out_file, te)
 #if USE_PRECICE
         if ( trim(comp_coupling_str) .eq. 'true' ) then
           call read_hdf5_al(c_ref_p, 'c_ref_p', geo_loc)
+          call read_hdf5_al(c_ref_c, 'c_ref_c', geo_loc)
           allocate(geo%components(i_comp)%c_ref_p( size(c_ref_p,1) , &
                                                    size(c_ref_p,2) ) )
+          allocate(geo%components(i_comp)%c_ref_c( size(c_ref_c,1) , &
+                                                   size(c_ref_c,2) ) )
           geo%components(i_comp)%c_ref_p = c_ref_p
+          geo%components(i_comp)%c_ref_c = c_ref_c
           
           !> === PreCICE connectivity for LL ===
           if ( trim(comp_coupling_type) .eq. 'll' ) then
@@ -1005,10 +1020,16 @@ subroutine load_components(geo, in_file, out_file, te)
                           'CouplingType',cloc2)
           call write_hdf5(geo%components(i_comp)%coupling_node, &
                           'CouplingNode',cloc2)
+          call write_hdf5(geo%components(i_comp)%coupling_node_rot, &
+                          'CouplingNodeOrientation',cloc2)
         else
           call write_hdf5('false','Coupled',cloc2)
           call write_hdf5('none', 'CouplingType',cloc2)
           call write_hdf5((/0.0_wp,0.0_wp,0.0_wp/), 'CouplingNode',cloc2)
+          call write_hdf5(reshape( (/ 1._wp, 0._wp, 0._wp, &
+                                      0._wp, 1._wp, 0._wp, &
+                                      0._wp, 0._wp, 1._wp/),(/3,3/)), &
+                          'CouplingNodeOrientation',cloc2)
         end if
         call new_hdf5_group(cloc2,'Geometry',geo_loc)
 
