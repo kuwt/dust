@@ -370,10 +370,10 @@ subroutine update_force( this, geo, elems )
         !> Rotation
         n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(1))
         theta = norm2( n_rot )
-        !> debug ---
-        write(*,*) ' THETA: ', theta
-        write(*,*) ' N_ROT: ', n_rot
-        !> debug ---
+!       !> debug ---
+!       write(*,*) ' THETA: ', theta
+!       write(*,*) ' N_ROT: ', n_rot
+!       !> debug ---
         if ( theta .lt. eps ) then
           n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
           theta = 0.0_wp
@@ -381,42 +381,72 @@ subroutine update_force( this, geo, elems )
           n_rot = n_rot / theta
         end if
 
-        do i = 1, size(comp%el)
-          !> vector between the center of the elements and the coupling node
-          chord = comp%c_ref_c(:,i)
-          chord_rot =  cos(theta) * chord + &
-                       sin(theta) * cross( n_rot, chord ) + &
-                     ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
+        if ( comp%comp_el_type(1:1) .eq. 'l' ) then
+
+          do i = 1, size(comp%el)
+            
+            !> vector between the center of the elements and the coupling node
+            chord = 0.5_wp * ( comp%c_ref_p(:,2*(i-1)+1) + &
+                               comp%c_ref_p(:,2* i   +1) )
+            chord_rot =  cos(theta) * chord + &
+                         sin(theta) * cross( n_rot, chord ) + &
+                       ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
  
-          ! debug ---
-          write(*,*) i, &
-                    chord, &
-                    chord_rot !, &
-!                   comp%el(i)%dforce, &
-!                   cross( chord_rot, comp%el(i)%dforce)
-          ! debug ---
+!           ! debug ---
+!           write(*,*) ' i, chord, chord_rot, dforce, cross ( chord_rot, dforce ): '
+!           write(*,*) i
+!           write(*,*) chord, '      ', chord_rot
+!           write(*,*) comp%el(i)%dforce
+!           write(*,*) cross( chord_rot, comp%el(i)%dforce)
+!           ! debug ---
 
-          this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) + &
-            comp%el(i)%dmom + &
-            cross( chord_rot, comp%el(i)%dforce)
+            this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) + &
+              comp%el(i)%dmom + &
+              cross( chord_rot, comp%el(i)%dforce)
 
-        end do
+          end do
+
+        else
+
+          do i = 1, size(comp%el)
+            
+            !> vector between the center of the elements and the coupling node
+            chord = comp%c_ref_c(:,i)
+            chord_rot =  cos(theta) * chord + &
+                         sin(theta) * cross( n_rot, chord ) + &
+                       ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
+ 
+!           ! debug ---
+!           write(*,*) i, &
+!                     chord, &
+!                     chord_rot !, &
+! !                   comp%el(i)%dforce, &
+! !                   cross( chord_rot, comp%el(i)%dforce)
+!           ! debug ---
+
+            this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) + &
+              comp%el(i)%dmom + &
+              cross( chord_rot, comp%el(i)%dforce)
+
+          end do
+
+        end if
 
       end if
     end if
 
     end associate
   end do
-! ! debug ---
-! write(*,*) ' debug in mod_precice '
-! write(*,*) ' Force and moments '
-! write(*,*) ' j_for, j_mom: ', j_for, j_mom
-! write(*,*) trim(this%fields(j_for)%fname), trim(this%fields(j_mom)%fname)
-! write(*,*) ' shape(geo%components): ', shape(geo%components)
-! do i = 1, size(geo%components(1)%i_points_precice)
-!   write(*,*) this%fields(j_for)%fdata(:,i), &
-!              this%fields(j_mom)%fdata(:,i)
-! end do
+  ! debug ---
+  write(*,*) ' debug in mod_precice '
+  write(*,*) ' Force and moments '
+  write(*,*) ' j_for, j_mom: ', j_for, j_mom
+  write(*,*) trim(this%fields(j_for)%fname), trim(this%fields(j_mom)%fname)
+  write(*,*) ' shape(geo%components): ', shape(geo%components)
+  do i = 1, size(geo%components(1)%i_points_precice)
+    write(*,*) this%fields(j_for)%fdata(:,i), &
+               this%fields(j_mom)%fdata(:,i)
+  end do
 ! stop
 ! ! debug ---
 
