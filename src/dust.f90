@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!! Copyright (C) 2018-2020 Davide   Montagnani, 
 !!                         Matteo   Tugnoli, 
 !!                         Federico Fonte
 !!
@@ -247,7 +247,7 @@ call prms%CreateLogicalOption( 'output_start', "output values at starting &
 call prms%CreateLogicalOption( 'output_detailed_geo', "output at each &
                     &timestep the detailed geometry in the results file", 'F')
 call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output', &
-                                                                         '0')
+                                                                         '1')
 
 ! restart
 call prms%CreateLogicalOption('restart_from_file','restarting from file?','F')
@@ -349,6 +349,8 @@ call prms%CreateRealOption('LeavesTimeRatio','Ratio that triggers the &
 
 ! models options
 call prms%CreateLogicalOption('Vortstretch','Employ vortex stretching','T')
+call prms%CreateLogicalOption('VortstretchFromElems','Employ vortex stretching&
+                                     & from geometry elements','F')
 call prms%CreateLogicalOption('Diffusion','Employ vorticity diffusion','T')
 call prms%CreateLogicalOption('TurbulentViscosity','Employ turbulent &
                                &viscosity','F')
@@ -384,8 +386,16 @@ output_start = getlogical(prms, 'output_start')
 call init_sim_param(sim_param, prms, nout, output_start)
 
 ! remaining parameters
-dt_debug_out = getreal(prms, 'dt_debug_out')
-basename_debug = getstr(prms,'basename_debug')
+if(countoption(prms, 'dt_debug_out') .lt. 1) then
+  dt_debug_out = sim_param%dt_out
+else
+  dt_debug_out = getreal(prms, 'dt_debug_out')
+endif
+if(countoption(prms, 'basename_debug') .lt. 1) then
+  basename_debug = sim_param%basename
+else
+  basename_debug = getstr(prms,'basename_debug')
+endif
 
 sim_param%basename_debug = basename_debug
 
@@ -897,6 +907,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%first_panel_scaling = getreal(prms,'ImplicitPanelScale')
   sim_param%min_vel_at_te  = getreal(prms,'ImplicitPanelMinVel')
   sim_param%use_vs = getlogical(prms, 'Vortstretch')
+  sim_param%vs_elems = getlogical(prms, 'VortstretchFromElems')
   sim_param%use_vd = getlogical(prms, 'Diffusion')
   sim_param%use_tv = getlogical(prms, 'TurbulentViscosity')
   sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')

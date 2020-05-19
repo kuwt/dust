@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!! Copyright (C) 2018-2020 Davide   Montagnani, 
 !!                         Matteo   Tugnoli, 
 !!                         Federico Fonte
 !!
@@ -254,6 +254,9 @@ type :: t_wake
 
  !> Last vortex intensity from removed panels
  real(wp), allocatable :: last_pan_idou(:)
+
+ !> Last vortex intensity from removed panels
+ real(wp), allocatable :: end_pan_idou(:)
 
  !> Are the panels full? (and so need to produce particles...)
  logical :: full_panels=.false.
@@ -530,6 +533,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
 
   allocate(wake%vort_p(0))
   allocate(wake%last_pan_idou(wake%n_pan_stripes))
+  allocate(wake%end_pan_idou(wake%n_pan_stripes))
   wake%last_pan_idou = 0.0_wp
 
   wake%full_panels = .false.
@@ -1169,6 +1173,11 @@ subroutine update_wake(wake, elems, octree)
   !==> Panels:  Update the intensities of the panels
   !       From the back, all the vortex intensities come from
   !       the previous panel
+
+  !QUICK AND DIRTY
+  do iw = 1,wake%n_pan_stripes
+    wake%end_pan_idou(iw) = wake%wake_panels(iw,wake%pan_wake_len)%mag
+  enddo
   do ipan = wake%pan_wake_len,2,-1
     do iw = 1,wake%n_pan_stripes
       wake%wake_panels(iw,ipan)%mag = wake%wake_panels(iw,ipan-1)%mag
@@ -1343,15 +1352,19 @@ subroutine complete_wake(wake, geo, elems)
       !Left side
       dir = wake%pan_w_points(:,p1,wake%nmax_pan+1)-points_end(:,p1)
       if (wake%pan_neigh(1,iw) .gt. 0) then
-        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
+        !ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
+        !      real(wake%pan_neigh_o(1,iw),wp)* &
+        !      wake%wake_panels(wake%pan_neigh(1,iw),wake%pan_wake_len)%mag
+        ave = wake%end_pan_idou(iw) - &
               real(wake%pan_neigh_o(1,iw),wp)* &
-              wake%wake_panels(wake%pan_neigh(1,iw),wake%pan_wake_len)%mag
+              wake%end_pan_idou(wake%pan_neigh(1,iw))
         ave = ave/2.0_wp
       else !has no fixed neighbour
         if(sim_param%join_te) then
           ave = get_joined_intensity(wake, iw, 1)
         else
-          ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+          !ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+          ave = wake%end_pan_idou(iw)
         endif
       endif
       partvec = partvec + dir*ave
@@ -1359,23 +1372,29 @@ subroutine complete_wake(wake, geo, elems)
       !Right side
       dir = -wake%pan_w_points(:,p2,wake%nmax_pan+1)+points_end(:,p2)
       if (wake%pan_neigh(2,iw) .gt. 0) then
-        ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
+        !ave = wake%wake_panels(iw,wake%pan_wake_len)%mag - &
+        !      real(wake%pan_neigh_o(2,iw),wp)* &
+        !      wake%wake_panels(wake%pan_neigh(2,iw),wake%pan_wake_len)%mag
+        ave = wake%end_pan_idou(iw) - &
               real(wake%pan_neigh_o(2,iw),wp)* &
-              wake%wake_panels(wake%pan_neigh(2,iw),wake%pan_wake_len)%mag
+              wake%end_pan_idou(wake%pan_neigh(2,iw))
         ave = ave/2.0_wp
       else
         if(sim_param%join_te) then
           ave = get_joined_intensity(wake, iw, 2)
         else
-          ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+          !ave = wake%wake_panels(iw,wake%pan_wake_len)%mag
+          ave = wake%end_pan_idou(iw)
         endif
       endif
       partvec = partvec + dir*ave
 
       !End side
       dir = points_end(:,p1) - points_end(:,p2)
-      ave = wake%wake_panels(iw,wake%pan_wake_len)%mag-wake%last_pan_idou(iw)
-      wake%last_pan_idou(iw) = wake%wake_panels(iw,wake%pan_wake_len)%mag
+      !ave = wake%wake_panels(iw,wake%pan_wake_len)%mag-wake%last_pan_idou(iw)
+      ave = wake%end_pan_idou(iw)-wake%last_pan_idou(iw)
+      !wake%last_pan_idou(iw) = wake%wake_panels(iw,wake%pan_wake_len)%mag
+      wake%last_pan_idou(iw) = wake%end_pan_idou(iw)
       partvec = partvec + dir*ave
 
       !Calculate the center

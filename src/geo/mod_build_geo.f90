@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!! Copyright (C) 2018-2020 Davide   Montagnani, 
 !!                         Matteo   Tugnoli, 
 !!                         Federico Fonte
 !!
@@ -207,8 +207,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
  character(len=*), parameter :: this_sub_name = 'build_component'
 
-
-  !Prepare all the parameters to be read in the file
+  !=====
+  !===== Define the parameters ====
+  !=====
   !mesh file
   call geo_prs%CreateStringOption('MeshFile','Mesh file definition')
   call geo_prs%CreateStringOption('MeshFileType','Mesh file type')
@@ -282,7 +283,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   call geo_prs%CreateIntOption('Rev_Nelem_rev', &
          'Number of elements around the body of revolution circumference.', '10')
 
-  !read the parameters
+  !=====
+  !===== Read the parameters ====
+  !=====
   call check_file_exists(geo_file,this_sub_name,this_mod_name)
   call geo_prs%read_options(geo_file,printout_val=.false.)
 
@@ -310,8 +313,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
          ' p,v,l,a.')
   end if
 
-  ! Parameters for gap sewing and edge identification ------------------
-  ! TolSewing --------------------------------------
+  ! Parameters for gap sewing and edge identification
+  ! TolSewing
   i_count = countoption(geo_prs,'TolSewing') 
   if ( i_count .eq. 1 ) then
     tol_sewing = getreal(geo_prs,'TolSewing')
@@ -326,12 +329,12 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
        ', defined in file: '//trim(geo_file)//'.')
   end if
  
-  ! InnerProductTe ---------------------------------
+  ! InnerProductTe
   i_count = countoption(geo_prs,'InnerProductTe') 
   if ( i_count .eq. 1 ) then
     inner_product_threshold = getreal(geo_prs,'InnerProductTe')
   else if ( i_count .eq. 0 ) then
-    ! Inherit tol_sewing from general parameter
+    ! Inherit inner_product_threshold from general parameter
     inner_product_threshold = global_inner_prod_te
   else
     inner_product_threshold = getreal(geo_prs,'InnerProductTe')
@@ -341,14 +344,13 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
        ', defined in file: '//trim(geo_file)//'. First value used.')
   end if 
 
-  ! te projection ----------------------------------
+  ! te projection
   i_count = countoption(geo_prs,'ProjTe')
   te_proj_logical = .false.
   if ( i_count .eq. 1 ) then
     te_proj_logical = getlogical(geo_prs,'ProjTe') 
   end if
    
-  ! ------
   if ( te_proj_logical ) then
     i_count = countoption(geo_prs,'ProjTeDir' )
     if ( i_count .eq. 1 ) then
@@ -371,7 +373,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
          ', defined in file: '//trim(geo_file)//'.')
     end if 
   end if
-  ! ------
+
   if ( te_proj_logical ) then
     i_count = countoption(geo_prs,'ProjTeVector' )
     if ( i_count .eq. 1 ) then
@@ -388,8 +390,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     end if
   end if
 
-
-  !Build the group -----------------------------------------------------
+  !=====
+  !===== Create the compontent group
+  !=====
   write(comp_name,'(A,I3.3)')'Comp',comp_id
   call new_hdf5_group(gloc, trim(comp_name), comp_loc)
   call write_hdf5(comp_tag,'CompName',comp_loc)
@@ -400,10 +403,12 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   call new_hdf5_group(comp_loc, 'Geometry', geo_loc)
 
-  ! read the files
+  !=====
+  !===== Read the input files
+  !=====
   select case (trim(mesh_file_type))
 
-   case('basic')
+   case('basic') 
     mesh_file = getstr(geo_prs,'MeshFile')
     call read_mesh_basic(trim(mesh_file),ee, rr)
 
@@ -567,12 +572,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                                 npoints_chord_tot, nelems_span )
       nelems_span_tot =   nelems_span
 
-!     ! check ---
-!     write(*,*) ' shape(ee)         : ' , shape(ee)
-!     write(*,*) ' shape(rr)         : ' , shape(rr)
-!     write(*,*) ' npoints_chord_tot : ' , npoints_chord_tot
-!     write(*,*) ' nelems_span       : ' , nelems_span      
-
     elseif ( ElType .eq. 'l' ) then
 
       call read_mesh_pointwise_ll(trim(mesh_file),ee,rr, &
@@ -606,9 +605,10 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
 
     else
-      write(*,*) ' MeshFileType = pointwise'
-      write(*,*) ' ElType = ' , ElType
-      write(*,*) ' but ElType must be either p , v or l. Stop ' ; stop
+      call error(this_sub_name, this_mod_name, 'Requested an element of &
+      &type '//trim(ElType)//' for the pointwise component '//trim(comp_tag)&
+      &//' while only p (panels), v (vortex lattice) or l (lifting line) &
+      &are aailable')
     end if
 
    case default
@@ -616,46 +616,32 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   end select
 
-  ! ==== SYMMETRY ==== only half of the component has been defined 
+  !=====
+  !===== Symmetry: double the mesh
+  !=====
   if ( mesh_symmetry ) then
     select case (trim(mesh_file_type))
       case('cgns', 'basic', 'revolution' )  ! TODO: check basic
         call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
+
       case('parametric','pointwise')
-!! !    if ( ElType .ne. 'l' ) then
         call symmetry_mesh_structured(ee, rr,  &
                                        npoints_chord_tot , nelems_span , &
                                        symmetry_point, symmetry_normal)
           nelems_span_tot = 2*nelems_span
 
-
-!! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !!
-!! Same routines used for all parametric elements: p,v,l        !!
-!! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !!
-!! !       else ! LIFTING LINE element
-!! !         call symmetry_mesh_structured(ee, rr,  &
-!! !                                      npoints_chord_tot , nelems_span , &
-!! !                                      symmetry_point, symmetry_normal)
-!! !         nelems_span_tot = 2*nelems_span
-!! !       end if
       case default
        call error(this_sub_name, this_mod_name,&
              'Symmetry routines implemented for MeshFileType = &
              & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
-             'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
+             'MeshFileType = '//trim(mesh_file_type))
     end select
 
   end if
 
-  if ( ( trim(mesh_file_type) .eq. 'parametric' ) .or. &
-       ( trim(mesh_file_type) .eq. 'pointwise'  ) ) then
-    !write HDF5 fields
-    call write_hdf5(  nelems_span_tot  ,'parametric_nelems_span',geo_loc)
-    call write_hdf5(npoints_chord_tot-1,'parametric_nelems_chor',geo_loc)
-
-  end if
-
-  ! ==== MIRROR ==== the component is mirrored w.r.t. the defined point and plane 
+  !=====
+  !===== Mirror: reflect the mesh
+  !=====
   if ( mesh_mirror ) then
 
     select case (trim(mesh_file_type))
@@ -675,21 +661,30 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   end if
 
+
+  !=====
+  !===== Write the geometry and connectivity
+  !=====
   call write_hdf5(rr,'rr',geo_loc)
   call write_hdf5(ee,'ee',geo_loc)
+  if ( ( trim(mesh_file_type) .eq. 'parametric' ) .or. &
+       ( trim(mesh_file_type) .eq. 'pointwise'  ) ) then
+    !write HDF5 fields
+    call write_hdf5(  nelems_span_tot  ,'parametric_nelems_span',geo_loc)
+    call write_hdf5(npoints_chord_tot-1,'parametric_nelems_chor',geo_loc)
 
-  !:::::::::::::::::::::::::::::::::::::::::::::::::::
+  end if
 
-  ! selectcase('cgns','parametric','basic') ---> build structures
-  ! ---- local numbering ----
-  !  -> build_connectivity                     || <-- these routines depend 
-  !  -> build_te                               ||     on the way a component 
-  !  -> create_local_velocity_stencil ( 3dP )  ||     is defined
-  !  -> create_strip_connecivity      ( vr )   ||
+
+  !=====
+  !===== Build mesh specific fields: 
+  !===== * connectivity 
+  !===== * trailing edge
+  !===== * velocity stencil
+  !===== * stripe connectivity
+  !=====
   selectcase(trim(mesh_file_type))
     case( 'basic', 'revolution' )
-
-! TODO: add WARNING and CHECK conventions if ElType = 'v'
 
       call build_connectivity_general( ee , neigh )
 
@@ -701,11 +696,11 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         write(*,*) '  be sure to your input files comply with the conventions '
         write(*,*) '  of parameteric component structures.'//nl
         !TODO: IMPORTANT: what should be the behaviour here?
-        call build_te_parametric( ee , rr , ElType ,  &
+        if(.not. suppress_te) call build_te_parametric( ee , rr , ElType ,  &
            npoints_chord_tot , nelems_span_tot , &
            e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
       else
-        call build_te_general ( ee , rr , ElType , &
+        if(.not. suppress_te) call build_te_general ( ee , rr , ElType , &
                   tol_sewing , inner_product_threshold , &
                   te_proj_logical , te_proj_dir , te_proj_vec , &
                   e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
@@ -718,7 +713,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
       if ( mesh_symmetry ) call update_connectivity_symmetry( ee , rr , neigh )
 
-      call build_te_general ( ee , rr , ElType , &
+      if(.not. suppress_te) call build_te_general ( ee , rr , ElType , &
                 tol_sewing , inner_product_threshold , &
                 te_proj_logical , te_proj_dir , te_proj_vec , &
                 e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) 
@@ -729,7 +724,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call build_connectivity_parametric( ee ,     &
                        npoints_chord_tot , nelems_span_tot , &
                        neigh )
-        call build_te_parametric( ee , rr , ElType ,  &
+        if(.not. suppress_te) call build_te_parametric( ee , rr , ElType ,  &
            npoints_chord_tot , nelems_span_tot , &
            e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
      elseif(ElType .eq. 'a') then
@@ -738,34 +733,23 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
      endif
 
 
-!! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !!
-!! Same routines used for all parametric elements: p,v,l        !!
-!! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !!
-!!       else
-!!         call build_connectivity_parametric( trim(mesh_file) , ee ,     &
-!!                       ElType , npoints_chord_tot , nelems_span_tot , &
-!!                       mesh_symmetry , neigh )
-!!         call build_te_parametric( ee , rr , ElType ,  &
-!!            npoints_chord_tot , nelems_span_tot , &
-!!            e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
-!! 
-!! !       call create_local_velocity_stencil_parametric()
-!! !       call create_strip_connectivity_parametric()
-!! 
-!!       end if
     case default
        call error(this_sub_name, this_mod_name,&
              'Unknown option for building connectivity.')
   end select    
 
+  !=====
+  !===== Write neighbours
+  !=====
   call write_hdf5(neigh,'neigh',geo_loc)
   call close_hdf5_group(geo_loc)
 
+  !=====
+  !===== Write trailing edge
+  !=====
   if (ElType .ne. 'a') then
-    !supppress the trailing edge for the current component
     if(suppress_te) then
-      !ignorance is strength, just kill all the trailing edge components
-      deallocate(e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te)
+      !supppress the trailing edge for the current component
       allocate(e_te(2,0), i_te(2,0), rr_te(3,0), ii_te(2,0), neigh_te(2,0))
       allocate(o_te(2,0), t_te(3,0))
     endif
@@ -782,6 +766,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   endif
 
  
+  !=====
+  !===== Finalize
+  !=====
   call close_hdf5_group(comp_loc)
   !cleanup
   deallocate(ee,rr)

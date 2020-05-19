@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!! Copyright (C) 2018-2020 Davide   Montagnani, 
 !!                         Matteo   Tugnoli, 
 !!                         Federico Fonte
 !!
@@ -298,6 +298,7 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
       end select
     else
       F_ave = F_ave*(real(ires-1,wp)/real(ires,wp)) + F_ref/real(ires,wp)
+      M_ave = M_ave*(real(ires-1,wp)/real(ires,wp)) + M_ref/real(ires,wp)
     endif
   
   end do ! Time loop
@@ -311,6 +312,8 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
     else
         write(fid_out,'(3'//ascii_real//')' ,advance='no') F_ave
         write(fid_out,'(3'//ascii_real//')' ,advance='no') M_ave
+        write(fid_out,'(9'//ascii_real//')',advance='no') refs_R(:,:, ref_id)
+        write(fid_out,'(3'//ascii_real//')',advance='no') refs_off(:, ref_id)
     endif
    
    case('tecplot')

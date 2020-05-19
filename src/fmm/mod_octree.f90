@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!! Copyright (C) 2018-2020 Davide   Montagnani, 
 !!                         Matteo   Tugnoli, 
 !!                         Federico Fonte
 !!
@@ -1337,37 +1337,36 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       vel = vel + sim_param%u_inf
       octree%leaves(lv)%p%cell_parts(ip)%p%vel = vel
 
-
-      !> Vortex stretching
-      stretch_elem = 0.0_wp
-      ! Influence of the body elements
-      do ie=1,size(elem)
-        call elem(ie)%p%compute_grad(pos, sim_param%u_inf, grad_elem)
-        stretch_elem = stretch_elem + & 
-            matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
-      enddo
-      ! Influence of the wake panels
-      do ie=1,size(wpan)
-        call wpan(ie)%p%compute_grad(pos, sim_param%u_inf, grad_elem)
-        stretch_elem = stretch_elem + & 
-            matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
-      enddo
-      ! Influence of the end vortex
-      do ie=1,size(wvort)
-        call wvort(ie)%compute_grad(pos, sim_param%u_inf, grad_elem)
-        stretch_elem = stretch_elem + & 
-            matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
-      enddo
-
-!     ! debug ---
-!     write(*,*) ' stretch, stretch_elem : ' , stretch, stretch_elem
-!     ! debug ---
+      !> Vortex stretching from other elements
+      if(sim_param%use_vs .and. sim_param%vs_elems) then
+        stretch_elem = 0.0_wp
+        ! Influence of the body elements
+        do ie=1,size(elem)
+          call elem(ie)%p%compute_grad(pos, sim_param%u_inf, grad_elem)
+          stretch_elem = stretch_elem + & 
+              matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
+        enddo
+        ! Influence of the wake panels
+        do ie=1,size(wpan)
+          call wpan(ie)%p%compute_grad(pos, sim_param%u_inf, grad_elem)
+          stretch_elem = stretch_elem + & 
+              matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
+        enddo
+        ! Influence of the end vortex
+        do ie=1,size(wvort)
+          call wvort(ie)%compute_grad(pos, sim_param%u_inf, grad_elem)
+          stretch_elem = stretch_elem + & 
+              matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
+        enddo
+        !DEBUG
+        !write(*,*) ' stretch, stretch_elem : ' , norm2(stretch), norm2(stretch_elem)
+        stretch = stretch + stretch_elem
+      endif
 
       !evolve the position in time
       if(sim_param%use_vs .or. sim_param%use_vd) then
         !evolve the intensity in time
-        octree%leaves(lv)%p%cell_parts(ip)%p%stretch = stretch + &
-                                                       stretch_elem
+        octree%leaves(lv)%p%cell_parts(ip)%p%stretch = stretch
       endif
 
 

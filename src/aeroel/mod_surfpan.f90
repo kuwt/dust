@@ -9,7 +9,7 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
+!! Copyright (C) 2018-2020 Davide   Montagnani, 
 !!                         Matteo   Tugnoli, 
 !!                         Federico Fonte
 !!
@@ -49,7 +49,7 @@
 module mod_surfpan
 
 use mod_param, only: &
-  wp , &
+  wp , nl, &
   prev_tri , next_tri , &
   prev_qua , next_qua , &
   pi, max_char_len
@@ -144,6 +144,8 @@ end type
 
 real(wp) :: ff_ratio
 
+character(len=max_char_len) :: msg(3)
+
 character(len=*), parameter :: this_mod_name = 'mod_surfpan'
 !----------------------------------------------------------------------
 contains
@@ -180,6 +182,7 @@ subroutine potential_calc_sou_surfpan(this, sou, dou, pos)
  real(wp) :: zQ , souLog , vi , R1 , R2
  real(wp), dimension(3) :: Qp
  integer :: indm1 , indp1
+ real(wp) :: den
 
  real(wp), parameter :: eps_sou  = 1.0e-6_wp
  real(wp), parameter :: ff_ratio = 10.0_wp
@@ -223,14 +226,27 @@ subroutine potential_calc_sou_surfpan(this, sou, dou, pos)
 
      R1 = norm2( pos - this%verp(:,i1) )
      R2 = norm2( pos - this%verp(:,indp1) )
-     ! si = this%edge_len(i1)
-     souLog = log( (R1+R2+this%edge_len(i1)) / (R1+R2-this%edge_len(i1)) )
 
-
-     if ( abs(R1+R2-this%edge_len(i1)) < 1e-6_wp ) then
-       call error(this_sub_name, this_mod_name, 'Too small denominator in &
-        &the calculation of sources')
+     den = R1+R2-this%edge_len(i1)
+     if ( den < 1e-6_wp ) then
+       write(msg(1),'(A)') 'Too small denominator in &
+       &source computation with point projection, using actual &
+       &points instead.'
+       write(msg(2),'(A,F12.6,F12.6,F12.6)') 'Computing sources on point: ',&
+       pos(1),pos(2),pos(3)
+       write(msg(3),'(A)')'This is most likely due to severely warped &
+       &quadrilateral elements adjacent to small elements.'//nl//&
+       &'      === CHECK MESH QUALITY! ==='
+       
+       call warning(this_sub_name, this_mod_name, msg)
+       R1 = norm2( pos - this%ver(:,i1) )
+       R2 = norm2( pos - this%ver(:,indp1) )
+       den = R1+R2-this%edge_len(i1)
      end if
+
+     souLog = log( (R1+R2+this%edge_len(i1)) / (den) )
+
+
 
      vi = - sum( cross( Qp-this%verp(:,i1), this%edge_vec(:,i1) ) * e3 ) / this%edge_len(i1)
      sou = sou + vi * souLog
