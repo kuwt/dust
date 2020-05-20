@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -276,7 +276,7 @@ type, abstract :: c_wake_mov
   procedure(i_get_vel), deferred, pass(this) :: get_vel
 end type
 
-abstract interface 
+abstract interface
  subroutine i_get_vel(this, elems, wake, pos, vel_hcas, vel)
    import :: c_wake_mov, wp, t_pot_elem_p, t_wake
    class(c_wake_mov) :: this
@@ -368,7 +368,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   allocate(wake%wake_rings(wake%ndisks,wake%nmax_rin))
   allocate(wake%rin_idou(wake%ndisks,wake%nmax_rin))
 
-  !panel wake: Associate for each panel the relevant intensity 
+  !panel wake: Associate for each panel the relevant intensity
   ! and allocate all the relevant fields
   nsides = 4
   do ip = 1,npan
@@ -392,7 +392,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
       enddo
     endif
   enddo
-  
+
   !ring wake: allocate the relevant fields of each ring
   do id = 1,wake%ndisks
     do ir = 1,wake%nmax_rin
@@ -438,7 +438,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
     endif
     if(any(wake%pan_neigh(:,iw).eq.0)) nend = nend+1
   enddo
-  
+
   if (sim_param%join_te) then
     !Store the indices of the ends of the panel wakes
     allocate(wake%pan_i_ends(nend))
@@ -454,15 +454,15 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
 
   wake%pan_idou = 0.0_wp
   wake%rin_idou = 0.0_wp
-  
-  !panel wake: The whole first line of (implicit) panels is initialized 
+
+  !panel wake: The whole first line of (implicit) panels is initialized
   !here to be used during linear system initialization
 
   !the first line of points is calculated from the mesh points
   wake%w_start_points = 0.5_wp * (geo%points(:,wake%pan_gen_points(1,:)) + &
                                   geo%points(:,wake%pan_gen_points(2,:)))
   wake%pan_w_points(:,:,1) = wake%w_start_points
-  wake%pan_w_vel(   :,:,:) = 0.0_wp 
+  wake%pan_w_vel(   :,:,:) = 0.0_wp
 
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1,wake%n_pan_points
@@ -493,7 +493,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
 
   !Starting length of the panel wake is 1
   wake%pan_wake_len = 1
-  
+
   !Associate the first implicit row
   allocate(wake%pan_p(wake%n_pan_stripes))
   do iw = 1,wake%n_pan_stripes
@@ -505,7 +505,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   do iw = 1,wake%n_pan_stripes
     wake%end_vorts(iw)%mag => null()
   enddo
-  
+
   ! Calculate geometrical quantities of first row
   do iw = 1,wake%n_pan_stripes
     p1 = wake%i_start_points(1,iw)
@@ -569,7 +569,7 @@ subroutine load_wake(filename, wake, elems)
  integer :: ipan, iw, p1, p2, ipt
  integer :: id, ir, ip, np
  character(len=*), parameter :: this_sub_name = 'load_wake'
-   
+
   call open_hdf5_file(filename, floc)
 
   !=== Panels ===
@@ -674,7 +674,7 @@ subroutine load_wake(filename, wake, elems)
   call read_hdf5_al(vpvort,'WakeVort',gloc)
   call read_hdf5(wake%last_pan_idou,'LastPanIdou',gloc)
   call close_hdf5_group(gloc)
-  
+
   if(size(vpvort,2) .gt. wake%nmax_prt) call error(this_sub_name, &
     this_mod_name, 'Loading a number of particles &
     & greater than the maximum allowed for this run: cannot truncate the &
@@ -693,7 +693,7 @@ subroutine load_wake(filename, wake, elems)
       allocate(wake%vort_p(wake%n_prt+wake%n_pan_stripes))
     endif
 
-    do iw = 1, wake%n_pan_stripes 
+    do iw = 1, wake%n_pan_stripes
       if(sim_param%use_fmm_pan) then
         wake%vort_p(iw)%p => wake%end_vorts(iw)
       else
@@ -715,9 +715,9 @@ subroutine load_wake(filename, wake, elems)
     wake%part_p(ip)%p => wake%wake_parts(ip)
     if(.not.sim_param%use_fmm_pan) wake%vort_p(ip)%p => wake%wake_parts(ip)
   enddo
-  
+
   deallocate(vppoints, vpvort, vpvels)
-  
+
   call close_hdf5_file(floc)
 
 
@@ -733,7 +733,7 @@ subroutine load_wake(filename, wake, elems)
                     wake%pan_w_points(:,p2,wake%pan_wake_len+1)/), (/3,2/)))
     enddo
   endif
-  
+
 !!!  !If there are particles and the multipole is employed, i
 !!!  !need to pre-compute the particles induced velocity now
 !!!  if(sim_param%use_fmm .and. wake%n_prt .gt. 0) then
@@ -763,7 +763,7 @@ subroutine prepare_wake(wake, elems, octree)
  type(t_octree), intent(inout) :: octree
 
  integer :: k, ip, ir, iw, ie, n_end_vort
-  
+
   !reset all the vorticity induced velocity
   do ie = 1,size(elems)
     elems(ie)%p%uvort = 0.0_wp
@@ -894,11 +894,11 @@ subroutine update_wake(wake, elems, octree)
     enddo
   enddo
 !$omp end parallel do
-  
-  !if the wake is full, calculate another row of points to generate the 
+
+  !if the wake is full, calculate another row of points to generate the
   !particles
   if(wake%full_panels) then
-    if(.not.allocated(points_end)) allocate(points_end(3,wake%n_pan_points)) 
+    if(.not.allocated(points_end)) allocate(points_end(3,wake%n_pan_points))
 
     ! create another row of points
 !$omp parallel do private(iw, pos_p, vel_p) schedule(dynamic)
@@ -916,7 +916,7 @@ subroutine update_wake(wake, elems, octree)
     enddo
 !$omp end parallel do
   endif
-  
+
 
   deallocate(point_old)
 
@@ -968,10 +968,10 @@ subroutine update_wake(wake, elems, octree)
   enddo !ip
 !$omp end parallel do
 
-  !if the wake is full, calculate another row of points to generate the 
+  !if the wake is full, calculate another row of points to generate the
   !particles
   if(wake%full_rings) then
-    if(.not.allocated(points_end_ring)) allocate(points_end_ring(3,wake%np_row)) 
+    if(.not.allocated(points_end_ring)) allocate(points_end_ring(3,wake%np_row))
     !Store the end points
     ip=1
     do id = 1,wake%ndisks
@@ -1023,7 +1023,7 @@ subroutine update_wake(wake, elems, octree)
     if (sim_param%use_vs .or. sim_param%use_vd) then
       wake%part_p(ip)%p%stretch => wake%prt_vortevol(:,ip)
     endif
-    
+
     !If not using the fast multipole, update particles position now
     if (.not.sim_param%use_fmm) then
       pos_p = wake%part_p(ip)%p%cen
@@ -1047,7 +1047,7 @@ subroutine update_wake(wake, elems, octree)
 !         stretch = stretch +(str - &
 !         sum(str*wake%part_p(ip)%p%dir)*wake%part_p(ip)%p%dir)/(4.0_wp*pi)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-        endif 
+        endif
         enddo
         !do ie=1,size(wake%end_vorts)
         !  call wake%end_vorts(ie)%compute_stretch(wake%part_p(ip)%p%cen, &
@@ -1065,16 +1065,16 @@ subroutine update_wake(wake, elems, octree)
           call wake%part_p(iq)%p%compute_diffusion(wake%part_p(ip)%p%cen, &
                wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, df)
           diff = diff + df*sim_param%nu_inf
-        endif 
+        endif
         enddo !iq
         wake%prt_vortevol(:,ip) = wake%prt_vortevol(:,ip) + diff
       endif !use_vd
     end if !use_fmm
 
-    
+
   enddo
 !$omp end parallel do
-  
+
   if (sim_param%use_fmm) then
     t0 = dust_time()
     call apply_multipole(wake%part_p, octree, elems, wake%pan_p, wake%rin_p, &
@@ -1095,7 +1095,7 @@ subroutine update_wake(wake, elems, octree)
   !err = norm2(points_prt-points_prt_fmm)/norm2(points_prt)
   !write(*,*) 'error',err
 
-  !!Assign the moved points, if they get outside the bounding box free the 
+  !!Assign the moved points, if they get outside the bounding box free the
   !!particles
   !n_part = wake%n_prt
   !do ip = 1, n_part
@@ -1194,7 +1194,7 @@ subroutine update_wake(wake, elems, octree)
   !endif
 
   !==> Rings: Update the intensities of the rings
-  !       From the back, all the vortex intensities come from the 
+  !       From the back, all the vortex intensities come from the
   !       previous panel
   do ir = wake%rin_wake_len,2,-1
     do id = 1,wake%ndisks
@@ -1266,7 +1266,7 @@ subroutine complete_wake(wake, geo, elems)
                   sim_param%min_vel_at_te*sim_param%dt / norm2(dist)
     end if
   enddo
-  
+
   !==> Check if the panels need to be joined
   if(sim_param%join_te) then
     wake%joined_tes(:,:,2:wake%nmax_pan+1) = &
@@ -1275,8 +1275,8 @@ subroutine complete_wake(wake, geo, elems)
     call join_first_panels(wake,sim_param%join_te_factor)
   endif
 
-  !==> Panels:  update the panels geometrical quantities of all the panels, 
-  !      the first two row of points have just been updated, the other 
+  !==> Panels:  update the panels geometrical quantities of all the panels,
+  !      the first two row of points have just been updated, the other
   !      rows of points were updated at the end of the last iteration
   do ipan = 1,wake%pan_wake_len
     do iw = 1,wake%n_pan_stripes
@@ -1288,7 +1288,7 @@ subroutine complete_wake(wake, geo, elems)
                                                                      (/3,4/)))
     enddo
   enddo
-  
+
   !==> Particles: update the position and intensity in time, avoid penetration
   !               and chech if remain into the boundaries
   n_part = wake%n_prt
@@ -1413,7 +1413,7 @@ subroutine complete_wake(wake, geo, elems)
          all(pos_p .le. wake%part_box_max)) then
         do ip = k, size(wake%wake_parts)
           if (wake%wake_parts(ip)%free) then
-            
+
             wake%wake_parts(ip)%free = .false.
             k = ip+1
             wake%n_prt = wake%n_prt+1
@@ -1438,9 +1438,9 @@ subroutine complete_wake(wake, geo, elems)
         call error(this_sub_name, this_mod_name, trim(msg))
         endif !max number of particles
       endif !inside the box
-      
+
     enddo !iw
-  endif !full wake 
+  endif !full wake
 
   if(wake%full_rings) then
     k = 1
@@ -1463,7 +1463,7 @@ subroutine complete_wake(wake, geo, elems)
            all(pos_p .le. wake%part_box_max)) then
           do ip = k, size(wake%wake_parts)
             if (wake%wake_parts(ip)%free) then
-              
+
               wake%wake_parts(ip)%free = .false.
               k = ip+1
               wake%n_prt = wake%n_prt+1
@@ -1491,7 +1491,7 @@ subroutine complete_wake(wake, geo, elems)
 
 
   ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  ! Treat flow separations 
+  ! Treat flow separations
   ! +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   if(sim_param%use_ve) then
     do i_comp = 1 , size( geo%components)! ***** loop #1 over components *****
@@ -1505,12 +1505,12 @@ subroutine complete_wake(wake, geo, elems)
 
         do i_elem = 1 , n_elem     ! ***** loop #2 over elements   *****
 
-          select type( el => geo%components(i_comp)%el(i_elem) ) 
+          select type( el => geo%components(i_comp)%el(i_elem) )
           type is (t_surfpan)
 
           ! flow separation
-          if ( el % al_free .gt. 0.0_wp ) then 
-            pos_p = el%cen + el%nor * el%h_bl + & 
+          if ( el % al_free .gt. 0.0_wp ) then
+            pos_p = el%cen + el%nor * el%h_bl + &
                        el % surf_vel * sim_param%dt
 
             if(all(pos_p .ge. wake%part_box_min) .and. &
@@ -1519,7 +1519,7 @@ subroutine complete_wake(wake, geo, elems)
               do ip = k, size(wake%wake_parts)
 
                 if (wake%wake_parts(ip)%free) then
-                  
+
                   wake%wake_parts(ip)%free = .false.
                   k = ip+1
                   wake%n_prt = wake%n_prt+1
@@ -1529,11 +1529,11 @@ subroutine complete_wake(wake, geo, elems)
                   else
                     wake%wake_parts(ip)%dir = el%free_vort
                   endif
-                  !wake%wake_parts(ip)%cen = el%cen + el%nor * el%h_bl + & 
+                  !wake%wake_parts(ip)%cen = el%cen + el%nor * el%h_bl + &
                   !       el % surf_vel * sim_param%dt
                   wake%wake_parts(ip)%cen = pos_p
                   wake%wake_parts(ip)%vel = el % surf_vel
-                  exit 
+                  exit
                 endif
               enddo
               if (ip .gt. wake%nmax_prt) then
@@ -1562,7 +1562,7 @@ subroutine complete_wake(wake, geo, elems)
           reshape((/wake%pan_w_points(:,p1,wake%pan_wake_len+1),  &
                     wake%pan_w_points(:,p2,wake%pan_wake_len+1)/), (/3,2/)))
       wake%end_vorts(iw)%ver_vel(:,1) = wake%pan_w_vel(:,p1,wake%pan_wake_len+1)
-      wake%end_vorts(iw)%ver_vel(:,2) = wake%pan_w_vel(:,p2,wake%pan_wake_len+1) 
+      wake%end_vorts(iw)%ver_vel(:,2) = wake%pan_w_vel(:,p2,wake%pan_wake_len+1)
     enddo
   endif
 
@@ -1578,7 +1578,7 @@ subroutine compute_vel_from_all(elems, wake, pos, vel)
 
  integer :: ie
  real(wp) :: v(3)
-  
+
   vel = 0.0_wp
 
   !calculate the influence of the solid bodies
@@ -1627,10 +1627,10 @@ subroutine get_vel_free(this, elems, wake, pos, vel_hcas, vel)
  real(wp), intent(out) :: vel(3)
 
   call compute_vel_from_all(elems, wake, pos, vel)
-  
+
   vel = vel + sim_param%u_inf
   if (sim_param%HCAS) vel = vel + vel_hcas
-  
+
 end subroutine get_vel_free
 
 !----------------------------------------------------------------------
@@ -1683,25 +1683,25 @@ subroutine join_first_panels(wake, te_fact)
       sp2_1 = wake%w_start_points(:,wake%i_start_points(2,ir))
       l2 = norm2(sp1_1-sp2_1)
       tol = te_fact*min(l1,l2)
-      
+
       !> check which is the pair of nodes to be joined, very rude approach
       i_case = 1
       lmin = norm2(sp1_1-sp1)
       if ( norm2(sp2_1-sp1) .lt. lmin ) then
         lmin = norm2(sp2_1-sp1) ; i_case = 2
-      end if 
+      end if
       if ( norm2(sp1_1-sp2) .lt. lmin ) then
         lmin = norm2(sp1_1-sp2) ; i_case = 3
-      end if 
+      end if
       if ( norm2(sp2_1-sp2) .lt. lmin ) then
         lmin = norm2(sp2_1-sp2) ; i_case = 4
-      end if 
-      
+      end if
+
       !checking only one side is enough, it is the opposite side for the other
       !end
       if ( i_case .eq. 1 ) then
         if( norm2(sp1-sp1_1).lt.tol) then
- 
+
           pos_p = (sp1+sp1_1)/2.0_wp
           wake%pan_w_points(:,wake%i_start_points(1,iw),1) = pos_p
           wake%pan_w_points(:,wake%i_start_points(1,ir),1) = pos_p
@@ -1709,13 +1709,13 @@ subroutine join_first_panels(wake, te_fact)
                    wake%pan_w_points(:,wake%i_start_points(1,ir),2))/2.0_wp
           wake%pan_w_points(:,wake%i_start_points(1,iw),2) = pos_p
           wake%pan_w_points(:,wake%i_start_points(1,ir),2) = pos_p
-  
+
           wake%joined_tes(1,i,1) = ir
           wake%joined_tes(1,j,1) = iw
 
         end if
       elseif ( i_case .eq. 2 ) then
-        if( norm2(sp1-sp2_1).lt.tol) then 
+        if( norm2(sp1-sp2_1).lt.tol) then
 
           pos_p = (sp1+sp2_1)/2.0_wp
           wake%pan_w_points(:,wake%i_start_points(1,iw),1) = pos_p
@@ -1724,13 +1724,13 @@ subroutine join_first_panels(wake, te_fact)
                    wake%pan_w_points(:,wake%i_start_points(2,ir),2))/2.0_wp
           wake%pan_w_points(:,wake%i_start_points(1,iw),2) = pos_p
           wake%pan_w_points(:,wake%i_start_points(2,ir),2) = pos_p
-  
+
           wake%joined_tes(1,i,1) = ir
           wake%joined_tes(2,j,1) = iw
 
         end if
       elseif ( i_case .eq. 3 ) then
-        if( norm2(sp2-sp1_1).lt.tol) then 
+        if( norm2(sp2-sp1_1).lt.tol) then
 
           pos_p = (sp2+sp1_1)/2.0_wp
           wake%pan_w_points(:,wake%i_start_points(2,iw),1) = pos_p
@@ -1739,13 +1739,13 @@ subroutine join_first_panels(wake, te_fact)
                    wake%pan_w_points(:,wake%i_start_points(1,ir),2))/2.0_wp
           wake%pan_w_points(:,wake%i_start_points(2,iw),2) = pos_p
           wake%pan_w_points(:,wake%i_start_points(1,ir),2) = pos_p
-  
+
           wake%joined_tes(2,i,1) = ir
           wake%joined_tes(1,j,1) = iw
 
         end if
       elseif ( i_case .eq. 4 ) then
-        if( norm2(sp2-sp2_1).lt.tol) then 
+        if( norm2(sp2-sp2_1).lt.tol) then
 
           pos_p = (sp2+sp2_1)/2.0_wp
           wake%pan_w_points(:,wake%i_start_points(2,iw),1) = pos_p
@@ -1754,7 +1754,7 @@ subroutine join_first_panels(wake, te_fact)
                    wake%pan_w_points(:,wake%i_start_points(2,ir),2))/2.0_wp
           wake%pan_w_points(:,wake%i_start_points(2,iw),2) = pos_p
           wake%pan_w_points(:,wake%i_start_points(2,ir),2) = pos_p
-  
+
           wake%joined_tes(2,i,1) = ir
           wake%joined_tes(2,j,1) = iw
 
@@ -1790,7 +1790,7 @@ function get_joined_intensity(wake, iw, side) result(ave)
   if (ineigh .ne. 0) then
     !check orientation
     if(sum(wake%wake_panels(iw,1)%nor * wake%wake_panels(ineigh,1)%nor) &
-       .ge. 0.0_wp) then 
+       .ge. 0.0_wp) then
       orient = 1.0_wp
     else
       orient = -1.0_wp
@@ -1838,7 +1838,7 @@ end function get_joined_intensity
 !    if ((distn .lt. check_radius) ) then
 !
 !      n = elems(ie)%p%nor
-!      normvel = sum(vel*n) 
+!      normvel = sum(vel*n)
 !      tanvel  = vel -normvel*n
 !      distnor = sum(dist * elems(ie)%p%nor)
 !      distnor_prev = sum((pos-elems(ie)%p%cen) * elems(ie)%p%nor)
@@ -1854,7 +1854,7 @@ end function get_joined_intensity
 !      if(normvel .lt. -k*distnor/sim_param%dt .and. distnor .ge. 0.0_wp) then
 !
 !        dtnor = -distnor/normvel
-!        facedist = norm2(elems(ie)%p%cen-(pos+vel*dtnor)) 
+!        facedist = norm2(elems(ie)%p%cen-(pos+vel*dtnor))
 !
 !         !DEBUG
 !         !write(*,*) 'facedist, elrad',facedist, elrad
@@ -1867,7 +1867,7 @@ end function get_joined_intensity
 !                   sim_param%dt/8.0_wp/distnor/(1-k) + 1.0)**8)-k*distnor/sim_param%dt
 !          tanvel = tanvel * sqrt(1+(normvel**2-normvel1**2)/sum(tanvel**2))
 !          !normvel = max(normvel,-distnor/sim_param%dt)
-!          
+!
 !          vel = tanvel + normvel1*n
 !
 !          !DEBUG
@@ -1913,28 +1913,28 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
  real(wp) :: distn, dist1_nor, dist1_tan, dist2_nor, dist2_tan
  real(wp) :: normvel, normvel_corr, tanvel(3), dt_part, tanvel2
  real(wp) :: check_radius, rad_mult, elrad_mult, r2d2, elrad, tol, blthick
- 
+
   !Multiplication factor for the check radius
   rad_mult = 1000.0_wp
   !rad_mult = 2.0_wp
- 
+
   !Multiplication factor for the element radius
   elrad_mult = 2.0_wp
 
-  ! Thickness of the "surface blocks" 
+  ! Thickness of the "surface blocks"
   ! ( now, HARDCODED. TODO: read as an input: same order of dimension of the blob radius )
   !blthick = 0.05_wp
   blthick = sim_param%VortexRad
- 
-  !tolerance for the minimum wall distance 
+
+  !tolerance for the minimum wall distance
   ! ( now, HARDCODED. TODO: read as an input: same order of dimension of the blob radius )
   tol = 0.025_wp
 
   r2d2 = sqrt(2.0_wp)/2.0_wp
-  
+
   !starting position
   pos1 = part%cen
-  
+
   vel = vel_in
 
   !Cycle on all the elements
@@ -1942,7 +1942,7 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
 
     select type( elem => elems(ie)%p )
 
-     class is (t_surfpan) 
+     class is (t_surfpan)
       !Get the position of the particle with respect to the element
       dist1 = pos1-(elem%cen + blthick*elem%nor )
       elrad = maxval(elem%edge_len)*r2d2
@@ -1952,15 +1952,15 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
       !if it is in the check radius perform calculations
       if ((distn .lt. check_radius) ) then
 
-        !use the relative velocity to take into account also the element 
+        !use the relative velocity to take into account also the element
         !movement
         relvel = vel - elem%ub
         n = elem%nor
-        dist1_nor = sum(dist1 * n) 
+        dist1_nor = sum(dist1 * n)
         dist1_tan = norm2(dist1-(n*dist1_nor))
-        normvel = sum(relvel*n) 
-        
-        !If it is on the opposite side of the element, or it is moving away, 
+        normvel = sum(relvel*n)
+
+        !If it is on the opposite side of the element, or it is moving away,
         !do not perform any modification
 !       if (dist1_nor .lt. 0.0_wp .or. normvel.ge.0.0_wp) cycle
         if (dist1_nor .lt. -blthick .or. normvel.ge.0.0_wp) cycle
@@ -1970,20 +1970,20 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
         !to keep it outside the surface
         if (dist1_nor .ge. -blthick .and. dist1_nor .le. 0.0_wp) then
           dist1 = pos1-(elem%cen)
-          dist1_nor = sum(dist1 * n) 
+          dist1_nor = sum(dist1 * n)
           dist1_tan = norm2(dist1-(n*dist1_nor))
           !make sure not to go back in time
-          dt_part = max(-dist1_nor/normvel,0.0_wp) 
+          dt_part = max(-dist1_nor/normvel,0.0_wp)
           if(dt_part .le. sim_param%dt) then
-            
-            !Get the position at the time in which the particle hits the 
+
+            !Get the position at the time in which the particle hits the
             !surface plane
             pos2  = part%cen+relvel*dt_part
             dist2 = pos2 - ( elem%cen )
             dist2_nor = sum(dist2 * n)
             dist2_tan = norm2(dist2-(n*dist2_nor))
-            
-            !If when the particle hits the surface plane it is within the 
+
+            !If when the particle hits the surface plane it is within the
             !considered element radius, keep on correcting (otherwise it is not
             !passing from the considered element)
             !if (dist2_tan .lt. elrad_mult*elrad) then
@@ -1992,8 +1992,8 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
               !correct the normal velocity to avoid penetration
 !             normvel_corr = -dist1_nor*(1-tol)/sim_param%dt
               normvel_corr = -dist1_nor*(1.0_wp-0.0_wp)/sim_param%dt
-               
-              ! should be 
+
+              ! should be
               ! vel = relvel + (normvel_corr-normvel)*n + elem%ub
               ! but simplifying
               newvel = vel + (normvel_corr-normvel)*n
@@ -2009,38 +2009,38 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
                                                      nveldiff.ge.0.0_wp) then
                 tanvel = tanvel * (sqrt(nveldiff)/sqrt(tanvel2) )
               endif
-              !reconstruct the velocity 
+              !reconstruct the velocity
               vel = tanvel + normvel_corr*n
             endif
           endif
           cycle
         endif
 
-        
+
         !get the time at which the particle hits the surface
         !make sure not to go back in time
-        dt_part = max(-dist1_nor/normvel,0.0_wp) 
-        !if it is lower than the timestep (i.e. the particles hits the surface 
+        dt_part = max(-dist1_nor/normvel,0.0_wp)
+        !if it is lower than the timestep (i.e. the particles hits the surface
         !within next step) start the correction
         if(dt_part .le. sim_param%dt) then
-          
-          !Get the position at the time in which the particle hits the 
+
+          !Get the position at the time in which the particle hits the
           !surface plane
           pos2  = part%cen+relvel*dt_part
           dist2 = pos2 - ( elem%cen + blthick*elem%nor )
           dist2_nor = sum(dist2 * n)
           dist2_tan = norm2(dist2-(n*dist2_nor))
-          
-          !If when the particle hits the surface plane it is within the 
+
+          !If when the particle hits the surface plane it is within the
           !considered element radius, keep on correcting (otherwise it is not
           !passing from the considered element)
           if (dist2_tan .lt. elrad_mult*elrad) then
-            
+
             !correct the normal velocity to avoid penetration
 !           normvel_corr = -dist1_nor*(1-tol)/sim_param%dt
             normvel_corr = -dist1_nor*(1.0_wp-0.0_wp)/sim_param%dt
-             
-            ! should be 
+
+            ! should be
             ! vel = relvel + (normvel_corr-normvel)*n + elem%ub
             ! but simplifying
             newvel = vel + (normvel_corr-normvel)*n
@@ -2056,16 +2056,16 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
                                                    nveldiff.ge.0.0_wp) then
               tanvel = tanvel * (sqrt(nveldiff)/sqrt(tanvel2) )
             endif
-            !reconstruct the velocity 
+            !reconstruct the velocity
             vel = tanvel + normvel_corr*n
           endif
         endif
 
       endif
-   
+
     class is ( t_vortlatt )
 
-    class is ( t_liftlin ) 
+    class is ( t_liftlin )
 
     class default
 
@@ -2093,28 +2093,28 @@ subroutine avoid_collision_2(elems, wake, part, vel_in, vel_out)
  real(wp) :: normvel, normvel_corr, tanvel(3), dt_part, tanvel2
  real(wp) :: check_radius, rad_mult, elrad_mult, r2d2, elrad, tol, blthick
  real(wp) :: dampf
- 
+
   !Multiplication factor for the check radius
   rad_mult = sim_param%pa_rad_mult
   !rad_mult = 2.0_wp
- 
+
   !Multiplication factor for the element radius
   elrad_mult = sim_param%pa_elrad_mult
 
-  ! Thickness of the "surface blocks" 
+  ! Thickness of the "surface blocks"
   ! ( now, HARDCODED. TODO: read as an input: same order of dimension of the blob radius )
   !blthick = 0.05_wp
   blthick = sim_param%VortexRad
- 
-  !tolerance for the minimum wall distance 
+
+  !tolerance for the minimum wall distance
   ! ( now, HARDCODED. TODO: read as an input: same order of dimension of the blob radius )
   tol = 0.025_wp
 
   r2d2 = sqrt(2.0_wp)/2.0_wp
-  
+
   !starting position
   pos1 = part%cen
-  
+
   vel = vel_in
 
   !Cycle on all the elements
@@ -2122,7 +2122,7 @@ subroutine avoid_collision_2(elems, wake, part, vel_in, vel_out)
 
     select type( elem => elems(ie)%p )
 
-     class is (t_surfpan) 
+     class is (t_surfpan)
       !Get the position of the particle with respect to the element
       dist1 = pos1-(elem%cen)
       elrad = maxval(elem%edge_len)*r2d2
@@ -2132,35 +2132,35 @@ subroutine avoid_collision_2(elems, wake, part, vel_in, vel_out)
       !if it is in the check radius perform calculations
       if ((distn .lt. check_radius) ) then
 
-        !use the relative velocity to take into account also the element 
+        !use the relative velocity to take into account also the element
         !movement
         relvel = vel - elem%ub
         n = elem%nor
-        dist1_nor = sum(dist1 * n) 
+        dist1_nor = sum(dist1 * n)
         dist1_tan = norm2(dist1-(n*dist1_nor))
-        normvel = sum(relvel*n) 
-        
-        !If it is on the opposite side of the element, or it is moving away, 
+        normvel = sum(relvel*n)
+
+        !If it is on the opposite side of the element, or it is moving away,
         !do not perform any modification
 !       if (dist1_nor .lt. 0.0_wp .or. normvel.ge.0.0_wp) cycle
         if (dist1_nor .lt. 0.0_wp .or. normvel.ge.0.0_wp) cycle
-        
+
         !get the time at which the particle hits the surface
         !make sure not to go back in time
         dt_part = min(max((dist1_nor)/(-normvel),0.0_wp), sim_param%dt)
-        !if it is lower than the timestep (i.e. the particles hits the surface 
+        !if it is lower than the timestep (i.e. the particles hits the surface
         !within next step) start the correction
-          
-        !Get the position at the time in which the particle hits the 
+
+        !Get the position at the time in which the particle hits the
         !surface plane
         pos2  = part%cen+relvel*dt_part
         dist2 = pos2 - ( elem%cen )
         dist2_nor = sum(dist2 * n)
         if(dist2_nor .le. blthick) then
           dist2_tan = norm2(dist2-(n*dist2_nor))
-          
+
           if (dist2_tan .lt. elrad_mult*elrad) then
-            
+
             !correct the normal velocity to avoid penetration
 !           normvel_corr = -dist1_nor*(1-tol)/sim_param%dt
             if (dt_part .lt. sim_param%dt) then
@@ -2169,8 +2169,8 @@ subroutine avoid_collision_2(elems, wake, part, vel_in, vel_out)
               dampf = (dist2_nor/blthick)
               normvel_corr = normvel + (blthick-dist2_nor)/sim_param%dt * dampf
             endif
-             
-            ! should be 
+
+            ! should be
             ! vel = relvel + (normvel_corr-normvel)*n + elem%ub
             ! but simplifying
             newvel = vel + (normvel_corr-normvel)*n
@@ -2186,16 +2186,16 @@ subroutine avoid_collision_2(elems, wake, part, vel_in, vel_out)
                                                    nveldiff.ge.0.0_wp) then
               tanvel = tanvel * (sqrt(nveldiff)/sqrt(tanvel2) )
             endif
-            !reconstruct the velocity 
+            !reconstruct the velocity
             vel = tanvel + normvel_corr*n
           endif
         endif
 
       endif
-   
+
     class is ( t_vortlatt )
 
-    class is ( t_liftlin ) 
+    class is ( t_liftlin )
 
     class default
 

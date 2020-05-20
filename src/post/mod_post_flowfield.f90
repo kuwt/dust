@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -62,7 +62,7 @@ use mod_parse, only: &
   countoption
 
 use mod_aeroel, only: &
-  t_elem_p 
+  t_elem_p
 
 
 use mod_wake, only: &
@@ -71,23 +71,23 @@ use mod_wake, only: &
 use mod_hdf5_io, only: &
    h5loc, &
    open_hdf5_file, &
-   close_hdf5_file, & 
+   close_hdf5_file, &
    open_hdf5_group, &
    close_hdf5_group, &
-   read_hdf5 
+   read_hdf5
 
 use mod_stringtools, only: &
   LowCase
 
 use mod_geo_postpro, only: &
   load_components_postpro, update_points_postpro , &
-  prepare_geometry_postpro  
+  prepare_geometry_postpro
 
 use mod_tecplot_out, only: &
-  tec_out_box 
+  tec_out_box
 
 use mod_vtk_out, only: &
-  vtr_write  
+  vtr_write
 
 use mod_post_load, only: &
   load_refs , load_res, load_wake_post
@@ -102,7 +102,7 @@ character(len=max_char_len), parameter :: this_mod_name = 'mod_post_flowfield'
 
 contains
 
-! ---------------------------------------------------------------------- 
+! ----------------------------------------------------------------------
 
 subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
                             out_frmt, components_names, all_comp, &
@@ -123,14 +123,14 @@ integer , parameter :: n_max_vars = 3 !vel,p,vort, ! TODO: 4 with cp
 character(len=max_char_len), allocatable :: var_names(:)
 integer , allocatable :: vars_n(:)
 integer :: i_var , n_vars
-logical :: probe_vel , probe_p , probe_vort 
+logical :: probe_vel , probe_p , probe_vort
 real(wp) :: u_inf(3)
 real(wp) :: P_inf , rho
 real(wp) :: vel_probe(3) = 0.0_wp , vort_probe(3) = 0.0_wp
-real(wp) :: pres_probe 
+real(wp) :: pres_probe
 real(wp) :: v(3) = 0.0_wp
 
-real(wp), allocatable , target :: sol(:) 
+real(wp), allocatable , target :: sol(:)
 integer(h5loc) :: floc , ploc
 real(wp), allocatable :: points(:,:)
 integer :: nelem
@@ -150,16 +150,16 @@ real(wp), allocatable :: xbox(:) , ybox(:) , zbox(:)
 real(wp) :: dxbox , dybox , dzbox
 real(wp), allocatable :: box_vel(:,:) , box_p(:) , box_vort(:,:)
 integer :: ix , iy , iz
-real(wp), allocatable :: vars(:,:) 
-real(wp), allocatable :: ave_vars(:,:) 
+real(wp), allocatable :: vars(:,:)
+real(wp), allocatable :: ave_vars(:,:)
 integer :: i_var_v , i_var_p , i_var_w
 
 integer :: ip , ipp, ic , ie , i1 , it, itave
 
-character(len=max_char_len) :: str_a , var_name 
+character(len=max_char_len) :: str_a , var_name
 character(len=max_char_len) :: filename
 
-character(len=max_char_len), parameter :: & 
+character(len=max_char_len), parameter :: &
    this_sub_name = 'post_flowfield'
 
     write(*,*) nl//' Analysis:',ia,' post_flowfield() +++++++++ '//nl
@@ -172,7 +172,7 @@ if ( allocated(components_names) ) then
      'All the components are used. <Components> input &
      &is ignored, and deallocated.' )
   deallocate(components_names)
-end if 
+end if
 all_comp = .true.
 
 ! Read variables to save : velocity | pressure | vorticity
@@ -190,14 +190,14 @@ else
    case ( 'velocity' ) ; probe_vel = .true.
    case ( 'pressure' ) ; probe_p   = .true.
    case ( 'vorticity') ; probe_vort= .true.
-   case ( 'cp'       ) 
-    write(str_a,*) ia 
+   case ( 'cp'       )
+    write(str_a,*) ia
     call error('dust_post','','Unknown Variable: '//trim(var_name)//&
                ' for analysis n.'//trim(str_a)//'.'//nl//&
                 'Choose "velocity", "pressure", "vorticity".')
    case ( 'all') ; probe_vel = .true. ; probe_p   = .true. ; probe_vort= .true.
    case default
-    write(str_a,*) ia 
+    write(str_a,*) ia
     call error('dust_post','','Unknown Variable: '//trim(var_name)//&
                ' for analysis n.'//trim(str_a)//'.'//nl//&
                 'Choose "velocity", "pressure", "vorticity".')
@@ -208,7 +208,7 @@ end if
 ! load the geo components just once
 call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
 !TODO: here get the run id    !todo????
-call load_components_postpro(comps, points, nelem, floc, & 
+call load_components_postpro(comps, points, nelem, floc, &
                              components_names,  all_comp)
 call close_hdf5_file(floc)
 
@@ -221,7 +221,7 @@ ip = 0
 do ic = 1 , size(comps)
  do ie = 1 , size(comps(ic)%el)
   ip = ip + 1
-  comps(ic)%el(ie)%mag => sol(ip) 
+  comps(ic)%el(ie)%mag => sol(ip)
  end do
 end do
 
@@ -233,24 +233,24 @@ maxxyz = getrealarray(sbprms,'Maxxyz',3)
 ! ... allocate 'box' and deal with inconsistent input
 if ( nxyz(1) .gt. 1 ) then ! x-coord
   allocate( xbox(nxyz(1)) )
-  dxbox = ( maxxyz(1) - minxyz(1) ) / real(nxyz(1) - 1, wp) 
-  xbox = (/ ( minxyz(1) + real(i1-1,wp) * dxbox , i1 = 1 , nxyz(1) )/) 
+  dxbox = ( maxxyz(1) - minxyz(1) ) / real(nxyz(1) - 1, wp)
+  xbox = (/ ( minxyz(1) + real(i1-1,wp) * dxbox , i1 = 1 , nxyz(1) )/)
 else
   allocate( xbox(1) )
   xbox(1) = minxyz(1)
 end if
 if ( nxyz(2) .gt. 1 ) then ! y-coord
   allocate( ybox(nxyz(2)) )
-  dybox = ( maxxyz(2) - minxyz(2) ) / real(nxyz(2) - 1, wp) 
-  ybox = (/ ( minxyz(2) + real(i1-1, wp) * dybox , i1 = 1 , nxyz(2) )/) 
+  dybox = ( maxxyz(2) - minxyz(2) ) / real(nxyz(2) - 1, wp)
+  ybox = (/ ( minxyz(2) + real(i1-1, wp) * dybox , i1 = 1 , nxyz(2) )/)
 else
   allocate( ybox(1) )
   ybox(1) = minxyz(2)
 end if
 if ( nxyz(3) .gt. 1 ) then ! z-coord
   allocate( zbox(nxyz(3)) )
-  dzbox = ( maxxyz(3) - minxyz(3) ) / real(nxyz(3) - 1, wp) 
-  zbox = (/ ( minxyz(3) + real(i1-1, wp) * dzbox , i1 = 1 , nxyz(3) )/) 
+  dzbox = ( maxxyz(3) - minxyz(3) ) / real(nxyz(3) - 1, wp)
+  zbox = (/ ( minxyz(3) + real(i1-1, wp) * dzbox , i1 = 1 , nxyz(3) )/)
 else
   allocate( zbox(1) )
   zbox(1) = minxyz(3)
@@ -274,7 +274,7 @@ if ( probe_p   ) then
   var_names(i_var) = 'pressure'
   vars_n(i_var) = 1
   i_var_p = i_var_v + 1
-end if 
+end if
 if ( probe_vort) then
   allocate(box_vort(product(nxyz),3))
   i_var = i_var + 1
@@ -293,8 +293,8 @@ end if
 
 ! Allocate and fill vars array, for output +++++++++++++++++
 !  sum(vars_n): # of scalar fields to be plotted
-!  product(nxyz) # of points where the vars are plotted 
-allocate(vars(sum(vars_n),product(nxyz))) ; vars = 0.0_wp 
+!  product(nxyz) # of points where the vars are plotted
+allocate(vars(sum(vars_n),product(nxyz))) ; vars = 0.0_wp
 if(average) then
  allocate(ave_vars(sum(vars_n),product(nxyz)))
  ave_vars = 0.0_wp
@@ -332,7 +332,7 @@ do it = an_start, an_end, an_step ! Time history
   !sol = vort
 
   ! Load the wake -----------------------------
-  call load_wake_post(floc, wake, wake_elems) 
+  call load_wake_post(floc, wake, wake_elems)
   call close_hdf5_file(floc)
 
   ! Compute fields to be plotted +++++++++++++++++++++++++++++
@@ -345,7 +345,7 @@ do it = an_start, an_end, an_step ! Time history
 !     ip = ip + 1
      ipp = ix + (iy-1)*size(xbox) + (iz-1)*size(xbox)*size(ybox)
 
-      if ( probe_vel .or. probe_p ) then 
+      if ( probe_vel .or. probe_p ) then
 
         ! Compute velocity
         vel_probe = 0.0_wp ; pres_probe = 0.0_wp ; vort_probe = 0.0_wp
@@ -353,9 +353,9 @@ do it = an_start, an_end, an_step ! Time history
         ! body
         do ic = 1,size(comps) ! Loop on components
          do ie = 1 , size( comps(ic)%el ) ! Loop on elems of the comp
-          call comps(ic)%el(ie)%compute_vel( (/ xbox(ix) , ybox(iy) , zbox(iz) /) , & 
+          call comps(ic)%el(ie)%compute_vel( (/ xbox(ix) , ybox(iy) , zbox(iz) /) , &
                                               u_inf , v )
-          vel_probe = vel_probe + v/(4*pi) 
+          vel_probe = vel_probe + v/(4*pi)
          end do
         end do
 
@@ -364,13 +364,13 @@ do it = an_start, an_end, an_step ! Time history
           call wake_elems(ie)%p%compute_vel( &
                    (/ xbox(ix) , ybox(iy) , zbox(iz) /) , &
                    u_inf , v )
-          vel_probe = vel_probe + v/(4*pi) 
+          vel_probe = vel_probe + v/(4*pi)
         enddo
-       
+
         ! + u_inf
         vel_probe = vel_probe + u_inf
 
-        
+
       end if
 
       if ( probe_vel ) then
@@ -383,8 +383,8 @@ do it = an_start, an_end, an_step ! Time history
         !TODO: add:
         ! - add the unsteady term: -rho*dphi/dt
         pres_probe = P_inf + 0.5_wp*rho*norm2(u_inf)**2 - 0.5_wp*rho*norm2(vel_probe)**2
-        vars(i_var_v+1,ipp) = pres_probe 
-         
+        vars(i_var_v+1,ipp) = pres_probe
+
       end if
 
       if ( probe_vort ) then
@@ -412,7 +412,7 @@ do it = an_start, an_end, an_step ! Time history
                                trim(an_name)//'_',it,'.vtr'
       call vtr_write ( filename , xbox , ybox , zbox , &
                        vars_n(1:i_var) , var_names(1:i_var) , &
-                       vars ) 
+                       vars )
     case('tecplot')
      write(filename,'(A,I4.4,A)') trim(basename)//'_'//&
                               trim(an_name)//'_',it,'.plt'
@@ -456,7 +456,7 @@ if (average) then
                              trim(an_name)//'_ave.vtr'
     call vtr_write ( filename , xbox , ybox , zbox , &
                      vars_n(1:i_var) , var_names(1:i_var) , &
-                     ave_vars ) 
+                     ave_vars )
   case('tecplot')
    write(filename,'(A)') trim(basename)//'_'//&
                             trim(an_name)//'_ave.plt'
@@ -497,10 +497,10 @@ endif
 do ic = 1 , size(comps)
  do ie = 1 , size(comps(ic)%el)
   ip = ip + 1
-  nullify(comps(ic)%el(ie)%mag) ! => null()  
+  nullify(comps(ic)%el(ie)%mag) ! => null()
  end do
 end do
-deallocate(sol) 
+deallocate(sol)
 
 if ( allocated(box_vel ) ) deallocate(box_vel )
 if ( allocated(box_p   ) ) deallocate(box_p   )
@@ -518,6 +518,6 @@ deallocate(comps,components_names)
 
 end subroutine post_flowfield
 
-! ---------------------------------------------------------------------- 
+! ----------------------------------------------------------------------
 
 end module mod_post_flowfield

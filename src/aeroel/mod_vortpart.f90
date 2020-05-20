@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -91,8 +91,8 @@ contains
 
   procedure, pass(this) :: compute_vel       => compute_vel_vortpart
   procedure, pass(this) :: compute_grad      => compute_grad_vortpart
-  procedure, pass(this) :: compute_stretch   => compute_stretch_vortpart  
-  procedure, pass(this) :: compute_diffusion => compute_diffusion_vortpart  
+  procedure, pass(this) :: compute_stretch   => compute_stretch_vortpart
+  procedure, pass(this) :: compute_diffusion => compute_diffusion_vortpart
   procedure, pass(this) :: calc_geo_data     => calc_geo_data_vortpart
 
 end type
@@ -112,7 +112,7 @@ real(wp) :: r_cutoff
 contains
 !----------------------------------------------------------------------
 
-!> Initialize vortex line 
+!> Initialize vortex line
 subroutine initialize_vortpart()
 
   r_Vortex = sim_param%VortexRad
@@ -141,7 +141,7 @@ subroutine compute_vel_vortpart (this, pos, uinf, vel)
   !Rosenhead kernel regularized velocity
   vvort =  cross(this%dir,dist) / (sqrt(sum(dist**2)+r_Vortex**2))**3
   vel = vvort*this%mag
-  
+
   !Rankine velocity
   !distn = norm2(dist)
   !if ( distn .gt. r_Vortex ) then
@@ -169,7 +169,7 @@ end subroutine compute_grad_vortpart
 
 !----------------------------------------------------------------------
 
-!> Compute the vortex stretching induced by a vortex particle 
+!> Compute the vortex stretching induced by a vortex particle
 !! in a prescribed position with a prescribed vorticity (i.e. another particle)
 !!
 !! WARNING: the calculated term, to be consistent with the formulation of
@@ -207,7 +207,7 @@ end subroutine compute_stretch_vortpart
 
 !----------------------------------------------------------------------
 
-!> Compute the vorticity diffusion induced by a vortex particle 
+!> Compute the vorticity diffusion induced by a vortex particle
 !! in a prescribed position with a prescribed vorticity (i.e. another particle)
 !!
 subroutine compute_diffusion_vortpart (this, pos, alpha, diff)
