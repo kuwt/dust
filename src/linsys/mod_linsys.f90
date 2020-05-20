@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -99,8 +99,8 @@ contains
 
 !> Initialize the linear system
 !!
-!! In the present subroutine all the relevant data for the solution 
-!! of the linear system are allocated. 
+!! In the present subroutine all the relevant data for the solution
+!! of the linear system are allocated.
 !! Then the aerodinamic influence coefficients of the static part of
 !! the geometry are calculated, as well as the contribution of such part
 !! to the right hand side
@@ -122,13 +122,13 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
 
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name = 'initialize_linsys'
- 
+
 
   ! Free-stream conditions
   uinf   = sim_param%u_inf
   Pinf   = sim_param%P_inf
   rhoinf = sim_param%rho_inf
- 
+
   linsys%rank = geo%nelem_impl
   linsys%nstatic = geo%nstatic_impl; linsys%nmoving = geo%nmoving_impl
   !linsys%n_ll = geo%nll
@@ -138,10 +138,10 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
   linsys%nstatic_expl = geo%nstatic_expl
   linsys%nmoving_expl = geo%nmoving_expl
   linsys%n_expl =  geo%nelem_expl
-  
+
   ntot = linsys%rank
 
-  !Allocate the vectors of the right size 
+  !Allocate the vectors of the right size
   allocate( linsys%A(linsys%rank, linsys%rank))
   allocate( linsys%L_static(linsys%nstatic, linsys%nstatic_expl))
  ! allocate( linsys%D_static(linsys%nstatic, linsys%nstatic_ad))
@@ -153,7 +153,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
   allocate( linsys%res_expl(linsys%n_expl,2))
   linsys%b_static = 0.0_wp
   linsys%res_expl = 0.0_wp
- 
+
 
   !! == Pressure
   !Set the number of surface panels
@@ -172,11 +172,11 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
   allocate( linsys%P_pres(linsys%n_sp) )
   allocate( linsys%res_pres(geo%nSurfPan) )
   linsys%res_pres = 0.0_wp
-  allocate( linsys%b_static_pres(geo%nstatic_SurfPan,geo%nstatic_SurfPan) ) 
-  
+  allocate( linsys%b_static_pres(geo%nstatic_SurfPan,geo%nstatic_SurfPan) )
+
 
   nst = linsys%nstatic
-  !Build the static part of the system, saving also the static part of the 
+  !Build the static part of the system, saving also the static part of the
   ! rhs
 !$omp parallel do private(ie) firstprivate(nst) schedule(dynamic)
   do ie = 1,nst
@@ -186,7 +186,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
                                       uinf, ie, 1, linsys%nstatic)
   enddo
 !$omp end parallel do
-  
+
   !! == Pressure
   !copy the matrix before it gets corrected for the wake contribution
   !linsys%A_pres = linsys%A( geo%idSurfPan , geo%idSurfPan )
@@ -196,7 +196,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
       linsys%A_pres(i,j) = linsys%A( geo%idSurfPan(i) , geo%idSurfPan(j) )
     enddo
   enddo
-  
+
   ! add the wake contribution
 !$omp parallel do private(ie) firstprivate(nst)
   do ie = 1,nst
@@ -214,7 +214,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
   !all the moving part will be assembled in \ref assemble_linsys, here
   !only the pointer to the solutions are associated
   do ie = linsys%nstatic+1,linsys%rank
-    
+
     !link the solution into the elements
     elems(ie)%p%mag => linsys%res(ie)
 
@@ -222,24 +222,24 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
 
   !At the end link all the explicit elements to their (latest) results
   do ie = 1,linsys%n_expl
-    expl_elems(ie)%p%mag => linsys%res_expl(ie,1) 
+    expl_elems(ie)%p%mag => linsys%res_expl(ie,1)
   enddo
 
   !! == Pressure
-  !linsys%b_static_pres = linsys%b_static( & 
+  !linsys%b_static_pres = linsys%b_static( &
   !       geo%idSurfPan(1:geo%nstatic_SurfPan), &
   !       geo%idSurfPan(1:geo%nstatic_SurfPan) )
   !ifort workaround
   do i = 1, geo%nstatic_SurfPan
     do j = 1, geo%nstatic_SurfPan
-      linsys%b_static_pres(i,j) = linsys%b_static( & 
+      linsys%b_static_pres(i,j) = linsys%b_static( &
                                   geo%idSurfPan(i), &
                                   geo%idSurfPan(j) )
     enddo
   enddo
   do ie = 1 , geo%nSurfpan
     select type( el => elems(geo%idSurfPan(ie))%p ) ; class is(t_surfpan)
-      el%pres_sol => linsys%res_pres(ie) 
+      el%pres_sol => linsys%res_pres(ie)
     end select
   end do
 
@@ -288,11 +288,11 @@ end subroutine initialize_linsys
 !!
 !! The linear system must be re-assembled each timestep since some geometry
 !! parts might be moving during the simulation.
-!! 
+!!
 !! First for all the equations for non moving parts only the influence of
-!! the moving parts are calculated, leaving all the static part as was 
+!! the moving parts are calculated, leaving all the static part as was
 !! already calculated in \ref initialize_linsys
-!! 
+!!
 !! Then for the equations for moving parts all the row and rhs are calculated
 subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
                            wake ) ! uinf)
@@ -307,7 +307,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
  real(wp) :: uinf(3)
  real(wp) :: rhoinf , Pinf
 
- integer :: ie, nst, ntot 
+ integer :: ie, nst, ntot
 
  ! Free-stream conditions
  uinf   = sim_param%u_inf
@@ -349,13 +349,13 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
 !$omp end parallel
 
   !!3) Copy the non modified dynamic part of the matrix into the pressure one
-  linsys%A_pres(1:linsys%nstatic_sp,linsys%nstatic_sp+1:linsys%n_sp) = & 
+  linsys%A_pres(1:linsys%nstatic_sp,linsys%nstatic_sp+1:linsys%n_sp) = &
     linsys%A( geo%idSurfPan(1:linsys%nstatic_sp) , &
               geo%idSurfPan(linsys%nstatic_sp+1:linsys%n_sp) )
   linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%n_sp) = &
     linsys%A( geo%idSurfPan(linsys%nstatic_sp+1:linsys%n_sp) , &
               geo%idSurfPan(1:linsys%n_sp) )
-   
+
    !!4) Correct the matrix with the wake contributions
   !First all the static ones (passing as start and end only the dynamic part)
 !$omp parallel private(ie) firstprivate(nst, ntot)
@@ -391,16 +391,16 @@ end subroutine assemble_linsys
 !! The static part of the system is stored already decomposed in LU
 !! The dynamic part of the system has been updated during the timestep, and
 !! a global LU factorization of the matrix must be completed. Finally the
-!! factorized system is solved. 
+!! factorized system is solved.
 subroutine solve_linsys(linsys)
  type(t_linsys), intent(inout) :: linsys
 
 ! real(wp) , allocatable :: A_tmp(:,:)
 ! integer, allocatable :: IPIV(:)
- integer              :: INFO   
+ integer              :: INFO
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name = 'solve_linsys'
-  
+
   ! Operations on the side band matrices: done only if the system is
   ! mixed static/dynamic and those matrices exists
   if (linsys%nstatic .gt. 0 .and. linsys%nmoving .gt.0) then
@@ -429,7 +429,7 @@ subroutine solve_linsys(linsys)
            linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank),    &
            linsys%nstatic)
 #endif /*DUST_PRECISION*/
-    
+
     !==>Solve the lower-diagoal block Lds
     !Solve Pdd-1 Lds Uss = Ads for Pdd-1 Lds and put it in place of Ads
 #if (DUST_PRECISION==1)
@@ -486,7 +486,7 @@ subroutine solve_linsys(linsys)
     endif
 
   endif
-  
+
   ! If the system is mixed finish the operation on the band blocks
   if (linsys%nstatic .gt. 0 .and. linsys%nmoving .gt.0) then
   !==> Permute the lower mixed bloc
@@ -528,12 +528,12 @@ end subroutine solve_linsys
 
 !> Destructor function for the linear system
 !!
-!! The destruction of the linear system type simply relies on passing it 
-!! to the subroutine with intent(out), which automatically destroys all the 
+!! The destruction of the linear system type simply relies on passing it
+!! to the subroutine with intent(out), which automatically destroys all the
 !! members of linsys
 subroutine destroy_linsys(linsys)
  type(t_linsys), intent(out) :: linsys
- 
+
  !Dummy operation to suppress warning
  linsys%rank = -1
 
@@ -549,7 +549,7 @@ subroutine dump_linsys(linsys , filen_A , filen_b )
  character(len=*) , intent(in) :: filen_A , filen_b
 
  integer :: fid
- integer :: i1 
+ integer :: i1
 
 
  fid = 21
@@ -558,7 +558,7 @@ subroutine dump_linsys(linsys , filen_A , filen_b )
   write(fid,*) linsys%A(i1,:)
  end do
  close(fid)
- 
+
  fid = 22
  open(unit=fid, file=trim(adjustl(filen_b)) )
  do i1 = 1 , size(linsys%b,1)
