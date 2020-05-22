@@ -166,6 +166,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  character(len=max_char_len) :: comp_el_type
  character :: ElType
  character(len=max_char_len) :: mesh_file_type
+ !> Hinge ---
+ integer :: n_hinges
  !> Coupling ---
  logical :: coupled_comp
  character(len=max_char_len) :: coupled_str  ! there is no hdf_write for logical
@@ -245,6 +247,12 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
               &component) of the unit vectors of the coupling node ref.frame: &
               &A = (/ I_nod_1^loc, I_nod_2^loc, I_nod_3^loc /)', &
               '(/ 1.,0.,0., 0.,1.,0., 0.,0.,1. /)')
+  !hinges
+  call geo_prs%CreateIntOption('n_hinges', &
+              'N. of hinges and rotating parts (e.g. aileron) of the component', &
+              '0') ! default: no hinges -> n_hinges = 0
+  call geo_prs%CreateSubOption('Hinge', &
+              'Hinge input data', hinge_prs)
   !symmtery
   call geo_prs%CreateLogicalOption('mesh_symmetry',&
                'Reflect and double the geometry?', 'F')
@@ -339,6 +347,11 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
          ', defined in file: '//trim(geo_file)//'. ElType must be:'// &
          ' p,v,l,a.')
   end if
+  !> Hinges
+  n_hinges = getint(geo_prs, 'n_hinges')
+  
+
+  !> Coupling
   coupled_comp = getlogical(geo_prs, 'Coupled')
   coupled_str = 'false'
 #if USE_PRECICE

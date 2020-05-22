@@ -77,7 +77,6 @@ use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
-
 use mod_surfpan, only: &
   t_surfpan
 
@@ -100,20 +99,23 @@ use mod_reference, only: &
   t_ref, build_references, update_all_references, destroy_references   ! , &
 ! update_relative_initial_conditions
 
+use mod_hinges, only: &
+  t_hinge
+
 use mod_hdf5_io, only: &
-   h5loc, &
-   new_hdf5_file, &
-   open_hdf5_file, &
-   close_hdf5_file, &
-   new_hdf5_group, &
-   new_hdf5_group, &
-   open_hdf5_group, &
-   close_hdf5_group, &
-   write_hdf5, &
-   write_hdf5_attr, &
-   read_hdf5, &
-   read_hdf5_al, &
-   check_dset_hdf5
+  h5loc, &
+  new_hdf5_file, &
+  open_hdf5_file, &
+  close_hdf5_file, &
+  new_hdf5_group, &
+  new_hdf5_group, &
+  open_hdf5_group, &
+  close_hdf5_group, &
+  write_hdf5, &
+  write_hdf5_attr, &
+  read_hdf5, &
+  read_hdf5_al, &
+  check_dset_hdf5
 
 !----------------------------------------------------------------------
 
@@ -215,6 +217,7 @@ type :: t_geo_component
  real(wp),allocatable :: theta_e(:)
  !> Id of the airfoil elements (index in airfoil_list char array)
  integer ,allocatable :: i_airfoil_e(:,:)
+
 #if USE_PRECICE
  !> Chord vector reference, required to assign the motion ot the 
  ! TE of a deformable LL element, knowing the LE motion
@@ -222,6 +225,10 @@ type :: t_geo_component
  !> "Chord" vector reference, referred to the center of the elements
  real(wp), allocatable :: c_ref_c(:,:)
 #endif
+
+ !> Hinges
+ integer :: n_hinges
+ type(t_hinge), allocatable :: hinge(:)
 
  !> Dimensions of parametric elements only
  integer :: parametric_nelems_span , parametric_nelems_chor 
