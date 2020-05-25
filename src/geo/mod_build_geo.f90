@@ -52,8 +52,8 @@ use mod_param, only: &
   wp, max_char_len, nl, prev_tri, next_tri, prev_qua, next_qua
 
 use mod_parse, only: &
-  t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption &
-  , finalizeparameters
+  t_parse, getstr, getint, getreal, getrealarray, getlogical, getsuboption, &
+  countoption, finalizeparameters
 
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime, check_file_exists
@@ -75,6 +75,9 @@ use mod_stringtools, only : &
 
 use mod_ll_io, only: &
   read_mesh_ll
+
+use mod_hinges, only: &
+  t_hinge, t_hinge_input, build_hinges, hinge_input_parser
 
 use mod_hdf5_io, only: &
    h5loc, &
@@ -167,7 +170,12 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  character :: ElType
  character(len=max_char_len) :: mesh_file_type
  !> Hinge ---
- integer :: n_hinges
+ integer :: n_hinges, n_nodes
+ type(t_parse), pointer :: hinge_prs
+ type(t_hinge_input), allocatable :: hinges(:)
+ character(len=max_char_len) :: hinge_str
+ character(len=2) :: hinge_id
+ integer(h5loc) :: hinge_loc, hinge_i_loc
  !> Coupling ---
  logical :: coupled_comp
  character(len=max_char_len) :: coupled_str  ! there is no hdf_write for logical
@@ -248,11 +256,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
               &A = (/ I_nod_1^loc, I_nod_2^loc, I_nod_3^loc /)', &
               '(/ 1.,0.,0., 0.,1.,0., 0.,0.,1. /)')
   !hinges
-  call geo_prs%CreateIntOption('n_hinges', &
-              'N. of hinges and rotating parts (e.g. aileron) of the component', &
-              '0') ! default: no hinges -> n_hinges = 0
-  call geo_prs%CreateSubOption('Hinge', &
-              'Hinge input data', hinge_prs)
+  call hinge_input_parser( geo_prs, hinge_prs )
   !symmtery
   call geo_prs%CreateLogicalOption('mesh_symmetry',&
                'Reflect and double the geometry?', 'F')
@@ -347,11 +351,14 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
          ', defined in file: '//trim(geo_file)//'. ElType must be:'// &
          ' p,v,l,a.')
   end if
-  !> Hinges
+  !> Hinges ---------------------------------------------------------------
   n_hinges = getint(geo_prs, 'n_hinges')
-  
 
-  !> Coupling
+  if ( n_hinges .gt. 0 ) then ! Read Hinges suboptions
+    call build_hinges( geo_prs, n_hinges, hinges )
+  end if
+
+  !> Coupling -------------------------------------------------------------
   coupled_comp = getlogical(geo_prs, 'Coupled')
   coupled_str = 'false'
 #if USE_PRECICE
@@ -963,7 +970,20 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     call close_hdf5_group(te_loc)
   endif
 
- 
+  !> Hinges ---
+  call new_hdf5_group(comp_loc, 'Hinges', hinge_loc)
+  call write_hdf5(n_hinges, 'n_hinges', hinge_loc)
+  do i = 1 , n_hinges
+    write(hinge_id,'(I2.2)') i
+    hinge_str = 'Hinge_'//hinge_id
+    call new_hdf5_group(hinge_loc, trim(hinge_str), hinge_i_loc)
+    call write_hdf5(hinges(i)%tag        , 'Tag'        , hinge_i_loc)
+    call write_hdf5(hinges(i)%nodes_input, 'Nodes_Input', hinge_i_loc)
+    call close_hdf5_group(hinge_i_loc)
+  end do
+  call close_hdf5_group(hinge_loc)
+
+
   call close_hdf5_group(comp_loc)
   !cleanup
   deallocate(ee,rr)

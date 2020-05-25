@@ -49,11 +49,29 @@ module mod_hinges
 use mod_param, only: &
   wp, max_char_len
 
+use mod_parse, only: &
+  t_parse, getstr, getint, getreal, getrealarray, getlogical, getsuboption, &
+  countoption, finalizeparameters
+
 implicit none
 
-public :: t_hinge
+public :: t_hinge, t_hinge_input, build_hinges, hinge_input_parser
 
 private
+
+! ---------------------------------------------------------------
+!> Hinge input data type
+type :: t_hinge_input
+  character(len=max_char_len) :: tag
+  character(len=max_char_len) :: nodes_input
+  real(wp) :: node1(3), node2(3)
+  integer  :: n_nodes
+  character(len=max_char_len) :: node_file
+  real(wp) :: ref_dir(3)
+  real(wp) :: offset
+  character(len=max_char_len) :: rotation_input
+  real(wp) :: rotation_amplitude
+end type t_hinge_input
 
 ! ---------------------------------------------------------------
 !> Hinge node configurations: to be used in defining reference
@@ -106,6 +124,7 @@ type :: t_hinge
   procedure, pass(this) :: from_reference_to_actual_config
 
 end type t_hinge
+
 ! ---------------------------------------------------------------
 
 contains
@@ -115,5 +134,95 @@ subroutine from_reference_to_actual_config(this)
 
 end subroutine from_reference_to_actual_config
 
+! ---------------------------------------------------------------
+!>
+subroutine build_hinges( geo_prs, n_hinges, hinges )
+  type(t_parse), intent(inout) :: geo_prs
+  integer      , intent(in)    :: n_hinges
+  type(t_hinge_input), allocatable, intent(inout) :: hinges(:)
+
+  type(t_parse), pointer :: hinge_prs
+  integer :: i
+
+
+  if ( allocated(hinges) ) deallocate(hinges)
+  allocate( hinges(n_hinges) )
+
+  do i = 1, n_hinges
+
+    !> De-associate, before reading next hinge
+    hinge_prs => null()
+    !> Open hinge sub-parser
+    call getsuboption(geo_prs, 'Hinge', hinge_prs)
+
+     hinges(i) % tag = getstr(hinge_prs, 'Hinge_Tag')
+     hinges(i) % nodes_input = getstr(hinge_prs, 'Hinge_Nodes_Input')
+
+     if ( trim(hinges(i) % nodes_input) .eq. 'parametric' ) then
+       hinges(i) % node1 = getrealarray(hinge_prs, 'Node1', 3)
+       hinges(i) % node2 = getrealarray(hinge_prs, 'Node2', 3)
+       hinges(i) % n_nodes = getint(hinge_prs, 'N_Nodes')
+       hinges(i) % node_file = 'hinge with parametric input. If you read this &
+           &string, something probabily went wrong.'
+     elseif ( trim(hinges(i) % nodes_input) .eq. 'from_file' ) then
+       ! *** to do *** fill dummy node1, node2, n_nodes fields
+       hinges(i) % node_file = getstr(hinge_prs,'Node_File')
+     else
+       ! *** to do *** use error message handling
+       write(*,*) ' Wrong Hinge_Nodes_Input input. Stop '; stop
+     end if
+
+     hinges(i) % ref_dir = getrealarray(hinge_prs, 'Hinge_Ref_Dir', 3)
+     hinges(i) % offset  = getreal(hinge_prs, 'Hinge_Offset')
+     hinges(i) % rotation_input     = getstr(hinge_prs, 'Hinge_Rotation_Input')
+     hinges(i) % rotation_amplitude = getreal(hinge_prs,'Hinge_Rotation_Amplitude')
+      
+     ! check ---
+     write(*,*) ' Hinge id:', i
+     write(*,*) ' _Tag        : ', trim(hinges(i)%tag)
+     write(*,*) ' _Nodes_Input: ', trim(hinges(i)%nodes_input)
+     ! check ---
+
+  end do
+
+end subroutine build_hinges
+
+! ---------------------------------------------------------------
+!> hinge input parser
+subroutine hinge_input_parser( geo_prs, hinge_prs )
+  type(t_parse),          intent(inout) :: geo_prs
+  type(t_parse), pointer, intent(inout) :: hinge_prs
+
+  call geo_prs%CreateIntOption('n_hinges', &
+              'N. of hinges and rotating parts (e.g. aileron) of the component', &
+              '0') ! default: no hinges -> n_hinges = 0
+  
+  call geo_prs%CreateSubOption('Hinge', 'Parser for hinge input', &
+               hinge_prs, multiple=.true. )
+
+  call hinge_prs%CreateStringOption('Hinge_Tag','Name of the hinge')
+  call hinge_prs%CreateStringOption('Hinge_Nodes_Input', &
+         'Type of hinge nodes input: parametric or from_file.')
+  call hinge_prs%CreateIntOption('N_Nodes','N.hinge nodes')
+  call hinge_prs%CreateRealArrayOption('Node1', &
+      'First node of the hinge. Components in the local ref.frame of the component')
+  call hinge_prs%CreateRealArrayOption('Node2', &
+      'Second node of the hinge. Components in the local ref.frame of the component')
+  call hinge_prs%CreateRealArrayOption('Hinge_Ref_Dir', &
+      'Reference direction of the hinges, indicating zero-deflection direction in &
+      &the local ref.frame of the component')
+  call hinge_prs%CreateRealOption('Hinge_Offset','Offset in the Ref_Dir needed for &
+      &avoiding irregular behavior of the surface for large deflections')
+  call hinge_prs%CreateStringOption('Hinge_Rotation_Input', &
+      'Input type of the rotation: constant, function, from_file, coupling')
+  call hinge_prs%CreateRealOption('Hinge_Rotation_Amplitude', &
+      'Amplitude of the rotation, for constant Rotation_Input')
+  ! *** to do ***
+  ! add all the fields required for all the input types
+
+
+end subroutine hinge_input_parser
+
+! ---------------------------------------------------------------
 
 end module mod_hinges
