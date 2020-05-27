@@ -66,6 +66,7 @@ type :: t_hinge_input
   character(len=max_char_len) :: nodes_input
   real(wp) :: node1(3), node2(3)
   integer  :: n_nodes
+  real(wp), allocatable :: rr(:,:)
   character(len=max_char_len) :: node_file
   real(wp) :: ref_dir(3)
   real(wp) :: offset
@@ -142,7 +143,7 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
   type(t_hinge_input), allocatable, intent(inout) :: hinges(:)
 
   type(t_parse), pointer :: hinge_prs
-  integer :: i
+  integer :: i, j
 
 
   if ( allocated(hinges) ) deallocate(hinges)
@@ -164,9 +165,19 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
        hinges(i) % n_nodes = getint(hinge_prs, 'N_Nodes')
        hinges(i) % node_file = 'hinge with parametric input. If you read this &
            &string, something probabily went wrong.'
+       allocate( hinges(i)%rr( 3, hinges(i)%n_nodes ) )
+       do j = 1, hinges(i)%n_nodes
+         hinges(i) % rr(:,j) = hinges(i) % node1 + &
+                             ( hinges(i) % node2 - hinges(i) % node1 ) * &
+                             dble(j-1)/dble(hinges(i)%n_nodes-1)
+       end do
+
      elseif ( trim(hinges(i) % nodes_input) .eq. 'from_file' ) then
        ! *** to do *** fill dummy node1, node2, n_nodes fields
        hinges(i) % node_file = getstr(hinge_prs,'Node_File')
+       call read_hinge_nodes( hinges(i)%node_file, &
+                              hinges(i)%n_nodes  , &
+                              hinges(i)%rr )
      else
        ! *** to do *** use error message handling
        write(*,*) ' Wrong Hinge_Nodes_Input input. Stop '; stop
@@ -186,6 +197,39 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
   end do
 
 end subroutine build_hinges
+
+! ---------------------------------------------------------------
+!> Three-column ascii file is expected
+subroutine read_hinge_nodes( filen, n_nodes, rr )
+  character(len=max_char_len), intent(in)  :: filen
+  integer                    , intent(out) :: n_nodes
+  real(wp), allocatable      , intent(out) :: rr(:,:)
+
+  integer :: i, io
+  integer :: fid = 21
+
+  if ( allocated(rr) ) deallocate(rr)
+
+  n_nodes = 0;  io = 0
+
+  !> Preliminary read for determining the n. of lines
+  open(unit=fid, file=trim(filen))
+  do while ( io .eq. 0 )
+    read(fid,*,iostat=io) ! dummy
+    n_nodes = n_nodes + 1
+  end do
+  close(fid) 
+
+  !> Allocate and fill rr array
+  allocate(rr(3,n_nodes))
+  open(unit=fid, file=trim(filen))
+  do i = 1, n_nodes
+    read(fid,*) rr(:,i)
+  end do
+  close(fid) 
+
+
+end subroutine read_hinge_nodes
 
 ! ---------------------------------------------------------------
 !> hinge input parser

@@ -690,7 +690,7 @@ subroutine load_components(geo, in_file, out_file, te)
  character(len=max_char_len) :: ref_tag, ref_tag_m
  integer :: ref_id, iref
  character(len=max_char_len) :: msg, cname, cname_write
- integer(h5loc) :: floc, gloc, cloc , geo_loc , te_loc, cloc2
+ integer(h5loc) :: floc, gloc, cloc , geo_loc , te_loc, cloc2, hloc
  integer(h5loc) :: floc_out, gloc_out
  integer :: n_comp, i_comp, n_comp_input, i_comp_input, n_comp_write
  integer :: n_mult, i_mult
@@ -703,6 +703,7 @@ subroutine load_components(geo, in_file, out_file, te)
  integer                 , allocatable :: i_airfoil_e(:,:)
  character(max_char_len) , allocatable :: airfoil_list(:)
  integer                 , allocatable :: nelem_span_list(:)
+ !> Coupling
  character(len=max_char_len) :: comp_coupling_str
  character(len=max_char_len) :: comp_coupling_type
  real(wp) :: comp_coupling_node(3)       = 0.0_wp    ! <- Initialization(?)
@@ -713,6 +714,8 @@ subroutine load_components(geo, in_file, out_file, te)
  real(wp), allocatable :: c_ref_c(:,:)
  integer :: points_offset_precice, np_precice
 #endif 
+ !> Hinges
+ integer :: n_hinges
  ! Parametric elements
  integer :: par_nelems_span , par_nelems_chor
  ! trailing edge ------
@@ -836,6 +839,8 @@ subroutine load_components(geo, in_file, out_file, te)
     call read_hdf5(comp_el_type,'ElType',cloc)
     call read_hdf5(comp_name,'CompName',cloc)
     call read_hdf5(comp_input,'CompInput',cloc)
+
+    !> Coupling
     call read_hdf5(comp_coupling_str     ,'Coupled',cloc)
     call read_hdf5(comp_coupling_type    ,'CouplingType',cloc)
     call read_hdf5(comp_coupling_node    ,'CouplingNode',cloc)
@@ -857,9 +862,28 @@ subroutine load_components(geo, in_file, out_file, te)
       call error (this_sub_name, this_mod_name, &
          ' Coupled = T for component'//trim(comp_name)// &
          ', but no coupled simulation is expected, since dust &
-           has been compiled without #USE_PRECICE option. Stop'//nl)
+          &has been compiled without #USE_PRECICE option. Stop'//nl)
     endif
 #endif
+
+    !> Some errors (or to do implementation?) for multiple components
+    !> Multiple component and Coupling
+    if ( mult .and. comp_coupling ) then
+      call error (this_sub_name, this_mod_name, &
+         ' Coupled = T for "Muliple" component'//trim(comp_name)// &
+         ', but this is not allowed (at least so far). Stop'//nl)
+    end if
+
+    !> Hinges
+    call open_hdf5_group(cloc,'Hinges',hloc)
+    call read_hdf5(n_hinges, 'n_hinges', hloc)
+    !> Some errors (or to do implementation?) for multiple components
+    !> Multiple component and Hinges
+    if ( mult .and. comp_coupling ) then
+      call error (this_sub_name, this_mod_name, &
+         ' n_hinges .gt. 0 for "Muliple" component'//trim(comp_name)// &
+         ', but this is not allowed (at least so far). Stop'//nl)
+    end if
 
     if(mult) then
       n_mult = geo%refs(ref_id)%n_mult

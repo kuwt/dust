@@ -977,16 +977,28 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     write(hinge_id,'(I2.2)') i
     hinge_str = 'Hinge_'//hinge_id
     call new_hdf5_group(hinge_loc, trim(hinge_str), hinge_i_loc)
-    call write_hdf5(hinges(i)%tag        , 'Tag'        , hinge_i_loc)
-    call write_hdf5(hinges(i)%nodes_input, 'Nodes_Input', hinge_i_loc)
+    call write_hdf5(hinges(i)%tag               , 'Tag'                     , hinge_i_loc)
+    call write_hdf5(hinges(i)%nodes_input       , 'Nodes_Input'             , hinge_i_loc)
+    call write_hdf5(hinges(i)%rr                , 'rr'                      , hinge_i_loc)
+    call write_hdf5(hinges(i)%ref_dir           , 'Ref_Dir'                 , hinge_i_loc)
+    call write_hdf5(hinges(i)%offset            , 'Offset'                  , hinge_i_loc)
+    call write_hdf5(hinges(i)%rotation_input    , 'Hinge_Rotation_Input'    , hinge_i_loc)
+    call write_hdf5(hinges(i)%rotation_amplitude, 'Hinge_Rotation_Amplitude', hinge_i_loc)
     call close_hdf5_group(hinge_i_loc)
   end do
   call close_hdf5_group(hinge_loc)
 
-
   call close_hdf5_group(comp_loc)
+
   !cleanup
   deallocate(ee,rr)
+  ! hinges cleanup
+  do i = 1 , n_hinges
+    deallocate( hinges(i)%rr )
+  end do
+  deallocate(hinges)
+
+  !> Finalize parser
   call finalizeparameters(geo_prs)
 
 end subroutine build_component
