@@ -138,22 +138,22 @@ subroutine compute_vel_vortpart (this, pos, uinf, vel)
  real(wp), intent(out) :: vel(3)
 
  real(wp) :: vvort(3)
- real(wp) :: dist(3)!, distn
+ real(wp) :: dist(3), distn
 
 
   dist = pos-this%cen
   !Rosenhead kernel regularized velocity
-  vvort =  cross(this%dir,dist) / (sqrt(sum(dist**2)+r_Vortex**2))**3
-  vel = vvort*this%mag
-
-  !Rankine velocity
-  !distn = norm2(dist)
-  !if ( distn .gt. r_Vortex ) then
-  !  vvort =  cross(this%dir,dist) / distn**3
-  !else
-  !  vvort =  cross(this%dir,dist)  / r_Vortex**3
-  !end if
+  !vvort =  cross(this%dir,dist) / (sqrt(sum(dist**2)+r_Vortex**2))**3
   !vel = vvort*this%mag
+  
+  !Rankine velocity
+  distn = norm2(dist)
+  if ( distn .gt. r_Vortex ) then
+    vvort =  cross(this%dir,dist) / distn**3
+  else
+    vvort =  cross(this%dir,dist)  / r_Vortex**3
+  end if
+  vel = vvort*this%mag
 
 
 
@@ -185,12 +185,19 @@ subroutine compute_stretch_vortpart (this, pos, alpha, stretch)
  real(wp), intent(in) :: alpha(3)
  real(wp), intent(out) :: stretch(3)
 
- real(wp) :: dist(3), distn
+ real(wp) :: dist(3), distn, Sr, dSr
 
   !TODO: add far field approximations
 
   dist = pos-this%cen
   distn = sqrt(sum(dist**2)+r_Vortex**2)
+  if ( distn .gt. r_Vortex ) then
+    Sr  =  1.0_wp / distn**3
+    dSr = -3.0_wp / distn**5 
+  else
+    Sr  =  1.0_wp / r_Vortex**3
+    dSr =  0.0_wp 
+  end if
   !"original"
   !stretch = -cross(alpha, this%dir*this%mag)/(distn)**3 &
   !     +3.0_wp/(distn)**5 * cross(dist, this%mag*this%dir) * &
@@ -203,9 +210,12 @@ subroutine compute_stretch_vortpart (this, pos, alpha, stretch)
 ! stretch = -cross(this%dir*this%mag, alpha)/(distn)**3 &
 !      +1.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
 
-  stretch = -cross(this%dir*this%mag, alpha)/(distn)**3 &
-       +3.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
+  !stretch = -cross(this%dir*this%mag, alpha)/(distn)**3 &
+  !     +3.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
 
+  !transpose, rankinezed
+  stretch = -cross(this%dir*this%mag, alpha) * Sr &
+       -dSr * dist * sum(dist*cross(this%dir*this%mag, alpha))
 
 end subroutine compute_stretch_vortpart
 
