@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -46,25 +46,25 @@
 
 !> Module to store and update all the reference frames
 !!
-!! The reference frames are built in a hierarchical manner. The base reference 
+!! The reference frames are built in a hierarchical manner. The base reference
 !! frame is the fixed cartesian frame and all the subsequent frames are defined
-!! upon that, and all the geometry inside dust is calculated with respect to 
-!! that frame. The base frame cannot be user defined and has internal index, 
+!! upon that, and all the geometry inside dust is calculated with respect to
+!! that frame. The base frame cannot be user defined and has internal index,
 !! as well as tag equal to 0.
 !!
-!! All the following reference frames can be defined by the user in an input 
+!! All the following reference frames can be defined by the user in an input
 !! file (see \ref build_references for details). They are defined by:
 !! - A parent tag referring to the reference frame upon which the frame is
 !!   built
 !! - An origin of the reference frame, expressed in coordinates in the parent
 !!   reference frame
-!! - An orientation matrix, defining the orientation of the frame axis in 
+!! - An orientation matrix, defining the orientation of the frame axis in
 !!   components of the parent reference frame
 !!
 !! Additionaly it is possible to impose a movement of the reference frame with
-!! respect to the parent reference frame. 
-!! At the moment the only movement that can be defined is a constant rate 
-!! rotation around a pole and an axis. 
+!! respect to the parent reference frame.
+!! At the moment the only movement that can be defined is a constant rate
+!! rotation around a pole and an axis.
 
 module mod_reference
 
@@ -81,7 +81,7 @@ use mod_parse, only: &
   t_parse, getstr, getint, getintarray, getreal, getrealarray, getlogical, countoption, &
   getsuboption, &
   finalizeparameters, t_link, check_opt_consistency
-  
+
 use mod_stringtools, only: &
   lowcase
 
@@ -153,7 +153,7 @@ type :: t_ref
   !> Is the frame moving with respect to the parent?
   logical :: self_moving
 
-  !> Is the reference frame moving ? (might be stationary with respect to a 
+  !> Is the reference frame moving ? (might be stationary with respect to a
   !! moving parent)
   logical :: moving
 
@@ -186,14 +186,14 @@ type :: t_ref
 
   !> Total rotation with respect to the base reference
   real(wp) :: R_g(3,3)
-  
+
   !> Total frame velocity with respect to the base reference
   real(wp) :: f_g(3)
 
   !> Total frame rotation rate with respect to the base reference
   real(wp) :: G_g(3,3)
 
-  !> Angular velocity in the root base reference 
+  !> Angular velocity in the root base reference
   real(wp) :: angVel_g(3)
 
   !> General motion arrays
@@ -240,16 +240,16 @@ contains
 !> Build all the set of reference frames, reading them from the reference
 !! frames file
 !!
-!! The input file used is either the one present in the main input file, or 
+!! The input file used is either the one present in the main input file, or
 !! if not specified the main input file is used.
 !!
-!! The base reference frame is the fixed one, and cannot be custom defined, 
+!! The base reference frame is the fixed one, and cannot be custom defined,
 !! and has tag nr 0.
-!! All the other reference frames must hierarchically refer to the fixed 
-!! reference frame. 
+!! All the other reference frames must hierarchically refer to the fixed
+!! reference frame.
 !!
 !! First all the details of the reference are read from the file. Then
-!! the tree of parent-children reference frames is built, and then the 
+!! the tree of parent-children reference frames is built, and then the
 !! moving properties of eache frame is set traversing the frames tree
 !!
 !! Each reference frame can be both self_moving, if moving with respect to the
@@ -260,7 +260,7 @@ subroutine build_references(refs, reference_file)
 
  type(t_ref), allocatable :: refs_temp(:)
  type(t_parse) :: ref_prs
- type(t_parse), pointer :: sbprms , sbprms_pol , sbprms_rot , sbprms_hin 
+ type(t_parse), pointer :: sbprms , sbprms_pol , sbprms_rot , sbprms_hin
  integer :: n_refs, n_refs_input
  integer :: n_mult_refs
  integer :: iref, iref_input, iref2, i_mult_ref
@@ -275,10 +275,10 @@ subroutine build_references(refs, reference_file)
 
  character(len=*), parameter :: this_sub_name = 'build_references'
 
- character(len=max_char_len) :: rot_filen , pol_filen 
+ character(len=max_char_len) :: rot_filen , pol_filen
  real(wp) , allocatable :: rot_mat(:,:) , pol_mat(:,:)
  integer , allocatable :: pol_fun_int(:)
- real(wp), allocatable :: pol_vec(:) , pol_ome(:) , pol_pha(:) 
+ real(wp), allocatable :: pol_vec(:) , pol_ome(:) , pol_pha(:)
  real(wp), allocatable :: pol_off(:) , pol_pos0(:)
  real(wp) :: pol_amp
  integer  :: rot_fun_int
@@ -296,7 +296,7 @@ subroutine build_references(refs, reference_file)
  logical                     :: transient_logical
  character(len=max_char_len) :: transient_fun
  real(wp)                    :: transient_time, init_rot_rate
- 
+
  integer :: i1
 
 
@@ -386,7 +386,7 @@ subroutine build_references(refs, reference_file)
                                &transient','1.0')
   call sbprms%CreateRealOption('Init_Rot_Rate','Initial value of the angular velocity', &
                                '1.0')
-  call sbprms%CreateRealOption('Psi_0','Starting rotation angle') 
+  call sbprms%CreateRealOption('Psi_0','Starting rotation angle')
   call sbprms%CreateIntOption('N_Dofs', 'Number of dofs for each blade')
   ! for complex rotor configurations ---------
   call sbprms%CreateSubOption('Dof','Definition of a hinge dof',&
@@ -399,38 +399,38 @@ subroutine build_references(refs, reference_file)
   call sbprms_hin%CreateRealOption('Cyclic_Phas','Phase of the cyclic motion')
 
   ! End Multiple sub-parser -------------------------------------------
- 
- 
+
+
   !read the file
   call ref_prs%read_options(trim(reference_file),printout_val=.true.)
 
   !Get the number of reference frames and check that all the required params
   !are actually present
-  n_refs = countoption(ref_prs,'Reference_Tag') 
-  n_refs_input = n_refs  
+  n_refs = countoption(ref_prs,'Reference_Tag')
+  n_refs_input = n_refs
 
   n_in = countoption(ref_prs,'Parent_Tag')
   if(n_in .ne. n_refs_input) call error(this_sub_name, this_mod_name, &
-   'Inconsistent number of Reference_Tag and Parent_Tag inputs in reference& 
+   'Inconsistent number of Reference_Tag and Parent_Tag inputs in reference&
    & frames. Forgot a "Parent_tag = ..." ?')
   n_in = countoption(ref_prs,'Origin')
   if(n_in .ne. n_refs_input) call error(this_sub_name, this_mod_name, &
-   'Inconsistent number of Reference_Tag and Origin  inputs in reference& 
+   'Inconsistent number of Reference_Tag and Origin  inputs in reference&
    & frames. Forgot a "Origin = ..." ?')
   n_in = countoption(ref_prs,'Orientation')
   if(n_in .ne. n_refs_input) call error(this_sub_name, this_mod_name, &
-   'Inconsistent number of Reference_Tag and Orientation inputs in reference& 
+   'Inconsistent number of Reference_Tag and Orientation inputs in reference&
    & frames. Forgot a "Orientation = ..." ?')
   n_in = countoption(ref_prs,'Moving')
   if(n_in .ne. n_refs_input) call error(this_sub_name, this_mod_name, &
-   'Inconsistent number of Reference_Tag and Moving inputs in reference& 
+   'Inconsistent number of Reference_Tag and Moving inputs in reference&
    & frames. Forgot a "Moving = ..." ?')
   n_in = countoption(ref_prs,'Multiple')
   if(n_in .ne. n_refs_input) call error(this_sub_name, this_mod_name, &
-   'Inconsistent number of Reference_Tag and Multiple inputs in reference& 
+   'Inconsistent number of Reference_Tag and Multiple inputs in reference&
    & frames. Forgot a "Multiple = ..." ?')
 
-  ! IMPORTANT: the references are allocated starting from zero, zero is the 
+  ! IMPORTANT: the references are allocated starting from zero, zero is the
   ! base reference, and then all the other references occupy the following
   ! position. Remember to correctly set the numbering starting from zero for
   ! all the other subroutines that employ the references
@@ -452,7 +452,7 @@ subroutine build_references(refs, reference_file)
   refs(0)%moving = .false.
   refs(0)%of_g = (/0.0_wp, 0.0_wp, 0.0_wp/)
   refs(0)%R_g = reshape((/1.0_wp, 0.0_wp, 0.0_wp, &
-                          0.0_wp, 1.0_wp, 0.0_wp, & 
+                          0.0_wp, 1.0_wp, 0.0_wp, &
                           0.0_wp, 0.0_wp, 1.0_wp/),(/3,3/))
   refs(0)%relative_pol_pos = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
   refs(0)%relative_rot_pos = 0.0_wp
@@ -475,9 +475,9 @@ subroutine build_references(refs, reference_file)
     refs(iref)%self_moving = getlogical(ref_prs,'Moving', olink=lnk)
     refs(iref)%moving = .false. !standard, will be checked later
 
-    
+
     if (refs(iref)%self_moving) then
-     
+
       n_mov = n_mov + 1
       call check_opt_consistency(lnk, next=.true., next_opt='Motion')
       call getsuboption(ref_prs,'Motion',sbprms)
@@ -494,32 +494,32 @@ subroutine build_references(refs, reference_file)
           end if
 
           ! Input type : from_file , simple_function
-          select case( trim(getstr(sbprms_pol,'Input_Type')) )    
+          select case( trim(getstr(sbprms_pol,'Input_Type')) )
 
             case('from_file')
               if ( countoption(sbprms_pol,'File') .eq. 0 ) then
                 write(ref_tag_str,'(I5)') refs(iref)%tag
                 call error(this_sub_name, this_mod_name, '"File" field not defined &
                       &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
-              end if 
+              end if
 
               pol_filen = trim(getstr(sbprms_pol,'File'))
               call read_real_array_from_file ( 4 , trim(pol_filen) , pol_mat )
               nt = size(pol_mat,1)
 
-              allocate(refs(iref)%pol_pos(3,nt)) 
-              allocate(refs(iref)%pol_vel(3,nt)) 
-              allocate(refs(iref)%pol_tim(  nt)) 
+              allocate(refs(iref)%pol_pos(3,nt))
+              allocate(refs(iref)%pol_vel(3,nt))
+              allocate(refs(iref)%pol_tim(  nt))
 
               ! Read time and position
-              refs(iref)%pol_tim = pol_mat(:,1) 
+              refs(iref)%pol_tim = pol_mat(:,1)
               refs(iref)%pol_pos = transpose(pol_mat(:,2:4))
 
               ! Check that min(pol_tim) <= min(sim_param%time_vec) -----
               call check_input_from_file( refs(iref)%tag , 'Pole' , &
-                                          refs(iref)%pol_tim , sim_param%time_vec ) 
+                                          refs(iref)%pol_tim , sim_param%time_vec )
 
-              ! Compute velocity with Finite Difference 
+              ! Compute velocity with Finite Difference
               do it = 1,nt
                 if ( it .eq. 1) then
                   refs(iref)%pol_vel(:,it) = ( refs(iref)%pol_pos(:,2) - &
@@ -535,19 +535,19 @@ subroutine build_references(refs, reference_file)
                     ( refs(iref)%pol_tim(nt) - refs(iref)%pol_tim(nt-1) )
                 end if
               end do
- 
+
             case('simple_function')
               if ( countoption(sbprms_pol,'Function') .eq. 0 ) then
                 write(ref_tag_str,'(A)') refs(iref)%tag
                 call error(this_sub_name, this_mod_name, '"Function" field not defined &
                   &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
-              end if 
+              end if
 
-              allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps)) 
-              allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps)) 
-              allocate(refs(iref)%pol_tim(  sim_param%n_timesteps)) 
+              allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps))
+              allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps))
+              allocate(refs(iref)%pol_tim(  sim_param%n_timesteps))
 
-              ! Read the integer id for the user defined functions 0:constant,1:sin              
+              ! Read the integer id for the user defined functions 0:constant,1:sin
               allocate(pol_fun_int(3), pol_vec(3), pol_ome(3), &
                        pol_pha(3), pol_off(3))
               pol_fun_int = getintarray(sbprms_pol,'Function',3)
@@ -556,7 +556,7 @@ subroutine build_references(refs, reference_file)
               pol_ome = getrealarray(sbprms_pol,'Omega',3)
               pol_pha = getrealarray(sbprms_pol,'Phase',3)
               pol_off = getrealarray(sbprms_pol,'Offset',3)
-               
+
               refs(iref)%pol_tim = sim_param%time_vec
 
               do i1 = 1 , 3
@@ -570,7 +570,7 @@ subroutine build_references(refs, reference_file)
 
                 elseif ( pol_fun_int(i1) .eq. 1 ) then ! sin function
 
-                  do it = 1 , sim_param%n_timesteps 
+                  do it = 1 , sim_param%n_timesteps
                     refs(iref)%pol_pos(i1,it) = pol_amp * pol_vec(i1) * &
                        sin( pol_ome(i1) * refs(iref)%pol_tim(it) - pol_pha(i1) ) + &
                        pol_off(i1)
@@ -591,8 +591,8 @@ subroutine build_references(refs, reference_file)
               call error(this_sub_name, this_mod_name, 'Undefined "Input_Type" field &
                   &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
                   &'. It must be "from_file" or "simple_function".')
-     
-          
+
+
           end select
 
         case('velocity')
@@ -611,7 +611,7 @@ subroutine build_references(refs, reference_file)
           allocate(pol_pos0(3))
           pol_pos0 = getrealarray(sbprms_pol,'Position_0',3)
 
-          ! Read the integer id for the user defined functions 0:constant,1:sin              
+          ! Read the integer id for the user defined functions 0:constant,1:sin
           allocate(pol_fun_int(3), pol_vec(3), pol_ome(3), &
                    pol_pha(3), pol_off(3))
           pol_fun_int = getintarray(sbprms_pol,'Function',3)
@@ -620,32 +620,32 @@ subroutine build_references(refs, reference_file)
           pol_ome = getrealarray(sbprms_pol,'Omega',3)
           pol_pha = getrealarray(sbprms_pol,'Phase',3)
           pol_off = getrealarray(sbprms_pol,'Offset',3)
-               
+
           ! Input type : from_file , simple_function
-          select case( trim(getstr(sbprms_pol,'Input_Type')) )    
+          select case( trim(getstr(sbprms_pol,'Input_Type')) )
 
             case('from_file')
               if ( countoption(sbprms_pol,'File') .eq. 0 ) then
                 write(ref_tag_str,'(I5)') refs(iref)%tag
                 call error(this_sub_name, this_mod_name, '"File" field not defined &
                       &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
-              end if 
+              end if
 
               pol_filen = trim(getstr(sbprms_pol,'File'))
               call read_real_array_from_file ( 4 , trim(pol_filen) , pol_mat )
               nt = size(pol_mat,1)
 
-              allocate(refs(iref)%pol_pos(3,nt)) 
-              allocate(refs(iref)%pol_vel(3,nt)) 
-              allocate(refs(iref)%pol_tim(  nt)) 
+              allocate(refs(iref)%pol_pos(3,nt))
+              allocate(refs(iref)%pol_vel(3,nt))
+              allocate(refs(iref)%pol_tim(  nt))
 
               ! Read time and velocity
-              refs(iref)%pol_tim = pol_mat(:,1) 
+              refs(iref)%pol_tim = pol_mat(:,1)
               refs(iref)%pol_vel = transpose(pol_mat(:,2:4))
 
               ! Check that min(pol_tim) <= min(sim_param%time_vec) -----
               call check_input_from_file( refs(iref)%tag , 'Pole' , &
-                                          refs(iref)%pol_tim , sim_param%time_vec ) 
+                                          refs(iref)%pol_tim , sim_param%time_vec )
 
               ! Compute velocity with Esplicit Euler integration
               refs(iref)%pol_pos(:,1) = pol_pos0  ! Initial condition ...
@@ -654,17 +654,17 @@ subroutine build_references(refs, reference_file)
                      refs(iref)%pol_vel(:,it-1) * &
                    ( refs(iref)%pol_tim(it) - refs(iref)%pol_tim(it-1) )
               end do
- 
+
             case('simple_function')
               if ( countoption(sbprms_pol,'Function') .eq. 0 ) then
                 write(ref_tag_str,'(I5)') refs(iref)%tag
                 call error(this_sub_name, this_mod_name, '"Function" field not defined &
                   &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
-              end if 
+              end if
 
-              allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps)) 
-              allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps)) 
-              allocate(refs(iref)%pol_tim(  sim_param%n_timesteps)) 
+              allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps))
+              allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps))
+              allocate(refs(iref)%pol_tim(  sim_param%n_timesteps))
 
               refs(iref)%pol_tim = sim_param%time_vec
 
@@ -673,17 +673,17 @@ subroutine build_references(refs, reference_file)
 
                   do it = 1 , sim_param%n_timesteps
                     refs(iref)%pol_vel(i1,it) = pol_amp * pol_vec(i1)
-                    refs(iref)%pol_pos(i1,it) = pol_pos0(i1) + & 
+                    refs(iref)%pol_pos(i1,it) = pol_pos0(i1) + &
                             pol_amp * pol_vec(i1) * &
                           ( refs(iref)%pol_tim(it) )
-! old: "relative    refs(iref)%pol_pos(i1,it) = pol_pos0(i1) + & 
+! old: "relative    refs(iref)%pol_pos(i1,it) = pol_pos0(i1) + &
 !       time"               pol_amp * pol_vec(i1) * &
 !                         ( refs(iref)%pol_tim(it) - refs(iref)%pol_tim(1) )
                   end do
 
                 elseif ( pol_fun_int(i1) .eq. 1 ) then ! sin function
 
-                  do it = 1 , sim_param%n_timesteps 
+                  do it = 1 , sim_param%n_timesteps
                     refs(iref)%pol_vel(i1,it) = pol_amp * pol_vec(i1) * &
                        sin( pol_ome(i1) * refs(iref)%pol_tim(it) - pol_pha(i1) ) + &
                        pol_off(i1)
@@ -702,7 +702,7 @@ subroutine build_references(refs, reference_file)
 !                        cos( pol_ome(i1) * refs(iref)%pol_tim(it) - pol_pha(i1) ) + &
 !                        pol_off(i1) * ( refs(iref)%pol_tim(it) - refs(iref)%pol_tim(it-1) ) + &
 !                        pol_pos0(i1)
-                    else 
+                    else
                       refs(iref)%pol_pos(i1,it) = &
                        ( pol_amp * pol_vec(i1) * sin( - pol_pha(i1) ) + pol_off(i1) ) * &
                        ( refs(iref)%pol_tim(it) ) + &
@@ -730,7 +730,7 @@ subroutine build_references(refs, reference_file)
               call error(this_sub_name, this_mod_name, 'Undefined "Input_Type" field &
                   &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
                   &'. It must be "from_file" or "simple_function".')
-     
+
           end select
 
           deallocate(pol_fun_int, pol_vec, pol_ome, pol_pha, pol_off, pol_pos0)
@@ -770,14 +770,14 @@ subroutine build_references(refs, reference_file)
           rot_pos0 = getreal(sbprms_rot,'Psi_0')
 
           ! Input type : from_file , simple_function
-          select case( trim(getstr(sbprms_rot,'Input_Type')) )    
+          select case( trim(getstr(sbprms_rot,'Input_Type')) )
 
             case('from_file')
               if ( countoption(sbprms_rot,'File') .eq. 0 ) then
                 write(ref_tag_str,'(I5)') refs(iref)%tag
                 call error(this_sub_name, this_mod_name, '"File" field not defined &
                       &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
-              end if 
+              end if
 
 
               rot_filen = trim(getstr(sbprms_rot,'File'))
@@ -785,17 +785,17 @@ subroutine build_references(refs, reference_file)
               nt = size(rot_mat,1)
 
 
-              allocate(refs(iref)%rot_pos(nt)) 
-              allocate(refs(iref)%rot_vel(nt)) 
-              allocate(refs(iref)%rot_tim(nt)) 
+              allocate(refs(iref)%rot_pos(nt))
+              allocate(refs(iref)%rot_vel(nt))
+              allocate(refs(iref)%rot_tim(nt))
 
               ! Read time and velocity
-              refs(iref)%rot_tim = rot_mat(:,1) 
+              refs(iref)%rot_tim = rot_mat(:,1)
               refs(iref)%rot_vel = rot_mat(:,2)
 
               ! Check that min(pol_tim) <= min(sim_param%time_vec) -----
               call check_input_from_file( refs(iref)%tag , 'Rotation' , &
-                                          refs(iref)%pol_tim , sim_param%time_vec ) 
+                                          refs(iref)%pol_tim , sim_param%time_vec )
 
               ! Compute velocity with Esplicit Euler integration
               refs(iref)%rot_pos(1) = rot_pos0  ! Initial condition ...
@@ -804,31 +804,31 @@ subroutine build_references(refs, reference_file)
                      refs(iref)%rot_vel(it-1) * &
                    ( refs(iref)%rot_tim(it) - refs(iref)%rot_tim(it-1) )
               end do
- 
+
             case('simple_function')
               if ( countoption(sbprms_rot,'Function') .eq. 0 ) then
                 write(ref_tag_str,'(I5)') refs(iref)%tag
                 call error(this_sub_name, this_mod_name, '"Function" field not defined &
                   &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
-              end if 
+              end if
 
-              allocate(refs(iref)%rot_pos(sim_param%n_timesteps)) 
-              allocate(refs(iref)%rot_vel(sim_param%n_timesteps)) 
-              allocate(refs(iref)%rot_tim(sim_param%n_timesteps)) 
+              allocate(refs(iref)%rot_pos(sim_param%n_timesteps))
+              allocate(refs(iref)%rot_vel(sim_param%n_timesteps))
+              allocate(refs(iref)%rot_tim(sim_param%n_timesteps))
 
-              ! Read the integer id for the user defined functions 0:constant,1:sin              
+              ! Read the integer id for the user defined functions 0:constant,1:sin
               rot_fun_int = getint(sbprms_rot,'Function')
               rot_amp = getreal(sbprms_rot,'Amplitude')
               rot_ome = getreal(sbprms_rot,'Omega')
               rot_pha = getreal(sbprms_rot,'Phase')
               rot_off = getreal(sbprms_rot,'Offset')
-              
+
               refs(iref)%rot_tim = sim_param%time_vec
 
               if ( rot_fun_int .eq. 0 ) then ! constant function
 
                 do it = 1 , sim_param%n_timesteps
-                  refs(iref)%rot_vel(it) = rot_amp 
+                  refs(iref)%rot_vel(it) = rot_amp
                   refs(iref)%rot_pos(it) = rot_pos0 + rot_amp * &
                         ( refs(iref)%rot_tim(it) )
 ! old: "relative  refs(iref)%rot_pos(it) = rot_pos0 + rot_amp * &
@@ -839,7 +839,7 @@ subroutine build_references(refs, reference_file)
                 refs(iref)%rot_vel(1) = rot_amp * &
                    sin( rot_ome * refs(iref)%rot_tim(1) - rot_pha ) + rot_off
                 refs(iref)%rot_pos(1) = rot_pos0  ! Initial condition ...
-                do it = 2 , sim_param%n_timesteps 
+                do it = 2 , sim_param%n_timesteps
                   refs(iref)%rot_vel(it) = rot_amp * &
                      sin( rot_ome * refs(iref)%rot_tim(it) - rot_pha ) + &
                      rot_off
@@ -859,7 +859,7 @@ subroutine build_references(refs, reference_file)
 !                       cos( - rot_pha )) + &
 !                      rot_off * ( refs(iref)%rot_tim(it) - refs(iref)%rot_tim(1) ) + &
 !                      rot_pos0
-                  else 
+                  else
                     refs(iref)%rot_pos(it) = &
                      ( rot_amp * sin( - rot_pha ) + rot_off ) * &
                      ( refs(iref)%rot_tim(it) ) + &
@@ -885,7 +885,7 @@ subroutine build_references(refs, reference_file)
               call error(this_sub_name, this_mod_name, 'Undefined "Input_Type" field &
                   &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
                   &'. It must be "from_file" or "simple_function".')
-     
+
           end select
 
         case('position')
@@ -910,14 +910,14 @@ subroutine build_references(refs, reference_file)
           !rot_pos0 = getreal(sbprms_rot,'Psi_0')
 
           ! Input type : from_file , simple_function
-          select case( trim(getstr(sbprms_rot,'Input_Type')) )    
+          select case( trim(getstr(sbprms_rot,'Input_Type')) )
 
             case('from_file')
               if ( countoption(sbprms_rot,'File') .eq. 0 ) then
                 write(ref_tag_str,'(I5)') refs(iref)%tag
                 call error(this_sub_name, this_mod_name, '"File" field not defined &
                       &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
-              end if 
+              end if
 
 
               rot_filen = trim(getstr(sbprms_rot,'File'))
@@ -925,19 +925,19 @@ subroutine build_references(refs, reference_file)
               nt = size(rot_mat,1)
 
 
-              allocate(refs(iref)%rot_pos(nt)) 
-              allocate(refs(iref)%rot_vel(nt)) 
-              allocate(refs(iref)%rot_tim(nt)) 
+              allocate(refs(iref)%rot_pos(nt))
+              allocate(refs(iref)%rot_vel(nt))
+              allocate(refs(iref)%rot_tim(nt))
 
               ! Read time and velocity
-              refs(iref)%rot_tim = rot_mat(:,1) 
+              refs(iref)%rot_tim = rot_mat(:,1)
               refs(iref)%rot_pos = rot_mat(:,2)
 
               ! Check that min(pol_tim) <= min(sim_param%time_vec) -----
               call check_input_from_file( refs(iref)%tag , 'Rotation' , &
-                                          refs(iref)%pol_tim , sim_param%time_vec ) 
+                                          refs(iref)%pol_tim , sim_param%time_vec )
 
-              ! Compute velocity with Finite Difference 
+              ! Compute velocity with Finite Difference
               do it = 1,nt
                 if ( it .eq. 1) then
                   refs(iref)%rot_vel(it) = ( refs(iref)%rot_pos(2) - &
@@ -953,26 +953,26 @@ subroutine build_references(refs, reference_file)
                     ( refs(iref)%rot_tim(nt) - refs(iref)%rot_tim(nt-1) )
                 end if
               end do
- 
+
             case('simple_function')
               if ( countoption(sbprms_rot,'Function') .eq. 0 ) then
                 write(ref_tag_str,'(A)') refs(iref)%tag
                 call error(this_sub_name, this_mod_name, '"Function" field not defined &
                   &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
-              end if 
+              end if
 
 
-              allocate(refs(iref)%rot_pos(sim_param%n_timesteps)) 
-              allocate(refs(iref)%rot_vel(sim_param%n_timesteps)) 
-              allocate(refs(iref)%rot_tim(sim_param%n_timesteps)) 
+              allocate(refs(iref)%rot_pos(sim_param%n_timesteps))
+              allocate(refs(iref)%rot_vel(sim_param%n_timesteps))
+              allocate(refs(iref)%rot_tim(sim_param%n_timesteps))
 
-              ! Read the integer id for the user defined functions 0:constant,1:sin              
+              ! Read the integer id for the user defined functions 0:constant,1:sin
               rot_fun_int = getint(sbprms_rot,'Function')
               rot_amp = getreal(sbprms_rot,'Amplitude')
               rot_ome = getreal(sbprms_rot,'Omega')
               rot_pha = getreal(sbprms_rot,'Phase')
               rot_off = getreal(sbprms_rot,'Offset')
-               
+
               refs(iref)%rot_tim = sim_param%time_vec
 
               if ( rot_fun_int .eq. 0 ) then ! constant function
@@ -986,7 +986,7 @@ subroutine build_references(refs, reference_file)
                 refs(iref)%rot_vel(1) = rot_amp * &
                    sin( rot_ome * refs(iref)%rot_tim(1) - rot_pha ) + rot_off
                 refs(iref)%rot_pos(1) = rot_pos0  ! Initial condition ...
-                do it = 1 , sim_param%n_timesteps 
+                do it = 1 , sim_param%n_timesteps
                   refs(iref)%rot_pos(it) = rot_amp * &
                      sin( rot_ome * refs(iref)%rot_tim(it) - rot_pha ) + &
                      rot_off
@@ -1004,7 +1004,7 @@ subroutine build_references(refs, reference_file)
               call error(this_sub_name, this_mod_name, 'Undefined "Input_Type" field &
                   &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
                   &'. It must be "from_file" or "simple_function".')
-     
+
           end select
 
         case default
@@ -1020,21 +1020,21 @@ subroutine build_references(refs, reference_file)
       refs(iref)%orig_pol_0 = refs(iref)%orig - refs(iref)%pol_pos(:,1)
 
       ! Motion sub-parser ---------------------------------------------
-      sbprms => null() 
+      sbprms => null()
       ! Motion sub-parser ---------------------------------------------
 
     endif
 
     ! Motion sub-parser ---------------------------------------------
-    sbprms     => null() 
-    sbprms_pol => null() 
-    sbprms_rot => null() 
+    sbprms     => null()
+    sbprms_pol => null()
+    sbprms_rot => null()
     ! Motion sub-parser ---------------------------------------------
 
     refs(iref)%multiple = getlogical(ref_prs,'Multiple')
 
     if (refs(iref)%multiple) then
-      
+
       n_mult = n_mult + 1
       call getsuboption(ref_prs,'Multiplicity',sbprms)
       refs(iref)%mult_type = trim(getstr(sbprms,'MultType'))
@@ -1090,22 +1090,22 @@ subroutine build_references(refs, reference_file)
           refs(iref)%self_moving = .true.
           refs(iref)%moving = .false. !standard, will be checked later
 
-          allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps)) 
-          allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps)) 
-          allocate(refs(iref)%pol_tim(  sim_param%n_timesteps)) 
-          allocate(refs(iref)%rot_pos(  sim_param%n_timesteps)) 
-          allocate(refs(iref)%rot_vel(  sim_param%n_timesteps)) 
-          allocate(refs(iref)%rot_tim(  sim_param%n_timesteps)) 
+          allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps))
+          allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps))
+          allocate(refs(iref)%pol_tim(  sim_param%n_timesteps))
+          allocate(refs(iref)%rot_pos(  sim_param%n_timesteps))
+          allocate(refs(iref)%rot_vel(  sim_param%n_timesteps))
+          allocate(refs(iref)%rot_tim(  sim_param%n_timesteps))
           do it = 1,sim_param%n_timesteps
             refs(iref)%pol_pos(:,it) = refs(iref)%pole
             refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
-            refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
+            refs(iref)%pol_tim(  it) = sim_param%time_vec(it)
             refs(iref)%rot_pos(  it) = refs(iref)%psi_0 + &
                  refs(iref)%Omega * ( sim_param%time_vec(it) )    ! <---- CHECK !!!!
                  !refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1) )    ! <---- CHECK !!!!
             refs(iref)%rot_vel(  it) = refs(iref)%Omega
             refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
-          end do 
+          end do
           allocate(refs(iref)%orig_pol_0(3))
           refs(iref)%orig_pol_0 = refs(iref)%orig - refs(iref)%pol_pos(:,1)
 
@@ -1113,7 +1113,7 @@ subroutine build_references(refs, reference_file)
 !       deallocate(psi_0)     ! psi_0 *****
        ! ++++++++++++++++++++++     Rotor    ++++++++++++++++++++++++
        case('rotor')
-      
+
          n_mult_blades = getint(sbprms,'N_Blades')
          refs(iref)%n_mult = n_mult_blades
          n_dofs   = getint(sbprms,'N_Dofs')
@@ -1169,18 +1169,18 @@ subroutine build_references(refs, reference_file)
 
          ! read and allocate some tmp arrays to describe the motion around the hinges
          if ( n_dofs .gt. 0 ) then
-           allocate(hinge_type(n_dofs  )) 
-           allocate(hinge_offs(n_dofs,3)) ; hinge_offs = 0.0_wp 
+           allocate(hinge_type(n_dofs  ))
+           allocate(hinge_offs(n_dofs,3)) ; hinge_offs = 0.0_wp
            allocate(hinge_coll(n_dofs  )) ; hinge_coll = 0.0_wp
            allocate(hinge_cyAm(n_dofs  )) ; hinge_cyAm = 0.0_wp
            allocate(hinge_cyPh(n_dofs  )) ; hinge_cyPh = 0.0_wp
            do i_dof = 1 , n_dofs
              call getsuboption(sbprms,'Dof',sbprms_hin)
-             hinge_type(i_dof  ) = getstr(sbprms_hin,'Hinge_Type') 
+             hinge_type(i_dof  ) = getstr(sbprms_hin,'Hinge_Type')
              hinge_offs(i_dof,:) = getrealarray(sbprms_hin,'Hinge_Offset',3)
-             hinge_coll(i_dof  ) = getreal(sbprms_hin,'Collective') 
-             hinge_cyAm(i_dof  ) = getreal(sbprms_hin,'Cyclic_Ampl') 
-             hinge_cyPh(i_dof  ) = getreal(sbprms_hin,'Cyclic_Phas') 
+             hinge_coll(i_dof  ) = getreal(sbprms_hin,'Collective')
+             hinge_cyAm(i_dof  ) = getreal(sbprms_hin,'Cyclic_Ampl')
+             hinge_cyPh(i_dof  ) = getreal(sbprms_hin,'Cyclic_Phas')
 
              ! from deg to rad
              hinge_coll(i_dof) = hinge_coll(i_dof) * pi / 180.0_wp
@@ -1200,7 +1200,7 @@ subroutine build_references(refs, reference_file)
              prev_id = refs(iref)%id
 
              iref = iref + 1
-             refs(iref)%id = iref 
+             refs(iref)%id = iref
              refs(iref)%multiple = .false.
 
              ! tag of the ref.sys.----
@@ -1219,26 +1219,26 @@ subroutine build_references(refs, reference_file)
 
              if ( i_dof .eq. 0 ) then
                refs(iref)%parent_tag = trim(refs(hub_id)%tag)
-             else 
+             else
                refs(iref)%parent_tag = trim(refs(prev_id)%tag)
              end if
 
              ! n_chil: initialisation only
-             refs(iref)%n_chil = 0 
-!            if ( i_dof .eq. n_dofs ) refs(iref)%n_chil = 0 
+             refs(iref)%n_chil = 0
+!            if ( i_dof .eq. n_dofs ) refs(iref)%n_chil = 0
 
              ! if ( i_dof .eq. 0 ) ---> rotation of the body around the rotor axis
              !   --> constant rotation
-             ! if ( i_dof .ge. 1 ) ---> rotation of the body around the hinges 
+             ! if ( i_dof .ge. 1 ) ---> rotation of the body around the hinges
              !   --> harmonic rotation
-             if ( i_dof .eq. 0 ) then ! constant rotation around the rotor axis 
+             if ( i_dof .eq. 0 ) then ! constant rotation around the rotor axis
 
                refs(iref)%axis  = rot_axis
                refs(iref)%pole  = (/0.0_wp, 0.0_wp, 0.0_wp/)
                refs(iref)%Omega = rot_rate
                refs(iref)%psi_0 = psi_0 - 2*pi*real(i_mult_blades-1,wp) &
                                               /real(n_mult_blades,wp)
-               !TODO: check the norm vector to define an origin of the psi angle 
+               !TODO: check the norm vector to define an origin of the psi angle
                norm = -cross(refs(iref)%axis,(/0.0_wp, 1.0_wp, 0.0_wp/))
                if (norm2(norm) .le. eps) &
                  norm = cross(refs(iref)%axis,(/1.0_wp, 0.0_wp, 0.0_wp/))
@@ -1250,18 +1250,18 @@ subroutine build_references(refs, reference_file)
                refs(iref)%self_moving = .true.
                refs(iref)%moving = .false. !standard, will be checked later
 
-               allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps)) 
-               allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps)) 
-               allocate(refs(iref)%pol_tim(  sim_param%n_timesteps)) 
-               allocate(refs(iref)%rot_pos(  sim_param%n_timesteps)) 
-               allocate(refs(iref)%rot_vel(  sim_param%n_timesteps)) 
+               allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps))
+               allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps))
+               allocate(refs(iref)%pol_tim(  sim_param%n_timesteps))
+               allocate(refs(iref)%rot_pos(  sim_param%n_timesteps))
+               allocate(refs(iref)%rot_vel(  sim_param%n_timesteps))
                allocate(refs(iref)%rot_tim(  sim_param%n_timesteps))
 
                if ( .not. transient_logical ) then ! default: no transient
                  do it = 1,sim_param%n_timesteps
                    refs(iref)%pol_pos(:,it) = refs(iref)%pole
                    refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
-                   refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
+                   refs(iref)%pol_tim(  it) = sim_param%time_vec(it)
                    refs(iref)%rot_pos(  it) = refs(iref)%psi_0 + &
                         refs(iref)%Omega * ( sim_param%time_vec(it) )  ! <---- CHECK !!!!
                         !refs(iref)%Omega * ( sim_param%time_vec(it) - sim_param%time_vec(1) )  ! <---- CHECK !!!!
@@ -1276,7 +1276,7 @@ subroutine build_references(refs, reference_file)
                    do it = 1,sim_param%n_timesteps
                      refs(iref)%pol_pos(:,it) = refs(iref)%pole
                      refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
-                     refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
+                     refs(iref)%pol_tim(  it) = sim_param%time_vec(it)
                      refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
                      if ( sim_param%time_vec(it) .lt. transient_time ) then
                        refs(iref)%rot_vel(  it) = &
@@ -1284,7 +1284,7 @@ subroutine build_references(refs, reference_file)
                             sim_param%time_vec(it) / transient_time  &
                           + init_rot_rate
                        refs(iref)%rot_pos(  it) = refs(iref)%psi_0 &
-                          + init_rot_rate * sim_param%time_vec(it) &  
+                          + init_rot_rate * sim_param%time_vec(it) &
                           + 0.5_wp * ( refs(iref)%Omega - init_rot_rate ) * &
                             sim_param%time_vec(it)**2.0_wp / transient_time
                      else
@@ -1302,7 +1302,7 @@ subroutine build_references(refs, reference_file)
                    do it = 1,sim_param%n_timesteps
                      refs(iref)%pol_pos(:,it) = refs(iref)%pole
                      refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
-                     refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
+                     refs(iref)%pol_tim(  it) = sim_param%time_vec(it)
                      refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
                      if ( sim_param%time_vec(it) .lt. transient_time ) then
                        refs(iref)%rot_vel(  it) = &
@@ -1327,11 +1327,11 @@ subroutine build_references(refs, reference_file)
                    end do
                  end if
                end if
- 
+
                allocate(refs(iref)%orig_pol_0(3))
                refs(iref)%orig_pol_0 = refs(iref)%orig - refs(iref)%pol_pos(:,1)
 
-             else ! harmonic rotation around the hinge axis 
+             else ! harmonic rotation around the hinge axis
 
                if ( trim(hinge_type(i_dof)) .eq. 'Flap' ) then
                  refs(iref)%axis  = (/ 1.0_wp , 0.0_wp , 0.0_wp /)
@@ -1348,7 +1348,7 @@ subroutine build_references(refs, reference_file)
                refs(iref)%psi_0 = psi_0 - 2*pi*real(i_mult_blades-1,wp)&
                                               /real(n_mult_blades,wp)
 
-               ! position of the hinge. 
+               ! position of the hinge.
                ! Orientation is described by the motion only (frame = eye(3))
                refs(iref)%orig =  hinge_offs(i_dof,:) ! hinge_offs(i_dof,:) ! *******
                refs(iref)%frame(1:3,1) = (/ 1.0_wp , 0.0_wp , 0.0_wp /)
@@ -1358,18 +1358,18 @@ subroutine build_references(refs, reference_file)
                refs(iref)%self_moving = .true.
                refs(iref)%moving = .false. !standard, will be checked later
 
-               allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps)) 
-               allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps)) 
-               allocate(refs(iref)%pol_tim(  sim_param%n_timesteps)) 
-               allocate(refs(iref)%rot_pos(  sim_param%n_timesteps)) 
-               allocate(refs(iref)%rot_vel(  sim_param%n_timesteps)) 
-               allocate(refs(iref)%rot_tim(  sim_param%n_timesteps)) 
+               allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps))
+               allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps))
+               allocate(refs(iref)%pol_tim(  sim_param%n_timesteps))
+               allocate(refs(iref)%rot_pos(  sim_param%n_timesteps))
+               allocate(refs(iref)%rot_vel(  sim_param%n_timesteps))
+               allocate(refs(iref)%rot_tim(  sim_param%n_timesteps))
 
                do it = 1,sim_param%n_timesteps
                  ! position of the pole ---------
                  refs(iref)%pol_pos(:,it) = refs(iref)%pole
                  refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
-                 refs(iref)%pol_tim(  it) = sim_param%time_vec(it) 
+                 refs(iref)%pol_tim(  it) = sim_param%time_vec(it)
                  ! rotation ---------------------
                  refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
                  if ( refs(iref)%Omega .ne. 0 ) then
@@ -1380,7 +1380,7 @@ subroutine build_references(refs, reference_file)
                       sin( refs(iref)%Omega * refs(iref)%rot_tim(it) &
                          + refs(iref)%psi_0 - hinge_cyPh(i_dof) )
                  else
-                   refs(iref)%rot_pos(  it) = hinge_coll(i_dof) 
+                   refs(iref)%rot_pos(  it) = hinge_coll(i_dof)
                    refs(iref)%rot_vel(  it) = 0.0_wp
                  end if
                end do
@@ -1390,14 +1390,14 @@ subroutine build_references(refs, reference_file)
 
              end if
 
-   
+
            end do ! loop over the dofs
-           
+
            !
          end do ! loop over the blades
 
          if ( n_dofs .gt. 0 ) then
-           deallocate(hinge_type) 
+           deallocate(hinge_type)
            deallocate(hinge_offs)
            deallocate(hinge_coll)
            deallocate(hinge_cyAm)
@@ -1409,13 +1409,13 @@ subroutine build_references(refs, reference_file)
        case default
          call error(this_sub_name, this_mod_name, 'Unknown type of movement')
       end select
-      
+
       ! Motion sub-parser ---------------------------------------------
-      sbprms => null() 
+      sbprms => null()
       ! Motion sub-parser ---------------------------------------------
 
     endif
-    
+
   enddo
 
   n_in = countoption(ref_prs,'Motion')
@@ -1430,7 +1430,7 @@ subroutine build_references(refs, reference_file)
   !Generate the parent-children references
   do iref = 1,n_refs
     refs(iref)%parent_id = -1
-    
+
     !look for the parent in all the other references (master included)
     do iref2 = 0,n_refs
       !if found
@@ -1447,14 +1447,14 @@ subroutine build_references(refs, reference_file)
         exit
       endif
     enddo
-  
+
     !if not found a parent
     if (refs(iref)%parent_id .lt. 0) then
       write(msg,'(A,A,A,A,A)') 'For reference tag ',trim(refs(iref)%tag), &
                    ' a parent with tag ',trim(refs(iref)%parent_tag),' was not found'
       call error(this_sub_name, this_mod_name, msg)
     endif
-    
+
   enddo
 
   ! check reference frame input
@@ -1489,7 +1489,7 @@ recursive subroutine set_movement(refs, iref, parent_moving)
  integer :: i
 
   refs(iref)%moving = parent_moving .or. refs(iref)%self_moving
- 
+
   do i=1,refs(iref)%n_chil
     call set_movement(refs, refs(iref)%chil_id(i), refs(iref)%moving)
   enddo
@@ -1498,7 +1498,7 @@ end subroutine set_movement
 
 !----------------------------------------------------------------------
 
-!> Chech that the inserted references are geometrically correct, correct 
+!> Chech that the inserted references are geometrically correct, correct
 !! where possible, abort if the input is wrong
 subroutine check_references(refs)
  type(t_ref), intent(inout) :: refs(0:)
@@ -1521,7 +1521,7 @@ subroutine check_references(refs)
    rot = refs(i_ref)%frame
 
    ! === check that the orientation is orthogonal ===
-   
+
    !> Unitary determinant
    det = rot(1,1)*rot(2,2)*rot(3,3) &
        + rot(1,2)*rot(2,3)*rot(3,1) &
@@ -1591,10 +1591,10 @@ subroutine check_references(refs)
                      &'//trim(msg)//'. Normalised.')
 
        refs(i_ref)%axis = refs(i_ref)%axis / norm2(refs(i_ref)%axis)
-       
+
      end if
- 
-   end if   
+
+   end if
 
 
   end do
@@ -1608,9 +1608,9 @@ end subroutine check_references
 !! This function is called recursively traversing the reference frames tree
 !!
 !! First the local movement with respect to the parent is calculated. Then
-!! it is combined with the movement coming from the parent with respect to 
-!! the base reference, to obtain the transformation of the present frame with 
-!! respect to the base frame. Then it is passed to all the children to 
+!! it is combined with the movement coming from the parent with respect to
+!! the base reference, to obtain the transformation of the present frame with
+!! respect to the base frame. Then it is passed to all the children to
 !! update their data
 recursive subroutine reference_update_ref(this,refs,t,R,of,G,f,angVel)
  class(t_ref), intent(inout) :: this
@@ -1625,9 +1625,9 @@ recursive subroutine reference_update_ref(this,refs,t,R,of,G,f,angVel)
  real(wp) :: R_loc(3,3), of_loc(3)
  real(wp) :: G_loc(3,3), f_loc(3) , angVel_loc(3)
  integer :: i1
-  
 
-  !Update the local transformation with respect to the parent 
+
+  !Update the local transformation with respect to the parent
 
   call this%update_self(t,R, of,  R_loc, of_loc, G_loc, f_loc, angVel_loc)
 
@@ -1637,30 +1637,30 @@ recursive subroutine reference_update_ref(this,refs,t,R,of,G,f,angVel)
 
   this%G_g = G + matmul(R, G_loc)
   this%f_g = f + matmul(R, f_loc)
-  
+
   this%angVel_g = angVel + matmul(R, angVel_loc)
 
-  
+
   !For all the reference children call the same updating subroutine, passing
   !this reference global matrices
   do i1 = 1 , this%n_chil
 
     call refs(this%chil_id(i1))%update_ref(refs, t, this%R_g, this%of_g, &
                                                     this%G_g, this%f_g, &
-                                                    this%angVel_g ) 
- 
-  end do 
+                                                    this%angVel_g )
+
+  end do
 
 
 end subroutine reference_update_ref
 
 !----------------------------------------------------------------------
 
-!> Update the local transformation with respect to the parent reference 
+!> Update the local transformation with respect to the parent reference
 !! frame
 !!
-!! The local transformation is just the orientation of the local frame if the 
-!! frame is not moving, or it is some pre-defined motion law. At the moment 
+!! The local transformation is just the orientation of the local frame if the
+!! frame is not moving, or it is some pre-defined motion law. At the moment
 !! just a constant rotation around a pole and an axis is implemented
 subroutine reference_update_self(this, t, R_par, of_par, R_loc, of_loc, &
                                                          G_loc,  f_loc, angVel_loc)
@@ -1681,8 +1681,8 @@ subroutine reference_update_self(this, t, R_par, of_par, R_loc, of_loc, &
 
  character(len=*), parameter :: this_sub_name = 'reference_update_self'
 
-  if (.not.this%self_moving) then 
-    
+  if (.not.this%self_moving) then
+
     !not moving with respect to the parent: orientation is the original
     ! one, and motion related matrices are zero
     R_loc  = this%frame
@@ -1704,7 +1704,7 @@ subroutine reference_update_self(this, t, R_par, of_par, R_loc, of_loc, &
 
     ! R01(t) -----
     call rot_mat_axis_angle( this%axis, Psi, R_01_t )
-    R_loc = matmul(R_01_t, this%frame) 
+    R_loc = matmul(R_01_t, this%frame)
     ! R10(0) -----
     R_10_0 = transpose(this%frame)
     of_loc = matmul( matmul(R_loc,R_10_0) , this%orig_pol_0) + xPole
@@ -1719,7 +1719,7 @@ subroutine reference_update_self(this, t, R_par, of_par, R_loc, of_loc, &
     f_loc = matmul(Omega_vec,(-matmul(transpose(R_par),of_par)- xPole))  + &
                       vPole
 
-    AngVel_loc = Omega*this%axis 
+    AngVel_loc = Omega*this%axis
 
   endif
 
@@ -1734,7 +1734,7 @@ subroutine update_all_references(refs, t)
  real(wp), intent(in) :: t
 
  real(wp) :: of(3), R(3,3), G(3,3), f(3) , angVel(3)
- 
+
  !Give to the first reference identity/null data to start the traversing
  of = (/0.0_wp, 0.0_wp, 0.0_wp/)
  R  = reshape((/1.0_wp, 0.0_wp, 0.0_wp, &
@@ -1752,12 +1752,12 @@ end subroutine update_all_references
 
 !----------------------------------------------------------------------
 
-!> Calculate the rotation matrix  generated by the rotation of an angle 
+!> Calculate the rotation matrix  generated by the rotation of an angle
 !! around an axis
 subroutine rot_mat_axis_angle ( axis, angle, R )
 
  real(wp)     , intent(in)  :: axis(3)
- real(wp)     , intent(in)  :: angle 
+ real(wp)     , intent(in)  :: angle
  real(wp)     , intent(out) :: R(3,3)
  real(wp)                   :: r0(9) , r1(9) , r2(9)
 
@@ -1779,7 +1779,7 @@ subroutine rot_mat_axis_angle ( axis, angle, R )
          nz*nx , nz*ny , nz*nz     /)
 
  R = reshape ( r0*cos(angle)+r1*sin(angle)+r2*(1.0_wp-cos(angle)) ,  &
-               (/3,3/) , order=(/2,1/) ) 
+               (/3,3/) , order=(/2,1/) )
 
 end subroutine rot_mat_axis_angle
 
@@ -1793,16 +1793,16 @@ subroutine check_input_from_file( ref_tag_str , pol_rot_str , time_from_file , s
  character(len=*), parameter :: this_sub_name = 'check_input_from_file'
 
  if ( time_from_file(1) .gt. sim_param_time(1) ) then
-    write(*,*) ' input time_vec(1)     : ' , time_from_file(1) 
-    write(*,*) ' sim_param%time_vec(1) : ' , sim_param_time(1) 
+    write(*,*) ' input time_vec(1)     : ' , time_from_file(1)
+    write(*,*) ' sim_param%time_vec(1) : ' , sim_param_time(1)
     call error(this_sub_name, this_mod_name, 'Wrong input file &
                   &in Motion={'//trim(pol_rot_str)// &
                    '={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
                   &'. Initial time value > sim_param%time_vec(1).')
  end if
  if ( time_from_file(size(time_from_file)) .gt. sim_param_time(size(sim_param_time)) ) then
-    write(*,*) ' input time_vec(end)     : ' , time_from_file(size(time_from_file)) 
-    write(*,*) ' sim_param%time_vec(end) : ' , sim_param_time(size(sim_param_time)) 
+    write(*,*) ' input time_vec(end)     : ' , time_from_file(size(time_from_file))
+    write(*,*) ' sim_param%time_vec(end) : ' , sim_param_time(size(sim_param_time))
     call error(this_sub_name, this_mod_name, 'Wrong input file &
                   &in Motion={'//trim(pol_rot_str)// &
                    '={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
@@ -1817,26 +1817,26 @@ end subroutine check_input_from_file
 !  character(len=max_char_len), intent(in) :: restart_file
 !  character(len=max_char_len), intent(in) :: ref_file
 !  type(t_ref), intent(inout) :: refs(0:)
-! 
+!
 !  type(t_parse) :: ref_prs
-!  type(t_parse), pointer :: sbprms , sbprms_pol , sbprms_rot 
-! 
+!  type(t_parse), pointer :: sbprms , sbprms_pol , sbprms_rot
+!
 !  integer(h5loc) :: floc , refs_gloc , ref_loc !, gloc1, gloc2, gloc3
 !  character(len=max_char_len) :: ref_title
-! 
+!
 !  real(wp) :: relative_pos_0(3)
 !  real(wp) :: relative_rot_0
 !  real(wp) :: relative_rot_01
-! 
+!
 !  logical :: multiple
-! 
+!
 !  integer :: iref
 !  integer :: nDofs , nBlades
 !  character(len=max_char_len) :: multType
 !  integer :: i , it , nref_ref_in , ib , idof
-! 
+!
 !  character(len=*), parameter :: this_sub_name = 'update_relative_initial_conditions'
-! 
+!
 !  !Define all the parameters to be read
 !  call ref_prs%CreateStringOption('Reference_Tag','Integer tag of reference frame',&
 !               multiple=.true.)
@@ -1844,7 +1844,7 @@ end subroutine check_input_from_file
 !               multiple=.true.)
 !  call ref_prs%CreateLogicalOption('Multiple','Is the reference multiple', &
 !               multiple=.true.)
-! 
+!
 !  ! Motion sub-parser ---------------------------------------------
 !  call ref_prs%CreateSubOption('Motion','Definition of the motion of a frame',sbprms, &
 !               multiple=.true.)
@@ -1860,7 +1860,7 @@ end subroutine check_input_from_file
 !  ! End Rotation motion sub-parser ------------------------------------
 !  ! End Motion sub-parser ---------------------------------------------
 !  sbprms => null()
-! 
+!
 !  ! Multiple sub-parser -------------------------------------------
 !  call ref_prs%CreateSubOption('Multiplicity','Parameters for multiple frames',&
 !                sbprms, multiple=.true.)
@@ -1870,108 +1870,108 @@ end subroutine check_input_from_file
 !               & blades or whatever')
 !  call sbprms%CreateIntOption('N_Dofs', 'Number of dofs for each blade')
 !  ! End Multiple sub-parser -------------------------------------------
-! 
-! 
+!
+!
 !  !read the file
 !  call ref_prs%read_options(trim(ref_file),printout_val=.false.)
-! 
+!
 !  ! debug -----
 !  write(*,*) ' shape(refs) : ' , shape(refs)
 !  ! debug -----
-!  
-!  nref_ref_in = countoption(ref_prs,'Reference_Tag') 
-! 
+!
+!  nref_ref_in = countoption(ref_prs,'Reference_Tag')
+!
 !  ! open restart file to read the relative initial conditions
 !  call open_hdf5_file(trim(restart_file), floc)
 !  call open_hdf5_group(floc, 'References', refs_gloc)
-! 
+!
 !  iref = 0
-!  
+!
 !  do i = 1 , nref_ref_in
-!     
+!
 !    iref = iref + 1
 !    ! debug ----
 !    write(*,*) ' refs(',iref,')%tag : ' , trim(refs(iref)%tag)
 !    ! debug ----
-! 
+!
 !    write(ref_title,'(A,I3.3)')'Ref',iref
 !    call open_hdf5_group(refs_gloc, trim(ref_title), ref_loc)
-! 
+!
 !    if ( refs(iref)%self_moving ) then
-! 
+!
 !      call getsuboption(ref_prs,'Motion',sbprms)
-! 
+!
 !      ! === Pole ===
 !      call getsuboption(sbprms,'Pole',sbprms_pol)
-! 
+!
 !      select case( trim(getstr(sbprms_pol,'Input')) )
 !         case('velocity')
 ! !         ! add the i.c. from restart file
 ! !         write(*,*) ' pole velocity, iref : ' , iref
-! 
+!
 !           call read_hdf5(relative_pos_0,'RelativePolPos',ref_loc)
-! 
+!
 !           do it = 1 , size(refs(iref)%pol_pos,2)
 !             refs(iref)%pol_pos(:,it) = refs(iref)%pol_pos(:,it) + &
 !                                        relative_pos_0
 !           end do
-! 
+!
 !         case default
 !           ! do nothing
 !       end select
-! 
+!
 !       ! === Rotation ===
 !       call getsuboption(sbprms,'Rotation',sbprms_rot)
-! 
+!
 !       select case(trim(getstr(sbprms_rot,'Input')) )
 !         case('velocity')
 ! !         ! add the i.c. from restart file
 ! !         write(*,*) ' rot  velocity, iref : ' , iref
-! 
+!
 !           call read_hdf5(relative_rot_0,'RelativeRotPos',ref_loc)
-! 
+!
 !           do it = 1 , size(refs(iref)%rot_pos)
 !             refs(iref)%rot_pos(it) = refs(iref)%rot_pos(it) + &
 !                                      relative_rot_0
 !           end do
-! 
+!
 !         case default
 !           ! do nothing
 !       end select
-! 
+!
 !       sbprms_rot => null()
 !       sbprms_pol => null()
 !       sbprms     => null()
-! 
+!
 !    end if
-! 
+!
 !    call close_hdf5_group(ref_loc)
-! 
+!
 ! ! Multiplicity -----
 !    multiple = getlogical(ref_prs,'Multiple')
-! 
+!
 !    if ( multiple ) then ! loop over multiplicity
-! 
+!
 !      call getsuboption(ref_prs,'Multiplicity',sbprms)
-!      
+!
 !      multType = trim(getstr(sbprms,'MultType'))
-!      nBlades  = getint(sbprms,'N_Blades') 
+!      nBlades  = getint(sbprms,'N_Blades')
 !      nDofs    = getint(sbprms,'N_dofs')
-! 
+!
 !      ! debug ----
 !      write(*,*) ' multType , nBlades , nDofs ' , trim(multType) , nBlades , nDofs
 !      ! debug ----
-!  
+!
 !      select case(trim(multType) )
-!  
+!
 !        case('simple rotor')
-!          ! to be implemented .... 
-! 
+!          ! to be implemented ....
+!
 !        case('rotor')
 !          ! multiple ref.sys. defined by means of offset and rotation ---------------
 !          ! read only the rotation offset of the first ref.sys. of the first blade
 !          ! and add to the first ref.sys. of all the other blades
-! 
+!
 !          write(ref_title,'(A,I3.3)')'Ref',iref+1
 !          call open_hdf5_group(refs_gloc, trim(ref_title), ref_loc)
 !          call read_hdf5(relative_rot_01,'RelativeRotPos',ref_loc)
@@ -1979,61 +1979,61 @@ end subroutine check_input_from_file
 !          ! debug ----
 !          write(*,*) trim(ref_title)
 !          ! debug ----
-! 
-!          
-! 
+!
+!
+!
 !          do ib = 1 , nBlades
-!  
+!
 !            ! Update first ref.sys. of the blade (~ first hinge)
 !            iref = iref + 1
 !            write(ref_title,'(A,I3.3)')'Ref',iref
 !            ! debug ----
-!            write(*,*) ' Update : ' , trim(ref_title) , relative_rot_01 
+!            write(*,*) ' Update : ' , trim(ref_title) , relative_rot_01
 !            ! debug ----
 !            do it = 1 , size(refs(iref)%rot_pos)
 !              refs(iref)%rot_pos(it) = refs(iref)%rot_pos(it) + &
 !                                       relative_rot_01
 !            end do
-!  
-!            ! Update the following ref.sys. of rotors 
+!
+!            ! Update the following ref.sys. of rotors
 !            do idof = 1 , nDofs
-!    
+!
 !              iref = iref + 1
 !              write(ref_title,'(A,I3.3)')'Ref',iref
 ! !            call open_hdf5_group(refs_gloc, trim(ref_title), ref_loc)
 ! !            call read_hdf5(relative_rot_0,'RelativeRotPos',ref_loc)
 ! !            call close_hdf5_group(ref_loc)
 !              ! debug ----
-!              write(*,*) ' Update : ' , trim(ref_title)  , relative_rot_0 
+!              write(*,*) ' Update : ' , trim(ref_title)  , relative_rot_0
 !              ! debug ----
-! 
+!
 !              do it = 1 , size(refs(iref)%rot_pos)
 !                refs(iref)%rot_pos(it) = refs(iref)%rot_pos(it) + &
 !                                         relative_rot_0
 !              end do
-!    
-!            end do 
-!   
-!          end do 
-!  
-!  
+!
+!            end do
+!
+!          end do
+!
+!
 !      end select
-! 
+!
 !      sbprms => null()
-!  
+!
 !    end if
-! 
-! 
+!
+!
 !  end do
-! 
+!
 !  call close_hdf5_group(refs_gloc)
 !  call close_hdf5_file(floc)
-! 
+!
 ! ! ! stop ----
 ! !  write(*,*) ' stop l.1714 update_relative_initial_conditions '
 ! !  stop
 ! ! ! stop ----
-! 
+!
 ! end subroutine update_relative_initial_conditions
 
 !----------------------------------------------------------------------

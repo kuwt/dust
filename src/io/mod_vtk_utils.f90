@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -92,7 +92,7 @@ subroutine add_output_var_scal(output_var, var, var_name, skip)
   output_var%var_name = trim(var_name)
   output_var%vector = .false.
   output_var%skip = skip
-  
+
   if(.not. skip) then
     allocate(output_var%var(1,size(var)))
     output_var%var(1,:) = var
@@ -113,7 +113,7 @@ subroutine add_output_var_vec(output_var, var, var_name, skip)
   output_var%var_name = trim(var_name)
   output_var%vector = .true.
   output_var%skip = skip
-  
+
   if(.not. skip) then
     allocate(output_var%var(size(var,1),size(var,2)))
     output_var%var = var
@@ -210,7 +210,7 @@ subroutine vtk_print_piece_header(fu, offset, npoints, ncells, nquad, ntria, &
 
   write(ostr,'(I0)') offset
   buffer = '    <DataArray type="Int32" Name="connectivity" &
-           &Format="appended" offset="'//trim(ostr)//'"/>'//lf; 
+           &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
   write(fu) trim(buffer)
   offset = offset + vtk_isize + vtk_isize*3*ntria + vtk_isize*4*nquad + &
                                 vtk_isize*1*npart
@@ -231,7 +231,7 @@ subroutine vtk_print_piece_header(fu, offset, npoints, ncells, nquad, ntria, &
 
   !Data
   if (size(out_vars) .gt. 0) then
-    buffer =  '   <CellData Scalars="scalars">'//lf; 
+    buffer =  '   <CellData Scalars="scalars">'//lf;
     write(fu) trim(buffer)
     do i_v = 1,size(out_vars)
       if(ncells.ne.size(out_vars(i_v)%var,2) .and. .not. out_vars(i_v)%skip) &
@@ -275,7 +275,7 @@ subroutine vtk_print_piece_data(fu, out_vars, nquad, ntria, &
 
   if(nquad+ntria .gt. 0 .and. .not. present(ee)) call internal_error( &
   this_sub_name,this_mod_name,'Not passed connectivity to piece with elements')
-  
+
   particles = .false.
   if(nquad+ntria .le. 0) particles = .true.
   ne = nquad+ntria+npart

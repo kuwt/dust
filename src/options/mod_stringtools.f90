@@ -1,12 +1,12 @@
 !!=====================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! This file was originally part of Flexi, and has been (minimally) modified
 !! to suit the needs of DUST
 !!
@@ -15,11 +15,11 @@
 !
 !Original copyright:
 !=================================================================================================================================
-! Copyright (c) 2010-2016  Prof. Claus-Dieter Munz 
+! Copyright (c) 2010-2016  Prof. Claus-Dieter Munz
 ! This file is part of flexi, a high-order accurate framework for numerically solving PDEs with discontinuous Galerkin methods.
 ! For more information see https://www.flexi-project.org and https://nrg.iag.uni-stuttgart.de/
 !
-! flexi is free software: you can redistribute it and/or modify it under the terms of the gnu General Public License 
+! flexi is free software: you can redistribute it and/or modify it under the terms of the gnu General Public License
 ! as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 !
 ! flexi is distributed in the hope that it will be useful, but without any warranty; without even the implied warranty
@@ -29,7 +29,7 @@
 !=================================================================================================================================
 !
 ! attention:
-! The routines 'clear_formatting', 'set_formatting', 'get_escape_sequence' and 'split_string' are copied from the fortran output 
+! The routines 'clear_formatting', 'set_formatting', 'get_escape_sequence' and 'split_string' are copied from the fortran output
 ! library (foul).
 ! Copyright and license see below.
 ! Full version of the foul-library can be found here:
@@ -66,10 +66,10 @@
 !------------------------------------------------------------
 
 
-!> Routines for performing operations on strings, which are not covered by 
+!> Routines for performing operations on strings, which are not covered by
 !! ISO_VARYING_STRING.
 !!
-!! The routines 'clear_formatting', 'set_formatting', 'get_escape_sequence' 
+!! The routines 'clear_formatting', 'set_formatting', 'get_escape_sequence'
 !! and 'split_string' are copied from the fortran output library (foul).
 !! Full version of the foul-library can be found here:
 !!   http://foul.sourceforge.net
@@ -137,9 +137,9 @@ public :: set_formatting
 public :: clear_formatting
 public :: IsInList, strip_mult_appendix
 
-logical :: use_escape_codes = .true.  !< If set to .false., output will consist only of standard text, allowing the 
+logical :: use_escape_codes = .true.  !< If set to .false., output will consist only of standard text, allowing the
                                       !< escape characters to be switched off in environments which don't support them.
-public :: use_escape_codes                                      
+public :: use_escape_codes
 
 character(len=*), parameter :: this_mod_name = 'mod_stringtools'
 
@@ -155,7 +155,7 @@ subroutine LowCase_overwrite(Str1)
 implicit none
 ! input / output variables
 character(len=*),intent(inout) :: Str1  !< Input/output string
-! local variables 
+! local variables
 integer                    :: iLen,nLen,Upper
 character(len=*),parameter :: lc='abcdefghijklmnopqrstuvwxyz'
 character(len=*),parameter :: uc='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -168,7 +168,7 @@ do iLen=1,nLen
   Upper=index(uc,Str1(iLen:iLen))
   if ((Upper > 0).and. .not. HasEq) then
     Str1(iLen:iLen) = lc(Upper:Upper)
-  end if  
+  end if
 end do
 end subroutine LowCase_overwrite
 
@@ -181,7 +181,7 @@ implicit none
 ! input / output variables
 character(len=*),intent(in)  :: Str1  !< Input string
 character(len=*),intent(out) :: Str2  !< Output string, lower case letters only
-! local variables 
+! local variables
 integer                    :: iLen,nLen,Upper
 character(len=*),parameter :: lc='abcdefghijklmnopqrstuvwxyz'
 character(len=*),parameter :: uc='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -199,13 +199,13 @@ end subroutine LowCase
 
 !----------------------------------------------------------------------
 
-!> Case insensitive string comparison 
+!> Case insensitive string comparison
 function stricmp(a, b)
 ! modules
 implicit none
 ! input/output variables
 character(len=*),intent(in) :: a,b !< strings to compare with each other
-! local variables 
+! local variables
 logical            :: stricmp
 character(len=255) :: alow
 character(len=255) :: blow
@@ -245,10 +245,10 @@ end function
 subroutine StripSpaces(string)
 ! modules
 implicit none
-! input / output variables 
+! input / output variables
 character(len=*),intent(inout) :: string  !< input string
 ! local variables
-integer :: stringLen 
+integer :: stringLen
 integer :: last, actual
 stringLen = len(string)
 last = 1
@@ -269,7 +269,7 @@ end subroutine
 !----------------------------------------------------------------------
 
 !> Converts integer to string
-pure function inttostr(value) 
+pure function inttostr(value)
 integer,intent(in)  :: value
 character(len=255)  :: inttostr
 write(inttostr,"(I20)") value
@@ -278,7 +278,7 @@ end function inttostr
 !----------------------------------------------------------------------
 
 !> Checks if a string is an integer
-pure function isint(value) 
+pure function isint(value)
 character(len=*),intent(in)  :: value
 logical                        :: isint
 ! local variables
@@ -290,7 +290,7 @@ end function isint
 !----------------------------------------------------------------------
 
 !> Checks if a string is a real
-pure function isreal(value) 
+pure function isreal(value)
 character(len=*),intent(in)  :: value
 logical                      :: isreal
 ! local variables
@@ -303,7 +303,7 @@ end function isreal
 !----------------------------------------------------------------------
 
 !> Checks if a string is a empty
-pure function isempty(value) 
+pure function isempty(value)
 character(len=*),intent(in)  :: value
 logical                      :: isempty
 isempty = ( LEN_TRIM(value) == 0 )
@@ -317,7 +317,7 @@ end function isempty
 subroutine split_string(string, delimiter, substrings, substring_count)
 ! modules
 implicit none
-! input / output variables 
+! input / output variables
 character (len = *), intent(in)  :: string          !< Variable-length character string that is to be split
 character (len = *),           intent(in)  :: delimiter       !< Character along which to split
 character (len = *), intent(out) :: substrings(*)   !< Array of substrings generated by split operation
@@ -373,7 +373,7 @@ subroutine strip_mult_appendix(string, rem, delimiter)
    & user is encouraged to avoid the use of the aforementioned delimiter in&
    & input strings.')
  endif
- 
+
  if (isint(trim(substrings(nstr)))) then
    striplen = len(trim(substrings(nstr)))
    striplen = striplen + len(trim(delimiter))
@@ -394,7 +394,7 @@ end subroutine strip_mult_appendix
 subroutine get_escape_sequence(style_string, escape_sequence)
 ! modules
 implicit none
-! input / output variables 
+! input / output variables
 character(len=*),intent(in)   :: style_string    !< String describing which styles to set (separated by space)
                                                  !< see source code for supported styles
 character(len=16),intent(out) :: escape_sequence !< escape_sequence: ansi escape sequence generated from the specified styles
@@ -469,7 +469,7 @@ end subroutine get_escape_sequence
 subroutine set_formatting(style_string)
 ! modules
 implicit none
-! input / output variables 
+! input / output variables
 character (len = *), intent(in) :: style_string !< String describing which styles to set (separated by space).
                                                 !< See get_escape_sequence for supported styles.
 ! local variables

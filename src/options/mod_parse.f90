@@ -1,16 +1,16 @@
 !!=====================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! It was originally part of Flexi, and has been extensively modified to suit
 !! the needs of DUST
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -106,7 +106,7 @@ use MOD_ISO_VARYING_STRING, only: &
   !insert       , &
   !remove       , &
   replace      , &
-  split        
+  split
 
 !use MOD_Options
 use MOD_Options, only: &
@@ -527,7 +527,7 @@ function CountOption_(this, name) result(count)
  class(t_parse),intent(inout) :: this    !< class(t_parse)
  character(len=*),intent(in)     :: name  !< Search for this keyword in ini file
  integer                         :: count !< number of found occurences of keyword
- 
+
  type(t_link),pointer :: current
   count = 0
   ! iterate over all options and compare names
@@ -573,7 +573,7 @@ recursive subroutine copy_parser(source_p, target_p)
  type(t_link), pointer :: newLink
  class(option), pointer  :: newopt
  type(t_link), pointer :: current_source, current_target
- 
+
   !allocate(newParser)
   !target_p => newParser
   allocate(target_p, source=source_p)
@@ -769,10 +769,10 @@ function read_option(this, line, sub_option, prev_read) result(found)
   if (i==0) return
   name = line(1:i-1)
   rest = line(i+1:)
-  
+
   !default, we have not found a sub-option
   sub_option => null()
-      
+
   current => this%firstLink
   ! iterate over all options and compare names
   do while (associated(current))
@@ -865,9 +865,9 @@ end function read_option
 
 !> Check the consistency of a given option
 !!
-!! The given option is passed as a link, previously retrieved from a 
+!! The given option is passed as a link, previously retrieved from a
 !! get... subroutine. Then through previous or next optional inputs
-!! is checked if the previous or next option actually introduced int the input 
+!! is checked if the previous or next option actually introduced int the input
 !! file is coherent with the required prev_opt or next_opt
 subroutine check_opt_consistency(olink, prev, prev_opt, next, next_opt)
  type(t_link), intent(in) :: olink
@@ -906,7 +906,7 @@ subroutine check_opt_consistency(olink, prev, prev_opt, next, next_opt)
 
    if(.not.present(next_opt)) call error(this_sub_name, this_mod_name, &
    'No next_opt provided when asked to check next argument')
-   
+
    res = olink%next_read%opt%nameequals(trim(next_opt))
    if (.not. res) call error(this_sub_name, this_mod_name, &
    'It is required that in the input file after the option '//&
@@ -1300,7 +1300,7 @@ use MOD_Options
     if (current%opt%nameequals(name).and.(.not.current%opt%isRemoved)) then
       opt => current%opt
       if(present(olink)) olink => current
-      ! if proposal is present and the option is not set due to the 
+      ! if proposal is present and the option is not set due to the
       ! parameter file, then return the proposal
       if ((present(proposal)).and.(.not.opt%isSet)) then
         proposal_loc = trim(proposal)
@@ -1339,7 +1339,7 @@ use MOD_Options
             value = opt%value
           end select
         !class is (StringArrayOption)
-          !if (size(opt%value).ne.no) call Abort(__STAMP__,"Array size of 
+          !if (size(opt%value).ne.no) call Abort(__STAMP__,"Array size of
           !option '"//trim(name)//"' is not correct!")
           !select type(value)
           !type is (t_str)
@@ -1373,7 +1373,7 @@ use MOD_Options
             value = opt%default_value
           end select
         !class is (StringArrayOption)
-          !if (size(opt%default_value).ne.no) call Abort(__STAMP__,"Array size of 
+          !if (size(opt%default_value).ne.no) call Abort(__STAMP__,"Array size of
           !option '"//trim(name)//"' is not correct!")
           !select type(value)
           !type is (t_str)
@@ -1657,7 +1657,7 @@ use MOD_StringTools ,only: isint, stricmp
               exit
             end if
           end do
-          ! If it is not found, print a warning and set the flag to later use 
+          ! If it is not found, print a warning and set the flag to later use
           ! the correct output format
           if(.not.found)then
             call warning(this_sub_name, this_mod_name, "No named option for &
@@ -1668,7 +1668,7 @@ use MOD_StringTools ,only: isint, stricmp
           call opt%print(prms%maxNameLen, prms%maxValueLen, mode=0)
           return
         end if
-        ! If a string has been supplied, check if this string exists in the 
+        ! If a string has been supplied, check if this string exists in the
         ! list and set it's integer representation according to the
         ! mapping
         do i=1,listSize
@@ -1716,10 +1716,10 @@ subroutine addStrListEntry(prms, name,string_in,int_in)
       opt => current%opt
       select type (opt)
       class is (IntFromStringOption)
-        ! Check if the arrays containing the string and integer values 
+        ! Check if the arrays containing the string and integer values
         ! are already allocated
         if (.not.(allocated(opt%strList))) then
-          ! This is the first call to addEntry, allocate the arrays 
+          ! This is the first call to addEntry, allocate the arrays
           ! with dimension one
           allocate(opt%strList(1))
           allocate(opt%intList(1))
@@ -1729,7 +1729,7 @@ subroutine addStrListEntry(prms, name,string_in,int_in)
           ! Save biggest length of string entry
           opt%maxLength = LEN_TRIM(string_in)
         else
-          ! Subsequent call to addEntry, re-allocate the lists with 
+          ! Subsequent call to addEntry, re-allocate the lists with
           ! one additional entry
           listSize = size(opt%strList)    ! opt size of the list
           ! store opt values in temporary arrays

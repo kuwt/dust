@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -70,7 +70,7 @@ use mod_hdf5_io, only: &
    read_hdf5
 
 use mod_stringtools, only: &
-  LowCase 
+  LowCase
 
 use mod_geo_postpro, only: &
   load_components_postpro, update_points_postpro , prepare_geometry_postpro
@@ -91,11 +91,11 @@ use mod_post_load, only: &
 use mod_tecplot_out, only: &
   tec_out_probes
 
-use mod_dat_out, only: & 
+use mod_dat_out, only: &
   dat_out_probes_header
 
 
-  
+
 implicit none
 
 public :: post_probes
@@ -107,7 +107,7 @@ character(len=max_char_len) :: msg
 
 contains
 
-! ---------------------------------------------------------------------- 
+! ----------------------------------------------------------------------
 
 subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
                       out_frmt , components_names , all_comp , &
@@ -121,7 +121,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
  character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
  logical , intent(inout) :: all_comp
  integer , intent(in) :: an_start , an_end , an_step
- 
+
  type(t_geo_component), allocatable :: comps(:)
  integer :: nstep
  real(wp), allocatable :: probe_vars(:,:,:)
@@ -137,24 +137,24 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
  integer(h5loc) :: floc , ploc
  character(len=max_char_len) :: filename
  real(wp), allocatable :: points(:,:)
- integer :: nelem 
- 
+ integer :: nelem
+
  real(wp) :: u_inf(3)
  real(wp) :: P_inf , rho
- real(wp) :: vel_probe(3) = 0.0_wp , vort_probe(3) = 0.0_wp 
+ real(wp) :: vel_probe(3) = 0.0_wp , vort_probe(3) = 0.0_wp
  real(wp) :: v(3) = 0.0_wp !, w(3) = 0.0_wp
- real(wp), allocatable , target :: sol(:) 
+ real(wp), allocatable , target :: sol(:)
  real(wp) :: pres_probe
  real(wp) :: t
- 
+
  real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
  real(wp), allocatable :: vort(:), cp(:)!, vel(:), press(:)
- 
+
  type(t_wake) :: wake
  type(t_elem_p), allocatable :: wake_elems(:)
  integer :: ivar, ierr
- 
- character(len=max_char_len), parameter :: & 
+
+ character(len=max_char_len), parameter :: &
     this_sub_name = 'post_probes'
 
   write(msg,'(A,I0,A)') nl//'++++++++++ Analysis: ',ia,' probes'//nl
@@ -191,7 +191,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
     end do
     close(fid_out)
    case default
-    write(str_a,*) ia 
+    write(str_a,*) ia
     call error('dust_post','','Unknown InputType: '//trim(in_type)//&
                ' for analysis n.'//trim(str_a)//'.'//nl//&
                 'It must either "point_list" or "from_file".')
@@ -211,14 +211,14 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
      case ( 'velocity' ) ; probe_vel = .true.
      case ( 'pressure' ) ; probe_p   = .true.
      case ( 'vorticity') ; probe_vort= .true.
-     case ( 'cp'       ) 
-      write(str_a,*) ia 
+     case ( 'cp'       )
+      write(str_a,*) ia
       call error('dust_post','','Unknown Variable: '//trim(var_name)//&
                  ' for analysis n.'//trim(str_a)//'.'//nl//&
                   'Choose "velocity", "pressure", "vorticity".')
      case ( 'all') ; probe_vel = .true. ; probe_p   = .true. ; probe_vort= .true.
      case default
-      write(str_a,*) ia 
+      write(str_a,*) ia
       call error('dust_post','','Unknown Variable: '//trim(var_name)//&
                  ' for analysis n.'//trim(str_a)//'.'//nl//&
                   'Choose "velocity", "pressure", "vorticity".')
@@ -226,7 +226,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
    end do
   end if
 
-  ! Find the number of fields to be plotted ( vec{vel} , p , vec{omega}) 
+  ! Find the number of fields to be plotted ( vec{vel} , p , vec{omega})
   nprint = 0
   if(probe_vel)  nprint = nprint+3
   if(probe_p)    nprint = nprint+1
@@ -274,7 +274,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
   ! load the geo components just once
   call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
   !TODO: here get the run id
-  call load_components_postpro(comps, points, nelem,  floc, & 
+  call load_components_postpro(comps, points, nelem,  floc, &
                                components_names,  all_comp)
   call close_hdf5_file(floc)
 
@@ -287,7 +287,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
   do ic = 1 , size(comps)
    do ie = 1 , size(comps(ic)%el)
     ip = ip + 1
-    comps(ic)%el(ie)%mag => sol(ip) 
+    comps(ic)%el(ie)%mag => sol(ip)
    end do
   end do
 
@@ -314,10 +314,10 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
    call update_points_postpro(comps, points, refs_R, refs_off)
    ! Load the results --------------------------
    call load_res(floc, comps, vort, cp, t)
-  
-   call load_wake_post(floc, wake, wake_elems) 
+
+   call load_wake_post(floc, wake, wake_elems)
    call close_hdf5_file(floc)
-   
+
    time(ires) = t
 
    ! Compute velocity --------------------------
@@ -325,25 +325,25 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 
     vel_probe = 0.0_wp ; pres_probe = 0.0_wp ; vort_probe = 0.0_wp
     i_var = 1
-    if ( probe_vel .or. probe_p ) then 
+    if ( probe_vel .or. probe_p ) then
 
       ! compute velocity
       do ic = 1,size(comps)
-!$omp parallel do private(ie, v) reduction(+:vel_probe) 
+!$omp parallel do private(ie, v) reduction(+:vel_probe)
        do ie = 1 , size( comps(ic)%el )
 
         call comps(ic)%el(ie)%compute_vel( rr_probes(:,ip) , u_inf , v )
-        vel_probe = vel_probe + v/(4*pi) 
-       
+        vel_probe = vel_probe + v/(4*pi)
+
        end do
 !$omp end parallel do
       end do
 
 
-!$omp parallel do private( ie, v) reduction(+:vel_probe) 
+!$omp parallel do private( ie, v) reduction(+:vel_probe)
       do ie = 1, size(wake_elems)
         call wake_elems(ie)%p%compute_vel( rr_probes(:,ip) , u_inf , v )
-        vel_probe = vel_probe + v/(4*pi) 
+        vel_probe = vel_probe + v/(4*pi)
       enddo
 !$omp end parallel do
 
@@ -366,7 +366,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
       probe_vars(i_var, ires, ip) = pres_probe
       i_var = i_var+1
     end if
-    
+
     ! compute vorticity
     if ( probe_vort ) then
       vort_probe = 0.0_wp
@@ -388,7 +388,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
    case ('dat')
     call new_file_unit(fid_out, ierr)
     write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.dat'
-    open(unit=fid_out,file=trim(filename)) 
+    open(unit=fid_out,file=trim(filename))
     call dat_out_probes_header( fid_out , rr_probes , vars_str )
 
     do ires = 1, size(time)
@@ -415,10 +415,10 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
   do ic = 1 , size(comps)
    do ie = 1 , size(comps(ic)%el)
     ip = ip + 1
-    comps(ic)%el(ie)%mag => null()  
+    comps(ic)%el(ie)%mag => null()
    end do
   end do
-  deallocate(sol) 
+  deallocate(sol)
 
   deallocate(probe_vars,time)
   deallocate(probe_var_names,probe_loc_names)
@@ -433,6 +433,6 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 
 end subroutine post_probes
 
-! ---------------------------------------------------------------------- 
+! ----------------------------------------------------------------------
 
 end module mod_post_probes

@@ -1,30 +1,16 @@
-
 basename       = ./Output/robin
-basename_debug =  ./Debug/robin_debug
 
-! Kinetic free-stream conditions -------------------
-! mu = 0.15 -----
- u_inf   = (/ 27.0 , 0.0 , 0.0 /)     ! free-stream velocity in the base ref.frame
+! free-stream conditions ---------------
+u_inf   = (/ 27.0 , 0.0 , 0.0 /)
 
-u_ref = 1.0
-
-! "Thermodynamic" free-stream state -------+----- [IS unit] -----+------------ comments ----------------------
-P_inf   = 0.0      ! Ref. pressure         |          Pa         |     (constant in a incompressible fluid)  
-rho_inf = 1.0      ! Ref. density          |        kg/m^3       |     (constant in a incompressible fluid) 
-a_inf   = 340.0    ! Ref. speed of sound   |         m/s         |     ("meaningless" for incompress fluid)
-mu_inf  = 0.000018 ! Dynamic viscosity     |        kg/(m s)     |     (constant in a incompressible fluid) 
-
-! Time ---------------------------------------------
+! Time ---------------------------------
 tstart = 0.0
 tend = 0.630063
 dt = 0.000751577
 dt_out = 0.000751577
-dt_debug_out = 0.0005
 output_start = T
 
-debug_level = 3
-
-! geometry (components) ------------
+! geometry -----------------------------
 GeometryFile = geo_input.h5
 
 ! restart ------------------------------
@@ -43,14 +29,12 @@ Diffusion = T
 PenetrationAvoidance = T
 
 ! wake parameters ----------------------
-n_wake_panels = 1       ! 1000
+n_wake_panels = 1
 n_wake_particles = 100000
 particles_box_min = (/ -2.0, -2.0, -7.0/)
 particles_box_max = (/  6.0,  2.0,  1.0/)
-rigid_wake = F
-rigid_wake_vel = (/ 27.0 , 0.0 , -1.0 /)
 
-! octree things-------------------
+! octree parameters--------------------
 BoxLength = 4
 NBox = (/2,1,2/)
 OctreeOrigin = (/-2.0, -2.0, -7.0/)
@@ -58,3 +42,6 @@ NOctreeLevels = 6
 MinOctreePart = 5
 MultipoleDegree = 2
 
+! lifting lines solver-----------------
+LLtol = 1.0e-4
+LLdamp = 5.0

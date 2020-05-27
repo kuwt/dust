@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -89,11 +89,11 @@ public :: t_vortlatt
 !! edges of the element.
 type, extends(c_impl_elem) :: t_vortlatt
 
-  real(wp) :: vel_ctr_pt(3) 
+  real(wp) :: vel_ctr_pt(3)
 
   !TODO: consider applying the correct element pointer here
   contains
-  
+
   procedure, pass(this) :: build_row        => build_row_vortlatt
   procedure, pass(this) :: build_row_static => build_row_static_vortlatt
   procedure, pass(this) :: add_wake         => add_wake_vortlatt
@@ -110,7 +110,7 @@ type, extends(c_impl_elem) :: t_vortlatt
   procedure, pass(this) :: calc_geo_data    => calc_geo_data_vortlatt
   procedure, pass(this) :: get_vort_vel     => get_vort_vel_vortlatt
   procedure, pass(this) :: get_bernoulli_source => get_bernoulli_source_vortlatt
-  
+
   procedure, pass(this) :: get_vel_ctr_pt   => get_vel_ctr_pt_vortlatt
   procedure, pass(this) :: compute_dforce_jukowski => &
                            compute_dforce_jukowski_vortlatt
@@ -136,25 +136,25 @@ subroutine build_row_vortlatt(this, elems, linsys, uinf, ie, ista, iend)
  real(wp), intent(in)             :: uinf(:)
  integer, intent(in)              :: ie
  integer, intent(in)              :: ista, iend
- 
+
  integer :: j1
  real(wp) :: b1
   !Not moving components, in the rhs contribution there is no body velocity
   !linsys%b(ie) = sum(linsys%b_static(:,ie) * (-uinf))
   linsys%b(ie) = 0.0_wp
     do j1 = 1,ista-1
-  
+
       linsys%b(ie) = linsys%b(ie) +  &
           linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-uinf-elems(j1)%p%uvort))
     enddo
-  
+
   ! ista and iend will be the end of the unknowns vector, containing
   ! the moving elements
   do j1 = ista , iend
-  
+
     call elems(j1)%p%compute_psi( linsys%A(ie,j1), b1,  &
                                   this%cen, this%nor, ie, j1 )
-  
+
     if (ie .eq. j1) then
       !diagonal, we are certainly employing vortrin, enforce the b.c. on ie
       linsys%b(ie) = linsys%b(ie) + &
@@ -165,10 +165,10 @@ subroutine build_row_vortlatt(this, elems, linsys, uinf, ie, ista, iend)
       linsys%b(ie) = linsys%b(ie) + &
                 b1*sum(elems(j1)%p%nor*(elems(j1)%p%ub-uinf-elems(j1)%p%uvort))
     endif
-  
+
   end do
 
-  
+
 end subroutine build_row_vortlatt
 
 !----------------------------------------------------------------------
@@ -518,8 +518,8 @@ end subroutine compute_dforce_dummy
 !>Compute the elementary force on the on the actual element
 ! using Kutta-Jukowski theorem as implemented in AVL:
 ! the velocity
-! 
-subroutine compute_dforce_jukowski_vortlatt(this) 
+!
+subroutine compute_dforce_jukowski_vortlatt(this)
  class(t_vortlatt), intent(inout) :: this
  real(wp) :: vel_w(3), gam(3)
 
@@ -531,14 +531,14 @@ subroutine compute_dforce_jukowski_vortlatt(this)
  i_stripe = size(this%stripe_elem)
 
  if ( i_stripe .gt. 1 ) then
- 
+
    this%dforce = sim_param%rho_inf * gam &
                * ( this%mag - this%stripe_elem(i_stripe-1)%p%mag )
- 
+
  else
- 
+
    this%dforce = sim_param%rho_inf * gam * this%mag
- 
+
  end if
 
  ! === Unsteady contribution ===
@@ -566,16 +566,16 @@ end subroutine compute_dforce_jukowski_vortlatt
 ! potential elements only:
 ! - body panels
 ! - wake panels
-! ------------------------------------------------------------------- ! 
+! ------------------------------------------------------------------- !
 ! This routine uses the value in the centre of the panels of:       !!!
 ! - the free-stream and the body velocity                           !!!
 ! - the rotational part of the velocity, collected in this%uvort    !!!
-! ------------------------------------------------------------------- ! 
+! ------------------------------------------------------------------- !
 subroutine get_vel_ctr_pt_vortlatt(this, elems, wake_elems)
  class(t_vortlatt), intent(inout) :: this
  type(t_pot_elem_p),intent(in):: elems(:)
  type(t_pot_elem_p),intent(in):: wake_elems(:)
- 
+
  real(wp) :: v(3),x0(3)
  integer :: j
 
@@ -587,17 +587,17 @@ subroutine get_vel_ctr_pt_vortlatt(this, elems, wake_elems)
 
  !=== Compute the velocity from all the elements ===
  do j = 1,size(wake_elems)  ! wake panels
- 
+
    call wake_elems(j)%p%compute_vel(x0,sim_param%u_inf,v)
    this%vel_ctr_pt = this%vel_ctr_pt + v
- 
+
  enddo
 
  do j = 1,size(elems) ! body elements
- 
+
    call elems(j)%p%compute_vel(x0,sim_param%u_inf,v)
    this%vel_ctr_pt = this%vel_ctr_pt + v
- 
+
  enddo
 
  this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp*pi) &
@@ -688,7 +688,7 @@ subroutine get_vort_vel_vortlatt(this, vort_elems, uinf)
    this%uvort = this%uvort + vel/(4*pi)
  enddo
 
-end subroutine 
+end subroutine
 
 !----------------------------------------------------------------------
 
@@ -697,7 +697,7 @@ function get_bernoulli_source_vortlatt(this) result(source)
   real(wp) :: source
 
   character(len=*), parameter :: this_sub_name = 'get_bernoulli_source_vortlatt'
-  
+
   !this is just a dummy, should never be used
   source = 0.0_wp
   !and for this reason here is an internal error

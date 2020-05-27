@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -474,7 +474,7 @@ subroutine read_string_hdf5(input, inputname, loc_id)
     this_sub_name = 'read_string_hdf5'
  integer :: h5err
  integer(HSIZE_T) ::strlen
-  
+
   in_size(1) = 1
   !open the dataset
   call h5Dopen_f(loc_id, inputname, dset_id, h5err)
@@ -492,7 +492,7 @@ subroutine read_string_hdf5(input, inputname, loc_id)
   call h5Tcopy_f(h5t_mem_char, memtype_id, h5err)
   call h5Tset_size_f(memtype_id, strlen,h5err)
 
-  !Prepare the local string: it might be filled with random data, and 
+  !Prepare the local string: it might be filled with random data, and
   !since we read only the first part is necessary to clear it to avoid
   !having garbage at the end of the string
   input = ''
@@ -580,7 +580,7 @@ subroutine read_1d_string_hdf5(input, inputname, loc_id)
     this_sub_name = 'read_string_hdf5'
  integer :: h5err
  integer(HSIZE_T) ::strlen
-  
+
   !open the dataset
   call h5Dopen_f(loc_id, inputname, dset_id, h5err)
   if(h5err<0) call error(this_mod_name,this_sub_name, &
@@ -612,7 +612,7 @@ subroutine read_1d_string_hdf5(input, inputname, loc_id)
       call  error(this_mod_name, this_sub_name, &
       'Dimension of read file and target array differs, for array '//inputname)
 
-  !Prepare the local string: it might be filled with random data, and 
+  !Prepare the local string: it might be filled with random data, and
   !since we read only the first part is necessary to clear it to avoid
   !having garbage at the end of the string
   input = ''
@@ -647,7 +647,7 @@ subroutine read_1d_string_hdf5_al(input, inputname, loc_id)
     this_sub_name = 'read_1d_string_hdf5_al'
  integer :: h5err
  integer(HSIZE_T) ::strlen
-  
+
   !open the dataset
   call h5Dopen_f(loc_id, inputname, dset_id, h5err)
   if(h5err<0) call error(this_mod_name,this_sub_name, &
@@ -675,10 +675,10 @@ subroutine read_1d_string_hdf5_al(input, inputname, loc_id)
      //trim(inputname))
   call h5Sget_simple_extent_dims_f(filespace_id, in_size, &
                                    max_size, h5err)
-  
+
   ! allocate memory data
   allocate(input(in_size(1)))
-  !Prepare the local string: it might be filled with random data, and 
+  !Prepare the local string: it might be filled with random data, and
   !since we read only the first part is necessary to clear it to avoid
   !having garbage at the end of the string
   input = ''
@@ -768,7 +768,7 @@ subroutine read_2d_string_hdf5(input, inputname, loc_id)
     this_sub_name = 'read_string_hdf5'
  integer :: h5err
  integer(HSIZE_T) ::strlen
-  
+
   !open the dataset
   call h5Dopen_f(loc_id, inputname, dset_id, h5err)
   if(h5err<0) call error(this_mod_name,this_sub_name, &
@@ -801,7 +801,7 @@ subroutine read_2d_string_hdf5(input, inputname, loc_id)
        call  error(this_mod_name, this_sub_name, &
       'Dimension of read file and target array differs, for array '//inputname)
 
-  !Prepare the local string: it might be filled with random data, and 
+  !Prepare the local string: it might be filled with random data, and
   !since we read only the first part is necessary to clear it to avoid
   !having garbage at the end of the string
   input = ''
@@ -836,7 +836,7 @@ subroutine read_2d_string_hdf5_al(input, inputname, loc_id)
     this_sub_name = 'read_string_hdf5'
  integer :: h5err
  integer(HSIZE_T) ::strlen
-  
+
   !open the dataset
   call h5Dopen_f(loc_id, inputname, dset_id, h5err)
   if(h5err<0) call error(this_mod_name,this_sub_name, &
@@ -866,7 +866,7 @@ subroutine read_2d_string_hdf5_al(input, inputname, loc_id)
                                    max_size, h5err)
   ! allocate memory data
   allocate(input(in_size(1),in_size(2)))
-  !Prepare the local string: it might be filled with random data, and 
+  !Prepare the local string: it might be filled with random data, and
   !since we read only the first part is necessary to clear it to avoid
   !having garbage at the end of the string
   input = ''
@@ -1012,7 +1012,7 @@ subroutine write_3d_real_hdf5(outdata, outname, file_id)
  integer :: h5err
 
   !create a 3D dataspace
-  out_size(1) = int(size(outdata,1), h5sz) 
+  out_size(1) = int(size(outdata,1), h5sz)
   out_size(2) = int(size(outdata,2), h5sz)
   out_size(3) = int(size(outdata,3), h5sz)
   call h5Screate_simple_f(rank, out_size, dspace_id, h5err)
@@ -2013,7 +2013,7 @@ subroutine write_1d_real_hdf5_attr(outdata, outname, loc_id)
   call h5Aexists_f(loc_id, trim(outname), l_exists, h5err)
 
   if(l_exists) then
-    call h5Adelete_f(loc_id, trim(outname), h5err) 
+    call h5Adelete_f(loc_id, trim(outname), h5err)
   endif
   !create the dataset on the file
   call h5Acreate_f(loc_id, trim(outname), h5t_file_float, dspace_id, &
@@ -2099,7 +2099,7 @@ subroutine write_1d_int_hdf5_attr(outdata, outname, loc_id)
   call h5Aexists_f(loc_id, trim(outname), l_exists, h5err)
 
   if(l_exists) then
-    call h5Adelete_f(loc_id, trim(outname), h5err) 
+    call h5Adelete_f(loc_id, trim(outname), h5err)
   endif
   !create the dataset on the file
   call h5Acreate_f(loc_id, trim(outname), h5t_file_int, dspace_id, &
@@ -2140,7 +2140,7 @@ subroutine write_string_hdf5_attr(outdata, outname, loc_id)
   !create the string datatypes
   call h5Tcopy_f(h5t_mem_char, memtype_id, h5err)
   call h5Tcopy_f(h5t_file_char, filetype_id, h5err)
-  
+
   if(strlen .gt. 0) then !create the string type and a scalar space
 
     call h5Tset_size_f(memtype_id, int(strlen,HSIZE_T),h5err)
@@ -2160,7 +2160,7 @@ subroutine write_string_hdf5_attr(outdata, outname, loc_id)
   call h5Aexists_f(loc_id, trim(outname), l_exists, h5err)
 
   if(l_exists) then
-    call h5Adelete_f(loc_id, trim(outname), h5err) 
+    call h5Adelete_f(loc_id, trim(outname), h5err)
   endif
   !create the dataset on the file
   call h5Acreate_f(loc_id, trim(outname), filetype_id, dspace_id, &
@@ -2182,7 +2182,7 @@ end subroutine write_string_hdf5_attr
 
 !> Write a logical to an attribute
 !!
-!! WARNING: the hdf5 support for boolean data types is doubtful, so for the 
+!! WARNING: the hdf5 support for boolean data types is doubtful, so for the
 !! moment a single character "T" or "F" is being printed
 subroutine write_logical_hdf5_attr(outdata, outname, loc_id)
  logical, intent(in)                  :: outdata
@@ -2221,7 +2221,7 @@ subroutine write_logical_hdf5_attr(outdata, outname, loc_id)
   call h5Aexists_f(loc_id, trim(outname), l_exists, h5err)
 
   if(l_exists) then
-    call h5Adelete_f(loc_id, trim(outname), h5err) 
+    call h5Adelete_f(loc_id, trim(outname), h5err)
   endif
   !create the dataset on the file
   call h5Acreate_f(loc_id, trim(outname), h5t_file_char, dspace_id, &
@@ -2405,7 +2405,7 @@ subroutine read_string_hdf5_attr(input, inputname, loc_id)
     this_sub_name = 'read_string_hdf5_attr'
  integer :: h5err
  integer(HSIZE_T) ::strlen
-  
+
   in_size(1) = 1
   !open the attribute
   call h5Aopen_f(loc_id, inputname, attr_id, h5err)
@@ -2423,7 +2423,7 @@ subroutine read_string_hdf5_attr(input, inputname, loc_id)
   call h5Tcopy_f(h5t_mem_char, memtype_id, h5err)
   call h5Tset_size_f(memtype_id, strlen,h5err)
 
-  !Prepare the local string: it might be filled with random data, and 
+  !Prepare the local string: it might be filled with random data, and
   !since we read only the first part is necessary to clear it to avoid
   !having garbage at the end of the string
   input = ''
@@ -2444,7 +2444,7 @@ end subroutine read_string_hdf5_attr
 
 !> Read a logical from an attribute
 !!
-!! WARNING: the hdf5 support for boolean data types is doubtful, so for the 
+!! WARNING: the hdf5 support for boolean data types is doubtful, so for the
 !! moment a single character "T" or "F" is being read
 subroutine read_logical_hdf5_attr(input, inputname, loc_id)
  logical, intent(out)                 :: input
@@ -2474,7 +2474,7 @@ subroutine read_logical_hdf5_attr(input, inputname, loc_id)
   call h5Aclose_f(attr_id, h5err)
 
   select case(strin)
-    
+
    case('t','T')
     input = .true.
 

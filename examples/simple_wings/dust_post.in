@@ -5,16 +5,59 @@ Analysis = {
   Name = v1
   Type = Viz
 
-  Format = vtk
-  !Format = tecplot
+  Format = vtk !tecplot
 
   StartRes = 1
   EndRes = 61
   StepRes = 1
   Wake = T
 
-  Variable = Vort
+  Variable = Vorticity
+  Variable = Pressure
 
 }
 
+Analysis = {
+
+Type = integral_loads
+Name = loads_left
+StartRes = 1 
+EndRes   = 61
+StepRes  = 1
+Format   = dat
+
+Component = left_wing  
+Reference_Tag = 0
+
+}
+
+Analysis = {
+
+Type = integral_loads
+Name = loads_right
+StartRes = 1 
+EndRes   = 61
+StepRes  = 1
+Format   = dat
+
+Component = right_wing  
+Reference_Tag = 0
+
+}
+
+Analysis = {
+
+Type = integral_loads
+Name = loads_full
+StartRes = 30 
+EndRes   = 61
+StepRes  = 1
+Format   = dat
+
+Average = T
+Component = left_wing  
+Component = right_wing  
+Reference_Tag = 0
+
+}
 

@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -73,10 +73,10 @@ contains
 ! subroutine vtk_out_bin
 ! subroutine vtk_out_viz
 
-!> RectilinearGrid: binary xml .vtr file 
+!> RectilinearGrid: binary xml .vtr file
 !!
 !!
-subroutine vtr_write ( filen , x , y , z , vars_n , vars_name , vars ) 
+subroutine vtr_write ( filen , x , y , z , vars_n , vars_name , vars )
  character(len=*), intent(in) :: filen
  real(wp), intent(in) :: x(:) , y(:) , z(:)
  integer , intent(in) :: vars_n(:)
@@ -101,7 +101,7 @@ subroutine vtr_write ( filen , x , y , z , vars_n , vars_name , vars )
  n_vars = size(vars_n)
 
  call new_file_unit(fid,ierr)
- 
+
  open(fid,file=trim(filen), &
        status='replace',access='stream',iostat=ierr)
 
@@ -133,29 +133,29 @@ subroutine vtr_write ( filen , x , y , z , vars_n , vars_name , vars )
  write(ostr,'(I0)') offset
  ! Data
  buffer = '   <PointData>'//lf ; write(fid) trim(buffer)
- do i1 = 1 , n_vars 
+ do i1 = 1 , n_vars
   if ( vars_n(i1) .eq. 1 ) then ! Scalar variable
- 
+
    buffer = '    <DataArray type="Float32" Name="'//trim(vars_name(i1))//'"&
             & format="appended" offset="'//trim(ostr)//'"/>'//lf ; write(fid) trim(buffer)
    offset = offset + vtk_isize + vtk_fsize*size(x)*size(y)*size(z)
    write(ostr,'(I0)') offset
- 
+
   elseif ( vars_n(i1) .eq. 3 ) then ! Vector variable
- 
+
    buffer = '    <DataArray type="Float32" Name="'//trim(vars_name(i1))//'"&
             & NumberOfComponents="3" format="appended" offset="'//trim(ostr)//'"/>'//lf
    write(fid) trim(buffer)
    offset = offset + vtk_isize + 3*vtk_fsize*size(x)*size(y)*size(z)
    write(ostr,'(I0)') offset
-  
+
  !elseif ( vars_n(i1) .eq. 9 ) then ! Tensor Variable
- 
+
   else
    write(istr,'(I0)') i1
    call error(this_sub_name, this_mod_name, 'Wrong dimension of the variable n.'//istr)
   end if
- 
+
  end do
  buffer = '   </PointData>'//lf ; write(fid) trim(buffer)
  buffer = '  </Piece>'//lf ; write(fid) trim(buffer)
@@ -163,8 +163,8 @@ subroutine vtr_write ( filen , x , y , z , vars_n , vars_name , vars )
  ! Appended data
  buffer = ' <AppendedData encoding="raw">'//lf ; write(fid) trim(buffer)
  buffer = '_'; write(fid) trim(buffer) !mark the beginning of the data
- ! Coordinates 
- nbytes = vtk_fsize * nx 
+ ! Coordinates
+ nbytes = vtk_fsize * nx
  write(fid) nbytes
  write(fid) real(x,vtk_fsize)
  nbytes = vtk_fsize * ny
@@ -177,7 +177,7 @@ subroutine vtr_write ( filen , x , y , z , vars_n , vars_name , vars )
  irow = 1
  do i1 = 1 , n_vars
   if ( vars_n(i1) .eq. 1 ) then
-   nbytes = vtk_fsize * n_points 
+   nbytes = vtk_fsize * n_points
    write(fid) nbytes
    write(fid) real( vars(irow,:) , vtk_fsize )
    irow = irow + 1
@@ -188,13 +188,13 @@ subroutine vtr_write ( filen , x , y , z , vars_n , vars_name , vars )
     write(fid) real( vars(irow:irow+2,i2) , vtk_fsize )
    end do
    irow = irow + 3
-  
+
  !elseif ( vars_n(i1) .eq. 9 ) then ! Tensor Variable
- 
+
    else
     write(istr,'(I0)') i1
     call error(this_sub_name, this_mod_name, 'Wrong dimension of the variable n.'//istr)
- 
+
   end if
  end do
  buffer = ' </AppendedData>'//lf ; write(fid) trim(buffer)
@@ -217,7 +217,7 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
  real(wp), intent(in) :: w_rr(:,:)
  integer, intent(in) :: w_ee(:,:)
  real(wp), intent(in) :: w_vort(:)
- character(len=*), intent(in) :: out_filename 
+ character(len=*), intent(in) :: out_filename
 
  integer :: fu, ierr, i, i_shift
  integer :: npoints, ncells, ne
@@ -276,7 +276,7 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
 
   write(ostr,'(I0)') offset
   buffer = '    <DataArray type="Int32" Name="connectivity" &
-           &Format="appended" offset="'//trim(ostr)//'"/>'//lf; 
+           &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
   write(fu) trim(buffer)
   offset = offset + vtk_isize + vtk_isize*3*ntria + vtk_isize*4*nquad
 
@@ -295,7 +295,7 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
   buffer =  '   </Cells>'//lf; write(fu) trim(buffer)
 
   !Data
-  buffer =  '   <CellData Scalars="scalars">'//lf; 
+  buffer =  '   <CellData Scalars="scalars">'//lf;
   write(fu) trim(buffer)
   write(ostr,'(I0)') offset
   buffer = '    <DataArray type="Float32" Name="Vort_intensity" &
@@ -306,7 +306,7 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
   buffer = '   </CellData>'//lf; write(fu) trim(buffer)
 
   !!Data
-  !buffer =  '   <PointData Scalars="scalars">'//lf; 
+  !buffer =  '   <PointData Scalars="scalars">'//lf;
   !write(fu) trim(buffer)
   !do ivar=1,pv_data%n_vars
   !  if(pv_data%vars(ivar)%output) then
@@ -355,7 +355,7 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
 
   write(ostr,'(I0)') offset
   buffer = '    <DataArray type="Int32" Name="connectivity" &
-           &Format="appended" offset="'//trim(ostr)//'"/>'//lf; 
+           &Format="appended" offset="'//trim(ostr)//'"/>'//lf;
   write(fu) trim(buffer)
   offset = offset + vtk_isize  + vtk_isize*4*nw
 
@@ -374,7 +374,7 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
   buffer =  '   </Cells>'//lf; write(fu) trim(buffer)
 
   !Data
-  buffer =  '   <CellData Scalars="scalars">'//lf; 
+  buffer =  '   <CellData Scalars="scalars">'//lf;
   write(fu) trim(buffer)
   write(ostr,'(I0)') offset
   buffer = '    <DataArray type="Float32" Name="Vort_intensity" &
@@ -394,7 +394,7 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
 
   !All the appended data
   buffer = '  <AppendedData encoding="raw">'//lf; write(fu) trim(buffer)
-  buffer = '_'; write(fu) trim(buffer) !mark the beginning of the data 
+  buffer = '_'; write(fu) trim(buffer) !mark the beginning of the data
 
   !Points
   nbytes = vtk_fsize *  &
@@ -478,7 +478,7 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
   do i=1,size(w_vort,1)
     write(fu) real(w_vort(i), vtk_fsize)
   enddo
-  
+
   !!All the variables data
   !do ivar=1,pv_data%n_vars
   !  if(pv_data%vars(ivar)%output) then
@@ -520,7 +520,7 @@ subroutine vtk_out_bin (rr, ee, vort, w_rr, w_ee, w_vort, out_filename)
 
 
   close(fu,iostat=ierr)
- 
+
 end subroutine vtk_out_bin
 
 !---------------------------------------------------------------------
@@ -528,11 +528,11 @@ end subroutine vtk_out_bin
 !> Output the processed data into a binary xml  .vtu file
 !!
 !! This is a more advanced version, supporting different variables
-subroutine vtk_out_viz (out_filename, & 
+subroutine vtk_out_viz (out_filename, &
                         rr, ee, vars, &
                         w_rr, w_ee, w_vars, &
                         vp_rr, vp_vars, separate_wake)
- character(len=*), intent(in) :: out_filename 
+ character(len=*), intent(in) :: out_filename
  real(wp), intent(in) :: rr(:,:)
  integer, intent(in) :: ee(:,:)
  type(t_output_var), intent(in) :: vars(:)
@@ -603,8 +603,8 @@ subroutine vtk_out_viz (out_filename, &
   endif
 
   !if output the wake separately, stop outputting the wake now
-  if (swake) got_wake=.false. 
-  if (swake) got_particles=.false. 
+  if (swake) got_wake=.false.
+  if (swake) got_particles=.false.
 
   call new_file_unit(fu,ierr)
   open(fu,file=trim(out_filename), &
@@ -631,18 +631,18 @@ subroutine vtk_out_viz (out_filename, &
 
   !All the appended data
   buffer = '  <AppendedData encoding="raw">'//lf; write(fu) trim(buffer)
-  buffer = '_'; write(fu) trim(buffer) !mark the beginning of the data 
+  buffer = '_'; write(fu) trim(buffer) !mark the beginning of the data
 
-  call vtk_print_piece_data(fu, vars, nquad, ntria, 0, rr, ee) 
+  call vtk_print_piece_data(fu, vars, nquad, ntria, 0, rr, ee)
 
   !=  == Wake
   if (got_wake) then
-    call vtk_print_piece_data(fu, w_vars, nquad_w, ntria_w, 0, w_rr, w_ee) 
+    call vtk_print_piece_data(fu, w_vars, nquad_w, ntria_w, 0, w_rr, w_ee)
   endif
-  
+
   !=  == Particles
   if (got_particles) then
-    call vtk_print_piece_data(fu, vp_vars, 0, 0, nvp, vp_rr) 
+    call vtk_print_piece_data(fu, vp_vars, 0, 0, nvp, vp_rr)
   endif
 
   buffer = '  </AppendedData>'//lf; write(fu) trim(buffer)
@@ -650,7 +650,7 @@ subroutine vtk_out_viz (out_filename, &
 
 
   close(fu,iostat=ierr)
-  
+
   !==== If sending separate files in output, write the additional files
   if (swake) then
     slen = len(trim(out_filename))
@@ -658,7 +658,7 @@ subroutine vtk_out_viz (out_filename, &
     ! == File for the panel wake
     open(fu,file=trim(out_filename(1:slen-9)//'_wpan'//out_filename(slen-8:slen)), &
           status='replace',access='stream',iostat=ierr)
-    
+
     buffer = '<?xml version="1.0"?>'//lf; write(fu) trim(buffer)
     buffer = '<VTKFile type="UnstructuredGrid" version="0.1" byte_order="LittleEndian">'//lf
     write(fu) trim(buffer)
@@ -671,19 +671,19 @@ subroutine vtk_out_viz (out_filename, &
 
     !All the appended data
     buffer = '  <AppendedData encoding="raw">'//lf; write(fu) trim(buffer)
-    buffer = '_'; write(fu) trim(buffer) !mark the beginning of the data 
+    buffer = '_'; write(fu) trim(buffer) !mark the beginning of the data
 
-    call vtk_print_piece_data(fu, w_vars, nquad_w, ntria_w, 0, w_rr, w_ee) 
+    call vtk_print_piece_data(fu, w_vars, nquad_w, ntria_w, 0, w_rr, w_ee)
 
     buffer = '  </AppendedData>'//lf; write(fu) trim(buffer)
     buffer = '</VTKFile>'//lf; write(fu) trim(buffer)
 
     close(fu,iostat=ierr)
-    
+
     ! === Particles file
     open(fu,file=trim(out_filename(1:slen-9)//'_wpart'//out_filename(slen-8:slen)), &
           status='replace',access='stream',iostat=ierr)
-    
+
     buffer = '<?xml version="1.0"?>'//lf; write(fu) trim(buffer)
     buffer = '<VTKFile type="UnstructuredGrid" version="0.1" byte_order="LittleEndian">'//lf
     write(fu) trim(buffer)
@@ -697,9 +697,9 @@ subroutine vtk_out_viz (out_filename, &
 
     !All the appended data
     buffer = '  <AppendedData encoding="raw">'//lf; write(fu) trim(buffer)
-    buffer = '_'; write(fu) trim(buffer) !mark the beginning of the data 
+    buffer = '_'; write(fu) trim(buffer) !mark the beginning of the data
 
-    call vtk_print_piece_data(fu, vp_vars, 0, 0, nvp, vp_rr) 
+    call vtk_print_piece_data(fu, vp_vars, 0, 0, nvp, vp_rr)
 
     buffer = '  </AppendedData>'//lf; write(fu) trim(buffer)
     buffer = '</VTKFile>'//lf; write(fu) trim(buffer)
@@ -707,7 +707,7 @@ subroutine vtk_out_viz (out_filename, &
     close(fu,iostat=ierr)
 
   endif !swake, output of separate wake files
- 
+
 end subroutine vtk_out_viz
 
 end module mod_vtk_out

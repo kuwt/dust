@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -97,7 +97,7 @@ contains
 !----------------------------------------------------------------------
 
 subroutine load_refs(floc, refs_R, refs_off, refs_G, refs_f, refs_tag)
- integer(h5loc), intent(in) :: floc 
+ integer(h5loc), intent(in) :: floc
  real(wp), allocatable, intent(out) :: refs_R(:,:,:)
  real(wp), allocatable, intent(out) :: refs_off(:,:)
  real(wp), allocatable, intent(out) , optional :: refs_G(:,:,:)
@@ -118,7 +118,7 @@ subroutine load_refs(floc, refs_R, refs_off, refs_G, refs_f, refs_tag)
   do iref = 0,nrefs-1
     write(rname,'(A,I3.3)') 'Ref',iref
     call open_hdf5_group(gloc1,trim(rname),gloc2)
-   
+
     call read_hdf5(refs_R(:,:,iref),'R',gloc2)
     call read_hdf5(refs_off(:,iref),'Offset',gloc2)
     if (present(refs_tag)) call read_hdf5(refs_tag(  iref),'Tag',gloc2)
@@ -136,7 +136,7 @@ end subroutine load_refs
 !----------------------------------------------------------------------
 
 subroutine load_res(floc, comps, vort, press, t, surfvel)
- integer(h5loc), intent(in) :: floc 
+ integer(h5loc), intent(in) :: floc
  type(t_geo_component), intent(inout) :: comps(:)
  real(wp), allocatable, intent(out) :: vort(:)
  real(wp), allocatable, intent(out) :: press(:)
@@ -155,19 +155,19 @@ subroutine load_res(floc, comps, vort, press, t, surfvel)
  logical :: saved_dmom
 
  character(len=*), parameter :: this_sub_name = 'load_res'
-  
+
   got_surfvel = present(surfvel)
   ncomps = size(comps)
   nelems = 0
   do icomp = 1, ncomps
     select type(el=>comps(icomp)%el)
      class default
-      nelems = nelems + comps(icomp)%nelems 
+      nelems = nelems + comps(icomp)%nelems
      type is(t_actdisk)
       nelems = nelems + size(comps(icomp)%loc_points,2)
     end select
   enddo
-  
+
   call read_hdf5(t,'time',floc)
   allocate(vort(nelems), press(nelems))
   if(got_surfvel) allocate(surfvel(3,nelems))
@@ -178,7 +178,7 @@ subroutine load_res(floc, comps, vort, press, t, surfvel)
 
   offset = 0
   do icomp = 1, ncomps
-    
+
     nelems_comp = comps(icomp)%nelems
     write(cname,'(A,I3.3)') 'Comp',comps(icomp)%comp_id
     call open_hdf5_group(gloc1,trim(cname),gloc2)
@@ -209,14 +209,14 @@ subroutine load_res(floc, comps, vort, press, t, surfvel)
        (size(pres_read,1) .ne. nelems_comp) .or. &
        (size(dforce_read,2) .ne. nelems_comp)) call error(this_mod_name, &
        this_sub_name, 'inconsistent number of elements between geometry and&
-       & solution')   
+       & solution')
 
 !   TODO: check if it is general enough *******
 !   TODO: check if something is broken after changing intent(in to inout) for comps
 
     do ie = 1 , nelems_comp
-      comps(icomp)%el(ie)%pres = pres_read(ie) 
-      comps(icomp)%el(ie)%dforce = dforce_read(:,ie) 
+      comps(icomp)%el(ie)%pres = pres_read(ie)
+      comps(icomp)%el(ie)%dforce = dforce_read(:,ie)
       if(got_surfvel) then
        select type(el =>comps(icomp)%el(ie))
          type is(t_surfpan)
@@ -273,7 +273,7 @@ end subroutine load_res
 !----------------------------------------------------------------------
 
 subroutine load_ll(floc, comps, ll_data)
- integer(h5loc), intent(in) :: floc 
+ integer(h5loc), intent(in) :: floc
  type(t_geo_component), intent(inout) :: comps(:)
  real(wp), intent(out) :: ll_data(:,:)
 
@@ -285,19 +285,19 @@ subroutine load_ll(floc, comps, ll_data)
  integer :: ncomps_sol
 
  character(len=*), parameter :: this_sub_name = 'load_ll'
-  
+
   ncomps = size(comps)
   nelems = 0
   do icomp = 1, ncomps
     select type(el=>comps(icomp)%el)
      type is(t_liftlin)
-      nelems = nelems + comps(icomp)%nelems 
+      nelems = nelems + comps(icomp)%nelems
      class default
       call internal_error(this_sub_name, this_mod_name,'Loading lifting &
       &lines from a non lifting line component')
     end select
   enddo
-  
+
   call open_hdf5_group(floc,'Components',gloc1)
   call read_hdf5(ncomps_sol,'NComponents',gloc1)
   if(ncomps_sol .lt. ncomps) call error(this_sub_name, this_mod_name, &
@@ -305,7 +305,7 @@ subroutine load_ll(floc, comps, ll_data)
 
   offset = 0
   do icomp = 1, ncomps
-    
+
     nelems_comp = comps(icomp)%nelems
     allocate(ll_data_read(nelems_comp,9))
     write(cname,'(A,I3.3)') 'Comp',comps(icomp)%comp_id
@@ -337,7 +337,7 @@ end subroutine load_ll
 
 subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
                          vpvort_v, vpturbvisc)
- integer(h5loc), intent(in) :: floc 
+ integer(h5loc), intent(in) :: floc
  real(wp), allocatable, intent(out) :: wpoints(:,:)
  integer, allocatable, intent(out)  :: welems(:,:)
  real(wp), allocatable, intent(out) :: wvort(:)
@@ -347,7 +347,7 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
  real(wp), allocatable, intent(out), optional :: vpturbvisc(:)
 
  integer(h5loc) :: gloc
- logical :: got_dset 
+ logical :: got_dset
  real(wp), allocatable :: wpoints_read(:,:,:)
  real(wp), allocatable :: wpoints_pan(:,:), wpoints_rin(:,:)
  integer, allocatable  :: wstart(:,:), wconn(:)
@@ -363,21 +363,21 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
   !get the panel wake
   got_dset = check_dset_hdf5('PanelWake',floc)
   if(got_dset) then
- 
+
     call open_hdf5_group(floc,'PanelWake',gloc)
     call read_hdf5_al(wpoints_read,'WakePoints',gloc)
     call read_hdf5_al(wstart,'StartPoints',gloc)
     call read_hdf5_al(wvort_read,'WakeVort',gloc)
- 
- 
+
+
     nstripes = size(wvort_read,1); nrows = size(wvort_read,2);
     npoints_row = size(wpoints_read,2)
     nelem_w = nstripes*nrows
- 
+
     allocate(wpoints_pan(3,npoints_row*(nrows+1)))
     allocate(welems_pan(4,nelem_w))
     allocate(wvort_pan(nelem_w))
- 
+
     wpoints_pan = reshape(wpoints_read, (/3,npoints_row*(nrows+1)/))
     wvort_pan = reshape(wvort_read, (/nelem_w/))
     iew = 0
@@ -390,49 +390,49 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
                               wstart(1,is)+npoints_row*(ir)/)
       enddo
     enddo
-   
+
     deallocate(wpoints_read, wstart, wvort_read)
     call close_hdf5_group(gloc)
   else
     !panel wake not present, allocate stuff at zero size
     allocate(wvort_pan(0), wpoints_pan(3,0), welems_pan(4,0))
   endif
- 
+
   !get the ring wake
   got_dset = check_dset_hdf5('RingWake',floc)
   if(got_dset) then
- 
+
     call open_hdf5_group(floc,'RingWake',gloc)
     call read_hdf5_al(wpoints_read,'WakePoints',gloc)
     call read_hdf5_al(wconn,'Conn_pe',gloc)
     call read_hdf5_al(wcen,'WakeCenters',gloc)
     call read_hdf5_al(wvort_read,'WakeVort',gloc)
-    
+
     ndisks = size(wvort_read,1); nrows = size(wvort_read,2)
     npoints_row = size(wpoints_read,2)
- 
+
     nelem_w = ndisks*nrows
- 
+
     allocate(wpoints_rin(3,npoints_row*nrows+nelem_w))
     allocate(welems_rin(4,npoints_row*nrows))
     allocate(wvort_rin(npoints_row*nrows))
- 
+
     wpoints_rin(:,1:npoints_row*nrows) = reshape(wpoints_read, &
                                             (/3,npoints_row*nrows/))
     wpoints_rin(:,npoints_row*nrows+1:size(wpoints_rin,2)) = &
            reshape(wcen, (/3,nelem_w/))
- 
+
     iew = 0; act_disk = 0
     do ir = 1,nrows
       do ip = 1, npoints_row
         iew = iew+1
- 
+
         if(ip .eq. 1) then
           first_elem = iew
         else
           if(wconn(ip-1) .ne. wconn(ip)) first_elem = iew
         endif
- 
+
         if(ip.lt.npoints_row) then
           if(wconn(ip+1) .ne. wconn(ip)) then
             next_elem = first_elem
@@ -442,45 +442,45 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
         else
           next_elem = first_elem
         endif
- 
+
         welems_rin(1,iew) = iew
         welems_rin(2,iew) = next_elem
         !welems_rin(3,iew) = npoints_row*nrows+(ir-1)*nelem_w+wconn(ip)
         welems_rin(3,iew) = npoints_row*nrows+(ir-1)*ndisks+wconn(ip)
         welems_rin(4,iew) = 0
- 
+
         wvort_rin(iew) = wvort_read(wconn(ip),ir)
       enddo
     enddo
- 
+
     call close_hdf5_group(gloc)
-    deallocate(wpoints_read, wconn, wcen, wvort_read) 
+    deallocate(wpoints_read, wconn, wcen, wvort_read)
   else
     allocate(wvort_rin(0), wpoints_rin(3,0), welems_rin(4,0))
   endif
- 
+
   !Stitch together the two wakes
   allocate(wpoints(3,size(wpoints_pan,2)+size(wpoints_rin,2)))
   wpoints(:,1:size(wpoints_pan,2)) = wpoints_pan
   wpoints(:,size(wpoints_pan,2)+1:size(wpoints,2)) = wpoints_rin
   deallocate(wpoints_pan, wpoints_rin)
- 
+
   allocate(welems(4,size(welems_pan,2)+size(welems_rin,2)))
   welems(:,1:size(welems_pan,2)) = welems_pan
   welems(1:3,size(welems_pan,2)+1:size(welems,2)) = welems_rin(1:3,:) + &
                                                     size(wpoints_pan,2)
   welems(4,size(welems_pan,2)+1:size(welems,2)) = 0
   deallocate(welems_pan, welems_rin)
- 
- 
+
+
   allocate(wvort(size(wvort_pan)+size(wvort_rin)))
   wvort(1:size(wvort_pan)) = wvort_pan
   wvort(size(wvort_pan)+1:size(wvort)) = wvort_rin
   deallocate(wvort_pan, wvort_rin)
-  
+
   got_dset = check_dset_hdf5('ParticleWake',floc)
   if(got_dset) then
- 
+
     call open_hdf5_group(floc,'ParticleWake',gloc)
     call read_hdf5_al(vppoints,'WakePoints',gloc)
     call read_hdf5_al(wvort_read,'WakeVort',gloc)
@@ -499,13 +499,13 @@ end subroutine load_wake_viz
 !----------------------------------------------------------------------
 
 subroutine load_wake_pan(floc, wpoints, wstart, wvort)
- integer(h5loc), intent(in) :: floc 
+ integer(h5loc), intent(in) :: floc
  real(wp), allocatable, intent(out) :: wpoints(:,:,:)
  integer, allocatable, intent(out) :: wstart(:,:)
  real(wp), allocatable, intent(out) :: wvort(:,:)
 
  integer(h5loc) :: gloc
-  
+
   call open_hdf5_group(floc,'PanelWake',gloc)
   call read_hdf5_al(wpoints,'WakePoints',gloc)
   call read_hdf5_al(wstart,'StartPoints',gloc)
@@ -517,16 +517,16 @@ end subroutine load_wake_pan
 !----------------------------------------------------------------------
 
 subroutine load_wake_ring(floc, wpoints, wconn, wvort)
- integer(h5loc), intent(in) :: floc 
+ integer(h5loc), intent(in) :: floc
  real(wp), allocatable, intent(out) :: wpoints(:,:,:)
  integer, allocatable, intent(out) :: wconn(:)
  !real(wp), allocatable, intent(out) :: wcen(:,:,:)
  real(wp), allocatable, intent(out) :: wvort(:,:)
 
  integer(h5loc) :: gloc
-  
+
   call open_hdf5_group(floc,'RingWake',gloc)
-  
+
   call read_hdf5_al(wpoints,'WakePoints',gloc)
   call read_hdf5_al(wconn,'Conn_pe',gloc)
 !  call read_hdf5_al(wcen,'WakeCenters',gloc)
@@ -538,10 +538,10 @@ end subroutine load_wake_ring
 
 !----------------------------------------------------------------------
 
-!> Load the wake for the postprocessing. 
-!! do everything 
+!> Load the wake for the postprocessing.
+!! do everything
 subroutine load_wake_post(floc, wake, wake_p)
- integer(h5loc), intent(in) :: floc 
+ integer(h5loc), intent(in) :: floc
  type(t_wake), target, intent(out)  :: wake
  type(t_elem_p), allocatable, intent(out) :: wake_p(:)
 
@@ -555,7 +555,7 @@ subroutine load_wake_post(floc, wake, wake_p)
  real(wp), allocatable :: vppoints(:,:), vpvort(:,:)
  integer :: n_wake_stripes , npan, ndisks, nrows
  integer :: nsides
- integer :: p1 , p2 
+ integer :: p1 , p2
  integer :: ip , iw, id, ir, iconn, i
  integer :: npt_disk
  integer, allocatable :: disk_pts(: )
@@ -568,7 +568,7 @@ subroutine load_wake_post(floc, wake, wake_p)
   call close_hdf5_group(gloc)
 
   n_wake_stripes = size(wstart_pan ,2)
-  npan           = size(wvort_pan  ,2) 
+  npan           = size(wvort_pan  ,2)
 
   wake%nmax_pan = npan
   wake%n_pan_stripes = n_wake_stripes
@@ -582,7 +582,7 @@ subroutine load_wake_post(floc, wake, wake_p)
   wake%i_start_points     = wstart_pan
   wake%pan_w_points       = wpoints_pan
 
-  nsides = 4 
+  nsides = 4
   do ip = 1,npan
     do iw=1,wake%n_pan_stripes
      wake%wake_panels(iw,ip)%mag => wake%pan_idou(iw,ip)
@@ -602,7 +602,7 @@ subroutine load_wake_post(floc, wake, wake_p)
        reshape((/wake%pan_w_points(:,p1,ip),   wake%pan_w_points(:,p2,ip), &
                  wake%pan_w_points(:,p2,ip+1), wake%pan_w_points(:,p1,ip+1)/),&
                                                                    (/3,4/)))
-       wake%wake_panels(iw,ip)%mag = wvort_pan(iw,ip) 
+       wake%wake_panels(iw,ip)%mag = wvort_pan(iw,ip)
    end do
   end do
 
@@ -641,7 +641,7 @@ subroutine load_wake_post(floc, wake, wake_p)
       allocate(wake%wake_rings(id,ir)%edge_uni(3,nsides))
       call wake%wake_rings(id,ir)%calc_geo_data(wpoints_rin(:,disk_pts,ir))
       wake%wake_rings(id,ir)%mag = wvort_rin(id,ir)
-      
+
     enddo
     deallocate(disk_pts)
   enddo
@@ -661,7 +661,7 @@ subroutine load_wake_post(floc, wake, wake_p)
   if(wake%n_prt .gt. 0) then
     allocate(wake%vort_p(wake%n_prt+wake%n_pan_stripes))
     allocate(wake%end_vorts(wake%n_pan_stripes))
-    do iw = 1, wake%n_pan_stripes 
+    do iw = 1, wake%n_pan_stripes
       wake%vort_p(wake%n_prt+iw)%p => wake%end_vorts(iw)
       wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag
       p1 = wake%i_start_points(1,iw)
@@ -687,7 +687,7 @@ subroutine load_wake_post(floc, wake, wake_p)
     wake%part_p(ip)%p => wake%wake_parts(ip)
     wake%vort_p(ip)%p => wake%wake_parts(ip)
   enddo
-  
+
   deallocate(vppoints, vpvort)
 
   !Stitch everything together
@@ -699,7 +699,7 @@ subroutine load_wake_post(floc, wake, wake_p)
     allocate(wake_p(wake%n_pan_stripes*wake%pan_wake_len &
     + wake%ndisks*wake%rin_wake_len))
   endif
- 
+
 
   i=0
   !panels
@@ -771,10 +771,10 @@ subroutine check_if_components_exist( components_list , filename )
  call close_hdf5_file(floc)
 
  do i1 = 1 , n_comp_inp
-   i_check = 0 ; write(*,*) ' i_check : ' , i_check 
+   i_check = 0 ; write(*,*) ' i_check : ' , i_check
    do i2 = 1 , n_comp_tot
      if ( trim(components(i2)) .eq. trim(components_list(i1)) ) &
-                                                        i_check = 1  
+                                                        i_check = 1
    end do
    if ( i_check .eq. 0 ) then
      write(*,*) ' All the available SINGLE components are: '
@@ -783,11 +783,11 @@ subroutine check_if_components_exist( components_list , filename )
      end do
      call error(this_sub_name, this_mod_name, &
               'Component '//trim(components_list(i1))//' received as &
-             &an input does not exist.') 
-   end if 
- end do 
+             &an input does not exist.')
+   end if
+ end do
 
- write(*,*) nl//' ++++ Check component input : OK. '//nl 
+ write(*,*) nl//' ++++ Check component input : OK. '//nl
 
 end subroutine check_if_components_exist
 

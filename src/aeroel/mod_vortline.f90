@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -106,7 +106,7 @@ real(wp) :: r_cutoff
 contains
 !----------------------------------------------------------------------
 
-!> Initialize vortex line 
+!> Initialize vortex line
 subroutine initialize_vortline()
 
   r_Rankine = sim_param%RankineRad
@@ -157,7 +157,7 @@ subroutine compute_vel_vortline (this, pos, uinf, vel)
         vdou = ((this%edge_len-ai)/R2 + ai/R1)/(r_Ran**2.0_wp)* &
                          cross(this%edge_uni(:),hv)
      else
-      vdou = 0.0_wp 
+      vdou = 0.0_wp
       end if
     end if
     vel = vdou*this%mag
@@ -192,7 +192,7 @@ subroutine compute_grad_vortline(this, pos, uinf, grad)
 
    i1 = 1 ;  i2 = 2
 
-   l = this%edge_uni(:) 
+   l = this%edge_uni(:)
    lv(:,1) = l
 
    R1 = pos-this%ver(:,i1) ;   a1 = cross( l , R1 )
@@ -206,14 +206,14 @@ subroutine compute_grad_vortline(this, pos, uinf, grad)
    lx(:,1) = (/  0.0_wp ,  l(3)   , -l(2)   /)
    lx(:,2) = (/ -l(3)   ,  0.0_wp ,  l(1)   /)
    lx(:,3) = (/  l(2)   , -l(1)   ,  0.0_wp /)
-   
-   aa1 = matmul( a1v , transpose(a1v) ) 
+
+   aa1 = matmul( a1v , transpose(a1v) )
    ax1 = matmul( a1v , transpose(R1v) )
    al1 = matmul( a1v , transpose( lv) )
    aa2 = matmul( a2v , transpose(a2v) )
    ax2 = matmul( a2v , transpose(R2v) )
    al2 = matmul( a2v , transpose( lv) )
-   
+
    grad = &
     + 1.0_wp / ( a2del2**1.5_wp * norm2(R1) ) * &
       ( (   a * lx &
@@ -223,7 +223,7 @@ subroutine compute_grad_vortline(this, pos, uinf, grad)
       ( (   a * lx &
           + ( 1.0_wp/a - 3.0_wp*a/a2del2 ) * matmul(aa2,lx) ) * sum(l*R2) &
       + a * ( al2 - ax2 * sum( l * R2 ) / norm2(R2)**2.0_wp ) )
- 
+
    grad = grad*this%mag
 
  else

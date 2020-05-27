@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -58,7 +58,7 @@ use iso_fortran_env, only: &
 !$   omp_get_wtime
 
 !-----------------------------------------------------------------------
- 
+
 implicit none
 
 !-----------------------------------------------------------------------
@@ -101,7 +101,7 @@ integer, parameter :: t_realtime = &
   kind(0.0) ! default real: for the standard cpu_time
 
 
-! File handling 
+! File handling
 integer, parameter :: &
   low_limit = 10, &
   top_limit = 99
@@ -134,11 +134,11 @@ contains
 
 !> Stop the execution
 subroutine dust_abort()
-  
+
   call abort()
 
 end subroutine dust_abort
-                   
+
 !-----------------------------------------------------------------------
 
 !> Stop the execution, can be called in a pure procedure
@@ -171,7 +171,7 @@ function dust_time() result(t)
  !$ end subroutine omp_dummy2
 
 end function dust_time
-                   
+
 !-----------------------------------------------------------------------
 
 !> Error: abort the execution, printing a message of the abort location
@@ -254,8 +254,8 @@ recursive subroutine error_main(caller,text)
   call dust_abort()
 
 end subroutine error_main
- 
- 
+
+
 !-----------------------------------------------------------------------
 
 !> Error: abort the execution, printing a message of the abort location
@@ -295,9 +295,9 @@ subroutine warning(caller,caller_mod,text)
       'WARNING in "', caller , caller_mod , '"!' , gfortran_bug_text ) )
 
 end subroutine warning
- 
+
 !-----------------------------------------------------------------------
- 
+
 !> Warning: print a scary warning, with location and reason, but do not
 !! abort the execution
 subroutine warning_multiline(caller,caller_mod,text)
@@ -315,7 +315,7 @@ end subroutine warning_multiline
 
 !-----------------------------------------------------------------------
 
-!> Info: print a detailed info message, with information on location 
+!> Info: print a detailed info message, with information on location
 subroutine info(caller,caller_mod,text)
  character(len=*), intent(in) :: &
    caller, caller_mod, text
@@ -332,10 +332,10 @@ subroutine info(caller,caller_mod,text)
       'INFO from "', caller , caller_mod , '":' , gfortran_bug_text ) )
 
 end subroutine info
- 
+
 !-----------------------------------------------------------------------
- 
-!> Info: print a detailed info message, with information on location 
+
+!> Info: print a detailed info message, with information on location
 subroutine info_multiline(caller,caller_mod,text)
  character(len=*), intent(in) :: &
    caller, caller_mod, text(:)
@@ -365,7 +365,7 @@ subroutine printout(text)
   call put_msg( 2 , gfortran_bug_text(1)  )
 
 end subroutine printout
- 
+
 !-----------------------------------------------------------------------
 
 !> Make a string and count its length
@@ -377,8 +377,8 @@ function format_out_string(msg,caller,caller_mod,end, text ) result(s)
    len = 1+len(msg)+len(caller)+14+len(caller_mod)+len(end)    &
         +1+sum((/( 2+len_trim(text(i))+1 , i=1,size(text) )/)) &
           ) :: s
-  
-  !DEBUG: 
+
+  !DEBUG:
   ! See ifort bug
   ! DPD200411297
   ! https://software.intel.com/en-us/forums/intel-fortran-compiler-for-linux-and-mac-os-x/topic/629432
@@ -414,7 +414,7 @@ function format_out_string_main(msg,caller,end, text ) result(s)
 end function format_out_string_main
 
 !-----------------------------------------------------------------------
- 
+
 !> Write a message to the selcted channel
 subroutine put_msg( msg_type , msg )
  integer, intent(in) :: msg_type
@@ -471,7 +471,7 @@ subroutine new_file_unit(fu,ierr)
    this_sub_name = 'new_file_unit'
  logical :: busy
  integer :: previous_unit_number
- 
+
   !$omp critical(omp_new_file_unit_critical)
   previous_unit_number = actual_unit_number
   busy = .true.
@@ -501,14 +501,14 @@ end subroutine new_file_unit
 
 !> Check if the basename provided is legitimate
 !!
-!! Attempts to create a test file with such basename, if it fails, 
+!! Attempts to create a test file with such basename, if it fails,
 !! aborts with error
 subroutine check_basename(basename,sub_name,mod_name)
  character(len=*), intent(in) :: basename
  character(len=*), intent(in) :: sub_name
  character(len=*), intent(in), optional :: mod_name
  integer :: estat, cstat
-  
+
   !try to print a test file in the provided basename
   call execute_command_line('touch '//trim(basename)//'.try > /dev/null 2>&1 ', &
                                           exitstat=estat,cmdstat=cstat)
@@ -539,7 +539,7 @@ subroutine check_file_exists(filename,sub_name,mod_name)
  character(len=*), intent(in) :: sub_name
  character(len=*), intent(in), optional :: mod_name
  logical :: exists
-  
+
   !Inquire file existence
   inquire(file=trim(filename), exist=exists)
 
@@ -560,7 +560,7 @@ end subroutine check_file_exists
 
 !-----------------------------------------------------------------------
 
-!> Check if the geometry files exists, if not, try to generate it 
+!> Check if the geometry files exists, if not, try to generate it
 !! calling the preprocessor
 subroutine check_preproc(filename)
  character(len=*), intent(in) :: filename
@@ -572,33 +572,33 @@ subroutine check_preproc(filename)
 
   !1) Check if the solver geometry input file exists
   inquire(file=trim(filename), exist=exists)
- 
+
   if(exists) then
     !2) exists, return
     return
   else
     !3) does not exist, try to call the preprocessor
     write(msg,*) '!!!! The geometry input file ',trim(filename),' was not found,&
-    & trying to call the preprocessor with default parameters to create it' 
+    & trying to call the preprocessor with default parameters to create it'
     call printout(msg)
     call execute_command_line('./dust_pre dust_pre.in '//trim(filename), &
                                                   exitstat=estat,cmdstat=cstat)
-    
+
     !4) check the execution
     if(cstat .ne. 0) call error(this_sub_name, this_mod_name, 'Call to the &
                      &preprocessor not executed, system error')
     if(estat .ne. 0) call error(this_sub_name, this_mod_name, 'Call to the &
                      &preprocessor failed, stopping')
-    
+
     !5) check that the file was actually created
     inquire(file=trim(filename), exist=exists)
- 
+
     if(.not.exists) then
       write(msg,*) 'The execution of the preprocessor was succesful, however &
-           & the input file was not created. Must stop the execution now.'     
+           & the input file was not created. Must stop the execution now.'
       call error(this_sub_name, this_mod_name, msg)
     endif
- 
+
   endif
 
 end subroutine check_preproc

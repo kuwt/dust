@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -115,7 +115,7 @@ end type t_line
 !   !> interpolation from inputs
 !   integer    :: id_pt(2) ! neighboring points
 !   real(wp)   :: s        ! curvilinear coord s\in(0,1) between the nodes
-!   real(wp)   :: n(3)     ! unit vector normal to the plane where the 
+!   real(wp)   :: n(3)     ! unit vector normal to the plane where the
 ! end type t_refline_pt
 
 !----------------------------------------------------------------------
@@ -127,10 +127,10 @@ contains
 !  and point coordinates
 subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
                      npoints_chord_tot , nelem_span_tot )
-              
+
  character(len=*), intent(in) :: mesh_file
- integer  , allocatable, intent(out) :: ee(:,:) 
- real(wp) , allocatable, intent(out) :: rr(:,:) 
+ integer  , allocatable, intent(out) :: ee(:,:)
+ real(wp) , allocatable, intent(out) :: rr(:,:)
  integer  , intent(out), optional    :: npoints_chord_tot, nelem_span_tot
 
  ! parser and sub-parsers
@@ -162,19 +162,19 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
  real(wp) , allocatable :: s_in(:) , nor_in(:,:)
 
  real(wp) , allocatable :: xy1(:,:) , xy2(:,:) , xy(:,:)
- real(wp) , allocatable :: rr_s(:,:) 
+ real(wp) , allocatable :: rr_s(:,:)
  real(wp) :: twist_rad , theta
 
  real(wp) :: w1 , w2
- integer :: i , i1 , i2 
+ integer :: i , i1 , i2
 
- 
+
  !> Prepare parser and sub-parsers
  ! pass "p" for <panel> or <vortlat> elems that contain "airfoil" field,
  ! while <liftlin>s contain "airfoil_table" field
  call set_parser_pointwise( 'p' , pmesh_prs , point_prs , line_prs )
 
- !> Enable option reading 
+ !> Enable option reading
  call pmesh_prs%read_options(mesh_file,printout_val=.true.)
 
 
@@ -182,14 +182,14 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
  type_chord  = getstr(pmesh_prs,'type_chord')
  ElType = trim(getstr(pmesh_prs,'ElType'))
  ref_chord_fraction = getreal(pmesh_prs,'reference_chord_fraction')
- 
- !> Read points and lines 
+
+ !> Read points and lines
  call read_points ( 'p' , pmesh_prs , point_prs , points )
  call read_lines  (       pmesh_prs ,  line_prs , lines  , nelem_span_tot )
 
 
  !> Set dimensions of ee, rr mat
- if (ElType.eq.'p') then ;  nelem_chord_tot = 2 * nelem_chord 
+ if (ElType.eq.'p') then ;  nelem_chord_tot = 2 * nelem_chord
  else                    ;  nelem_chord_tot =     nelem_chord
  endif
 
@@ -217,23 +217,23 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
 
  ! === define the reference line ===
  !> Check line connectivity, re-order lines and define tangent vectors
- call sort_lines( lines ) 
+ call sort_lines( lines )
 
- call sort_points( points ) 
+ call sort_points( points )
 
 
  !> check input consistency (todo: improve this subroutine)
  call check_point_line_inputs ( points , lines )
 
- !>  
+ !>
  call fill_line_tan_vec( points , lines )
 
  !>
  call build_reference_line( npoint_span_tot   , &
                             points , lines    , &
                             ref_line_points   , &
-                            ref_line_normal   , &  
-                            ref_line_interp_p , & 
+                            ref_line_normal   , &
+                            ref_line_interp_p , &
                             ref_line_interp_s , &
                             ref_line_interp_s_all , &
                             s_in , nor_in )
@@ -246,16 +246,16 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
                                        s_in , nor_in    )
 
 
- ! === define the coordinates of the sections at all the input points === 
+ ! === define the coordinates of the sections at all the input points ===
  !> check that the first and last node has no interp attribute
  if ( trim(points( lines(1)%end_points(1) )%airfoil) .eq. 'interp' ) then
    write(*,*) ' error in read_mesh_pointwise: "airfoil" input &
                &of the first point cannot be "interp". Stop ' ; stop
- end if 
+ end if
  if ( trim(points( lines(size(lines))%end_points(2) )%airfoil) .eq. 'interp' ) then
    write(*,*) ' error in read_mesh_pointwise: "airfoil" input &
                &of the last point cannot be "interp". Stop ' ; stop
- end if 
+ end if
 
  allocate(chord_fraction(nelem_chord+1))
  call define_division(type_chord, nelem_chord, chord_fraction)
@@ -263,18 +263,18 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
 
  !> first point
  call define_section( points(1)%chord , trim(adjustl(points(1)%airfoil)) , &
-                      points(1)%theta , ElType , nelem_chord             , & 
-                      type_chord , chord_fraction , ref_chord_fraction   , & 
-                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(1)%xy ) 
+                      points(1)%theta , ElType , nelem_chord             , &
+                      type_chord , chord_fraction , ref_chord_fraction   , &
+                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(1)%xy )
 
  if ( points(1)%flip_sec ) call flip_section( ElType , points(1)%xy )
 
  !> last point
  i = size(points)
  call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
-                      points(i)%theta , ElType , nelem_chord             , & 
-                      type_chord , chord_fraction , ref_chord_fraction   , & 
-                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy ) 
+                      points(i)%theta , ElType , nelem_chord             , &
+                      type_chord , chord_fraction , ref_chord_fraction   , &
+                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy )
 
  if ( points(i)%flip_sec ) call flip_section( ElType , points(i)%xy )
 
@@ -283,9 +283,9 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   if ( trim(points(i)%airfoil) .ne. 'interp' ) then
 
     call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
-                         points(i)%theta , ElType , nelem_chord             , & 
-                         type_chord , chord_fraction , ref_chord_fraction   , & 
-                         (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy ) 
+                         points(i)%theta , ElType , nelem_chord             , &
+                         type_chord , chord_fraction , ref_chord_fraction   , &
+                         (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy )
 
     if ( points(i)%flip_sec ) call flip_section( ElType , points(i)%xy )
 
@@ -299,27 +299,27 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
     do while ( trim(points(i2)%airfoil) .eq. 'interp' )
       i2 = i2+1
     end do
-    
+
     w1 = ( s_in(i2) - s_in(i ) ) / ( s_in(i2) - s_in(i1) )
     w2 = ( s_in(i ) - s_in(i1) ) / ( s_in(i2) - s_in(i1) )
 
 !   ! check ---
 !   write(*,*) ' i , i1 , i2 , w1 , w2 : ' , i , i1 , i2 , w1 , w2
 
-    if ( allocated(xy1) ) deallocate(xy1) 
-    if ( allocated(xy2) ) deallocate(xy2) 
+    if ( allocated(xy1) ) deallocate(xy1)
+    if ( allocated(xy2) ) deallocate(xy2)
 
     !> compute the xy coordinates of the neighboring points w/o interp attribute
     !> interpolate the shape only:
     !> -----> unitary chord, theta = 0.0, ref_chord fraction = 0.0_wp
     call define_section( 1.0_wp , trim(adjustl(points(i1)%airfoil)) , &
-                         0.0_wp , ElType , nelem_chord              , & 
-                         type_chord , chord_fraction , 0.0_wp       , & 
-                         (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy1 ) 
+                         0.0_wp , ElType , nelem_chord              , &
+                         type_chord , chord_fraction , 0.0_wp       , &
+                         (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy1 )
     call define_section( 1.0_wp , trim(adjustl(points(i2)%airfoil)) , &
-                         0.0_wp , ElType , nelem_chord              , & 
-                         type_chord , chord_fraction , 0.0_wp       , & 
-                         (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy2 ) 
+                         0.0_wp , ElType , nelem_chord              , &
+                         type_chord , chord_fraction , 0.0_wp       , &
+                         (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy2 )
 
     if ( points(i1)%flip_sec ) call flip_section( ElType , xy1 )
     if ( points(i2)%flip_sec ) call flip_section( ElType , xy2 )
@@ -350,7 +350,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
  allocate( rr( 3 , rr_size ) ) ; rr = 0.0_wp
  allocate( rr_s ( 2 , size(points(1)%xy,2) ) )
 
- !>  
+ !>
  ! write(*,*) ' shape(ref_line_interp_p) : ' ,  shape(ref_line_interp_p)
  ! write(*,*) ' shape(ref_line_interp_s) : ' ,  shape(ref_line_interp_s)
  ! write(*,*) ' shape(points           ) : ' ,  shape(points)
@@ -369,12 +369,12 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
    i2 =       i     * npoint_chord_tot
 
    ! rotation
-   theta = atan2( ref_line_normal(i,3) , ref_line_normal(i,2) ) 
+   theta = atan2( ref_line_normal(i,3) , ref_line_normal(i,2) )
    ! write(*,*) ' theta : ' , theta
-   rr(1,i1:i2) = rr_s(1,:) 
+   rr(1,i1:i2) = rr_s(1,:)
    rr(2,i1:i2) =-rr_s(2,:) * sin(theta)
-   rr(3,i1:i2) = rr_s(2,:) * cos(theta) 
-   
+   rr(3,i1:i2) = rr_s(2,:) * cos(theta)
+
    ! traslation
    rr(1,i1:i2) = rr(1,i1:i2) + ref_line_points(i,1)
    rr(2,i1:i2) = rr(2,i1:i2) + ref_line_points(i,2)
@@ -390,7 +390,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
  npoints_chord_tot = npoint_chord_tot
  ! optional output ----
 
- !> end parser reading (it could be done before, but it really 
+ !> end parser reading (it could be done before, but it really
  !  doesn't matter, does it?)
  call finalizeParameters(pmesh_prs)
 
@@ -412,8 +412,8 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
                         chord_p,theta_p,theta_e )
 
  character(len=*), intent(in) :: mesh_file
- integer  , allocatable, intent(out) :: ee(:,:) 
- real(wp) , allocatable, intent(out) :: rr(:,:) 
+ integer  , allocatable, intent(out) :: ee(:,:)
+ real(wp) , allocatable, intent(out) :: rr(:,:)
  character(len=max_char_len), allocatable , intent(out) :: airfoil_list_actual(:)
  integer  , allocatable, intent(out) :: nelem_span_list(:)
  integer  , allocatable, intent(out) :: i_airfoil_e(:,:)
@@ -436,7 +436,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
 
  integer ::  nelem_chord_tot, npoint_chord_tot, npoint_span_tot
  integer :: ee_size , rr_size
- integer :: i_ch , i_sp , i_point , i_elem 
+ integer :: i_ch , i_sp , i_point , i_elem
 
  !>
  real(wp) , allocatable :: ref_line_points(:,:)
@@ -447,7 +447,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
  real(wp) , allocatable :: s_in(:) , nor_in(:,:)
  real(wp) , allocatable :: airfoil_list_actual_s(:)
 
- real(wp) , allocatable :: rr_s(:,:) 
+ real(wp) , allocatable :: rr_s(:,:)
  real(wp) :: twist_rad , theta
 
  !>
@@ -463,8 +463,8 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
  ! pass "p" for <panel> or <vortlat> elems that contain "airfoil" field,
  ! while <liftlin>s contain "airfoil_table" field
  call set_parser_pointwise( 'l' , pmesh_prs , point_prs , line_prs )
- 
- !> Enable option reading 
+
+ !> Enable option reading
  call pmesh_prs%read_options(mesh_file,printout_val=.true.)
 
  nelem_chord     = 1 ! nelem_chord = 1 and no type_chord for liftlin
@@ -476,16 +476,16 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
    write(*,*) ' Stop. ' ; stop
  end if
 
- !> Option for flat meshes: panels are not rotated, but normals and 
+ !> Option for flat meshes: panels are not rotated, but normals and
  !! tangent vectors are rotated with the twist
  mesh_flat = getlogical(pmesh_prs,'mesh_flat')
 
  if ( mesh_flat .and. trim(ElType) .ne. 'l' ) then
    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
         &flat mesh option is available only for lifting line elements.')
- end if 
+ end if
 
- !> Read points and lines 
+ !> Read points and lines
  call read_points ( 'l' , pmesh_prs , point_prs , points )
  call read_lines  (       pmesh_prs ,  line_prs , lines  , nelem_span_tot )
 
@@ -508,7 +508,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
 
  !> === build ee, rr arrays (and all the remaining variables) ===
   do i = 1 , size(points)
-   
+
   end do
  ee_size = nelem_span_tot
  rr_size = npoint_span_tot * npoint_chord_tot
@@ -528,22 +528,22 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
 
  ! === define the reference line ===
  !> Check line connectivity, re-order lines and define tangent vectors
- call sort_lines( lines ) 
+ call sort_lines( lines )
 
- call sort_points( points ) 
+ call sort_points( points )
 
  !> check input consistency (todo: improve this subroutine)
  call check_point_line_inputs ( points , lines )
 
- !>  
+ !>
  call fill_line_tan_vec( points , lines )
 
  !>
  call build_reference_line( npoint_span_tot   , &
                             points , lines    , &
                             ref_line_points   , &
-                            ref_line_normal   , &  
-                            ref_line_interp_p , & 
+                            ref_line_normal   , &
+                            ref_line_interp_p , &
                             ref_line_interp_s , &
                             ref_line_interp_s_all , &
                             s_in , nor_in )
@@ -569,20 +569,20 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
 !! -- 0.75 chord -- look for other "0.75 chord" tag
 !! set the TE 0.75*chord far from the ll
 !do i = 1 , size(points)
-!  points(i)%chord = points(i)%chord * 0.75_wp 
+!  points(i)%chord = points(i)%chord * 0.75_wp
 !end do
 
 
- ! === define the coordinates of the sections at all the input points === 
+ ! === define the coordinates of the sections at all the input points ===
  !> check that the first and last node has no interp attribute
  if ( trim(points( lines(1)%end_points(1) )%airfoil) .eq. 'interp' ) then
    write(*,*) ' error in read_mesh_pointwise: "airfoil" input &
                &of the first point cannot be "interp". Stop ' ; stop
- end if 
+ end if
  if ( trim(points( lines(size(lines))%end_points(2) )%airfoil) .eq. 'interp' ) then
    write(*,*) ' error in read_mesh_pointwise: "airfoil" input &
                &of the last point cannot be "interp". Stop ' ; stop
- end if 
+ end if
 
 
  ! === fields on the input points ===
@@ -608,7 +608,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
    endif
 
    if ( points(i)%flip_sec ) points(i)%xy(2,:) = -points(i)%xy(2,:)
-   
+
  end do
 
 
@@ -635,12 +635,12 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
    i2 =       i     * npoint_chord_tot
 
    ! rotation
-   theta = atan2( ref_line_normal(i,3) , ref_line_normal(i,2) ) 
+   theta = atan2( ref_line_normal(i,3) , ref_line_normal(i,2) )
    ! write(*,*) ' theta : ' , theta
-   rr(1,i1:i2) = rr_s(1,:) 
+   rr(1,i1:i2) = rr_s(1,:)
    rr(2,i1:i2) =-rr_s(2,:) * sin(theta)
-   rr(3,i1:i2) = rr_s(2,:) * cos(theta) 
-   
+   rr(3,i1:i2) = rr_s(2,:) * cos(theta)
+
    ! traslation
    rr(1,i1:i2) = rr(1,i1:i2) + ref_line_points(i,1)
    rr(2,i1:i2) = rr(2,i1:i2) + ref_line_points(i,2)
@@ -652,7 +652,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
  ! normal/tangent vector are
 
  if ( mesh_flat ) then
-   do i = 1,nelem_span_tot 
+   do i = 1,nelem_span_tot
      theta_e(i) = 0.5_wp*(theta_p(i)+theta_p(i+1))
    enddo
  endif
@@ -662,10 +662,10 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
  ! ref_line_interp_p, red_line_interp_s -> i_airfoil_e , normalised_coord_e
  ! ...
 
- !> airfoil_list_actual: save only the actual airfoil, not "interp" inputs 
+ !> airfoil_list_actual: save only the actual airfoil, not "interp" inputs
  nAirfoils = 0
  do i = 1 , size(points)
-   if ( trim(points(i)%airfoil) .ne. 'interp' ) nAirfoils = nAirfoils + 1 
+   if ( trim(points(i)%airfoil) .ne. 'interp' ) nAirfoils = nAirfoils + 1
  end do
 
  allocate(airfoil_list_actual(  nAirfoils))
@@ -675,23 +675,23 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
 
  do i = 1 , size(points)
    if ( trim(points(i)%airfoil) .ne. 'interp' ) then
-               
+
      iAirfoil  = iAirfoil + 1
      airfoil_list_actual(iAirfoil) = trim( points(i)%airfoil )
      airfoil_list_actual_s(iAirfoil) = s_in( i ) ! curvilinear coord. of a sec.
-                                                 ! where an airfoil is defined 
-              
+                                                 ! where an airfoil is defined
+
      !> check  if the file containing the .c81 table exists
      call check_file_exists(airfoil_list_actual(iAirfoil), this_sub_name, &
           this_mod_name)
-   end if      
- end do        
+   end if
+ end do
 
 
  !> i_airfoil_e, normalised_coord_e
  allocate(i_airfoil_e       (2,nelem_span_tot)) ; i_airfoil_e        = 0
  allocate(normalised_coord_e(2,nelem_span_tot)) ; normalised_coord_e = 0.0_wp
- 
+
  ! Find normalised_coord_e for ll interpolation ---
  j = 1
  do i = 1 , nelem_span_tot ! loop over the elements in the spanwise direction
@@ -704,11 +704,11 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
      if ( j .eq. size(airfoil_list_actual_s) ) then
        write(*,*) ' error in read_mesh_pointwise_ll: &
                     &out of bounds while scanning line sectons; stop ' ; stop
-     endif 
+     endif
    end if
 
    ! check if the elem belongs to more than two sections of the reference line: if .t. -> error
-   if ( ( ref_line_interp_s_all(i  ) .lt. airfoil_list_actual_s(j  ) ) .and. & 
+   if ( ( ref_line_interp_s_all(i  ) .lt. airfoil_list_actual_s(j  ) ) .and. &
         ( ref_line_interp_s_all(i+1) .gt. airfoil_list_actual_s(j+1) ) ) then
 
      write(*,*) ' error in read_mesh_pointwise_ll: '
@@ -722,7 +722,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
    ! i_airfoil_e and normalised_coord_e (of the edges of the element) for ll interpolation
    i_airfoil_e(1,i) = j
    i_airfoil_e(2,i) = j + 1
- 
+
    normalised_coord_e(1,i) = ( ref_line_interp_s_all(i)   - airfoil_list_actual_s(j) ) / &
                              ( airfoil_list_actual_s(j+1) - airfoil_list_actual_s(j) )
    normalised_coord_e(2,i) = ( ref_line_interp_s_all(i+1) - airfoil_list_actual_s(j) ) / &
@@ -730,30 +730,30 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
 
  end do
 
- 
+
 ! ! -- 0.75 chord -- look for other "0.75 chord" tag
 ! ! set the TE 0.75*chord far from the ll
 ! do i = 1 , size(points)
-!   points(i)%chord = points(i)%chord / 0.75_wp 
+!   points(i)%chord = points(i)%chord / 0.75_wp
 ! end do
 ! do i = 1 , size(chord_p)
 !   chord_p(i) = chord_p(i) / 0.75_wp
 ! end do
- 
+
  ! optional output ----
  npoints_chord_tot = npoint_chord_tot
  ! optional output ----
 
 
- !> end parser reading (it could be done before, but it really 
+ !> end parser reading (it could be done before, but it really
  !  doesn't matter, does it?)
  call finalizeParameters(pmesh_prs)
 
 
 
 ! ! check ---
-! write(*,*) ' shape(ref_line_interp_p) : ' , shape(ref_line_interp_p) 
-! write(*,*) ' shape(ref_line_interp_p) : ' , shape(ref_line_interp_s) 
+! write(*,*) ' shape(ref_line_interp_p) : ' , shape(ref_line_interp_p)
+! write(*,*) ' shape(ref_line_interp_p) : ' , shape(ref_line_interp_s)
 ! do i = 1 , size(ref_line_interp_s)
 !   write(*,*) ref_line_interp_p(i,:) , ref_line_interp_s(i)
 ! end do
@@ -798,7 +798,7 @@ subroutine build_reference_line( npoint_span_tot   , points, lines     , &
  real(wp)      , allocatable , intent(out)   :: ref_line_interp_s_all(:)
  real(wp)      , allocatable , intent(out)   :: s_in(:)
  real(wp)      , allocatable , intent(out)   :: nor_in(:,:)
- 
+
  real(wp)      , allocatable                 :: ref_line_spline_s(:)
 
  integer       , allocatable :: ip(:,:)
@@ -819,10 +819,10 @@ subroutine build_reference_line( npoint_span_tot   , points, lines     , &
  allocate(  s_in(size(points)  )) ;   s_in = 0.0_wp
  allocate(nor_in(size(points),3)) ; nor_in = 0.0_wp
 
- 
+
  !> Starting point
  ref_line_points(1,:) = points( lines(1)%end_points(1) ) % coord
- i2 = 1 
+ i2 = 1
  do i = 1 , size(lines)
    ! end points
    i1 = i2
@@ -835,7 +835,7 @@ subroutine build_reference_line( npoint_span_tot   , points, lines     , &
      do j = i1 , i2
        ref_line_interp_p(j,:) = lines(i)%end_points(:)
      end do
-     
+
      call straight_line( points( lines(i)%end_points(1) )%coord , &
                          points( lines(i)%end_points(2) )%coord , &
                          lines(i)%nelems                        , &
@@ -856,7 +856,7 @@ subroutine build_reference_line( npoint_span_tot   , points, lines     , &
      !> s
      if ( allocated(s_in_1) ) deallocate(s_in_1) ; allocate(s_in_1(2))
      s_in_1 = (/ 0.0_wp , 1.0_wp /)
-     s_in(lines(i)%end_points(2)) = & 
+     s_in(lines(i)%end_points(2)) = &
              s_in(lines(i)%end_points(1)) + s_in_1(2) * lines(i)%leng
      !> nor
      if ( allocated(nor_in_1) ) deallocate(nor_in_1) ; allocate(nor_in_1(2,3))
@@ -869,16 +869,16 @@ subroutine build_reference_line( npoint_span_tot   , points, lines     , &
      nor_in(lines(i)%end_points(2),:) = nor_in_1(2,:)
 
      deallocate(s_in_1 , nor_in_1)
-      
- 
+
+
    else if ( trim(lines(i)%l_type) .eq. 'Spline'   ) then
-     
+
      !> build t_spline structure
      n = lines(i)%end_points(2) - lines(i)%end_points(1) + 1
      allocate(spl%rr( n , 3 ))
      allocate(spl%d0( 3 )) ; spl%d0 = lines(i)%t_vec1
      allocate(spl%d1( 3 )) ; spl%d1 = lines(i)%t_vec2
-     spl%e_bc = (/ 'derivative' , 'derivative' /) 
+     spl%e_bc = (/ 'derivative' , 'derivative' /)
 
      do j = 1 , n
        spl%rr( j , : ) = points( lines(i)%end_points(1)-1+j )%coord
@@ -887,7 +887,7 @@ subroutine build_reference_line( npoint_span_tot   , points, lines     , &
      if ( allocated(  ip)     ) deallocate(  ip    ) ; allocate(  ip(i2-i1+1,2))
      if ( allocated(  s_in_1) ) deallocate(  s_in_1) ; allocate(  s_in_1(n))
      if ( allocated(nor_in_1) ) deallocate(nor_in_1) ; allocate(nor_in_1(n,3))
- 
+
      !> compute ref_line_points on the spline
      call hermite_spline( spl , lines(i)%nelems           , &
                                 lines(i)%tension          , &
@@ -925,7 +925,7 @@ subroutine build_reference_line( npoint_span_tot   , points, lines     , &
      if ( allocated( nor_in_1 ) ) deallocate( nor_in_1 )
 
      call deallocate_spline( spl )
-     
+
    else
      write(*,*) ' error in build_reference_line(): '
      write(*,*) ' lines(',i,')%l_type = ' , lines(i)%l_type
@@ -934,7 +934,7 @@ subroutine build_reference_line( npoint_span_tot   , points, lines     , &
    end if
 
  end do
- 
+
 
 end subroutine build_reference_line
 
@@ -957,7 +957,7 @@ subroutine straight_line( r1 , r2 , nelems , type_span , rr , nor , s , &
   ! allocate(rr(nelems+1,3))
 
   nor_v = r2 - r1
-  leng = norm2(nor_v) 
+  leng = norm2(nor_v)
   nor_v = nor_v / leng
 
   do i = 1 , nelems+1
@@ -975,7 +975,7 @@ subroutine straight_line( r1 , r2 , nelems , type_span , rr , nor , s , &
     nor(i,:) = nor_v
 
     !> curvilinear coordinate, s
-    s(i) = norm2(rr(i,:)-r1) / norm2(r2-r1) 
+    s(i) = norm2(rr(i,:)-r1) / norm2(r2-r1)
 
   end do
 
@@ -1013,9 +1013,9 @@ end subroutine sort_points
 subroutine sort_lines( lines )
   type(t_line ) , intent(inout) :: lines( :)
   type(t_line ) , allocatable :: lines_tmp(:)
-  integer :: n_lines 
+  integer :: n_lines
   integer :: i , i1 , i2 , i2_old , il , n_1
- 
+
   n_lines = size(lines)
 
   allocate(lines_tmp(n_lines))
@@ -1032,12 +1032,12 @@ subroutine sort_lines( lines )
   if ( n_1 .ne. 1 ) then
     write(*,*) ' error in sort_lines: only 1 line must have'
     write(*,*) ' end_points(1) = 1. Stop ' ; stop
-  end if  
+  end if
   lines(1) = lines_tmp(i1)
   ! -> no multiple start/end points
   ! ...
 
-  !> find the chain of lines 
+  !> find the chain of lines
   i1 = lines(1)%end_points(1) ; i2 = lines(1)%end_points(2)
   do i = 2 , n_lines
 
@@ -1046,12 +1046,12 @@ subroutine sort_lines( lines )
     do while ( ( i2 .eq. i2_old ) .and. ( il .lt. n_lines ) )
       il = il + 1
       if (      lines_tmp(il)%end_points(1) .eq. i2_old ) then
-        i1 =    lines_tmp(il)%end_points(1) 
+        i1 =    lines_tmp(il)%end_points(1)
         i2 =    lines_tmp(il)%end_points(2)
       end if
 
     end do
-    !> 
+    !>
     if ( i2 .eq. i2_old ) then
       write(*,*) ' error in sort_lines: broken chain. stop ' ; stop
     end if
@@ -1080,7 +1080,7 @@ subroutine flip_section ( eltype , xy )
       xy_tmp(1,i) =  xy(1,size(xy,2)-i+1)
       xy_tmp(2,i) = -xy(2,size(xy,2)-i+1)
     enddo
-  
+
   else if ( eltype .eq. 'v' ) then
 
     do i = 1 , size(xy,2)
@@ -1093,7 +1093,7 @@ subroutine flip_section ( eltype , xy )
                 &"p" or "v". Stop.' ; stop
   end if
 
-  xy = xy_tmp 
+  xy = xy_tmp
 
   deallocate( xy_tmp )
 
@@ -1113,15 +1113,15 @@ subroutine check_point_line_inputs( points , lines )
   if ( size(points) .lt. lines(size(lines))%end_points(2) ) then
     write(*,*) ' n. points .lt. last line end point id. stop ' ; stop
   end if
-  
-  !> if first or last lines are Splines, the user must provide the 
+
+  !> if first or last lines are Splines, the user must provide the
   !  initial or final direction
   if ( ( trim(lines(1)%l_type) .eq. 'Spline' ) .and. &
        ( .not. allocated(lines(1)%t_vec1) ) ) then
     write(*,*) ' error in check_point_lines_input: the first line is a Spline and &
                 &has no TangentVec1 provided as an input. Stop ' ; stop
   end if
-                                            
+
   if ( ( trim(lines(n_lines)%l_type) .eq. 'Spline' ) .and. &
        ( .not. allocated(lines(n_lines)%t_vec2) ) ) then
     write(*,*) ' error in check_point_lines_input: the last line is a Spline and &
@@ -1142,7 +1142,7 @@ subroutine check_point_line_inputs( points , lines )
     end if
   end do
 
- 
+
 end subroutine check_point_line_inputs
 
 !----------------------------------------------------------------------
@@ -1174,24 +1174,24 @@ subroutine update_ref_line_normal( points , ref_line_normal   , &
  do i = 1 , size(points)
    if ( trim(points(i)%sec_nor_str) .eq. 'referenceLine' ) then
      points(i)%sec_nor = nor_in(i,:)
-   elseif ( trim(points(i)%sec_nor_str) .eq. 'yAxis'    ) then 
+   elseif ( trim(points(i)%sec_nor_str) .eq. 'yAxis'    ) then
      points(i)%sec_nor = (/ 0.0_wp , 1.0_wp , 0.0_wp /)
-   elseif ( trim(points(i)%sec_nor_str) .eq. 'yAxisNeg' ) then 
+   elseif ( trim(points(i)%sec_nor_str) .eq. 'yAxisNeg' ) then
      points(i)%sec_nor = (/ 0.0_wp ,-1.0_wp , 0.0_wp /)
-   elseif ( trim(points(i)%sec_nor_str) .eq. 'vector' ) then 
+   elseif ( trim(points(i)%sec_nor_str) .eq. 'vector' ) then
      ! % sec_nor assigned during reading in read_points()
    else
      write(*,*) ' Error in mod_pointwise_io.f90: '
      write(*,*) ' points(',i,')%sec_nor_str : ' , trim(points(i)%sec_nor_str)
      write(*,*) ' while the possible inputs are: "referenceLine" (default), '
      write(*,*) ' "yAxis", "yAxisNeg" , "vector". Stop. ' ; stop
-   endif 
+   endif
  end do
 
 
  !> set ref_line_normal vector
  do i = 1 , size(ref_line_normal,1)
- 
+
    str1 = trim( points( ref_line_interp_p(i,1) ) %sec_nor_str )
    str2 = trim( points( ref_line_interp_p(i,2) ) %sec_nor_str )
 
@@ -1223,10 +1223,10 @@ subroutine update_ref_line_normal( points , ref_line_normal   , &
           ( s_in( ref_line_interp_p(i,2) ) - s_in( ref_line_interp_p(i,1) ) )
      w2 = ( ref_line_interp_s_all(i)       - s_in( ref_line_interp_p(i,1) ) ) / &
           ( s_in( ref_line_interp_p(i,2) ) - s_in( ref_line_interp_p(i,1) ) )
-  
+
 !    write(*,*) ' w1 , w2  : ' , w1 , w2
-  
-     ref_line_normal(i,:) = nor1 * w1 +  nor2 * w2 
+
+     ref_line_normal(i,:) = nor1 * w1 +  nor2 * w2
 
    else
 
@@ -1236,15 +1236,15 @@ subroutine update_ref_line_normal( points , ref_line_normal   , &
      !> non-dimensional coord \in (-1,1)
      ds = ( ref_line_interp_s_all(i) - &
             0.5_wp * ( s_in( ref_line_interp_p(i,2) ) + s_in( ref_line_interp_p(i,1) ) ) ) * &
-            2.0_wp / ( s_in( ref_line_interp_p(i,2) ) - s_in( ref_line_interp_p(i,1) ) ) 
+            2.0_wp / ( s_in( ref_line_interp_p(i,2) ) - s_in( ref_line_interp_p(i,1) ) )
 
      w1 = 0.5_wp * ds * ( ds-1.0_wp)
      w2 = 0.5_wp * ds * ( ds+1.0_wp)
-     w0 = (1.0_wp - ds)*(1.0_wp + ds) 
-     
+     w0 = (1.0_wp - ds)*(1.0_wp + ds)
+
 !    write(*,*) ' w1 , w2 , w0 : ' , w1 , w2 , w0
- 
-     ref_line_normal(i,:) = nor1 * w1 +  nor2 * w2 + w0 * nor0 
+
+     ref_line_normal(i,:) = nor1 * w1 +  nor2 * w2 + w0 * nor0
 
    end if
 
@@ -1262,7 +1262,7 @@ subroutine update_ref_line_normal( points , ref_line_normal   , &
 end subroutine update_ref_line_normal
 
 !----------------------------------------------------------------------
-!> 
+!>
 subroutine fill_line_tan_vec( points , lines )
  type(t_point) , intent(inout) :: points(:)
  type(t_line ) , intent(inout) :: lines( :)
@@ -1288,7 +1288,7 @@ subroutine fill_line_tan_vec( points , lines )
      lines(i)%t_vec1 = lines(i)%t_vec1 / norm2(lines(i)%t_vec1)
      lines(i)%t_vec2 = lines(i)%t_vec1
 
-   end if 
+   end if
 
  end do
 
@@ -1298,7 +1298,7 @@ subroutine fill_line_tan_vec( points , lines )
    if ( trim(lines(i)%l_type) .eq. 'Spline' ) then
 
      if ( .not. allocated(lines(i)%t_vec1) ) then
- 
+
        if  ( i .eq. 1 ) then  ! check
          write(*,*) ' error in fill_line_tan_vec: '
          write(*,*) ' first line is a spline w/o tangentVec1 input. '
@@ -1309,7 +1309,7 @@ subroutine fill_line_tan_vec( points , lines )
 
        allocate(lines(i)%t_vec1(3))
        lines(i)%t_vec1 = lines(i-1)%t_vec2
-       
+
      end if
 
      if ( .not. allocated(lines(i)%t_vec2) ) then
@@ -1392,7 +1392,7 @@ subroutine read_lines ( pmesh_prs , line_prs , lines  , nelems_span_tot)
  integer :: nLines , i
 
  ! === Read line groups ===
- nLines  = countoption(pmesh_prs,'Line') ; allocate( lines(nLines) ) 
+ nLines  = countoption(pmesh_prs,'Line') ; allocate( lines(nLines) )
 
  nelems_span_tot = 0
  do i = 1 , nLines
@@ -1414,11 +1414,11 @@ subroutine read_lines ( pmesh_prs , line_prs , lines  , nelems_span_tot)
    end if
 
    !> allocate tvec for spline if they are provided as a input
-   if ( trim(lines(i)%l_type) .eq.'Spline' ) then 
- 
-     !> allocate tangent vec1 if specified as an input 
-     if ( countoption( line_prs , 'TangentVec1' ) .eq. 0 ) then 
-       ! do nothing: tan vec must be inherited 
+   if ( trim(lines(i)%l_type) .eq.'Spline' ) then
+
+     !> allocate tangent vec1 if specified as an input
+     if ( countoption( line_prs , 'TangentVec1' ) .eq. 0 ) then
+       ! do nothing: tan vec must be inherited
      elseif ( countoption( line_prs , 'TangentVec1' ) .eq. 1 ) then
        allocate(lines(i)%t_vec1(3))
        lines(i)%t_vec1 = getrealarray(line_prs , 'TangentVec1' , 3 )
@@ -1427,9 +1427,9 @@ subroutine read_lines ( pmesh_prs , line_prs , lines  , nelems_span_tot)
                    &TangentVec1 as an input. Stop' ; stop
      end if
 
-     !> allocate tangent vec2 if specified as an input 
+     !> allocate tangent vec2 if specified as an input
      if ( countoption( line_prs , 'TangentVec2' ) .eq. 0 ) then
-       ! do nothing: tan vec must be inherited 
+       ! do nothing: tan vec must be inherited
      elseif ( countoption( line_prs , 'TangentVec2' ) .eq. 1 ) then
        allocate(lines(i)%t_vec2(3))
        lines(i)%t_vec2 = getrealarray(line_prs , 'TangentVec2' , 3 )
@@ -1437,7 +1437,7 @@ subroutine read_lines ( pmesh_prs , line_prs , lines  , nelems_span_tot)
        write(*,*) ' Error in read_lines(). Provided more than one &
                    &TangentVec2 as an input. Stop' ; stop
      end if
- 
+
    end if
 
    nelems_span_tot = nelems_span_tot + lines(i)%nelems
@@ -1468,9 +1468,9 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
 
    call pmesh_prs%CreateStringOption('type_chord', &
                  'type of chord-wise division: uniform, cosine, &
-                 &cosineLE, cosineTE', 'uniform', & 
+                 &cosineLE, cosineTE', 'uniform', &
                  multiple=.false.)
- 
+
    call pmesh_prs%CreateRealOption('reference_chord_fraction',&
                 'Reference chord fraction', &
                 '0.0',&
@@ -1479,8 +1479,8 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
 
  !> no need for a starting point
  !...
- 
- ! === Point subparser === 
+
+ ! === Point subparser ===
  call pmesh_prs%CreateSubOption('Point','Point group',point_prs, &
               multiple=.true.)
 
@@ -1493,7 +1493,7 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
  elseif ( eltype .eq. 'l' ) then
    call point_prs%CreateStringOption(  'airfoil_table', 'section airfoil' )
  endif
- 
+
  if ( eltype .eq. 'l' ) then
    call pmesh_prs%CreateLogicalOption('mesh_flat', 'flat mesh yes/no','F' )
  endif
@@ -1530,12 +1530,12 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
  !> TangentVec1,2: in the code:
  ! straight lines: useles input -> tan vec computed
  ! spline lines  : either assigned or inherited from neighbouring lines
- !                        
+ !
  call line_prs%CreateRealArrayOption('TangentVec1' , &
                'assign tangent vector to the line at its first point' )
  call line_prs%CreateRealArrayOption('TangentVec2' , &
                'assign tangent vector to the line at its first point' )
-                
+
 
 
 
@@ -1546,7 +1546,7 @@ end subroutine set_parser_pointwise
 ! ! --- points, lines structures ---
 ! write(*,*) ' nPoints , nLines : ' , size(points) , size(lines)
 ! do i = 1 , size(points)
-!   write(*,*)      points(i) % id    
+!   write(*,*)      points(i) % id
 !   write(*,*)      points(i) % coord
 !   write(*,*) trim(points(i) % airfoil)
 !   write(*,*)      points(i) % chord
@@ -1561,17 +1561,17 @@ end subroutine set_parser_pointwise
 !  !> Build reference line
 !  ! test ---
 !  allocate(spl%rr(4,3)) ; allocate(spl%d0(3)) ; allocate(spl%d1(3))
-!  spl%rr(1,:) = (/ 0.0_wp , 0.0_wp , 0.0_wp /) 
-!  spl%rr(2,:) = (/ 1.0_wp , 1.0_wp , 0.0_wp /) 
-!  spl%rr(3,:) = (/ 1.0_wp , 2.0_wp , 0.0_wp /) 
-!  spl%rr(4,:) = (/ 0.0_wp , 3.0_wp , 0.0_wp /) 
+!  spl%rr(1,:) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
+!  spl%rr(2,:) = (/ 1.0_wp , 1.0_wp , 0.0_wp /)
+!  spl%rr(3,:) = (/ 1.0_wp , 2.0_wp , 0.0_wp /)
+!  spl%rr(4,:) = (/ 0.0_wp , 3.0_wp , 0.0_wp /)
 !  spl%d0 = (/ 1.0_wp , 0.0_wp , 0.0_wp /)
 !  spl%d1 = (/-1.0_wp , 0.0_wp , 0.0_wp /)
 !  spl%e_bc(1) = 'derivative'
 !  spl%e_bc(2) = 'derivative'
-! 
-!  call hermite_spline( spl , rr_spl ) 
-! 
+!
+!  call hermite_spline( spl , rr_spl )
+!
 ! ! check ---
 ! do i = 1 , size(rr_spl,1)
 !   write(*,*) rr_spl(i,:)

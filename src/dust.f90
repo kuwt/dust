@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -133,7 +133,7 @@ use mod_hdf5_io, only: &
   write_hdf5, write_hdf5_attr, read_hdf5, read_hdf5_al, append_hdf5
 
 use mod_dust_io, only: &
-  save_status, load_solution, load_time 
+  save_status, load_solution, load_time
 
 use mod_viscosity, only: &
   viscosity_effects
@@ -188,7 +188,7 @@ type(t_tedge) :: te
 type(t_aero_tab), allocatable :: airfoil_data(:)
 !> Linear system
 type(t_linsys) :: linsys
-!> Wake 
+!> Wake
 type(t_wake) :: wake
 
 !> Timing vars
@@ -247,7 +247,7 @@ call prms%CreateLogicalOption( 'output_start', "output values at starting &
 call prms%CreateLogicalOption( 'output_detailed_geo', "output at each &
                     &timestep the detailed geometry in the results file", 'F')
 call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output', &
-                                                                         '0')
+                                                                         '1')
 
 ! restart
 call prms%CreateLogicalOption('restart_from_file','restarting from file?','F')
@@ -260,7 +260,7 @@ call prms%CreateLogicalOption('reset_time','reset the time from previous &
 call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
                                                        '(/1.0, 0.0, 0.0/)')
 call prms%CreateRealOption( 'u_ref', "reference velocity")             !
-call prms%CreateRealOption( 'P_inf', "free stream pressure", '0.0')    ! 
+call prms%CreateRealOption( 'P_inf', "free stream pressure", '0.0')    !
 call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')   !
 call prms%CreateRealOption( 'a_inf', "Speed of sound", '340.0')        ! m/s   for dimensional sim
 call prms%CreateRealOption( 'mu_inf', "Dynamic viscosity", '0.000018') ! kg/ms
@@ -305,13 +305,13 @@ call prms%CreateLogicalOption('LLReynoldsCorrections', &
        'Use Reynolds corrections for the .c81 tables?', 'F')
 call prms%CreateRealOption('LLReynoldsCorrectionsNfact', &
        'Exponent in (Re/Re_T)^n correction', '0.2')
-call prms%CreateIntOption('LLmaxIter', & 
+call prms%CreateIntOption('LLmaxIter', &
        'Maximum number of iteration in LL algorithm', '100')
 call prms%CreateRealOption('LLtol', 'Tolerance for the relative error in &
                            &fixed point iteration for LL','1.0e-6' )
 call prms%CreateRealOption('LLdamp', 'Damping param in fixed point iteration &
                            &for LL used to avoid oscillations','25.0')
-call prms%CreateLogicalOption('LLstallRegularisation', & 
+call prms%CreateLogicalOption('LLstallRegularisation', &
        'Avoid "unphysical" separations in inner sections of LL?','T')
 call prms%CreateIntOption('LLstallRegularisationNelems', &
        'Number of "unphysical" separations to be removed', '1' )
@@ -327,10 +327,10 @@ call prms%CreateRealOption('LLartificialViscosityAdaptive_Alpha', &
        'Adaptive Artificial Viscosity algorithm, reference AOA [deg]')
 call prms%CreateRealOption('LLartificialViscosityAdaptive_dAlpha', &
        'Adaptive Artificial Viscosity algorithm, reference AOA [deg]')
-call prms%CreateLogicalOption('LLloadsAVL', & 
+call prms%CreateLogicalOption('LLloadsAVL', &
        'Use AVL expression for inviscid load computation','T')
 
-!== Octree and multipole data == 
+!== Octree and multipole data ==
 call prms%CreateLogicalOption('FMM','Employ fast multipole method?','T')
 call prms%CreateLogicalOption('FMMPanels','Employ fast multipole method &
                               &also for panels?','F')
@@ -349,6 +349,8 @@ call prms%CreateRealOption('LeavesTimeRatio','Ratio that triggers the &
 
 ! models options
 call prms%CreateLogicalOption('Vortstretch','Employ vortex stretching','T')
+call prms%CreateLogicalOption('VortstretchFromElems','Employ vortex stretching&
+                                     & from geometry elements','F')
 call prms%CreateLogicalOption('Diffusion','Employ vorticity diffusion','T')
 call prms%CreateLogicalOption('TurbulentViscosity','Employ turbulent &
                                &viscosity','F')
@@ -384,8 +386,16 @@ output_start = getlogical(prms, 'output_start')
 call init_sim_param(sim_param, prms, nout, output_start)
 
 ! remaining parameters
-dt_debug_out = getreal(prms, 'dt_debug_out')
-basename_debug = getstr(prms,'basename_debug')
+if(countoption(prms, 'dt_debug_out') .lt. 1) then
+  dt_debug_out = sim_param%dt_out
+else
+  dt_debug_out = getreal(prms, 'dt_debug_out')
+endif
+if(countoption(prms, 'basename_debug') .lt. 1) then
+  basename_debug = sim_param%basename
+else
+  basename_debug = getstr(prms,'basename_debug')
+endif
 
 sim_param%basename_debug = basename_debug
 
@@ -427,7 +437,7 @@ endif
     call check_basename(trim(basename_debug),'dust main')
 
 !---- Simulation parameters ----
-!!nstep = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1 
+!!nstep = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1
 !!       !(+1 for the zero time step)
 !!sim_param%n_timesteps = nstep
 nstep = sim_param%n_timesteps
@@ -500,16 +510,16 @@ if (sim_param%restart_from_file) then
 
 ! Moved to mod_geo.f90/create_geometry()
 !! Update the initial relative position of the ref.sys.
-!call update_relative_initial_conditions(restart_file, sim_param%ReferenceFile, geo%refs) 
+!call update_relative_initial_conditions(restart_file, sim_param%ReferenceFile, geo%refs)
 
 else ! Set to zero the intensity of all the singularities
 
   do i_el = 1 , size(elems)      ! implicit elements (vr, sp)
      elems(i_el)%p%mag = 0.0_wp
-  end do 
+  end do
   do i_el = 1 , size(elems_expl) ! explicit elements (ll, ad)
      elems_expl(i_el)%p%mag = 0.0_wp
-  end do 
+  end do
 
 endif
 
@@ -520,7 +530,7 @@ if(sim_param%debug_level .ge. 1) then
   call printout(message)
 endif
 
-! === build kernel for regularisation (averaging) process for LL === 
+! === build kernel for regularisation (averaging) process for LL ===
 if ( ( size(elems_ll) .gt. 0 ) ) then
   allocate(al_v(size(elems_ll))) ; al_v = 0.0_wp
   call build_ll_kernel( elems_ll , al_v , al_kernel )
@@ -541,7 +551,7 @@ allocate(res_old(size(elems)))
 if ( sim_param % restart_from_file ) then
   do i_el = 1 , size(elems)
     res_old(i_el) = elems(i_el)%p%mag
-  end do 
+  end do
 else
  res_old = 0.0_wp
 end if
@@ -549,7 +559,7 @@ end if
 
 t11 = dust_time()
 do it = 1,nstep
- 
+
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
                                         nstep, ' simulation time: ', time
@@ -561,12 +571,12 @@ do it = 1,nstep
 
   !Calculate the normal velocity derivative for the pressure equation
   call press_normvel_der(geo, elems, surf_vel_SurfPan_old)
-  
+
   !time related checks
   call init_timestep(time)
 
   call prepare_wake(wake, elems_tot, octree)
- 
+
   call update_liftlin(elems_ll,linsys)
   call update_actdisk(elems_ad,linsys)
 
@@ -610,7 +620,7 @@ do it = 1,nstep
   endif
   t1 = dust_time()
 
-  sel = size(elems) 
+  sel = size(elems)
   ! compute time derivative of the result ( = i_vortex = -i_doublet ) -------
 !$omp parallel do private(i_el)
   do i_el = 1 , sel
@@ -623,7 +633,7 @@ do it = 1,nstep
     write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
     call printout(message)
   endif
-  
+
   !debug print of the results
   if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                       call debug_printout_result(linsys, basename_debug, it)
@@ -657,7 +667,7 @@ do it = 1,nstep
   !------ Compute loads -------
   ! Implicit elements: vortex rings and 3d-panels
   ! 2019-07-23: D.Isola suggested to implement AVL formula for VL elements
-  ! so far, select type() to keep the old formulation for t_surfpan and 
+  ! so far, select type() to keep the old formulation for t_surfpan and
   ! use AVL formula for t_vortlatt
 !$omp parallel do private(i_el)
   do i_el = 1 , sel
@@ -675,12 +685,12 @@ do it = 1,nstep
 !$omp end parallel do
 
   ! ifort bugs workaround:
-  ! since even if the following calls looks thread safe, they mess up with 
+  ! since even if the following calls looks thread safe, they mess up with
   ! ifort and parallel runs, so the cycle is executed another time just for the
   ! vortex lattices
   if ( geo%nVortLatt .gt. 0) then
     do i_el = 1 , sel
-      select type( el => elems(i_el)%p ) 
+      select type( el => elems(i_el)%p )
         class is(t_vortlatt)
           ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
           call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/) )
@@ -714,14 +724,14 @@ do it = 1,nstep
   !!    select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
   !!     ! check UHLMAN's EQN -----
   !!     el%pres = &
-  !!      linsys%res_pres(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp 
+  !!      linsys%res_pres(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp
 ! !!     el%pres = &
 ! !!      surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp + &
 ! !!         sim_param%rho_inf * sum(el%surf_vel*el%ub)
   !!     ! check UHLMAN's EQN -----
   !!    end select
   !!  end do
-  !!  
+  !!
 
   !!else
   !!  do i_el = 1 , geo%nSurfPan
@@ -767,7 +777,7 @@ do it = 1,nstep
   end do
   ! Pressure integral equation ++++++++
 
-  if(it .lt. nstep) then 
+  if(it .lt. nstep) then
     !time = min(sim_param%tend, time+sim_param%dt)
     time = min(sim_param%tend, sim_param%time_vec(it+1))
     call update_geometry(geo, time, .false.)
@@ -834,7 +844,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
  type(t_parse) :: prms
  integer, intent(inout) :: nout
  logical, intent(inout) :: output_start
- 
+
   !timing
   sim_param%t0     = getreal(prms, 'tstart')
   sim_param%tend   = getreal(prms, 'tend')
@@ -897,6 +907,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%first_panel_scaling = getreal(prms,'ImplicitPanelScale')
   sim_param%min_vel_at_te  = getreal(prms,'ImplicitPanelMinVel')
   sim_param%use_vs = getlogical(prms, 'Vortstretch')
+  sim_param%vs_elems = getlogical(prms, 'VortstretchFromElems')
   sim_param%use_vd = getlogical(prms, 'Diffusion')
   sim_param%use_tv = getlogical(prms, 'TurbulentViscosity')
   sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
@@ -932,12 +943,12 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     sim_param%llSolver = 'GammaMethod'
 
   end if
-  if ( trim(sim_param%llSolver) .eq. 'GammaMethod' ) then 
+  if ( trim(sim_param%llSolver) .eq. 'GammaMethod' ) then
     if ( sim_param%llArtificialViscosity .gt. 0.0_wp ) then
       call warning('dust','init_sim_param','LLartificialViscoisty set as an input, &
          & different from zero, but ll regularisation available only if&
          & LLsolver = AlphaMethod. LLartificialViscosity = 0.0')
-         sim_param%llArtificialViscosity = 0.0_wp 
+         sim_param%llArtificialViscosity = 0.0_wp
          sim_param%llArtificialViscosityAdaptive = .false.
          sim_param%llArtificialViscosityAdaptive_Alpha  = 0.0_wp
          sim_param%llArtificialViscosityAdaptive_dAlpha = 0.0_wp
@@ -947,7 +958,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
          & as an input, but ll adaptive regularisation available only if&
          & LLsolver = AlphaMethod')
     end if
-  end if 
+  end if
   !> The user is required to set _Alpha and _dAlpha for ll adaptive regularisation
   if ( trim(sim_param%llSolver) .eq. 'AlphaMethod' ) then
     if ( sim_param%llArtificialViscosityAdaptive) then
@@ -957,17 +968,17 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
         call error('dust','init_sim_param','LLartificialViscosityAdaptive_Alpha or&
            & LLartificialViscosity_dAlpha not set as an input, while LLartificialViscosityAdaptive&
            & is set equal to T. Set these parameters [deg].')
-  
+
       else
         sim_param%llArtificialViscosityAdaptive_Alpha = &
                   getreal(prms,'LLartificialViscosityAdaptive_Alpha')
         sim_param%llArtificialViscosityAdaptive_dAlpha= &
                   getreal(prms,'LLartificialViscosityAdaptive_dAlpha')
-      end if 
-    end if 
+      end if
+    end if
   end if
   write(*,*) ' sim_param%llSolver : ' , trim(sim_param%llSolver)
- 
+
   !Octree and FMM parameters
   sim_param%use_fmm = getlogical(prms, 'FMM')
   if(sim_param%use_fmm) then
@@ -978,7 +989,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     sim_param%NOctreeLevels = getint(prms, 'NOctreeLevels')
     sim_param%MinOctreePart = getint(prms, 'MinOctreePart')
     sim_param%MultipoleDegree = getint(prms,'MultipoleDegree')
-    
+
     sim_param%use_dyn_layers = getlogical(prms,'DynLayers')
     if(sim_param%use_dyn_layers) then
       sim_param%NMaxOctreeLevels = getint(prms, 'NMaxOctreeLevels')
@@ -986,7 +997,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     else
       sim_param%NMaxOctreeLevels = sim_param%NOctreeLevels
     endif
-  
+
     sim_param%use_pr = getlogical(prms, 'ParticlesRedistribution')
     if(sim_param%use_pr) then
       sim_param%part_redist_ratio = getreal(prms,'ParticlesRedistributionRatio')
@@ -1006,11 +1017,11 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     sim_param%hcas_time = getreal(prms,'HCAS_time')
     sim_param%hcas_vel = getrealarray(prms,'HCAS_velocity',3)
   endif
-  
+
   !Manage restart
   sim_param%restart_from_file = getlogical(prms,'restart_from_file')
   if (sim_param%restart_from_file) then
-  
+
     sim_param%reset_time = getlogical(prms,'reset_time')
     sim_param%restart_file = getstr(prms,'restart_file')
     !Removing leading "./" if present to avoid issues when restarting
@@ -1019,19 +1030,19 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     call printout('RESTART: restarting from file: '//trim(sim_param%restart_file))
     sim_param%GeometryFile = sim_param%restart_file(1:len(trim(sim_param%restart_file))-11)&
                                                              &//'geo.h5'
-  
+
     !restarting the same simulation, advance the numbers
     if(sim_param%restart_file(1:len(trim(sim_param%restart_file))-12).eq. &
                                                  trim(sim_param%basename)) then
     read(sim_param%restart_file(len(trim(sim_param%restart_file))-6:len(trim(sim_param%restart_file))-3),*) &
-                                                                           nout 
+                                                                           nout
       call printout('Identified restart from the same simulation, keeping the&
       & previous output numbering')
       !avoid rewriting the same timestep
       output_start = .false.
     endif
     if(.not. sim_param%reset_time) call load_time(sim_param%restart_file, sim_param%t0)
-  
+
   endif
 
 
@@ -1045,7 +1056,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
       !get dt and compute number of timesteps
       sim_param%dt     = getreal(prms, 'dt')
       sim_param%n_timesteps = ceiling((sim_param%tend-sim_param%t0)/&
-                                       sim_param%dt) + 1 
+                                       sim_param%dt) + 1
        !(+1 for the zero time step)
     endif
   else
@@ -1053,7 +1064,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     sim_param%n_timesteps = getint(prms, 'timesteps')
     sim_param%dt =  (sim_param%tend-sim_param%t0)/&
                      real(sim_param%n_timesteps,wp)
-    sim_param%n_timesteps = sim_param%n_timesteps + 1 
+    sim_param%n_timesteps = sim_param%n_timesteps + 1
                             !add one for the first step
   endif
 
@@ -1075,7 +1086,7 @@ end subroutine init_sim_param
 !!
 !!  !target file name: same as run basename with appendix
 !!  target_file = trim(sim_param%basename)//'_geo.h5'
-!!  
+!!
 !!  if (trim(geo_file) .ne. trim(target_file)) then
 !!  !Copy the geometry file
 !!  call execute_command_line('cp '//trim(geo_file)//' '//trim(target_file), &
@@ -1104,7 +1115,7 @@ end subroutine init_sim_param
 !! to perform output or not
 subroutine init_timestep(t)
  real(wp), intent(in) :: t
-  
+
   sim_param%time = t
 
   !if (real(t-t_last_out) .ge. real(sim_param%dt_out)) then
@@ -1126,13 +1137,13 @@ subroutine init_timestep(t)
   endif
 
   !If it is the last timestep output the solution, unless dt_out is set
-  !longer than the whole execution, declaring implicitly that no output is 
+  !longer than the whole execution, declaring implicitly that no output is
   !required.
   if((it .eq. nstep) .and. (sim_param%dt_out .le. sim_param%tend)) then
     time_2_out = .true.
     time_2_debug_out = .true.
   endif
- 
+
   !if requested, print the output also at the first step (t0)
   if ((t.eq.sim_param%t0) .and. output_start) then
     t_last_out = t
@@ -1180,7 +1191,7 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
  integer :: ie, iv
 
  ! surf_vel and vel_phi
- real(wp), allocatable :: surf_vel(:,:), vel_phi(:,:) 
+ real(wp), allocatable :: surf_vel(:,:), vel_phi(:,:)
  integer :: i_e
 
  ! chtls
@@ -1192,7 +1203,7 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
   allocate(conn(4,size(elems))); conn = -666;
   ! surf_vel and vel_phi
   allocate( surf_vel(3,size(elems)), vel_phi(3,size(elems)) )
-  surf_vel = -666.6_wp ; vel_phi = -666.6_wp 
+  surf_vel = -666.6_wp ; vel_phi = -666.6_wp
 
   do ie=1,size(elems)
     norm(:,ie) = elems(ie)%p%nor
@@ -1209,10 +1220,10 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
 
     ! surf_vel and vel_phi for surfpan only
     select type( el => elems(ie)%p )
-     class is(t_surfpan) 
+     class is(t_surfpan)
       surf_vel(:,ie) = el%surf_vel   ! elems(ie)%p%surf_vel
 
-!     ! 1. FVM approx --------      
+!     ! 1. FVM approx --------
 !     vel_phi(:,ie) = 0.0_wp
 !     do i_e = 1 , el%n_ver    ! elems(ie)%p%n_ver
 !       if ( associated(el%neigh(i_e)%p) ) then !  .and. &
@@ -1222,7 +1233,7 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
 !     end do
 !     vel_phi(:,ie)  = - vel_phi(:,ie)
 
-      ! 2. CHTLS method ------      
+      ! 2. CHTLS method ------
       vel_phi(:,ie) = 0.0_wp
       f = 0.0_wp ; n_neigh = 0
       do i_e = 1 , el%n_ver
@@ -1234,9 +1245,9 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
       f(n_neigh+1) = sum(el%nor * (-sim_param%u_inf - el%uvort + el%ub) )
       vel_phi(:,ie) = matmul( el%chtls_stencil , f(1:n_neigh+1) )
 
- 
+
     end select
-  
+
   enddo
 
   write(sit,'(I4.4)') it
@@ -1311,8 +1322,8 @@ subroutine debug_ll_printout_geometry(elems, geo, basename, it)
 ! only for surfpan !!!!!!
 ! ! surf_vel and vel_phi
 ! allocate( surf_vel(3,size(elems)), vel_phi(3,size(elems)) )
-! surf_vel = -666.6 ; vel_phi = -666.6 
- 
+! surf_vel = -666.6 ; vel_phi = -666.6
+
   do ie=1,size(elems)
     norm(:,ie) = elems(ie)%p%nor
     cent(:,ie) = elems(ie)%p%cen
@@ -1329,9 +1340,9 @@ subroutine debug_ll_printout_geometry(elems, geo, basename, it)
 ! only for surfpan !!!!!!
 !   ! surf_vel and vel_phi for surfpan only
 !   select type( el => elems(ie)%p )
-!    class is(t_surfpan) 
+!    class is(t_surfpan)
 !     surf_vel(:,ie) = el%surf_vel   ! elems(ie)%p%surf_vel
-!     
+!
 !     vel_phi(:,ie) = 0.0_wp
 !     do i_e = 1 , el%n_ver    ! elems(ie)%p%n_ver
 !       if ( associated(el%neigh(i_e)%p) ) then !  .and. &
@@ -1342,7 +1353,7 @@ subroutine debug_ll_printout_geometry(elems, geo, basename, it)
 !     vel_phi(:,ie)  = - vel_phi(:,ie)
 !
 !   end select
-  
+
   enddo
 
   write(sit,'(I4.4)') it

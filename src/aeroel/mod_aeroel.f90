@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -140,7 +140,7 @@ type, abstract, extends(c_elem) :: c_pot_elem
 
   !> Element tangential vectors
   real(wp) :: tang(3,2) ! tangent unit vectors as in PANAIR
-  
+
   !> Vector of each edge
   real(wp), allocatable :: edge_vec(:,:)
 
@@ -174,7 +174,7 @@ type, abstract, extends(c_elem) :: c_pot_elem
   !TODO: these three are used only by vortlatt and liftlin
   ! consider moving them there, but then change the implementation of
   ! create_strip_connectivity
-  !> Previous element in a stripe 
+  !> Previous element in a stripe
   type(t_pot_elem_p)        :: stripe_1
   !> Panel width (= strip width)
   real(wp)              :: dy
@@ -304,11 +304,11 @@ end interface
 !!
 !! The contribution is divided into an implicit part, due to the first row
 !! of wake panels, and an explicit contribution due to all the other wake
-!! elements. 
+!! elements.
 !! The implicit part affects the linear system matrix A while the explicit
 !! contributions affect only the right hand side b.
 !!
-!! The vector impl_wake_ind tells which are the elements affected by the 
+!! The vector impl_wake_ind tells which are the elements affected by the
 !! implicit wake panels.
 !! The parameters ista and iend are employed to separate the update of the
 !! stationary part of the matrix from the dynamic part.
@@ -379,7 +379,7 @@ end interface
 
 !----------------------------------------------------------------------
 
-!> Compute the potential induced by an aerodinamic element in a certain 
+!> Compute the potential induced by an aerodinamic element in a certain
 !! position
 !!
 !! The structure of the subroutine is already intended to be used to calculate
@@ -399,11 +399,11 @@ end interface
 
 !----------------------------------------------------------------------
 
-!> Compute the velocity induced by an aerodynamic element in a certain 
+!> Compute the velocity induced by an aerodynamic element in a certain
 !! position
 !!
-!! WARNING: the velocity calculated, to be consistent with the formulation of 
-!! the equations is multiplied by 4*pi, to obtain the actual velocity the 
+!! WARNING: the velocity calculated, to be consistent with the formulation of
+!! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 abstract interface
   subroutine i_compute_vel(this, pos, uinf, vel)
@@ -418,11 +418,11 @@ end interface
 
 !----------------------------------------------------------------------
 
-!> Compute the velocity induced by an aerodynamic element in a certain 
+!> Compute the velocity induced by an aerodynamic element in a certain
 !! position
 !!
-!! WARNING: the velocity calculated, to be consistent with the formulation of 
-!! the equations is multiplied by 4*pi, to obtain the actual velocity the 
+!! WARNING: the velocity calculated, to be consistent with the formulation of
+!! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 abstract interface
   subroutine i_compute_grad(this, pos, uinf, grad)
@@ -437,10 +437,10 @@ end interface
 
 !----------------------------------------------------------------------
 
-!> Compute the psi induced by an aerodinamic element in a certain 
+!> Compute the psi induced by an aerodinamic element in a certain
 !! position
 !!
-!! The psi is the velocity induced by the singularities multiplied by 
+!! The psi is the velocity induced by the singularities multiplied by
 !! 4*pi.
 !! The structure of the subroutine is already intended to be used to calculate
 !! the contribution to the linear system matrix and to the right hand side
@@ -499,7 +499,7 @@ end interface
 
 !> Get the bernoulli source for the pressure equation
 !!
-!! This interface is used to avoid the use of select types to get the 
+!! This interface is used to avoid the use of select types to get the
 !! bernoulli source field which is defined only on surface panels
 abstract interface
   function i_get_bernoulli_source(this) result(source)

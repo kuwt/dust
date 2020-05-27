@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -333,7 +333,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
  real(wp) , allocatable :: vel_ctr(:,:)
  real(wp) , allocatable :: chord_v(:) , cl_v(:)
  real(wp) , allocatable :: el_csi_cen_v(:)
- integer  , allocatable :: el_i_airfoil_m(:,:) 
+ integer  , allocatable :: el_i_airfoil_m(:,:)
 ! debug ----
 
 ! newton ---
@@ -352,7 +352,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
  real(wp) :: al0
 ! newton ---
 
- 
+
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name = 'solve_liftlin'
 
@@ -373,13 +373,13 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   !Compute the velocity from all the elements except for liftling elems
   ! and store it outside the loop, since it is constant
   ! === %cen === velocity on the centres
-  allocate(vel_w(3,size(elems_ll))) ; vel_w = 0.0_wp 
+  allocate(vel_w(3,size(elems_ll))) ; vel_w = 0.0_wp
   do i_l = 1,size(elems_ll)
-    do j = 1,size(elems_impl) ! body panels: liftlin, vortlat 
+    do j = 1,size(elems_impl) ! body panels: liftlin, vortlat
       call elems_impl(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
-    do j = 1,size(elems_ad) ! actuator disks 
+    do j = 1,size(elems_ad) ! actuator disks
       call elems_ad(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
@@ -414,7 +414,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
    select type(el => elems_ll(i_l)%p)
    type is(t_liftlin)
      u_v(i_l) = norm2((uinf-el%ub) - &
-         el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub))) 
+         el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
    end select
   end do
 
@@ -427,7 +427,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   ! newton ---
 
   !Calculate the induced velocity on the airfoil
-  do ic = 1, fp_maxIter       !TODO: Refine this iterative process 
+  do ic = 1, fp_maxIter       !TODO: Refine this iterative process
     diff = 0.0_wp             ! max diff ("norm \infty")
     max_mag_ll = 0.0_wp
     do i_l = 1,size(elems_ll)
@@ -446,7 +446,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 ! ! debug ----
       enddo
 ! ! debug ----
-!       write(*,*) '      vel : ' , vel 
+!       write(*,*) '      vel : ' , vel
 ! ! debug ----
 
       select type(el => elems_ll(i_l)%p)
@@ -465,16 +465,16 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
         !TODO: test these two approximations
         unorm = u_v(i_l)      ! velocity w/o induced velocity
       ! unorm = norm2(up)     ! full velocity
-       
+
         ! Angle of incidence (full velocity)
         alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
         alpha = alpha * 180.0_wp/pi  ! .c81 tables defined with angles in [deg]
 
         ! compute local Reynolds and Mach numbers for the section
         ! needed to enter the LUT (.c81) of aerodynamic loads (2d airfoil)
-        mach     = unorm / sim_param%a_inf      
-        reynolds = sim_param%rho_inf * unorm * & 
-                   el%chord / sim_param%mu_inf    
+        mach     = unorm / sim_param%a_inf
+        reynolds = sim_param%rho_inf * unorm * &
+                   el%chord / sim_param%mu_inf
 
         ! debug ----
         el_i_airfoil_m(i_l,:) = el%i_airfoil
@@ -495,20 +495,20 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 ! newton cleaning
 !       ! >>> update/define the zero lift normal versor for liftlin elems
 !       al0 = al0 * pi/180.0_wp
-!       el%nor_zeroLift = el%nor * cos(al0) - el%tang_cen * sin(al0) 
+!       el%nor_zeroLift = el%nor * cos(al0) - el%tang_cen * sin(al0)
 ! newton cleaning
 
 !       ! debug ----
-!       write(*,*) ' cl , cd , cm , dclda ' 
+!       write(*,*) ' cl , cd , cm , dclda '
 !       write(*,*) aero_coeff , dclda
 !       ! debug ----
-       
-        ! Compute the "equivalent" intensity of the vortex line 
+
+        ! Compute the "equivalent" intensity of the vortex line
         dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
         diff = max(diff,abs(elems_ll(i_l)%p%mag-dou_temp(i_l)))
 
         ! debug ----
-        chord_v(i_l) = el%chord 
+        chord_v(i_l) = el%chord
         cl_v(i_l) = cl
         ! debug ----
 
@@ -529,28 +529,28 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     ! TODO:
     ! - read neighbouring elements and not the prev and next elem in ll numbering <<<<
     ! - decide if using .and. or .or. in the if statement (or user input ?)       <<<<
-    ! - use n_inner_stall to check more than one inner elems 
+    ! - use n_inner_stall to check more than one inner elems
     ! - read al_stall from tables (?) or leave it as an input from the user
     ! al_stall = ... \hardcoded as a parameter
     ! rough ----
-    if ( stall_regularisation ) then 
+    if ( stall_regularisation ) then
       do i_l = 2 , size(elems_ll) - 1
         if ( a_v(i_l) .gt. al_stall ) then
           if ( ( a_v(i_l-1) .lt. al_stall ) .and. &
                ( a_v(i_l+1) .lt. al_stall ) ) then
-             a_v(     i_l) = 0.5_wp * ( a_v(     i_l-1) + a_v(     i_l+1) ) 
-             dou_temp(i_l) = 0.5_wp * ( dou_temp(i_l-1) + dou_temp(i_l+1) ) 
+             a_v(     i_l) = 0.5_wp * ( a_v(     i_l-1) + a_v(     i_l+1) )
+             dou_temp(i_l) = 0.5_wp * ( dou_temp(i_l-1) + dou_temp(i_l+1) )
            end if
         elseif ( a_v(i_l) .lt. -al_stall ) then
           if ( ( a_v(i_l-1) .gt. -al_stall ) .and. &
                ( a_v(i_l+1) .gt. -al_stall ) ) then
-             a_v(     i_l) = 0.5_wp * ( a_v(     i_l-1) + a_v(     i_l+1) ) 
-             dou_temp(i_l) = 0.5_wp * ( dou_temp(i_l-1) + dou_temp(i_l+1) ) 
+             a_v(     i_l) = 0.5_wp * ( a_v(     i_l-1) + a_v(     i_l+1) )
+             dou_temp(i_l) = 0.5_wp * ( dou_temp(i_l-1) + dou_temp(i_l+1) )
            end if
         end if
       end do
     end if
-    ! rough ---- 
+    ! rough ----
 
     ! Update ll intensity
     do i_l = 1,size(elems_ll)
@@ -563,8 +563,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     enddo
 
 !   ! debug ----
-!   write(*,*) ' Iter n.' , ic 
-!   write(*,'(A)') ' i_l  ,   u_v  ,   a_v  ,  chord ,   cl  , dou_temp : ' 
+!   write(*,*) ' Iter n.' , ic
+!   write(*,'(A)') ' i_l  ,   u_v  ,   a_v  ,  chord ,   cl  , dou_temp : '
 !   do i_l = 1,size(elems_ll)
 !      write(*,'(I4.4,5(F10.4),2(I4.2),F10.4)') &
 !          i_l , u_v(i_l) , a_v(i_l) , chord_v(i_l) , cl_v(i_l) , dou_temp(i_l) , &
@@ -589,7 +589,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
                   0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * ( &
                  -c_m(i_l,1) * sin(a_v(i_l)) + c_m(i_l,2) * cos(a_v(i_l)) &
                  ) ) * el%area
-    ! elementary moment = 0.5 * rho * v^2 * A * c * cm, 
+    ! elementary moment = 0.5 * rho * v^2 * A * c * cm,
     ! - around bnorm_cen (always? TODO: check)
     ! - referred to the ref.point of the elem,
     !   ( here, cen of the elem = cen of the liftlin (for liftlin elems) )
@@ -640,7 +640,7 @@ subroutine calc_geo_data_liftlin(this, vert)
                this%ver(:,4) - this%ver(:,2)     )
 
   ! -- 0.75 chord -- look for other "0.75 chord" tag
-  this%area = 0.5_wp * norm2(nor) / 0.75_wp 
+  this%area = 0.5_wp * norm2(nor) / 0.75_wp
   this%nor = nor / norm2(nor)   ! then overwritten
 
   ! *** 2019-02-27 ***
@@ -691,8 +691,8 @@ subroutine calc_geo_data_liftlin(this, vert)
   tanl = 0.5_wp * ( this%ver(:,nsides) + this%ver(:,1) ) - this%cen
 
   ! they should not be used, but ...
-  this%tang(:,1) = tanl / norm2(tanl)                   ! this%tang_cen    ! 
-  this%tang(:,2) = cross( this%nor, this%tang(:,1)  )   ! this%bnorm_cen   ! 
+  this%tang(:,1) = tanl / norm2(tanl)                   ! this%tang_cen    !
+  this%tang(:,2) = cross( this%nor, this%tang(:,1)  )   ! this%bnorm_cen   !
   ! *** 2019-02-27 ***
 
   !TODO: is it necessary to initialize it here?
@@ -700,12 +700,12 @@ subroutine calc_geo_data_liftlin(this, vert)
   this%dmom   = 0.0_wp
 
 ! ! debug ----
-! write(*,*) ' this%cen       :' , this%cen   
+! write(*,*) ' this%cen       :' , this%cen
 ! write(*,*) ' this%ctr_pt    :' , this%ctr_pt
-! write(*,*) ' this%chord     :' , this%chord 
-! write(*,*) ' this%nor       :' , this%nor   
-! write(*,*) ' this%tang_cen  :' , this%tang_cen  
-! write(*,*) ' this%bnorm_cen :' , this%bnorm_cen 
+! write(*,*) ' this%chord     :' , this%chord
+! write(*,*) ' this%nor       :' , this%nor
+! write(*,*) ' this%tang_cen  :' , this%tang_cen
+! write(*,*) ' this%bnorm_cen :' , this%bnorm_cen
 ! write(*,*)
 ! ! debug ----
 

@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -45,7 +45,7 @@
 
 !> Module containing subroutines about doublets distributions.
 !!
-!! Note that this module does not expose an aerodynamic element of its own, 
+!! Note that this module does not expose an aerodynamic element of its own,
 !! but collects utilities for other aerodynamic elements that contain
 !! a doublet distribution
 module mod_doublet
@@ -154,15 +154,15 @@ subroutine potential_calc_doublet(this, dou, pos)
 
 
 !    if ( this%n_ver .eq. 3 ) then
-! 
+!
 !      ! === TRIA elements ===
 !      !> old implmentation that did not distinguish TRIA from QUAD
 !      do i1 = 1 , this%n_ver
-!   
+!
 !        !This is ugly but should be general and work...
 !        indp1 = 1+mod(i1,this%n_ver)
 !        indm1 = this%n_ver - mod(this%n_ver-i1+1, this%n_ver)
-!   
+!
 !        ! doublet  -----
 !        ! it is possible to use ver, instead of ver_p for the doublet
 !        ei = - ( pos - this%ver (:,i1) ) ; ei = ei / norm2(ei)
@@ -172,11 +172,11 @@ subroutine potential_calc_doublet(this, dou, pos)
 !        am1n= norm2(am1)
 !        sinB = sum ( ei * cross(am1,ap1) ) / ( ap1n * am1n )
 !        cosB = sum ( am1 * ap1 ) / ( ap1n * am1n )
-!        beta = datan2( sinB , cosB )
+!        beta = atan2( sinB , cosB )
 !        dou = dou + beta
-!   
+!
 !      end do
-!   
+!
 !      ! Correct the result to obtain the solid angle (from Gauss-Bonnet theorem)
 !      if     ( dou .lt. -real(this%n_ver-2,wp)*pi + 1.0e-5_wp ) then
 !        dou = dou + real(this%n_ver-2,wp) * pi
@@ -188,16 +188,16 @@ subroutine potential_calc_doublet(this, dou, pos)
 !        ! debug ---
 !        dou = 0.0_wp
 !      end if
-! 
+!
 !    elseif ( this%n_ver .eq. 4 ) then
 
      !> old implmentation that did not distinguish TRIA from QUAD
      do i1 = 1 , this%n_ver
-  
+
        !This is ugly but should be general and work...
        indp1 = 1+mod(i1,this%n_ver)
        indm1 = this%n_ver - mod(this%n_ver-i1+1, this%n_ver)
-  
+
        ! doublet  -----
        ! it is possible to use ver, instead of ver_p for the doublet
        ei = - ( pos - this%ver (:,i1) ) ; ei = ei / norm2(ei)
@@ -207,11 +207,11 @@ subroutine potential_calc_doublet(this, dou, pos)
        am1n= norm2(am1)
        sinB = sum ( ei * cross(am1,ap1) ) / ( ap1n * am1n )
        cosB = sum ( am1 * ap1 ) / ( ap1n * am1n )
-       beta = datan2( sinB , cosB )
+       beta = atan2( sinB , cosB )
        dou = dou + beta
-  
+
      end do
-  
+
      ! Correct the result to obtain the solid angle (from Gauss-Bonnet theorem)
      if     ( dou .lt. -real(this%n_ver-2,wp)*pi + 1.0e-5_wp ) then
        dou = dou + real(this%n_ver-2,wp) * pi
@@ -226,7 +226,7 @@ subroutine potential_calc_doublet(this, dou, pos)
 
 !      ! === Latest (partial) implementation ===
 !      do i2 = 1 , 2  ! QUAD elem split in 2 TRIA elems
-! 
+!
 !        if ( i2 .eq. 1 ) then
 !          indexm1 = (/ 3 , 1 , 2 /)
 !          index0  = (/ 1 , 2 , 3 /)
@@ -235,21 +235,21 @@ subroutine potential_calc_doublet(this, dou, pos)
 !          indexm1 = (/ 4 , 1 , 3 /)
 !          index0  = (/ 1 , 3 , 4 /)
 !          indexp1 = (/ 3 , 4 , 1 /)
-!        end if 
-! 
+!        end if
+!
 !        do i1 = 1 , 3
-! 
+!
 !          v1 = this%ver(:,index0 (i1)) - this%ver(:,indexm1(i1))
 !          v2 = this%ver(:,indexp1(i1)) - this%ver(:,index0 (i1))
 !          nor_vec = cross( v1 , v2 ) ; nor_vec = nor_vec / norm2(nor_vec)
 !          pos_z = sum( nor_vec * ( pos - this%ver(:,index0(i1)) ) )
-! 
+!
 !          if ( abs(pos_z) .gt. tol_z_dou ) then
-! 
+!
 !            ind0  = index0 (i1)
 !            ! indp1 = indexp1(i1)
 !            ! indm1 = indexm1(i1)
-!             
+!
 !            ei = - ( pos - this%ver (:,ind0) ) ; ei = ei / norm2(ei)
 !            ap1 =   v2 - ei * sum( ei * v2 )
 !            am1 = - v1 + ei * sum( ei * v1 )
@@ -259,20 +259,20 @@ subroutine potential_calc_doublet(this, dou, pos)
 !            cosB = sum ( am1 * ap1 ) / ( ap1n * am1n )
 !            beta = datan2( sinB , cosB )
 !            dou = dou + beta
-! 
+!
 !          else
-! 
+!
 !            ! TODO: write regularisation
 ! !          ! debug ---
 ! !          write(*,*) ' pos_z : ' , pos_z
 ! !          ! debug ---
-! 
+!
 !          end if
-! 
+!
 !        end do
-! 
+!
 !      end do
-!   
+!
 !      ! Correct the result to obtain the solid angle (from Gauss-Bonnet theorem)
 !      if     ( dou .lt. -real(this%n_ver-2,wp)*pi + 1.0e-5_wp ) then
 !        dou = dou + real(this%n_ver-2,wp) * pi
@@ -284,7 +284,7 @@ subroutine potential_calc_doublet(this, dou, pos)
 ! !      ! debug ---
 !        dou = 0.0_wp
 !      end if
-! 
+!
 !    end if
 
    ! ! Check on the proj of r_i-r normal to the panel (useless?)
@@ -351,7 +351,7 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
 
 !    ! === Rosenhead kernel ===
 !    do i1 = 1 , this%n_ver
-! 
+!
 !      indp1 = 1+mod(i1,this%n_ver)
 !      av = cross( this%edge_uni(:,i1) , pos - this%ver(:,i1) )
 !      hi = norm2( av )
@@ -359,13 +359,13 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
 !      v2 = pos - this%ver(:,indp1)
 !      th1 = datan2( hi , sum( this%edge_uni(:,i1) * v1 ) )
 !      th2 = datan2( hi , sum( this%edge_uni(:,i1) * v2 ) )
-! 
+!
 !      v_dou = v_dou + av * hi / ( hi**2.0_wp + sim_param%RankineRad**2.0_wp ) * ( &
 !       - cos(th2) / ( hi**2.0_wp + sim_param%RankineRad**2.0_wp * &
 !                                           max(sin(th2)**2.0_wp,0.001_wp) )**0.5_wp &
 !       + cos(th1) / ( hi**2.0_wp + sim_param%RankineRad**2.0_wp * &
 !                                           max(sin(th1)**2.0_wp,0.001_wp) )**0.5_wp )
-! 
+!
 !    end do
 
    ! === Original DUST regularisation ===
@@ -449,7 +449,7 @@ subroutine gradient_calc_doublet(this, grad_dou, pos)
    i1 = i
    i2 = indp1
 
-   l = this%edge_uni(:,i) 
+   l = this%edge_uni(:,i)
    lv(:,1) = l
 
 ! ! debug ---
@@ -469,13 +469,13 @@ subroutine gradient_calc_doublet(this, grad_dou, pos)
    lx(:,2) = (/ -l(3)   ,  0.0_wp ,  l(1)   /)
    lx(:,3) = (/  l(2)   , -l(1)   ,  0.0_wp /)
 
-   aa1 = matmul( a1v , transpose(a1v) ) 
+   aa1 = matmul( a1v , transpose(a1v) )
    ax1 = matmul( a1v , transpose(R1v) )
    al1 = matmul( a1v , transpose( lv) )
    aa2 = matmul( a2v , transpose(a2v) )
    ax2 = matmul( a2v , transpose(R2v) )
    al2 = matmul( a2v , transpose( lv) )
-   
+
    grad_dou = grad_dou &
     + 1.0_wp / ( a2del2**1.5_wp * norm2(R1) ) * &
       ( (   a * lx &
@@ -484,8 +484,8 @@ subroutine gradient_calc_doublet(this, grad_dou, pos)
     - 1.0_wp / ( a2del2**1.5_wp * norm2(R2) ) * &
       ( (   a * lx &
           + ( 1.0_wp/a - 3.0_wp*a/a2del2 ) * matmul(aa2,lx) ) * sum(l*R2) &
-      + a * ( al2 - ax2 * sum( l * R2 ) / norm2(R2)**2.0_wp ) ) 
-     
+      + a * ( al2 - ax2 * sum( l * R2 ) / norm2(R2)**2.0_wp ) )
+
  end do
 
 ! debug ---

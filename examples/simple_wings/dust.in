@@ -1,19 +1,13 @@
 
 ! Simulation names
 basename       = ./Output/wings
-basename_debug = ./Debug/wings
 
 ! Timings ---------------------
 tstart = 0.0
 tend = 30.0
 dt = 0.50
 dt_out = 0.5 
-dt_debug_out = 0.5
 output_start = T
-debug_level= 3
-
-! restart -----------------------------
-restart_from_file = F
 
 ! reference values ---------------------
 u_inf = (/0.1, 0.0, 0.0/)
@@ -26,7 +20,6 @@ ReferenceFile = References.in
 FMM = F
 Vortstretch = F
 Diffusion = F
-PenetrationAvoidance = F
 
 ! wake parameters  -------------
-n_wake_panels = 60
+n_wake_panels = 65

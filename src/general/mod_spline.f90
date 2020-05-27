@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -94,12 +94,12 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
 
   real(wp) , allocatable :: spl_s(:)
 
-  ! spline reconstruction 
+  ! spline reconstruction
   integer , parameter :: n_points1 = 100  ! now hardcoded (pass as a default input)
   real(wp) , allocatable :: tv1(:) , s(:) , s_spl(:)
   real(wp) , allocatable :: rr(:,:)
 
-  integer :: i_r , i , j 
+  integer :: i_r , i , j
 
   !> scale derivatives
   spl%d0 = spl%d0
@@ -108,11 +108,11 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
 
   !> check input consistency
   if ( nelems .ne. size(rr_spl,1)-1 ) then
-    write(*,*) ' error in hermite_spline : ' 
+    write(*,*) ' error in hermite_spline : '
     write(*,*) '  nelems .ne. size(rr_spl,1)-1 . stop ' ; stop
   end if
   if ( nelems .ne. size(nn_spl,1)-1 ) then
-    write(*,*) ' error in hermite_spline : ' 
+    write(*,*) ' error in hermite_spline : '
     write(*,*) '  nelems .ne. size(nn_spl,1)-1 . stop ' ; stop
   end if
 
@@ -123,7 +123,7 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
 
 
   !> dimensions
-  n_d      = size(spl%rr,2)  
+  n_d      = size(spl%rr,2)
   n_points = size(spl%rr,1) ; n_splines = n_points - 1
 
   ! === parameter vectors %t, %dt ===
@@ -138,22 +138,22 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
   do i = 2 , n_splines
     ll(    i  ) = norm2( spl%rr(i+1,:) - spl%rr(i,:) ) + ll(i-1)
     spl%t( i+1) = ll(i)
-    spl%dt(i  ) = spl%t(i+1) - spl%t(i) 
+    spl%dt(i  ) = spl%t(i+1) - spl%t(i)
   end do
   deallocate(ll)
- 
+
   allocate(spl%dp(n_points,n_d)) ; spl%dp = 0.0_wp
 
   !> following Paul Bourke description of splines
   !> http://paulbourke.net/miscellaneous/interpolation/
 
   !> === inner points ===
-  do i = 2 , n_points - 1 
+  do i = 2 , n_points - 1
 
     spl%dp(i,:) = 0.5_wp * ( 1.0_wp - par_tension ) * &
                ( ( spl%rr(i  ,:) -spl%rr(i-1,:) ) * ( 1.0_wp + par_bias ) + &
-                 ( spl%rr(i+1,:) -spl%rr(i  ,:) ) * ( 1.0_wp - par_bias ) ) 
-                           
+                 ( spl%rr(i+1,:) -spl%rr(i  ,:) ) * ( 1.0_wp - par_bias ) )
+
   end do
 
   !> === end points ===
@@ -168,7 +168,7 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
   else
     write(*,*) ' hermite_spline. Wrong b.c. '
     write(*,*) ' Only "derivative" implemented so far. Stop.' ; stop
-  end if 
+  end if
 
   !-> last point
   if (     trim( spl%e_bc(2) ) .eq. 'derivative' ) then
@@ -205,7 +205,7 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
       allocate(tv1(n_points1+1))
       tv1 = (/ ( real(j,wp) , j = 0,n_points1   ) /) / real(n_points1,wp)
     end if
-   
+
     do j = 1 , size(tv1)
       i_r = i_r + 1  ! update index
       !> point coords
@@ -254,15 +254,15 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
   nn_spl(nelems+1,:) = rr(size(rr,1),:) - rr(size(rr,1)-1,:)
   nn_spl(nelems+1,:) = nn_spl(nelems+1,:) / norm2(nn_spl(nelems+1,:))
 
-  ip_spl(       1,:) = (/ 1 , 2 /) 
-  ip_spl(nelems+1,:) = (/ n_points-1, n_points /) 
+  ip_spl(       1,:) = (/ 1 , 2 /)
+  ip_spl(nelems+1,:) = (/ n_points-1, n_points /)
   ss_spl(       1)   = 0.0_wp
   ss_spl(nelems+1)   = 1.0_wp
 
   do i = 2 , nelems
 
     ! interp from the finest discretisation
-    do j = 1 , size(s) 
+    do j = 1 , size(s)
       if ( s(j) .gt. s_spl(i)  ) then
 
         if ( j .eq. 1 ) then
@@ -275,9 +275,9 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
 
         nn_spl(i,:) = rr(j,:) - rr(j-1,:)
         nn_spl(i,:) = nn_spl(i,:) / norm2(nn_spl(i,:))
-        
+
         exit
- 
+
       end if
     end do
 
@@ -285,12 +285,12 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
     do j = 1 , n_points
       if ( spl_s(j) .gt. s_spl(i) ) then
 
-        ip_spl(i,:) = (/ j-1 , j /) 
+        ip_spl(i,:) = (/ j-1 , j /)
         ss_spl(i)   = ( s_spl(i) - spl_s(j-1) )/( spl_s(j)-spl_s(j-1) )
 
         exit
 
-      end if 
+      end if
     end do
 
     ! spl_spl
@@ -317,7 +317,7 @@ function hermite_p2(t) result(h)
   real(wp) , intent(in)  :: t
   real(wp) :: h
 
-  h = - 2.0_wp * t**3.0_wp + 3.0_wp * t**2.0_wp 
+  h = - 2.0_wp * t**3.0_wp + 3.0_wp * t**2.0_wp
 
 end function hermite_p2
 
@@ -378,49 +378,49 @@ end module mod_spline
 !   real(wp)                     , intent(out)   :: leng
 !   real(wp)                     , intent(out)   ::   s_in(:)
 !   real(wp)                     , intent(out)   :: nor_in(:,:)
-! 
+!
 !   integer :: n_d , n_points , n_splines
 !   real(wp) , allocatable :: ll(:)  ! useless with this def of %t
 !   real(wp) , allocatable :: A(:,:) , b(:)
-! 
+!
 !   real(wp) , allocatable :: spl_s(:)
-! 
+!
 !   ! lapack
 !   integer , allocatable :: ipiv(:)
 !   integer :: info
-! 
-!   ! spline reconstruction 
+!
+!   ! spline reconstruction
 !   integer , parameter :: n_points1 = 100  ! now hardcoded (pass as a default input)
 !   real(wp) , allocatable :: tv1(:) , s(:) , s_spl(:)
 !   real(wp) , allocatable :: rr(:,:)
-! 
+!
 !   integer :: i_r , i , j , n
-! 
+!
 !   !> scale derivatives
 !   spl%d0 = spl%d0
 !   spl%d1 = spl%d1
-! 
-! 
+!
+!
 !   !> check input consistency
 !   if ( nelems .ne. size(rr_spl,1)-1 ) then
-!     write(*,*) ' error in hermite_spline : ' 
+!     write(*,*) ' error in hermite_spline : '
 !     write(*,*) '  nelems .ne. size(rr_spl,1)-1 . stop ' ; stop
 !   end if
 !   if ( nelems .ne. size(nn_spl,1)-1 ) then
-!     write(*,*) ' error in hermite_spline : ' 
+!     write(*,*) ' error in hermite_spline : '
 !     write(*,*) '  nelems .ne. size(nn_spl,1)-1 . stop ' ; stop
 !   end if
-! 
+!
 !   !> ...
 !   if ( allocated(spl% t) ) deallocate(spl% t)
 !   if ( allocated(spl%dt) ) deallocate(spl%dt)
 !   if ( allocated(spl%dp) ) deallocate(spl%dp)
-! 
-! 
+!
+!
 !   !> dimensions
-!   n_d      = size(spl%rr,2)  
+!   n_d      = size(spl%rr,2)
 !   n_points = size(spl%rr,1) ; n_splines = n_points - 1
-! 
+!
 !   ! === parameter vectors %t, %dt ===
 !   ! todo: check the sensitivity of the spline w.r.t. the param array t
 !   allocate( spl%t ( n_points  ) ) ; spl%t  = 0.0_wp
@@ -433,76 +433,76 @@ end module mod_spline
 !   do i = 2 , n_splines
 !     ll(    i  ) = norm2( spl%rr(i+1,:) - spl%rr(i,:) ) + ll(i-1)
 !     spl%t( i+1) = ll(i)
-!     spl%dt(i  ) = spl%t(i+1) - spl%t(i) 
+!     spl%dt(i  ) = spl%t(i+1) - spl%t(i)
 !   end do
 !   deallocate(ll)
-!  
-! 
+!
+!
 !   ! === Linear system to solve for the derivatives of the spline ===
 !   !> one linear system per coorindate since the systems are not coupled
 !   allocate(spl%dp(n_points,n_d)) ; spl%dp = 0.0_wp
 !   allocate(A(n_points,n_points)) ; A = 0.0_wp
 !   allocate(b(n_points))          ; b = 0.0_wp
-! 
+!
 !   do n = 1 , n_d
-! 
-!     !> Initialise (reset) A,b 
+!
+!     !> Initialise (reset) A,b
 !     A = 0.0_wp ; b = 0.0_wp
-! 
+!
 !     !> inner points
 !     do i = 2 , n_points - 1
-! 
-!       A(i,i-1:i+1) = (/ spl%dt(i) ,  & 
+!
+!       A(i,i-1:i+1) = (/ spl%dt(i) ,  &
 !                 2.0_wp*(spl%dt(i-1)+spl%dt(i)) , &
 !                         spl%dt(i-1) /)
 !       b(i) = 3.0_wp * spl%dt(i-1)/spl%dt(i  ) * &
 !                     ( spl%rr(i+1,n) - spl%rr(i  ,n) ) + &
-!              3.0_wp * spl%dt(i  )/spl%dt(i-1) * & 
-!                     ( spl%rr(i  ,n) - spl%rr(i-1,n) ) 
-! 
+!              3.0_wp * spl%dt(i  )/spl%dt(i-1) * &
+!                     ( spl%rr(i  ,n) - spl%rr(i-1,n) )
+!
 !     end do
-!  
-!     !> end points: boundary conditions 
+!
+!     !> end points: boundary conditions
 !     if ( trim( spl%e_bc(1) ) .eq. 'derivative' ) then
 !       A(1,1) = 1.0_wp
-!       b(1  ) = spl%d0(n) 
+!       b(1  ) = spl%d0(n)
 !     else
 !       write(*,*) ' hermite_spline. Wrong b.c. '
 !       write(*,*) ' Only "derivative" implemented so far. Stop.' ; stop
-!     end if 
+!     end if
 !     if ( trim( spl%e_bc(2) ) .eq. 'derivative' ) then
 !       A(n_points,n_points) = 1.0_wp
 !       b(n_points         ) = spl%d1(n)
 !     else
 !       write(*,*) ' hermite_spline. Wrong b.c. '
 !       write(*,*) ' Only "derivative" implemented so far. Stop.' ; stop
-!     end if 
-! 
+!     end if
+!
 !     ! ! check ---
 !     ! do i = 1 , size(A,1)
 !     !   write(*,*) A(i,:) , '           ' , b(i)
 !     ! end do
 !     ! write(*,*)
-! 
+!
 !     !> add a multiplication factor
 !     A = A * der_factor
-! 
+!
 !     !> solve the linear system ( call to lapack dgesv )
 !     spl%dp(:,n) = b   ! intent(inout) in dgesv
 !     allocate(ipiv(n_points))
 !     call dgesv( n_points, 1 , A , n_points , &
-!              ipiv , spl%dp(:,n) , n_points , info ) 
+!              ipiv , spl%dp(:,n) , n_points , info )
 !     deallocate(ipiv)
-! 
-!   end do 
-! 
+!
+!   end do
+!
 !   ! === tangent vector to the reference line ===
 !   nor_in = 0.0_wp
 !   do i = 1 , n_points
 !     nor_in(i,:) = spl%dp(i,:)
 !     nor_in(i,:) = nor_in(i,:) / norm2(nor_in(i,:))
 !   end do
-! 
+!
 !   ! === spline (non-uniform param) ===
 !   allocate(rr( n_points1*n_splines + 1,n_d))
 !   allocate(tv1(n_points1))
@@ -510,7 +510,7 @@ end module mod_spline
 !   allocate(spl_s(n_points)) ; spl_s = 0.0_wp ! overall curv. coord of the input points
 !   i_r = 0
 !   do i = 1 , n_splines
-! 
+!
 !     if ( i .ne. n_splines ) then
 !       tv1 = (/ ( dble(j) , j = 0,n_points1-1 ) /) / dble(n_points1)
 !     else
@@ -518,7 +518,7 @@ end module mod_spline
 !       allocate(tv1(n_points1+1))
 !       tv1 = (/ ( dble(j) , j = 0,n_points1   ) /) / dble(n_points1)
 !     end if
-!    
+!
 !     do j = 1 , size(tv1)
 !       i_r = i_r + 1  ! update index
 !       !> point coords
@@ -533,18 +533,18 @@ end module mod_spline
 !         s(i_r) = 0.0_wp  ! first point: s = 0
 !       end if
 !     end do
-! 
+!
 !     spl_s(i+1) = s(i_r)
-! 
+!
 !   end do
-! 
+!
 !   !> s \in [ 0 , 1 ]
 !   leng = s(size(s))
 !   s     = s / s(size(s))
-! 
+!
 !   s_in = spl_s           ! curvilinear coord of the input points
 !   spl_s = spl_s / spl_s(size(spl_s)) ! and its non-dimensionalisation
-! 
+!
 ! ! ! check ---
 ! ! do i = 1 , size(spl_s)
 ! !   write(*,*) spl_s(i)
@@ -554,9 +554,9 @@ end module mod_spline
 ! ! do i = 1 , size(rr,1)
 ! !   write(*,*) ' rr,  s : ' , rr(i,:) , '   ' , s(i)
 ! ! end do
-! 
+!
 !   deallocate(tv1)
-! 
+!
 !   ! === spline ===
 !   !  allocate(rr_spl(nelems+1,3)) <- passed as an input
 !   allocate(s_spl(nelems+1)) ! curvilinear coord of the output points
@@ -566,64 +566,64 @@ end module mod_spline
 !     write(*,*) ' error in hermite_spline. Only type_span = uniform '
 !     write(*,*) ' implemented so far. Stop. ' ; stop
 !   end if
-! 
+!
 !   !> first and last points
 !   rr_spl(       1,:) = spl%rr(       1,:)
 !   rr_spl(nelems+1,:) = spl%rr(n_points,:)
-! 
+!
 !   nn_spl(       1,:) = rr(2,:) - rr(1,:)
 !   nn_spl(       1,:) = nn_spl(1,:) / norm2(nn_spl(1,:))
 !   nn_spl(nelems+1,:) = rr(size(rr,1),:) - rr(size(rr,1)-1,:)
 !   nn_spl(nelems+1,:) = nn_spl(nelems+1,:) / norm2(nn_spl(nelems+1,:))
-! 
-!   ip_spl(       1,:) = (/ 1 , 2 /) 
-!   ip_spl(nelems+1,:) = (/ n_points-1, n_points /) 
+!
+!   ip_spl(       1,:) = (/ 1 , 2 /)
+!   ip_spl(nelems+1,:) = (/ n_points-1, n_points /)
 !   ss_spl(       1)   = 0.0_wp
 !   ss_spl(nelems+1)   = 1.0_wp
-! 
+!
 !   do i = 2 , nelems
-! 
+!
 !     ! interp from the finest discretisation
-!     do j = 1 , size(s) 
+!     do j = 1 , size(s)
 !       if ( s(j) .gt. s_spl(i)  ) then
-! 
+!
 !         if ( j .eq. 1 ) then
 !           write(*,*) ' error in hermite_spline, during the definition &
 !                       &of the points on the spline. Stop ' ; stop
 !         end if
-! 
+!
 !         rr_spl(i,:) = ( s(j) - s_spl(i)   )/( s(j)-s(j-1) ) * rr(j-1,:) + &
 !                       ( s_spl(i) - s(j-1) )/( s(j)-s(j-1) ) * rr(j  ,:)
-! 
+!
 !         nn_spl(i,:) = rr(j,:) - rr(j-1,:)
 !         nn_spl(i,:) = nn_spl(i,:) / norm2(nn_spl(i,:))
-!         
+!
 !         exit
-!  
+!
 !       end if
 !     end do
-! 
+!
 !     ! find neighbouring input points (for input interpolation)
 !     do j = 1 , n_points
 !       if ( spl_s(j) .gt. s_spl(i) ) then
-! 
-!         ip_spl(i,:) = (/ j-1 , j /) 
+!
+!         ip_spl(i,:) = (/ j-1 , j /)
 !         ss_spl(i)   = ( s_spl(i) - spl_s(j-1) )/( spl_s(j)-spl_s(j-1) )
-! 
+!
 !         exit
-! 
-!       end if 
+!
+!       end if
 !     end do
-! 
+!
 !     ! spl_spl
 !     spl_spl(i) = ( s_spl(i) - spl_s(1) ) / ( spl_s(size(spl_s)) - spl_s(1) )
-! 
+!
 !   end do
-! 
+!
 ! ! ! check
 ! ! write(*,*) ' in hermite_spline : ip , ss '
 ! ! do i = 1 , size(ss_spl)
 ! !   write(*,*) ip_spl(i,:) , '     ' , ss_spl(i)
 ! ! end do
-! 
+!
 ! end subroutine hermite_spline

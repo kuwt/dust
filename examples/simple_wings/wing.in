@@ -1,19 +1,10 @@
-MeshFile = vv_wing_rect.in
 MeshFileType = parametric
 ElType = v
-!ElType = p
-
-mesh_mirror = F
-mirror_point = (/0.0,0.0,0.0/)
-mirror_normal = (/0.0,1.0,0.0/)
-mesh_symmetry = F
-symmetry_point = (/0.0,0.0,0.0/)
-symmetry_normal = (/0.0,1.0,0.0/)
 
 nelem_chord = 5
 type_chord = uniform   ! uniform  cosineLE  cosineTE
 starting_point = (/0.0,0.0,0.0/)
-reference_chord_fraction = 0.0
+reference_chord_fraction = 0.25
 
 ! First section
 chord = 0.4

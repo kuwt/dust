@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2019 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -66,10 +66,10 @@ private
 !> Type containing all the data necessary to solve the linear system
 !! for the aerodynamic elements doublets intensities
 type :: t_linsys
- 
+
  !> Rank of the linear system
  integer :: rank
- 
+
  !> Linear system matrix
  real(wp), allocatable :: A(:,:)
 
@@ -78,20 +78,20 @@ type :: t_linsys
 
  !> Linear system matrix (for pressure integral equation)
  real(wp), allocatable :: A_pres(:,:)
- 
+
  !> Linear system right hand side (for pressure integral equation)
  real(wp), allocatable :: b_pres(:)
 
  !> LU solvers pivot permutation matrix (in vector form)
  integer, allocatable :: P(:)
  integer, allocatable :: P_pres(:)
- 
+
  !> Static part of the right hand side
  !!
  !! The right hand side contains contributions from all the surface panels.
- !! The contributions from surface panels that do not actually move can be 
- !! calculated just once, than multiplied for the freestream velocity and 
- !! finally the contribution of the moving panels is added 
+ !! The contributions from surface panels that do not actually move can be
+ !! calculated just once, than multiplied for the freestream velocity and
+ !! finally the contribution of the moving panels is added
  real(wp), allocatable :: b_static(:,:)
 
  !> static part for integral equation (for pressure integral equation)
