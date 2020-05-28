@@ -84,11 +84,24 @@ type :: t_hinge_conn
   !> Local index of the nodes performing the desired motion
   integer, allocatable :: node_id(:)
   !> Surface node performing motion vs. hinge node connectivity
-  integer, allocatable :: ind(:,:)
+  integer , allocatable :: ind(:,:)
   !> Surface node performing motion vs. hinge node connectivity, weights
   ! for the weighted average of the motion
-  integer, allocatable :: wei(:,:)
+  real(wp), allocatable :: wei(:,:)
+  !> Node to hinge connectivity array of objs
+  type(t_n2h_conn), allocatable :: n2h(:)
 end type t_hinge_conn
+
+! ---------------------------------------------------------------
+!> Hinge node to surface node connectivity. The different number of surface
+! nodes per hinge nodes requires an array of obj, containing indices and
+! weights
+type :: t_n2h_conn
+  !> Indices of the surface nodes
+  integer, allocatable :: p2h(:)
+  !> Weights
+  real(wp),allocatable :: w2h(:)
+end type t_n2h_conn
 
 ! ---------------------------------------------------------------
 !> Hinge node configurations: to be used in defining reference
@@ -109,7 +122,7 @@ type :: t_hinge_config
   !> h: rotation axis
   real(wp), allocatable :: h(:,:)
   !> v: zero direction (user inputs are overwritten, in order to 
-  ! build ortonormal reference frames
+  ! build ortonormal reference frameshinge%rot  
   real(wp), allocatable :: v(:,:)
   !> n: normal direction
   real(wp), allocatable :: n(:,:)
@@ -164,6 +177,7 @@ type :: t_hinge
  
   procedure, pass(this) :: build_connectivity
   procedure, pass(this) :: from_reference_to_actual_config
+  procedure, pass(this) :: hinge_deflection
 
 end type t_hinge
 
@@ -182,15 +196,23 @@ subroutine build_connectivity(this, loc_points)
   real(wp),       intent(in)    :: loc_points(:,:)
 
   real(wp) :: hinge_width
-  integer  :: nb, nh, ib, ih
+  integer  :: nb, nh, ib, ih, iw
   real(wp), allocatable :: rrb(:,:), rrh(:,:)
   real(wp) :: Rot(3,3) = 0.0_wp
 
   real(wp), allocatable :: dist_all(:), wei_v(:)
   integer , allocatable ::              ind_v(:)
 
-  integer , allocatable :: node_id(:), rot_ind(:,:), ble_ind(:,:)
-  real(wp), allocatable ::             rot_wei(:,:), ble_wei(:,:)
+  integer , allocatable :: rot_node_id(:), ble_node_id(:)
+  integer , allocatable :: rot_ind(:,:)  , ble_ind(:,:)
+  real(wp), allocatable :: rot_wei(:,:)  , ble_wei(:,:)
+
+  integer , allocatable :: rot_p2h(:,:)   ! *** to do *** improve the actual inefficient
+  real(wp), allocatable :: rot_w2h(:,:)   ! and memory intensive implementation
+  integer , allocatable :: rot_i2h(:)     ! Look for ***** in this routine
+  integer , allocatable :: ble_p2h(:,:)   ! *** to do *** improve the actual inefficient
+  real(wp), allocatable :: ble_w2h(:,:)   ! and memory intensive implementation
+  integer , allocatable :: ble_i2h(:)     ! Look for ***** in this routine
 
   integer :: nrot, nble
 
@@ -201,9 +223,9 @@ subroutine build_connectivity(this, loc_points)
   !> Coordinates in the hinge reference frame
   ! Rotation matrix, build with the local ortonormal ref.frame of 
   ! the first hinge node
-  Rot(1,:) = this % ref % v(1,:)
-  Rot(2,:) = this % ref % h(1,:)
-  Rot(3,:) = this % ref % n(1,:)
+  Rot(1,:) = this % ref % v(:,1)
+  Rot(2,:) = this % ref % h(:,1)
+  Rot(3,:) = this % ref % n(:,1)
 
   allocate( rrb(3,nb) );  allocate( rrh(3,nh) )
   do ib = 1, nb
@@ -218,14 +240,21 @@ subroutine build_connectivity(this, loc_points)
 
   !> Compute connectivity and weights
   ! Allocate auxiliary node_id(:), ind(:,:), wei(:,:) arrays
-  allocate(node_id(            nb)); node_id = 0
-  allocate(rot_ind(this%n_wei, nb)); rot_ind = 0
-  allocate(rot_wei(this%n_wei, nb)); rot_wei = 0.0_wp
-  allocate(ble_ind(this%n_wei, nb)); ble_ind = 0
-  allocate(ble_wei(this%n_wei, nb)); ble_wei = 0.0_wp
+  allocate(rot_node_id(        nb)); rot_node_id = 0
+  allocate(ble_node_id(        nb)); ble_node_id = 0
+  allocate(rot_ind(this%n_wei, nb));     rot_ind = 0
+  allocate(ble_ind(this%n_wei, nb));     ble_ind = 0
+  allocate(rot_wei(this%n_wei, nb));     rot_wei = 0.0_wp
+  allocate(ble_wei(this%n_wei, nb));     ble_wei = 0.0_wp
 
   ! diff_all and dist_all auxiliaary arrays
   allocate(dist_all(   nb)); dist_all = 0.0_wp
+
+  ! auxiliary matrix for hinge to surf connectivity 
+  ! ***** to do ***** improve the implementation
+  allocate(rot_p2h(nh,nb)); rot_p2h = 0      ;  allocate(ble_p2h(nh,nb)); ble_p2h = 0
+  allocate(rot_w2h(nh,nb)); rot_w2h = 0.0_wp ;  allocate(ble_w2h(nh,nb)); ble_w2h = 0.0_wp
+  allocate(rot_i2h(nh   )); rot_i2h = 0      ;  allocate(ble_i2h(nh   )); ble_i2h = 0
 
   nrot = 0; nble = 0
   ! Loop over all the surface points
@@ -251,11 +280,18 @@ subroutine build_connectivity(this, loc_points)
         rot_wei(:,nrot) = wei_v
         rot_ind(:,nrot) = ind_v
 
-        ! ... anything else to do ? ...
+        ! *****
+        do iw = 1, this%n_wei
+          rot_i2h(ind_v(iw)) = rot_i2h(ind_v(iw)) + 1
+          rot_p2h(ind_v(iw),   rot_i2h(ind_v(iw))) = ib
+          rot_w2h(ind_v(iw),   rot_i2h(ind_v(iw))) = wei_v(iw)
+        end do
+        ! *****
 
       else ! blending region
         
         nble = nble + 1
+        ble_node_id(nble) = ib
 
         do ih = 1, nh
           dist_all(ih) = abs( rrb(2,ib) - rrh(2,ih) )
@@ -269,7 +305,13 @@ subroutine build_connectivity(this, loc_points)
         ble_wei(:,nble) = wei_v
         ble_ind(:,nble) = ind_v
 
-        ! ... anything else to do ? ...
+        ! *****
+        do iw = 1, this%n_wei
+          ble_i2h(ind_v(iw)) = ble_i2h(ind_v(iw)) + 1
+          ble_p2h(ind_v(iw),   ble_i2h(ind_v(iw))) = ib
+          ble_w2h(ind_v(iw),   ble_i2h(ind_v(iw))) = wei_v(iw)
+        end do
+        ! *****
 
       end if
 
@@ -278,7 +320,29 @@ subroutine build_connectivity(this, loc_points)
   end do
 
   !> Fill hinge object, with the connectivity and weight arrays
-  ! ...
+  allocate(this%rot %node_id(        nrot)); this%rot %node_id = rot_node_id(1:nrot)
+  allocate(this%rot %ind(this%n_wei, nrot)); this%rot %ind     = rot_ind( :, 1:nrot)
+  allocate(this%rot %wei(this%n_wei, nrot)); this%rot %wei     = rot_wei( :, 1:nrot)
+  allocate(this%blen%node_id(        nble)); this%blen%node_id = ble_node_id(1:nble)
+  allocate(this%blen%ind(this%n_wei, nble)); this%blen%ind     = ble_ind( :, 1:nble)
+  allocate(this%blen%wei(this%n_wei, nble)); this%blen%wei     = ble_wei( :, 1:nble)
+  allocate(this%rot %n2h(nh))
+  allocate(this%blen%n2h(nh))
+  do ih = 1, nh
+    allocate(this%rot %n2h(ih)%p2h( rot_i2h(ih) )) ; this%rot %n2h(ih)%p2h = rot_p2h( ih, 1:rot_i2h(ih) )
+    allocate(this%rot %n2h(ih)%w2h( rot_i2h(ih) )) ; this%rot %n2h(ih)%w2h = rot_w2h( ih, 1:rot_i2h(ih) )
+    allocate(this%blen%n2h(ih)%p2h( ble_i2h(ih) )) ; this%blen%n2h(ih)%p2h = ble_p2h( ih, 1:ble_i2h(ih) )
+    allocate(this%blen%n2h(ih)%w2h( ble_i2h(ih) )) ; this%blen%n2h(ih)%w2h = ble_w2h( ih, 1:ble_i2h(ih) )
+  end do
+
+
+  !> Explicit deallocations
+  deallocate(rrb, rrh, dist_all, wei_v, ind_v)
+  deallocate(rot_node_id, rot_ind, rot_wei)
+  deallocate(ble_node_id, ble_ind, ble_wei)
+  deallocate(rot_i2h, rot_p2h, rot_w2h) ! *****
+  deallocate(ble_i2h, ble_p2h, ble_w2h) ! *****
+
 
 end subroutine build_connectivity
 
@@ -290,10 +354,8 @@ subroutine sort_vector_real( vec, nel, sor, ind )
   real(wp), allocatable, intent(out):: sor(:)
   integer , allocatable, intent(out):: ind(:)
 
-  integer :: a
-
-  real(wp):: v, minv
-  integer :: i, iv
+  real(wp):: minv
+  integer :: i
 
   allocate(sor(nel)); sor = 0.0_wp
   allocate(ind(nel)); ind = 0
@@ -315,6 +377,30 @@ subroutine from_reference_to_actual_config(this)
   ! *** to do ***
 
 end subroutine from_reference_to_actual_config
+
+! ---------------------------------------------------------------
+!> Update points of the surface, after hinge deflection
+subroutine hinge_deflection(this)
+  class(t_hinge), intent(inout) :: this
+
+  integer :: nrot, nble, ib
+ 
+  !> n.nodes in the rigid-rotation and in the blending regions
+  nrot = size(this%rot %node_id)
+  nble = size(this%blen%node_id)
+
+
+  !> Rigid rotation
+  do ib = 1, nrot
+    
+  end do
+
+  !> Blending region
+  do ib = 1, nble
+
+  end do
+
+end subroutine hinge_deflection
 
 ! ---------------------------------------------------------------
 !> Build hinge configuration

@@ -1038,6 +1038,7 @@ subroutine load_components(geo, in_file, out_file, te)
                                       geo%components(i_comp)%hinge(ih) )
 
         !> Build hinge connectivity and weights
+        call geo%components(i_comp)%hinge(ih)%build_connectivity( rr )
 
       end do
 
