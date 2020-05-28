@@ -100,7 +100,7 @@ use mod_reference, only: &
 ! update_relative_initial_conditions
 
 use mod_hinges, only: &
-  t_hinge
+  t_hinge, initialize_hinge_config
 
 use mod_hdf5_io, only: &
   h5loc, &
@@ -690,7 +690,7 @@ subroutine load_components(geo, in_file, out_file, te)
  character(len=max_char_len) :: ref_tag, ref_tag_m
  integer :: ref_id, iref
  character(len=max_char_len) :: msg, cname, cname_write
- integer(h5loc) :: floc, gloc, cloc , geo_loc , te_loc, cloc2, hloc
+ integer(h5loc) :: floc, gloc, cloc , geo_loc , te_loc, cloc2
  integer(h5loc) :: floc_out, gloc_out
  integer :: n_comp, i_comp, n_comp_input, i_comp_input, n_comp_write
  integer :: n_mult, i_mult
@@ -715,7 +715,10 @@ subroutine load_components(geo, in_file, out_file, te)
  integer :: points_offset_precice, np_precice
 #endif 
  !> Hinges
- integer :: n_hinges
+ integer :: n_hinges, ih
+ real(wp) :: rotation_amplitude
+ character(len=2) :: hinge_id_str
+ integer(h5loc) :: hloc, hiloc
  ! Parametric elements
  integer :: par_nelems_span , par_nelems_chor
  ! trailing edge ------
@@ -875,14 +878,14 @@ subroutine load_components(geo, in_file, out_file, te)
     end if
 
     !> Hinges
-    call open_hdf5_group(cloc,'Hinges',hloc)
+    call open_hdf5_group(cloc,'Hinges', hloc)
     call read_hdf5(n_hinges, 'n_hinges', hloc)
     !> Some errors (or to do implementation?) for multiple components
     !> Multiple component and Hinges
-    if ( mult .and. comp_coupling ) then
+    if ( mult .and. ( n_hinges .gt. 0 ) ) then
       call error (this_sub_name, this_mod_name, &
-         ' n_hinges .gt. 0 for "Muliple" component'//trim(comp_name)// &
-         ', but this is not allowed (at least so far). Stop'//nl)
+         ' n_hinges .gt. 0 for "Multiple" component'//trim(comp_name)// &
+         ', but this is not allowed (so far, at least). Stop'//nl)
     end if
 
     if(mult) then
@@ -958,6 +961,8 @@ subroutine load_components(geo, in_file, out_file, te)
         geo%components(i_comp)%normalised_coord_e = normalised_coord_e
         allocate(geo%components(i_comp)%theta_e(size(theta_e)))
         geo%components(i_comp)%theta_e = theta_e
+
+        ! *** to do *** make coupling available for all the components
 #if USE_PRECICE
         if ( trim(comp_coupling_str) .eq. 'true' ) then
           call read_hdf5_al(c_ref_p, 'c_ref_p', geo_loc)
@@ -995,6 +1000,48 @@ subroutine load_components(geo, in_file, out_file, te)
         call read_hdf5(trac,'Traction',cloc)
         call read_hdf5(rad,'Radius',cloc)
       end if
+
+      !> Hinges ---
+      geo%components(i_comp)%n_hinges = n_hinges
+      allocate( geo%components(i_comp)%hinge(n_hinges) )
+      do ih = 1, n_hinges
+
+        !> Open hinge group
+        write(hinge_id_str,'(I2.2)') ih
+        call open_hdf5_group(hloc, 'Hinge_'//hinge_id_str, hiloc)
+
+        !> read input and fill component%hinge fields
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%nodes_input, &
+                                                         'Nodes_Input', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%offset, &
+                                                         'Offset', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%ref_dir, &
+                                                        'Ref_Dir', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%input_type, &
+                                            'Hinge_Rotation_Input'    , hiloc)
+        call read_hdf5( rotation_amplitude, 'Hinge_Rotation_Amplitude', hiloc)
+        allocate( geo%components(i_comp)%hinge(ih)%theta( &
+                  geo%components(i_comp)%hinge(ih)%n_nodes ) )
+        geo%components(i_comp)%hinge(ih)%theta = rotation_amplitude
+
+        call read_hdf5_al( geo%components(i_comp)%hinge(ih)%ref%rr, 'rr', hiloc)
+
+        geo%components(i_comp)%hinge(ih)%n_nodes = size( &
+           geo%components(i_comp)%hinge(ih)%ref%rr, 2)
+
+        call close_hdf5_group( hiloc )
+
+        !> Initialize reference and actual configuration
+        call initialize_hinge_config( geo%components(i_comp)%hinge(ih)%ref , &
+                                      geo%components(i_comp)%hinge(ih) )
+        call initialize_hinge_config( geo%components(i_comp)%hinge(ih)%act , &
+                                      geo%components(i_comp)%hinge(ih) )
+
+        !> Build hinge connectivity and weights
+
+      end do
+
+
 
       ! for PARAMETRIC elements only:
       ! parametric_nelems_span , parametric_nelems_chor 
@@ -1321,6 +1368,7 @@ subroutine load_components(geo, in_file, out_file, te)
       i_comp = i_comp + 1
     enddo !i_mult
 
+    call close_hdf5_group(hloc)
     call close_hdf5_group(cloc)
 
   enddo !i_comp

@@ -49,13 +49,17 @@ module mod_hinges
 use mod_param, only: &
   wp, max_char_len
 
+use mod_math, only: &
+  cross
+
 use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, getsuboption, &
   countoption, finalizeparameters
 
 implicit none
 
-public :: t_hinge, t_hinge_input, build_hinges, hinge_input_parser
+public :: t_hinge, t_hinge_input, build_hinges, hinge_input_parser, &
+          initialize_hinge_config
 
 private
 
@@ -73,6 +77,18 @@ type :: t_hinge_input
   character(len=max_char_len) :: rotation_input
   real(wp) :: rotation_amplitude
 end type t_hinge_input
+
+! ---------------------------------------------------------------
+!> Hinge connectivity, meant for rigid rotation and bleding regions
+type :: t_hinge_conn
+  !> Local index of the nodes performing the desired motion
+  integer, allocatable :: node_id(:)
+  !> Surface node performing motion vs. hinge node connectivity
+  integer, allocatable :: ind(:,:)
+  !> Surface node performing motion vs. hinge node connectivity, weights
+  ! for the weighted average of the motion
+  integer, allocatable :: wei(:,:)
+end type t_hinge_conn
 
 ! ---------------------------------------------------------------
 !> Hinge node configurations: to be used in defining reference
@@ -103,14 +119,31 @@ end type t_hinge_config
 !> Hinge type
 type :: t_hinge
 
-  !> Type: constant, function, coupling
-  character(len=max_char_len) :: input_type
+  !> Number of points for transferring the motion from the hinge to the
+  ! surface, through a weighted average
+  ! *** to do *** hardcoded, so far. Read as an input, with a default value,
+  ! equal to 2 (or 1?)
+  integer :: n_wei = 2
+
+  !> Order of the norm used for computing distance-based weights
+  ! *** to do *** hardcoded, so far. Read as an input, with a default value,
+  ! equal to 1 (or 2?)
+  integer :: w_order = 1
+
+  !> Type: parametric, from_file
+  character(len=max_char_len) :: nodes_input
 
   !> N.nodes of the hinge
   integer :: n_nodes
 
   !> Offset for avoiding irregular behavior
   real(wp) :: offset
+
+  !> Offset for avoiding irregular behavior
+  real(wp) :: ref_dir(3)
+
+  !> Type: constant, function, coupling
+  character(len=max_char_len) :: input_type
 
   !> Array of the rotation angle (read as an input, or from coupling nodes)
   real(wp), allocatable :: theta(:)
@@ -120,8 +153,16 @@ type :: t_hinge
   !> Actual configuration
   type(t_hinge_config) :: act
 
+  !> Connectivity for the rigid rotation motion of a ``control surface''
+  type(t_hinge_conn) :: rot
+  !> Connectivity of the blending region to avoid irregular behavior 
+  ! with a ``control surface'' large rotation (blending region extends
+  ! from -offset to offset qualitatively in the ref_dir of the hinge)
+  type(t_hinge_conn) :: blen
+
   contains
  
+  procedure, pass(this) :: build_connectivity
   procedure, pass(this) :: from_reference_to_actual_config
 
 end type t_hinge
@@ -130,13 +171,125 @@ end type t_hinge
 
 contains
 
+! ---------------------------------------------------------------
+!> Build hinge connectivity from component nodes rr, expressed in the
+! local reference frame, and the hinge nodes.
+! >
+! >
+! >
+subroutine build_connectivity(this, loc_points)
+  class(t_hinge), intent(inout) :: this
+  real(wp),       intent(in)    :: loc_points(:,:)
+
+  real(wp) :: hinge_width
+  integer  :: nb, nh, ib
+  real(wp), allocatable :: rrb(:,:), rrh(:,:)
+  real(wp) :: Rot(3,3) = 0.0_wp
+
+  integer , allocatable :: node_id(:), ind(:,:)
+  real(wp), allocatable :: wei(:,:)
+
+  integer :: nrot, nble
+
+  !> N. of surfae and hinge nodes
+  nb = size(loc_points,2)
+  nh = this%n_nodes
+ 
+  !> Coordinates in the hinge reference frame
+  ! Rotation matrix, build with the local ortonormal ref.frame of 
+  ! the first hinge node
+  Rot(1,:) = this % ref % v(1,:)
+  Rot(2,:) = this % ref % h(1,:)
+  Rot(3,:) = this % ref % n(1,:)
+
+  allocate( rrb(3,nb) );  allocate( rrh(3,nh) )
+  do ib = 1, nb
+    rrb(:,ib) = matmul( Rot, loc_points(:,ib) - this%ref%rr(:,1) )
+  end do
+  do ib = 1, nh
+    rrh(:,ib) = matmul( Rot, this%ref%rr(:,ib) - this%ref%rr(:,1) )
+  end do
+
+  ! hinge width, measured in the hinge direction
+  hinge_width = rrh(2,nh) - rrh(2,1) 
+
+  !> Compute connectivity and weights
+  ! Allocate auxiliary node_id(:), ind(:,:), wei(:,:) arrays
+  allocate(node_id(            nb)); node_id = 0
+  allocate(    ind(this%n_wei, nb));     ind = 0
+  allocate(    wei(this%n_wei, nb));     wei = 0.0_wp
+
+  nrot = 0; nble = 0
+  ! Loop over all the surface points
+  do ib = 1, nb
+
+    if ( ( rrb(2,ib) .gt. 0.0_wp ) .and. ( rrb(2,ib) .lt. hinge_width ) ) then
+
+      if ( rrb(1,ib) .lt. -this%offset ) then
+        ! do nothing
+      elseif ( rrb(1,ib) .gt. this%offset ) then ! rigid rotation
+        nrot = nrot + 1
+
+         
+      else ! blending region
+        nble = nble + 1
+
+      end if
+
+    end if
+
+  end do
+
+  !> Fill hinge object, with the connectivity and weight arrays
+  ! ...
+
+end subroutine build_connectivity
+
+! ---------------------------------------------------------------
+!> Compute actual configuration of the hinge nodes
 subroutine from_reference_to_actual_config(this)
   class(t_hinge), intent(inout) :: this
+
+  ! *** to do ***
 
 end subroutine from_reference_to_actual_config
 
 ! ---------------------------------------------------------------
-!>
+!> Build hinge configuration
+! Used to build reference configuration in load_component(), and
+! initialize actual configuration, as the reference configuration
+subroutine initialize_hinge_config( h_config, hinge )
+  type(t_hinge_config), intent(inout) :: h_config
+  type(t_hinge)       , intent(inout) :: hinge
+
+  real(wp) :: hv(3), vv(3), nv(3)
+  integer :: i
+
+  !> rr0, rr1 (useless?)
+  h_config%rr0 = hinge%ref%rr(:,1)
+  h_config%rr1 = hinge%ref%rr(:,hinge%n_nodes)
+  hv = h_config%rr1 - h_config%rr0;  hv = hv / norm2(hv)
+  vv = hinge%ref_dir / norm2(hinge%ref_dir)
+  nv = cross( vv, hv ); nv = nv / norm2(nv)
+  vv = cross( hv, nv ); vv = vv / norm2(vv)  ! useless normalization
+
+  !> h, v, n
+  allocate( h_config%h(3, hinge%n_nodes) )
+  allocate( h_config%v(3, hinge%n_nodes) )
+  allocate( h_config%n(3, hinge%n_nodes) )
+
+  do i = 1, hinge%n_nodes
+
+    h_config%h(:,i) = hv;  h_config%v(:,i) = vv;  h_config%n(:,i) = nv 
+
+  end do
+
+end subroutine initialize_hinge_config
+
+
+! ---------------------------------------------------------------
+!> build hinges_input, used in dust_pre for generating geometry input file
+! for the solver
 subroutine build_hinges( geo_prs, n_hinges, hinges )
   type(t_parse), intent(inout) :: geo_prs
   integer      , intent(in)    :: n_hinges
@@ -199,7 +352,8 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
 end subroutine build_hinges
 
 ! ---------------------------------------------------------------
-!> Three-column ascii file is expected
+!> Read ascii file of hinge node coordinates, w/ input type from_file
+!  Three-column ascii file is expected
 subroutine read_hinge_nodes( filen, n_nodes, rr )
   character(len=max_char_len), intent(in)  :: filen
   integer                    , intent(out) :: n_nodes
@@ -232,7 +386,7 @@ subroutine read_hinge_nodes( filen, n_nodes, rr )
 end subroutine read_hinge_nodes
 
 ! ---------------------------------------------------------------
-!> hinge input parser
+!> Hinge input parser, called in mod_build_geo.f90 by dust_pre preprocessor
 subroutine hinge_input_parser( geo_prs, hinge_prs )
   type(t_parse),          intent(inout) :: geo_prs
   type(t_parse), pointer, intent(inout) :: hinge_prs
