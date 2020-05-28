@@ -182,12 +182,15 @@ subroutine build_connectivity(this, loc_points)
   real(wp),       intent(in)    :: loc_points(:,:)
 
   real(wp) :: hinge_width
-  integer  :: nb, nh, ib
+  integer  :: nb, nh, ib, ih
   real(wp), allocatable :: rrb(:,:), rrh(:,:)
   real(wp) :: Rot(3,3) = 0.0_wp
 
-  integer , allocatable :: node_id(:), ind(:,:)
-  real(wp), allocatable :: wei(:,:)
+  real(wp), allocatable :: dist_all(:), wei_v(:)
+  integer , allocatable ::              ind_v(:)
+
+  integer , allocatable :: node_id(:), rot_ind(:,:), ble_ind(:,:)
+  real(wp), allocatable ::             rot_wei(:,:), ble_wei(:,:)
 
   integer :: nrot, nble
 
@@ -216,8 +219,13 @@ subroutine build_connectivity(this, loc_points)
   !> Compute connectivity and weights
   ! Allocate auxiliary node_id(:), ind(:,:), wei(:,:) arrays
   allocate(node_id(            nb)); node_id = 0
-  allocate(    ind(this%n_wei, nb));     ind = 0
-  allocate(    wei(this%n_wei, nb));     wei = 0.0_wp
+  allocate(rot_ind(this%n_wei, nb)); rot_ind = 0
+  allocate(rot_wei(this%n_wei, nb)); rot_wei = 0.0_wp
+  allocate(ble_ind(this%n_wei, nb)); ble_ind = 0
+  allocate(ble_wei(this%n_wei, nb)); ble_wei = 0.0_wp
+
+  ! diff_all and dist_all auxiliaary arrays
+  allocate(dist_all(   nb)); dist_all = 0.0_wp
 
   nrot = 0; nble = 0
   ! Loop over all the surface points
@@ -228,11 +236,40 @@ subroutine build_connectivity(this, loc_points)
       if ( rrb(1,ib) .lt. -this%offset ) then
         ! do nothing
       elseif ( rrb(1,ib) .gt. this%offset ) then ! rigid rotation
+
         nrot = nrot + 1
 
-         
+        do ih = 1, nh
+          dist_all(ih) = abs( rrb(2,ib) - rrh(2,ih) )
+        end do
+
+        call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
+        
+        wei_v = 1.0_wp / wei_v**this%w_order
+        wei_v = wei_v / sum(wei_v)
+
+        rot_wei(:,nrot) = wei_v
+        rot_ind(:,nrot) = ind_v
+
+        ! ... anything else to do ? ...
+
       else ! blending region
+        
         nble = nble + 1
+
+        do ih = 1, nh
+          dist_all(ih) = abs( rrb(2,ib) - rrh(2,ih) )
+        end do
+
+        call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
+        
+        wei_v = 1.0_wp / wei_v**this%w_order
+        wei_v = wei_v / sum(wei_v)
+
+        ble_wei(:,nble) = wei_v
+        ble_ind(:,nble) = ind_v
+
+        ! ... anything else to do ? ...
 
       end if
 
@@ -244,6 +281,31 @@ subroutine build_connectivity(this, loc_points)
   ! ...
 
 end subroutine build_connectivity
+
+! ---------------------------------------------------------------
+!> Naif sort
+subroutine sort_vector_real( vec, nel, sor, ind )
+  real(wp), intent(inout) :: vec(:)
+  integer , intent(in) :: nel
+  real(wp), allocatable, intent(out):: sor(:)
+  integer , allocatable, intent(out):: ind(:)
+
+  integer :: a
+
+  real(wp):: v, minv
+  integer :: i, iv
+
+  allocate(sor(nel)); sor = 0.0_wp
+  allocate(ind(nel)); ind = 0
+
+  minv = minval( vec )
+  do i = 1, nel
+    sor(i) = maxval( vec, 1 )
+    ind(i) = maxloc( vec, 1 )
+    vec( ind(i) ) = minv - 0.1_wp ! naif
+  end do
+
+end subroutine sort_vector_real
 
 ! ---------------------------------------------------------------
 !> Compute actual configuration of the hinge nodes
