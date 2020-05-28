@@ -1068,8 +1068,8 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
                             !add one for the first step
   endif
 
-  if(sim_param%use_vs) sim_param%filt_eta = 1/(10.0_wp*sim_param%dt)
-  
+  if(sim_param%use_vs) sim_param%filt_eta = 1/(40.0_wp*sim_param%dt)
+
 end subroutine init_sim_param
 
 !----------------------------------------------------------------------
