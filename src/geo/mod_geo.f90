@@ -718,7 +718,7 @@ subroutine load_components(geo, in_file, out_file, te)
  integer :: n_hinges, ih
  real(wp) :: rotation_amplitude
  character(len=2) :: hinge_id_str
- integer(h5loc) :: hloc, hiloc
+ integer(h5loc) :: hloc, hiloc, hloc2
  ! Parametric elements
  integer :: par_nelems_span , par_nelems_chor
  ! trailing edge ------
@@ -740,7 +740,7 @@ subroutine load_components(geo, in_file, out_file, te)
  real(wp) :: trac, rad
  logical :: rewrite_geo
 
- integer :: i
+ ! integer :: i
 
  character(len=*), parameter :: this_sub_name = 'load_components'
 
@@ -878,7 +878,7 @@ subroutine load_components(geo, in_file, out_file, te)
     end if
 
     !> Hinges
-    call open_hdf5_group(cloc,'Hinges', hloc)
+    call open_hdf5_group(cloc, 'Hinges', hloc)
     call read_hdf5(n_hinges, 'n_hinges', hloc)
     !> Some errors (or to do implementation?) for multiple components
     !> Multiple component and Hinges
@@ -1143,6 +1143,7 @@ subroutine load_components(geo, in_file, out_file, te)
         call write_hdf5(ee   ,'ee'   ,geo_loc)
         call write_hdf5(rr   ,'rr'   ,geo_loc)
         call write_hdf5(neigh,'neigh',geo_loc)
+
 #if USE_PRECICE
         call write_hdf5(geo%components(i_comp)%i_points_precice, &
                         'i_points_PreCICE', geo_loc)
@@ -1167,6 +1168,31 @@ subroutine load_components(geo, in_file, out_file, te)
         end if
 
         call close_hdf5_group(geo_loc)
+
+        !> Hinges -------------------------------------------------------------
+        call new_hdf5_group(cloc2, 'Hinges', hloc2)
+        call write_hdf5(n_hinges, 'n_hinges', hloc2)
+
+        do ih = 1, n_hinges
+          !> Open hinge group
+          write(hinge_id_str,'(I2.2)') ih
+          call new_hdf5_group(hloc2, 'Hinge_'//hinge_id_str, hiloc)
+  
+          !> read input and fill component%hinge fields
+          call write_hdf5( geo%components(i_comp)%hinge(ih)%nodes_input, &
+                                                            'Nodes_Input', hiloc)
+          call write_hdf5( geo%components(i_comp)%hinge(ih)%offset, &
+                                                            'Offset', hiloc)
+          call write_hdf5( geo%components(i_comp)%hinge(ih)%ref_dir, &
+                                                           'Ref_Dir', hiloc)
+          call write_hdf5( geo%components(i_comp)%hinge(ih)%ref%rr, 'rr', hiloc)
+
+          call write_hdf5( geo%components(i_comp)%hinge(ih)%input_type, &
+                                               'Hinge_Rotation_Input'    , hiloc)
+          call write_hdf5( rotation_amplitude, 'Hinge_Rotation_Amplitude', hiloc)
+  
+        end do
+        !> Hinges -------------------------------------------------------------
 
         if( comp_el_type(1:1) .eq. 'p' .or. &
             comp_el_type(1:1) .eq. 'v' .or. &
@@ -1984,7 +2010,7 @@ subroutine update_geometry(geo, t, update_static)
  logical, intent(in) :: update_static
 
  real(wp), allocatable :: rr_hinge_contig(:,:)
- integer :: i_comp, ie, ih, i_deb
+ integer :: i_comp, ie, ih
 
  !update all the references
  call update_all_references(geo%refs,t)

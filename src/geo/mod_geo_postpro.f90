@@ -747,19 +747,13 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
 #endif
 
   !> Hinges ----------------------------------------------------------------
-  ! debug ---
-  write(*,*) ' mod_geo_postpro, l.750, comp%n_hinges: ', comp%n_hinges
-  ! debug ---
   do ih = 1, comp%n_hinges
 
-    ! debug ---
-    write(*,*) '*** updating geometry following hinge rotations ***'
-    ! debug ---
     !> Allocating 
     allocate(rr_hinge_contig(3,size(comp%i_points)))
     rr_hinge_contig = points(:, comp%i_points)
     call comp%hinge(ih)%hinge_deflection( &
-                                        rr_hinge_contig )
+                                        rr_hinge_contig, postpro=.true. )
     points(:, comp%i_points) = rr_hinge_contig
 
     deallocate(rr_hinge_contig)

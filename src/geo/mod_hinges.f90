@@ -387,13 +387,22 @@ end subroutine from_reference_to_actual_config
 ! ---------------------------------------------------------------
 !> Update the coordinates rr of the points of the surface, after
 ! hinge deflection
-subroutine hinge_deflection( this, rr )
+subroutine hinge_deflection( this, rr, postpro )
   class(t_hinge), intent(inout) :: this
   real(wp)      , intent(inout) :: rr(:,:)
+  logical, optional, intent(in) :: postpro
+  logical            ::   local_postpro
+  logical, parameter :: default_postpro = .false.
 
   real(wp) :: th, thp, yc, xq, yq, xqp, yqp
   real(wp) :: nx(3,3), Rot_I(3,3)
   integer :: nrot, nble, ib, ih, ii
+
+  !> Use the same routine for solver (incremental rotation) and
+  ! postpro (non-incremental rotation)
+  if ( present(postpro) ) then;  local_postpro = postpro
+  else                        ;  local_postpro = default_postpro
+  end if
 
   !> n.nodes in the rigid-rotation and in the blending regions
   nrot = size(this%rot %node_id)
@@ -401,7 +410,11 @@ subroutine hinge_deflection( this, rr )
 
   do ih = 1, this%n_nodes
 
-    th = ( this % theta(ih) - this % theta_old(ih) ) * pi/180.0_wp
+    if ( .not. local_postpro ) then
+      th = ( this % theta(ih) - this % theta_old(ih) ) * pi/180.0_wp
+    else 
+      th =   this % theta(ih)                          * pi/180.0_wp
+    end if
 
     if ( th .ne. 0.0_wp ) then ! (equality check on real?)
 
