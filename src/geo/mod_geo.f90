@@ -1049,26 +1049,27 @@ subroutine load_components(geo, in_file, out_file, te)
 
       end do
 
-      !> Some checks ---
-      write(*,*)
-      write(*,*) ' ---------------------------------- '
-      write(*,*) ' Some checks in mode_geo.f90, after hinge objects construction'
-      write(*,*) ' component: ', i_comp, ' n_hinges: ', n_hinges
-      do ih = 1, n_hinges
-        write(*,*) ' Hinge: ', ih
-        write(*,*) ' n_nodes: ', geo%components(i_comp)%hinge(ih)%n_nodes
-        write(*,*) ' theta  : ', geo%components(i_comp)%hinge(ih)%theta
-        write(*,*) ' nrot   : ', size( &
-                                 geo%components(i_comp)%hinge(ih)%rot%node_id )
-        write(*,*) ' nble   : ', size( &
-                                 geo%components(i_comp)%hinge(ih)%blen%node_id )
-        write(*,*) '  rot%node_id : ', &
-                                 geo%components(i_comp)%hinge(ih)%rot%node_id 
-        write(*,*) ' blen%node_id : ', &
-                                 geo%components(i_comp)%hinge(ih)%blen%node_id 
-      end do
-      write(*,*) ' ---------------------------------- '
-      write(*,*)
+!     !> Hinges - Some checks --------------------------------------------------
+!     write(*,*)
+!     write(*,*) ' ---------------------------------- '
+!     write(*,*) ' Some checks in mode_geo.f90, after hinge objects construction'
+!     write(*,*) ' component: ', i_comp, ' n_hinges: ', n_hinges
+!     do ih = 1, n_hinges
+!       write(*,*) ' Hinge: ', ih
+!       write(*,*) ' n_nodes: ', geo%components(i_comp)%hinge(ih)%n_nodes
+!       write(*,*) ' theta  : ', geo%components(i_comp)%hinge(ih)%theta
+!       write(*,*) ' nrot   : ', size( &
+!                                geo%components(i_comp)%hinge(ih)%rot%node_id )
+!       write(*,*) ' nble   : ', size( &
+!                                geo%components(i_comp)%hinge(ih)%blen%node_id )
+!       write(*,*) '  rot%node_id : ', &
+!                                geo%components(i_comp)%hinge(ih)%rot%node_id 
+!       write(*,*) ' blen%node_id : ', &
+!                                geo%components(i_comp)%hinge(ih)%blen%node_id 
+!     end do
+!     write(*,*) ' ---------------------------------- '
+!     write(*,*)
+!     !> Hinges - Some checks --------------------------------------------------
 
 
       ! for PARAMETRIC elements only:
@@ -1982,7 +1983,6 @@ subroutine update_geometry(geo, t, update_static)
  real(wp), intent(in) :: t
  logical, intent(in) :: update_static
 
- real(wp), allocatable :: rr_hinge_debug(:,:)
  real(wp), allocatable :: rr_hinge_contig(:,:)
  integer :: i_comp, ie, ih, i_deb
 
@@ -2041,7 +2041,7 @@ subroutine update_geometry(geo, t, update_static)
 
   end if  ! if ( .not. comp%coupling )
 
-  !> === Hinges ===
+  !> Hinges -----------------------------------------------------------
   ! *** to do ***
   !> update hinge point coordinates, for moving/coupled components
   !> update hinge point rotation
@@ -2065,6 +2065,8 @@ subroutine update_geometry(geo, t, update_static)
   enddo
   !Velocity of the elem center
   ! ...
+
+  !> Hinges -----------------------------------------------------------
 
   end associate
  enddo

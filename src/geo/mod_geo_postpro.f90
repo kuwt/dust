@@ -114,6 +114,9 @@ use mod_hdf5_io, only: &
    read_hdf5_al, &
    check_dset_hdf5
 
+use mod_hinges, only: &
+  initialize_hinge_config
+
 use mod_geometry, only: &
   t_geo, t_geo_component , calc_geo_data_pan , calc_geo_vel
 
@@ -166,7 +169,13 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
  integer :: n_comp, i_comp, n_comp_tot, i_comp_tot , i_comp_tmp
  integer :: parametric_nelems_span , parametric_nelems_chor
 
- ! Some structure to handlge multiple components
+ !> Hinges
+ integer(h5loc) :: hiloc, hloc
+ integer :: ih, n_hinges
+ real(wp):: rotation_amplitude
+ character(len=2) :: hinge_id_str
+
+ ! Some structure to handle multiple components
  character(len=max_char_len), allocatable :: components(:) , components_tmp(:)
  character(len=max_char_len) :: component_stripped
 
@@ -407,6 +416,59 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
  
       ! Update elems_offset for the next component
       !elems_offset = elems_offset + size(ee,2)
+
+      !> Hinges ---
+      call open_hdf5_group(cloc,'Hinges', hloc)
+      call read_hdf5(n_hinges, 'n_hinges', hloc)
+      comps(i_comp)%n_hinges = n_hinges
+      allocate( comps(i_comp)%hinge(n_hinges) )
+      do ih = 1, n_hinges
+
+        !> Open hinge group
+        write(hinge_id_str,'(I2.2)') ih
+        call open_hdf5_group(hloc, 'Hinge_'//hinge_id_str, hiloc)
+
+        !> read input and fill component%hinge fields
+        call read_hdf5( comps(i_comp)%hinge(ih)%nodes_input, &
+                                                         'Nodes_Input', hiloc)
+        call read_hdf5( comps(i_comp)%hinge(ih)%offset, &
+                                                         'Offset', hiloc)
+        call read_hdf5( comps(i_comp)%hinge(ih)%ref_dir, &
+                                                        'Ref_Dir', hiloc)
+        call read_hdf5_al( comps(i_comp)%hinge(ih)%ref%rr, 'rr', hiloc)
+        comps(i_comp)%hinge(ih)%n_nodes = size( &
+           comps(i_comp)%hinge(ih)%ref%rr, 2)
+
+        call read_hdf5( comps(i_comp)%hinge(ih)%input_type, &
+                                            'Hinge_Rotation_Input'    , hiloc)
+        call read_hdf5( rotation_amplitude, 'Hinge_Rotation_Amplitude', hiloc)
+        allocate( comps(i_comp)%hinge(ih)%theta( &
+                  comps(i_comp)%hinge(ih)%n_nodes ) )
+        allocate( comps(i_comp)%hinge(ih)%theta_old( &
+                  comps(i_comp)%hinge(ih)%n_nodes ) )
+        comps(i_comp)%hinge(ih)%theta     = rotation_amplitude
+        comps(i_comp)%hinge(ih)%theta_old = 0.0_wp
+
+        call close_hdf5_group( hiloc )
+
+        !> Initialize reference and actual configuration
+        call initialize_hinge_config( comps(i_comp)%hinge(ih)%ref , &
+                                      comps(i_comp)%hinge(ih) )
+        call initialize_hinge_config( comps(i_comp)%hinge(ih)%act , &
+                                      comps(i_comp)%hinge(ih) )
+        ! Allocate and initialize hinge node coords in the actual configuration
+        allocate( comps(i_comp)%hinge(ih)%act%rr( &
+                3,comps(i_comp)%hinge(ih)%n_nodes ) )
+        comps(i_comp)%hinge(ih)%act%rr = &
+                                      comps(i_comp)%hinge(ih)%ref%rr
+
+        !> Build hinge connectivity and weights
+        call comps(i_comp)%hinge(ih)%build_connectivity( rr )
+
+      end do
+
+      call close_hdf5_group( hloc )
+
 
       !cleanup
       deallocate(ee,rr)
@@ -650,18 +712,23 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
  real(wp), allocatable :: rr(:,:)
 #endif
 
- integer :: i_comp, ie
+ integer(h5loc) :: hiloc, hloc
+ real(wp), allocatable :: rr_hinge_contig(:,:)
+ integer :: i_comp, ie, ih
 
  do i_comp = 1,size(comps)
   associate(comp => comps(i_comp))
 #if USE_PRECICE
   if ( .not. comp%coupling ) then
 #endif
-  points(:,comp%i_points) = move_points(comp%loc_points, &
-                           refs_R(:,:,comp%ref_id), &
-                           refs_off(:,comp%ref_id))
+    !> Move points of a rigid component, not coupled with an external software
+    points(:,comp%i_points) = move_points(comp%loc_points, &
+                             refs_R(:,:,comp%ref_id), &
+                             refs_off(:,comp%ref_id))
 #if USE_PRECICE
   else
+    !> Read points of a coupled component, from result files
+
     !> Open result hdf5 file and read points coordinates
     call open_hdf5_file( trim(filen), floc )
     call open_hdf5_group( floc, 'Components', gloc )
@@ -678,6 +745,27 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
     call close_hdf5_file(floc)
   endif
 #endif
+
+  !> Hinges ----------------------------------------------------------------
+  ! debug ---
+  write(*,*) ' mod_geo_postpro, l.750, comp%n_hinges: ', comp%n_hinges
+  ! debug ---
+  do ih = 1, comp%n_hinges
+
+    ! debug ---
+    write(*,*) '*** updating geometry following hinge rotations ***'
+    ! debug ---
+    !> Allocating 
+    allocate(rr_hinge_contig(3,size(comp%i_points)))
+    rr_hinge_contig = points(:, comp%i_points)
+    call comp%hinge(ih)%hinge_deflection( &
+                                        rr_hinge_contig )
+    points(:, comp%i_points) = rr_hinge_contig
+
+    deallocate(rr_hinge_contig)
+    
+  end do
+  !> Hinges ----------------------------------------------------------------
 
   do ie = 1,size(comp%el)
     call calc_geo_data_postpro(comp%el(ie),points(:,comp%el(ie)%i_ver))
