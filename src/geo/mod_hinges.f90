@@ -76,6 +76,8 @@ type :: t_hinge_input
   real(wp) :: offset
   character(len=max_char_len) :: rotation_input
   real(wp) :: rotation_amplitude
+  real(wp) :: rotation_omega
+  real(wp) :: rotation_phase
 end type t_hinge_input
 
 ! ---------------------------------------------------------------
@@ -133,7 +135,7 @@ end type t_hinge_config
 type :: t_hinge
 
   !> Number of points for transferring the motion from the hinge to the
-  ! surface, through a weighted average
+  ! surface, through a weighted averageamplitude
   ! *** to do *** hardcoded, so far. Read as an input, with a default value,
   ! equal to 2 (or 1?)
   integer :: n_wei = 2
@@ -158,6 +160,11 @@ type :: t_hinge
   !> Type: constant, function, coupling
   character(len=max_char_len) :: input_type
 
+  !> function:const, :sin, :cos amplitude, angular velocity and phase
+  real(wp) :: f_ampl
+  real(wp) :: f_omega
+  real(wp) :: f_phase
+
   !> Array of the rotation angle (read as an input, or from coupling nodes)
   real(wp), allocatable :: theta(:)
   real(wp), allocatable :: theta_old(:)
@@ -178,6 +185,8 @@ type :: t_hinge
  
   procedure, pass(this) :: build_connectivity
   procedure, pass(this) :: from_reference_to_actual_config
+  procedure, pass(this) :: update_hinge_nodes
+  procedure, pass(this) :: update_theta
   procedure, pass(this) :: hinge_deflection
 
 end type t_hinge
@@ -216,10 +225,6 @@ subroutine build_connectivity(this, loc_points)
   integer , allocatable :: ble_i2h(:)     ! Look for ***** in this routine
 
   integer :: nrot, nble
-
-  ! debug ---
-  integer :: i_debug = 0
-  ! debug ---
 
   !> N. of surfae and hinge nodes
   nb = size(loc_points,2)
@@ -373,6 +378,7 @@ subroutine sort_vector_real( vec, nel, sor, ind )
     vec( ind(i) ) = minv - 0.1_wp ! naif
   end do
 
+
 end subroutine sort_vector_real
 
 ! ---------------------------------------------------------------
@@ -381,15 +387,50 @@ subroutine from_reference_to_actual_config(this)
   class(t_hinge), intent(inout) :: this
 
   ! *** to do ***
+  ! still usefull? anything else to do, that is missing in
+  ! update_hinge_nodes() subroutine?
+  
 
 end subroutine from_reference_to_actual_config
 
 ! ---------------------------------------------------------------
+!> Update hinge nodes, for non-coupled components
+subroutine update_hinge_nodes( this, R, of )
+  class(t_hinge), intent(inout) :: this
+  real(wp)      , intent(in)    ::  R(:,:)
+  real(wp)      , intent(in)    :: of(:)
+
+  !> Actual configuration: node position
+  this % act % rr = matmul( R, this % ref % rr )
+  this % act % rr(1,:) = this % act % rr(1,:) + of(1) 
+  this % act % rr(2,:) = this % act % rr(2,:) + of(2)
+  this % act % rr(3,:) = this % act % rr(3,:) + of(3)
+
+  !> Actual configuration: node orientation
+  this % act % h = matmul( R, this % ref % h )
+  this % act % v = matmul( R, this % ref % v )
+  this % act % n = matmul( R, this % ref % n )
+
+
+end subroutine update_hinge_nodes
+
+! ---------------------------------------------------------------
+!> Update hinge nodes, for non-coupled components
+subroutine update_theta( this, time )
+  class(t_hinge), intent(inout) :: this
+  real(wp)      , intent(in)    :: time
+
+  
+
+end subroutine update_theta
+
+! ---------------------------------------------------------------
 !> Update the coordinates rr of the points of the surface, after
 ! hinge deflection
-subroutine hinge_deflection( this, rr, postpro )
+subroutine hinge_deflection( this, rr, t, postpro )
   class(t_hinge), intent(inout) :: this
   real(wp)      , intent(inout) :: rr(:,:)
+  real(wp)      , intent(in)    :: t
   logical, optional, intent(in) :: postpro
   logical            ::   local_postpro
   logical, parameter :: default_postpro = .false.
@@ -466,6 +507,7 @@ subroutine hinge_deflection( this, rr, postpro )
 
   end do
 
+
 end subroutine hinge_deflection
 
 ! ---------------------------------------------------------------
@@ -512,7 +554,6 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
   type(t_parse), pointer :: hinge_prs
   integer :: i, j
 
-
   if ( allocated(hinges) ) deallocate(hinges)
   allocate( hinges(n_hinges) )
 
@@ -554,14 +595,22 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
      hinges(i) % offset  = getreal(hinge_prs, 'Hinge_Offset')
      hinges(i) % rotation_input     = getstr(hinge_prs, 'Hinge_Rotation_Input')
      hinges(i) % rotation_amplitude = getreal(hinge_prs,'Hinge_Rotation_Amplitude')
-      
-     ! check ---
-     write(*,*) ' Hinge id:', i
-     write(*,*) ' _Tag        : ', trim(hinges(i)%tag)
-     write(*,*) ' _Nodes_Input: ', trim(hinges(i)%nodes_input)
-     ! check ---
+     hinges(i) % rotation_omega     = getreal(hinge_prs,'Hinge_Rotation_Omega')
+     hinges(i) % rotation_phase     = getreal(hinge_prs,'Hinge_Rotation_Phase')
+     
+     !> Overwrite 'constant' rotation_input with 'function:const'
+     if ( trim( hinges(i)%rotation_input ) .eq. 'constant' ) then
+       hinges(i)%rotation_input = 'function:const'
+     end if
+
+!    ! check ---
+!    write(*,*) ' Hinge id:', i
+!    write(*,*) ' _Tag        : ', trim(hinges(i)%tag)
+!    write(*,*) ' _Nodes_Input: ', trim(hinges(i)%nodes_input)
+!    ! check ---
 
   end do
+
 
 end subroutine build_hinges
 
@@ -628,7 +677,14 @@ subroutine hinge_input_parser( geo_prs, hinge_prs )
   call hinge_prs%CreateStringOption('Hinge_Rotation_Input', &
       'Input type of the rotation: constant, function, from_file, coupling')
   call hinge_prs%CreateRealOption('Hinge_Rotation_Amplitude', &
-      'Amplitude of the rotation, for constant Rotation_Input')
+      'Amplitude of the rotation, for constant, function:const, :sin, &
+      &:cos Rotation_Input')
+  call hinge_prs%CreateRealOption('Hinge_Rotation_Omega', &
+      'Angular velocity of the rotation, for constant, function:const, &
+      &:sin, :cos Rotation_Input', '0.0')
+  call hinge_prs%CreateRealOption('Hinge_Rotation_Phase', &
+      'Phase of the rotation, for constant, function:const, :sin, :cos &
+      &Rotation_Input', '0.0')
   ! *** to do ***
   ! add all the fields required for all the input types
 

@@ -712,6 +712,7 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
  real(wp), allocatable :: rr(:,:)
 #endif
 
+ real(wp) :: time_todo = 0.0_wp  ! *** to do *** pass time as an input
  integer(h5loc) :: hiloc, hloc
  real(wp), allocatable :: rr_hinge_contig(:,:)
  integer :: i_comp, ie, ih
@@ -753,7 +754,7 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
     allocate(rr_hinge_contig(3,size(comp%i_points)))
     rr_hinge_contig = points(:, comp%i_points)
     call comp%hinge(ih)%hinge_deflection( &
-                                        rr_hinge_contig, postpro=.true. )
+                         rr_hinge_contig, time_todo, postpro=.true. )
     points(:, comp%i_points) = rr_hinge_contig
 
     deallocate(rr_hinge_contig)

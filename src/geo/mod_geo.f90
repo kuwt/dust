@@ -1023,12 +1023,17 @@ subroutine load_components(geo, in_file, out_file, te)
 
         call read_hdf5( geo%components(i_comp)%hinge(ih)%input_type, &
                                             'Hinge_Rotation_Input'    , hiloc)
-        call read_hdf5( rotation_amplitude, 'Hinge_Rotation_Amplitude', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_ampl , 'Hinge_Rotation_Amplitude', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_omega, 'Hinge_Rotation_Omega', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_phase, 'Hinge_Rotation_Phase', hiloc)
         allocate( geo%components(i_comp)%hinge(ih)%theta( &
                   geo%components(i_comp)%hinge(ih)%n_nodes ) )
         allocate( geo%components(i_comp)%hinge(ih)%theta_old( &
                   geo%components(i_comp)%hinge(ih)%n_nodes ) )
-        geo%components(i_comp)%hinge(ih)%theta     = rotation_amplitude
+        !> Initialize theta
+        ! *** to do *** move to a subroutine, to treat all the different inputs
+        geo%components(i_comp)%hinge(ih)%theta     = &
+                                           geo%components(i_comp)%hinge(ih)%f_ampl
         geo%components(i_comp)%hinge(ih)%theta_old = 0.0_wp
 
         call close_hdf5_group( hiloc )
@@ -1189,7 +1194,12 @@ subroutine load_components(geo, in_file, out_file, te)
 
           call write_hdf5( geo%components(i_comp)%hinge(ih)%input_type, &
                                                'Hinge_Rotation_Input'    , hiloc)
-          call write_hdf5( rotation_amplitude, 'Hinge_Rotation_Amplitude', hiloc)
+          call write_hdf5( geo%components(i_comp)%hinge(ih)%f_ampl , &
+                                               'Hinge_Rotation_Amplitude', hiloc)
+          call write_hdf5( geo%components(i_comp)%hinge(ih)%f_omega, &
+                                                   'Hinge_Rotation_Omega', hiloc)
+          call write_hdf5( geo%components(i_comp)%hinge(ih)%f_phase, &
+                                                   'Hinge_Rotation_Phase', hiloc)
   
         end do
         !> Hinges -------------------------------------------------------------
@@ -1224,12 +1234,6 @@ subroutine load_components(geo, in_file, out_file, te)
       allocate(geo%components(i_comp)%loc_points(3,size(rr,2)))
       geo%components(i_comp)%loc_points = rr
 
-!     ! debug ---
-!     write(*,*) ' debug in mod_geo, l.1009. rr, i_comp: ', i_comp
-!     do i = 1, size(rr,2)
-!       write(*,*) rr(:,i), '           ', &
-!                  geo%components(i_comp)%loc_points(:,i)
-!     end do
 
       !Now for the moments the points are stored here without moving them,
       !will be moved later, consider not storing them here at all
@@ -2024,6 +2028,8 @@ subroutine update_geometry(geo, t, update_static)
   
     if (comp%moving .or. update_static) then
 
+      write(*,*) ' bla bla bla '
+
       !> store %nor at previous time step, for moving, used few lines
       ! below to evaluate unit normal time derivative dn_dt
       if ( .not. update_static ) then
@@ -2059,8 +2065,8 @@ subroutine update_geometry(geo, t, update_static)
 
       !> Calculate the velocity of the centers to assing b.c.
       do ie = 1,size(comp%el)
-        call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &
-                                geo%refs(comp%ref_id)%f_g)
+        call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%R_g, &
+                                       geo%refs(comp%ref_id)%f_g )
       enddo
 
     end if
@@ -2069,16 +2075,31 @@ subroutine update_geometry(geo, t, update_static)
 
   !> Hinges -----------------------------------------------------------
   ! *** to do ***
-  !> update hinge point coordinates, for moving/coupled components
-  !> update hinge point rotation
   !> update geometrical quantities (position, velocity) of the elements
   do ih = 1, comp%n_hinges
 
-    !> Allocating 
+    !> Update:
+    ! - hinge node coordinates, act%rr
+    ! - hinge node orientation (unit vectors h,v,n)
+    ! - hinge rotation angle, theta
+    ! for non-coupled components only (so far)
+    if ( .not. comp%coupling ) then
+      !> hinge nodes, points and orientation
+      call comp%hinge(ih)%update_hinge_nodes( geo%refs(comp%ref_id)%R_g, &
+                                              geo%refs(comp%ref_id)%f_g )
+      !> hinge rotation, theta
+      call comp%hinge(ih)%update_theta( t )
+    else
+      ! *** to do ***
+    end if
+
+
+    !> Allocating  contiguous array to pass to %hinge_deflection procedure
     allocate(rr_hinge_contig(3,size(comp%i_points)))
     rr_hinge_contig = geo%points(:, comp%i_points)
+
     call comp%hinge(ih)%hinge_deflection( &
-                                        rr_hinge_contig )
+                                   rr_hinge_contig, t )
     geo%points(:, comp%i_points) = rr_hinge_contig
 
     deallocate(rr_hinge_contig)
@@ -2089,7 +2110,8 @@ subroutine update_geometry(geo, t, update_static)
   do ie = 1,size(comp%el)
     call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
   enddo
-  !Velocity of the elem center
+  ! Velocity of the elem center
+  ! *** to do *** 
   ! ...
 
   !> Hinges -----------------------------------------------------------
