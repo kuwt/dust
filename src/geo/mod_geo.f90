@@ -1017,17 +1017,19 @@ subroutine load_components(geo, in_file, out_file, te)
                                                          'Offset', hiloc)
         call read_hdf5( geo%components(i_comp)%hinge(ih)%ref_dir, &
                                                         'Ref_Dir', hiloc)
+        call read_hdf5_al( geo%components(i_comp)%hinge(ih)%ref%rr, 'rr', hiloc)
+        geo%components(i_comp)%hinge(ih)%n_nodes = size( &
+           geo%components(i_comp)%hinge(ih)%ref%rr, 2)
+
         call read_hdf5( geo%components(i_comp)%hinge(ih)%input_type, &
                                             'Hinge_Rotation_Input'    , hiloc)
         call read_hdf5( rotation_amplitude, 'Hinge_Rotation_Amplitude', hiloc)
         allocate( geo%components(i_comp)%hinge(ih)%theta( &
                   geo%components(i_comp)%hinge(ih)%n_nodes ) )
-        geo%components(i_comp)%hinge(ih)%theta = rotation_amplitude
-
-        call read_hdf5_al( geo%components(i_comp)%hinge(ih)%ref%rr, 'rr', hiloc)
-
-        geo%components(i_comp)%hinge(ih)%n_nodes = size( &
-           geo%components(i_comp)%hinge(ih)%ref%rr, 2)
+        allocate( geo%components(i_comp)%hinge(ih)%theta_old( &
+                  geo%components(i_comp)%hinge(ih)%n_nodes ) )
+        geo%components(i_comp)%hinge(ih)%theta     = rotation_amplitude
+        geo%components(i_comp)%hinge(ih)%theta_old = 0.0_wp
 
         call close_hdf5_group( hiloc )
 
@@ -1036,12 +1038,37 @@ subroutine load_components(geo, in_file, out_file, te)
                                       geo%components(i_comp)%hinge(ih) )
         call initialize_hinge_config( geo%components(i_comp)%hinge(ih)%act , &
                                       geo%components(i_comp)%hinge(ih) )
+        ! Allocate and initialize hinge node coords in the actual configuration
+        allocate( geo%components(i_comp)%hinge(ih)%act%rr( &
+                3,geo%components(i_comp)%hinge(ih)%n_nodes ) )
+        geo%components(i_comp)%hinge(ih)%act%rr = &
+                                      geo%components(i_comp)%hinge(ih)%ref%rr
 
         !> Build hinge connectivity and weights
         call geo%components(i_comp)%hinge(ih)%build_connectivity( rr )
 
       end do
 
+      !> Some checks ---
+      write(*,*)
+      write(*,*) ' ---------------------------------- '
+      write(*,*) ' Some checks in mode_geo.f90, after hinge objects construction'
+      write(*,*) ' component: ', i_comp, ' n_hinges: ', n_hinges
+      do ih = 1, n_hinges
+        write(*,*) ' Hinge: ', ih
+        write(*,*) ' n_nodes: ', geo%components(i_comp)%hinge(ih)%n_nodes
+        write(*,*) ' theta  : ', geo%components(i_comp)%hinge(ih)%theta
+        write(*,*) ' nrot   : ', size( &
+                                 geo%components(i_comp)%hinge(ih)%rot%node_id )
+        write(*,*) ' nble   : ', size( &
+                                 geo%components(i_comp)%hinge(ih)%blen%node_id )
+        write(*,*) '  rot%node_id : ', &
+                                 geo%components(i_comp)%hinge(ih)%rot%node_id 
+        write(*,*) ' blen%node_id : ', &
+                                 geo%components(i_comp)%hinge(ih)%blen%node_id 
+      end do
+      write(*,*) ' ---------------------------------- '
+      write(*,*)
 
 
       ! for PARAMETRIC elements only:
@@ -1955,7 +1982,9 @@ subroutine update_geometry(geo, t, update_static)
  real(wp), intent(in) :: t
  logical, intent(in) :: update_static
 
- integer :: i_comp, ie
+ real(wp), allocatable :: rr_hinge_debug(:,:)
+ real(wp), allocatable :: rr_hinge_contig(:,:)
+ integer :: i_comp, ie, ih, i_deb
 
  !update all the references
  call update_all_references(geo%refs,t)
@@ -1969,32 +1998,28 @@ subroutine update_geometry(geo, t, update_static)
   
     if (comp%moving .or. update_static) then
 
-      !> compute dn_dt: store %nor at previous time step, for moving
-      ! components
+      !> store %nor at previous time step, for moving, used few lines
+      ! below to evaluate unit normal time derivative dn_dt
       if ( .not. update_static ) then
         do ie = 1 , size(comp%el)
           comp%el(ie)%nor_old = comp%el(ie)%nor
         end do
       end if
 
-      ! ! debug ---
-      ! write(*,*) ' comp%loc_points : '
-      ! write(*,*)   comp%loc_points    
-
+      !> Move points of the component
       geo%points(:,comp%i_points) = move_points(comp%loc_points, &
                            geo%refs(comp%ref_id)%R_g, &
                            geo%refs(comp%ref_id)%of_g)
 
+      !> Update geometrical data of the elements, after geometry motion
       do ie = 1,size(comp%el)
-        !comp%el(ie)%ver = move_points(comp%loc_points(:,comp%el(ie)%i_ver), &
-        !                   geo%refs(comp%ref_id)%R_g, &
-        !                   geo%refs(comp%ref_id)%of_g)
-
         call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
       enddo
 
-      !> compute dn_dt: set %nor_old = %nor for static elements 
-      ! and first time step
+      !> Unit normal vector time derivative, dn_dt
+      ! set %nor_old = %nor for static elements and first time step,
+      ! this if statement completes the if statement found few lines
+      ! above, avoiding initialization issues (dirty implementation?)
       if ( update_static ) then
         do ie = 1 , size(comp%el)
           comp%el(ie)%nor_old = comp%el(ie)%nor
@@ -2006,19 +2031,8 @@ subroutine update_geometry(geo, t, update_static)
                               sim_param % dt
       end do
 
-! 2018.11.15 Moved outside, at the end of create_geometry
-! !     !in the first pass compute also the velocity stencil for surfpans
-! !     if(update_static) then
-!         select type(els=>comp%el); class is(t_surfpan)
-!         do ie = 1,size(els)
-!           call els(ie)%create_local_velocity_stencil()
-!         enddo
-!         end select
-! !     endif
-
-
+      !> Calculate the velocity of the centers to assing b.c.
       do ie = 1,size(comp%el)
-        !Calculate the velocity of the centers to assing b.c.
         call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &
                                 geo%refs(comp%ref_id)%f_g)
       enddo
@@ -2026,6 +2040,32 @@ subroutine update_geometry(geo, t, update_static)
     end if
 
   end if  ! if ( .not. comp%coupling )
+
+  !> === Hinges ===
+  ! *** to do ***
+  !> update hinge point coordinates, for moving/coupled components
+  !> update hinge point rotation
+  !> update geometrical quantities (position, velocity) of the elements
+  do ih = 1, comp%n_hinges
+
+    !> Allocating 
+    allocate(rr_hinge_contig(3,size(comp%i_points)))
+    rr_hinge_contig = geo%points(:, comp%i_points)
+    call comp%hinge(ih)%hinge_deflection( &
+                                        rr_hinge_contig )
+    geo%points(:, comp%i_points) = rr_hinge_contig
+
+    deallocate(rr_hinge_contig)
+  end do
+
+  !> Then update geometrical data
+  ! Position of the elem nodes
+  do ie = 1,size(comp%el)
+    call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
+  enddo
+  !Velocity of the elem center
+  ! ...
+
   end associate
  enddo
 

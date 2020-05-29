@@ -47,7 +47,7 @@
 module mod_hinges
 
 use mod_param, only: &
-  wp, max_char_len
+  wp, max_char_len, pi
 
 use mod_math, only: &
   cross
@@ -160,6 +160,7 @@ type :: t_hinge
 
   !> Array of the rotation angle (read as an input, or from coupling nodes)
   real(wp), allocatable :: theta(:)
+  real(wp), allocatable :: theta_old(:)
 
   !> Reference configuration
   type(t_hinge_config) :: ref
@@ -216,6 +217,10 @@ subroutine build_connectivity(this, loc_points)
 
   integer :: nrot, nble
 
+  ! debug ---
+  integer :: i_debug = 0
+  ! debug ---
+
   !> N. of surfae and hinge nodes
   nb = size(loc_points,2)
   nh = this%n_nodes
@@ -267,6 +272,7 @@ subroutine build_connectivity(this, loc_points)
       elseif ( rrb(1,ib) .gt. this%offset ) then ! rigid rotation
 
         nrot = nrot + 1
+        rot_node_id(nrot) = ib
 
         do ih = 1, nh
           dist_all(ih) = abs( rrb(2,ib) - rrh(2,ih) )
@@ -388,14 +394,14 @@ subroutine hinge_deflection( this, rr )
   real(wp) :: th, thp, yc, xq, yq, xqp, yqp
   real(wp) :: nx(3,3), Rot_I(3,3)
   integer :: nrot, nble, ib, ih, ii
- 
+
   !> n.nodes in the rigid-rotation and in the blending regions
   nrot = size(this%rot %node_id)
   nble = size(this%blen%node_id)
 
   do ih = 1, this%n_nodes
 
-    th = this % theta(ih)
+    th = ( this % theta(ih) - this % theta_old(ih) ) * pi/180.0_wp
 
     if ( th .ne. 0.0_wp ) then ! (equality check on real?)
 
@@ -415,12 +421,13 @@ subroutine hinge_deflection( this, rr )
       end do
     
       !> Blending region
-      do ib = 1, size(this%rot%n2h(ih)%p2h)
+      do ib = 1, size(this%blen%n2h(ih)%p2h)
 
-        th = -th  ! dirty implementation *** to do ***
         ii = this%blen%n2h(ih)%p2h(ib)
-        !> coordinate of the centre of the circle used for 
-        ! blending, in the n-direction
+        th = -th  ! dirty implementation *** to do ***
+
+        !> coordinate of the centre of the circle used for blending, 
+        ! in the n-direction
         yc = cos(th)/sin(th) * this%offset * ( 1.0_wp + cos(th) ) + &
                                this%offset * sin(th)
         !> Some auxiliary quantities
@@ -430,7 +437,7 @@ subroutine hinge_deflection( this, rr )
         xqp = yc*sin(thp)          - this%offset - yq*sin(thp) - xq
         yqp = yc*(1.0_wp-cos(thp))               + yq*cos(thp) - yq
 
-        ! > Update coordinates
+        !> Update coordinates
         rr(:,ii) = rr(:,ii) + &
                    this%blen%n2h(ih)%w2h(ib) * &
                  ( xqp * this%act%v(:,ih) + yqp * this%act%n(:,ih) )
@@ -440,6 +447,9 @@ subroutine hinge_deflection( this, rr )
       end do
 
     end if
+
+    !> Update theta_old
+    this % theta_old(ih) = this % theta(ih)
 
   end do
 
