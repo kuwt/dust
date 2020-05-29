@@ -385,9 +385,9 @@ subroutine hinge_deflection( this, rr )
   class(t_hinge), intent(inout) :: this
   real(wp)      , intent(inout) :: rr(:,:)
 
-  real(wp) :: th, thp, yc, xq, yq, xqp, yqp
+  real(wp) :: th
   real(wp) :: nx(3,3), Rot_I(3,3)
-  integer :: nrot, nble, ib, ih, ii
+  integer :: nrot, nble, ib, ih
  
   !> n.nodes in the rigid-rotation and in the blending regions
   nrot = size(this%rot %node_id)
@@ -407,7 +407,7 @@ subroutine hinge_deflection( this, rr )
       Rot_I = sin(th) * nx + ( 1.0_wp - cos(th) ) * matmul( nx, nx )
 
       !> Rigid rotation
-      do ib = 1, size(this%rot%n2h(ih)%p2h)
+      do ib = 1, size(this%rot%n2h(ih))
         ii = this%rot%n2h(ih)%p2h(ib)
         rr(:,ii) = rr(:,ii) + &
                    this%rot%n2h(ih)%w2h(ib) * &
@@ -415,7 +415,7 @@ subroutine hinge_deflection( this, rr )
       end do
     
       !> Blending region
-      do ib = 1, size(this%rot%n2h(ih)%p2h)
+      do ib = 1, size(this%rot%n2h(ih))
 
         th = -th  ! dirty implementation *** to do ***
         ii = this%blen%n2h(ih)%p2h(ib)
@@ -423,14 +423,11 @@ subroutine hinge_deflection( this, rr )
         ! blending, in the n-direction
         yc = cos(th)/sin(th) * this%offset * ( 1.0_wp + cos(th) ) + &
                                this%offset * sin(th)
-        !> Some auxiliary quantities
-        xq = sum( ( rr(:,ii) - this%act%rr(:,ih) ) * this%act%v(:,ih) )
-        yq = sum( ( rr(:,ii) - this%act%rr(:,ih) ) * this%act%n(:,ih) )
-        thp = 0.5_wp * ( xq + this%offset ) / this%offset * th
-        xqp = yc*sin(thp)          - this%offset - yq*sin(thp) - xq
-        yqp = yc*(1.0_wp-cos(thp))               + yq*cos(thp) - yq
-
-        ! > Update coordinates
+        xq = 
+        yq = 
+        thp = 
+        xqp = 
+        yqp = 
         rr(:,ii) = rr(:,ii) + &
                    this%blen%n2h(ih)%w2h(ib) * &
                  ( xqp * this%act%v(:,ih) + yqp * this%act%n(:,ih) )
