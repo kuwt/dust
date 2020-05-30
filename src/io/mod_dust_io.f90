@@ -132,7 +132,7 @@ subroutine save_status(geo, wake, it, time, run_id)
  real(wp), intent(in)            :: time
  integer, intent(in)             :: run_id(10)
 
- integer(h5loc) :: floc, gloc1, gloc2, gloc3, ploc
+ integer(h5loc) :: floc, gloc1, gloc2, gloc3, gloc4, ploc
  character(len=max_char_len) :: comp_name, sit
  integer :: icomp, ncomp
  integer :: iref, nref
@@ -148,7 +148,9 @@ subroutine save_status(geo, wake, it, time, run_id)
  real(wp), allocatable :: alpha(:), vel_2d(:), vel_outplane(:)
  real(wp), allocatable :: alpha_isolated(:), vel_2d_isolated(:)
  real(wp), allocatable :: vel_outplane_isolated(:), aero_coeff(:,:)
- integer :: ir, id, ip, np
+ integer :: ir, id, ip, np, ih
+ ! Hinges
+ character(len=2) :: hinge_id_str
 
   !create the output file
   write(sit,'(I4.4)') it
@@ -243,6 +245,25 @@ subroutine save_status(geo, wake, it, time, run_id)
       deallocate(aero_coeff)
     endif
 
+    call close_hdf5_group(gloc3)
+
+    !> Hinges: node position, node orientation(v,h,n), theta, theta_old
+    call new_hdf5_group(gloc2, 'Hinges', gloc3)
+    call write_hdf5(geo%components(icomp)%n_hinges, 'n_hinges', gloc3)
+    do ih = 1, geo%components(icomp)%n_hinges
+      !> Open hinge group
+      write(hinge_id_str,'(I2.2)') ih
+      call new_hdf5_group(gloc3, 'Hinge_'//hinge_id_str, gloc4)
+      associate( comp => geo%components(icomp) )
+        call write_hdf5( comp%hinge(ih)%act%rr, 'act_rr', gloc4 )
+        call write_hdf5( comp%hinge(ih)%act%v , 'act_v ', gloc4 )
+        call write_hdf5( comp%hinge(ih)%act%h , 'act_h ', gloc4 )
+        call write_hdf5( comp%hinge(ih)%act%n , 'act_n ', gloc4 )
+        call write_hdf5( comp%hinge(ih)%theta     , 'theta'     , gloc4 )
+        call write_hdf5( comp%hinge(ih)%theta_old , 'theta_old' , gloc4 )
+      end associate
+      call close_hdf5_group(gloc4)
+    end do
     call close_hdf5_group(gloc3)
 
     if(sim_param%output_detailed_geo) then

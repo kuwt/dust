@@ -241,7 +241,8 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
     ! Load the references and move the points ---
     call load_refs(floc,refs_R,refs_off)
     ! Move the points ---------------------------
-    call update_points_postpro(comps, points, refs_R, refs_off)
+    call update_points_postpro(comps, points, refs_R, refs_off, &
+                               filen = trim(filename) )
     ! Load the results --------------------------
     call load_res(floc, comps, vort, cp, t)
   

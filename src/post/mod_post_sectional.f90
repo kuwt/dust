@@ -383,7 +383,8 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
       ! Load the references and move the points ---
       call load_refs(floc,refs_R,refs_off)
       ! Move the points ---------------------------
-      call update_points_postpro(comps, points, refs_R, refs_off)
+      call update_points_postpro(comps, points, refs_R, refs_off, &
+                                 filen = trim(filename) )
       ! Load the results --------------------------
       call load_res(floc, comps, vort, cp, t)
       if(print_ll) call load_ll(floc, comps, ll_data(ires,:,:))

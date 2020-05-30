@@ -227,14 +227,9 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     ! Load the references
     call load_refs(floc,refs_R,refs_off)
 
-#if USE_PRECICE
     ! Move the points
     call update_points_postpro(comps, points, refs_R, refs_off, &
-                               filen = filename )
-#else
-    ! Move the points
-    call update_points_postpro(comps, points, refs_R, refs_off)
-#endif
+                               filen = trim(filename) )
     !expand the actuator disks
     call expand_actdisk_postpro(comps, points, points_exp, elems)
     if(average) then

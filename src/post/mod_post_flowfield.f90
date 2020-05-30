@@ -325,7 +325,8 @@ do it = an_start, an_end, an_step ! Time history
   ! Load the references and move the points ---
   call load_refs(floc,refs_R,refs_off,refs_G,refs_f)
 
-  call update_points_postpro(comps, points, refs_R, refs_off, refs_G, refs_f)
+  call update_points_postpro(comps, points, refs_R, refs_off, refs_G, refs_f, &
+                             filen = trim(filename) )
 
   ! Load the results --------------------------
   call load_res(floc, comps, vort, cp, t)

@@ -692,13 +692,8 @@ function move_points(pp, R, of)  result(rot_pp)
 end function move_points
 
 !----------------------------------------------------------------------
-#if USE_PRECICE
 subroutine update_points_postpro(comps, points, refs_R, refs_off, &
                                  refs_G , refs_f, filen)
-#else
-subroutine update_points_postpro(comps, points, refs_R, refs_off, &
-                                 refs_G , refs_f)
-#endif
  type(t_geo_component), intent(inout) :: comps(:)
  real(wp), intent(inout) :: points(:,:)
  real(wp), intent(in)    :: refs_R(:,:,0:)
@@ -706,16 +701,17 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
  real(wp), optional , intent(in)    :: refs_G(:,:,0:)
  real(wp), optional , intent(in)    :: refs_f(:,0:)
 #if USE_PRECICE
- character(max_char_len), optional, intent(in) :: filen
- character(max_char_len) :: cname
- integer(h5loc) :: floc, gloc, cloc, rloc
  real(wp), allocatable :: rr(:,:)
 #endif
+ character(len=*), optional, intent(in) :: filen
+ character(max_char_len) :: cname
+ integer(h5loc) :: floc, gloc, cloc, rloc
 
  real(wp) :: time_todo = 0.0_wp  ! *** to do *** pass time as an input
  integer(h5loc) :: hiloc, hloc
  real(wp), allocatable :: rr_hinge_contig(:,:)
  integer :: i_comp, ie, ih
+ character(len=2) :: hinge_id_str
 
  do i_comp = 1,size(comps)
   associate(comp => comps(i_comp))
@@ -747,10 +743,27 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
   endif
 #endif
 
+  
   !> Hinges ----------------------------------------------------------------
+  !> Re-open and close result hdf5 file and groups
+  call open_hdf5_file ( trim(filen), floc )
+  call open_hdf5_group( floc, 'Components', gloc )
+  write(cname,'(A,I3.3)') 'Comp', i_comp
+  call open_hdf5_group( gloc, trim(cname), cloc )
+  call open_hdf5_group( cloc, 'Hinges', hloc )
   do ih = 1, comp%n_hinges
+    
+    !> Read hinge node position, orientation and theta
+    write(hinge_id_str,'(I2.2)') ih
+    call open_hdf5_group( hloc, 'Hinge_'//hinge_id_str, hiloc)
+    call read_hdf5_al( comp%hinge(ih)%act%rr, 'act_rr', hiloc)
+    call read_hdf5_al( comp%hinge(ih)%act%v , 'act_v ', hiloc)
+    call read_hdf5_al( comp%hinge(ih)%act%h , 'act_h ', hiloc)
+    call read_hdf5_al( comp%hinge(ih)%act%n , 'act_n ', hiloc)
+    call read_hdf5_al( comp%hinge(ih)%theta    , 'theta'    , hiloc)
+    call read_hdf5_al( comp%hinge(ih)%theta_old, 'theta_old', hiloc)
 
-    !> Allocating 
+    !> Allocating contiguous array
     allocate(rr_hinge_contig(3,size(comp%i_points)))
     rr_hinge_contig = points(:, comp%i_points)
     call comp%hinge(ih)%hinge_deflection( &
@@ -758,8 +771,15 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
     points(:, comp%i_points) = rr_hinge_contig
 
     deallocate(rr_hinge_contig)
+
+    call close_hdf5_group(hiloc)
     
   end do
+
+  call close_hdf5_group(hloc)
+  call close_hdf5_group(cloc)
+  call close_hdf5_group(gloc)
+  call close_hdf5_file(floc)
   !> Hinges ----------------------------------------------------------------
 
   do ie = 1,size(comp%el)

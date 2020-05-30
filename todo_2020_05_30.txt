@@ -1,3 +1,8 @@
 TODO list:
-- initialize %theta field for different hinge rotation input functions
-- in postpro routines, pass time to update time dependent hinge rotations
+- fix TE bug with moving hinges. First wake elements looks to drift towards
+  the LE, w/o being coincidente with the TE of the geometrical component
+- update velocity of the elem centers due to hinge motion
+- make all the solver and postprocessor ooutput process consistent with the
+  output_detailed_geo = T option available in dust.in
+  e.g. in dust_post: if Components/rr present in hdf5 file, read rr, w/o
+  re-constructing the motion
