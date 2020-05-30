@@ -184,7 +184,8 @@ type :: t_hinge
   contains
  
   procedure, pass(this) :: build_connectivity
-  procedure, pass(this) :: from_reference_to_actual_config
+  procedure, pass(this) :: init_theta
+  procedure, pass(this) :: from_reference_to_actual_config ! empty (useless?)
   procedure, pass(this) :: update_hinge_nodes
   procedure, pass(this) :: update_theta
   procedure, pass(this) :: hinge_deflection
@@ -198,9 +199,6 @@ contains
 ! ---------------------------------------------------------------
 !> Build hinge connectivity from component nodes rr, expressed in the
 ! local reference frame, and the hinge nodes.
-! >
-! >
-! >
 subroutine build_connectivity(this, loc_points)
   class(t_hinge), intent(inout) :: this
   real(wp),       intent(in)    :: loc_points(:,:)
@@ -383,6 +381,28 @@ end subroutine sort_vector_real
 
 ! ---------------------------------------------------------------
 !> Compute actual configuration of the hinge nodes
+! *** to do *** unpredictable (or better, wrong) behavior when
+! restarting a simulation
+subroutine init_theta(this, t)
+  class(t_hinge), intent(inout) :: this
+  real(wp)      , intent(in)    :: t
+
+  if ( t .ne. 0.0_wp ) then
+    write(*,*) ' Error in t_hinge % init_theta: t .ne. 0.0_wp. &
+               &This argument is meant for future restart capabilities. &
+               &So far, must be passed to the function equal to 0.0_wp. Stop'
+    stop
+  end if
+
+  call this % update_theta( t )
+
+  this%theta_old = 0.0_wp
+
+
+end subroutine init_theta
+
+! ---------------------------------------------------------------
+!> Compute actual configuration of the hinge nodes
 subroutine from_reference_to_actual_config(this)
   class(t_hinge), intent(inout) :: this
 
@@ -416,11 +436,21 @@ end subroutine update_hinge_nodes
 
 ! ---------------------------------------------------------------
 !> Update hinge nodes, for non-coupled components
-subroutine update_theta( this, time )
+subroutine update_theta( this, t )
   class(t_hinge), intent(inout) :: this
-  real(wp)      , intent(in)    :: time
+  real(wp)      , intent(in)    :: t
 
-  
+  if ( trim(this%input_type) .eq. 'function:const' ) then
+    this%theta = this%f_ampl
+  elseif ( trim(this%input_type) .eq. 'function:sin' ) then
+    this%theta = this%f_ampl * sin( this%f_omega * t - this%f_phase )
+  elseif ( trim(this%input_type) .eq. 'function:cos' ) then
+    this%theta = this%f_ampl * cos( this%f_omega * t - this%f_phase )
+  else
+    write(*,*) ' Error in t_hinge % init_theta(): only working &
+               &with function:const, :sin, :cos, so far. Stop'; stop
+  end if
+
 
 end subroutine update_theta
 
@@ -435,8 +465,8 @@ subroutine hinge_deflection( this, rr, t, postpro )
   logical            ::   local_postpro
   logical, parameter :: default_postpro = .false.
 
-  real(wp) :: th, thp, yc, xq, yq, xqp, yqp
-  real(wp) :: nx(3,3), Rot_I(3,3)
+  real(wp) :: th, th1, thp, yc, xq, yq, xqp, yqp
+  real(wp) :: nx(3,3), Rot_I(3,3), Rot(3,3)
   integer :: nrot, nble, ib, ih, ii
 
   !> Use the same routine for solver (incremental rotation) and
@@ -465,6 +495,10 @@ subroutine hinge_deflection( this, rr, t, postpro )
       nx(3,:) = (/ -this%act%h(2,ih),  this%act%h(1,ih),            0.0_wp /)
 
       Rot_I = sin(th) * nx + ( 1.0_wp - cos(th) ) * matmul( nx, nx )
+      Rot = Rot_I
+      Rot(1,1) = Rot_I(1,1) + 1.0_wp
+      Rot(2,2) = Rot_I(2,2) + 1.0_wp
+      Rot(3,3) = Rot_I(3,3) + 1.0_wp
 
       !> Rigid rotation
       do ib = 1, size(this%rot%n2h(ih)%p2h)
@@ -472,6 +506,9 @@ subroutine hinge_deflection( this, rr, t, postpro )
         rr(:,ii) = rr(:,ii) + &
                    this%rot%n2h(ih)%w2h(ib) * &
                    matmul( Rot_I, rr(:,ii)-this%act%rr(:,ih) )
+        ! rr(:,ii) = this%rot%n2h(ih)%w2h(ib) * &
+        !          ( this%act%rr(:,ih) + &
+        !            matmul( Rot, rr(:,ii)-this%act%rr(:,ih) ) )
       end do
     
       !> Blending region
@@ -591,17 +628,36 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
        write(*,*) ' Wrong Hinge_Nodes_Input input. Stop '; stop
      end if
 
+     !> Hinge reference direction (zero rotation direction) and offset to
+     ! avoid irregular behavior during hinge rotation
      hinges(i) % ref_dir = getrealarray(hinge_prs, 'Hinge_Ref_Dir', 3)
      hinges(i) % offset  = getreal(hinge_prs, 'Hinge_Offset')
-     hinges(i) % rotation_input     = getstr(hinge_prs, 'Hinge_Rotation_Input')
-     hinges(i) % rotation_amplitude = getreal(hinge_prs,'Hinge_Rotation_Amplitude')
-     hinges(i) % rotation_omega     = getreal(hinge_prs,'Hinge_Rotation_Omega')
-     hinges(i) % rotation_phase     = getreal(hinge_prs,'Hinge_Rotation_Phase')
-     
+
+     !> Hinge input: function, amplitude
      !> Overwrite 'constant' rotation_input with 'function:const'
      if ( trim( hinges(i)%rotation_input ) .eq. 'constant' ) then
        hinges(i)%rotation_input = 'function:const'
      end if
+     hinges(i) % rotation_input     = getstr(hinge_prs, 'Hinge_Rotation_Input')
+     if ( ( trim(hinges(i)%rotation_input) .ne. 'function:const' ) .or. &
+          ( trim(hinges(i)%rotation_input) .ne. 'function:sin'   ) .or. &
+          ( trim(hinges(i)%rotation_input) .ne. 'function:cos'   ) .or. &
+          ( trim(hinges(i)%rotation_input) .ne. 'from_file'      ) .or. &
+          ( trim(hinges(i)%rotation_input) .ne. 'coupling'       ) ) then
+     else
+       if ( trim(hinges(i)%rotation_input) .eq. 'from_file' ) then
+         write(*,*) ' Error in t_hinge%build_hinge(): rotation_input = from_file &
+                    &not implemented yet.'
+       end if
+       if ( trim(hinges(i)%rotation_input) .eq. 'coupling' ) then
+         write(*,*) ' Error in t_hinge%build_hinge(): rotation_input = coupling &
+                    &not implemented yet.'
+       end if
+     end if
+     hinges(i) % rotation_amplitude = getreal(hinge_prs,'Hinge_Rotation_Amplitude')
+     hinges(i) % rotation_omega     = getreal(hinge_prs,'Hinge_Rotation_Omega')
+     hinges(i) % rotation_phase     = getreal(hinge_prs,'Hinge_Rotation_Phase')
+     
 
 !    ! check ---
 !    write(*,*) ' Hinge id:', i

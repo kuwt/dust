@@ -1,0 +1,3 @@
+TODO list:
+- initialize %theta field for different hinge rotation input functions
+- in postpro routines, pass time to update time dependent hinge rotations

@@ -1030,11 +1030,9 @@ subroutine load_components(geo, in_file, out_file, te)
                   geo%components(i_comp)%hinge(ih)%n_nodes ) )
         allocate( geo%components(i_comp)%hinge(ih)%theta_old( &
                   geo%components(i_comp)%hinge(ih)%n_nodes ) )
-        !> Initialize theta
-        ! *** to do *** move to a subroutine, to treat all the different inputs
-        geo%components(i_comp)%hinge(ih)%theta     = &
-                                           geo%components(i_comp)%hinge(ih)%f_ampl
-        geo%components(i_comp)%hinge(ih)%theta_old = 0.0_wp
+
+        !> Initialize theta: set the values of theta and theta_old fields
+        call geo%components(i_comp)%hinge(ih)%init_theta( t=0.0_wp )
 
         call close_hdf5_group( hiloc )
 
