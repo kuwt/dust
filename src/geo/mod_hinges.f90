@@ -481,11 +481,12 @@ subroutine hinge_deflection( this, rr, t, postpro )
 
   do ih = 1, this%n_nodes
 
-    if ( .not. local_postpro ) then
-      th = ( this % theta(ih) - this % theta_old(ih) ) * pi/180.0_wp
-    else 
-      th =   this % theta(ih)                          * pi/180.0_wp
-    end if
+    ! if ( .not. local_postpro ) then
+    !   th = ( this % theta(ih) - this % theta_old(ih) ) * pi/180.0_wp
+    ! else 
+    !   th =   this % theta(ih)                          * pi/180.0_wp
+    ! end if
+    th =   this % theta(ih)                          * pi/180.0_wp
 
     if ( th .ne. 0.0_wp ) then ! (equality check on real?)
 

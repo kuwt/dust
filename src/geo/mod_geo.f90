@@ -2096,11 +2096,10 @@ subroutine update_geometry(geo, t, update_static)
     allocate(rr_hinge_contig(3,size(comp%i_points)))
     rr_hinge_contig = geo%points(:, comp%i_points)
 
-    call comp%hinge(ih)%hinge_deflection( &
-                                   rr_hinge_contig, t )
+    call comp%hinge(ih)%hinge_deflection( rr_hinge_contig, t )
     geo%points(:, comp%i_points) = rr_hinge_contig
-
     deallocate(rr_hinge_contig)
+
   end do
 
   !> Then update geometrical data
