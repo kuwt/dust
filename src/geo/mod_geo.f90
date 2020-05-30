@@ -2117,6 +2117,11 @@ subroutine update_geometry(geo, t, update_static)
   end associate
  enddo
 
+ !> debug ---
+ write(*,*) ' debug in update_geometry() '
+ write(*,*) ' rr(:,126): ', geo%points(:,126)
+ 
+
 end subroutine update_geometry
 
 !----------------------------------------------------------------------
