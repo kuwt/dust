@@ -310,12 +310,12 @@ subroutine build_connectivity(this, loc_points)
           rot_w2h(ind_v(iw),   rot_i2h(ind_v(iw))) = wei_v(iw)
           !> Spanwise weight
           if ( rrb(2,ib) .lt. 0.0_wp ) then
-            rot_s2h(ind_v(iw), rot_i2h(ind_v(iw))) = - rrb(2,ib) / this%span_blending
+            rot_s2h(ind_v(iw), rot_i2h(ind_v(iw))) = 1.0_wp + rrb(2,ib) / this%span_blending
           elseif( rrb(2,ib) .lt. hinge_width ) then
             rot_s2h(ind_v(iw), rot_i2h(ind_v(iw))) = 1.0_wp
           else
-            rot_s2h(ind_v(iw), rot_i2h(ind_v(iw))) = ( rrb(2,ib) - hinge_width ) / &
-                                                                   this%span_blending 
+            rot_s2h(ind_v(iw), rot_i2h(ind_v(iw))) = 1.0_wp - &
+                       ( rrb(2,ib) - hinge_width ) / this%span_blending 
           endif
         end do
         ! *****
@@ -344,12 +344,12 @@ subroutine build_connectivity(this, loc_points)
           ble_w2h(ind_v(iw),   ble_i2h(ind_v(iw))) = wei_v(iw)
           !> Spanwise weight
           if ( rrb(2,ib) .lt. 0.0_wp ) then
-            ble_s2h(ind_v(iw), ble_i2h(ind_v(iw))) = - rrb(2,ib) / this%span_blending
+            ble_s2h(ind_v(iw), ble_i2h(ind_v(iw))) = 1.0_wp + rrb(2,ib) / this%span_blending
           elseif( rrb(2,ib) .lt. hinge_width ) then
             ble_s2h(ind_v(iw), ble_i2h(ind_v(iw))) = 1.0_wp
           else
-            ble_s2h(ind_v(iw), ble_i2h(ind_v(iw))) = ( rrb(2,ib) - hinge_width ) / &
-                                                                   this%span_blending 
+            ble_s2h(ind_v(iw), ble_i2h(ind_v(iw))) = 1.0_wp - &
+                       ( rrb(2,ib) - hinge_width ) / this%span_blending 
           endif
         end do
         ! *****
