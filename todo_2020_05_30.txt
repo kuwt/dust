@@ -1,6 +1,7 @@
 TODO list:
-#6 check load evaluation on surface panel and vortex lattice, due to hinge rotation.
-  Start with integral loads, VL steady.
+#7 define the extension of the ailerons in the streamwise direction
+#8 linear interpolation of the aileron regions to avoid sharp discontinuities
+   w/ the fixed part of the component
 
 DONE list:
 #1 fix TE bug with moving hinges. First wake elements looks to drift towards
@@ -17,3 +18,5 @@ DONE list:
   re-constructing the motion
 #5 update linear system construction, to handle components with Motion = F
   but moving hinges. Are #5 and #3 enough to get the right results?
+#6 check load evaluation on surface panel and vortex lattice, due to hinge rotation.
+  Start with integral loads, VL steady. Bug-fix: wrong update of el%dn_dt

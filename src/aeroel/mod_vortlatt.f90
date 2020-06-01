@@ -545,6 +545,19 @@ subroutine compute_dforce_jukowski_vortlatt(this)
  this%dforce = this%dforce &
              - sim_param%rho_inf * this%area * ( &
                this%didou_dt * this%nor + this%mag * this%dn_dt )
+!! debug ---
+!write(*,'(I4,A,3F10.5,A,3F10.5,A,3F10.5,A,3E10.2)') &
+!                  this % id, '     ', this%vel_ctr_pt   , &
+!                             '     ', this%edge_vec(:,1), &
+!                             '     ', gam, &
+!                             '     ', this%dforce
+!write(*,*) ' rho_inf, area, didou_dt: ', sim_param%rho_inf, this%area, &
+!                       this%didou_dt
+!write(*,*) ' this%mag, this%dn_dt: ', &
+!             this%mag, this%dn_dt
+!write(*,*)
+!! debug ---
+
  ! ! if statement to avoid singularities
  ! if ( norm2( this % vel_ctr_pt ) .gt. &
  !        max( 0.001_wp, 0.001_wp *norm2(sim_param%u_inf) ) ) then

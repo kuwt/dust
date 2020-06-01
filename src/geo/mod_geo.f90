@@ -2064,7 +2064,7 @@ subroutine update_geometry(geo, t, update_static)
 
       do ie = 1 , size(comp%el)
         comp%el(ie)%dn_dt = ( comp%el(ie)%nor - comp%el(ie)%nor_old ) / &
-                              sim_param % dt
+                                                                sim_param % dt
       end do
 
       !> Calculate the velocity of the centers to assing b.c.
@@ -2128,7 +2128,10 @@ subroutine update_geometry(geo, t, update_static)
                                                                    sim_param%dt
       !> Update on-body velocity
       comp%el(ie)%ub = comp%el(ie)%ub + comp%el(ie)%dvel_h 
-  
+
+      !> Update time derivative of the unit normal vector
+      comp%el(ie)%dn_dt = ( comp%el(ie)%nor - comp%el(ie)%nor_old ) / &
+                                                                 sim_param % dt
     end do
   end if
   !> Hinges -----------------------------------------------------------

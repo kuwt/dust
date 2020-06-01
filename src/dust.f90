@@ -829,6 +829,14 @@ do while ( ( it .lt. nstep ) )
           !ifort bug workaround
           elems(i_el)%p%pres = sum( elems(i_el)%p%dforce * elems(i_el)%p%nor )&
                                / elems(i_el)%p%area
+
+!         ! debug ---
+!         write(*,'(I4,A,3F10.5,A,3F10.5,A,F10.5)') &
+!                                i_el, '     ', elems(i_el)%p%dforce, &
+!                                      '     ', elems(i_el)%p%nor,    &
+!                                      '     ', elems(i_el)%p%pres
+!         ! debug ---
+
       end select
     end do
   endif
