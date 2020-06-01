@@ -433,6 +433,8 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
                                                          'Nodes_Input', hiloc)
         call read_hdf5( comps(i_comp)%hinge(ih)%offset, &
                                                          'Offset', hiloc)
+        call read_hdf5( comps(i_comp)%hinge(ih)%span_blending, &
+                                              'Spanwise_Blending', hiloc)
         call read_hdf5( comps(i_comp)%hinge(ih)%ref_dir, &
                                                         'Ref_Dir', hiloc)
         call read_hdf5_al( comps(i_comp)%hinge(ih)%ref%rr, 'rr', hiloc)

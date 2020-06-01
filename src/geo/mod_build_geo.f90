@@ -982,6 +982,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     call write_hdf5(hinges(i)%rr                , 'rr'                      , hinge_i_loc)
     call write_hdf5(hinges(i)%ref_dir           , 'Ref_Dir'                 , hinge_i_loc)
     call write_hdf5(hinges(i)%offset            , 'Offset'                  , hinge_i_loc)
+    call write_hdf5(hinges(i)%span_blending     , 'Spanwise_Blending'       , hinge_i_loc)
     call write_hdf5(hinges(i)%rotation_input    , 'Hinge_Rotation_Input'    , hinge_i_loc)
     call write_hdf5(hinges(i)%rotation_amplitude, 'Hinge_Rotation_Amplitude', hinge_i_loc)
     call write_hdf5(hinges(i)%rotation_omega    , 'Hinge_Rotation_Omega'    , hinge_i_loc)

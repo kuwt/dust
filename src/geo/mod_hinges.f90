@@ -74,6 +74,7 @@ type :: t_hinge_input
   character(len=max_char_len) :: node_file
   real(wp) :: ref_dir(3)
   real(wp) :: offset
+  real(wp) :: span_blending
   character(len=max_char_len) :: rotation_input
   real(wp) :: rotation_amplitude
   real(wp) :: rotation_omega
@@ -103,6 +104,8 @@ type :: t_n2h_conn
   integer, allocatable :: p2h(:)
   !> Weights
   real(wp),allocatable :: w2h(:)
+  !> Spanwise weights
+  real(wp),allocatable :: s2h(:)
 end type t_n2h_conn
 
 ! ---------------------------------------------------------------
@@ -129,6 +132,9 @@ type :: t_hinge_config
   !> n: normal direction
   real(wp), allocatable :: n(:,:)
 
+  !> Spanwise weight to avoid irregulat behaviors
+  real(wp) :: span_wei
+
 end type t_hinge_config
 
 !> Hinge type
@@ -154,7 +160,10 @@ type :: t_hinge
   !> Offset for avoiding irregular behavior
   real(wp) :: offset
 
-  !> Offset for avoiding irregular behavior
+  !> Spanwise blending to avoid irregular behaviors
+  real(wp) :: span_blending
+
+  !> Vector identifying zero-rotation direction
   real(wp) :: ref_dir(3)
 
   !> Type: constant, function, coupling
@@ -218,9 +227,11 @@ subroutine build_connectivity(this, loc_points)
   integer , allocatable :: rot_p2h(:,:)   ! *** to do *** improve the actual inefficient
   real(wp), allocatable :: rot_w2h(:,:)   ! and memory intensive implementation
   integer , allocatable :: rot_i2h(:)     ! Look for ***** in this routine
+  real(wp), allocatable :: rot_s2h(:,:)
   integer , allocatable :: ble_p2h(:,:)   ! *** to do *** improve the actual inefficient
   real(wp), allocatable :: ble_w2h(:,:)   ! and memory intensive implementation
   integer , allocatable :: ble_i2h(:)     ! Look for ***** in this routine
+  real(wp), allocatable :: ble_s2h(:,:)
 
   integer :: nrot, nble
 
@@ -263,12 +274,15 @@ subroutine build_connectivity(this, loc_points)
   allocate(rot_p2h(nh,nb)); rot_p2h = 0      ;  allocate(ble_p2h(nh,nb)); ble_p2h = 0
   allocate(rot_w2h(nh,nb)); rot_w2h = 0.0_wp ;  allocate(ble_w2h(nh,nb)); ble_w2h = 0.0_wp
   allocate(rot_i2h(nh   )); rot_i2h = 0      ;  allocate(ble_i2h(nh   )); ble_i2h = 0
+  allocate(rot_s2h(nh,nb)); rot_s2h = 0.0_wp ;  allocate(ble_s2h(nh,nb)); ble_s2h = 0.0_wp
 
   nrot = 0; nble = 0
   ! Loop over all the surface points
   do ib = 1, nb
 
-    if ( ( rrb(2,ib) .gt. 0.0_wp ) .and. ( rrb(2,ib) .lt. hinge_width ) ) then
+    ! if ( ( rrb(2,ib) .gt. 0.0_wp ) .and. ( rrb(2,ib) .lt. hinge_width ) ) then
+    if ( ( rrb(2,ib) .gt. -this%span_blending ) .and. &
+         ( rrb(2,ib) .lt.  this%span_blending + hinge_width ) ) then
 
       if ( rrb(1,ib) .lt. -this%offset ) then
         ! do nothing
@@ -294,6 +308,15 @@ subroutine build_connectivity(this, loc_points)
           rot_i2h(ind_v(iw)) = rot_i2h(ind_v(iw)) + 1
           rot_p2h(ind_v(iw),   rot_i2h(ind_v(iw))) = ib
           rot_w2h(ind_v(iw),   rot_i2h(ind_v(iw))) = wei_v(iw)
+          !> Spanwise weight
+          if ( rrb(2,ib) .lt. 0.0_wp ) then
+            rot_s2h(ind_v(iw), rot_i2h(ind_v(iw))) = - rrb(2,ib) / this%span_blending
+          elseif( rrb(2,ib) .lt. hinge_width ) then
+            rot_s2h(ind_v(iw), rot_i2h(ind_v(iw))) = 1.0_wp
+          else
+            rot_s2h(ind_v(iw), rot_i2h(ind_v(iw))) = ( rrb(2,ib) - hinge_width ) / &
+                                                                   this%span_blending 
+          endif
         end do
         ! *****
 
@@ -319,6 +342,15 @@ subroutine build_connectivity(this, loc_points)
           ble_i2h(ind_v(iw)) = ble_i2h(ind_v(iw)) + 1
           ble_p2h(ind_v(iw),   ble_i2h(ind_v(iw))) = ib
           ble_w2h(ind_v(iw),   ble_i2h(ind_v(iw))) = wei_v(iw)
+          !> Spanwise weight
+          if ( rrb(2,ib) .lt. 0.0_wp ) then
+            ble_s2h(ind_v(iw), ble_i2h(ind_v(iw))) = - rrb(2,ib) / this%span_blending
+          elseif( rrb(2,ib) .lt. hinge_width ) then
+            ble_s2h(ind_v(iw), ble_i2h(ind_v(iw))) = 1.0_wp
+          else
+            ble_s2h(ind_v(iw), ble_i2h(ind_v(iw))) = ( rrb(2,ib) - hinge_width ) / &
+                                                                   this%span_blending 
+          endif
         end do
         ! *****
 
@@ -340,17 +372,21 @@ subroutine build_connectivity(this, loc_points)
   do ih = 1, nh
     allocate(this%rot %n2h(ih)%p2h( rot_i2h(ih) )) ; this%rot %n2h(ih)%p2h = rot_p2h( ih, 1:rot_i2h(ih) )
     allocate(this%rot %n2h(ih)%w2h( rot_i2h(ih) )) ; this%rot %n2h(ih)%w2h = rot_w2h( ih, 1:rot_i2h(ih) )
+    allocate(this%rot %n2h(ih)%s2h( rot_i2h(ih) )) ; this%rot %n2h(ih)%s2h = rot_s2h( ih, 1:rot_i2h(ih) )
     allocate(this%blen%n2h(ih)%p2h( ble_i2h(ih) )) ; this%blen%n2h(ih)%p2h = ble_p2h( ih, 1:ble_i2h(ih) )
     allocate(this%blen%n2h(ih)%w2h( ble_i2h(ih) )) ; this%blen%n2h(ih)%w2h = ble_w2h( ih, 1:ble_i2h(ih) )
+    allocate(this%blen%n2h(ih)%s2h( ble_i2h(ih) )) ; this%blen%n2h(ih)%s2h = ble_s2h( ih, 1:ble_i2h(ih) )
   end do
+
+  !> Spanwise weights to avoid spanwise irregular behaviors
 
 
   !> Explicit deallocations
   deallocate(rrb, rrh, dist_all, wei_v, ind_v)
   deallocate(rot_node_id, rot_ind, rot_wei)
   deallocate(ble_node_id, ble_ind, ble_wei)
-  deallocate(rot_i2h, rot_p2h, rot_w2h) ! *****
-  deallocate(ble_i2h, ble_p2h, ble_w2h) ! *****
+  deallocate(rot_i2h, rot_p2h, rot_w2h, rot_s2h) ! *****
+  deallocate(ble_i2h, ble_p2h, ble_w2h, ble_s2h) ! *****
 
 
 end subroutine build_connectivity
@@ -499,47 +535,34 @@ subroutine hinge_deflection( this, rr, t, postpro )
 
     if ( th .ne. 0.0_wp ) then ! (equality check on real?)
 
-!     ! debug ---
-!     write(*,*) ' hinge%act%rr: ', this%act%rr(:,ih)
-!     write(*,*) ' h           : ', this%act%h(:,ih)
-
-
       !Rotation matrix
       nx(1,:) = (/            0.0_wp, -this%act%h(3,ih),  this%act%h(2,ih) /)
       nx(2,:) = (/  this%act%h(3,ih),            0.0_wp, -this%act%h(1,ih) /)
       nx(3,:) = (/ -this%act%h(2,ih),  this%act%h(1,ih),            0.0_wp /)
 
-      Rot_I = sin(th) * nx + ( 1.0_wp - cos(th) ) * matmul( nx, nx )
-      Rot = Rot_I
-      Rot(1,1) = Rot_I(1,1) + 1.0_wp
-      Rot(2,2) = Rot_I(2,2) + 1.0_wp
-      Rot(3,3) = Rot_I(3,3) + 1.0_wp
-
       !> Rigid rotation
       do ib = 1, size(this%rot%n2h(ih)%p2h)
         ii = this%rot%n2h(ih)%p2h(ib)
+        th1 = th * this%rot%n2h(ih)%s2h(ib)
+        Rot_I = sin(th1) * nx + ( 1.0_wp - cos(th1) ) * matmul( nx, nx )
         rr(:,ii) = rr(:,ii) + &
                    this%rot%n2h(ih)%w2h(ib) * &
                    matmul( Rot_I, rr_in(:,ii)-this%act%rr(:,ih) )
-        ! rr(:,ii) = this%rot%n2h(ih)%w2h(ib) * &
-        !          ( this%act%rr(:,ih) + &
-        !            matmul( Rot, rr(:,ii)-this%act%rr(:,ih) ) )
       end do
     
       !> Blending region
       do ib = 1, size(this%blen%n2h(ih)%p2h)
 
         ii = this%blen%n2h(ih)%p2h(ib)
-        th = -th  ! dirty implementation *** to do ***
-
+        th1 = -th * this%blen%n2h(ih)%s2h(ib)
         !> coordinate of the centre of the circle used for blending, 
         ! in the n-direction
-        yc = cos(th)/sin(th) * this%offset * ( 1.0_wp + cos(th) ) + &
-                               this%offset * sin(th)
+        yc = cos(th1)/sin(th1) * this%offset * ( 1.0_wp + cos(th1) ) + &
+                                 this%offset * sin(th1)
         !> Some auxiliary quantities
         xq = sum( ( rr(:,ii) - this%act%rr(:,ih) ) * this%act%v(:,ih) )
         yq = sum( ( rr(:,ii) - this%act%rr(:,ih) ) * this%act%n(:,ih) )
-        thp = 0.5_wp * ( xq + this%offset ) / this%offset * th
+        thp = 0.5_wp * ( xq + this%offset ) / this%offset * th1
         xqp = yc*sin(thp)          - this%offset - yq*sin(thp) - xq
         yqp = yc*(1.0_wp-cos(thp))               + yq*cos(thp) - yq
 
@@ -547,8 +570,6 @@ subroutine hinge_deflection( this, rr, t, postpro )
         rr(:,ii) = rr(:,ii) + &
                    this%blen%n2h(ih)%w2h(ib) * &
                  ( xqp * this%act%v(:,ih) + yqp * this%act%n(:,ih) )
-
-        th = -th  ! dirty implementation *** to do ***
 
       end do
 
@@ -653,6 +674,7 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
      ! avoid irregular behavior during hinge rotation
      hinges(i) % ref_dir = getrealarray(hinge_prs, 'Hinge_Ref_Dir', 3)
      hinges(i) % offset  = getreal(hinge_prs, 'Hinge_Offset')
+     hinges(i) % span_blending = getreal(hinge_prs, 'Hinge_Spanwise_Blending')
 
      !> Hinge input: function, amplitude
      !> Overwrite 'constant' rotation_input with 'function:const'
@@ -751,6 +773,9 @@ subroutine hinge_input_parser( geo_prs, hinge_prs )
       &the local ref.frame of the component')
   call hinge_prs%CreateRealOption('Hinge_Offset','Offset in the Ref_Dir needed for &
       &avoiding irregular behavior of the surface for large deflections')
+  call hinge_prs%CreateRealOption('Hinge_Spanwise_Blending', &
+      'Blending in the spanwise direction needed for &
+      &avoiding irregular behavior of the surface for large deflections','0.0')
   call hinge_prs%CreateStringOption('Hinge_Rotation_Input', &
       'Input type of the rotation: constant, function, from_file, coupling')
   call hinge_prs%CreateRealOption('Hinge_Rotation_Amplitude', &

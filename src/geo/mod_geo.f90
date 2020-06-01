@@ -1018,6 +1018,8 @@ subroutine load_components(geo, in_file, out_file, te)
                                                          'Nodes_Input', hiloc)
         call read_hdf5( geo%components(i_comp)%hinge(ih)%offset, &
                                                          'Offset', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%span_blending, &
+                                              'Spanwise_Blending', hiloc)
         call read_hdf5( geo%components(i_comp)%hinge(ih)%ref_dir, &
                                                         'Ref_Dir', hiloc)
         call read_hdf5_al( geo%components(i_comp)%hinge(ih)%ref%rr, 'rr', hiloc)
@@ -1189,6 +1191,8 @@ subroutine load_components(geo, in_file, out_file, te)
                                                             'Nodes_Input', hiloc)
           call write_hdf5( geo%components(i_comp)%hinge(ih)%offset, &
                                                             'Offset', hiloc)
+          call write_hdf5( geo%components(i_comp)%hinge(ih)%span_blending, &
+                                                 'Spanwise_Blending', hiloc)
           call write_hdf5( geo%components(i_comp)%hinge(ih)%ref_dir, &
                                                            'Ref_Dir', hiloc)
           call write_hdf5( geo%components(i_comp)%hinge(ih)%ref%rr, 'rr', hiloc)
