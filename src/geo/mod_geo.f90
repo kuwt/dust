@@ -920,6 +920,9 @@ subroutine load_components(geo, in_file, out_file, te)
       geo%components(i_comp)%ref_id  = ref_id
       geo%components(i_comp)%ref_tag = trim(ref_tag_m)
       geo%components(i_comp)%moving  = geo%refs(ref_id)%moving
+      !> Overwirte moving, if n_hinges .gt. 0
+      ! *** to do *** avoid moving = .true. if hinge_input is constant
+      if ( n_hinges .gt. 0 )  geo%components(i_comp)%moving = .true.
 
       geo%components(i_comp)%coupling          =      comp_coupling
       geo%components(i_comp)%coupling_type     = trim(comp_coupling_type)
@@ -1603,6 +1606,11 @@ subroutine prepare_geometry(geo)
        call error(this_sub_name, this_mod_name, 'Unknown element type')
      end select
 
+     !> Position and velocity increment, due to hinge motion
+     elem%dcen_h     = 0.0_wp
+     elem%dcen_h_old = 0.0_wp
+     elem%dvel_h     = 0.0_wp
+
    enddo
  enddo
 
@@ -2026,8 +2034,6 @@ subroutine update_geometry(geo, t, update_static)
   
     if (comp%moving .or. update_static) then
 
-      write(*,*) ' bla bla bla '
-
       !> store %nor at previous time step, for moving, used few lines
       ! below to evaluate unit normal time derivative dn_dt
       if ( .not. update_static ) then
@@ -2063,7 +2069,7 @@ subroutine update_geometry(geo, t, update_static)
 
       !> Calculate the velocity of the centers to assing b.c.
       do ie = 1,size(comp%el)
-        call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%R_g, &
+        call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &
                                        geo%refs(comp%ref_id)%f_g )
       enddo
 
@@ -2072,8 +2078,6 @@ subroutine update_geometry(geo, t, update_static)
   end if  ! if ( .not. comp%coupling )
 
   !> Hinges -----------------------------------------------------------
-  ! *** to do ***
-  !> update geometrical quantities (position, velocity) of the elements
   do ih = 1, comp%n_hinges
 
     !> Update:
@@ -2091,34 +2095,46 @@ subroutine update_geometry(geo, t, update_static)
       ! *** to do ***
     end if
 
-
     !> Allocating  contiguous array to pass to %hinge_deflection procedure
     allocate(rr_hinge_contig(3,size(comp%i_points)))
     rr_hinge_contig = geo%points(:, comp%i_points)
-
+     
     call comp%hinge(ih)%hinge_deflection( rr_hinge_contig, t )
     geo%points(:, comp%i_points) = rr_hinge_contig
+
     deallocate(rr_hinge_contig)
 
   end do
 
-  !> Then update geometrical data
-  ! Position of the elem nodes
-  do ie = 1,size(comp%el)
-    call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
-  enddo
-  ! Velocity of the elem center
-  ! *** to do *** 
-  ! ...
-
+  if ( comp%n_hinges .gt. 0 ) then
+    !> Then update geometrical data, position and velocity of the elem centers
+    do ie = 1,size(comp%el)
+  
+      !> Save dcen_h at previous timestep
+      comp%el(ie)%dcen_h_old = comp%el(ie)%dcen_h
+  
+      !> Save the position of the centre, before hinge rotation
+      comp%el(ie)%dcen_h = comp%el(ie)%cen
+  
+      !> Update new position of the centers, taking into account hinge motions
+      call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
+  
+      !> Evaluate dcen_h, delta position due to hinge motion
+      comp%el(ie)%dcen_h = comp%el(ie)%cen - comp%el(ie)%dcen_h
+  
+      !> Evaluate dvel_h, delta velocity due to hinge motion, with first
+      ! order finite difference
+      comp%el(ie)%dvel_h = ( comp%el(ie)%dcen_h - comp%el(ie)%dcen_h_old ) / &
+                                                                   sim_param%dt
+      !> Update on-body velocity
+      comp%el(ie)%ub = comp%el(ie)%ub + comp%el(ie)%dvel_h 
+  
+    end do
+  end if
   !> Hinges -----------------------------------------------------------
 
   end associate
  enddo
-
- !> debug ---
- write(*,*) ' debug in update_geometry() '
- write(*,*) ' rr(:,126): ', geo%points(:,126)
  
 
 end subroutine update_geometry

@@ -127,7 +127,7 @@ type, abstract, extends(c_elem) :: c_pot_elem
   integer, allocatable :: i_ver(:)
 
   !> Element area
-  real(wp)              :: area
+  real(wp)             :: area
 
   !> Element normal vector
   real(wp) :: nor(3)
@@ -181,17 +181,22 @@ type, abstract, extends(c_elem) :: c_pot_elem
   !> Element indices in the component%strip_elem array
   type(t_elem_p), allocatable :: stripe_elem(:)
 
+  !> Hinge motion
+  ! Initialization to zero *** to do: restart??? ***
+  !> Delta position, due to hinge motion of the element center
+  real(wp) :: dcen_h(3)     ! = 0.0_wp
+  real(wp) :: dcen_h_old(3) ! = 0.0_wp
+  !> Delta velocity, due to hinge motion of the element center, evaluated
+  ! with finite difference method: dvel_h = ( dcen_h - dcen_h_old ) / dt
+  real(wp) :: dvel_h(3) ! = 0.0_wp 
+
   contains
 
-  procedure(i_compute_pot),    deferred, pass(this) :: compute_pot
-
-  procedure(i_compute_psi),    deferred, pass(this) :: compute_psi
-
-  procedure(i_compute_pres),   deferred, pass(this) :: compute_pres
-
+  procedure(i_compute_pot)   , deferred, pass(this) :: compute_pot
+  procedure(i_compute_psi)   , deferred, pass(this) :: compute_psi
+  procedure(i_compute_pres)  , deferred, pass(this) :: compute_pres
   procedure(i_compute_dforce), deferred, pass(this) :: compute_dforce
-
-  procedure(i_calc_geo_data),  deferred, pass(this) :: calc_geo_data
+  procedure(i_calc_geo_data) , deferred, pass(this) :: calc_geo_data
 
 end type c_pot_elem
 
@@ -211,17 +216,12 @@ type, abstract, extends(c_pot_elem) :: c_impl_elem
 
   contains
 
-  procedure(i_build_row)  , deferred, pass(this)      :: build_row
-
-  procedure(i_build_row_static), deferred, pass(this) :: build_row_static
-
-  procedure(i_add_wake),    deferred, pass(this)      :: add_wake
-
-  procedure(i_add_expl), deferred, pass(this)         :: add_expl
-
-  procedure(i_get_vort_vel), deferred, pass(this)     :: get_vort_vel
-
-  procedure(i_get_bernoulli_source),    deferred, pass(this) :: get_bernoulli_source
+  procedure(i_build_row)           , deferred, pass(this) :: build_row
+  procedure(i_build_row_static)    , deferred, pass(this) :: build_row_static
+  procedure(i_add_wake)            , deferred, pass(this) :: add_wake
+  procedure(i_add_expl)            , deferred, pass(this) :: add_expl
+  procedure(i_get_vort_vel)        , deferred, pass(this) :: get_vort_vel
+  procedure(i_get_bernoulli_source), deferred, pass(this) :: get_bernoulli_source
 
 end type c_impl_elem
 

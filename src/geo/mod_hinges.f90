@@ -440,6 +440,9 @@ subroutine update_theta( this, t )
   class(t_hinge), intent(inout) :: this
   real(wp)      , intent(in)    :: t
 
+  !> Update theta_old
+  this % theta_old = this % theta
+
   if ( trim(this%input_type) .eq. 'function:const' ) then
     this%theta = this%f_ampl
   elseif ( trim(this%input_type) .eq. 'function:sin' ) then
@@ -465,6 +468,7 @@ subroutine hinge_deflection( this, rr, t, postpro )
   logical            ::   local_postpro
   logical, parameter :: default_postpro = .false.
 
+  real(wp), allocatable :: rr_in(:,:)
   real(wp) :: th, th1, thp, yc, xq, yq, xqp, yqp
   real(wp) :: nx(3,3), Rot_I(3,3), Rot(3,3)
   integer :: nrot, nble, ib, ih, ii
@@ -475,20 +479,30 @@ subroutine hinge_deflection( this, rr, t, postpro )
   else                        ;  local_postpro = default_postpro
   end if
 
+  allocate(rr_in(size(rr,1),size(rr,2))); rr_in = rr
+
+! ! debug ---
+! write(*,*) ' ********* debug in hinge_deflection *********** '
+! write(*,*) ' rr(:,105:21:168) in '
+! do ii = 0,3
+!   write(*,*) rr(:,105+ii*21)
+! end do
+! ! debug ---
+
   !> n.nodes in the rigid-rotation and in the blending regions
   nrot = size(this%rot %node_id)
   nble = size(this%blen%node_id)
 
   do ih = 1, this%n_nodes
 
-    ! if ( .not. local_postpro ) then
-    !   th = ( this % theta(ih) - this % theta_old(ih) ) * pi/180.0_wp
-    ! else 
-    !   th =   this % theta(ih)                          * pi/180.0_wp
-    ! end if
-    th =   this % theta(ih)                          * pi/180.0_wp
+    th =   this % theta(ih) * pi/180.0_wp
 
     if ( th .ne. 0.0_wp ) then ! (equality check on real?)
+
+!     ! debug ---
+!     write(*,*) ' hinge%act%rr: ', this%act%rr(:,ih)
+!     write(*,*) ' h           : ', this%act%h(:,ih)
+
 
       !Rotation matrix
       nx(1,:) = (/            0.0_wp, -this%act%h(3,ih),  this%act%h(2,ih) /)
@@ -506,7 +520,7 @@ subroutine hinge_deflection( this, rr, t, postpro )
         ii = this%rot%n2h(ih)%p2h(ib)
         rr(:,ii) = rr(:,ii) + &
                    this%rot%n2h(ih)%w2h(ib) * &
-                   matmul( Rot_I, rr(:,ii)-this%act%rr(:,ih) )
+                   matmul( Rot_I, rr_in(:,ii)-this%act%rr(:,ih) )
         ! rr(:,ii) = this%rot%n2h(ih)%w2h(ib) * &
         !          ( this%act%rr(:,ih) + &
         !            matmul( Rot, rr(:,ii)-this%act%rr(:,ih) ) )
@@ -540,11 +554,16 @@ subroutine hinge_deflection( this, rr, t, postpro )
 
     end if
 
-    !> Update theta_old
-    this % theta_old(ih) = this % theta(ih)
-
   end do
 
+! ! debug ---
+! write(*,*) ' rr(:,105:21:168) out '
+! do ii = 0,3
+!   write(*,*) rr(:,105+ii*21)
+! end do
+! ! debug ---
+
+  deallocate(rr_in)
 
 end subroutine hinge_deflection
 
@@ -577,6 +596,7 @@ subroutine initialize_hinge_config( h_config, hinge )
     h_config%h(:,i) = hv;  h_config%v(:,i) = vv;  h_config%n(:,i) = nv 
 
   end do
+
 
 end subroutine initialize_hinge_config
 
@@ -659,12 +679,12 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
      hinges(i) % rotation_omega     = getreal(hinge_prs,'Hinge_Rotation_Omega')
      hinges(i) % rotation_phase     = getreal(hinge_prs,'Hinge_Rotation_Phase')
      
-
 !    ! check ---
 !    write(*,*) ' Hinge id:', i
 !    write(*,*) ' _Tag        : ', trim(hinges(i)%tag)
 !    write(*,*) ' _Nodes_Input: ', trim(hinges(i)%nodes_input)
 !    ! check ---
+
 
   end do
 
