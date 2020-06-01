@@ -1,5 +1,6 @@
 TODO list:
-
+#6 check load evaluation on surface panel and vortex lattice, due to hinge rotation.
+  Start with integral loads, VL steady.
 
 DONE list:
 #1 fix TE bug with moving hinges. First wake elements looks to drift towards
