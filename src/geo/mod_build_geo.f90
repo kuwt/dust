@@ -663,9 +663,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
           do i =1, size(c_ref_c,2)
             do j = 1, 4
               n_non_zero = 0
-              if ( ee(i,j) .ne. 0 ) then
+              if ( ee(j,i) .ne. 0 ) then
                 n_non_zero = n_non_zero + 1
-                c_ref_c(:,i) = c_ref_c(:,i) + rr(:,ee(i,j))
+                c_ref_c(:,i) = c_ref_c(:,i) + rr(:,ee(j,i))
               end if
             end do
             !> Offset
@@ -999,7 +999,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   do i = 1 , n_hinges
     deallocate( hinges(i)%rr )
   end do
-  deallocate(hinges)
+  if ( allocated(hinges) ) deallocate(hinges)
 
   !> Finalize parser
   call finalizeparameters(geo_prs)
