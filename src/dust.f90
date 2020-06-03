@@ -944,9 +944,18 @@ do while ( ( it .lt. nstep ) )
     end if
   endif
 
-  it = it + 1
 
 #if USE_PRECICE
+  ! *** to do *** dirty implementation. it-update moved into #if USE_PRECICE
+  ! statement, to avoid double time counter update, when the code is not coupled
+  ! with external softwares through PRECICE.
+  ! #if .not. USE_PRECICE, it-update occurs at the beginning of the time loop,
+  ! approximately at l.615.
+  ! Is there a reasone why it-update should occur in two different places of the
+  ! time loop (at the begin w/o precice, at the end w/ precice)?
+  !> Update n. time step
+  it = it + 1
+
   endif ! End of the if statement that check whether the timestep
         ! has converged or not
 #endif
