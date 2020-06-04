@@ -1,9 +1,8 @@
 TODO list:
 #7   define the extension of the ailerons in the streamwise direction
-#9   check time advance w/o precice, since it skips dt
-#10  hinge output with precice, even if there is no hinge.
-     Group not saved in .hdf5 files with Coupling_Type = ll (only?), but postpro
-     tries to read it
+#9a  check time advance w/o precice, since it skips dt. (DONE)
+     *** dirty *** check if the increment of dt counter could be moved in the
+     same place (begin/end) of the time loop for both coupled/uncoupled code
 #11  Test model with both rigid and ll coupling
 #12  Clean mbdynAdapter.py and mbdynInterface.py. Remove hardcoded parameters
      and read them from files, instead.
@@ -30,3 +29,9 @@ DONE list:
      Start with integral loads, VL steady. Bug-fix: wrong update of el%dn_dt
 #8   linear interpolation of the aileron regions to avoid sharp discontinuities
      w/ the fixed part of the component
+#9   check time advance w/o precice, since it skips dt. *** dirty ? ***
+(#10)  hinge output with precice, even if there is no hinge.
+       Group not saved in .hdf5 files with Coupling_Type = ll (only?), but postpro
+       tries to read it.
+       It was an illusion, produced by the presence in the same folder of old
+       result files along with the new ones.
