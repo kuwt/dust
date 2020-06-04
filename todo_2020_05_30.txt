@@ -35,3 +35,5 @@ DONE list:
        tries to read it.
        It was an illusion, produced by the presence in the same folder of old
        result files along with the new ones.
+#13  dust_post not working while dust is running. _geo.h5 file busy. hdf5 hinge
+     groups were not closed, after writing hinge fields.

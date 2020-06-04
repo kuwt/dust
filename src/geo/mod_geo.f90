@@ -1205,8 +1205,12 @@ subroutine load_components(geo, in_file, out_file, te)
                                                    'Hinge_Rotation_Omega', hiloc)
           call write_hdf5( geo%components(i_comp)%hinge(ih)%f_phase, &
                                                    'Hinge_Rotation_Phase', hiloc)
+          call close_hdf5_group(hiloc)
   
         end do
+        
+        call close_hdf5_group(hloc2)
+
         !> Hinges -------------------------------------------------------------
 
         if( comp_el_type(1:1) .eq. 'p' .or. &
