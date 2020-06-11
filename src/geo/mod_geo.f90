@@ -117,6 +117,11 @@ use mod_hdf5_io, only: &
   read_hdf5_al, &
   check_dset_hdf5
 
+#if USE_PRECICE
+use mod_precice_rbf, only: &
+  t_precice_rbf
+#endif
+
 !----------------------------------------------------------------------
 
 implicit none
@@ -155,7 +160,7 @@ type :: t_geo_component
  !> Coupling w/ external structural code: .true., .false.
  logical :: coupling
 
- !> Coupling type: 'll', 'rigid'
+ !> Coupling type: 'll', 'rigid', 'rbf'
  character(len=max_char_len) :: coupling_type
 
  !> Coupling node: local coordinates (in the component local ref.frame) 
@@ -165,6 +170,10 @@ type :: t_geo_component
  !> Coupling node orientation: orientation of the coupling node, w.r.t.
  ! the local ref.rame of the geometrical component (why initialized?)
  real(wp) :: coupling_node_rot(3,3) = 0.0_wp
+
+#if USE_PRECICE
+ type(t_precice_rbf) :: rbf
+#endif
 
  !> Id of the component (warning: not always defined)
  integer :: comp_id
@@ -712,6 +721,7 @@ subroutine load_components(geo, in_file, out_file, te)
 #if USE_PRECICE
  real(wp), allocatable :: c_ref_p(:,:)
  real(wp), allocatable :: c_ref_c(:,:)
+ real(wp), allocatable :: comp_coupling_nodes(:,:)
  integer :: points_offset_precice, np_precice
 #endif 
  !> Hinges
@@ -853,10 +863,11 @@ subroutine load_components(geo, in_file, out_file, te)
     if ( trim(comp_coupling_str) .eq. 'true' ) comp_coupling = .true.
 
     if ( trim(comp_coupling_str) .eq. 'true' ) then
-      if ( comp_el_type(1:1) .ne. 'l' ) then
+      if ( ( comp_el_type(1:1) .ne. 'l' ) .and. &
+           ( trim(comp_coupling_type) .eq. 'll' ) ) then
         call error (this_sub_name, this_mod_name, &
-           ' Coupled = T for component'//trim(comp_name)// &
-           ', but it is not a LL element. So far, coupling is implemented &
+           ' Coupled = T and CouplingType = ll for component <'//trim(comp_name)// &
+           '>, but it is not a LL element. So far, coupling is implemented &
               for lifting line elements only. Stop'//nl)
       end if
     end if
@@ -965,9 +976,16 @@ subroutine load_components(geo, in_file, out_file, te)
         allocate(geo%components(i_comp)%theta_e(size(theta_e)))
         geo%components(i_comp)%theta_e = theta_e
 
-        ! *** to do *** make coupling available for all the components
+      else if (comp_el_type(1:1) .eq. 'a') then
+        call read_hdf5(trac,'Traction',cloc)
+        call read_hdf5(rad,'Radius',cloc)
+      end if
+
+      !> PreCICE coupling ---
 #if USE_PRECICE
-        if ( trim(comp_coupling_str) .eq. 'true' ) then
+      if ( trim(comp_coupling_str) .eq. 'true' ) then
+        if ( ( trim(comp_coupling_type) .eq. 'll' ) .or. &
+             ( trim(comp_coupling_type) .eq. 'rigid' ) ) then
           call read_hdf5_al(c_ref_p, 'c_ref_p', geo_loc)
           call read_hdf5_al(c_ref_c, 'c_ref_c', geo_loc)
           allocate(geo%components(i_comp)%c_ref_p( size(c_ref_p,1) , &
@@ -994,15 +1012,42 @@ subroutine load_components(geo, in_file, out_file, te)
                            (/((i3),i3=points_offset_precice+1, &
                                       points_offset_precice+np_precice)/)
           points_offset_precice = points_offset_precice + np_precice
-        else
-          np_precice = 0
+
+          !> allocate dummy rbf structure
+          ! *** to do *** cleaner implementation of different kinds of coupling
+          ! allocate(geo%components(i_comp)%rbf%nodes(0,0))
+          ! allocate(geo%components(i_comp)%rbf%ind  (0,0))
+          ! allocate(geo%components(i_comp)%rbf%wei  (0,0))
+
+        elseif ( trim(comp_coupling_type) .eq. 'rbf' ) then
+
+          call read_hdf5_al( comp_coupling_nodes, 'CouplingNodes', geo_loc )
+          allocate(geo%components(i_comp)%rbf%nodes(size(comp_coupling_nodes,1), &
+                                                    size(comp_coupling_nodes,2)) )
+          geo%components(i_comp)%rbf%nodes = comp_coupling_nodes
+          call geo%components(i_comp)%rbf%build_connectivity( rr )
+
+          !> allocate dummy c_ref_p(:,:), c_ref_c(:,:)
+          ! *** to do *** cleaner implementation of different kinds of coupling
+          allocate(geo%components(i_comp)%c_ref_c(0,0))
+          allocate(geo%components(i_comp)%c_ref_p(0,0))
+
+          !> Allocate and fill i_points_precice array containing the 
+          ! connectivity between dust with PreCICE nodes
+          np_precice = size(comp_coupling_nodes,2)
+          write(*,*) ' np_precice: ', np_precice
           allocate(geo%components(i_comp)%i_points_precice( np_precice ))
-        end if
-#endif
-      else if (comp_el_type(1:1) .eq. 'a') then
-        call read_hdf5(trac,'Traction',cloc)
-        call read_hdf5(rad,'Radius',cloc)
+          geo%components(i_comp)%i_points_precice = &
+                           (/((i3),i3=points_offset_precice+1, &
+                                      points_offset_precice+np_precice)/)
+          points_offset_precice = points_offset_precice + np_precice
+
+        endif
+      else
+        np_precice = 0
+        allocate(geo%components(i_comp)%i_points_precice( np_precice ))
       end if
+#endif
 
       !> Hinges ---
       geo%components(i_comp)%n_hinges = n_hinges

@@ -141,7 +141,7 @@ end type t_hinge_config
 type :: t_hinge
 
   !> Number of points for transferring the motion from the hinge to the
-  ! surface, through a weighted averageamplitude
+  ! surface, through a weighted average
   ! *** to do *** hardcoded, so far. Read as an input, with a default value,
   ! equal to 2 (or 1?)
   integer :: n_wei = 2
@@ -734,7 +734,9 @@ subroutine read_hinge_nodes( filen, n_nodes, rr )
     read(fid,*,iostat=io) ! dummy
     n_nodes = n_nodes + 1
   end do
-  close(fid) 
+  close(fid)
+ 
+  n_nodes = n_nodes - 1 ! *** to do *** check
 
   !> Allocate and fill rr array
   allocate(rr(3,n_nodes))

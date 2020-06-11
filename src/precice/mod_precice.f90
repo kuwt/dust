@@ -41,7 +41,7 @@ public :: t_precice
 integer, parameter :: precice_mcl = 50 ! precice_max_char_len
 
 !> PreCICE mesh -------------------------------------------------
-type t_precice_mesh
+type :: t_precice_mesh
   character(len=precice_mcl) :: mesh_name
   integer                    :: mesh_id
   integer , allocatable      :: node_ids(:)
@@ -93,10 +93,9 @@ type :: t_precice
   procedure, pass(this) :: update_near_field_wake
 
 end type t_precice
+
 !> --------------------------------------------------------------
-
 contains
-
 !----------------------------------------------------------------
 !>
 subroutine initialize(this)
@@ -171,6 +170,11 @@ subroutine initialize_mesh( this, geo )
         !> Increment number of nodes
         dnnodes = 1
         nnodes = nnodes + dnnodes
+      elseif ( trim(coupling_type) .eq. 'rbf' ) then
+        !> Set PreCICE nodes
+        dnnodes = size(geo%components(i_comp)%rbf%nodes,2)
+        !> Increment number of nodes
+        nnodes = nnodes + dnnodes
       else
         write(*,*) ' Error in initialize mesh. CouplingType= '// &
                    trim(coupling_type)//', while only ll, rigid'&
@@ -200,11 +204,18 @@ subroutine initialize_mesh( this, geo )
           geo%components(i_comp)%loc_points(:,1:2*dnnodes:2)
         nnodes = nnodes + dnnodes
       elseif ( trim(coupling_type) .eq. 'rigid' ) then 
-        !> ll coupling
+        !> rigid coupling
         dnnodes = 1
         !> Here in the local reference frame ! ***to do***
         this%mesh%nodes(:,nnodes+1) = &
           geo%components(i_comp)%coupling_node
+        nnodes = nnodes + dnnodes
+      elseif ( trim(coupling_type) .eq. 'rbf' ) then 
+        !> rbf coupling
+        dnnodes = size(geo%components(i_comp)%rbf%nodes,2)
+        !> Here in the local reference frame ! ***to do***
+        this%mesh%nodes(:,nnodes+1:nnodes+dnnodes) = &
+          geo%components(i_comp)%rbf%nodes
         nnodes = nnodes + dnnodes
       end if
     end if
@@ -320,8 +331,8 @@ subroutine update_force( this, geo, elems )
 
     if ( comp%coupling ) then
 
+      !> ll coupling -----------------------------------------------------------
       if ( trim(comp%coupling_type) .eq. 'll' ) then
-        !> ll coupling
 
         !> Reset force and moment fields, to be filled by accumulation
         do i = 1, size(comp%i_points_precice)
@@ -348,6 +359,7 @@ subroutine update_force( this, geo, elems )
           end do
         end if
 
+      !> rigid coupling --------------------------------------------------------
       elseif ( trim(comp%coupling_type) .eq. 'rigid' ) then
         !> rigid coupling. All the forces and moments are reduced to
         ! the coupling_node
@@ -372,6 +384,7 @@ subroutine update_force( this, geo, elems )
         theta = norm2( n_rot )
 !       !> debug ---
 !       write(*,*) ' THETA: ', theta
+
 !       write(*,*) ' N_ROT: ', n_rot
 !       !> debug ---
         if ( theta .lt. eps ) then
@@ -432,17 +445,25 @@ subroutine update_force( this, geo, elems )
 
         end if
 
+      !> rbf coupling ----------------------------------------------------------
+      elseif ( trim(comp%coupling_type) .eq. 'rbf' ) then
+      
+
       end if
     end if
 
     end associate
   end do
+
   ! debug ---
   write(*,*) ' debug in mod_precice '
   write(*,*) ' Force and moments '
   write(*,*) ' j_for, j_mom: ', j_for, j_mom
   write(*,*) trim(this%fields(j_for)%fname), trim(this%fields(j_mom)%fname)
   write(*,*) ' shape(geo%components): ', shape(geo%components)
+
+  write(*,*) ' allocated((j_for)%fdata): ', allocated(this%fields(j_for)%fdata)
+  write(*,*) ' allocated((j_mom)%fdata): ', allocated(this%fields(j_mom)%fdata)
   do i = 1, size(geo%components(1)%i_points_precice)
     write(*,*) this%fields(j_for)%fdata(:,i), &
                this%fields(j_mom)%fdata(:,i)
@@ -475,7 +496,7 @@ subroutine update_elems( this, geo, elems )
   type(t_geo)       , intent(inout) :: geo
   type(t_pot_elem_p), intent(inout) :: elems(:)
  
-  integer :: i,j, i_comp
+  integer :: i,j, i_comp, ip, iw
   real(wp) :: n_rot(3), chord(3), chord_rot(3), omega(3), pos(3), vel(3)
   real(wp) :: theta
   real(wp) :: eps = 1.0e-9_wp
@@ -497,8 +518,8 @@ subroutine update_elems( this, geo, elems )
 
     if ( comp%coupling ) then
 
+      !> ll coupling -----------------------------------------------------------
       if ( trim(comp%coupling_type) .eq. 'll' ) then
-        !> ll coupling
 
         !> Reset comp%el()%ub, vel_ctr_pt: these fields are the average value of the
         ! velocity of the neighboring points and they will be filled "by accumulation"
@@ -573,8 +594,8 @@ subroutine update_elems( this, geo, elems )
   
         end do ! precice points associated to the component
 
+      !> rigid coupling --------------------------------------------------------
       elseif ( trim(comp%coupling_type) .eq. 'rigid' ) then
-        !> rigid coupling
 
         !> === Coupling node ===
         !> Position
@@ -610,6 +631,78 @@ subroutine update_elems( this, geo, elems )
           !> Position and velocity of the nodes of the grid
           geo%points(    :, comp%i_points(i)) = pos + chord_rot
           geo%points_vel(:, comp%i_points(i)) = vel + cross( omega, chord_rot )
+
+        end do
+
+        !> === Control nodes of the elements ===
+        ! *** to do *** avoid computing element quantities as the 
+        ! average value of node quantities
+        do i = 1, size(comp%el)
+          comp%el(i)%ub = 0.0_wp
+          !> Compute the velocity of the element centre as the 
+          ! average value of the velocity of its nodes, by
+          ! accumulation
+          do j = 1, comp%el(i)%n_ver
+            comp%el(i)%ub = comp%el(i)%ub + &
+               1.0_wp / dble(comp%el(i)%n_ver) * &
+               geo%points_vel(:, comp%el(i)%i_ver(j) )
+          end do
+          !> Velocity of the control point for LL components
+          !> (exploit implicit connectivity of LL components)
+          select type( el => comp%el(i) ); type is(t_liftlin)
+            el%vel_ctr_pt = 0.5_wp * ( &
+                 geo%points_vel(:, comp%i_points( 2*i-1 ) ) &
+               + geo%points_vel(:, comp%i_points( 2*i+1 ) ) ) 
+          end select
+        end do
+ 
+      !> rbf coupling ----------------------------------------------------------
+      elseif ( trim(comp%coupling_type) .eq. 'rbf' ) then
+
+        !> Reset, before accumulation
+        geo%points     = 0.0_wp
+        geo%points_vel = 0.0_wp
+
+        !> Update surface quantities, as the weighted averages of the structure
+        ! quantities
+        do i = 1, size(comp%i_points)
+         
+          ip = comp%i_points(i)
+
+          do iw = 1, size(comp%rbf%ind,1)
+
+            ! === Coupling Node ===
+            !> Position
+            pos = this%fields(j_pos)%fdata(:, comp%i_points_precice(comp%rbf%ind(iw,i)))
+            !> Velocity
+            vel = this%fields(j_vel)%fdata(:, comp%i_points_precice(comp%rbf%ind(iw,i)))
+            !> Rotation
+            n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(comp%rbf%ind(iw,i)))
+            theta = norm2( n_rot )
+            if ( theta .lt. eps ) then
+              n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
+              theta = 0.0_wp
+            else
+              n_rot = n_rot / theta
+            end if
+            !> Angular velocity of the point at the LE
+            omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(comp%rbf%ind(iw,i)))
+
+            ! === Grid nodes of the components ===
+            !> Reference difference
+            chord = comp%loc_points(:,i) - comp%rbf%nodes(:,comp%rbf%ind(iw,i))
+            !> Rotated position difference
+            chord_rot =  cos(theta) * chord + &
+                         sin(theta) * cross( n_rot, chord ) + &
+                       ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
+
+            !> Position
+            geo%points(:, ip) = geo%points(:, ip) + &
+                                comp%rbf%wei(iw,i) * ( pos + chord_rot ) 
+            !> Velocity
+            geo%points_vel(:, ip) = geo%points_vel(:, ip) + &
+                                comp%rbf%wei(iw,i) * ( vel + cross( omega, chord_rot ) )
+          end do
 
         end do
 
@@ -736,6 +829,8 @@ subroutine update_near_field_wake( this, geo, wake )
              sim_param%min_vel_at_te*sim_param%dt
         end if
 
+      elseif ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) .eq. 'rbf' ) then
+        ! ...
       else
         !> other coupling
         ! not implemented, so far

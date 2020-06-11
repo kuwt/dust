@@ -182,6 +182,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  character(len=max_char_len) :: coupling_type
  real(wp)                    :: coupling_node(3)
  real(wp)                    :: coupling_node_rot(3,3)
+ character(len=max_char_len) :: coupling_node_file
+ real(wp), allocatable       :: coupling_nodes(:,:)
+ integer                   :: n_coupling_nodes, io
  !> Symmetry and mirror ---
  logical :: mesh_symmetry , mesh_mirror
  real(wp) :: symmetry_point(3), symmetry_normal(3)
@@ -244,11 +247,15 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
               'Component of a coupled simulation, w/ a structural solver?', 'F')
   call geo_prs%CreateStringOption('CouplingType', &
               'Type of the coupling: &
-              ll   : ll/beam coupling, &
-              rigid: rigid component/node', 'none')
+             &ll   : ll/beam coupling, &
+             &rigid: rigid component/node, &
+             &rbf: rigid component/node, &
+             &none', 'none')
   call geo_prs%CreateRealArrayOption('CouplingNode', &
               'Node for rigid coupling in the reference configuration (x, y, z)', &
               '(/0.0, 0.0, 0.0/)')
+  call geo_prs%CreateStringOption('CouplingNodeFile', &
+              'File containing the nodes for FSI (fluid structure interaction)')
   call geo_prs%CreateRealArrayOption('CouplingNodeOrientation', &
               'Orientation of the node for rigid coupling. This array contains the &
               &local components (in the local reference frame of the geometrical &
@@ -366,18 +373,41 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     coupled_str       = 'true'
     coupling_type     = getstr(geo_prs, 'CouplingType')
     coupling_node     = getrealarray(geo_prs, 'CouplingNode', 3)
+    coupling_node_file = getstr(geo_prs, 'CouplingNodeFile')
     coupling_node_rot = reshape( &
                         getrealarray(geo_prs, 'CouplingNodeOrientation', 9), &
                         (/3,3/) )
+    if (  trim(coupling_type) .eq. 'rbf' ) then
+      !> Open coupling_nodes_file and read nodes for FSI
+      n_coupling_nodes = 0; io = 0
+      open(unit=21, file=trim(coupling_node_file))
+      do while ( io .eq. 0 ) ! *** to do *** check
+        read(21,*,iostat=io) ; n_coupling_nodes = n_coupling_nodes + 1
+      end do
+      n_coupling_nodes = n_coupling_nodes - 1
+      close(21)
+
+      allocate(coupling_nodes(3,n_coupling_nodes)); coupling_nodes = 0.0_wp
+      
+      open(unit=21, file=trim(coupling_node_file))
+      write(*,*) ' n_coupling_nodes: ', n_coupling_nodes
+      do i = 1, n_coupling_nodes
+        read(21,*) coupling_nodes(:,i) ; write(*,*) coupling_nodes(:,i) 
+      end do
+      close(21)
+    end if
+
     if ( ( trim(coupling_type) .ne. 'll'    ) .and. &
-         ( trim(coupling_type) .ne. 'rigid' ) ) then
+         ( trim(coupling_type) .ne. 'rigid' ) .and. &
+         ( trim(coupling_type) .ne. 'rbf'   ) ) then
       call error (this_sub_name, this_mod_name, &
          ' Coupled = T for component'//trim(comp_tag)// &
          ', but CouplingType is equal to: '//trim(coupling_type)// &
          ', it is not assigned, or it is assigned &
-           as ''none''. Assign a valid CouplingType:'//nl// &
+          &as ''none''. Assign a valid CouplingType:'//nl// &
            '  ll   : ll/beam coupling'//nl// &
-           '  rigid: rigid component/node'//nl//'Stop'//nl)
+           '  rigid: rigid component/node'//nl// &
+           '  rbf  : generic component/node'//nl//'Stop'//nl)
     end if
   end if
 #else
@@ -478,8 +508,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   call write_hdf5(trim(comp_el_type),'ElType',comp_loc)
   call write_hdf5(trim(coupled_str),'Coupled',comp_loc)
-  call write_hdf5(trim(coupling_type)    ,'CouplingType',comp_loc)
-  call write_hdf5(     coupling_node     ,'CouplingNode',comp_loc)
+  call write_hdf5(trim(coupling_type)    ,'CouplingType' ,comp_loc)
+  call write_hdf5(     coupling_node     ,'CouplingNode' ,comp_loc)  ! Useless for 'rbf', and maybe for 'll'
   call write_hdf5(     coupling_node_rot ,'CouplingNodeOrientation',comp_loc)
 
   call new_hdf5_group(comp_loc, 'Geometry', geo_loc)
@@ -632,104 +662,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call write_hdf5(theta_e,'theta_e',geo_loc)
       call write_hdf5(i_airfoil_e,'i_airfoil_e',geo_loc)
       call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
-
-#if USE_PRECICE
-      !> *** to do *** symmetry and mirror. So far, finalize run with an error
-      if ( coupled_comp ) then
-        if ( mesh_symmetry .or. mesh_mirror ) then
-          call error(this_sub_name, this_mod_name, &
-                      'So far, mesh_symmetry and mesh_mirror &
-                      &not implemented for coupled components')
-        end if
-      end if
-      if ( coupled_comp ) then
-        write(*,*) ' coupling_type: ', trim(coupling_type) 
-        if ( trim(coupling_type) .eq. 'll' ) then
-          !> Compute the reference chord vector, for geometry transformation
-          ! of the deformable component. Meant for blades, wings defined using
-          ! the local y-axis as the spanwise direction and the x-axis as the
-          ! streamwise direction, pointing from the LE towards the TE
-          allocate(c_ref_p(3, nelems_span+1)); c_ref_p = 0.0_wp
-          do i = 1, size(c_ref_p,2)
-            c_ref_p(:,i) = chord_p(i) * &
-                    (/ cos(theta_p(i)), 0.0_wp, -sin(theta_p(i)) /)
-            ! !> Orientation
-            ! ! *** to do *** needed for beam/ll coupling?
-            ! c_ref_p(:,i) = matmul( transpose(coupling_node_rot), &
-            !                        c_ref_p(:,i) )
-          end do
-
-          allocate(c_ref_c(3, size(ee,2))); c_ref_c = 0.0_wp
-          do i =1, size(c_ref_c,2)
-            do j = 1, 4
-              n_non_zero = 0
-              if ( ee(j,i) .ne. 0 ) then
-                n_non_zero = n_non_zero + 1
-                c_ref_c(:,i) = c_ref_c(:,i) + rr(:,ee(j,i))
-              end if
-            end do
-            !> Offset
-            c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero) - coupling_node
-            ! !> Orientation
-            ! ! *** to do *** needed for beam/ll coupling?
-            ! c_ref_c(:,i) = matmul( transpose(coupling_node_rot), &
-            !                        c_ref_c(:,i) )
-          end do
-
-          !> Write to hdf5 geo file
-          call write_hdf5(c_ref_p,'c_ref_p',geo_loc)
-          call write_hdf5(c_ref_c,'c_ref_c',geo_loc)
-
-        elseif ( trim(coupling_type) .eq. 'rigid' ) then
-          !> Rigid coupling between a rigid component and a "structural" node,
-          ! defined as an input, coupling_node. This node represents the 
-          ! reference configuration for data communication between the aerodynamic
-          ! and the structural solvers
-
-          allocate(c_ref_p(3, size(rr,2))); c_ref_p = 0.0_wp
-          do i =1, size(c_ref_p,2)
-            !> Offset
-            c_ref_p(:,i) = rr(:,i) - coupling_node
-            !> Orientation
-            c_ref_p(:,i) = matmul( transpose(coupling_node_rot), &
-                                   c_ref_p(:,i) )
-          end do
-
-          allocate(c_ref_c(3, size(ee,2))); c_ref_c = 0.0_wp
-          do i =1, size(c_ref_c,2)
-            n_non_zero = 0
-            do j = 1, 4
-              if ( ee(j,i) .ne. 0 ) then
-                n_non_zero = n_non_zero + 1
-                c_ref_c(:,i) = c_ref_c(:,i) + rr(:,ee(j,i))
-              end if
-            end do
-            !> Offset
-            c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero) - coupling_node
-            !> Orientation
-            c_ref_c(:,i) = matmul( transpose(coupling_node_rot), &
-                                   c_ref_c(:,i) )
-          end do
-
-          ! debug ---
-          write(*,*) ' ip, rr, c_ref_p: '
-          do i = 1, size(rr,2)
-            write(*,*) i, rr(:,i), c_ref_p(:,i)
-          end do
-          write(*,*) ' ie, c_ref_c: '
-          do i = 1, size(ee,2)
-            write(*,*) i, c_ref_c(:,i)
-          end do
-          ! debug ---
-
-          !> Write to hdf5 geo file
-          call write_hdf5(c_ref_p,'c_ref_p',geo_loc)
-          call write_hdf5(c_ref_c,'c_ref_c',geo_loc)
-
-        end if
-      end if
-#endif
-
     elseif(ElType .eq. 'a') then ! ACTUATOR DISK
       call read_actuatordisk_parametric(trim(mesh_file),ee,rr)
       trac = getreal(geo_prs,'traction')
@@ -738,6 +670,102 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call write_hdf5(radius,'Radius', comp_loc)
 
     end if
+
+#if USE_PRECICE
+    !> *** to do *** symmetry and mirror. So far, finalize run with an error
+    if ( coupled_comp ) then
+      if ( mesh_symmetry .or. mesh_mirror ) then
+        call error(this_sub_name, this_mod_name, &
+                    'So far, mesh_symmetry and mesh_mirror &
+                    &not implemented for coupled components')
+      end if
+    end if
+    if ( coupled_comp ) then
+      write(*,*) ' coupling_type: ', trim(coupling_type) 
+      if ( trim(coupling_type) .eq. 'll' ) then
+        !> Compute the reference chord vector, for geometry transformation
+        ! of the deformable component. Meant for blades, wings defined using
+        ! the local y-axis as the spanwise direction and the x-axis as the
+        ! streamwise direction, pointing from the LE towards the TE
+        allocate(c_ref_p(3, nelems_span+1)); c_ref_p = 0.0_wp
+        do i = 1, size(c_ref_p,2)
+          c_ref_p(:,i) = chord_p(i) * &
+                  (/ cos(theta_p(i)), 0.0_wp, -sin(theta_p(i)) /)
+          ! !> Orientation
+          ! ! *** to do *** needed for beam/ll coupling?
+          ! c_ref_p(:,i) = matmul( transpose(coupling_node_rot), &
+          !                        c_ref_p(:,i) )
+        end do
+
+        allocate(c_ref_c(3, size(ee,2))); c_ref_c = 0.0_wp
+        do i =1, size(c_ref_c,2)
+          do j = 1, 4
+            n_non_zero = 0
+            if ( ee(j,i) .ne. 0 ) then
+              n_non_zero = n_non_zero + 1
+              c_ref_c(:,i) = c_ref_c(:,i) + rr(:,ee(j,i))
+            end if
+          end do
+          !> Offset
+          c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero)
+!         ! old. Is coupling_node a useful input for 'll' coupling? *** to do *** 
+!         c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero) - coupling_node
+          ! !> Orientation
+          ! ! *** to do *** needed for beam/ll coupling?
+          ! c_ref_c(:,i) = matmul( transpose(coupling_node_rot), &
+          !                        c_ref_c(:,i) )
+        end do
+
+        !> Write to hdf5 geo file
+        call write_hdf5(c_ref_p,'c_ref_p',geo_loc)
+        call write_hdf5(c_ref_c,'c_ref_c',geo_loc)
+
+      elseif ( trim(coupling_type) .eq. 'rigid' ) then
+        !> Rigid coupling between a rigid component and a "structural" node,
+        ! defined as an input, coupling_node. This node represents the 
+        ! reference configuration for data communication between the aerodynamic
+        ! and the structural solvers
+
+        allocate(c_ref_p(3, size(rr,2))); c_ref_p = 0.0_wp
+        do i =1, size(c_ref_p,2)
+          !> Offset
+          c_ref_p(:,i) = rr(:,i) - coupling_node
+          !> Orientation
+          c_ref_p(:,i) = matmul( transpose(coupling_node_rot), &
+                                 c_ref_p(:,i) )
+        end do
+
+        allocate(c_ref_c(3, size(ee,2))); c_ref_c = 0.0_wp
+        do i =1, size(c_ref_c,2)
+          n_non_zero = 0
+          do j = 1, 4
+            if ( ee(j,i) .ne. 0 ) then
+              n_non_zero = n_non_zero + 1
+              c_ref_c(:,i) = c_ref_c(:,i) + rr(:,ee(j,i))
+            end if
+          end do
+          !> Offset
+          c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero) - coupling_node
+          !> Orientation
+          c_ref_c(:,i) = matmul( transpose(coupling_node_rot), &
+                                 c_ref_c(:,i) )
+        end do
+
+        !> Write to hdf5 geo file
+        call write_hdf5(c_ref_p,'c_ref_p',geo_loc)
+        call write_hdf5(c_ref_c,'c_ref_c',geo_loc)
+
+      elseif ( trim(coupling_type) .eq. 'rbf' ) then
+
+        call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)
+
+      end if
+
+    end if
+#endif
+
+
+
    case('pointwise')
 
     mesh_file = geo_file
@@ -920,12 +948,10 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
 #if USE_PRECICE
      if ( coupled_comp ) then
+       ! *** to do *** check if the rotation is required only for 'rigid' coupling
        if ( trim(coupling_type) .eq. 'rigid' ) then
-         write(*,*) ' shape(t_te): ', shape(t_te)
          !> Rotate t_te, if needed
          do i = 1, size(t_te,2)
-           write(*,*) ' t_te(:,',i,'): ', t_te(:,i)
-           write(*,*) ' coupling_node_rot: ', coupling_node_rot
            t_te(:,i) = matmul( transpose(coupling_node_rot), &
                                        t_te(:,i) )
          end do

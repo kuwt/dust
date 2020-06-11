@@ -8,6 +8,12 @@ TODO list:
      and read them from files, instead.
 #14  Clean mbdynAdapter and mod_precice module in dust to avoid verbose 
      screen output used for debug, during implementation
+#15  In geo/mod_build_geo.f90, check if t_te rotation is required only for
+     'rigid' coupling
+#16  In geo/mod_build_geo.f90, check if coupling_node might be a dummy input
+     for 'll' coupling (l.676-8)
+#17  Check in mod_hinges.f90, read_hinge_nodes(): n_nodes = n_nodes - 1, after
+     reading n_nodes?
 
 #A   Implement general coupling
 #B   Implement hinge coupling
