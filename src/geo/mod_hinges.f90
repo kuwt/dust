@@ -267,7 +267,7 @@ subroutine build_connectivity(this, loc_points)
   allocate(ble_wei(this%n_wei, nb));     ble_wei = 0.0_wp
 
   ! diff_all and dist_all auxiliaary arrays
-  allocate(dist_all(   nb)); dist_all = 0.0_wp
+  allocate(dist_all(   nh)); dist_all = 0.0_wp
 
   ! auxiliary matrix for hinge to surf connectivity 
   ! ***** to do ***** improve the implementation
@@ -296,7 +296,7 @@ subroutine build_connectivity(this, loc_points)
         end do
 
         call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
-        
+       
         wei_v = 1.0_wp / wei_v**this%w_order
         wei_v = wei_v / sum(wei_v)
 
@@ -399,17 +399,17 @@ subroutine sort_vector_real( vec, nel, sor, ind )
   real(wp), allocatable, intent(out):: sor(:)
   integer , allocatable, intent(out):: ind(:)
 
-  real(wp):: minv
+  real(wp):: maxv
   integer :: i
 
   allocate(sor(nel)); sor = 0.0_wp
   allocate(ind(nel)); ind = 0
 
-  minv = minval( vec )
+  maxv = maxval( vec )
   do i = 1, nel
-    sor(i) = maxval( vec, 1 )
-    ind(i) = maxloc( vec, 1 )
-    vec( ind(i) ) = minv - 0.1_wp ! naif
+    sor(i) = minval( vec, 1 )
+    ind(i) = minloc( vec, 1 )
+    vec( ind(i) ) = maxv + 0.1_wp ! naif
   end do
 
 

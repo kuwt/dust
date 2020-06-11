@@ -805,6 +805,11 @@
         ! select cases for intel, need to call these for all elements and for the
         ! vortex lattices it is going to be a dummy empty function call
 
+!           write(*,*) ' i_el : ', i_el
+!           write(*,*) ' elems(i_el)%p%comp_id): ', elems(i_el)%p%comp_id
+!           write(*,*) ' geo%components()%ref_id: ', &
+!                        geo%components(elems(i_el)%p%comp_id)%ref_id
+           
             call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
                     geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g)
             call elems(i_el)%p%compute_dforce()

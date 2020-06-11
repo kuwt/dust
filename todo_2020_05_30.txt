@@ -14,6 +14,9 @@ TODO list:
      for 'll' coupling (l.676-8)
 #17  Check in mod_hinges.f90, read_hinge_nodes(): n_nodes = n_nodes - 1, after
      reading n_nodes?
+#18  Check nodes numbering in precice rbf coupling: %i_points_precice, %rbf%ind
+#19  Compute pressure for v and p elements, in dust.f90
+
 
 #A   Implement general coupling
 #B   Implement hinge coupling

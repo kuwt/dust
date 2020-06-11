@@ -1025,7 +1025,7 @@ subroutine load_components(geo, in_file, out_file, te)
           allocate(geo%components(i_comp)%rbf%nodes(size(comp_coupling_nodes,1), &
                                                     size(comp_coupling_nodes,2)) )
           geo%components(i_comp)%rbf%nodes = comp_coupling_nodes
-          call geo%components(i_comp)%rbf%build_connectivity( rr )
+          call geo%components(i_comp)%rbf%build_connectivity( rr, ee )
 
           !> allocate dummy c_ref_p(:,:), c_ref_c(:,:)
           ! *** to do *** cleaner implementation of different kinds of coupling

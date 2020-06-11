@@ -316,7 +316,7 @@ subroutine update_force( this, geo, elems )
   real(wp) :: theta
   real(wp) :: eps = 1.0e-9_wp
 
-  integer :: i, j, i_comp, ip
+  integer :: i, j, i_comp, iw, ip, ip_p
 
   integer :: j_for, j_mom, j_rot
 
@@ -447,7 +447,29 @@ subroutine update_force( this, geo, elems )
 
       !> rbf coupling ----------------------------------------------------------
       elseif ( trim(comp%coupling_type) .eq. 'rbf' ) then
-      
+
+        !> Forces and moments by accumulation 
+        this%fields(j_for)%fdata = 0.0_wp
+        this%fields(j_mom)%fdata = 0.0_wp
+
+        do i = 1, size(comp%el)
+
+          do iw = 1, size(comp%rbf%cen%ind,1)
+
+!           ! debug ---
+!           write(*,*) ' iw, i, comp%rbf%cen%ind(iw,i): ', &
+!                        iw, i, comp%rbf%cen%ind(iw,i)
+
+            ip = comp%i_points_precice( comp%rbf%cen%ind(iw,i) )
+
+            !> Force
+            this%fields(j_for)%fdata(:,ip) = this%fields(j_for)%fdata(:,ip) + &
+                    comp%rbf%cen%wei(iw,i) * comp%el(i)%dforce
+            this%fields(j_mom)%fdata(:,ip) = 0.0_wp
+
+          end do
+
+        end do
 
       end if
     end if
@@ -669,15 +691,15 @@ subroutine update_elems( this, geo, elems )
          
           ip = comp%i_points(i)
 
-          do iw = 1, size(comp%rbf%ind,1)
+          do iw = 1, size(comp%rbf%nod%ind,1)
 
             ! === Coupling Node ===
             !> Position
-            pos = this%fields(j_pos)%fdata(:, comp%i_points_precice(comp%rbf%ind(iw,i)))
+            pos   = this%fields(j_pos)%fdata(:, comp%i_points_precice(comp%rbf%nod%ind(iw,i)))
             !> Velocity
-            vel = this%fields(j_vel)%fdata(:, comp%i_points_precice(comp%rbf%ind(iw,i)))
+            vel   = this%fields(j_vel)%fdata(:, comp%i_points_precice(comp%rbf%nod%ind(iw,i)))
             !> Rotation
-            n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(comp%rbf%ind(iw,i)))
+            n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(comp%rbf%nod%ind(iw,i)))
             theta = norm2( n_rot )
             if ( theta .lt. eps ) then
               n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
@@ -686,11 +708,11 @@ subroutine update_elems( this, geo, elems )
               n_rot = n_rot / theta
             end if
             !> Angular velocity of the point at the LE
-            omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(comp%rbf%ind(iw,i)))
+            omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(comp%rbf%nod%ind(iw,i)))
 
             ! === Grid nodes of the components ===
             !> Reference difference
-            chord = comp%loc_points(:,i) - comp%rbf%nodes(:,comp%rbf%ind(iw,i))
+            chord = comp%loc_points(:,i) - comp%rbf%nodes(:,comp%rbf%nod%ind(iw,i))
             !> Rotated position difference
             chord_rot =  cos(theta) * chord + &
                          sin(theta) * cross( n_rot, chord ) + &
@@ -698,10 +720,10 @@ subroutine update_elems( this, geo, elems )
 
             !> Position
             geo%points(:, ip) = geo%points(:, ip) + &
-                                comp%rbf%wei(iw,i) * ( pos + chord_rot ) 
+                                comp%rbf%nod%wei(iw,i) * ( pos + chord_rot ) 
             !> Velocity
             geo%points_vel(:, ip) = geo%points_vel(:, ip) + &
-                                comp%rbf%wei(iw,i) * ( vel + cross( omega, chord_rot ) )
+                                comp%rbf%nod%wei(iw,i) * ( vel + cross( omega, chord_rot ) )
           end do
 
         end do
@@ -830,6 +852,7 @@ subroutine update_near_field_wake( this, geo, wake )
         end if
 
       elseif ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) .eq. 'rbf' ) then
+        ! *** to do ***
         ! ...
       else
         !> other coupling

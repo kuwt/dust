@@ -9,15 +9,28 @@ private
 
 public :: t_precice_rbf
 
+!> Connectivity, indices and weights of the structural nodes driving
+! the surface points
+type :: t_rbf_conn
 
-!> RBF coupling structures
-type :: t_precice_rbf
-  !> Coupling nodes
-  real(wp), allocatable :: nodes(:,:)
   !> Indices (surface to structure)
   integer,  allocatable :: ind(:,:) 
   !> Weights (surface to structure)
   real(wp), allocatable :: wei(:,:)
+
+end type t_rbf_conn
+
+!> RBF coupling structures
+type :: t_precice_rbf
+
+  !> Coupling nodes
+  real(wp), allocatable :: nodes(:,:)
+
+  !> Grid nodes connectivity
+  type(t_rbf_conn) :: nod
+
+  !> Elem centers connectivity
+  type(t_rbf_conn) :: cen
 
   !> --- Parameters of rbf interpolation ---
   !> Number of points for transferring the motion from the structure to the
@@ -44,25 +57,44 @@ contains
 !----------------------------------------------------------------
 !> Read local coordinates of surface nodes, rr, and build data for
 ! structure to surface interpolation of the motion
-subroutine build_connectivity(this, rr)
+subroutine build_connectivity(this, rr, ee)
   class(t_precice_rbf), intent(inout) :: this
   real(wp),             intent(in)    :: rr(:,:)
+  integer ,             intent(in)    :: ee(:,:)
   
   real(wp), allocatable :: dist_all(:), wei_v(:)
   integer , allocatable ::              ind_v(:)
+  real(wp) :: cen(3)
 
-  integer :: np, ns
-  integer :: ip, is
+  integer :: np, ns, ne, n
+  integer :: ip, is, ie
 
   !> Number of surface points
   np = size(rr,2)
+  !> Number of surface elems
+  ne = size(ee,2)
   !> Number of coupling nodes of the structure
   ns = size(this%nodes,2)
 
-  allocate(this%ind(this%n_wei, np)); this%ind = 0
-  allocate(this%wei(this%n_wei, np)); this%wei = 0.0_wp
+  ! debug ---
+  write(*,*) ' shape(rr): ', shape(rr)
+  write(*,*) ' shape(ee): ', shape(ee)
 
-  allocate(dist_all(np)); dist_all = 0.0_wp
+  write(*,*); write(*,*) ' rr: '
+  do ip = 1, np
+    write(*,*) rr(:,ip)
+  end do
+  write(*,*); write(*,*) ' this%nodes: '
+  do is = 1, ns
+    write(*,*) this%nodes(:,is)
+  end do
+  ! debug ---
+
+  !> === Surface nodes ===
+  allocate(this%nod%ind(this%n_wei, np)); this%nod%ind = 0
+  allocate(this%nod%wei(this%n_wei, np)); this%nod%wei = 0.0_wp
+
+  allocate(dist_all(ns)); dist_all = 0.0_wp
 
   do ip = 1, np
 
@@ -71,15 +103,72 @@ subroutine build_connectivity(this, rr)
       dist_all(is) = norm2( rr(:,ip) - this%nodes(:,is) )
     end do
 
+    ! debug ---
+    write(*,*) ' dist_all:', dist_all
+    ! debug ---
+
     call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
 
     wei_v = 1.0_wp / wei_v**this%w_order
     wei_v = wei_v / sum(wei_v)
 
-    this%wei(:,ip) = wei_v
-    this%ind(:,ip) = ind_v
+    this%nod%wei(:,ip) = wei_v
+    this%nod%ind(:,ip) = ind_v
 
   enddo
+
+ 
+  !> === Surface centers ===
+  allocate(this%cen%ind(this%n_wei, np)); this%cen%ind = 0
+  allocate(this%cen%wei(this%n_wei, np)); this%cen%wei = 0.0_wp
+
+  deallocate(dist_all); allocate(dist_all(ns)); dist_all = 0.0_wp
+
+  do ie = 1, ne
+
+    !> Compute element center
+    ! *** to do *** elem center for 'll'
+    cen = 0.0_wp; n = 0
+    do ip = 1, 4
+      if ( ee(ip,ie) .ne. 0 ) then
+        n = n + 1
+        cen = cen + rr(:,ee(ip,ie))
+      end if
+    end do
+    cen = cen / dble(n)
+
+    !> Distance of the surface nodes from the structural nodes
+    do is = 1, ns
+      dist_all(is) = norm2( cen - this%nodes(:,is) )
+    end do
+
+    call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
+
+    wei_v = 1.0_wp / wei_v**this%w_order
+    wei_v = wei_v / sum(wei_v)
+
+    this%cen%wei(:,ie) = wei_v
+    this%cen%ind(:,ie) = ind_v
+
+  enddo
+
+! ! check ---
+! write(*,*) 
+! write(*,*) ' Check in t_precice_rbf % build_connectivity, %nod '
+! do ip = 1, np
+!   write(*,*) this%nod%ind(:,ip), this%nod%wei(:,ip)
+! end do
+! write(*,*) 
+! write(*,*) ' Check in t_precice_rbf % build_connectivity, %cen '
+! do ie = 1, ne
+!   write(*,*) this%cen%ind(:,ie), this%cen%wei(:,ie)
+! end do
+! write(*,*) 
+! write(*,*) ' Stop.'
+! write(*,*) 
+! stop
+! ! check ---
+
 
   !> Deallocate and cleaning
   if ( allocated(dist_all) )  deallocate(dist_all)
@@ -99,17 +188,17 @@ subroutine sort_vector_real( vec, nel, sor, ind )
   real(wp), allocatable, intent(out):: sor(:)
   integer , allocatable, intent(out):: ind(:)
 
-  real(wp):: minv
+  real(wp):: maxv
   integer :: i
 
   allocate(sor(nel)); sor = 0.0_wp
   allocate(ind(nel)); ind = 0
 
-  minv = minval( vec )
+  maxv = maxval( vec )
   do i = 1, nel
-    sor(i) = maxval( vec, 1 )
-    ind(i) = maxloc( vec, 1 )
-    vec( ind(i) ) = minv - 0.1_wp ! naif
+    sor(i) = minval( vec, 1 )
+    ind(i) = minloc( vec, 1 )
+    vec( ind(i) ) = maxv + 0.1_wp ! naif
   end do
 
 
