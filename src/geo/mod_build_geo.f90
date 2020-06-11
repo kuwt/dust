@@ -919,11 +919,18 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
      endif
 
 #if USE_PRECICE
-     !> Rotate t_te, if needed
-     do i = 1, size(t_te,2)
-       t_te(:,i) = matmul( transpose(coupling_node_rot), &
-                                   t_te(:,i) )
-     end do
+     if ( coupled_comp ) then
+       if ( trim(coupling_type) .eq. 'rigid' ) then
+         write(*,*) ' shape(t_te): ', shape(t_te)
+         !> Rotate t_te, if needed
+         do i = 1, size(t_te,2)
+           write(*,*) ' t_te(:,',i,'): ', t_te(:,i)
+           write(*,*) ' coupling_node_rot: ', coupling_node_rot
+           t_te(:,i) = matmul( transpose(coupling_node_rot), &
+                                       t_te(:,i) )
+         end do
+       end if
+     end if
 #endif
 
 

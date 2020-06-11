@@ -6,6 +6,8 @@ TODO list:
 #11  Test model with both rigid and ll coupling
 #12  Clean mbdynAdapter.py and mbdynInterface.py. Remove hardcoded parameters
      and read them from files, instead.
+#14  Clean mbdynAdapter and mod_precice module in dust to avoid verbose 
+     screen output used for debug, during implementation
 
 #A   Implement general coupling
 #B   Implement hinge coupling
