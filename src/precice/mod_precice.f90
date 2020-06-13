@@ -465,7 +465,13 @@ subroutine update_force( this, geo, elems )
             !> Force
             this%fields(j_for)%fdata(:,ip) = this%fields(j_for)%fdata(:,ip) + &
                     comp%rbf%cen%wei(iw,i) * comp%el(i)%dforce
-            this%fields(j_mom)%fdata(:,ip) = 0.0_wp
+
+            !> Moments
+            this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) + &
+                    comp%rbf%cen%wei(iw,i) * ( comp%el(i)%dmom + &
+                    cross( comp%el(i)%cen - comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i)), &
+                           comp%el(i)%dforce ) )
+
 
           end do
 
