@@ -138,8 +138,13 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
   linsys%nstatic_expl = geo%nstatic_expl
   linsys%nmoving_expl = geo%nmoving_expl
   linsys%n_expl =  geo%nelem_expl
-  
+   
   ntot = linsys%rank
+
+  ! check ---
+  write(*,*) ' linsys%nstatic: ', linsys%nstatic
+  write(*,*) ' linsys%nmoving: ', linsys%nmoving
+  ! check ---
 
   !Allocate the vectors of the right size 
   allocate( linsys%A(linsys%rank, linsys%rank))

@@ -931,14 +931,18 @@ subroutine load_components(geo, in_file, out_file, te)
       geo%components(i_comp)%ref_id  = ref_id
       geo%components(i_comp)%ref_tag = trim(ref_tag_m)
       geo%components(i_comp)%moving  = geo%refs(ref_id)%moving
-      !> Overwirte moving, if n_hinges .gt. 0
-      ! *** to do *** avoid moving = .true. if hinge_input is constant
-      if ( n_hinges .gt. 0 )  geo%components(i_comp)%moving = .true.
 
       geo%components(i_comp)%coupling          =      comp_coupling
       geo%components(i_comp)%coupling_type     = trim(comp_coupling_type)
       geo%components(i_comp)%coupling_node     =      comp_coupling_node
       geo%components(i_comp)%coupling_node_rot =      comp_coupling_node_rot
+
+      !> Overwirte moving,
+      !>> if n_hinges .gt. 0
+      ! *** to do *** avoid moving = .true. if hinge_input is constant
+      if ( n_hinges .gt. 0 )  geo%components(i_comp)%moving = .true.
+      !>> if coupling = .true.
+      if ( comp_coupling )  geo%components(i_comp)%moving = .true.
 
       ! ====== READING =====
       geo%components(i_comp)%comp_el_type = trim(comp_el_type)

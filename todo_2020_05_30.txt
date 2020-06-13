@@ -16,7 +16,13 @@ TODO list:
      reading n_nodes?
 #18  Check nodes numbering in precice rbf coupling: %i_points_precice, %rbf%ind
 #19  Compute pressure for v and p elements, in dust.f90
-
+#20  Add 'small_displacement' option for coupled components, in order to assign
+     b.c. by transpiration, without moving the geometry and refactorizing the
+     linear system.
+>>>>>
+#21  Bugfix needed for rbf coupling w/ particle wake. Something wrong in 
+     t_precice % update_near_wake()?
+<<<<<
 
 #A   Implement general coupling
 #B   Implement hinge coupling
