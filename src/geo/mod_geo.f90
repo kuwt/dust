@@ -937,7 +937,7 @@ subroutine load_components(geo, in_file, out_file, te)
       geo%components(i_comp)%coupling_node     =      comp_coupling_node
       geo%components(i_comp)%coupling_node_rot =      comp_coupling_node_rot
 
-      !> Overwirte moving,
+      !> Overwrite moving,
       !>> if n_hinges .gt. 0
       ! *** to do *** avoid moving = .true. if hinge_input is constant
       if ( n_hinges .gt. 0 )  geo%components(i_comp)%moving = .true.

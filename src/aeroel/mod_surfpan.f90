@@ -1160,7 +1160,8 @@ subroutine get_vort_vel_surfpan(this, vort_elems, uinf)
  integer :: iv
  real(wp) :: vel(3)
 
- !this%uvort = 0.0_wp
+ !> Initialize to zero, before accumulation
+ this%uvort = 0.0_wp
 
  do iv=1,size(vort_elems)
    call vort_elems(iv)%p%compute_vel(this%cen, uinf, vel)

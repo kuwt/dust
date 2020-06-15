@@ -144,7 +144,8 @@ subroutine build_connectivity(this, rr, ee)
 
     call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
 
-    wei_v = 1.0_wp / wei_v**this%w_order
+    !> Weight, inverse of the norm, avoid singularities
+    wei_v = 1.0_wp / max( wei_v, 1e-9_wp ) **this%w_order
     wei_v = wei_v / sum(wei_v)
 
     this%cen%wei(:,ie) = wei_v
