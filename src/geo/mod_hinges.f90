@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -82,6 +82,19 @@ type :: t_hinge_input
 end type t_hinge_input
 
 ! ---------------------------------------------------------------
+!> Hinge node to surface node connectivity. The different number of surface
+! nodes per hinge nodes requires an array of obj, containing indices and
+! weights
+type :: t_n2h_conn
+  !> Indices of the surface nodes
+  integer, allocatable :: p2h(:)
+  !> Weights
+  real(wp),allocatable :: w2h(:)
+  !> Spanwise weights
+  real(wp),allocatable :: s2h(:)
+end type t_n2h_conn
+
+! ---------------------------------------------------------------
 !> Hinge connectivity, meant for rigid rotation and bleding regions
 type :: t_hinge_conn
   !> Local index of the nodes performing the desired motion
@@ -94,19 +107,6 @@ type :: t_hinge_conn
   !> Node to hinge connectivity array of objs
   type(t_n2h_conn), allocatable :: n2h(:)
 end type t_hinge_conn
-
-! ---------------------------------------------------------------
-!> Hinge node to surface node connectivity. The different number of surface
-! nodes per hinge nodes requires an array of obj, containing indices and
-! weights
-type :: t_n2h_conn
-  !> Indices of the surface nodes
-  integer, allocatable :: p2h(:)
-  !> Weights
-  real(wp),allocatable :: w2h(:)
-  !> Spanwise weights
-  real(wp),allocatable :: s2h(:)
-end type t_n2h_conn
 
 ! ---------------------------------------------------------------
 !> Hinge node configurations: to be used in defining reference
@@ -126,8 +126,8 @@ type :: t_hinge_config
   !    v = cross(h,n)
   !> h: rotation axis
   real(wp), allocatable :: h(:,:)
-  !> v: zero direction (user inputs are overwritten, in order to 
-  ! build ortonormal reference frameshinge%rot  
+  !> v: zero direction (user inputs are overwritten, in order to
+  ! build ortonormal reference frameshinge%rot
   real(wp), allocatable :: v(:,:)
   !> n: normal direction
   real(wp), allocatable :: n(:,:)
@@ -185,13 +185,13 @@ type :: t_hinge
 
   !> Connectivity for the rigid rotation motion of a ``control surface''
   type(t_hinge_conn) :: rot
-  !> Connectivity of the blending region to avoid irregular behavior 
+  !> Connectivity of the blending region to avoid irregular behavior
   ! with a ``control surface'' large rotation (blending region extends
   ! from -offset to offset qualitatively in the ref_dir of the hinge)
   type(t_hinge_conn) :: blen
 
   contains
- 
+
   procedure, pass(this) :: build_connectivity
   procedure, pass(this) :: init_theta
   procedure, pass(this) :: from_reference_to_actual_config ! empty (useless?)
@@ -238,9 +238,9 @@ subroutine build_connectivity(this, loc_points)
   !> N. of surfae and hinge nodes
   nb = size(loc_points,2)
   nh = this%n_nodes
- 
+
   !> Coordinates in the hinge reference frame
-  ! Rotation matrix, build with the local ortonormal ref.frame of 
+  ! Rotation matrix, build with the local ortonormal ref.frame of
   ! the first hinge node
   Rot(1,:) = this % ref % v(:,1)
   Rot(2,:) = this % ref % h(:,1)
@@ -255,7 +255,7 @@ subroutine build_connectivity(this, loc_points)
   end do
 
   ! hinge width, measured in the hinge direction
-  hinge_width = rrh(2,nh) - rrh(2,1) 
+  hinge_width = rrh(2,nh) - rrh(2,1)
 
   !> Compute connectivity and weights
   ! Allocate auxiliary node_id(:), ind(:,:), wei(:,:) arrays
@@ -269,7 +269,7 @@ subroutine build_connectivity(this, loc_points)
   ! diff_all and dist_all auxiliaary arrays
   allocate(dist_all(   nh)); dist_all = 0.0_wp
 
-  ! auxiliary matrix for hinge to surf connectivity 
+  ! auxiliary matrix for hinge to surf connectivity
   ! ***** to do ***** improve the implementation
   allocate(rot_p2h(nh,nb)); rot_p2h = 0      ;  allocate(ble_p2h(nh,nb)); ble_p2h = 0
   allocate(rot_w2h(nh,nb)); rot_w2h = 0.0_wp ;  allocate(ble_w2h(nh,nb)); ble_w2h = 0.0_wp
@@ -296,7 +296,7 @@ subroutine build_connectivity(this, loc_points)
         end do
 
         call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
-       
+
         wei_v = 1.0_wp / wei_v**this%w_order
         wei_v = wei_v / sum(wei_v)
 
@@ -315,13 +315,13 @@ subroutine build_connectivity(this, loc_points)
             rot_s2h(ind_v(iw), rot_i2h(ind_v(iw))) = 1.0_wp
           else
             rot_s2h(ind_v(iw), rot_i2h(ind_v(iw))) = 1.0_wp - &
-                       ( rrb(2,ib) - hinge_width ) / this%span_blending 
+                       ( rrb(2,ib) - hinge_width ) / this%span_blending
           endif
         end do
         ! *****
 
       else ! blending region
-        
+
         nble = nble + 1
         ble_node_id(nble) = ib
 
@@ -330,7 +330,7 @@ subroutine build_connectivity(this, loc_points)
         end do
 
         call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
-        
+
         wei_v = 1.0_wp / wei_v**this%w_order
         wei_v = wei_v / sum(wei_v)
 
@@ -349,7 +349,7 @@ subroutine build_connectivity(this, loc_points)
             ble_s2h(ind_v(iw), ble_i2h(ind_v(iw))) = 1.0_wp
           else
             ble_s2h(ind_v(iw), ble_i2h(ind_v(iw))) = 1.0_wp - &
-                       ( rrb(2,ib) - hinge_width ) / this%span_blending 
+                       ( rrb(2,ib) - hinge_width ) / this%span_blending
           endif
         end do
         ! *****
@@ -445,7 +445,7 @@ subroutine from_reference_to_actual_config(this)
   ! *** to do ***
   ! still usefull? anything else to do, that is missing in
   ! update_hinge_nodes() subroutine?
-  
+
 
 end subroutine from_reference_to_actual_config
 
@@ -458,7 +458,7 @@ subroutine update_hinge_nodes( this, R, of )
 
   !> Actual configuration: node position
   this % act % rr = matmul( R, this % ref % rr )
-  this % act % rr(1,:) = this % act % rr(1,:) + of(1) 
+  this % act % rr(1,:) = this % act % rr(1,:) + of(1)
   this % act % rr(2,:) = this % act % rr(2,:) + of(2)
   this % act % rr(3,:) = this % act % rr(3,:) + of(3)
 
@@ -549,13 +549,13 @@ subroutine hinge_deflection( this, rr, t, postpro )
                    this%rot%n2h(ih)%w2h(ib) * &
                    matmul( Rot_I, rr_in(:,ii)-this%act%rr(:,ih) )
       end do
-    
+
       !> Blending region
       do ib = 1, size(this%blen%n2h(ih)%p2h)
 
         ii = this%blen%n2h(ih)%p2h(ib)
         th1 = -th * this%blen%n2h(ih)%s2h(ib)
-        !> coordinate of the centre of the circle used for blending, 
+        !> coordinate of the centre of the circle used for blending,
         ! in the n-direction
         yc = cos(th1)/sin(th1) * this%offset * ( 1.0_wp + cos(th1) ) + &
                                  this%offset * sin(th1)
@@ -614,7 +614,7 @@ subroutine initialize_hinge_config( h_config, hinge )
 
   do i = 1, hinge%n_nodes
 
-    h_config%h(:,i) = hv;  h_config%v(:,i) = vv;  h_config%n(:,i) = nv 
+    h_config%h(:,i) = hv;  h_config%v(:,i) = vv;  h_config%n(:,i) = nv
 
   end do
 
@@ -700,7 +700,7 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
      hinges(i) % rotation_amplitude = getreal(hinge_prs,'Hinge_Rotation_Amplitude')
      hinges(i) % rotation_omega     = getreal(hinge_prs,'Hinge_Rotation_Omega')
      hinges(i) % rotation_phase     = getreal(hinge_prs,'Hinge_Rotation_Phase')
-     
+
 !    ! check ---
 !    write(*,*) ' Hinge id:', i
 !    write(*,*) ' _Tag        : ', trim(hinges(i)%tag)
@@ -735,7 +735,7 @@ subroutine read_hinge_nodes( filen, n_nodes, rr )
     n_nodes = n_nodes + 1
   end do
   close(fid)
- 
+
   n_nodes = n_nodes - 1 ! *** to do *** check
 
   !> Allocate and fill rr array
@@ -744,7 +744,7 @@ subroutine read_hinge_nodes( filen, n_nodes, rr )
   do i = 1, n_nodes
     read(fid,*) rr(:,i)
   end do
-  close(fid) 
+  close(fid)
 
 
 end subroutine read_hinge_nodes
@@ -758,7 +758,7 @@ subroutine hinge_input_parser( geo_prs, hinge_prs )
   call geo_prs%CreateIntOption('n_hinges', &
               'N. of hinges and rotating parts (e.g. aileron) of the component', &
               '0') ! default: no hinges -> n_hinges = 0
-  
+
   call geo_prs%CreateSubOption('Hinge', 'Parser for hinge input', &
                hinge_prs, multiple=.true. )
 
