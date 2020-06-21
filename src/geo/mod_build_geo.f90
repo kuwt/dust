@@ -373,7 +373,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     coupled_str       = 'true'
     coupling_type     = getstr(geo_prs, 'CouplingType')
     coupling_node     = getrealarray(geo_prs, 'CouplingNode', 3)
-    coupling_node_file = getstr(geo_prs, 'CouplingNodeFile')
+    if ( countoption(geo_prs, 'CouplingNodeFile') .ne. 0 ) &
+        coupling_node_file = getstr(geo_prs, 'CouplingNodeFile')
     coupling_node_rot = reshape( &
                         getrealarray(geo_prs, 'CouplingNodeOrientation', 9), &
                         (/3,3/) )

@@ -914,8 +914,13 @@ subroutine update_wake(wake, elems, octree)
 
       !update the position in time
       wake%pan_w_vel(   :,iw,ipan) = vel_p
-      wake%pan_w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + &
-                                     vel_p*sim_param%dt*sim_param%ndt_update_wake
+      if ( ipan .ne. 3 ) then
+        wake%pan_w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + &
+                                       vel_p*sim_param%dt*sim_param%ndt_update_wake
+      else
+        wake%pan_w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + &
+                                       vel_p*sim_param%dt
+      end if
     enddo
   enddo
 !$omp end parallel do

@@ -103,8 +103,10 @@ subroutine initialize(this)
 
   write(*,*) ' Using PreCICE '
 
+  ! *** to do *** read %config_file_name as an input
   !> Default input for dust in a preCICE coupled simulation
-  this % config_file_name = './../precice-config.xml'
+  this % config_file_name = './../../../precice-config.xml'
+  !this % config_file_name = './../precice-config.xml'
   this % solver_name = 'dust'
   this %   mesh_name = 'dust_mesh'
   this % comm_rank = 0
@@ -823,11 +825,13 @@ subroutine update_near_field_wake( this, geo, wake )
         if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
              dist*wake%pan_gen_scaling(ip)* &
-             norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist)
+             norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist) * &
+             sim_param%ndt_update_wake
         else
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
              dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
-             sim_param%min_vel_at_te*sim_param%dt
+             sim_param%min_vel_at_te*sim_param%dt * &
+             sim_param%ndt_update_wake
         end if
 
       elseif ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) .eq. 'rigid' ) then
@@ -850,11 +854,13 @@ subroutine update_near_field_wake( this, geo, wake )
         if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
              dist*wake%pan_gen_scaling(ip)* &
-             norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist)
+             norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist) * &
+             sim_param%ndt_update_wake
         else
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
              dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
-             sim_param%min_vel_at_te*sim_param%dt
+             sim_param%min_vel_at_te*sim_param%dt * &
+             sim_param%ndt_update_wake
         end if
 
       elseif ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) .eq. 'rbf' ) then

@@ -19,10 +19,6 @@ TODO list:
 #20  Add 'small_displacement' option for coupled components, in order to assign
      b.c. by transpiration, without moving the geometry and refactorizing the
      linear system.
->>>>>
-#21  Bugfix needed for rbf coupling w/ particle wake. Something wrong in 
-     t_precice % update_near_wake()?
-<<<<<
 
 #A   Implement general coupling
 #B   Implement hinge coupling
@@ -54,3 +50,8 @@ DONE list:
        result files along with the new ones.
 #13  dust_post not working while dust is running. _geo.h5 file busy. hdf5 hinge
      groups were not closed, after writing hinge fields.
+#21  Bugfix needed for rbf coupling w/ particle wake. Something wrong in 
+     t_precice % update_near_wake()?
+     Bugfix: %uvort was not set to zero, before computing it.
+#22  Fix "step behavior" of the 3rd row of points of wake panels, when
+     ndt_update_wake .ne. 1
