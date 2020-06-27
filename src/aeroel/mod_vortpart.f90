@@ -288,13 +288,13 @@ subroutine kernel_coeffs(rr, c, d)
   !d = 3.0_wp/distn**5
 
   !Rankine
-  if (r .ge. r_Vortex) then
-    c = -1.0_wp/r**3
-    d = 3.0_wp/r**5
-  else
-    c = -1.0_wp/r_Vortex**3
-    d = 0.0_wp
-  endif
+  !if (r .ge. r_Vortex) then
+  !  c = -1.0_wp/r**3
+  !  d = 3.0_wp/r**5
+  !else
+  !  c = -1.0_wp/r_Vortex**3
+  !  d = 0.0_wp
+  !endif
 
   !Gaussian from Alvarez
   !if(r.gt.1e-13_wp) then
@@ -306,6 +306,11 @@ subroutine kernel_coeffs(rr, c, d)
   !  c=0.0
   !  d=0.0
   !endif
+
+  !High Order Algebraic
+  distn = sqrt(r**2+r_Vortex**2)
+  c = -(r**2+2.5_wp*r_Vortex**2)/distn**5
+  d = -2.0_wp/distn**5 + 5.0_wp*(r**2+2.5_wp*r_Vortex**2)/distn**7
 
 end subroutine
 
