@@ -184,7 +184,7 @@ subroutine potential_calc_sou_surfpan(this, sou, dou, pos)
  real(wp), parameter :: eps_sou  = 1.0e-6_wp
  real(wp), parameter :: ff_ratio = 10.0_wp
 
- integer :: i1
+ integer :: i1, i2
  character(len=*), parameter :: this_sub_name = 'potential_calc_sou_surfpan'
 
  radius = norm2(pos-this%cen)
@@ -227,7 +227,17 @@ subroutine potential_calc_sou_surfpan(this, sou, dou, pos)
      souLog = log( (R1+R2+this%edge_len(i1)) / (R1+R2-this%edge_len(i1)) )
 
 
-     if ( abs(R1+R2-this%edge_len(i1)) < 1e-6_wp ) then
+     if ( abs(R1+R2-this%edge_len(i1)) < 1e-10_wp ) then
+       write(*,*) ' elem%id  : ' , this%id
+       write(*,*) ' elem%cen : ' , this%cen
+       write(*,*) ' R1                   : ', R1
+       write(*,*) ' R2                   : ', R2
+       write(*,*) ' elem%edge_len(',i1,'): ', this%edge_len(i1)
+       write(*,*) ' abs(R1+R2-len%edge_len(',i1,')): ', abs(R1+R2-this%edge_len(i1))
+       write(*,*) ' pos      : ' , pos
+       do i2 = 1, this%n_ver
+         write(*,*) ' ver(',i2,'): ', this%ver(:,i2), this%verp(:,i2)
+       end do
        call error(this_sub_name, this_mod_name, 'Too small denominator in &
         &the calculation of sources')
      end if
@@ -1050,6 +1060,12 @@ subroutine create_chtls_stencil_surfpan( this , R_g )
     allocate(this%chtls_stencil( 3 , n_neigh + 1 ) ) ; this%chtls_stencil = 0.0_wp
   end if
  
+  !> debug ---
+  write(*,*) ' iCls_tilde: '
+  write(*,*)   iCls_tilde(1,1), iCls_tilde(1,2)
+  write(*,*)   iCls_tilde(2,1), iCls_tilde(2,2)
+  !> debug ---
+
   r1 = R(1,1) 
   allocate(chtls_tmp( 3 , n_neigh + 1 )) ; chtls_tmp = 0.0_wp
   chtls_tmp(  1,n_neigh + 1 ) = 1.0_wp / R(1,1) 
