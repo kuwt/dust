@@ -105,8 +105,8 @@ subroutine initialize(this)
 
   ! *** to do *** read %config_file_name as an input
   !> Default input for dust in a preCICE coupled simulation
-  this % config_file_name = './../../../precice-config.xml'
-  !this % config_file_name = './../precice-config.xml'
+  !this % config_file_name = './../../../precice-config.xml'
+  this % config_file_name = './../precice-config.xml'
   this % solver_name = 'dust'
   this %   mesh_name = 'dust_mesh'
   this % comm_rank = 0
@@ -315,14 +315,17 @@ subroutine update_force( this, geo, elems )
   type(t_geo)       , intent(inout) :: geo
   type(t_pot_elem_p), intent(in)    :: elems(:)
   real(wp) :: n_rot(3), chord(3), chord_rot(3), omega(3), pos(3), vel(3)
+  real(wp) ::   ell(3),   off(3),   off_rot(3)
+  real(wp) :: radius_1(3), radius_2(3)
   real(wp) :: theta
   real(wp) :: eps = 1.0e-9_wp
 
   integer :: i, j, i_comp, iw, ip, ip_p
 
-  integer :: j_for, j_mom, j_rot
+  integer :: j_for, j_mom, j_rot, j_pos
 
   do j = 1, size(this%fields)
+    if ( trim(this%fields(j)%fname) .eq. 'Position') j_pos = j
     if ( trim(this%fields(j)%fname) .eq. 'Rotation') j_rot = j
     if ( trim(this%fields(j)%fname) .eq. 'Force'   ) j_for = j
     if ( trim(this%fields(j)%fname) .eq. 'Moment'  ) j_mom = j
@@ -352,12 +355,33 @@ subroutine update_force( this, geo, elems )
                                      0.5_wp * comp%el(i)%dforce
             this%fields(j_for)%fdata(:, ip+1) = this%fields(j_for)%fdata(:, ip+1) + &
                                      0.5_wp * comp%el(i)%dforce
-  
+
+            !> Rotation matrix
+            n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(i))
+            theta = norm2( n_rot )
+            if ( theta .lt. eps ) then
+              n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
+              theta = 0.0_wp
+            else
+              n_rot = n_rot / theta
+            end if
+    
+            off = 0.5_wp * ( comp%xac(i) + comp%xac(i+1) )
+            off_rot =  cos(theta) * chord + &
+                       sin(theta) * cross( n_rot, off*chord ) + &
+                     ( 1.0_wp - cos(theta) )*sum( off*n_rot ) * n_rot
+            ell = ( this%fields(j_pos)%fdata(:, comp%i_points_precice(i+1) ) &
+                  - this%fields(j_pos)%fdata(:, comp%i_points_precice(i  ) ) ) * 0.5_wp
+            radius_1 =   ell + off_rot
+            radius_2 = - ell + off_rot
+
             !> Accumulation of moments
             this%fields(j_mom)%fdata(:, ip)   = this%fields(j_mom)%fdata(:, ip) + &
-                                     0.5_wp * comp%el(i)%dmom
+                                     0.5_wp * comp%el(i)%dmom + &
+                   0.5_wp * cross( radius_1 , comp%el(i)%dforce )
             this%fields(j_mom)%fdata(:, ip+1) = this%fields(j_mom)%fdata(:, ip+1) + &
-                                     0.5_wp * comp%el(i)%dmom
+                                     0.5_wp * comp%el(i)%dmom + &
+                   0.5_wp * cross( radius_2 , comp%el(i)%dforce )
           end do
         end if
 
@@ -574,27 +598,31 @@ subroutine update_elems( this, geo, elems )
           !> Angular velocity of the point at the LE
           omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(i))
   
-          !> Position of the LE
-          geo%points(:, comp%i_points( 2*i-1 ) ) = &
-             this%fields(j_pos)%fdata(:, comp%i_points_precice( i ) )
   
           chord = comp%c_ref_p(:,i)
           chord_rot =  cos(theta) * chord + &
                        sin(theta) * cross( n_rot, chord ) + &
                      ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
   
+          !> Position of the LE
+          geo%points(:, comp%i_points( 2*i-1 ) ) = &
+             this%fields(j_pos)%fdata(:, comp%i_points_precice( i ) ) &
+           - chord_rot * comp%xac(i)/norm2(chord_rot)
+
           !> Position of the TE
           geo%points(:, comp%i_points( 2*i ) ) = &
-             geo%points(:, comp%i_points( 2*i-1 ) ) + chord_rot
+             geo%points(:, comp%i_points( 2*i-1 ) ) + &
+             chord_rot
   
           !> Velocity of the LE
           geo%points_vel(:, comp%i_points( 2*i-1 ) ) = &
-             this%fields(j_vel)%fdata(:, comp%i_points_precice( i ) )
+             this%fields(j_vel)%fdata(:, comp%i_points_precice( i ) ) - &
+             cross( omega, chord_rot ) * comp%xac(i)/norm2(chord_rot)
   
           !> Velocity of the TE
           geo%points_vel(:, comp%i_points( 2*i ) ) = &
              this%fields(j_vel)%fdata(:, comp%i_points_precice( i ) ) + &
-             cross( omega, chord_rot )
+             cross( omega, chord_rot ) * ( 1.0_wp - comp%xac(i)/norm2(chord_rot) )
   
           !> Velocity of the control point on the LL ( accumulation ), vel_ctr_pt
           ! and velocity of the center of the QUAD el, ub

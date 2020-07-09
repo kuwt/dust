@@ -233,6 +233,8 @@ type :: t_geo_component
  real(wp), allocatable :: c_ref_p(:,:)
  !> "Chord" vector reference, referred to the center of the elements
  real(wp), allocatable :: c_ref_c(:,:)
+ !> x_ac offset for LL
+ real(wp), allocatable :: xac(:)
 #endif
 
  !> Hinges
@@ -721,6 +723,7 @@ subroutine load_components(geo, in_file, out_file, te)
 #if USE_PRECICE
  real(wp), allocatable :: c_ref_p(:,:)
  real(wp), allocatable :: c_ref_c(:,:)
+ real(wp), allocatable :: xac_p(:)
  real(wp), allocatable :: comp_coupling_nodes(:,:)
  integer :: points_offset_precice, np_precice
 #endif 
@@ -992,12 +995,15 @@ subroutine load_components(geo, in_file, out_file, te)
              ( trim(comp_coupling_type) .eq. 'rigid' ) ) then
           call read_hdf5_al(c_ref_p, 'c_ref_p', geo_loc)
           call read_hdf5_al(c_ref_c, 'c_ref_c', geo_loc)
+          call read_hdf5_al(xac_p  , 'x_ac_p' , geo_loc)
           allocate(geo%components(i_comp)%c_ref_p( size(c_ref_p,1) , &
                                                    size(c_ref_p,2) ) )
           allocate(geo%components(i_comp)%c_ref_c( size(c_ref_c,1) , &
                                                    size(c_ref_c,2) ) )
+          allocate( geo%components(i_comp)%xac( size(xac_p,1) ) )
           geo%components(i_comp)%c_ref_p = c_ref_p
           geo%components(i_comp)%c_ref_c = c_ref_c
+          geo%components(i_comp)%xac     = xac_p
           
           !> === PreCICE connectivity for LL ===
           if ( trim(comp_coupling_type) .eq. 'll' ) then

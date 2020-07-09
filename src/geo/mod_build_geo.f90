@@ -74,7 +74,7 @@ use mod_stringtools, only : &
   isempty
 
 use mod_ll_io, only: &
-  read_mesh_ll
+  read_mesh_ll, read_xac_offset
 
 use mod_hinges, only: &
   t_hinge, t_hinge_input, build_hinges, hinge_input_parser
@@ -231,6 +231,10 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  real(wp), allocatable :: c_ref_c(:,:)
  integer :: n_non_zero
 #endif
+ ! ll offset
+ character(len=max_char_len) :: xac_offset_filen
+ logical                     :: xac_offset_io
+ real(wp), allocatable       :: xac_p(:)
 
  character(len=*), parameter :: this_sub_name = 'build_component'
 
@@ -262,6 +266,11 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
               &component) of the unit vectors of the coupling node ref.frame: &
               &A = (/ I_nod_1^loc, I_nod_2^loc, I_nod_3^loc /)', &
               '(/ 1.,0.,0., 0.,1.,0., 0.,0.,1. /)')
+  ! ll xac offset (meant for coupled simulations)
+  call geo_prs%CreateLogicalOption('Offset_xac', 'Offset in the chordwise &
+              &direction of the LL elem w.r.t. the structural nodes', 'F')
+  call geo_prs%CreateStringOption('Offset_xac_file','Filename of the &
+              &chordwise input')
   !hinges
   call hinge_input_parser( geo_prs, hinge_prs )
   !symmtery
@@ -643,6 +652,17 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                                 chord_p,theta_p,theta_e )
       ! nelems_span_tot will be overwritten if symmetry is required (around l.220)
       nelems_span_tot =   nelems_span
+
+      !> x_AC Offset
+      xac_offset_io = getlogical(geo_prs,'Offset_xac')
+      if ( xac_offset_io ) then
+        xac_offset_filen = getstr(geo_prs,'Offset_xac_file')
+        call read_xac_offset( xac_offset_filen, normalised_coord_e, &
+                              xac_p )
+      else
+        allocate(xac_p(size(normalised_coord_e,2)+1)); xac_p = 0.0_wp
+      end if
+      call write_hdf5(xac_p,'x_ac_p',geo_loc)
 
       ! correction of the following list, if symmetry is required ---------
       if ( mesh_symmetry ) then

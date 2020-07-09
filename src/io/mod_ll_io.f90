@@ -61,7 +61,7 @@ use mod_parse, only: &
 
 implicit none
 
-public :: read_mesh_ll
+public :: read_mesh_ll, read_xac_offset
 
 private
 
@@ -607,5 +607,72 @@ function spacing_weights ( itype, i, n ) result(w)
 
 end function spacing_weights
 
+!----------------------------------------------------------------------
+!
+subroutine read_xac_offset( filen, normalized_coord_e, xac )
+  character(len=*)     , intent(in)  :: filen
+  real(wp)             , intent(in)  :: normalized_coord_e(:,:)
+  real(wp), allocatable, intent(out) :: xac(:)
+
+  real(wp), allocatable :: y_coord(:), yin(:), xacin(:)
+
+  integer :: nel, np, i, io, ny, j
+  integer :: fid = 21
+
+  ! *** to do ***
+  ! if ll has more than one section, normalized_coord_e
+  ! goes from 0 to 1 for each of the sections
+  ! -> use rr(2,:) instead?
+  ! *** to do ***
+
+  !> Set y_coord array
+  nel = size(normalized_coord_e,2)
+  np = nel + 1
+  allocate(y_coord(np))
+  do i = 1, nel
+    y_coord(i) = normalized_coord_e(1,i)
+  end do
+  y_coord(np) = normalized_coord_e(2,nel)
+
+  !> Read offset_xac_file
+  open(unit=fid, file=trim(filen))
+  ny = 0
+  do
+    read(fid,*,iostat=io)
+    if ( io .lt. 0 ) then; exit
+    else                 ; ny = ny + 1
+    end if
+  end do
+  close(fid)
+
+  allocate(yin(ny), xacin(ny))
+  open(unit=fid, file=trim(filen))
+  do i = 1, ny
+    read(fid,*) yin(i), xacin(i)
+  end do
+  close(fid)
+
+  !> Non-dimensionalization of yin array
+  yin = ( yin - yin(1) ) / ( yin(ny) - yin(1) )
+
+  !> Interpolation of xacin in xac
+  allocate(xac(np))
+  xac(1)  = xacin(1)
+  xac(np) = xacin(ny)
+  do i = 2, np-1
+    do j = 1, ny-1
+      if ( ( y_coord(i)-yin(j)   .gt. 0.0_wp ) .and. &
+           ( y_coord(i)-yin(j+1) .le. 0.0_wp ) ) then
+        xac(i) = ( xacin(j+1) - xacin(j) ) / &
+                 (   yin(j+1) -   yin(j) ) * &
+                 ( y_coord(i) -   yin(j) ) + xacin(j)
+      end if
+    end do
+  end do
+
+
+end subroutine read_xac_offset
+
+!----------------------------------------------------------------------
 
 end module mod_ll_io

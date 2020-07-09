@@ -1416,6 +1416,9 @@ subroutine calc_geo_data_liftlin(this, vert)
 
   ! unit vector
   do is = 1 , nSides
+    ! debug ---
+    write(*,*) is, this%edge_vec(:,is), this%edge_len(is)
+    ! debug ---
     this%edge_uni(:,is) = this%edge_vec(:,is) / this%edge_len(is)
   end do
 
