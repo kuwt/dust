@@ -608,10 +608,10 @@ function spacing_weights ( itype, i, n ) result(w)
 end function spacing_weights
 
 !----------------------------------------------------------------------
-!
-subroutine read_xac_offset( filen, normalized_coord_e, xac )
+!> Set offset between xac and the structural coupling node
+subroutine read_xac_offset( filen, rr, xac )
   character(len=*)     , intent(in)  :: filen
-  real(wp)             , intent(in)  :: normalized_coord_e(:,:)
+  real(wp)             , intent(in)  :: rr(:,:)
   real(wp), allocatable, intent(out) :: xac(:)
 
   real(wp), allocatable :: y_coord(:), yin(:), xacin(:)
@@ -619,20 +619,14 @@ subroutine read_xac_offset( filen, normalized_coord_e, xac )
   integer :: nel, np, i, io, ny, j
   integer :: fid = 21
 
-  ! *** to do ***
-  ! if ll has more than one section, normalized_coord_e
-  ! goes from 0 to 1 for each of the sections
-  ! -> use rr(2,:) instead?
-  ! *** to do ***
-
   !> Set y_coord array
-  nel = size(normalized_coord_e,2)
-  np = nel + 1
+  np = size(rr,2) / 2
   allocate(y_coord(np))
-  do i = 1, nel
-    y_coord(i) = normalized_coord_e(1,i)
+  do i = 1, np
+    y_coord(i) = rr(2,2*i-1)
   end do
-  y_coord(np) = normalized_coord_e(2,nel)
+  !> Non-dimensionalization of y_coord
+  y_coord = ( y_coord - y_coord(1) ) / ( y_coord(np) - y_coord(1) )
 
   !> Read offset_xac_file
   open(unit=fid, file=trim(filen))

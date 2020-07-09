@@ -657,7 +657,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       xac_offset_io = getlogical(geo_prs,'Offset_xac')
       if ( xac_offset_io ) then
         xac_offset_filen = getstr(geo_prs,'Offset_xac_file')
-        call read_xac_offset( xac_offset_filen, normalised_coord_e, &
+        call read_xac_offset( xac_offset_filen, rr, &
                               xac_p )
       else
         allocate(xac_p(size(normalised_coord_e,2)+1)); xac_p = 0.0_wp
