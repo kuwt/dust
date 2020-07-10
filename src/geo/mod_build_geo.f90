@@ -718,8 +718,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                       (/ cos(theta_p(i)), 0.0_wp, -sin(theta_p(i)) /) )
           !         (/ 0.0_wp, -cos(theta_p(i)), -sin(theta_p(i)) /)
           !         (/ cos(theta_p(i)), 0.0_wp, -sin(theta_p(i)) /)
-          write(*,*) coupling_node_rot
-          write(*,*) c_ref_p(:,i)
           ! !> Orientation
           ! ! *** to do *** needed for beam/ll coupling?
           ! c_ref_p(:,i) = matmul( transpose(coupling_node_rot), &
