@@ -367,9 +367,11 @@ subroutine update_force( this, geo, elems )
             end if
     
             off = 0.5_wp * ( comp%xac(i) + comp%xac(i+1) )
+            chord = 0.5_wp * ( comp%c_ref_p(:,i) + comp%c_ref_p(:,i+1) )
+            chord = -off * chord/norm2(chord)
             off_rot =  cos(theta) * chord + &
-                       sin(theta) * cross( n_rot, off*chord ) + &
-                     ( 1.0_wp - cos(theta) )*sum( off*n_rot ) * n_rot
+                       sin(theta) * cross( n_rot, chord ) + &
+                     ( 1.0_wp - cos(theta) )*sum( chord*n_rot ) * n_rot
             ell = ( this%fields(j_pos)%fdata(:, comp%i_points_precice(i+1) ) &
                   - this%fields(j_pos)%fdata(:, comp%i_points_precice(i  ) ) ) * 0.5_wp
             radius_1 =   ell + off_rot
