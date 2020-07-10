@@ -105,8 +105,8 @@ subroutine initialize(this)
 
   ! *** to do *** read %config_file_name as an input
   !> Default input for dust in a preCICE coupled simulation
-  !this % config_file_name = './../../../precice-config.xml'
-  this % config_file_name = './../precice-config.xml'
+  this % config_file_name = './../../../precice-config.xml'
+  !this % config_file_name = './../precice-config.xml'
   this % solver_name = 'dust'
   this %   mesh_name = 'dust_mesh'
   this % comm_rank = 0
@@ -599,7 +599,6 @@ subroutine update_elems( this, geo, elems )
           end if
           !> Angular velocity of the point at the LE
           omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(i))
-  
   
           chord = comp%c_ref_p(:,i)
           chord_rot =  cos(theta) * chord + &

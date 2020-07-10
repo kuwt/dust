@@ -711,7 +711,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         allocate(c_ref_p(3, nelems_span+1)); c_ref_p = 0.0_wp
         do i = 1, size(c_ref_p,2)
           c_ref_p(:,i) = chord_p(i) * &
-                  (/ cos(theta_p(i)), 0.0_wp, -sin(theta_p(i)) /)
+                  (/ 0.0_wp, -cos(theta_p(i)), -sin(theta_p(i)) /)
+          !         (/ cos(theta_p(i)), 0.0_wp, -sin(theta_p(i)) /)
           ! !> Orientation
           ! ! *** to do *** needed for beam/ll coupling?
           ! c_ref_p(:,i) = matmul( transpose(coupling_node_rot), &
