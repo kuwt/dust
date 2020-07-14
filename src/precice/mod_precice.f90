@@ -105,8 +105,8 @@ subroutine initialize(this)
 
   ! *** to do *** read %config_file_name as an input
   !> Default input for dust in a preCICE coupled simulation
-  this % config_file_name = './../../../precice-config.xml'
-  !this % config_file_name = './../precice-config.xml'
+  !this % config_file_name = './../../../precice-config.xml'
+  this % config_file_name = './../precice-config.xml'
   this % solver_name = 'dust'
   this %   mesh_name = 'dust_mesh'
   this % comm_rank = 0
@@ -481,7 +481,6 @@ subroutine update_force( this, geo, elems )
         this%fields(j_mom)%fdata = 0.0_wp
 
         do i = 1, size(comp%el)
-
           do iw = 1, size(comp%rbf%cen%ind,1)
 
 !           ! debug ---
@@ -497,8 +496,14 @@ subroutine update_force( this, geo, elems )
             !> Moments
             this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) + &
                     comp%rbf%cen%wei(iw,i) * ( comp%el(i)%dmom + &
-                    cross( comp%el(i)%cen - comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i)), &
+                    cross( comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i)) - comp%el(i)%cen, &
                            comp%el(i)%dforce ) )
+!           ! debug ---
+!           write(*,*) i, iw, comp%rbf%cen%ind(iw,i)
+!           write(*,*) comp%el(i)%cen
+!           write(*,*) comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i))
+!           write(*,*) comp%el(i)%dforce
+!           ! debug ---
 
 
           end do
@@ -511,19 +516,19 @@ subroutine update_force( this, geo, elems )
     end associate
   end do
 
-  ! debug ---
-  write(*,*) ' debug in mod_precice '
-  write(*,*) ' Force and moments '
-  write(*,*) ' j_for, j_mom: ', j_for, j_mom
-  write(*,*) trim(this%fields(j_for)%fname), trim(this%fields(j_mom)%fname)
-  write(*,*) ' shape(geo%components): ', shape(geo%components)
-
-  write(*,*) ' allocated((j_for)%fdata): ', allocated(this%fields(j_for)%fdata)
-  write(*,*) ' allocated((j_mom)%fdata): ', allocated(this%fields(j_mom)%fdata)
-  do i = 1, size(geo%components(1)%i_points_precice)
-    write(*,*) this%fields(j_for)%fdata(:,i), &
-               this%fields(j_mom)%fdata(:,i)
-  end do
+! ! debug ---
+! write(*,*) ' debug in mod_precice '
+! write(*,*) ' Force and moments '
+! write(*,*) ' j_for, j_mom: ', j_for, j_mom
+! write(*,*) trim(this%fields(j_for)%fname), trim(this%fields(j_mom)%fname)
+! write(*,*) ' shape(geo%components): ', shape(geo%components)
+!
+! write(*,*) ' allocated((j_for)%fdata): ', allocated(this%fields(j_for)%fdata)
+! write(*,*) ' allocated((j_mom)%fdata): ', allocated(this%fields(j_mom)%fdata)
+! do i = 1, size(geo%components(1)%i_points_precice)
+!   write(*,*) this%fields(j_for)%fdata(:,i), &
+!              this%fields(j_mom)%fdata(:,i)
+! end do
 ! stop
 ! ! debug ---
 
@@ -787,15 +792,28 @@ subroutine update_elems( this, geo, elems )
           end select
         end do
 
-      else ! not a lifting line elements -> Error *** to do ***
+      else ! 
         call error('update_elems','mod_precice', &
                    ' Wrong CouplingType: '//trim(comp%coupling_type)// &
                    ' for component: '//trim(comp%comp_name)// &
-                   '. So far, available CouplingType inputs are: ll, rigid.'// &
+                   '. So far, available CouplingType inputs are: ll, rigid, rbf.'// &
                    ' Stop.'); stop
       end if
 
     end if ! if coupling
+
+!   !> debug rbf coupling ---
+!   write(*,*) ' comp%loc_points : '
+!   do i = 1, size(comp%loc_points,2)
+!     write(*,*) comp%loc_points(:,i)
+!   end do
+!   write(*,*) ' comp%rbf%nodes : '
+!   do i = 1, size(comp%rbf%nodes,2)
+!     write(*,*) comp%rbf%nodes(:,i)
+!   end do
+!   
+!   stop
+!   !> debug rbf coupling ---
 
     end associate
   end do
@@ -813,6 +831,7 @@ subroutine update_near_field_wake( this, geo, wake )
   real(wp) :: theta
   real(wp) :: eps = 1.0e-9_wp
 
+  integer :: icomp
   integer :: ip, ir, i_point, p1, p2, j, j_rot
 
   ! write(*,*) ' Debug in mod_precice.f90/update_near_field_wake '
@@ -838,17 +857,14 @@ subroutine update_near_field_wake( this, geo, wake )
 
     if ( geo%components( wake%pan_gen_icomp(ip) )%coupling ) then
   
-      if ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) .eq. 'll' ) then
+      if ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) &
+           .eq. 'll' ) then
        
         !> LL coupling
         i_point = wake%pan_gen_points(1,ip)
         dist = geo%points(:,i_point) - geo%points(:,i_point-1)
         dist = dist/norm2(dist)
 
-        ! !> debug ---
-        ! write(*,*) i_point, dist
-        ! !> debug ---
-        
         vel_te = geo%points_vel(:, wake%pan_gen_icomp(ip))
 
         if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
@@ -863,7 +879,8 @@ subroutine update_near_field_wake( this, geo, wake )
              sim_param%ndt_update_wake
         end if
 
-      elseif ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) .eq. 'rigid' ) then
+      elseif ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) &
+               .eq. 'rigid' ) then
         
         !> rigid coupling
         !> Rotation
@@ -892,9 +909,43 @@ subroutine update_near_field_wake( this, geo, wake )
              sim_param%ndt_update_wake
         end if
 
-      elseif ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) .eq. 'rbf' ) then
-        ! *** to do ***
-        ! ...
+      elseif ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) &
+               .eq. 'rbf' ) then
+
+        !> rbf coupling (general coupling)
+        !> Rotation
+        icomp = wake%pan_gen_icomp(ip)
+        associate( comp => geo%components(icomp) )
+        
+          ! *** to do ***
+          ! So far, t_te inherits orientation ONLY from the closest coupling node,
+          ! without interpolation with rbf coefficients
+          n_rot = this%fields(j_rot)%fdata(:, &
+                   comp%i_points_precice( comp%rbf%nod%ind(1,wake%pan_gen_points(1,ip)) ) )
+          theta = norm2( n_rot )
+          if ( theta .lt. eps ) then;  n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /);  theta = 0.0_wp
+          else                      ;  n_rot = n_rot / theta
+          end if
+  
+          dist =  cos(theta) * wake%pan_gen_dir(:,ip) + &
+                  sin(theta) * cross( n_rot, wake%pan_gen_dir(:,ip) ) + &
+                ( 1.0_wp - cos(theta) ) * sum( wake%pan_gen_dir(:,ip)*n_rot ) * n_rot
+  
+          vel_te = geo%points_vel(:, wake%pan_gen_icomp(ip))
+  
+          if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
+            wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
+               dist*wake%pan_gen_scaling(ip)* &
+               norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist) * &
+               sim_param%ndt_update_wake
+          else
+            wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
+               dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
+               sim_param%min_vel_at_te*sim_param%dt * &
+               sim_param%ndt_update_wake
+          end if
+        end associate
+
       else
         !> other coupling
         ! not implemented, so far
@@ -903,29 +954,7 @@ subroutine update_near_field_wake( this, geo, wake )
     end if
 
   enddo
-  ! *** to do ***
 
-  ! !> debug ---
-  ! write(*,*) ' Debug in mod_precice.f90/update_near_field_wake '
-  ! write(*,*) ' wake%pan_w_points: '
-  ! do ip = 1, wake%n_pan_stripes
-  !   do ir = 1, min(2, wake%pan_wake_len)
-  !     p1 = wake%i_start_points(1,ip)
-  !     p2 = wake%i_start_points(2,ip)
-  !     write(*,*) wake%pan_w_points(1,p1,ir),   wake%pan_w_points(1,p2,ir), &
-  !                wake%pan_w_points(1,p2,ir+1), wake%pan_w_points(1,p1,ir+1)
-  !     write(*,*) wake%pan_w_points(2,p1,ir),   wake%pan_w_points(2,p2,ir), &
-  !                wake%pan_w_points(2,p2,ir+1), wake%pan_w_points(2,p1,ir+1)
-  !     write(*,*) wake%pan_w_points(3,p1,ir),   wake%pan_w_points(3,p2,ir), &
-  !                wake%pan_w_points(3,p2,ir+1), wake%pan_w_points(3,p1,ir+1)
-  !   end do
-  !   write(*,*)
-  ! end do
-  ! write(*,*) 
-  ! stop
-
-
-  ! write(*,*) ' wake%pan_wake_len: ', wake%pan_wake_len
   ! Calculate geometrical quantities of first 2 rows
   do ip = 1,wake%n_pan_stripes
     do ir = 1, min(2, wake%pan_wake_len)

@@ -709,19 +709,10 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         ! the local y-axis as the spanwise direction and the x-axis as the
         ! streamwise direction, pointing from the LE towards the TE
         allocate(c_ref_p(3, nelems_span+1)); c_ref_p = 0.0_wp
-        ! R =  0  -1   0
-        !      1   0   0
-        !      0   0   1
         do i = 1, size(c_ref_p,2)
           c_ref_p(:,i) = chord_p(i) * &
               matmul( transpose(coupling_node_rot) , &
                       (/ cos(theta_p(i)), 0.0_wp, -sin(theta_p(i)) /) )
-          !         (/ 0.0_wp, -cos(theta_p(i)), -sin(theta_p(i)) /)
-          !         (/ cos(theta_p(i)), 0.0_wp, -sin(theta_p(i)) /)
-          ! !> Orientation
-          ! ! *** to do *** needed for beam/ll coupling?
-          ! c_ref_p(:,i) = matmul( transpose(coupling_node_rot), &
-          !                        c_ref_p(:,i) )
         end do
 
         allocate(c_ref_c(3, size(ee,2))); c_ref_c = 0.0_wp
@@ -735,12 +726,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
           end do
           !> Offset
           c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero)
-!         ! old. Is coupling_node a useful input for 'll' coupling? *** to do *** 
-!         c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero) - coupling_node
-          ! !> Orientation
-          ! ! *** to do *** needed for beam/ll coupling?
-          ! c_ref_c(:,i) = matmul( transpose(coupling_node_rot), &
-          !                        c_ref_c(:,i) )
+          ! *** to do *** check if the lines above for c_ref_c are useless in
+          ! ll coupling. If they are needed, check if a rotation is missing
+          ! ( see above, lines for c_ref_p )
         end do
 
         !> Write to hdf5 geo file
@@ -785,6 +773,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       elseif ( trim(coupling_type) .eq. 'rbf' ) then
 
         call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)
+
+        rr = matmul( transpose(coupling_node_rot), rr )
 
       end if
 
@@ -976,7 +966,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 #if USE_PRECICE
      if ( coupled_comp ) then
        ! *** to do *** check if the rotation is required only for 'rigid' coupling
-       if ( trim(coupling_type) .eq. 'rigid' ) then
+       if ( ( trim(coupling_type) .eq. 'rigid' ) ) then
          !> Rotate t_te, if needed
          do i = 1, size(t_te,2)
            t_te(:,i) = matmul( transpose(coupling_node_rot), &

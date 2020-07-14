@@ -76,19 +76,19 @@ subroutine build_connectivity(this, rr, ee)
   !> Number of coupling nodes of the structure
   ns = size(this%nodes,2)
 
-  ! debug ---
-  write(*,*) ' shape(rr): ', shape(rr)
-  write(*,*) ' shape(ee): ', shape(ee)
+  ! ! debug ---
+  ! write(*,*) ' shape(rr): ', shape(rr)
+  ! write(*,*) ' shape(ee): ', shape(ee)
 
-  write(*,*); write(*,*) ' rr: '
-  do ip = 1, np
-    write(*,*) rr(:,ip)
-  end do
-  write(*,*); write(*,*) ' this%nodes: '
-  do is = 1, ns
-    write(*,*) this%nodes(:,is)
-  end do
-  ! debug ---
+  ! write(*,*); write(*,*) ' rr: '
+  ! do ip = 1, np
+  !   write(*,*) rr(:,ip)
+  ! end do
+  ! write(*,*); write(*,*) ' this%nodes: '
+  ! do is = 1, ns
+  !   write(*,*) this%nodes(:,is)
+  ! end do
+  ! ! debug ---
 
   !> === Surface nodes ===
   allocate(this%nod%ind(this%n_wei, np)); this%nod%ind = 0
@@ -101,21 +101,28 @@ subroutine build_connectivity(this, rr, ee)
     !> Distance of the surface nodes from the structural nodes
     do is = 1, ns
       dist_all(is) = norm2( rr(:,ip) - this%nodes(:,is) )
+      ! write(*,*) this%nodes(:,is), '         ', dist_all(is)
     end do
-
-    ! debug ---
-    write(*,*) ' dist_all:', dist_all
-    ! debug ---
 
     call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
 
-    wei_v = 1.0_wp / wei_v**this%w_order
+    wei_v = 1.0_wp / max( wei_v, 1e-9_wp )**this%w_order
     wei_v = wei_v / sum(wei_v)
+
+    ! ! debug ---
+    ! write(*,*) ' ip, rr(:,ip)', ip, rr(:,ip)
+    ! write(*,*) ' wei_v: ' , wei_v
+    ! write(*,*) ' ind_v: ' , ind_v
+    ! ! debug ---
 
     this%nod%wei(:,ip) = wei_v
     this%nod%ind(:,ip) = ind_v
 
   enddo
+
+  ! ! debug ---
+  ! write(*,*) ' stop in mod_precice_rbf/build_connectivity().'; stop
+  ! ! debug ---
 
  
   !> === Surface centers ===
@@ -153,6 +160,8 @@ subroutine build_connectivity(this, rr, ee)
 
   enddo
 
+  ! stop
+
 ! ! check ---
 ! write(*,*) 
 ! write(*,*) ' Check in t_precice_rbf % build_connectivity, %nod '
@@ -170,7 +179,6 @@ subroutine build_connectivity(this, rr, ee)
 ! stop
 ! ! check ---
 
-
   !> Deallocate and cleaning
   if ( allocated(dist_all) )  deallocate(dist_all)
   if ( allocated(wei_v   ) )  deallocate(wei_v   )
@@ -185,7 +193,7 @@ end subroutine build_connectivity
 ! into math module
 subroutine sort_vector_real( vec, nel, sor, ind )
   real(wp), intent(inout) :: vec(:)
-  integer , intent(in) :: nel
+  integer , intent(in)    :: nel
   real(wp), allocatable, intent(out):: sor(:)
   integer , allocatable, intent(out):: ind(:)
 
