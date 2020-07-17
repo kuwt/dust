@@ -105,8 +105,8 @@ subroutine initialize(this)
 
   ! *** to do *** read %config_file_name as an input
   !> Default input for dust in a preCICE coupled simulation
-  !this % config_file_name = './../../../precice-config.xml'
   this % config_file_name = './../precice-config.xml'
+  !this % config_file_name = './../precice-config.xml'
   this % solver_name = 'dust'
   this %   mesh_name = 'dust_mesh'
   this % comm_rank = 0

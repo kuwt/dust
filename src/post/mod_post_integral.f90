@@ -263,7 +263,7 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
         F_bas1 = comps(ic)%el(ie)%dforce
   
         F_bas = F_bas + F_bas1
-  
+
         M_bas = M_bas + cross( comps(ic)%el(ie)%cen    &
                       - refs_off(:,ref_id) , F_bas1 )  &
                       + comps(ic)%el(ie)%dmom   ! updated 2018-07-12
@@ -275,7 +275,7 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
            transpose( refs_R(:,:, ref_id) ) , F_bas )
       M_ref = M_ref + matmul( &
            transpose( refs_R(:,:, ref_id) ) , M_bas )
-  
+
     end do !ic
     
     if(.not. average) then

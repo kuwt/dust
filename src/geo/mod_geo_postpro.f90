@@ -715,6 +715,8 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
  integer :: i_comp, ie, ih
  character(len=2) :: hinge_id_str
 
+ integer :: i
+
  do i_comp = 1,size(comps)
   associate(comp => comps(i_comp))
 #if USE_PRECICE
@@ -731,7 +733,7 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
     !> Open result hdf5 file and read points coordinates
     call open_hdf5_file( trim(filen), floc )
     call open_hdf5_group( floc, 'Components', gloc )
-    write(cname,'(A,I3.3)') 'Comp', i_comp
+    write(cname,'(A,I3.3)') 'Comp', comp%comp_id
     call open_hdf5_group( gloc, trim(cname), cloc )
     call open_hdf5_group( cloc, 'Geometry', rloc )
     call read_hdf5_al(rr, 'rr', rloc)
