@@ -1036,9 +1036,11 @@ subroutine update_wake(wake, elems, octree)
 !         stretch = stretch +(str - &
 !         sum(str*wake%part_p(ip)%p%dir)*wake%part_p(ip)%p%dir)/(4.0_wp*pi)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-        call wake%part_p(iq)%p%compute_rotu(wake%part_p(ip)%p%cen, &
-             wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, ru)
-          rotu = rotu + ru/(4.0_wp*pi)
+          if(sim_param%use_divfilt) then
+            call wake%part_p(iq)%p%compute_rotu(wake%part_p(ip)%p%cen, &
+                 wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, ru)
+            rotu = rotu + ru/(4.0_wp*pi)
+          endif
         endif
         enddo
         !do ie=1,size(wake%end_vorts)
@@ -1048,7 +1050,7 @@ subroutine update_wake(wake, elems, octree)
         !enddo
 
         wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch + stretch
-        wake%part_p(ip)%p%rotu = wake%part_p(ip)%p%rotu + rotu
+        if(sim_param%use_divfilt) wake%part_p(ip)%p%rotu = wake%part_p(ip)%p%rotu + rotu
 
       endif !use_vs
 
@@ -1305,25 +1307,21 @@ subroutine complete_wake(wake, geo, elems)
     endif
     if(.not. wake%part_p(ip)%p%free) then
       pos_p = wake%part_p(ip)%p%cen + wake%part_p(ip)%p%vel*sim_param%dt
-      !pos_p = wake%part_p(ip)%p%cen &
-      !      + 1.5_wp*wake%part_p(ip)%p%vel*sim_param%dt &
-      !      - 0.5_wp*wake%part_p(ip)%p%vel_old*sim_param%dt
       if(all(pos_p .ge. wake%part_box_min) .and. &
          all(pos_p .le. wake%part_box_max)) then
         !wake%part_p(ip)%p%cen = points_prt(:,ip)
         wake%part_p(ip)%p%cen = pos_p
         if(sim_param%use_vs .or. sim_param%use_vd) then
-        !add filtering
-          wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
-            sim_param%filt_eta*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
-            wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))
+
+          !add filtering
+          if(sim_param%use_divfilt) then
+            wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
+              sim_param%filt_eta*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
+              wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))
+          endif
           !Explicit Euler
           alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
                           wake%part_p(ip)%p%stretch*sim_param%dt
-          !Adams Bashforth
-          !alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
-          !                1.5_wp*wake%part_p(ip)%p%stretch*sim_param%dt &
-          !              - 0.5_wp*wake%part_p(ip)%p%stretch_old*sim_param%dt
           alpha_p_n = norm2(alpha_p)
 
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===

@@ -143,8 +143,10 @@ type t_sim_param
   logical :: use_vs
     !> use the vortex stretching from elements
     logical :: vs_elems
-  !> time scale of the divergence filter
-  real(wp) :: filt_eta
+    !> use the divergence filtering
+    logical :: use_divfilt
+      !> time scale of the divergence filter
+      real(wp) :: filt_eta
   !> use the vorticity diffusion or not
   logical :: use_vd
   !> use turbulent viscosity or not
@@ -293,7 +295,11 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%VortexRad, 'VortexRad', loc)
   call write_hdf5_attr(this%CutoffRad, 'CutoffRad', loc)
   call write_hdf5_attr(this%use_vs, 'Vortstretch', loc)
-  call write_hdf5_attr(this%vs_elems, 'VortstretchFromElems', loc)
+  if(this%use_vs) then
+    call write_hdf5_attr(this%vs_elems, 'VortstretchFromElems', loc)
+    call write_hdf5_attr(this%use_divfilt, 'DivergenceFiltering', loc)
+    call write_hdf5_attr(1.0_wp/this%filt_eta*this%dt, 'FilterTimescale', loc)
+  endif
   call write_hdf5_attr(this%use_vd, 'vortdiff', loc)
   call write_hdf5_attr(this%use_tv, 'turbvort', loc)
   call write_hdf5_attr(this%use_pa, 'PenetrationAvoidance', loc)

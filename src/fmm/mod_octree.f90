@@ -1201,10 +1201,12 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
 !       stretch = stretch + str - sum(str*dir)*dir
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
         stretchv(:,ip) = stretch
-        rotu(1) = grad(2,3) - grad(3,2)
-        rotu(2) = grad(3,1) - grad(1,3)
-        rotu(3) = grad(1,2) - grad(2,1)
-        rotuv(:,ip) = rotu
+        if(sim_param%use_divfilt) then
+          rotu(1) = grad(2,3) - grad(3,2)
+          rotu(2) = grad(3,1) - grad(1,3)
+          rotu(3) = grad(1,2) - grad(2,1)
+          rotuv(:,ip) = rotu
+        endif
       endif
       if(sim_param%use_vd)  then
         ave_ros = ave_ros + sum((0.5_wp*(grad+transpose(grad)))**2)
@@ -1257,9 +1259,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
 !             !removed the parallel component
 !             stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-              call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
-                 %compute_rotu(pos, alpha, ru)
-              rotu = rotu + ru/(4.0_wp*pi)
+              if(sim_param%use_divfilt) then
+                call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
+                   %compute_rotu(pos, alpha, ru)
+                rotu = rotu + ru/(4.0_wp*pi)
+              endif
             endif
             if(sim_param%use_vd) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
@@ -1286,9 +1290,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
 !          !removed the parallel component
 !          stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-           call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
-              %compute_rotu(pos, alpha, ru)
-              rotu = rotu + ru/(4.0_wp*pi)
+           if(sim_param%use_divfilt) then
+             call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
+                %compute_rotu(pos, alpha, ru)
+             rotu = rotu + ru/(4.0_wp*pi)
+           endif
          endif
          if(sim_param%use_vd) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
@@ -1312,9 +1318,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
 !           !> removed the parallel component ( proj to avoid numerical instability ? )
 !           stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
-            call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_rotu(pos, &
+            if(sim_param%use_divfilt) then
+              call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_rotu(pos, &
                                                           alpha, ru)
               rotu = rotu + ru/(4.0_wp*pi)
+            endif
           endif
 
           if(sim_param%use_vd) then
@@ -1385,7 +1393,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       if(sim_param%use_vs .or. sim_param%use_vd) then
         !evolve the intensity in time
         octree%leaves(lv)%p%cell_parts(ip)%p%stretch = stretch
-        octree%leaves(lv)%p%cell_parts(ip)%p%rotu = rotu
+        if(sim_param%use_divfilt) octree%leaves(lv)%p%cell_parts(ip)%p%rotu = rotu
       endif
 
 

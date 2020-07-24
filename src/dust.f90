@@ -351,6 +351,8 @@ call prms%CreateRealOption('LeavesTimeRatio','Ratio that triggers the &
 call prms%CreateLogicalOption('Vortstretch','Employ vortex stretching','T')
 call prms%CreateLogicalOption('VortstretchFromElems','Employ vortex stretching&
                                      & from geometry elements','F')
+call prms%CreateLogicalOption('DivergenceFiltering','Employ divergence filtering','T')
+call prms%CreateRealOption('FilterTimescale','Filter timescale','40.0')
 call prms%CreateLogicalOption('Diffusion','Employ vorticity diffusion','T')
 call prms%CreateLogicalOption('TurbulentViscosity','Employ turbulent &
                                &viscosity','F')
@@ -845,6 +847,8 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
  integer, intent(inout) :: nout
  logical, intent(inout) :: output_start
 
+ real(wp) :: timescale
+
   !timing
   sim_param%t0     = getreal(prms, 'tstart')
   sim_param%tend   = getreal(prms, 'tend')
@@ -1068,7 +1072,14 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
                             !add one for the first step
   endif
 
-  if(sim_param%use_vs) sim_param%filt_eta = 1/(40.0_wp*sim_param%dt)
+  if(sim_param%use_vs) then
+    sim_param%use_divfilt = getlogical(prms,'DivergenceFiltering')
+    if(sim_param%use_divfilt) then
+      timescale = getreal(prms,'FilterTimescale')
+      sim_param%filt_eta = 1.0_wp/(timescale*sim_param%dt)
+    endif
+
+  endif
 
 end subroutine init_sim_param
 
