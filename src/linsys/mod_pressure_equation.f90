@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -117,14 +117,14 @@ subroutine  initialize_pressure_sys(linsys, geo, elems)
   linsys%b_pres = 0.0_wp
   allocate( linsys%res_pres(geo%nSurfPan) )
   linsys%res_pres = 0.0_wp
-  allocate( linsys%b_static_pres(geo%nstatic_SurfPan,geo%nstatic_SurfPan) ) 
-  linsys%b_static_pres = linsys%b_static( & 
+  allocate( linsys%b_static_pres(geo%nstatic_SurfPan,geo%nstatic_SurfPan) )
+  linsys%b_static_pres = linsys%b_static( &
          geo%idSurfPan(1:geo%nstatic_SurfPan), &
          geo%idSurfPan(1:geo%nstatic_SurfPan) )
 
   do ie = 1 , geo%nSurfpan
     select type( el => elems(geo%idSurfPan(ie))%p ) ; class is(t_surfpan)
-      el%pres_sol => linsys%res_pres(ie) 
+      el%pres_sol => linsys%res_pres(ie)
     end select
   end do
 
@@ -153,7 +153,7 @@ subroutine assemble_pressure_sys(linsys, geo, elems, wake)
 
 
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++
-  
+
   !This should have been done in the linear system assembling
   !!! Slicing --------------------
   !!linsys%A_pres = linsys%A( geo%idSurfPan , geo%idSurfPan )
@@ -164,7 +164,7 @@ subroutine assemble_pressure_sys(linsys, geo, elems, wake)
   !!          (/wake%pan_p, wake%rin_p/), wake%pan_gen_elems_id, linsys,uinf,ie,1,ntot)
   !!  end select
   !!end do
-  
+
   ! rhs: ....
 
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !
@@ -174,13 +174,13 @@ subroutine assemble_pressure_sys(linsys, geo, elems, wake)
   !       + \oint_{Sb} { G ( du/dt - ... ) } +      (b) time-dependent
   !       +  \int_{V } { DG . \omega x U } +        (c) rotational
   !       +  \int_{Sb} { viscous terms }            (d) viscous
-   
+
   ! RHS assembled as the sum of:
   ! (b) time-dependent source contribution: computed and assembled in the
   !     %build_row routines above
   ! do nothing here
   ! (c) rotational effects (up to now, ignoring ring wakes)
-!$omp parallel do private(ie, iw, dist, elcen) schedule(dynamic,32) 
+!$omp parallel do private(ie, iw, dist, elcen) schedule(dynamic,32)
   do ie = 1 , geo%nSurfpan
     elcen = elems( geo%idSurfpan(ie) )%p%cen
     ! (c.1) particles ( part_p )
@@ -189,61 +189,61 @@ subroutine assemble_pressure_sys(linsys, geo, elems, wake)
         if  ( .not. ( wake%part_p(iw)%p%free ) ) then
 
           dist = wake%part_p(iw)%p%cen - elcen
-          linsys%b_pres(ie) = linsys%b_pres(ie) + & 
+          linsys%b_pres(ie) = linsys%b_pres(ie) + &
             sum( dist * cross( wake%part_p(iw)%p%dir , wake%part_p(iw)%p%vel ) ) * &
-                 wake%part_p(iw)%p%mag / ( (sqrt(sum(dist**2)+sim_param%VortexRad**2))**3.0_wp ) 
-! singular  >>>  wake%part_p(iw)%p%mag / ( norm2(dist)**3.0_wp ) 
-! Rosenhead >>>  wake%part_p(iw)%p%mag / ( (sqrt(sum(dist**2)+sim_param%VortexRad**2))**3.0_wp ) 
+                 wake%part_p(iw)%p%mag / ( (sqrt(sum(dist**2)+sim_param%VortexRad**2))**3.0_wp )
+! singular  >>>  wake%part_p(iw)%p%mag / ( norm2(dist)**3.0_wp )
+! Rosenhead >>>  wake%part_p(iw)%p%mag / ( (sqrt(sum(dist**2)+sim_param%VortexRad**2))**3.0_wp )
                  !EXPERIMENTAL: adding vortex rosenhead regularization
         end if
-      end do 
+      end do
     end if
   enddo
 !$omp end parallel do
 
-!$omp parallel do private(ie, iw, dist, dist2, p1, p2, ipp, iww,ip, is, inext, elcen) schedule(dynamic, 64) 
+!$omp parallel do private(ie, iw, dist, dist2, p1, p2, ipp, iww,ip, is, inext, elcen) schedule(dynamic, 64)
   do ie = 1 , geo%nSurfpan
     elcen = elems( geo%idSurfpan(ie) )%p%cen
     ! (c.2) line elements ( end_vorts )
     do iw = 1 , wake%n_pan_stripes
       if( associated( wake%end_vorts(iw)%mag ) ) then
-        dist  = wake%end_vorts(iw)%ver(:,1) - elcen 
+        dist  = wake%end_vorts(iw)%ver(:,1) - elcen
         dist2 = wake%end_vorts(iw)%ver(:,2) - elcen
         linsys%b_pres(ie) = linsys%b_pres(ie) - &
           0.5_wp * wake%end_vorts(iw)%mag * sum( wake%end_vorts(iw)%edge_vec * &
                ( cross(dist , wake%end_vorts(iw)%ver_vel(:,1) ) /(norm2(dist )**3.0_wp) + &
-                 cross(dist2, wake%end_vorts(iw)%ver_vel(:,2) ) /(norm2(dist2)**3.0_wp) ) )  
+                 cross(dist2, wake%end_vorts(iw)%ver_vel(:,2) ) /(norm2(dist2)**3.0_wp) ) )
       end if
     end do
     ! (c.3) constant surface doublets = vortex rings ( wake_panels )
     do ip = 1 , wake%pan_wake_len
       do iw = 1 , wake%n_pan_stripes
- 
-        p1 = wake%i_start_points(1,iw) 
+
+        p1 = wake%i_start_points(1,iw)
         p2 = wake%i_start_points(2,iw)
- 
+
         ipp = (/ ip , ip , ip+1, ip+1 /)
         iww = (/ p1 , p2 , p2  , p1   /)
- 
-        do is = 1 , wake%wake_panels(iw,ip)%n_ver ! do is = 1 , 4 
-          
-          inext = mod(is,wake%wake_panels(iw,ip)%n_ver) + 1 
-          dist  = wake%wake_panels(iw,ip)%ver(:,is   ) - elcen 
+
+        do is = 1 , wake%wake_panels(iw,ip)%n_ver ! do is = 1 , 4
+
+          inext = mod(is,wake%wake_panels(iw,ip)%n_ver) + 1
+          dist  = wake%wake_panels(iw,ip)%ver(:,is   ) - elcen
           dist2 = wake%wake_panels(iw,ip)%ver(:,inext) - elcen
-          
+
           linsys%b_pres(ie) = linsys%b_pres(ie) - &
             0.5_wp * wake%wake_panels(iw,ip)%mag * sum( wake%wake_panels(iw,ip)%edge_vec(:,is) * &
                  ( cross(dist , wake%pan_w_vel(:,iww(is   ),ipp(is   )) ) /(norm2(dist )**3.0_wp) + &
-                   cross(dist2, wake%pan_w_vel(:,iww(inext),ipp(inext)) ) /(norm2(dist2)**3.0_wp) ) )   
+                   cross(dist2, wake%pan_w_vel(:,iww(inext),ipp(inext)) ) /(norm2(dist2)**3.0_wp) ) )
 !           ! old ----
 !           0.5_wp * wake%end_vorts(iw)%mag * sum( wake%wake_panels(iw2,iw)%edge_vec(:,is) * &
 !                ( cross(dist , wake%wake_panels(iw2,iw)%ver_vel(:,is   ) ) /(norm2(dist )**3.0_wp) + &
-!                  cross(dist2, wake%wake_panels(iw2,iw)%ver_vel(:,inext) ) /(norm2(dist2)**3.0_wp) ) )  
+!                  cross(dist2, wake%wake_panels(iw2,iw)%ver_vel(:,inext) ) /(norm2(dist2)**3.0_wp) ) )
 !                ( cross(dist , wake%pan_w_vel(:,iw2  , ) ) /(norm2(dist )**3.0_wp) + &
-!                  cross(dist2, wake%pan_w_vel(:,iw2+1, ) ) /(norm2(dist2)**3.0_wp) ) )  
+!                  cross(dist2, wake%pan_w_vel(:,iw2+1, ) ) /(norm2(dist2)**3.0_wp) ) )
 !           ! old ----
-          
-        end do 
+
+        end do
       end do
     end do
     ! (c.4) rings from actuator disks
@@ -317,7 +317,7 @@ subroutine solve_pressure_sys(linsys)
           linsys%A_pres(1:linsys%nstatic_sp,linsys%nstatic_sp+1:linsys%n_sp),&
           linsys%nstatic_sp)
 #endif /*DUST_PRECISION*/
-    
+
     !==>Solve the lower-diagoal block Lds
     !Solve Pdd-1 Lds Uss = Ads for Pdd-1 Lds and put it in place of Ads
 #if (DUST_PRECISION==1)
@@ -355,12 +355,12 @@ subroutine solve_pressure_sys(linsys)
           linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,linsys%nstatic_sp+1:linsys%n_sp),&
           linsys%nmoving_sp)
 #endif /*DUST_PRECISION*/
-     
+
   endif
 
   ! If the system has a dynamic part, factorize such part
   if (linsys%nmoving_sp .gt. 0) then
-  
+
     !==>Factorize and put in place the square dynamic block
 #if (DUST_PRECISION==1)
     call sgetrf(linsys%nmoving_sp,linsys%nmoving_sp, &
@@ -378,7 +378,7 @@ subroutine solve_pressure_sys(linsys)
     end if
 
   endif
- 
+
   ! If the system is mixed finish the operation on the band blocks
   if (linsys%nstatic .gt. 0 .and. linsys%nmoving .gt.0) then
   !==> Permute the lower mixed bloc
@@ -420,9 +420,9 @@ end subroutine solve_pressure_sys
 
 !> Compute the normal velocity derivative
 !!
-!! compute the time derivative of the normal component of the velocity on 
+!! compute the time derivative of the normal component of the velocity on
 !!  surfpan to be used in the source rhs of the Bernoulli integral equation.
-!! surf_vel_SurfPan_old should be saved at the end of the time step 
+!! surf_vel_SurfPan_old should be saved at the end of the time step
 subroutine press_normvel_der(geo, elems, surf_vel_SurfPan_old)
  type(t_geo), intent(in) :: geo
  type(t_impl_elem_p), intent(inout) :: elems(:)
@@ -436,7 +436,7 @@ subroutine press_normvel_der(geo, elems, surf_vel_SurfPan_old)
 
     select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
 
-      el%dUn_dt = sum( el%nor * ( el%ub - & 
+      el%dUn_dt = sum( el%nor * ( el%ub - &
              surf_vel_SurfPan_old( i_el , : ) ) ) / sim_param%dt
 !            surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) ) / sim_param%dt ! <<< mod-2018-12-21
 
@@ -472,20 +472,20 @@ subroutine press_normvel_der(geo, elems, surf_vel_SurfPan_old)
                                                             el%pot_vel_stencil(:,i_e) ) * &
                     ( el_neigh%surf_vel - el%surf_vel )   )
           end select
-        else  
+        else
 !         select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
             DivS_U = DivS_U + &
               sum( &
-                matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g ,   & 
+                matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g ,   &
                                                            el%pot_vel_stencil(:,i_e) ) * &
                    ( - 2.0_wp * el%surf_vel ) )
 !         end select
         end if
-      end do  
+      end do
 
       ! Compute "source intensity" of Bernoulli equations
-      el%bernoulli_source = + el%dUn_dt & !    n . DU/Dt 
-         - sum( GradS_Un * ( el%ub ))   & !  - GradS_Un . el%ub 
+      el%bernoulli_source = + el%dUn_dt & !    n . DU/Dt
+         - sum( GradS_Un * ( el%ub ))   & !  - GradS_Un . el%ub
          + DivS_U * sum(el%ub*el%nor)     !  + Un * Div_S U
 
     end select
@@ -502,7 +502,7 @@ subroutine dump_linsys_pres(linsys , filen_A , filen_b )
  character(len=*) , intent(in) :: filen_A , filen_b
 
  integer :: fid
- integer :: i1 
+ integer :: i1
 
 
  fid = 23
@@ -511,7 +511,7 @@ subroutine dump_linsys_pres(linsys , filen_A , filen_b )
   write(fid,*) linsys%A_pres(i1,:)
  end do
  close(fid)
- 
+
  fid = 24
  open(unit=fid, file=trim(adjustl(filen_b)) )
  do i1 = 1 , size(linsys%b_pres,1)

@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -54,7 +54,7 @@ use mod_param, only: &
   wp, max_char_len, nl
 
 use mod_handling, only: &
-  !error, 
+  !error,
   warning, info, printout, new_file_unit, dust_abort
 
 use mod_stringtools, only: &
@@ -80,19 +80,19 @@ contains
 
 !----------------------------------------------------------------------
 
-!>Read a mesh in a cgns format employing the cgns API 
+!>Read a mesh in a cgns format employing the cgns API
 !!
 !! WARNING: this is still experimental and based on an incomplete reverse
 !! engineering of cgns mesh files, it shall be extended to be more reliable
 !! and general
 subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
- 
+
  character(len=*), intent(in) :: mesh_file
  character(len=*), intent(in) :: sectionNamesUsed(:)
- integer  , allocatable, intent(out) :: ee(:,:) 
- real(wp) , allocatable, intent(out) :: rr(:,:) 
- 
- 
+ integer  , allocatable, intent(out) :: ee(:,:)
+ real(wp) , allocatable, intent(out) :: rr(:,:)
+
+
 
  character(len=max_char_len), allocatable :: sectionNames(:)
  logical, allocatable :: selectedSection(:)
@@ -107,19 +107,19 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
  integer :: nSectionsUsed, posSection
  logical :: sectionFound
 
- real(wp) , allocatable :: coordinateList(:) 
+ real(wp) , allocatable :: coordinateList(:)
  integer, allocatable :: nodeMap(:), nodeList(:)
- 
+
  integer, pointer     :: pdata(:), nmixed(:)
  integer, allocatable :: elemcg(:,:)
- 
+
  integer, allocatable :: estart(:) , eend(:)
 ! integer, allocatable :: ee_cgns(:)
- 
+
  integer :: i1 , i , ielem, ielem_section, iNode
 
  character(len=*), parameter :: this_sub_name = 'read_mesh_cgns'
- 
+
   ! Name of the arrays containint the grid coordinates
   coordname(1) = 'CoordinateX'
   coordname(2) = 'CoordinateY'
@@ -142,27 +142,27 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
     write(*,'(A,I2)') ' Number of bases in the cgns file: ', nbase
     !call error(this_sub_name, this_mod_name,'More than one base in the &
     !  &CGNS file, not supported')
-    write(*,'(A)') 'More than one base in the CGNS file, not supported' 
+    write(*,'(A)') 'More than one base in the CGNS file, not supported'
     call dust_abort()
   end if
   ibase = 1
 
 ! Base data
- 
+
   call CG_BASE_READ_F(INDEX_FILE, ibase, basename, icelldim, ndim, ier)
   if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
- 
+
 !  Special case for 2d: if icelldim=2 we assume a pure 2d mesh with
 !  coordinates in x and y only (not a surface mesh in 3d)
- 
+
   if ((icelldim == 2) .and. (ndim > icelldim)) ndim = icelldim
 
 !  Number of zones. Assume a zone is a region. Loop over the zones
- 
+
   call CG_NZONES_F(INDEX_FILE, ibase, nzone, ier)
   if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
 
-  if ( nzone .ne. 1 ) then 
+  if ( nzone .ne. 1 ) then
     write(*,'(A,I2)') ' Number of zones in the cgns base: ', nzone
     !call error(this_sub_name, this_mod_name,'More than one zon in the &
     !  &CGNS file, not supported')
@@ -176,14 +176,14 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
 !   call APPEND_CHILD_N(pmsh,'region',overwrite=.false.)
 !   preg => NTH_CHILD(pmsh,izone,'region')
 !   call APPEND_CHILD_L0(preg,'region_name','volume_elements')
- 
+
 !  Read zone data
- 
+
     call CG_ZONE_READ_F(INDEX_FILE, ibase, izone, zonename, isize, ier)
     if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
 
 !  Check if unstructured zone. todo
- 
+
     call CG_ZONE_TYPE_F(INDEX_FILE, ibase, izone, id, ier)
     if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
     if ( id /= unstructured ) then
@@ -203,7 +203,7 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
 
 
 !  Read coordinates from file
- 
+
 ! Define working precision. todo
     iprec = realdouble
 
@@ -220,14 +220,14 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
     allocate(eend(nsec))   ; eend   = 0
     allocate(sectionNames(nsec));
     allocate(selectedSection(nsec)); selectedSection = .false.
-    do isec = 1 , nsec   
- 
+    do isec = 1 , nsec
+
       call CG_SECTION_READ_F(INDEX_FILE, ibase, izone, isec, sectionname, &
                              ieltype, nstart, nend, nbelem, parent_flag, ier)
       if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
       nelem = nend - nstart + 1
 
-      eend(isec)   = nend  
+      eend(isec)   = nend
       estart(isec) = nstart
 
       call StripSpaces(sectionname)
@@ -263,10 +263,10 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
         endif
       enddo
     else
-      write(*,*)  'All sections will be used' 
+      write(*,*)  'All sections will be used'
       ! All sections will be selected
       selectedSection = .true.
-      nelem_zone = nend 
+      nelem_zone = nend
     endif
 
     write(*,*) 'Total number of elements: ', nelem_zone
@@ -283,7 +283,7 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
                                ieltype, nstart, nend, nbelem, parent_flag, ier)
         if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
         nelem = nend - nstart + 1
- 
+
         ! Set dust element name.
         select case (ieltype)
         case(node)
@@ -371,7 +371,7 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
           end do
         end if
 
-        
+
         deallocate(elemcg)
 
       endif
@@ -411,25 +411,25 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
         do iNode = 1, nNodesUsed
           rr(i,iNode) = coordinateList(nodeList(iNode))
         enddo
-        
+
       enddo
 
     ! No selection of sections performed, read all nodes
-    else 
+    else
       allocate(coordinateList(nNodes))
       allocate(rr(ndim,nNodes))
       do i = 1, ndim
         coordinateList = 0.0_wp;
 
         !TODO: passing rr(1,:) is not a contiguous memory location and
-        !needs a temporary, and rises a warning. Consider either using 
+        !needs a temporary, and rises a warning. Consider either using
         !an explicit temporary or a transposition of rr
         call cg_coord_read_f(INDEX_FILE, ibase, izone, coordname(i), &
                              iprec, 1, isize(1), coordinateList, ier);
         if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
 
         rr(i,:) = coordinateList
-        
+
       enddo
 
     endif
@@ -437,7 +437,7 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
   end do ! Loop on zones
 
 
-  
+
 end subroutine read_mesh_cgns
 
 !----------------------------------------------------------------------

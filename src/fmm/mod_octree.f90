@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -86,7 +86,7 @@ end type
 
 !> Type containing all the data relative to a single octree cell
 type :: t_cell
-  
+
   !> Is the cell a leaf?
   logical :: leaf
 
@@ -117,14 +117,14 @@ type :: t_cell
 
   !> Level of the cell in the layers
   !integer :: level
-  
+
   !> Number of particles contained in each cell
   integer :: npart
 
   !> Poiners to all the particles contained in the cell
   type(t_vortpart_p), allocatable :: cell_parts(:)
 
-  !> Number of panels (centres) contained in the cell 
+  !> Number of panels (centres) contained in the cell
   integer :: npan
 
   !> Poiners to all the panels contained in the cell
@@ -135,7 +135,7 @@ type :: t_cell
 
   !> Center of the cell
   real(wp) :: cen(3)
-  
+
   !> Multipole data relative to the cell
   type(t_multipole) :: mp
 
@@ -148,17 +148,17 @@ end type
 
 !> Type containing the pointers to a layer in the octree
 type :: t_cell_layer
-  
+
   !> Size of all the cubic cells in the layer
   real(wp) :: cell_size
-  
+
   !> All the cells contained in the layer, the main allocation happens here
   type(t_cell), allocatable :: lcells(:,:,:)
 
-  !> All the possible derivatives of the kernel among all the possible 
+  !> All the possible derivatives of the kernel among all the possible
   !! different relative locations for interaction at the current level
   type(t_ker_der), allocatable :: ker_der(:,:,:)
-  
+
   !length (positive and negative) of kernel derivatives in each direction
   integer :: ker_der_len(3)
 
@@ -169,7 +169,7 @@ end type
 
 !> Type containing the whole octree structure
 type :: t_octree
- 
+
  !> maximum and minimum of the coordinates of the whole octree
  real(wp) :: xmin(3), xmax(3)
 
@@ -178,7 +178,7 @@ type :: t_octree
 
  !> number of levels of octree division
  integer :: nlevels
- 
+
  !> Level at which the solid walls are considered (for particles redistribution)
  integer :: lvl_solid
 
@@ -190,11 +190,11 @@ type :: t_octree
 
  !> all the actual cells, in a 1d array
  !type(t_cell), allocatable :: cells(:)
- 
- !> cell pointers organized in layers, each layer corresponding to 
+
+ !> cell pointers organized in layers, each layer corresponding to
  !! a level of the octree
  type(t_cell_layer), allocatable :: layers(:)
- 
+
  !> pointer array to all the leaves
  type(t_cell_p), allocatable :: leaves(:)
 
@@ -268,7 +268,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
   octree%nbox = nbox
   octree%nlevels = nlevels
   octree%delta = delta
-  
+
   !Check the particles bounding
   if (any(octree%xmax-sim_param%particles_box_max .lt. 0.0_wp) .or. &
       any(sim_param%particles_box_min-octree%xmin .lt. 0.0_wp)) then
@@ -290,17 +290,17 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
   call octree%pexp%set_degree(degree)
   !for the derivatives is needed 2*degree+1 degree
   call octree%pexp_der%set_degree(2*degree+2)
-  
+
   !Count all the cells contained in the octree
   octree%ncells_tot = product(nbox)
   do l = 2,nlevels
     octree%ncells_tot = octree%ncells_tot + product(nbox)*8**(l-1)
   enddo
-  
+
   !Allocate all the possible leaves (to avoid pushing the pointer vector many
   ! times), then only the first nleaves will be employed
   allocate(octree%leaves(product(nbox)*8**(nlevels-1)))
- 
+
   if(sim_param%use_dyn_layers) then
     allocate(octree%layers(sim_param%NMaxOctreeLevels))
   else
@@ -310,8 +310,8 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
   !compute the number of cells in each direction, for each layer
   allocate(octree%ncl(3,sim_param%NMaxOctreeLevels))
   do l=1,nlevels
-    octree%ncl(1,l) = nbox(1)*2**(l-1); 
-    octree%ncl(2,l) = nbox(2)*2**(l-1); 
+    octree%ncl(1,l) = nbox(1)*2**(l-1);
+    octree%ncl(2,l) = nbox(2)*2**(l-1);
     octree%ncl(3,l) = nbox(3)*2**(l-1);
   enddo
 
@@ -333,7 +333,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
 
   !dive down  all the other levels
   do l = 2,nlevels
-    !Set the quantities for the layer 
+    !Set the quantities for the layer
     octree%layers(l)%cell_size = box_length/real((2**(l-1)),wp)
     allocate(octree%layers(l)%&
                        lcells(octree%ncl(1,l),octree%ncl(2,l),octree%ncl(3,l)))
@@ -346,12 +346,12 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
       do kc = 1,2; do jc = 1,2; do ic = 1,2
         !point the cell in the ordered layer
         octree%layers(l)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%cart_index &
-                             = (/2*(i-1)+ic, 2*(j-1)+jc, 2*(k-1)+kc/)        
+                             = (/2*(i-1)+ic, 2*(j-1)+jc, 2*(k-1)+kc/)
     !    octree%layers(l)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%level = l
 
         !set the parent
         octree%layers(l)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%parent%p &
-                                     => octree%layers(l-1)%lcells(i,j,k) 
+                                     => octree%layers(l-1)%lcells(i,j,k)
     !    octree%layers(l)%lcells(i,j,k)%level = l
         !set the present cell as children of the parent
         octree%layers(l-1)%lcells(i,j,k)%children(p)%p => &
@@ -364,7 +364,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
 
         !update the counters
         p = p+1
-      
+
       enddo; enddo; enddo !children ic,jc,kc
     enddo; enddo; enddo !parents i,j,k
   enddo
@@ -379,10 +379,10 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
     do k = 1,kmax; do j = 1,jmax; do i = 1,imax
       !cycle on all the possible neighbours
       do kc = -1,1; do jc = -1,1; do ic = -1,1
-        
+
         if( ((i+ic).ge.1 .and. (i+ic).le.imax) .and. &
-            ((j+jc).ge.1 .and. (j+jc).le.jmax) .and. & 
-            ((k+kc).ge.1 .and. (k+kc).le.kmax) .and. & 
+            ((j+jc).ge.1 .and. (j+jc).le.jmax) .and. &
+            ((k+kc).ge.1 .and. (k+kc).le.kmax) .and. &
             .not.(ic.eq.0 .and. jc.eq.0 .and. kc.eq.0) ) then
           !if it is inside the domain, set the pointer to the neighbour
           octree%layers(l)%lcells(i,j,k)%neighbours(ic,jc,kc)%p =>  &
@@ -446,12 +446,12 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
                                                   neighbours(ic,jc,kc)%p)) then
           !if the neighbour of the parent exists, cycle on all the childs
           do child = 1,8
-            !Index of the child of the parent neighbour     
+            !Index of the child of the parent neighbour
             indx = octree%layers(l)%lcells(i,j,k)%parent%p%&
                             neighbours(ic,jc,kc)%p%children(child)%p%cart_index
             if(any(abs(indx - octree%layers(l)%lcells(i,j,k)%cart_index)&
                                                                    .gt.1)) then
-              !If the parent neighbour child is not a neighbour =) 
+              !If the parent neighbour child is not a neighbour =)
               !push it in the interaction list
               !call push_ptr(octree%layers(l)%lcells(i,j,k)%interaction_list, &
               !       octree%layers(l)%lcells(i,j,k)%parent%p%&
@@ -464,7 +464,7 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
           enddo !child
         endif
       enddo; enddo; enddo !parents neighbours ic,jc,kc
-        
+
 
         call push_ptr(octree%layers(l)%lcells(i,j,k)%interaction_list, &
                inter_list(1:ip_list))
@@ -476,18 +476,18 @@ subroutine initialize_octree(box_length, nbox, origin, nlevels, min_part, &
   write(msg,'(A,F9.3,A)') 'Initialized interaction lists in: ' , t1 - t0,' s.'
   if(sim_param%debug_level.ge.5) call printout(msg)
 
-   
+
   !pre-build all the kernel derivatives for cell-cell interactions
   !first level can have many cells, must be treated separately
-  
+
   octree%layers(1)%ker_der_len = max(octree%nbox,(/3,3,3/))
   allocate(octree%layers(1)%ker_der&
        (-octree%layers(1)%ker_der_len(1):octree%layers(1)%ker_der_len(1),&
         -octree%layers(1)%ker_der_len(2):octree%layers(1)%ker_der_len(2),&
         -octree%layers(1)%ker_der_len(3):octree%layers(1)%ker_der_len(3)))
 
-  do k=-octree%layers(1)%ker_der_len(3),octree%layers(1)%ker_der_len(3) 
-  do j=-octree%layers(1)%ker_der_len(2),octree%layers(1)%ker_der_len(2) 
+  do k=-octree%layers(1)%ker_der_len(3),octree%layers(1)%ker_der_len(3)
+  do j=-octree%layers(1)%ker_der_len(2),octree%layers(1)%ker_der_len(2)
   do i=-octree%layers(1)%ker_der_len(1),octree%layers(1)%ker_der_len(1)
     if(any(abs((/i,j,k/)) .ge. 2)) then
       call octree%layers(1)%ker_der(i,j,k)%&
@@ -529,15 +529,15 @@ subroutine add_layer(octree)
 
   octree%nlevels = octree%nlevels+1
   ll = octree%nlevels
-  write(msg,'(A,I0,A)') 'Adding an octree level!! Now there are ',ll,& 
+  write(msg,'(A,I0,A)') 'Adding an octree level!! Now there are ',ll,&
                           ' levels.'
   if(sim_param%debug_level.ge.5) call printout(msg)
-  
 
-  
+
+
   !add the last level to the number of cells
   octree%ncells_tot = octree%ncells_tot + product(octree%nbox)*8**(ll-1)
-  
+
   !extend leaves vector
   !TODO: check a way to do it less ugly with move allocs
   !allocate(leaves_temp(product(octree%nbox)*8**(octree%nlevels-1)))
@@ -547,7 +547,7 @@ subroutine add_layer(octree)
   !  octree%leaves(il) = leaves_temp(il)
   !enddo
   !deallocate(leaves_temp)
- 
+
   !extend the layers vector
   !TODO: check a way to do it less ugly with move allocs
   !allocate(layers_temp(octree%nlevels))
@@ -561,13 +561,13 @@ subroutine add_layer(octree)
   !deallocate(layers_temp)
 
   !compute the number of cells in each direction, for last layer
-  octree%ncl(1,ll) = octree%nbox(1)*2**(ll-1); 
-  octree%ncl(2,ll) = octree%nbox(2)*2**(ll-1); 
+  octree%ncl(1,ll) = octree%nbox(1)*2**(ll-1);
+  octree%ncl(2,ll) = octree%nbox(2)*2**(ll-1);
   octree%ncl(3,ll) = octree%nbox(3)*2**(ll-1);
 
   ! == Prepare the hierarchical tree
 
-  !Set the quantities for the  last layer 
+  !Set the quantities for the  last layer
   octree%layers(ll)%cell_size = octree%layers(ll-1)%cell_size/2.0_wp
   allocate(octree%layers(ll)%&
                   lcells(octree%ncl(1,ll),octree%ncl(2,ll),octree%ncl(3,ll)))
@@ -580,12 +580,12 @@ subroutine add_layer(octree)
     do kc = 1,2; do jc = 1,2; do ic = 1,2
       !point the cell in the ordered layer
       octree%layers(ll)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%cart_index &
-                           = (/2*(i-1)+ic, 2*(j-1)+jc, 2*(k-1)+kc/)        
+                           = (/2*(i-1)+ic, 2*(j-1)+jc, 2*(k-1)+kc/)
     !  octree%layers(ll)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%level = ll
 
       !set the parent
       octree%layers(ll)%lcells(2*(i-1)+ic,2*(j-1)+jc,2*(k-1)+kc)%parent%p &
-                                   => octree%layers(ll-1)%lcells(i,j,k) 
+                                   => octree%layers(ll-1)%lcells(i,j,k)
      ! octree%layers(ll)%lcells(i,j,k)%level = ll
       !set the present cell as children of the parent
       octree%layers(ll-1)%lcells(i,j,k)%children(p)%p => &
@@ -598,7 +598,7 @@ subroutine add_layer(octree)
 
       !update the counters
       p = p+1
-    
+
     enddo; enddo; enddo !children ic,jc,kc
   enddo; enddo; enddo !parents i,j,k
 
@@ -608,10 +608,10 @@ subroutine add_layer(octree)
   do k = 1,kmax; do j = 1,jmax; do i = 1,imax
     !cycle on all the possible neighbours
     do kc = -1,1; do jc = -1,1; do ic = -1,1
-      
+
       if( ((i+ic).ge.1 .and. (i+ic).le.imax) .and. &
-          ((j+jc).ge.1 .and. (j+jc).le.jmax) .and. & 
-          ((k+kc).ge.1 .and. (k+kc).le.kmax) .and. & 
+          ((j+jc).ge.1 .and. (j+jc).le.jmax) .and. &
+          ((k+kc).ge.1 .and. (k+kc).le.kmax) .and. &
           .not.(ic.eq.0 .and. jc.eq.0 .and. kc.eq.0) ) then
         !if it is inside the domain, set the pointer to the neighbour
         octree%layers(ll)%lcells(i,j,k)%neighbours(ic,jc,kc)%p =>  &
@@ -649,12 +649,12 @@ subroutine add_layer(octree)
                                                 neighbours(ic,jc,kc)%p)) then
         !if the neighbour of the parent exists, cycle on all the childs
         do child = 1,8
-          !Index of the child of the parent neighbour     
+          !Index of the child of the parent neighbour
           indx = octree%layers(ll)%lcells(i,j,k)%parent%p%&
                           neighbours(ic,jc,kc)%p%children(child)%p%cart_index
           if(any(abs(indx - octree%layers(ll)%lcells(i,j,k)%cart_index)&
                                                                  .gt.1)) then
-            !If the parent neighbour child is not a neighbour =) 
+            !If the parent neighbour child is not a neighbour =)
             !push it in the interaction list
             ip_list = ip_list + 1
             inter_list(ip_list)%p => octree%layers(ll)%lcells(i,j,k)%parent%p%&
@@ -670,7 +670,7 @@ subroutine add_layer(octree)
 
   enddo; enddo; enddo !layer cells i,j,k
 
-   
+
   !pre-build all the kernel derivatives for cell-cell interactions
   allocate(octree%layers(ll)%ker_der(-3:3,-3:3,-3:3))
   !cycle on all the possible interactions (interaction list cannot go farther
@@ -712,14 +712,14 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
  integer :: nprt, nprt2, iq
  real(wp) :: redistr(3), vort(3)
  character(len=*), parameter :: this_sub_name = 'sort_particles'
- 
+
   !PROFILE
   t0 = dust_time()
 
   ll = octree%nlevels
   csize = octree%layers(ll)%cell_size
 
-  
+
   !set all the cells to empty
   do l = 1,ll
     !cycle on the elements on the level
@@ -729,14 +729,14 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
     enddo; enddo; enddo !layer cells i,j,k
 !$omp end parallel do
   enddo
-  
+
   !to stay on the safe side, nullify all the leaves pointers
 !$omp parallel do private(l)
   do l=1,size(octree%leaves)
     nullify(octree%leaves(l)%p)
   enddo
 !$omp end parallel do
-  
+
   !cycle on all the particles
   !TODO: make this parallel too, but pay attention to the race conditions
   ipp = 0
@@ -755,7 +755,7 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
     if(any(idx.le.0).or.any(idx.gt.shape(octree%layers(ll)%lcells))) then
       write(msg,*) 'Sorted particle resulted outside octree box at: ',&
                     wparts(ipp)%cen
-      call error(this_sub_name, this_mod_name, msg) 
+      call error(this_sub_name, this_mod_name, msg)
     endif
 
     !add the particle to the lowest level
@@ -769,7 +769,7 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
 
   enddo
 
-  
+
   !Sort also all the elements
   if(sim_param%use_pr .or. sim_param%use_fmm_pan) then
     do ip=1,size(elem)
@@ -781,10 +781,10 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
         write(msg,*) 'Sorted element resulted outside octree box at: ',&
                       elem(ip)%p%cen
         if(sim_param%use_fmm_pan) then
-          call error(this_sub_name, this_mod_name, msg) 
+          call error(this_sub_name, this_mod_name, msg)
         else
           if(sim_param%debug_level.ge.5) &
-            call warning(this_sub_name, this_mod_name, msg) 
+            call warning(this_sub_name, this_mod_name, msg)
           cycle
         endif
       endif
@@ -802,7 +802,7 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
 !!!!!$omp parallel do collapse(3) private(i,j,k,child)
       do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
 
-        !cycle on the children, gather the number of particles and if are 
+        !cycle on the children, gather the number of particles and if are
         !leaves
         do child = 1,8
           octree%layers(l)%lcells(i,j,k)%npan = &
@@ -819,8 +819,8 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
 
 
 
-  
-  ! --- Particles Redistribution --- 
+
+  ! --- Particles Redistribution ---
   if(sim_param%use_pr) then
 
     !Check if the cells contain a solid boundary at level lvl_solid
@@ -847,8 +847,8 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
           octree%layers(ll)%lcells(i,j,k)%ave_vortmag =  &
              octree%layers(ll)%lcells(i,j,k)%ave_vortmag/real(nprt,wp)
         endif
-        
-        ip = 1 
+
+        ip = 1
         !do ip=1,nprt
         do while (ip.lt.nprt+1)
           if(octree%layers(ll)%lcells(i,j,k)%cell_parts(ip)%p%mag .lt. &
@@ -910,7 +910,7 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
 !$omp parallel do collapse(3) private(i,j,k,got_leaves, got_branches, child)
     do k=1,octree%ncl(3,l); do j=1,octree%ncl(2,l); do i = 1,octree%ncl(1,l)
 
-      !cycle on the children, gather the number of particles and if are 
+      !cycle on the children, gather the number of particles and if are
       !leaves
       got_leaves = .false.
       got_branches = .false.
@@ -926,7 +926,7 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
         call push_ptr(octree%layers(l)%lcells(i,j,k)%cell_parts, &
         octree%layers(l)%lcells(i,j,k)%children(child)%p%cell_parts)
       enddo !child
-      
+
       !check how we need to flag the cell
       if(got_leaves .or. got_branches) then
         !Some of the children are leaves or branches, all which is not
@@ -956,7 +956,7 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
     enddo; enddo; enddo !layer cells i,j,k
 !$omp end parallel do
   enddo
-  
+
   !Last dive down the levels to set the leaf neighbours
   do l = 2,ll
     !cycle on the elements on the level
@@ -1004,7 +1004,7 @@ subroutine calculate_multipole(part,octree)
  integer :: ll
  integer :: idx_diff(3)
  real(t_realtime) :: tsta , tend
-  
+
   tsta = dust_time()
   ll = octree%nlevels
   !reset multipole data (might be done elsewhere)
@@ -1065,11 +1065,11 @@ subroutine calculate_multipole(part,octree)
   write(msg,'(A,F9.3,A)') 'Calculated M2M in: ' , t1 - t0,' s.'
   if(sim_param%debug_level.ge.5) call printout(msg)
 
-  
+
   !from the top, interact in the interaction list, then pass to the children
   !(if not already at the lowest level)
   do l = 1,ll
-  
+
   !PROFILE
   t0 = dust_time()
     !cycle on the elements on the level
@@ -1087,7 +1087,7 @@ subroutine calculate_multipole(part,octree)
                octree%pexp_der, &
                octree%layers(l)%lcells(i,j,k)%interaction_list(il)%p%mp)
           endif
-        enddo !il 
+        enddo !il
       endif
     enddo; enddo; enddo !layer cells i,j,k
 !$omp end parallel do
@@ -1111,7 +1111,7 @@ subroutine calculate_multipole(part,octree)
                  octree%layers(l)%lcells(i,j,k)%cen, &
                  octree%pexp )
           endif
-        enddo 
+        enddo
       endif
     enddo; enddo; enddo !layer cells i,j,k
 !$omp end parallel do
@@ -1143,33 +1143,36 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
 
  integer :: i, j, k, lv, ip, ipp, m, ie, iln
  real(wp) :: Rnorm2, vel(3), pos(3), v(3), stretch(3), str(3), alpha(3), dir(3)
- real(wp), allocatable :: velv(:,:), stretchv(:,:)
+ real(wp), allocatable :: velv(:,:), stretchv(:,:), rotuv(:,:)
  real(wp) :: grad(3,3)
  real(t_realtime) :: tsta , tend
  real(wp) :: turbvisc, ave_ros
+ real(wp) :: rotu(3), ru(3)
 
  real(wp) :: grad_elem(3,3) , stretch_elem(3)
 
   tsta = dust_time()
-  !for all the leaves apply the local expansion and then local interactions 
+  !for all the leaves apply the local expansion and then local interactions
   t0 = dust_time()
 !$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, &
 !$omp& v, stretch, str, grad, alpha, dir, velv, stretchv, ave_ros, turbvisc, &
-!$omp& grad_elem, stretch_elem, iln) schedule(dynamic)
+!$omp& grad_elem, stretch_elem, iln, rotuv, rotu, ru) schedule(dynamic)
   do lv = 1, octree%nleaves
     !I am on a leaf, cycle on all the particles inside the leaf
     allocate(velv(3,octree%leaves(lv)%p%npart),&
-             stretchv(3,octree%leaves(lv)%p%npart))
+             stretchv(3,octree%leaves(lv)%p%npart), &
+             rotuv(3,octree%leaves(lv)%p%npart))
 
     ave_ros = 0.0_wp
 
 !$omp simd private(vel, stretch, str, grad, pos, alpha, dir, m) reduction(+:ave_ros)
     do ip = 1,octree%leaves(lv)%p%npart
     if(.not. octree%leaves(lv)%p%cell_parts(ip)%p%free) then
-      
+
       vel = 0.0_wp
       stretch = 0.0_wp
       grad = 0.0_wp
+      rotu = 0.0_wp
       pos = octree%leaves(lv)%p%cell_parts(ip)%p%cen
       alpha = octree%leaves(lv)%p%cell_parts(ip)%p%mag * &
               octree%leaves(lv)%p%cell_parts(ip)%p%dir
@@ -1185,24 +1188,31 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
           !stretching
           grad = grad + octree%leaves(lv)%p%mp%c(:,:,m)* &
              product((pos-octree%leaves(lv)%p%cen)**octree%pexp%pwr(:,m))
+          !NOTE: grad_ij = d u_j / d x_i
         endif
       enddo
       velv(:,ip) = vel
       if(sim_param%use_vs)  then
-        str = matmul(alpha, grad)
-        !str = matmul(alpha, transpose(grad))
+        !str = matmul(alpha, grad)
+        str = matmul(alpha, transpose(grad))
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
         stretch = stretch + str
         !remove the parallel component
 !       stretch = stretch + str - sum(str*dir)*dir
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
         stretchv(:,ip) = stretch
+        if(sim_param%use_divfilt) then
+          rotu(1) = grad(2,3) - grad(3,2)
+          rotu(2) = grad(3,1) - grad(1,3)
+          rotu(3) = grad(1,2) - grad(2,1)
+          rotuv(:,ip) = rotu
+        endif
       endif
       if(sim_param%use_vd)  then
         ave_ros = ave_ros + sum((0.5_wp*(grad+transpose(grad)))**2)
       endif
     endif
-    enddo
+    enddo !ip in the leave
 !$omp end simd
 
     if(sim_param%use_vd)  then
@@ -1224,6 +1234,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       vel = velv(:,ip)
       stretch = stretchv(:,ip)
       grad = 0.0_wp
+      rotu  = rotuv(:,ip)
       pos = octree%leaves(lv)%p%cell_parts(ip)%p%cen
       alpha = octree%leaves(lv)%p%cell_parts(ip)%p%mag * &
               octree%leaves(lv)%p%cell_parts(ip)%p%dir
@@ -1248,6 +1259,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
 !             !removed the parallel component
 !             stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
+              if(sim_param%use_divfilt) then
+                call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
+                   %compute_rotu(pos, alpha, ru)
+                rotu = rotu + ru/(4.0_wp*pi)
+              endif
             endif
             if(sim_param%use_vd) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
@@ -1274,6 +1290,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
 !          !removed the parallel component
 !          stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
+           if(sim_param%use_divfilt) then
+             call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
+                %compute_rotu(pos, alpha, ru)
+             rotu = rotu + ru/(4.0_wp*pi)
+           endif
          endif
          if(sim_param%use_vd) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
@@ -1283,7 +1304,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
        enddo
       enddo
 
-      !finally interact with the particles inside the cell 
+      !finally interact with the particles inside the cell
       do ipp = 1,octree%leaves(lv)%p%npart
         if (ipp .ne. ip) then
           call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_vel(pos, &
@@ -1294,9 +1315,14 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
                                                           alpha, str)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
             stretch = stretch + str/(4.0_wp*pi)
-!           !> removed the parallel component ( proj to avoid numerical instability ? ) 
+!           !> removed the parallel component ( proj to avoid numerical instability ? )
 !           stretch = stretch +(str - sum(str*dir)*dir)/(4.0_wp*pi)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
+            if(sim_param%use_divfilt) then
+              call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_rotu(pos, &
+                                                          alpha, ru)
+              rotu = rotu + ru/(4.0_wp*pi)
+            endif
           endif
 
           if(sim_param%use_vd) then
@@ -1332,7 +1358,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
         call wvort(ie)%compute_vel(pos, sim_param%u_inf, v)
         vel = vel+ v/(4*pi)
       enddo
-      
+
       !at last, add the free stream velocity
       vel = vel + sim_param%u_inf
       octree%leaves(lv)%p%cell_parts(ip)%p%vel = vel
@@ -1343,19 +1369,19 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
         ! Influence of the body elements
         do ie=1,size(elem)
           call elem(ie)%p%compute_grad(pos, sim_param%u_inf, grad_elem)
-          stretch_elem = stretch_elem + & 
+          stretch_elem = stretch_elem + &
               matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
         enddo
         ! Influence of the wake panels
         do ie=1,size(wpan)
           call wpan(ie)%p%compute_grad(pos, sim_param%u_inf, grad_elem)
-          stretch_elem = stretch_elem + & 
+          stretch_elem = stretch_elem + &
               matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
         enddo
         ! Influence of the end vortex
         do ie=1,size(wvort)
           call wvort(ie)%compute_grad(pos, sim_param%u_inf, grad_elem)
-          stretch_elem = stretch_elem + & 
+          stretch_elem = stretch_elem + &
               matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
         enddo
         !DEBUG
@@ -1367,12 +1393,13 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       if(sim_param%use_vs .or. sim_param%use_vd) then
         !evolve the intensity in time
         octree%leaves(lv)%p%cell_parts(ip)%p%stretch = stretch
+        if(sim_param%use_divfilt) octree%leaves(lv)%p%cell_parts(ip)%p%rotu = rotu
       endif
 
 
     endif
     enddo
-    deallocate(velv, stretchv)
+    deallocate(velv, stretchv, rotuv)
   enddo
 !Don't ask me why, but without this pragma it is much faster!
 !$omp end parallel do
@@ -1387,7 +1414,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       call add_layer(octree)
     endif
   endif
-  
+
 end subroutine apply_multipole
 
 !----------------------------------------------------------------------
@@ -1408,7 +1435,7 @@ subroutine apply_multipole_panels(octree, elem)
 
 
   tsta = dust_time()
-  !for all the leaves apply the local expansion and then local interactions 
+  !for all the leaves apply the local expansion and then local interactions
   t0 = dust_time()
 !$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, &
 !$omp& v, stretch, str, grad, alpha, dir, velv, stretchv, ave_ros, turbvisc, iln) schedule(dynamic)
@@ -1416,7 +1443,7 @@ subroutine apply_multipole_panels(octree, elem)
     !I am on a leaf, cycle on all the particles inside the leaf
 
     do ip = 1,octree%leaves(lv)%p%npan
-      
+
       vel = 0.0_wp
       pos = octree%leaves(lv)%p%cell_pans(ip)%p%cen
 
@@ -1452,7 +1479,7 @@ subroutine apply_multipole_panels(octree, elem)
        enddo
       enddo
 
-      !finally interact with the particles inside the cell 
+      !finally interact with the particles inside the cell
       do ipp = 1,octree%leaves(lv)%p%npart
         call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_vel(pos, &
                                                       sim_param%u_inf, v)
@@ -1468,7 +1495,7 @@ subroutine apply_multipole_panels(octree, elem)
   t1 = dust_time()
   write(msg,'(A,F9.3,A)') 'Calculated panels interactions in: ' , t1 - t0,' s.'
   if(sim_param%debug_level.ge.5) call printout(msg)
-  
+
 end subroutine apply_multipole_panels
 !----------------------------------------------------------------------
 
@@ -1480,15 +1507,15 @@ end subroutine apply_multipole_panels
 !!recursive subroutine check_cell_content(cell, leaves)
 !! type(t_cell), intent(inout) :: cell
 !! type(t_cell_p), allocatable, intent(inout) :: leaves(:)
-!! 
+!!
 !! integer :: sib
 !! logical :: enough
-!!  
+!!
 !!
 !!  if(cell%npart .ge. min_part_4_cell) then
 !!    ! Enough particles, since we started from the bottom, it is a leaf, set
 !!    ! it as leaf and cut out the descendant
-!!    call set_leaf(cell,.true.)  
+!!    call set_leaf(cell,.true.)
 !!    call push_ptr(leaves, cell)
 !!
 !!  else
@@ -1500,7 +1527,7 @@ end subroutine apply_multipole_panels
 !!    if(associated(cell%parent%p)) then
 !!      do sib = 1,8
 !!        if(cell%parent%p%children(sib)%p%npart .ge. min_part_4_cell) then
-!!          enough = .true. 
+!!          enough = .true.
 !!        endif
 !!      enddo
 !!    else
@@ -1509,7 +1536,7 @@ end subroutine apply_multipole_panels
 !!    endif
 !!
 !!    if (.not. enough) then
-!!      !all the siblings have not enough particles,  all are going to be 
+!!      !all the siblings have not enough particles,  all are going to be
 !!      ! set inactive, push the pointers to particles to the parent
 !!      do sib = 1,8
 !!        !TODO: for some reasons the generic does not work here
@@ -1521,7 +1548,7 @@ end subroutine apply_multipole_panels
 !!    else
 !!      !the present cell has not enough particles, however the siblings
 !!      !do, so the present cell becomes a leaf anyway
-!!      call set_leaf(cell,.true.)  
+!!      call set_leaf(cell,.true.)
 !!      call push_ptr(leaves, cell)
 !!
 !!    endif
@@ -1538,7 +1565,7 @@ end subroutine apply_multipole_panels
 !! A cell is set as leaf, and if necessary the multipole data is
 !! allocated. In all cases the multipole data is reset.
 !! Note: leaves are not a dynamic vector, are allocated as a whole and
-!! then only the first one are employed. This means that to set a leaf 
+!! then only the first one are employed. This means that to set a leaf
 !! in the correct position an increasing index is necessary, and must be
 !! passed with intent(inout)
 recursive subroutine set_leaf(cell,leaves,il,pexp)
@@ -1546,7 +1573,7 @@ recursive subroutine set_leaf(cell,leaves,il,pexp)
  type(t_cell_p), intent(inout) :: leaves(:)
  integer, intent(inout) :: il
  type(t_polyexp), intent(in) :: pexp
-  
+
   !I is a leaf
   cell%leaf = .true.
 
@@ -1700,9 +1727,9 @@ subroutine push_part_ptr_scalar(pointers, particle, last_elem)
 
  type(t_vortpart_p) :: tmp_ptr(size(pointers)+1)
  integer :: i, l, ife
-  
+
   l = size(pointers)
-  !Get first empty element: receive from 
+  !Get first empty element: receive from
   if(.not.present(last_elem)) then
     ife = 1
     do i=1,l
@@ -1746,7 +1773,7 @@ subroutine push_part_ptr_vec(pointers, elements, last_elem)
  integer :: i, l, m, ife, nblck
 
   l = size(pointers)
-  !Get first empty element: receive from 
+  !Get first empty element: receive from
   if(.not.present(last_elem)) then
     ife = 1
     do i=1,l
@@ -1817,7 +1844,7 @@ subroutine push_pan_ptr_scalar(pointers, particle, last_elem)
  integer :: i, l, ife
 
   l = size(pointers)
-  !Get first empty element: receive from 
+  !Get first empty element: receive from
   if(.not.present(last_elem)) then
     ife = 1
     do i=1,l
@@ -1861,7 +1888,7 @@ subroutine push_pan_ptr_vec(pointers, elements, last_elem)
  integer :: i, l, m, ife, nblck
 
   l = size(pointers)
-  !Get first empty element: receive from 
+  !Get first empty element: receive from
   if(.not.present(last_elem)) then
     ife = 1
     do i=1,l
@@ -1905,7 +1932,7 @@ end subroutine push_pan_ptr_vec
 !> Reset the particles stored inside the cell
 !!
 !! The number of particles, the particles pointers and the brach/leaves
-!! flags are re-set. Activity flag is kept since it marks whether the 
+!! flags are re-set. Activity flag is kept since it marks whether the
 !! multipole data are allocated or not, will be set during sorting
 subroutine reset_cell(cell)
  type(t_cell), intent(inout) :: cell
@@ -1929,12 +1956,12 @@ subroutine reset_cell(cell)
 
 
   do concurrent (i=1:cell%npart)
-    nullify(cell%cell_parts(i)%p) 
+    nullify(cell%cell_parts(i)%p)
   enddo
   cell%npart = 0
 
   do concurrent (i=1:cell%npan)
-    nullify(cell%cell_pans(i)%p) 
+    nullify(cell%cell_pans(i)%p)
   enddo
   cell%npan = 0
   !cell%active = .true.

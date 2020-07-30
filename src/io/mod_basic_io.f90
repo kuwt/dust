@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -57,7 +57,7 @@ use mod_handling, only: &
 
 implicit none
 
-public :: read_mesh_basic, write_basic , read_real_array_from_file 
+public :: read_mesh_basic, write_basic , read_real_array_from_file
 
 private
 
@@ -75,11 +75,11 @@ contains
 !----------------------------------------------------------------------
 
 subroutine read_mesh_basic(mesh_file,ee,rr)
- 
+
  character(len=*), intent(in) :: mesh_file
- integer  , allocatable, intent(out) :: ee(:,:) 
- real(wp) , allocatable, intent(out) :: rr(:,:) 
- 
+ integer  , allocatable, intent(out) :: ee(:,:)
+ real(wp) , allocatable, intent(out) :: rr(:,:)
+
  character(len=max_char_len) :: filen_ee , filen_rr
  integer :: ee_size , rr_size
  integer :: io_error
@@ -97,7 +97,7 @@ subroutine read_mesh_basic(mesh_file,ee,rr)
    call error(this_sub_name, this_mod_name, &
         'File '//trim(filen_ee)//' does not exist')
   endif
-  
+
   ! read # of lines
   call new_file_unit(fid, fid_err)
   open(unit=fid, file=trim(adjustl(filen_ee)), action='read', iostat=io_error )
@@ -110,7 +110,7 @@ subroutine read_mesh_basic(mesh_file,ee,rr)
     end if
   end do
   close(fid)
-  
+
   ! read file
   call new_file_unit(fid, fid_err)
   allocate(ee(4,ee_size)) ; ee = 0
@@ -119,7 +119,7 @@ subroutine read_mesh_basic(mesh_file,ee,rr)
     read(fid,*) ee(:,i1)
   end do
   close(fid)
-  
+
   ! rr
   inquire(file=trim(adjustl(filen_rr)), exist=file_exists)
   if (.not. file_exists) then
@@ -138,7 +138,7 @@ subroutine read_mesh_basic(mesh_file,ee,rr)
     end if
   end do
   close(fid)
-  
+
   ! read file
   call new_file_unit(fid, fid_err)
   allocate(rr(3,rr_size)) ; rr = 0.0_wp
@@ -147,8 +147,8 @@ subroutine read_mesh_basic(mesh_file,ee,rr)
     read(fid,*) rr(:,i1)
   end do
   close(fid)
-  
-  
+
+
 end subroutine read_mesh_basic
 
 !----------------------------------------------------------------------
@@ -190,15 +190,15 @@ end subroutine write_basic_int
 !----------------------------------------------------------------------
 
 subroutine read_real_array_from_file ( n_cols , filen , A )
- integer         , intent(in)  :: n_cols 
+ integer         , intent(in)  :: n_cols
  character(len=*), intent(in)  :: filen
- real(wp)        , intent(out), allocatable :: A(:,:) 
+ real(wp)        , intent(out), allocatable :: A(:,:)
 
  integer :: n_rows
  integer :: fid , fid_err , io_error , i1
  logical :: file_exists
  character(len=*), parameter :: this_sub_name = 'read_real_array_from_file'
-  
+
   !chech if the file exists
   inquire(file=trim(adjustl(filen)), exist=file_exists)
   if (.not. file_exists) then
@@ -216,8 +216,8 @@ subroutine read_real_array_from_file ( n_cols , filen , A )
     end if
   end do
   close(fid)
- 
-  allocate(A(n_rows, n_cols)) ; A = 0.0_wp 
+
+  allocate(A(n_rows, n_cols)) ; A = 0.0_wp
   call new_file_unit(fid, fid_err)
   open(unit=fid, file=trim(adjustl(filen)), action='read', iostat=io_error )
   do i1 = 1 , n_rows

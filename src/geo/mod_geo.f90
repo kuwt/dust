@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -242,7 +242,7 @@ type :: t_geo_component
  type(t_hinge), allocatable :: hinge(:)
 
  !> Dimensions of parametric elements only
- integer :: parametric_nelems_span , parametric_nelems_chor 
+ integer :: parametric_nelems_span , parametric_nelems_chor
 
 end type  t_geo_component
 
@@ -365,7 +365,7 @@ interface destroy_elements
   module procedure destroy_elements_geo
   module procedure destroy_elements_comps
 
-end interface 
+end interface
 
 
 !----------------------------------------------------------------------
@@ -414,7 +414,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
  integer(h5loc) :: floc
 
  integer :: iSurfPan, iVortLatt
- 
+
  character(len=max_char_len) :: msg
  character(len=*), parameter :: this_sub_name='create_geometry'
 
@@ -433,12 +433,12 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
 ! -----------------------------------------------------------------------------------------
 ! The following lines were needed when the motion was defined w.r.t. the initial
 ! time of the simulation, tstart, and not w.r.t. 0, as they are defined now
-! 
+!
 ! ! If rstart_from_file, set the right initial conditions!
 ! ! -> Correction needed for motion defined through its velocity
 ! if ( sim_param%restart_from_file .and. sim_param%reset_time ) then
-!   call update_relative_initial_conditions(sim_param%restart_file, sim_param%ReferenceFile, geo%refs) 
-! end if 
+!   call update_relative_initial_conditions(sim_param%restart_file, sim_param%ReferenceFile, geo%refs)
+! end if
 ! -----------------------------------------------------------------------------------------
 
   !Create the output geometry file (if it is not restarting with the same name)
@@ -498,7 +498,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
       endif
       geo%nLiftLin = geo%nLiftLin + geo%components(i_comp)%nelems
       geo%nelem_expl = geo%nelem_expl + geo%components(i_comp)%nelems
-     
+
      case('a')
       if(geo%components(i_comp)%moving) then
         geo%nmoving_expl = geo%nmoving_expl + geo%components(i_comp)%nelems
@@ -673,7 +673,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
               geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
     end select
   end do
-  
+
 end subroutine create_geometry
 
 !----------------------------------------------------------------------
@@ -767,7 +767,7 @@ subroutine load_components(geo, in_file, out_file, te)
   call open_hdf5_group(floc,'Components',gloc)
   call read_hdf5(n_comp,'NComponents',gloc)
 
-  ! First it is necessary to count how many actual components will 
+  ! First it is necessary to count how many actual components will
   ! be present, including the multiples. Due to pointers pointing to
   ! allocatables the components array cannot be expanded later
   n_comp_input = n_comp
@@ -799,7 +799,7 @@ subroutine load_components(geo, in_file, out_file, te)
     endif
     call close_hdf5_group(cloc)
   enddo
-  
+
   ! Allocate the components of the right full size
   allocate(geo%components(n_comp))
 
@@ -811,10 +811,10 @@ subroutine load_components(geo, in_file, out_file, te)
   endif
 
   elems_offset = 0
-  
+
   !TODO check this
   n_comp_write = n_comp
-  
+
 #if USE_PRECICE
   points_offset_precice = 0
 #endif
@@ -950,7 +950,7 @@ subroutine load_components(geo, in_file, out_file, te)
       ! ====== READING =====
       geo%components(i_comp)%comp_el_type = trim(comp_el_type)
       geo%components(i_comp)%comp_input   = trim(comp_input  )
- 
+
       if(mult) then
         write(geo%components(i_comp)%comp_name,'(A,I2.2)') trim(comp_name)&
                                                             &//'__',i_mult
@@ -1136,12 +1136,12 @@ subroutine load_components(geo, in_file, out_file, te)
 
 
       ! for PARAMETRIC elements only:
-      ! parametric_nelems_span , parametric_nelems_chor 
+      ! parametric_nelems_span , parametric_nelems_chor
       if ( trim(comp_input) .eq. 'parametric' ) then
         call read_hdf5(par_nelems_span,'parametric_nelems_span',geo_loc)
         call read_hdf5(par_nelems_chor,'parametric_nelems_chor',geo_loc)
       end if
- 
+
       call close_hdf5_group(geo_loc)
 
 
@@ -1168,8 +1168,8 @@ subroutine load_components(geo, in_file, out_file, te)
         allocate(e_te(0,0), i_te(2,0), ii_te(2,0), neigh_te(2,0), o_te(2,0),&
                  t_te(3,0))
       endif
-      
-      !Re-write all that was read in the new output file (cannot just copy 
+
+      !Re-write all that was read in the new output file (cannot just copy
       !the read file since the components order will be changed when emplying
       !the multiple components). If it is restarting with the same name
       !avoid write
@@ -1468,12 +1468,12 @@ subroutine load_components(geo, in_file, out_file, te)
       do i1 = 1,ne_te
         do i2 = 1,geo%components(i_comp)%el(e_te(1,i1))%n_ver
           if ( neigh(i2,e_te(1,i1)) .eq. e_te(2,i1) ) then
-            geo%components(i_comp)%el(e_te(1,i1))%neigh(i2)%p => null() 
+            geo%components(i_comp)%el(e_te(1,i1))%neigh(i2)%p => null()
           end if
         end do
         do i2 = 1,geo%components(i_comp)%el(e_te(2,i1))%n_ver
           if ( neigh(i2,e_te(2,i1)) .eq. e_te(1,i1) ) then
-            geo%components(i_comp)%el(e_te(2,i1))%neigh(i2)%p => null() 
+            geo%components(i_comp)%el(e_te(2,i1))%neigh(i2)%p => null()
           end if
         end do
       end do
@@ -1609,7 +1609,7 @@ subroutine import_aero_tab(geo,coeff)
 !                  coeff(i_a)%aero_coeff(i_c)%clstall_pos(i_l) , &
 !                  coeff(i_a)%aero_coeff(i_c)%alstall_neg(i_l) , &
 !                  coeff(i_a)%aero_coeff(i_c)%clstall_neg(i_l)
-!     end do           
+!     end do
 !   end do
 ! end do
 ! write(*,*) ' stop in mod_geo.f90 l.1225 '
@@ -1643,7 +1643,7 @@ subroutine prepare_geometry(geo)
      allocate(elem%edge_vec(3,nsides))
      allocate(elem%edge_len(nsides))
      allocate(elem%edge_uni(3,nsides))
-     
+
      !type-specific fields
      select type(elem)
       !Surface panel
@@ -1766,7 +1766,7 @@ subroutine calc_geo_data_pan(elem,vert)
   ! initialise %dforce
   elem%dforce = 0.0_wp
 
-  ! initialise %dmom  
+  ! initialise %dmom
   elem%dmom   = 0.0_wp
 
 
@@ -1851,7 +1851,7 @@ subroutine calc_geo_data_ll(elem,vert)
   ! initialise %dforce
   elem%dforce = 0.0_wp
 
-  ! initialise %dmom  
+  ! initialise %dmom
   elem%dmom   = 0.0_wp
 
 end subroutine calc_geo_data_ll
@@ -1915,7 +1915,7 @@ subroutine calc_geo_data_ad(elem,vert)
   ! initialise %dforce
   elem%dforce = 0.0_wp
 
-  ! initialise %dmom  
+  ! initialise %dmom
   elem%dmom   = 0.0_wp
 
 end subroutine calc_geo_data_ad
@@ -2210,7 +2210,7 @@ end subroutine update_geometry
 !> Destroy the pointers array of the components
 !!
 !! This subroutine is needed just for compatibility with gcc 4.8
-!! Newer versions of the compiler and ifort deallocate also the 
+!! Newer versions of the compiler and ifort deallocate also the
 !! vector of pointers alongside the geometry in destroy_geometry,
 !! however gcc 4.8 gives a SIGSEGV and needs and explicit deallocation
 subroutine destroy_elements_geo(geo)
@@ -2229,7 +2229,7 @@ end subroutine destroy_elements_geo
 !> Destroy the pointers array of the components
 !!
 !! This subroutine is needed just for compatibility with gcc 4.8
-!! Newer versions of the compiler and ifort deallocate also the 
+!! Newer versions of the compiler and ifort deallocate also the
 !! vector of pointers alongside the geometry in destroy_geometry,
 !! however gcc 4.8 gives a SIGSEGV and needs and explicit deallocation
 subroutine destroy_elements_comps(components)

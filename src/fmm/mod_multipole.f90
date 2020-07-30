@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,15 +36,15 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
 !!=========================================================================
 
 
-!> Module to handle the multipole and local expansions, and their 
+!> Module to handle the multipole and local expansions, and their
 !! manipulation
 module mod_multipole
 
@@ -86,10 +86,10 @@ type :: t_multipole
   real(wp), allocatable :: c(:,:,:)
 
 contains
-  
+
   !> Initialize the data
   procedure, pass(this) :: init => init_multipole
-  
+
   !> Reset the data
   procedure, pass(this) :: reset => reset_multipole
 
@@ -115,7 +115,7 @@ end type
 
 !> Type containing the derivatives of kernel evalued at a certain distance
 type :: t_ker_der
-  
+
   !> Store the derivatives of the kernel evalued between two points
   real(wp), allocatable :: D(:,:)
 
@@ -125,26 +125,26 @@ contains
 
   procedure, pass(this) :: compute_der => compute_der_ker
 
-end type 
+end type
 
 !----------------------------------------------------------------------
 
 !> Polynomial expansion tools
 type :: t_polyexp
-  
+
   !> Maximum degree of the polynomial expansion
   integer :: degree
 
   !> Number of monomials of the polynomial expansion
   integer :: n_mon
-  
+
   !> Number of monomials, at all the different degrees
   integer, allocatable :: n_mon_d(:)
-  
+
   !> For a given set of degrees in the three dimensions returns the index
-  !! in the unrolled 
-  integer, allocatable :: idx(:,:,:) 
-  
+  !! in the unrolled
+  integer, allocatable :: idx(:,:,:)
+
   integer, allocatable :: pwr(:,:)
 
   integer, allocatable :: fact(:)
@@ -153,7 +153,7 @@ type :: t_polyexp
 
 contains
 
-  procedure, pass(this) :: set_degree => set_degree_polyexp  
+  procedure, pass(this) :: set_degree => set_degree_polyexp
 
   procedure, pass(this) :: nbinom => nbinom_polyexp
 
@@ -230,7 +230,7 @@ subroutine leaf_M_multipole(this, cen, parts, nparts,  pexp)
 
   this%a = 0.0_wp
   if(nparts .gt. 0) then
-    do m=1,size(this%a,2) 
+    do m=1,size(this%a,2)
       do i=1,nparts
         if(.not. parts(i)%p%free) then
           this%a(:,m) = this%a(:,m) + &
@@ -261,7 +261,7 @@ subroutine M2M_multipole(this, cen, child, child_cen, pexp)
  integer :: m, idx(3), s
  integer :: is, js, ks
 
-  do m=1,size(this%a,2) 
+  do m=1,size(this%a,2)
     idx = pexp%pwr(:,m)
     do ks = 0,idx(3); do js = 0,idx(2); do is = 0,idx(1)
       s = pexp%idx(is,js,ks)
@@ -288,7 +288,7 @@ subroutine M2L_multipole(this, ker_der, pexp, pexp_der, multipol_int)
  real(wp) :: Der(3)
 
  integer :: n, m, idx(3), idx_der
- 
+
   !Subdivide all the degrees, for the first ones expand both the velocity
   !and the gradient, for the last one only the velocity
 
@@ -302,11 +302,11 @@ subroutine M2L_multipole(this, ker_der, pexp, pexp_der, multipol_int)
       mult = real(pexp_der%nfact(idx(1),idx(2),idx(3)),wp)/real( &
                 pexp%nfact(pexp%pwr(1,m),pexp%pwr(2,m),pexp%pwr(3,m))*&
                 pexp%nfact(pexp%pwr(1,n),pexp%pwr(2,n),pexp%pwr(3,n)),wp)
-      
+
       !sum_v = sum_v + mult * cross(ker_der%D(:,idx_der), multipol_int%a(:,n))
       Der = ker_der%D(:,idx_der)
       sum_v = sum_v + mult * cross(Der, multipol_int%a(:,n))
-      
+
       if(multipole_use_vs) then
         !/!sum_g(:,1) = sum_g(:,1) + mult * &
         !/!             cross(ker_der%Dc(:,1,idx_der), multipol_int%a(:,n))
@@ -349,13 +349,13 @@ subroutine M2L_multipole(this, ker_der, pexp, pexp_der, multipol_int)
     this%b(:,m) = this%b(:,m) + real((-1)**(sum(pexp%pwr(:,m))),wp)*sum_v
     if(multipole_use_vs) &
       this%c(:,:,m) = this%c(:,:,m) + real((-1)**(sum(pexp%pwr(:,m))),wp)*sum_g
-  enddo 
+  enddo
 
 end subroutine M2L_multipole
 
 !----------------------------------------------------------------------
 
-subroutine L2L_multipole(this, cen, parent, parent_cen, pexp) 
+subroutine L2L_multipole(this, cen, parent, parent_cen, pexp)
  class(t_multipole) :: this
  real(wp), intent(in) :: cen(3)
  type(t_multipole), intent(in) :: parent
@@ -365,8 +365,8 @@ subroutine L2L_multipole(this, cen, parent, parent_cen, pexp)
  integer :: m, idx(3), s
  integer :: is, js, ks
  real(wp) :: mult
-  
-  do m=1,size(this%b,2) 
+
+  do m=1,size(this%b,2)
     idx = pexp%pwr(:,m)
     do ks = idx(3),pexp%degree; do js = idx(2),pexp%degree-ks; do is = idx(1),pexp%degree-ks-js
       s = pexp%idx(is,js,ks)
@@ -388,11 +388,13 @@ subroutine compute_der_ker(this,diff,delta,pexp)
  real(wp), intent(in) :: diff(3)
  real(wp), intent(in) :: delta
  type(t_polyexp), intent(in) :: pexp
- 
+
  integer :: i, j, k
  real(wp) :: kmod, Rnorm2
  real(wp) :: sum1, sum2
  real(wp), allocatable :: bk(:)
+ real(wp) :: diffnorm
+
 
 
   allocate(this%D(3,pexp%n_mon_d(pexp%degree-1)))
@@ -401,7 +403,17 @@ subroutine compute_der_ker(this,diff,delta,pexp)
   this%D = 0.0_wp
   this%Dc = 0.0_wp
   bk = 0.0_wp
-  Rnorm2 = sum(diff**2) + delta**2 
+  !Rosenhead
+  Rnorm2 = sum(diff**2) + delta**2
+  !Singular
+  !Rnorm2 = sum(diff**2)
+  !diffnorm = norm2(diff)
+  !if(diffnorm .gt. delta) then
+  !  Rnorm2 = diffnorm**2
+  !else
+  !  Rnorm2 = delta**3/diffnorm
+  !endif
+
 
   do k=0,pexp%degree;  do j=0,pexp%degree-k; do i=0,pexp%degree-j-k;
     kmod = real(k+j+i,wp)
@@ -422,7 +434,7 @@ subroutine compute_der_ker(this,diff,delta,pexp)
 
 
         bk(pexp%idx(i,j,k)) = 1.0_wp/(Rnorm2*kmod)*&
-                     ((2.0_wp*kmod-1.0_wp)*sum1 - (kmod-1.0_wp)*sum2) 
+                     ((2.0_wp*kmod-1.0_wp)*sum1 - (kmod-1.0_wp)*sum2)
     endif
   enddo; enddo; enddo
 
@@ -460,12 +472,12 @@ subroutine set_degree_polyexp(this, deg)
    do i=o,0,-1
     do j=o-i,0,-1
         k=o-j-i
-        ipol = ipol+1 
+        ipol = ipol+1
         this%idx(i,j,k) = ipol
   enddo; enddo;
     this%n_mon_d(o) = ipol
   enddo
-  
+
   this%n_mon = ipol
 
   allocate(this%pwr(3,this%n_mon))
@@ -475,11 +487,11 @@ subroutine set_degree_polyexp(this, deg)
    do i=o,0,-1
     do j=o-i,0,-1
         k=o-j-i
-        ipol = ipol+1 
+        ipol = ipol+1
         this%pwr(:,ipol) = (/i,j,k/)
   enddo; enddo;
   enddo
-  
+
   allocate(this%fact(0:deg))
   this%fact(0) = 1
   do o = 1,deg
@@ -506,7 +518,7 @@ function nbinom_polyexp(this, m, s) result(nbinom)
   do d=1,3
     nbinom = nbinom* &
              (this%fact(m(d)) / &
-             ( this%fact(s(d))*this%fact(m(d)-s(d)) ) ) 
+             ( this%fact(s(d))*this%fact(m(d)-s(d)) ) )
   enddo
 
 end function nbinom_polyexp
@@ -523,7 +535,7 @@ function nfact_polyexp(this, m) result(nfact)
 
   nfact = 1
   do d=1,3
-    nfact = nfact * this%fact(m(d))  
+    nfact = nfact * this%fact(m(d))
   enddo
 
 end function nfact_polyexp

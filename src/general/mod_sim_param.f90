@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -145,6 +145,10 @@ type t_sim_param
   logical :: use_vs
     !> use the vortex stretching from elements
     logical :: vs_elems
+    !> use the divergence filtering
+    logical :: use_divfilt
+      !> time scale of the divergence filter
+      real(wp) :: filt_eta
   !> use the vorticity diffusion or not
   logical :: use_vd
   !> use turbulent viscosity or not
@@ -172,7 +176,7 @@ type t_sim_param
   real(wp) :: llDamp
   !> Avoid "unphysical" separations in inner sections of LL? :: llTol
   logical  :: llStallRegularisation
-  !> Number of "unphysical" separations that can be removed 
+  !> Number of "unphysical" separations that can be removed
   integer  :: llStallRegularisationNelems
   !> Number of iterations between two regularisation processes
   integer  :: llStallRegularisationNiters
@@ -224,14 +228,14 @@ type t_sim_param
   logical :: hcas
     !> Time of deployment of the hcas
     real(wp) :: hcas_time
-    !> Velocity of the hcas 
+    !> Velocity of the hcas
     real(wp) :: hcas_vel(3)
 
 
   !Handling parameters:
   !> Debug level
   integer :: debug_level
-  !> Output interval 
+  !> Output interval
   real(wp) :: dt_out
   !> Basename
   character(len=max_char_len) :: basename
@@ -293,7 +297,11 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%VortexRad, 'VortexRad', loc)
   call write_hdf5_attr(this%CutoffRad, 'CutoffRad', loc)
   call write_hdf5_attr(this%use_vs, 'Vortstretch', loc)
-  call write_hdf5_attr(this%vs_elems, 'VortstretchFromElems', loc)
+  if(this%use_vs) then
+    call write_hdf5_attr(this%vs_elems, 'VortstretchFromElems', loc)
+    call write_hdf5_attr(this%use_divfilt, 'DivergenceFiltering', loc)
+    call write_hdf5_attr(1.0_wp/this%filt_eta*this%dt, 'FilterTimescale', loc)
+  endif
   call write_hdf5_attr(this%use_vd, 'vortdiff', loc)
   call write_hdf5_attr(this%use_tv, 'turbvort', loc)
   call write_hdf5_attr(this%use_pa, 'PenetrationAvoidance', loc)

@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -384,34 +384,34 @@ subroutine build_ll_kernel( elems_ll , alpha , kernel )
 
   end do
 
-  if ( allocated(kernel) ) deallocate(kernel) 
+  if ( allocated(kernel) ) deallocate(kernel)
   allocate(kernel(n_l,n_l)) ; kernel = 0.0_wp
 
   !> Normal distribution
   do i_l = 1 , n_l
- 
+
     if ( f_chord_v(i_l) .le. 0.0_wp ) then
- 
-      kernel(i_l,i_l) = 1.0_wp 
- 
+
+      kernel(i_l,i_l) = 1.0_wp
+
     else
- 
+
       sigma = 2.0_wp * f_chord_v(i_l) * elems_ll(i_l)%p%chord
       do j_l = 1 , n_l
-     
+
         kernel(i_l,j_l) = exp( - 0.5_wp * norm2( elems_ll(j_l)%p%cen &
                                                - elems_ll(i_l)%p%cen )**2.0_wp / &
                                sigma**2.0_wp )
-     
+
       end do
- 
+
     end if
- 
+
     !> normalisation
     kernel(i_l,:) = kernel(i_l,:) / sum(kernel(i_l,:))
- 
+
   end do
- 
+
   ! Deallocations
   deallocate(f_chord_v)
 
@@ -465,7 +465,7 @@ subroutine solve_liftlin_piszkin( &
  integer  :: fp_maxIter
  ! stall regularisation: params read as inputs
  logical  :: stall_regularisation
- real(wp):: al_stall 
+ real(wp):: al_stall
  integer :: n_stall
  integer :: n_iter_reg
  ! load computation
@@ -496,7 +496,7 @@ subroutine solve_liftlin_piszkin( &
   ! param for load computation
   load_avl   = sim_param%llLoadsAVL
   ! adaptive ll regularisation
-  adaptive_reg = sim_param%llArtificialViscosityAdaptive 
+  adaptive_reg = sim_param%llArtificialViscosityAdaptive
 
   uinf = sim_param%u_inf
 
@@ -511,15 +511,15 @@ subroutine solve_liftlin_piszkin( &
 
   !=== Compute the velocity from all the elements except for liftling elems ===
   ! and store it outside the loop, since it is constant
-  allocate(vel_w     (3,size(elems_ll))) ; vel_w      = 0.0_wp 
-  allocate(vel_w_vort(3,size(elems_ll))) ; vel_w_vort = 0.0_wp 
+  allocate(vel_w     (3,size(elems_ll))) ; vel_w      = 0.0_wp
+  allocate(vel_w_vort(3,size(elems_ll))) ; vel_w_vort = 0.0_wp
 !$omp parallel do private(i_l, j, v) schedule(dynamic)
   do i_l = 1,size(elems_ll)
-    do j = 1,size(elems_impl) ! body panels: liftlin, vor che tenga contotlat 
+    do j = 1,size(elems_impl) ! body panels: liftlin, vor che tenga contotlat
       call elems_impl(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
-    do j = 1,size(elems_ad) ! actuator disks 
+    do j = 1,size(elems_ad) ! actuator disks
       call elems_ad(j)%p%compute_vel(  elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
@@ -577,7 +577,7 @@ subroutine solve_liftlin_piszkin( &
    !type is(t_liftlin)
      el => elems_ll(i_l)%p
      u_v(i_l) = norm2((uinf-el%ub) - &
-         el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub))) 
+         el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
      el%vel_2d_isolated = norm2((uinf-el%ub) - &
                           el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
      el%vel_outplane_isolated = sum(el%bnorm_cen*(uinf-el%ub))
@@ -591,7 +591,7 @@ subroutine solve_liftlin_piszkin( &
   ! === Fixed-Point iterations ===
   ! ==============================
   ! !!! elems_ll(i_l)%alpha is meant to be the average AOA !!!
- 
+
   ! === Initial condition on the induced angle ===
   ! Initial conditions on the average angle (saved in %alpha field)
   ! from previous time step,
@@ -631,19 +631,19 @@ subroutine solve_liftlin_piszkin( &
 
         ! === Average value of AOA (regularisation?) ===
         alpha_avg = alpha_avg_v(i_l) ! * 180.0_wp/pi
-        
+
         ! overall relative velocity computed in the centre of the ll elem
         vel = ui_v(i_l,:) + uinf - el%ub + vel_w(:,i_l)
         ! "effective" velocity = proj. of vel in the n-t plane
         !!! up =  el%nor*sum(el%nor*vel) + el%tang_cen*sum(el%tang_cen*vel)
-        !!! u_v(i_l) = norm2(up) 
+        !!! u_v(i_l) = norm2(up)
         unorm = u_v(i_l)      ! velocity w/o induced velocity
-       
+
         ! compute local Reynolds and Mach numbers for the section
         ! needed to enter the LUT (.c81) of aerodynamic loads (2d airfoil)
-        mach     = unorm / sim_param%a_inf      
-        reynolds = sim_param%rho_inf * unorm * & 
-                   el%chord / sim_param%mu_inf    
+        mach     = unorm / sim_param%a_inf
+        reynolds = sim_param%rho_inf * unorm * &
+                   el%chord / sim_param%mu_inf
 
         ! Read the aero coeff from .c81 tables
         call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil , &
@@ -651,7 +651,7 @@ subroutine solve_liftlin_piszkin( &
                                                       aero_coeff , dcl_v(i_l) )
         cl = aero_coeff(1)   ! cl needed for the iterative process
 
-        ! Compute the "equivalent" intensity of the vortex line 
+        ! Compute the "equivalent" intensity of the vortex line
         dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
 
         c_m(i_l,:) = aero_coeff
@@ -687,9 +687,9 @@ subroutine solve_liftlin_piszkin( &
         vel = vel/(4.0_wp*pi) + uinf - el%ub + vel_w(:,i_l)
         ! "effective" velocity = proj. of vel in the n-t plane
         up =  el%nor*sum(el%nor*vel) + el%tang_cen*sum(el%tang_cen*vel)
-        u_v(i_l) = norm2(up) 
+        u_v(i_l) = norm2(up)
         unorm = u_v(i_l)      ! velocity w/o induced velocity
-       
+
         ! Angle of incidence (full velocity)
         alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
         alpha = alpha * 180.0_wp/pi  ! .c81 tables defined with angles in [deg]
@@ -700,7 +700,7 @@ subroutine solve_liftlin_piszkin( &
         !
         !> "2D correction" of the induced angle
         alpha_2d = el%mag / ( pi * el%chord * unorm ) *180.0_wp/pi
-        alpha = alpha - alpha_2d 
+        alpha = alpha - alpha_2d
         ! =========================================================
 
         a_v(i_l) = alpha
@@ -746,11 +746,11 @@ subroutine solve_liftlin_piszkin( &
   ! === Update dGamma_dt field ===
   do i_l = 1,size(elems_ll)
     elems_ll(i_l)%p%dGamma_dt = ( elems_ll(i_l)%p%mag - Gamma_old(i_l) ) / &
-                                  sim_param%dt 
+                                  sim_param%dt
   end do
 
   ! === Loads computation ===
-  ! compute LL sectional loads from singularity intensities. 
+  ! compute LL sectional loads from singularity intensities.
   do i_l = 1,size(elems_ll)
 
    !select type(el => elems_ll(i_l)%p)
@@ -835,7 +835,7 @@ subroutine solve_liftlin_piszkin( &
 
     end if
 
-    ! elementary moment = 0.5 * rho * v^2 * A * c * cm, 
+    ! elementary moment = 0.5 * rho * v^2 * A * c * cm,
     ! - around bnorm_cen (always? TODO: check)
     ! - referred to the ref.point of the elem,
     !   ( here, cen of the elem = cen of the liftlin (for liftlin elems) )
@@ -858,7 +858,7 @@ subroutine solve_liftlin_piszkin( &
   ! useful arrays ---
   deallocate(dou_temp, vel_w, vel_w_vort, Gamma_old)
   deallocate(a_v,c_m,u_v, alpha_avg_v)
-  
+
 
 end subroutine solve_liftlin_piszkin
 
@@ -903,7 +903,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
  integer  :: fp_maxIter
  ! stall regularisation: params read as inputs
  logical  :: stall_regularisation
- real(wp):: al_stall 
+ real(wp):: al_stall
  integer :: i_do , i , nn_stall , n_stall
  integer :: n_iter_reg
  ! load computation
@@ -948,15 +948,15 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   !=== Compute the velocity from all the elements except for liftling elems ===
   ! and store it outside the loop, since it is constant
-  allocate(vel_w     (3,size(elems_ll))) ; vel_w      = 0.0_wp 
-  allocate(vel_w_vort(3,size(elems_ll))) ; vel_w_vort = 0.0_wp 
+  allocate(vel_w     (3,size(elems_ll))) ; vel_w      = 0.0_wp
+  allocate(vel_w_vort(3,size(elems_ll))) ; vel_w_vort = 0.0_wp
 !$omp parallel do private(i_l, j, v) schedule(dynamic)
   do i_l = 1,size(elems_ll)
-    do j = 1,size(elems_impl) ! body panels: liftlin, vor che tenga contotlat 
+    do j = 1,size(elems_impl) ! body panels: liftlin, vor che tenga contotlat
       call elems_impl(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
-    do j = 1,size(elems_ad) ! actuator disks 
+    do j = 1,size(elems_ad) ! actuator disks
       call elems_ad(j)%p%compute_vel(  elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
@@ -969,7 +969,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       vel_w     (:,i_l) = vel_w(:,i_l) + v
       vel_w_vort(:,i_l) = vel_w_vort(:,i_l) + v
     enddo
-    
+
     if(sim_param%use_fmm_pan) then
 
       ! === FMM from particles to panels ===
@@ -1008,7 +1008,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
    !type is(t_liftlin)
      el => elems_ll(i_l)%p
      u_v(i_l) = norm2((uinf-el%ub) - &
-         el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub))) 
+         el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
      el%vel_2d_isolated = norm2((uinf-el%ub) - &
                           el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
      el%vel_outplane_isolated = sum(el%bnorm_cen*(uinf-el%ub))
@@ -1039,9 +1039,9 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
         vel = vel/(4.0_wp*pi) + uinf - el%ub + vel_w(:,i_l)
         ! "effective" velocity = proj. of vel in the n-t plane
         up =  el%nor*sum(el%nor*vel) + el%tang_cen*sum(el%tang_cen*vel)
-        u_v(i_l) = norm2(up) 
+        u_v(i_l) = norm2(up)
         unorm = u_v(i_l)      ! velocity w/o induced velocity
-       
+
         ! Angle of incidence (full velocity)
         alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
         alpha = alpha * 180.0_wp/pi  ! .c81 tables defined with angles in [deg]
@@ -1052,14 +1052,14 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
         !
         !> "2D correction" of the induced angle
         alpha_2d = el%mag / ( pi * el%chord * unorm ) *180.0_wp/pi
-        alpha = alpha - alpha_2d 
+        alpha = alpha - alpha_2d
         ! =========================================================
 
         ! compute local Reynolds and Mach numbers for the section
         ! needed to enter the LUT (.c81) of aerodynamic loads (2d airfoil)
-        mach     = unorm / sim_param%a_inf      
-        reynolds = sim_param%rho_inf * unorm * & 
-                   el%chord / sim_param%mu_inf    
+        mach     = unorm / sim_param%a_inf
+        reynolds = sim_param%rho_inf * unorm * &
+                   el%chord / sim_param%mu_inf
 
         ! Read the aero coeff from .c81 tables
         call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil , &
@@ -1067,7 +1067,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
                                                               aero_coeff )
         cl = aero_coeff(1)   ! cl needed for the iterative process
 
-        ! Compute the "equivalent" intensity of the vortex line 
+        ! Compute the "equivalent" intensity of the vortex line
         dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
 !$omp atomic
         diff = max(diff,abs(elems_ll(i_l)%p%mag-dou_temp(i_l)))
@@ -1088,7 +1088,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     ! ll section of nn_stall elems, with nn_stall \in (1,llRegularisationNelems)
     ! todo:
     !   - read neighbouring elements and not the prev and next elem in ll numbering
-    !   - read al_stall from tables (?), now it is an input from the user 
+    !   - read al_stall from tables (?), now it is an input from the user
     if ( stall_regularisation ) then ! *** stall regularisation ***
 
       if ( ( mod( ic , n_iter_reg ) .eq. 0 ) .or. &
@@ -1096,7 +1096,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
         al_stall = al_stall * 180.0_wp / pi
         a_v = a_v * 180.0_wp / pi
-        i_l = 2 
+        i_l = 2
 
         nn_stall = 1
         do while( i_l .lt. size(elems_ll) )
@@ -1119,7 +1119,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 !                          (a_v(i_l+nn_stall) .lt. al_stall)
 !               write(*,*) ' a_v(i_l-1,i_l+nn_stall): ' , a_v(i_l-1) , a_v(i_l+nn_stall)
 !               write(*,*) ' a_v(i_l:i_l+nn_stall-1)    : ' , a_v(i_l:i_l+nn_stall-1)
-! ! debug ---- 
+! ! debug ----
               do i = 1 , nn_stall
                 a_v(     i_l+i-1) =  real(i,wp)/real(nn_stall+1,wp) &
                         * a_v(i_l+nn_stall) + (real(nn_stall+1-i,wp))/&
@@ -1134,7 +1134,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 ! ! debug ----
 
 !               write(*,*) ' a_v(i_l:i_l+nn_stall-1) new: ' , a_v(i_l:i_l+nn_stall-1)
-! ! debug ---- 
+! ! debug ----
 
               i_do = 0 ;  ! update variable for the do while loops
 
@@ -1142,7 +1142,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
             nn_stall = nn_stall + 1 ! look for larger ll sections
 
-          end do        
+          end do
 
           ! update the index of the next elems to analyse for regularisation
           if ( i_do .eq. 0 ) then ;  i_l = i_l + nn_stall-1
@@ -1165,7 +1165,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
                              /(1.0_wp+fp_damp)
       max_mag_ll = max(max_mag_ll,abs(elems_ll(i_l)%p%mag))
     enddo
- 
+
     diff_v(ic) = diff/max_mag_ll
 
     if ( diff/max_mag_ll .le. fp_tol ) exit ! convergence
@@ -1187,11 +1187,11 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   ! === Update dGamma_dt field ===
   do i_l = 1,size(elems_ll)
     elems_ll(i_l)%p%dGamma_dt = ( elems_ll(i_l)%p%mag - Gamma_old(i_l) ) / &
-                                  sim_param%dt 
+                                  sim_param%dt
   end do
 
   ! === Loads computation ===
-  ! compute LL sectional loads from singularity intensities. 
+  ! compute LL sectional loads from singularity intensities.
   do i_l = 1,size(elems_ll)
 
    !select type(el => elems_ll(i_l)%p)
@@ -1277,7 +1277,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
     end if
 
-    ! elementary moment = 0.5 * rho * v^2 * A * c * cm, 
+    ! elementary moment = 0.5 * rho * v^2 * A * c * cm,
     ! - around bnorm_cen (always? TODO: check)
     ! - referred to the ref.point of the elem,
     !   ( here, cen of the elem = cen of the liftlin (for liftlin elems) )
@@ -1300,7 +1300,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   ! useful arrays ---
   deallocate(dou_temp, vel_w, vel_w_vort, Gamma_old)
   deallocate(a_v,c_m,u_v)
-  
+
 
 end subroutine solve_liftlin
 
@@ -1310,8 +1310,8 @@ end subroutine solve_liftlin
 ! using the velocity computed at the ctr_pt on the LL, in the subroutine
 ! get_vel_ctr_cp_liftlin. The viscous contribution is performed in
 ! the subroutine solve_liftlin
-! 
-subroutine compute_dforce_jukowski_liftlin(this, elems, wake_elems) 
+!
+subroutine compute_dforce_jukowski_liftlin(this, elems, wake_elems)
  class(t_liftlin), intent(inout) :: this
  type(t_pot_elem_p),intent(in):: elems(:)
  type(t_pot_elem_p),intent(in):: wake_elems(:)
@@ -1329,14 +1329,14 @@ end subroutine compute_dforce_jukowski_liftlin
 !----------------------------------------------------------------------
 
 !> Compute the velocity and the "induced" incidence angle at ctr_pt
-! located on the LL. These quantities are used in the inviscid load 
+! located on the LL. These quantities are used in the inviscid load
 ! computation, using AVL expression (~ VL elements)
 !
 subroutine get_vel_ctr_pt_liftlin(this, elems, wake_elems)
  class(t_liftlin), intent(inout) :: this
  type(t_pot_elem_p),intent(in):: elems(:)
  type(t_pot_elem_p),intent(in):: wake_elems(:)
- 
+
  real(wp) :: v(3),x0(3)
  integer :: j
 
@@ -1348,23 +1348,23 @@ subroutine get_vel_ctr_pt_liftlin(this, elems, wake_elems)
 
  !=== Compute the velocity from all the elements ===
  do j = 1,size(wake_elems)  ! wake panels
- 
+
    call wake_elems(j)%p%compute_vel(x0,sim_param%u_inf,v)
    this%vel_ctr_pt = this%vel_ctr_pt + v
- 
+
  enddo
 
  do j = 1,size(elems) ! body elements
- 
+
    call elems(j)%p%compute_vel(x0,sim_param%u_inf,v)
    this%vel_ctr_pt = this%vel_ctr_pt + v
- 
+
  enddo
 
  this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp*pi) &
                + sim_param%u_inf + this%uvort - this%ub
 
- this%al_ctr_pt = atan2( sum(this%vel_ctr_pt * this%nor     ) , & 
+ this%al_ctr_pt = atan2( sum(this%vel_ctr_pt * this%nor     ) , &
                          sum(this%vel_ctr_pt * this%tang_cen) )
 
 end subroutine get_vel_ctr_pt_liftlin
@@ -1393,7 +1393,7 @@ subroutine calc_geo_data_liftlin(this, vert)
                this%ver(:,4) - this%ver(:,2)     )
 
   ! -- 0.75 chord -- look for other "0.75 chord" tag
-! this%area = 0.5_wp * norm2(nor) / 0.75_wp 
+! this%area = 0.5_wp * norm2(nor) / 0.75_wp
   this%area = 0.5_wp * norm2(nor)
   this%nor = nor / norm2(nor)   ! then overwritten
 
@@ -1443,9 +1443,9 @@ subroutine calc_geo_data_liftlin(this, vert)
   !
   !> sweep angle
   cos_lambda  = norm2( cross( this%tang_cen , -this%edge_uni(:,1) ) )
- 
+
   !> modified ~3/4 control point
-  this%ctr_pt = this%cen + this%tang_cen * this%chord / 2.0_wp 
+  this%ctr_pt = this%cen + this%tang_cen * this%chord / 2.0_wp
   ! this%ctr_pt = this%cen + this%tang_cen * this%chord / ( 2.0_wp * cos_lambda )
 
   !> 2 * pi * | x_CP - x{1/4*c} | * cos(lambda)
@@ -1467,8 +1467,8 @@ subroutine calc_geo_data_liftlin(this, vert)
   tanl = 0.5_wp * ( this%ver(:,nsides) + this%ver(:,1) ) - cen
 
   ! they should not be used, but ...
-  this%tang(:,1) = tanl / norm2(tanl)                   ! this%tang_cen    ! 
-  this%tang(:,2) = cross( this%nor, this%tang(:,1)  )   ! this%bnorm_cen   ! 
+  this%tang(:,1) = tanl / norm2(tanl)                   ! this%tang_cen    !
+  this%tang(:,2) = cross( this%nor, this%tang(:,1)  )   ! this%bnorm_cen   !
   ! *** 2019-02-27 ***
 
   !TODO: is it necessary to initialize it here?
@@ -1476,7 +1476,7 @@ subroutine calc_geo_data_liftlin(this, vert)
   this%dmom   = 0.0_wp
 
   ! Apply twist (for non flat elements)
-  ! 
+  !
   ! For flat elements the wing panels are not twisted, only account for
   ! sweep and dihedral angles. In order to account for twist the normal
   ! and tangential vectors are rotated with the input twist angle.
@@ -1498,7 +1498,7 @@ subroutine calc_geo_data_liftlin(this, vert)
   rm(3,1) = rm(3,1) - this%bnorm_cen(2)*st
   rm(2,3) = rm(3,2) - this%bnorm_cen(1)*st
   rm(3,2) = rm(3,2) + this%bnorm_cen(1)*st
-  
+
   rm(1,1) = this%bnorm_cen(1)*this%bnorm_cen(1)*mc + ct
   rm(2,2) = this%bnorm_cen(2)*this%bnorm_cen(2)*mc + ct
   rm(3,3) = this%bnorm_cen(3)*this%bnorm_cen(3)*mc + ct
@@ -1510,28 +1510,28 @@ end subroutine calc_geo_data_liftlin
 
 
 !----------------------------------------------------------------------
-! TODO: use this function to compute the induced velocity from 
+! TODO: use this function to compute the induced velocity from
 ! vortex elements (vortex particles, vortex lines at TE) on the
 ! LL. In order to correctly use this function, the field %uvort
 ! should not be overwritten, when the use_fmm_option is set .T.
-! 
+!
 ! !> Calculate the vorticity induced velocity from vortical elements
 ! subroutine get_vort_vel_liftlin(this, vort_elems, uinf)
 !  class(t_liftlin), intent(inout)    :: this
 !  type(t_vort_elem_p), intent(in)    :: vort_elems(:)
 !  real(wp), intent(in) :: uinf(3)
-! 
+!
 !  integer :: iv
 !  real(wp) :: vel(3)
-! 
+!
 !  !this%uvort = 0.0_wp
-! 
+!
 !  do iv=1,size(vort_elems)
 !    call vort_elems(iv)%p%compute_vel(this%cen, uinf, vel)
 !    this%uvort = this%uvort + vel/(4*pi)
 !  enddo
-! 
-! end subroutine 
+!
+! end subroutine
 
 !----------------------------------------------------------------------
 

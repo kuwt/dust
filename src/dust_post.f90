@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -116,8 +116,8 @@ use mod_tecplot_out, only: &
 use mod_vtk_out, only: &
   vtk_out_viz , vtr_write
 
-use mod_dat_out, only: & 
-  dat_out_probes_header, & 
+use mod_dat_out, only: &
+  dat_out_probes_header, &
   dat_out_loads_header
 
 use mod_math, only: &
@@ -151,7 +151,7 @@ use mod_post_aa, only: &
 implicit none
 
 !Input
-character(len=*), parameter :: input_file_name_def = 'dust_post.in' 
+character(len=*), parameter :: input_file_name_def = 'dust_post.in'
 character(len=max_char_len) :: input_file_name
 
 !Geometry parameters
@@ -175,11 +175,11 @@ call initialize_hdf5()
 
 !------ Input reading ------
 
-if(command_argument_count().gt.0) then 
+if(command_argument_count().gt.0) then
   call get_command_argument(1,value=input_file_name)
 else
   input_file_name = input_file_name_def
-endif   
+endif
 
 call prms%CreateStringOption('basename','Base name of the processed data')
 call prms%CreateStringOption('data_basename','Base name of the data to be &
@@ -285,7 +285,7 @@ call check_basename(trim(data_basename),'dust postprocessor')
 
 !Cycle on all the analyses
 do ia = 1,n_analyses
-  
+
   !Get general parameter for the analysis
   call getsuboption(prms,'Analysis',sbprms)
   an_type  = getstr(sbprms,'Type')
@@ -297,7 +297,7 @@ do ia = 1,n_analyses
   an_end   = getint(sbprms,'EndRes')
   an_step  = getint(sbprms,'StepRes')
   average  = getlogical(sbprms, 'Average')
- 
+
   !Check if we are analysing all the components or just some
   all_comp = .false.
   n_comp = countoption(sbprms, 'Component')
@@ -308,7 +308,7 @@ do ia = 1,n_analyses
     do i_comp = 1, n_comp
       components_names(i_comp) = getstr(sbprms, 'Component')
     enddo
-    call LowCase(components_names(1),lowstr)    ! char 
+    call LowCase(components_names(1),lowstr)    ! char
     if(trim(lowstr) .eq. 'all') then
       all_comp = .true.
       n_comp = 0
@@ -329,7 +329,7 @@ do ia = 1,n_analyses
                         an_start , an_end , an_step, average )
 
    ! Visualizations
-   case('viz') 
+   case('viz')
 
     call post_viz( sbprms , basename , data_basename , an_name , ia , &
                    out_frmt , components_names , all_comp , &
@@ -351,14 +351,14 @@ do ia = 1,n_analyses
 
    ! Sectional Loads
    case('sectional_loads')
-    
+
     call post_sectional ( sbprms , bxprms , basename , data_basename , an_name , ia , &
                           out_frmt , components_names , all_comp , &
                           an_start , an_end , an_step, average )
 
    ! Aeroacoustics
    case('aeroacoustics')
-    
+
     call post_aeroacoustics ( sbprms, basename, data_basename, &
                               an_name, ia, out_frmt, components_names, &
                               all_comp, an_start, an_end, an_step, average )
@@ -367,7 +367,7 @@ do ia = 1,n_analyses
     call error('dust_post','','Unknown type of analysis: '//trim(an_type))
 ! end if
   end select
-  
+
   if(allocated(var_names)) deallocate(var_names)
   if(allocated(components_names)) deallocate(components_names)
 
@@ -384,14 +384,14 @@ call printout(nl//'<<<<<< DUST POSTPROCESSOR end       <<<<<<'//nl)
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
 !
-! moved to ./post/mod_post_load.f90 
-! 
+! moved to ./post/mod_post_load.f90
+!
 ! subroutine load_refs(floc, refs_R, refs_off, refs_G, refs_f, refs_tag)
 ! subroutine load_res(floc, comps, vort, press, t)
 ! subroutine load_wake_pan(floc, wpoints, wstart, wvort)
 ! subroutine load_wake_ring(floc, wpoints, wconn, wvort)
 ! subroutine load_wake_viz(floc, wpoints, welems, wvort)
-! 
+!
 !----------------------------------------------------------------------
 
 end program dust_post

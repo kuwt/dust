@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -81,8 +81,8 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
                                             chord_p,theta_p,theta_e)
 
  character(len=*), intent(in) :: mesh_file
- integer  , allocatable, intent(out) :: ee(:,:) 
- real(wp) , allocatable, intent(out) :: rr(:,:) 
+ integer  , allocatable, intent(out) :: ee(:,:)
+ real(wp) , allocatable, intent(out) :: rr(:,:)
  character(len=max_char_len), allocatable , intent(out) :: airfoil_list_actual(:)
  character(len=max_char_len), allocatable               :: airfoil_list(:)
  integer  , allocatable, intent(out) :: nelem_span_list(:)
@@ -97,12 +97,12 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
  integer :: nelem_chord, nelem_chord_tot ! , nelem_span_tot <--- moved as an output
  integer :: npoint_chord_tot, npoint_span_tot
  integer :: nRegions, nSections, nAirfoils, rr_size , ee_size , ispace
- integer :: iRegion , iSection , iAirfoil , iChord , iElement , iPoint 
+ integer :: iRegion , iSection , iAirfoil , iChord , iElement , iPoint
  real(wp):: ref_chord_fraction
  real(wp), allocatable :: ref_point(:)
  ! data read from file
  ! sections ---
- real(wp)         , allocatable :: chord_list(:) , twist_list(:) 
+ real(wp)         , allocatable :: chord_list(:) , twist_list(:)
 !character(len=max_str_len), allocatable , intent(out) :: airfoil_list(:)
  ! regions  ---
 !integer , allocatable , intent(out) :: nelem_span_list(:)
@@ -112,8 +112,8 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
  character :: ElType
  logical :: symmetry, mesh_flat
  ! Sections 1. 2.
- real(wp), allocatable :: rrSection1(:,:) , rrSection2(:,:) 
-!real(wp) :: th1 , th2 , ch1 , ch2 
+ real(wp), allocatable :: rrSection1(:,:) , rrSection2(:,:)
+!real(wp) :: th1 , th2 , ch1 , ch2
  real(wp) :: dx_ref , dy_ref , dz_ref
  integer :: ista , iend , ich
 
@@ -197,19 +197,19 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   if ( mesh_flat .and. trim(ElType) .ne. 'l' ) then
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
          &flat mesh option is available only for lifting line elements.')
-  end if 
+  end if
 
   nSections = countoption(pmesh_prs,'chord')
   nRegions  = countoption(pmesh_prs,'span')
 
   write(msg,*) nl,'  Number of sections: ',nSections; call printout(msg)
   write(msg,*) ' Number of regions:  ',nRegions; call printout(msg)
-  
+
   ! Check that nSections = nRegion + 1
   if ( nSections .ne. nRegions + 1 ) then
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
          &number of sections different from number of regions + 1.')
-  end if 
+  end if
 
   ref_chord_fraction = getreal(pmesh_prs,'reference_chord_fraction')
   ref_point          = getrealarray(pmesh_prs,'starting_point',3)
@@ -266,14 +266,14 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   else
    write(*,*) ' mesh_file   : ' , trim(mesh_file)
    write(*,*) ' n_type_span : ' , n_type_span
-   write(*,*) ' nRegions    : ' , nRegions    
+   write(*,*) ' nRegions    : ' , nRegions
    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
          &number of type_span different from number of regions.')
   end if
 
   allocate(chord_list  (nSections))  ; chord_list = 0.0_wp
   allocate(twist_list  (nSections))  ; twist_list = 0.0_wp
-  allocate(airfoil_list(nSections)) 
+  allocate(airfoil_list(nSections))
 
   do iSection= 1,nSections
     chord_list(iSection)   = getreal(pmesh_prs,'chord')
@@ -284,8 +284,8 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 ! ! -- 0.75 chord -- look for other "0.75 chord" tag
 ! ! set the te 0.75*chord far from the ll
 ! do iSection= 1,nSections
-!   chord_list(iSection)   = chord_list(iSection) * 0.75_wp 
-! end do 
+!   chord_list(iSection)   = chord_list(iSection) * 0.75_wp
+! end do
 
 
   npoint_chord_tot = nelem_chord_tot + 1
@@ -324,7 +324,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 ! allocate(rrSection1(3,nRegions)) ; rrSection1 = 0.0_wp
 ! allocate(rrSection2(3,nRegions)) ; rrSection2 = 0.0_wp
 
-  ! Initialise dr_ref for the definition of the actual reference_point 
+  ! Initialise dr_ref for the definition of the actual reference_point
   !  of each bay (by updating)
   dx_ref = 0.0_wp
   dy_ref = 0.0_wp
@@ -332,12 +332,12 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
 
   twist_list = twist_list * pi / 180
-  ista = 1 ; iend = npoint_chord_tot 
+  ista = 1 ; iend = npoint_chord_tot
   ich = 1
 
   do iRegion = 1,nRegions
- 
-    if ( iRegion .gt. 1 ) then  ! first section = last section of the previous region 
+
+    if ( iRegion .gt. 1 ) then  ! first section = last section of the previous region
       rrSection1 = rrSection2
     else                        ! build points
       rrSection1(:,1) = ref_point
@@ -363,7 +363,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 ! The following lines should not have existed even before 2019-02-06:
 ! fields overwritten at the end of the outer do loop
 ! === old-2019-02-06 === !
-!      i_airfoil_e(1,ich) = iRegion 
+!      i_airfoil_e(1,ich) = iRegion
 !      i_airfoil_e(2,ich) = iRegion+1
 ! === old-2019-02-06 === !
 
@@ -388,16 +388,16 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     else
       write(*,*) ' mesh_file   : ' , trim(mesh_file)
       write(*,*) ' type_span_list(',iRegion,') : ' , &
-                    trim(type_span_list(iRegion)) 
+                    trim(type_span_list(iRegion))
       call error(this_sub_name, this_mod_name, 'Inconsistent input: &
             & type_span must be equal to uniform, cosine, cosineIB,&
             & cosineOB.')
     end if
-  
+
     !> save before update
-    dx_ref =  span_list(iRegion) * tan( sweep_list(iRegion)* pi / 180.0_wp ) ! + dx_ref 
-    dy_ref =  span_list(iRegion)                                             ! + dy_ref 
-    dz_ref =  span_list(iRegion) * tan( dihed_list(iRegion)* pi / 180.0_wp ) ! + dz_ref 
+    dx_ref =  span_list(iRegion) * tan( sweep_list(iRegion)* pi / 180.0_wp ) ! + dx_ref
+    dy_ref =  span_list(iRegion)                                             ! + dy_ref
+    dz_ref =  span_list(iRegion) * tan( dihed_list(iRegion)* pi / 180.0_wp ) ! + dz_ref
 
     ! Rotate the section around the reference line with the twist angle
     !
@@ -421,7 +421,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     ! Interpolation of the nodes of the region i (between sections i and i+1)
     do iSpan = 1 , nelem_span_list(iRegion)
 
-      ista = iend + 1 
+      ista = iend + 1
       iend = iend + npoint_chord_tot
       ich = ich + 1
 
@@ -469,7 +469,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 ! ! correct the chord value ----
 ! do ich = 1 , size(chord_p)
 !   chord_p(ich) = chord_p(ich) / 0.75_wp
-! end do 
+! end do
 
 
 ! === new-2019-02-06 ===
@@ -488,7 +488,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
   nAirfoils = 0
   do i = 1 , nSections
-    if ( trim(airfoil_list(i)) .ne. 'interp' ) nAirfoils = nAirfoils + 1 
+    if ( trim(airfoil_list(i)) .ne. 'interp' ) nAirfoils = nAirfoils + 1
   end do
 
   allocate(airfoil_list_actual(nAirfoils))
@@ -515,9 +515,9 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
     iend = sum(nelem_span_list(1:i_aero2-1))
 
-    do iSpan = ista , iend 
-      i_airfoil_e(1, iSpan) = iAirfoil 
-      i_airfoil_e(2, iSpan) = iAirfoil+1 
+    do iSpan = ista , iend
+      i_airfoil_e(1, iSpan) = iAirfoil
+      i_airfoil_e(2, iSpan) = iAirfoil+1
 
       normalised_coord_e(2,iSpan) = ( rr(2,(iSpan+1)*2) - rr(2,ista*2) ) / &
                                     ( rr(2,iend *2+1) - rr(2,ista*2) )
@@ -562,22 +562,22 @@ end subroutine read_mesh_ll
 
 !> Function that computes the weights used to interpolate date between
 !! two points.
-!! 
+!!
 !! The interval defined by the extrema A and B, is discretized by N segments
 !! and N+1 points such that
-!! 
+!!
 !!    x_i = A + w_i*(B-A)     with i in (0,N)
 !!
 !! where `w_i` is the weight generated by this function for the i-th point.
 !!
 !! If a uniform spacing is used the distribution becomes
-!! 
+!!
 !!    x_i = A + i/N*(B*A)
-!! 
+!!
 !! such that x_0 = A and x_N = B
 !!
 !! Four options are currently available
-!! 
+!!
 !!   ISPACE = 0    Uniform spacing
 !!   ISPACE = 1    cosine spacing
 !!   ISPACE = 2    left cosine spacing
@@ -592,7 +592,7 @@ function spacing_weights ( itype, i, n ) result(w)
   select case (itype)
 
   case(1)
-    w = 0.5_wp - 0.5_wp * cos( real(i,wp)*pi/ real(n,wp) ) 
+    w = 0.5_wp - 0.5_wp * cos( real(i,wp)*pi/ real(n,wp) )
 
   case(2)
     w = sin( 0.5_wp*real(i,wp)*pi/ real(n,wp) )

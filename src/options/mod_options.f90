@@ -1,16 +1,16 @@
 !!=====================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
-!! It was originally part of Flexi, and has been modified to suit the 
+!!
+!! It was originally part of Flexi, and has been modified to suit the
 !! needs of DUST
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -88,7 +88,7 @@ use MOD_ISO_VARYING_STRING, only: &
   !insert       , &
   !remove       , &
   replace      , &
-  split        
+  split
 !----------------------------------------------------------------------
 
 implicit none
@@ -688,7 +688,7 @@ subroutine parse(this, rest_in, is_default)
   if(present(is_default)) then
     if(is_default) def = .true.
   endif
-    
+
 
   stat=0
   ! Replace brackets
