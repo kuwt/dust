@@ -79,6 +79,7 @@ type :: t_hinge_input
   real(wp) :: rotation_amplitude
   real(wp) :: rotation_omega
   real(wp) :: rotation_phase
+  integer, allocatable :: coupling_nodes(:)
 end type t_hinge_input
 
 ! ---------------------------------------------------------------
@@ -630,8 +631,9 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
   integer      , intent(in)    :: n_hinges
   type(t_hinge_input), allocatable, intent(inout) :: hinges(:)
 
-  type(t_parse), pointer :: hinge_prs
-  integer :: i, j
+  type(t_parse), pointer :: hinge_prs, fun_prs, file_prs, coupling_prs
+  character(len=max_char_len) :: hinge_node_subset
+  integer :: i, j, id_1, id_2
 
   if ( allocated(hinges) ) deallocate(hinges)
   allocate( hinges(n_hinges) )
@@ -640,6 +642,7 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
 
     !> De-associate, before reading next hinge
     hinge_prs => null()
+    fun_prs => null(); file_prs => null(); coupling_prs => null()
     !> Open hinge sub-parser
     call getsuboption(geo_prs, 'Hinge', hinge_prs)
 
@@ -678,35 +681,65 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
 
      !> Hinge input: function, amplitude
      !> Overwrite 'constant' rotation_input with 'function:const'
+     hinges(i) % rotation_input = getstr(hinge_prs,'Hinge_Rotation_Input')
+     !> Overwrite old 'constant' input
      if ( trim( hinges(i)%rotation_input ) .eq. 'constant' ) then
        hinges(i)%rotation_input = 'function:const'
      end if
-     hinges(i) % rotation_input     = getstr(hinge_prs, 'Hinge_Rotation_Input')
-     if ( ( trim(hinges(i)%rotation_input) .ne. 'function:const' ) .or. &
-          ( trim(hinges(i)%rotation_input) .ne. 'function:sin'   ) .or. &
-          ( trim(hinges(i)%rotation_input) .ne. 'function:cos'   ) .or. &
-          ( trim(hinges(i)%rotation_input) .ne. 'from_file'      ) .or. &
+     if ( ( trim(hinges(i)%rotation_input) .ne. 'function:const' ) .and. &
+          ( trim(hinges(i)%rotation_input) .ne. 'function:sin'   ) .and. &
+          ( trim(hinges(i)%rotation_input) .ne. 'function:cos'   ) .and. &
+          ( trim(hinges(i)%rotation_input) .ne. 'from_file'      ) .and. &
           ( trim(hinges(i)%rotation_input) .ne. 'coupling'       ) ) then
      else
-       if ( trim(hinges(i)%rotation_input) .eq. 'from_file' ) then
+       if ( ( trim(hinges(i)%rotation_input) .eq. 'function:const' ) .or. &
+            ( trim(hinges(i)%rotation_input) .eq. 'function:sin'   ) .or. &
+            ( trim(hinges(i)%rotation_input) .eq. 'function:cos'   ) ) then
+
+         call getsuboption(hinge_prs, 'Hinge_Rotation_Function', fun_prs)
+         hinges(i) % rotation_amplitude = getreal(fun_prs,'Amplitude')
+         hinges(i) % rotation_omega     = getreal(fun_prs,'Omega')
+         hinges(i) % rotation_phase     = getreal(fun_prs,'Phase')
+       
+       elseif ( trim(hinges(i)%rotation_input) .eq. 'from_file' ) then
          write(*,*) ' Error in t_hinge%build_hinge(): rotation_input = from_file &
-                    &not implemented yet.'
-       end if
-       if ( trim(hinges(i)%rotation_input) .eq. 'coupling' ) then
-         write(*,*) ' Error in t_hinge%build_hinge(): rotation_input = coupling &
-                    &not implemented yet.'
+                    &not implemented yet.'; stop
+
+       elseif ( trim(hinges(i)%rotation_input) .eq. 'coupling' ) then
+
+         !> Read coupling options
+         call getsuboption(hinge_prs, 'Hinge_Rotation_Coupling', coupling_prs)
+         hinge_node_subset = getstr(coupling_prs,'Coupling_Node_Subset')
+
+         if ( trim(hinge_node_subset) .eq. 'range' ) then
+           id_1 = getint(coupling_prs,'Coupling_Node_First')
+           id_2 = getint(coupling_prs,'Coupling_Node_Last' )
+           ! *** to do *** add some checks on node numbering ???
+
+           allocate( hinges(i) % coupling_nodes( id_2-id_1+1 ) )
+           do j = id_1, id_2; hinges(i)%coupling_nodes(j-id_1+1) = j; end do
+
+         elseif ( trim(hinge_node_subset) .eq. 'from_file' ) then
+           ! *** to do ***
+           write(*,*) ' Coupling_Node_Subset = from_file, not implemented yet. Stop' ; stop
+         else
+           write(*,*) ' Coupling_Node_Subset must be = "range" or "from_file", but it &
+                      &is = '// trim(hinge_node_subset)//'. Stop.'; stop
+         end if
+
+         !> Set "default" values of the function: inputs
+         hinges(i) % rotation_amplitude = 1.0_wp
+         hinges(i) % rotation_omega     = 0.0_wp 
+         hinges(i) % rotation_phase     = 0.0_wp 
+
        end if
      end if
-     hinges(i) % rotation_amplitude = getreal(hinge_prs,'Hinge_Rotation_Amplitude')
-     hinges(i) % rotation_omega     = getreal(hinge_prs,'Hinge_Rotation_Omega')
-     hinges(i) % rotation_phase     = getreal(hinge_prs,'Hinge_Rotation_Phase')
 
 !    ! check ---
 !    write(*,*) ' Hinge id:', i
 !    write(*,*) ' _Tag        : ', trim(hinges(i)%tag)
 !    write(*,*) ' _Nodes_Input: ', trim(hinges(i)%nodes_input)
 !    ! check ---
-
 
   end do
 
@@ -751,9 +784,11 @@ end subroutine read_hinge_nodes
 
 ! ---------------------------------------------------------------
 !> Hinge input parser, called in mod_build_geo.f90 by dust_pre preprocessor
-subroutine hinge_input_parser( geo_prs, hinge_prs )
+subroutine hinge_input_parser( geo_prs, hinge_prs, &
+                               fun_prs, file_prs, coupling_prs )
   type(t_parse),          intent(inout) :: geo_prs
   type(t_parse), pointer, intent(inout) :: hinge_prs
+  type(t_parse), pointer, intent(inout) :: fun_prs, file_prs, coupling_prs
 
   call geo_prs%CreateIntOption('n_hinges', &
               'N. of hinges and rotating parts (e.g. aileron) of the component', &
@@ -778,17 +813,40 @@ subroutine hinge_input_parser( geo_prs, hinge_prs )
   call hinge_prs%CreateRealOption('Hinge_Spanwise_Blending', &
       'Blending in the spanwise direction needed for &
       &avoiding irregular behavior of the surface for large deflections','0.0')
+  !> Hinge_Rotation_Input
   call hinge_prs%CreateStringOption('Hinge_Rotation_Input', &
-      'Input type of the rotation: constant, function, from_file, coupling')
-  call hinge_prs%CreateRealOption('Hinge_Rotation_Amplitude', &
+      'Input type of the rotation: function, from_file, coupling')
+  !> Hinge_Rotation_Input = function:...
+  call hinge_prs%CreateSubOption('Hinge_Rotation_Function', &
+               'Parser for hinge input w/ simple functions', fun_prs )
+  call fun_prs%CreateRealOption('Amplitude', &
       'Amplitude of the rotation, for constant, function:const, :sin, &
       &:cos Rotation_Input')
-  call hinge_prs%CreateRealOption('Hinge_Rotation_Omega', &
+  call fun_prs%CreateRealOption('Omega', &
       'Angular velocity of the rotation, for constant, function:const, &
       &:sin, :cos Rotation_Input', '0.0')
-  call hinge_prs%CreateRealOption('Hinge_Rotation_Phase', &
+  call fun_prs%CreateRealOption('Phase', &
       'Phase of the rotation, for constant, function:const, :sin, :cos &
       &Rotation_Input', '0.0')
+  !> Hinge_Rotation_Input = from_file
+  call hinge_prs%CreateSubOption('Hinge_Rotation_File', &
+               'Parser for hinge input from file', file_prs )
+  call file_prs%CreateStringOption('Filename', &
+      'Name of the file containing the input of the hinge rotation')
+  !> Hinge_Rotation_Input = coupling
+  call hinge_prs%CreateSubOption('Hinge_Rotation_Coupling', &
+               'Parser for hinge input from coupling', coupling_prs )
+  call coupling_prs%CreateStringOption('Coupling_Node_Subset', &
+      'Optional. Define a subset of structural nodes to evaluate &
+      &coupling: "range" or "from_file"')
+  call coupling_prs%CreateIntOption('Coupling_Node_First','If node subset &
+      &is defined through "range" input: first id of the nodes')
+  call coupling_prs%CreateIntOption('Coupling_Node_Last','If node subset &
+      &is defined through "range" input: last id of the nodes')
+  call coupling_prs%CreateStringOption('Coupling_Node_Filename', &
+      'File collecting the IDs of the coupling nodes for hinge coupling')
+
+
   ! *** to do ***
   ! add all the fields required for all the input types
 

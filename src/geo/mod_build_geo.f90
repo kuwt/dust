@@ -172,6 +172,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  !> Hinge ---
  integer :: n_hinges, n_nodes
  type(t_parse), pointer :: hinge_prs
+ type(t_parse), pointer :: fun_prs, file_prs, coupling_prs
  type(t_hinge_input), allocatable :: hinges(:)
  character(len=max_char_len) :: hinge_str
  character(len=2) :: hinge_id
@@ -272,7 +273,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   call geo_prs%CreateStringOption('Offset_xac_file','Filename of the &
               &chordwise input')
   !hinges
-  call hinge_input_parser( geo_prs, hinge_prs )
+  call hinge_input_parser( geo_prs, hinge_prs, fun_prs, file_prs, coupling_prs )
   !symmtery
   call geo_prs%CreateLogicalOption('mesh_symmetry',&
                'Reflect and double the geometry?', 'F')
@@ -1054,6 +1055,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   !> Finalize parser
   call finalizeparameters(geo_prs)
 
+
 end subroutine build_component
 
 !----------------------------------------------------------------------
@@ -1067,7 +1069,7 @@ end subroutine build_component
 subroutine symmetry_mesh(ee, rr, cent, norm)
  integer, allocatable, intent(inout) :: ee(:,:)
  real(wp), allocatable, intent(inout) :: rr(:,:)
- real(wp), intent(in) :: cent(3), norm(3)
+ real(wp), intent(in) :: cent(3), norm(3) 
 
  real(wp) :: n(3), d, l
  integer, allocatable :: ee_temp(:,:)
