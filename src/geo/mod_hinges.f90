@@ -56,6 +56,11 @@ use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, getsuboption, &
   countoption, finalizeparameters
 
+#if USE_PRECICE
+use mod_precice_rbf, only: &
+  t_precice_rbf
+#endif
+
 implicit none
 
 public :: t_hinge, t_hinge_input, build_hinges, hinge_input_parser, &
@@ -138,6 +143,7 @@ type :: t_hinge_config
 
 end type t_hinge_config
 
+! ---------------------------------------------------------------
 !> Hinge type
 type :: t_hinge
 
@@ -174,6 +180,13 @@ type :: t_hinge
   real(wp) :: f_ampl
   real(wp) :: f_omega
   real(wp) :: f_phase
+
+  !> Coupling nodes ( for Hinge_Rotation_input = coupling )
+  ! replicating geo%components(i_comp)%i_points_precice(:)
+  !             geo%components(i_comp)%rbf%nodes(:,:)
+  integer , allocatable :: i_points_precice(:)
+  real(wp), allocatable :: nodes(:,:)
+  integer , allocatable :: i_coupling_nodes(:)
 
   !> Array of the rotation angle (read as an input, or from coupling nodes)
   real(wp), allocatable :: theta(:)
@@ -236,6 +249,17 @@ subroutine build_connectivity(this, loc_points)
 
   integer :: nrot, nble
 
+  ! ! debug ---
+  ! write(*,*) ' Debug in hinge%build_connectivity(), loc_points: '
+  ! do iw = 1, size(loc_points,2)
+  !   write(*,*) loc_points(:,iw)
+  ! end do
+  ! write(*,*) ' Debug in hinge%build_connectivity(), ref%rr: '
+  ! do iw = 1, size(this%ref%rr,2)
+  !   write(*,*) this%ref%rr(:,iw)
+  ! end do
+  ! ! debug ---
+
   !> N. of surfae and hinge nodes
   nb = size(loc_points,2)
   nh = this%n_nodes
@@ -246,6 +270,12 @@ subroutine build_connectivity(this, loc_points)
   Rot(1,:) = this % ref % v(:,1)
   Rot(2,:) = this % ref % h(:,1)
   Rot(3,:) = this % ref % n(:,1)
+  ! ! debug ---
+  ! write(*,*) ' v: ', Rot(1,:) 
+  ! write(*,*) ' h: ', Rot(2,:) 
+  ! write(*,*) ' n: ', Rot(3,:) 
+  ! ! debug ---
+
 
   allocate( rrb(3,nb) );  allocate( rrh(3,nh) )
   do ib = 1, nb
@@ -254,6 +284,17 @@ subroutine build_connectivity(this, loc_points)
   do ib = 1, nh
     rrh(:,ib) = matmul( Rot, this%ref%rr(:,ib) - this%ref%rr(:,1) )
   end do
+
+  ! ! debug ---
+  ! write(*,*) ' rrb : '
+  ! do ib = 1, nb
+  !   write(*,*) rrb(:,ib)
+  ! end do
+  ! write(*,*) ' rrh : '
+  ! do ib = 1, nh
+  !   write(*,*) rrh(:,ib)
+  ! end do
+  ! ! debug ---
 
   ! hinge width, measured in the hinge direction
   hinge_width = rrh(2,nh) - rrh(2,1)
@@ -298,7 +339,7 @@ subroutine build_connectivity(this, loc_points)
 
         call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
 
-        wei_v = 1.0_wp / wei_v**this%w_order
+        wei_v = 1.0_wp / max( wei_v, 1e-9_wp ) **this%w_order
         wei_v = wei_v / sum(wei_v)
 
         rot_wei(:,nrot) = wei_v
@@ -332,7 +373,7 @@ subroutine build_connectivity(this, loc_points)
 
         call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
 
-        wei_v = 1.0_wp / wei_v**this%w_order
+        wei_v = 1.0_wp / max( wei_v, 1e-9_wp ) **this%w_order
         wei_v = wei_v / sum(wei_v)
 
         ble_wei(:,nble) = wei_v
@@ -379,8 +420,38 @@ subroutine build_connectivity(this, loc_points)
     allocate(this%blen%n2h(ih)%s2h( ble_i2h(ih) )) ; this%blen%n2h(ih)%s2h = ble_s2h( ih, 1:ble_i2h(ih) )
   end do
 
+  ! (???)
   !> Spanwise weights to avoid spanwise irregular behaviors
+  ! (???)
 
+  ! check ---
+  write(*,*) ' Check in t_hinge%build_connectivity() '
+  write(*,*) ' shape(this%rot %node_id) : ' ,  shape(this%rot %node_id)
+  do iw = 1, size(this%rot %node_id,1)
+    write(*,*) this%rot %node_id(iw)
+  end do
+  write(*,*) ' shape(this%rot %ind    ) : ' ,  shape(this%rot %ind    )
+  do iw = 1, size(this%rot %ind,2)
+    write(*,*) this%rot %ind(:,iw)
+  end do
+  write(*,*) ' shape(this%rot %wei    ) : ' ,  shape(this%rot %wei    )
+  do iw = 1, size(this%rot %wei,2)
+    write(*,*) this%rot %wei(:,iw)
+  end do
+  write(*,*) ' shape(this%blen%node_id) : ' ,  shape(this%blen%node_id)
+  do iw = 1, size(this%blen%node_id,1)
+    write(*,*) this%blen%node_id(iw)
+  end do
+  write(*,*) ' shape(this%blen%ind    ) : ' ,  shape(this%blen%ind    )
+  do iw = 1, size(this%blen%ind,2)
+    write(*,*) this%blen%ind(:,iw)
+  end do
+  write(*,*) ' shape(this%blen%wei    ) : ' ,  shape(this%blen%wei    )
+  do iw = 1, size(this%blen%wei,2)
+    write(*,*) this%blen%wei(:,iw)
+  end do
+  ! write(*,*) ' stop in t_hinge%build_connectivity() ' ; stop
+  ! check ---
 
   !> Explicit deallocations
   deallocate(rrb, rrh, dist_all, wei_v, ind_v)
@@ -457,16 +528,24 @@ subroutine update_hinge_nodes( this, R, of )
   real(wp)      , intent(in)    ::  R(:,:)
   real(wp)      , intent(in)    :: of(:)
 
-  !> Actual configuration: node position
-  this % act % rr = matmul( R, this % ref % rr )
-  this % act % rr(1,:) = this % act % rr(1,:) + of(1)
-  this % act % rr(2,:) = this % act % rr(2,:) + of(2)
-  this % act % rr(3,:) = this % act % rr(3,:) + of(3)
+  if ( trim(this%input_type) .ne. 'coupling' ) then !> Prescribed motion
 
-  !> Actual configuration: node orientation
-  this % act % h = matmul( R, this % ref % h )
-  this % act % v = matmul( R, this % ref % v )
-  this % act % n = matmul( R, this % ref % n )
+    !> Actual configuration: node position
+    this % act % rr = matmul( R, this % ref % rr )
+    this % act % rr(1,:) = this % act % rr(1,:) + of(1)
+    this % act % rr(2,:) = this % act % rr(2,:) + of(2)
+    this % act % rr(3,:) = this % act % rr(3,:) + of(3)
+  
+    !> Actual configuration: node orientation
+    this % act % h = matmul( R, this % ref % h )
+    this % act % v = matmul( R, this % ref % v )
+    this % act % n = matmul( R, this % ref % n )
+
+  else !> Coupling with dynamics solver
+
+    ! *** todo ***
+
+  end if
 
 
 end subroutine update_hinge_nodes
@@ -487,8 +566,12 @@ subroutine update_theta( this, t )
   elseif ( trim(this%input_type) .eq. 'function:cos' ) then
     this%theta = this%f_ampl * cos( this%f_omega * t - this%f_phase )
   else
-    write(*,*) ' Error in t_hinge % init_theta(): only working &
-               &with function:const, :sin, :cos, so far. Stop'; stop
+    this%theta_old = 0.0_wp
+    this%theta     = 0.0_wp
+    ! *** to do ***
+    !> fix this
+    ! write(*,*) ' Error in t_hinge % init_theta(): only working &
+    !            &with function:const, :sin, :cos, so far. Stop'; stop
   end if
 
 
@@ -510,82 +593,77 @@ subroutine hinge_deflection( this, rr, t, postpro )
   real(wp) :: nx(3,3), Rot_I(3,3), Rot(3,3)
   integer :: nrot, nble, ib, ih, ii
 
-  !> Use the same routine for solver (incremental rotation) and
-  ! postpro (non-incremental rotation)
-  if ( present(postpro) ) then;  local_postpro = postpro
-  else                        ;  local_postpro = default_postpro
-  end if
 
-  allocate(rr_in(size(rr,1),size(rr,2))); rr_in = rr
+  if ( trim(this%input_type) .ne. 'coupling' ) then
+    ! Old routine for hinges with prescribed motion
 
-! ! debug ---
-! write(*,*) ' ********* debug in hinge_deflection *********** '
-! write(*,*) ' rr(:,105:21:168) in '
-! do ii = 0,3
-!   write(*,*) rr(:,105+ii*21)
-! end do
-! ! debug ---
-
-  !> n.nodes in the rigid-rotation and in the blending regions
-  nrot = size(this%rot %node_id)
-  nble = size(this%blen%node_id)
-
-  do ih = 1, this%n_nodes
-
-    th =   this % theta(ih) * pi/180.0_wp
-
-    if ( th .ne. 0.0_wp ) then ! (equality check on real?)
-
-      !Rotation matrix
-      nx(1,:) = (/            0.0_wp, -this%act%h(3,ih),  this%act%h(2,ih) /)
-      nx(2,:) = (/  this%act%h(3,ih),            0.0_wp, -this%act%h(1,ih) /)
-      nx(3,:) = (/ -this%act%h(2,ih),  this%act%h(1,ih),            0.0_wp /)
-
-      !> Rigid rotation
-      do ib = 1, size(this%rot%n2h(ih)%p2h)
-        ii = this%rot%n2h(ih)%p2h(ib)
-        th1 = th * this%rot%n2h(ih)%s2h(ib)
-        Rot_I = sin(th1) * nx + ( 1.0_wp - cos(th1) ) * matmul( nx, nx )
-        rr(:,ii) = rr(:,ii) + &
-                   this%rot%n2h(ih)%w2h(ib) * &
-                   matmul( Rot_I, rr_in(:,ii)-this%act%rr(:,ih) )
-      end do
-
-      !> Blending region
-      do ib = 1, size(this%blen%n2h(ih)%p2h)
-
-        ii = this%blen%n2h(ih)%p2h(ib)
-        th1 = -th * this%blen%n2h(ih)%s2h(ib)
-        !> coordinate of the centre of the circle used for blending,
-        ! in the n-direction
-        yc = cos(th1)/sin(th1) * this%offset * ( 1.0_wp + cos(th1) ) + &
-                                 this%offset * sin(th1)
-        !> Some auxiliary quantities
-        xq = sum( ( rr(:,ii) - this%act%rr(:,ih) ) * this%act%v(:,ih) )
-        yq = sum( ( rr(:,ii) - this%act%rr(:,ih) ) * this%act%n(:,ih) )
-        thp = 0.5_wp * ( xq + this%offset ) / this%offset * th1
-        xqp = yc*sin(thp)          - this%offset - yq*sin(thp) - xq
-        yqp = yc*(1.0_wp-cos(thp))               + yq*cos(thp) - yq
-
-        !> Update coordinates
-        rr(:,ii) = rr(:,ii) + &
-                   this%blen%n2h(ih)%w2h(ib) * &
-                 ( xqp * this%act%v(:,ih) + yqp * this%act%n(:,ih) )
-
-      end do
-
+    !> Use the same routine for solver (incremental rotation) and
+    ! postpro (non-incremental rotation)
+    if ( present(postpro) ) then;  local_postpro = postpro
+    else                        ;  local_postpro = default_postpro
     end if
+  
+    allocate(rr_in(size(rr,1),size(rr,2))); rr_in = rr
+  
+    !> n.nodes in the rigid-rotation and in the blending regions
+    nrot = size(this%rot %node_id)
+    nble = size(this%blen%node_id)
+  
+    do ih = 1, this%n_nodes
+  
+      th =   this % theta(ih) * pi/180.0_wp
+  
+      if ( th .ne. 0.0_wp ) then ! (equality check on real?)
+  
+        ! Rotation matrix
+        nx(1,:) = (/            0.0_wp, -this%act%h(3,ih),  this%act%h(2,ih) /)
+        nx(2,:) = (/  this%act%h(3,ih),            0.0_wp, -this%act%h(1,ih) /)
+        nx(3,:) = (/ -this%act%h(2,ih),  this%act%h(1,ih),            0.0_wp /)
+  
+        !> Rigid rotation
+        do ib = 1, size(this%rot%n2h(ih)%p2h)
+          ii = this%rot%n2h(ih)%p2h(ib)
+          th1 = th * this%rot%n2h(ih)%s2h(ib)
+          Rot_I = sin(th1) * nx + ( 1.0_wp - cos(th1) ) * matmul( nx, nx )
+          rr(:,ii) = rr(:,ii) + &
+                     this%rot%n2h(ih)%w2h(ib) * &
+                     matmul( Rot_I, rr_in(:,ii)-this%act%rr(:,ih) )
+        end do
+  
+        !> Blending region
+        do ib = 1, size(this%blen%n2h(ih)%p2h)
+  
+          ii = this%blen%n2h(ih)%p2h(ib)
+          th1 = -th * this%blen%n2h(ih)%s2h(ib)
+          !> coordinate of the centre of the circle used for blending,
+          ! in the n-direction
+          yc = cos(th1)/sin(th1) * this%offset * ( 1.0_wp + cos(th1) ) + &
+                                   this%offset * sin(th1)
+          !> Some auxiliary quantities
+          xq = sum( ( rr(:,ii) - this%act%rr(:,ih) ) * this%act%v(:,ih) )
+          yq = sum( ( rr(:,ii) - this%act%rr(:,ih) ) * this%act%n(:,ih) )
+          thp = 0.5_wp * ( xq + this%offset ) / this%offset * th1
+          xqp = yc*sin(thp)          - this%offset - yq*sin(thp) - xq
+          yqp = yc*(1.0_wp-cos(thp))               + yq*cos(thp) - yq
+  
+          !> Update coordinates
+          rr(:,ii) = rr(:,ii) + &
+                     this%blen%n2h(ih)%w2h(ib) * &
+                   ( xqp * this%act%v(:,ih) + yqp * this%act%n(:,ih) )
+  
+        end do
+  
+      end if
+  
+    end do
+  
+    deallocate(rr_in)
 
-  end do
-
-! ! debug ---
-! write(*,*) ' rr(:,105:21:168) out '
-! do ii = 0,3
-!   write(*,*) rr(:,105+ii*21)
-! end do
-! ! debug ---
-
-  deallocate(rr_in)
+  else  !> Coupled hinge
+    ! *** to do ***
+    ! ...
+    ! ...
+  end if
 
 end subroutine hinge_deflection
 
@@ -721,7 +799,8 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
 
          elseif ( trim(hinge_node_subset) .eq. 'from_file' ) then
            ! *** to do ***
-           write(*,*) ' Coupling_Node_Subset = from_file, not implemented yet. Stop' ; stop
+           write(*,*) ' Coupling_Node_Subset = from_file, not implemented yet. Stop'
+           stop
          else
            write(*,*) ' Coupling_Node_Subset must be = "range" or "from_file", but it &
                       &is = '// trim(hinge_node_subset)//'. Stop.'; stop

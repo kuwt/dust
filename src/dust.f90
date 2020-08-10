@@ -665,6 +665,9 @@
         call precicef_mark_action_fulfilled( precice%write_it_checkp )
       end if
 
+      ! check ---
+      write(*,*) ' precice%mesh%nnodes : ', precice%mesh%nnodes
+      ! check ---
       !> Read data from structural solver
       do i = 1, size(precice%fields)
         if ( trim(precice%fields(i)%fio) .eq. 'read' ) then
@@ -688,6 +691,7 @@
                                        precice%fields(i)%fdata )
           endif
           ! check ---
+          write(*,*) ' precice%mesh%nnodes : ', precice%mesh%nnodes
           write(*,*) i, precice%fields(i)%fid, precice%fields(i)%fname
           do i_el = 1, size(precice%fields(i)%fdata,2)
             write(*,*) precice%fields(i)%fdata(:,i_el)
@@ -697,8 +701,17 @@
         end if
       end do
 
+      ! write(*,*) ' write something, before stop in dust.f90, l.700 '
+      ! read(*,*)
+
+      ! ! check ---
+      ! stop
+      ! ! check ---
+
       !> Update dust geometry ( elems and first wake panels )
       call precice % update_elems( geo, elems_tot )
+
+      !> Update geo_data()
       do i_el = 1, size(elems_tot)
         call elems_tot(i_el)%p%calc_geo_data( &
                                geo%points(:,elems_tot(i_el)%p%i_ver) )

@@ -140,7 +140,7 @@ subroutine initialize_mesh( this, geo )
   type(t_geo)     , intent(in)    :: geo
 
   integer :: i, i_comp, n_comp
-  integer :: dnnodes, nnodes
+  integer :: dnnodes, nnodes, ih, n_hinges
 
   !> TODO: add component field, that describe if the component
   ! participates to the coupling. So far, all the components 
@@ -177,6 +177,16 @@ subroutine initialize_mesh( this, geo )
         dnnodes = size(geo%components(i_comp)%rbf%nodes,2)
         !> Increment number of nodes
         nnodes = nnodes + dnnodes
+        !> Hinges ---
+        n_hinges = size(geo%components(i_comp)%hinge)
+        do ih = 1, n_hinges
+          if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. &
+               'coupling' ) then
+            dnnodes = size(geo%components(i_comp)%hinge(ih)%i_points_precice)
+            nnodes = nnodes + dnnodes
+            write(*,*) ' ih, dnnodes, nnodes : ' , ih, dnnodes, nnodes
+          end if
+        end do
       else
         write(*,*) ' Error in initialize mesh. CouplingType= '// &
                    trim(coupling_type)//', while only ll, rigid'&
@@ -216,9 +226,29 @@ subroutine initialize_mesh( this, geo )
         !> rbf coupling
         dnnodes = size(geo%components(i_comp)%rbf%nodes,2)
         !> Here in the local reference frame ! ***to do***
-        this%mesh%nodes(:,nnodes+1:nnodes+dnnodes) = &
+        ! old ---
+        ! this%mesh%nodes(:,nnodes+1:nnodes+dnnodes) = &
+        !   geo%components(i_comp)%rbf%nodes
+        ! old ---
+        ! new, w/ hinges ---
+        this%mesh%nodes(:,geo%components(i_comp)%i_points_precice) = &
           geo%components(i_comp)%rbf%nodes
+        ! new, w/ hinges ---
         nnodes = nnodes + dnnodes
+        !> Hinges ---
+        n_hinges = size(geo%components(i_comp)%hinge)
+        do ih = 1, n_hinges
+          if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. &
+               'coupling' ) then
+            dnnodes = size(geo%components(i_comp)%hinge(ih)%i_points_precice)
+            ! new, w/ hinges ---
+            this%mesh%nodes(:,geo%components(i_comp)%hinge(ih)%i_points_precice) = &
+              geo%components(i_comp)%hinge(ih)%nodes
+            ! new, w/ hinges ---
+            nnodes = nnodes + dnnodes
+            write(*,*) ' ih, dnnodes, nnodes : ' , ih, dnnodes, nnodes
+          end if
+        end do
       end if
     end if
   end do
@@ -557,11 +587,13 @@ subroutine update_elems( this, geo, elems )
   type(t_geo)       , intent(inout) :: geo
   type(t_pot_elem_p), intent(inout) :: elems(:)
  
-  integer :: i,j, i_comp, ip, iw
+  integer :: i,j, i_comp, ip, iw, ih, ib
   real(wp) :: n_rot(3), chord(3), chord_rot(3), omega(3), pos(3), vel(3)
   real(wp) :: theta
   real(wp) :: eps = 1.0e-9_wp
   integer :: j_pos, j_vel, j_rot, j_ome
+
+  real(wp) :: Rot(3,3), nx(3,3)
 
   ! Find rotation and angular velocity field id
   j_rot = 0; j_ome = 0
@@ -728,7 +760,7 @@ subroutine update_elems( this, geo, elems )
         geo%points_vel = 0.0_wp
 
         !> Update surface quantities, as the weighted averages of the structure
-        ! quantities
+        ! quantities, w/o considering rotations of the hinges
         do i = 1, size(comp%i_points)
          
           ip = comp%i_points(i)
@@ -769,6 +801,75 @@ subroutine update_elems( this, geo, elems )
           end do
 
         end do
+
+        !> Add hinge motion
+        do ih = 1, comp%n_hinges
+          if ( trim(comp%hinge(ih)%input_type) .eq. 'coupling' ) then
+            
+            !> Update hinge nodes
+            write(*,*) ' Update "coupled" hinge. '
+            comp%hinge(ih) % act % rr = & 
+                this%fields(j_pos)%fdata(:,comp%hinge(ih)%i_points_precice)
+
+            !> Reset nodes: coupled hinge prescribed absolute motion and not relative motion
+            ! *** not efficient, but effective: some geo%points(:,ip) are reset more than once
+            do i = 1, comp%hinge(ih)%n_nodes
+              do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
+                !> Hinge-to-local connectivity
+                ip = comp%hinge(ih)%rot%n2h(i)%p2h(ib)
+                !> Local-to-global connectivity
+                ip = comp%i_points(ip)
+                !> Reset position and velocity
+                geo%points(:,ip) = 0.0_wp
+                geo%points_vel(:,ip) = 0.0_wp
+              end do
+            end do
+
+            !> From motion of hinge nodes to surface motion
+            ! ... see ~ geo/mod_hinges/himge_deflection()
+            ! write(*,*) ' comp%hinge(',ih,')%n_nodes: ', comp%hinge(ih)%n_nodes
+            do i = 1, comp%hinge(ih)%n_nodes ! hinge nodes
+              
+              !> Rotation vector and rotation matrix
+              n_rot = this%fields(j_rot)%fdata(:,comp%hinge(ih)%i_points_precice(i))
+              theta = norm2( n_rot )
+              if ( theta .lt. eps ) then
+                n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /); theta = 0.0_wp
+              else
+                n_rot = n_rot / theta
+              end if
+              nx(1,:) = (/    0.0_wp, -n_rot(3),  n_rot(2) /)
+              nx(2,:) = (/  n_rot(3),    0.0_wp, -n_rot(1) /)
+              nx(3,:) = (/ -n_rot(2),  n_rot(1),    0.0_wp /)
+              Rot = reshape( (/1.0_wp, 0.0_wp, 0.0_wp, &
+                               0.0_wp, 1.0_wp, 0.0_wp, &
+                               0.0_wp, 0.0_wp, 1.0_wp /), (/3,3/) ) + &
+                    sin(theta) * nx + ( 1.0_wp - cos(theta) ) * matmul(nx, nx)
+
+              !> Update points
+              do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
+
+                !> Reference difference
+                ip = comp%hinge(ih)%rot%n2h(i)%p2h(ib)
+                chord = comp%loc_points(:,ip) - comp%hinge(ih)%nodes(:,i)
+                
+                ip = comp%i_points(ip)  ! Local-to-global connectivity
+
+                !> Position
+                geo%points(:,ip) = comp%hinge(ih) % act % rr(:,i) + &
+                     comp%hinge(ih)%rot%n2h(i)%w2h(ib) * &
+                     matmul( Rot, chord )
+
+                !> Velocity
+                ! *** to do ***
+
+              end do
+
+            end do
+
+          end if
+        end do
+        ! write(*,*) ' Stop in mod_precice/update_elems().'; stop
 
         !> === Control nodes of the elements ===
         ! *** to do *** avoid computing element quantities as the 
