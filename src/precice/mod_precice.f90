@@ -838,27 +838,66 @@ subroutine update_elems( this, geo, elems )
               else
                 n_rot = n_rot / theta
               end if
+
+              ! debug ---
+              write(*,*) ' +++++++ n_rot(',i,'): ' , n_rot
+              ! debug ---
+
               nx(1,:) = (/    0.0_wp, -n_rot(3),  n_rot(2) /)
               nx(2,:) = (/  n_rot(3),    0.0_wp, -n_rot(1) /)
               nx(3,:) = (/ -n_rot(2),  n_rot(1),    0.0_wp /)
               Rot = reshape( (/1.0_wp, 0.0_wp, 0.0_wp, &
                                0.0_wp, 1.0_wp, 0.0_wp, &
-                               0.0_wp, 0.0_wp, 1.0_wp /), (/3,3/) ) + &
-                    sin(theta) * nx + ( 1.0_wp - cos(theta) ) * matmul(nx, nx)
+                               0.0_wp, 0.0_wp, 1.0_wp /), (/3,3/) ) &
+                  - sin(theta) * nx + ( 1.0_wp - cos(theta) ) * matmul(nx, nx)
 
               !> Update points
               do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
 
                 !> Reference difference
-                ip = comp%hinge(ih)%rot%n2h(i)%p2h(ib)
+                ip = comp%hinge(ih)%rot%n2h(i)%p2h(ib)  ! Local numbering
                 chord = comp%loc_points(:,ip) - comp%hinge(ih)%nodes(:,i)
                 
-                ip = comp%i_points(ip)  ! Local-to-global connectivity
+                ! debug ---
+                write(*,*) ' ih, i, ib: ', ih, i, ib
+                write(*,*) comp%hinge(ih)%rot%n2h(i)%p2h(ib), &
+                           comp%hinge(ih)%rot%n2h(i)%w2h(ib)
+                ! write(*,*) ' comp%loc_points(:,ip) : ', &
+                !              comp%loc_points(:,ip)
+                ! debug ---
 
-                !> Position
-                geo%points(:,ip) = comp%hinge(ih) % act % rr(:,i) + &
+                ! ! debug ---
+                ! write(*,*) ' hinge id: ', ih, &
+                !            ' i/hinge%n_nodes: ' , i,'/', comp%hinge(ih)%n_nodes, &
+                !            ' ib: ', ib
+                ! write(*,*) '  local numbering: ', ip
+                ! write(*,*) ' ip, comp%loc_points(:,ip):        ', comp%loc_points(:,ip), ip
+                ! write(*,*) ' ih, i, comp%hinge(ih)%nodes(:,i): ', &
+                !                                            comp%hinge(ih)%nodes(:,i), ih, i
+                ! write(*,*) ' chord                           : ', chord
+                ! ! debug ---
+                
+                ip = comp%i_points(ip)  ! Local-to-global connectivity
+                ! ! debug ---
+                write(*,*) ' -------- '
+                write(*,*) ' ip, i, ib: ', ip, i, ib
+                write(*,*) ' comp%hinge(ih)%rot%n2h(i)%w2h(ib): ', &
+                             comp%hinge(ih)%rot%n2h(i)%w2h(ib) 
+                write(*,*) ' comp%hinge(ih) % act % rr(:,i)   : ', &
+                             comp%hinge(ih) % act % rr(:,i)
+                write(*,*) ' Rot,       chord: '
+                write(*,*) Rot(1,:), '       ', chord(1) 
+                write(*,*) Rot(2,:), '       ', chord(2)
+                write(*,*) Rot(3,:), '       ', chord(3)
+                ! write(*,*) ' global numbering: ', ip
+                ! write(*,*) ' ------ ' 
+                ! ! debug ---
+
+                !> Position: absolute position (!)
+                geo%points(:,ip) = geo%points(:,ip) + &
                      comp%hinge(ih)%rot%n2h(i)%w2h(ib) * &
-                     matmul( Rot, chord )
+                   ( comp%hinge(ih) % act % rr(:,i) + &
+                     matmul( Rot, chord ) )
 
                 !> Velocity
                 ! *** to do ***
