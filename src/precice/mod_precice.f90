@@ -781,7 +781,7 @@ subroutine update_elems( this, geo, elems )
             else
               n_rot = n_rot / theta
             end if
-            !> Angular velocity of the point at the LE
+            !> Angular velocity of the structural point
             omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(comp%rbf%nod%ind(iw,i)))
 
             ! === Grid nodes of the components ===
@@ -802,7 +802,9 @@ subroutine update_elems( this, geo, elems )
 
         end do
 
-        !> Add hinge motion
+        ! -------------------------------------------------------------------------------
+        !>  === Add hinge motion: START ===
+        ! -------------------------------------------------------------------------------
         do ih = 1, comp%n_hinges
           if ( trim(comp%hinge(ih)%input_type) .eq. 'coupling' ) then
             
@@ -811,7 +813,7 @@ subroutine update_elems( this, geo, elems )
             comp%hinge(ih) % act % rr = & 
                 this%fields(j_pos)%fdata(:,comp%hinge(ih)%i_points_precice)
 
-            !> Reset nodes: coupled hinge prescribed absolute motion and not relative motion
+            !> 0. Reset nodes: coupled hinge prescribed absolute motion and not relative motion
             ! *** not efficient, but effective: some geo%points(:,ip) are reset more than once
             do i = 1, comp%hinge(ih)%n_nodes
               do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
@@ -827,9 +829,10 @@ subroutine update_elems( this, geo, elems )
 
             !> From motion of hinge nodes to surface motion
             ! ... see ~ geo/mod_hinges/himge_deflection()
-            ! write(*,*) ' comp%hinge(',ih,')%n_nodes: ', comp%hinge(ih)%n_nodes
+            !> 1. Update position
             do i = 1, comp%hinge(ih)%n_nodes ! hinge nodes
-              
+             
+              !> === Hinge nodes ===
               !> Rotation vector and rotation matrix
               n_rot = this%fields(j_rot)%fdata(:,comp%hinge(ih)%i_points_precice(i))
               theta = norm2( n_rot )
@@ -838,11 +841,6 @@ subroutine update_elems( this, geo, elems )
               else
                 n_rot = n_rot / theta
               end if
-
-              ! debug ---
-              write(*,*) ' +++++++ n_rot(',i,'): ' , n_rot
-              ! debug ---
-
               nx(1,:) = (/    0.0_wp, -n_rot(3),  n_rot(2) /)
               nx(2,:) = (/  n_rot(3),    0.0_wp, -n_rot(1) /)
               nx(3,:) = (/ -n_rot(2),  n_rot(1),    0.0_wp /)
@@ -851,6 +849,7 @@ subroutine update_elems( this, geo, elems )
                                0.0_wp, 0.0_wp, 1.0_wp /), (/3,3/) ) &
                   - sin(theta) * nx + ( 1.0_wp - cos(theta) ) * matmul(nx, nx)
 
+              !> === Surface nodes ===
               !> Update points
               do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
 
@@ -859,9 +858,9 @@ subroutine update_elems( this, geo, elems )
                 chord = comp%loc_points(:,ip) - comp%hinge(ih)%nodes(:,i)
                 
                 ! debug ---
-                write(*,*) ' ih, i, ib: ', ih, i, ib
-                write(*,*) comp%hinge(ih)%rot%n2h(i)%p2h(ib), &
-                           comp%hinge(ih)%rot%n2h(i)%w2h(ib)
+                ! write(*,*) ' ih, i, ib: ', ih, i, ib
+                ! write(*,*) comp%hinge(ih)%rot%n2h(i)%p2h(ib), &
+                !            comp%hinge(ih)%rot%n2h(i)%w2h(ib)
                 ! write(*,*) ' comp%loc_points(:,ip) : ', &
                 !              comp%loc_points(:,ip)
                 ! debug ---
@@ -873,22 +872,23 @@ subroutine update_elems( this, geo, elems )
                 ! write(*,*) '  local numbering: ', ip
                 ! write(*,*) ' ip, comp%loc_points(:,ip):        ', comp%loc_points(:,ip), ip
                 ! write(*,*) ' ih, i, comp%hinge(ih)%nodes(:,i): ', &
+
                 !                                            comp%hinge(ih)%nodes(:,i), ih, i
                 ! write(*,*) ' chord                           : ', chord
                 ! ! debug ---
                 
                 ip = comp%i_points(ip)  ! Local-to-global connectivity
                 ! ! debug ---
-                write(*,*) ' -------- '
-                write(*,*) ' ip, i, ib: ', ip, i, ib
-                write(*,*) ' comp%hinge(ih)%rot%n2h(i)%w2h(ib): ', &
-                             comp%hinge(ih)%rot%n2h(i)%w2h(ib) 
-                write(*,*) ' comp%hinge(ih) % act % rr(:,i)   : ', &
-                             comp%hinge(ih) % act % rr(:,i)
-                write(*,*) ' Rot,       chord: '
-                write(*,*) Rot(1,:), '       ', chord(1) 
-                write(*,*) Rot(2,:), '       ', chord(2)
-                write(*,*) Rot(3,:), '       ', chord(3)
+                ! write(*,*) ' -------- '
+                ! write(*,*) ' ip, i, ib: ', ip, i, ib
+                ! write(*,*) ' comp%hinge(ih)%rot%n2h(i)%w2h(ib): ', &
+                !              comp%hinge(ih)%rot%n2h(i)%w2h(ib) 
+                ! write(*,*) ' comp%hinge(ih) % act % rr(:,i)   : ', &
+                !              comp%hinge(ih) % act % rr(:,i)
+                ! write(*,*) ' Rot,       chord: '
+                ! write(*,*) Rot(1,:), '       ', chord(1) 
+                ! write(*,*) Rot(2,:), '       ', chord(2)
+                ! write(*,*) Rot(3,:), '       ', chord(3)
                 ! write(*,*) ' global numbering: ', ip
                 ! write(*,*) ' ------ ' 
                 ! ! debug ---
@@ -896,19 +896,40 @@ subroutine update_elems( this, geo, elems )
                 !> Position: absolute position (!)
                 geo%points(:,ip) = geo%points(:,ip) + &
                      comp%hinge(ih)%rot%n2h(i)%w2h(ib) * &
-                   ( comp%hinge(ih) % act % rr(:,i) + &
-                     matmul( Rot, chord ) )
-
-                !> Velocity
-                ! *** to do ***
+                   ( comp%hinge(ih) % act % rr(:,i) + matmul( Rot, chord ) )
 
               end do
+            end do
 
+            !> 2. Update velocity with weighted rigid motion, after the new position
+            ! of the nodes has been evaluated
+            do i = 1, comp%hinge(ih)%n_nodes ! hinge nodes
+
+              !> === Hinge nodes ===
+              !> Velocity and Angular Velocity of hinge nodes
+              vel   = this%fields(j_vel)%fdata(:,comp%hinge(ih)%i_points_precice(i))
+              omega = this%fields(j_ome)%fdata(:,comp%hinge(ih)%i_points_precice(i))
+
+              !> === Surface nodes ===
+              do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
+
+                !> Connectivity
+                ip = comp%hinge(ih)%rot%n2h(i)%p2h(ib)  ! Local numbering
+                ip = comp%i_points(ip)  ! Local-to-global connectivity
+                !> Velocity: v = v_H + Omega_H x ( r - r_H )
+                geo%points_vel(:,ip) = geo%points_vel(:,ip) + &
+                     comp%hinge(ih)%rot%n2h(i)%w2h(ib) * &
+                   ( vel + cross( omega, &
+                                  geo%points(:,ip) - comp%hinge(ih) % act % rr(:,i) ) )
+              end do
             end do
 
           end if
         end do
         ! write(*,*) ' Stop in mod_precice/update_elems().'; stop
+        ! -------------------------------------------------------------------------------
+        !>  === Add hinge motion: END ===
+        ! -------------------------------------------------------------------------------
 
         !> === Control nodes of the elements ===
         ! *** to do *** avoid computing element quantities as the 
