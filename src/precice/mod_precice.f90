@@ -802,6 +802,8 @@ subroutine update_elems( this, geo, elems )
 
         end do
 
+        !> *** to do *** move to a function: update_elems_coupled_hinges(), here in mod_precice
+        !> *** to do *** blending regions
         ! -------------------------------------------------------------------------------
         !>  === Add hinge motion: START ===
         ! -------------------------------------------------------------------------------
@@ -814,18 +816,33 @@ subroutine update_elems( this, geo, elems )
                 this%fields(j_pos)%fdata(:,comp%hinge(ih)%i_points_precice)
 
             !> 0. Reset nodes: coupled hinge prescribed absolute motion and not relative motion
-            ! *** not efficient, but effective: some geo%points(:,ip) are reset more than once
-            do i = 1, comp%hinge(ih)%n_nodes
-              do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
-                !> Hinge-to-local connectivity
-                ip = comp%hinge(ih)%rot%n2h(i)%p2h(ib)
-                !> Local-to-global connectivity
-                ip = comp%i_points(ip)
-                !> Reset position and velocity
-                geo%points(:,ip) = 0.0_wp
-                geo%points_vel(:,ip) = 0.0_wp
-              end do
+            do i = 1, size( comp%hinge(ih)%rot %node_id )
+              ip = comp%hinge(ih)%rot%node_id(i)
+              geo%points(:,ip)     = geo%points(:,ip) * &
+                                     ( 1.0_wp - comp%hinge(ih)%rot %span_wei(i) )
+              geo%points_vel(:,ip) = geo%points_vel(:,ip) * &
+                                     ( 1.0_wp - comp%hinge(ih)%rot %span_wei(i) )
             end do
+            do i = 1, size( comp%hinge(ih)%blen%node_id )
+              ip = comp%hinge(ih)%blen%node_id(i)
+              geo%points(:,ip)     = geo%points(:,ip) * &
+                                     ( 1.0_wp - comp%hinge(ih)%blen%span_wei(i) )
+              geo%points_vel(:,ip) = geo%points_vel(:,ip) * &
+                                     ( 1.0_wp - comp%hinge(ih)%blen%span_wei(i) )
+            end do
+            ! old implementation: all the nodes were reset. Impossible to treat spanwise blending
+            ! *** not efficient, but effective: some geo%points(:,ip) are reset more than once
+            ! do i = 1, comp%hinge(ih)%n_nodes
+            !   do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
+            !     !> Hinge-to-local connectivity
+            !     ip = comp%hinge(ih)%rot%n2h(i)%p2h(ib)
+            !     !> Local-to-global connectivity
+            !     ip = comp%i_points(ip)
+            !     !> Reset position and velocity
+            !     geo%points(:,ip) = 0.0_wp
+            !     geo%points_vel(:,ip) = 0.0_wp
+            !   end do
+            ! end do
 
             !> From motion of hinge nodes to surface motion
             ! ... see ~ geo/mod_hinges/himge_deflection()
@@ -895,6 +912,7 @@ subroutine update_elems( this, geo, elems )
 
                 !> Position: absolute position (!)
                 geo%points(:,ip) = geo%points(:,ip) + &
+                     comp%hinge(ih)%rot%n2h(i)%s2h(ib) * &
                      comp%hinge(ih)%rot%n2h(i)%w2h(ib) * &
                    ( comp%hinge(ih) % act % rr(:,i) + matmul( Rot, chord ) )
 
@@ -918,6 +936,7 @@ subroutine update_elems( this, geo, elems )
                 ip = comp%i_points(ip)  ! Local-to-global connectivity
                 !> Velocity: v = v_H + Omega_H x ( r - r_H )
                 geo%points_vel(:,ip) = geo%points_vel(:,ip) + &
+                     comp%hinge(ih)%rot%n2h(i)%s2h(ib) * &
                      comp%hinge(ih)%rot%n2h(i)%w2h(ib) * &
                    ( vel + cross( omega, &
                                   geo%points(:,ip) - comp%hinge(ih) % act % rr(:,i) ) )
