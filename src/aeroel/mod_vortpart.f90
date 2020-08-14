@@ -84,14 +84,18 @@ type, extends(c_vort_elem) :: t_vortpart
   !> Orientation of the vorticity vector
   real(wp) :: dir(3)
   real(wp) :: vel(3)
-  real(wp), pointer :: stretch(:)
-  logical :: free=.true.
+  real(wp) :: vel_old(3)
+  real(wp) :: stretch(3)
+  real(wp) :: stretch_old(3)
+  logical  :: free=.true.
   real(wp) :: turbvisc
+  real(wp) :: rotu(3)
 contains
 
   procedure, pass(this) :: compute_vel       => compute_vel_vortpart
   procedure, pass(this) :: compute_grad      => compute_grad_vortpart
   procedure, pass(this) :: compute_stretch   => compute_stretch_vortpart
+  procedure, pass(this) :: compute_rotu      => compute_rotu_vortpart
   procedure, pass(this) :: compute_diffusion => compute_diffusion_vortpart
   procedure, pass(this) :: calc_geo_data     => calc_geo_data_vortpart
 
@@ -134,13 +138,14 @@ subroutine compute_vel_vortpart (this, pos, uinf, vel)
  real(wp), intent(out) :: vel(3)
 
  real(wp) :: vvort(3)
- real(wp) :: dist(3)!, distn
+ real(wp) :: dist(3), distn, c, d
 
 
   dist = pos-this%cen
+
   !Rosenhead kernel regularized velocity
-  vvort =  cross(this%dir,dist) / (sqrt(sum(dist**2)+r_Vortex**2))**3
-  vel = vvort*this%mag
+  !vvort =  cross(this%dir,dist) / (sqrt(sum(dist**2)+r_Vortex**2))**3
+  !vel = vvort*this%mag
 
   !Rankine velocity
   !distn = norm2(dist)
@@ -150,6 +155,11 @@ subroutine compute_vel_vortpart (this, pos, uinf, vel)
   !  vvort =  cross(this%dir,dist)  / r_Vortex**3
   !end if
   !vel = vvort*this%mag
+
+  !generic
+  distn = norm2(dist)
+  call kernel_coeffs(distn, c, d)
+  vel = c * cross(dist, this%dir)*this%mag
 
 
 
@@ -181,32 +191,130 @@ subroutine compute_stretch_vortpart (this, pos, alpha, stretch)
  real(wp), intent(in) :: alpha(3)
  real(wp), intent(out) :: stretch(3)
 
- real(wp) :: dist(3), distn
+ real(wp) :: dist(3), distn, Sr, dSr, vecprod(3), c, d
 
   !TODO: add far field approximations
 
   dist = pos-this%cen
-  distn = sqrt(sum(dist**2)+r_Vortex**2)
-  !"original"
-  !stretch = -cross(alpha, this%dir*this%mag)/(distn)**3 &
-  !     +3.0_wp/(distn)**5 * cross(dist, this%mag*this%dir) * &
-  !     sum(alpha*dist)
-  !"original" fixed sign
-  !stretch = -cross(alpha, this%dir*this%mag)/(distn)**3 &
-  !     -3.0_wp/(distn)**5 * cross(dist, this%mag*this%dir) * &
-  !     sum(alpha*dist)
-  !"transpose"
-! stretch = -cross(this%dir*this%mag, alpha)/(distn)**3 &
-!      +1.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
+  distn = norm2(dist)
 
-  stretch = -cross(this%dir*this%mag, alpha)/(distn)**3 &
-       +3.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
+!!  !distn = sqrt(sum(dist**2)+r_Vortex**2) !rosenhead
+!!  !Rankine
+!!  distn = norm2(dist)
+!!  if ( distn .gt. r_Vortex ) then
+!!    Sr  =  1.0_wp / distn**3
+!!    dSr = -3.0_wp / distn**5
+!!  else
+!!    Sr  =  -1.0_wp / (r_Vortex**2*distn)
+!!    dSr =  1.0/ (r_Vortex**2*distn**2)
+!!  end if
+!!  !"original"
+!!  !stretch = -cross(alpha, this%dir*this%mag)/(distn)**3 &
+!!  !     +3.0_wp/(distn)**5 * cross(dist, this%mag*this%dir) * &
+!!  !     sum(alpha*dist)
+!!  !"original" fixed sign
+!!  !stretch = -cross(alpha, this%dir*this%mag)/(distn)**3 &
+!!  !     -3.0_wp/(distn)**5 * cross(dist, this%mag*this%dir) * &
+!!  !     sum(alpha*dist)
+!!  !"transpose"
+!!! stretch = -cross(this%dir*this%mag, alpha)/(distn)**3 &
+!!!      +1.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
+!!
+!!  !stretch = -cross(this%dir*this%mag, alpha)/(distn)**3 &
+!!  !     +3.0_wp/(distn)**5 * dist * sum(dist*cross(this%dir*this%mag, alpha))
+!!
+!!  !transpose, rankinezed, old and wrong
+!!  !stretch = -cross(this%dir*this%mag, alpha) * Sr &
+!!  !     -dSr * dist * sum(dist*cross(this%dir*this%mag, alpha))
+!!
+!!  !transpose with rankine
+!!  !vecprod = cross(alpha, this%dir*this%mag)
+!!  !stretch = Sr*vecprod + dSr * dist * sum(dist*vecprod)
 
+  !transpose, generic
+  vecprod = cross(alpha, this%dir*this%mag)
+  call kernel_coeffs(distn, c, d)
+  stretch = -( c * vecprod + d * dist * sum(dist*vecprod) )
 
 end subroutine compute_stretch_vortpart
 
 !----------------------------------------------------------------------
 
+!> Compute the vorticity created by a particle in a prescibed position
+!!
+!! WARNING: the calculated term, to be consistent with the formulation of
+!! the equations is multiplied by 4*pi, to obtain the actual velocity the
+!! result of the present subroutine MUST be DIVIDED by 4*pi
+subroutine compute_rotu_vortpart (this, pos, alpha, rotu)
+ class(t_vortpart), intent(in) :: this
+ real(wp), intent(in) :: pos(:)
+ real(wp), intent(in) :: alpha(3)
+ real(wp), intent(out) :: rotu(3)
+
+ real(wp) :: dist(3), distn, c, d
+
+  !TODO: add far field approximations
+
+  dist = pos-this%cen
+  distn = norm2(dist)
+
+  !rosenhead
+  !distn = sqrt(sum(dist**2)+r_Vortex**2)
+
+  !rotu = 2.0_wp*this%dir*this%mag/(distn)**3 &
+  !     +3.0_wp/(distn)**5 * cross(dist, cross(dist, this%dir*this%mag))
+
+  !generic
+  call kernel_coeffs(distn, c, d)
+  rotu = -2.0_wp * c * this%dir*this%mag + d * cross(dist, cross(dist, this%dir*this%mag))
+
+
+
+end subroutine compute_rotu_vortpart
+
+!----------------------------------------------------------------------
+!> Compute kernel derivatives coefficients
+subroutine kernel_coeffs(rr, c, d)
+ real(wp), intent(in) :: rr
+ real(wp), intent(out) :: c,d
+
+ real(wp) :: distn,r
+
+  r = rr
+
+  !Rosenhead
+  distn = sqrt(r**2+r_Vortex**2)
+  c = -1.0_wp/distn**3
+  d = 3.0_wp/distn**5
+
+  !Rankine
+  !if (r .ge. r_Vortex) then
+  !  c = -1.0_wp/r**3
+  !  d = 3.0_wp/r**5
+  !else
+  !  c = -1.0_wp/r_Vortex**3
+  !  d = 0.0_wp
+  !endif
+
+  !Gaussian from Alvarez
+  !if(r.gt.1e-13_wp) then
+  !c = -erf(r/(sqrt(2.0_wp)*r_Vortex))/r**3 + &
+  !     2.0_wp/(r**2 * sqrt(2.0_wp*pi) * r_Vortex) * exp(-r**2/(2.0_wp * r_Vortex**2))
+  !d = 3.0_wp/r**5 * erf(r/(sqrt(2.0_wp)*r_Vortex)) + exp(-r**2/(2.0_wp * r_Vortex**2)) * &
+  !    (-6.0_wp/(r**4*r_Vortex*sqrt(2.0_wp*pi)) - 2.0_wp/(r**2*r_Vortex**3*sqrt(2.0_wp*pi)))
+  !else
+  !  c=0.0
+  !  d=0.0
+  !endif
+
+  !!High Order Algebraic
+  !distn = sqrt(r**2+r_Vortex**2)
+  !c = -(r**2+2.5_wp*r_Vortex**2)/distn**5
+  !d = -2.0_wp/distn**5 + 5.0_wp*(r**2+2.5_wp*r_Vortex**2)/distn**7
+
+end subroutine
+
+!----------------------------------------------------------------------
 !> Compute the vorticity diffusion induced by a vortex particle
 !! in a prescribed position with a prescribed vorticity (i.e. another particle)
 !!
