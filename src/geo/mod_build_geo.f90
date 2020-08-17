@@ -273,15 +273,15 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   ! Body of revolution
   call geo_prs%CreateRealOption('Rev_Length',&
-         'Length of the body of revolution measured from nose to nose','1.0')
+         'Length of the body of revolution measured from nose to nose')
   call geo_prs%CreateRealOption('Rev_Radius', &
-         'Radius of the body of revolution section.', '1.0')
+         'Radius of the body of revolution section.')
   call geo_prs%CreateRealOption('Rev_Nose_Radius', &
-         'Radius of the body of revolution nose.', '1.0')
+         'Radius of the body of revolution nose.')
   call geo_prs%CreateIntOption('Rev_Nelem_long', &
-         'Number of elements along the length of the body revolution.', '10')
+         'Number of elements along the length of the body revolution.')
   call geo_prs%CreateIntOption('Rev_Nelem_rev', &
-         'Number of elements around the body of revolution circumference.', '10')
+         'Number of elements around the body of revolution circumference.')
 
   !=====
   !===== Read the parameters ====
