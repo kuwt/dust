@@ -709,7 +709,7 @@ subroutine sort_particles(wparts, n_prt, elem, octree)
  integer :: l, i,j,k, child, ic,jc,kc
  integer :: ll, nl
  logical :: got_leaves, got_branches
- integer :: nprt, nprt2, iq
+ integer :: nprt, iq
  real(wp) :: redistr(3), vort(3)
  character(len=*), parameter :: this_sub_name = 'sort_particles'
 

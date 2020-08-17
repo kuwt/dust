@@ -118,22 +118,22 @@ subroutine potential_calc_doublet(this, dou, pos)
  real(wp), dimension(3) :: e3
 
  real(wp) :: zQ
- real(wp), dimension(3) ::Qp
+ !real(wp), dimension(3) ::Qp
 
  real(wp), dimension(3) :: ei , ap1 , am1
  real(wp) :: ap1n , am1n , sinB , cosB , beta
 
- integer :: ind0 , indm1 , indp1
+ integer :: indm1, indp1!, ind0
 
  ! QUAD elem as 2 TRIA elems
- integer :: indexm1(3) , indexp1(3) , index0(3)
- real(wp):: nor_vec(3) , v1(3) , v2(3)
- real(wp):: tol_z_dou = 1.0e-6_wp
- real(wp):: pos_z
+ !integer :: indexm1(3), indexp1(3), index0(3)
+ !real(wp):: nor_vec(3), v1(3), v2(3)
+ !real(wp):: tol_z_dou = 1.0e-6_wp
+ !real(wp):: pos_z
 
  real(wp) :: radius
 
- integer :: i1 , i2
+ integer :: i1!, i2
 
  radius = norm2(pos-this%cen)
 
@@ -311,11 +311,11 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
 
  real(wp) :: phix , phiy , pdou
  integer  :: indp1 , indm1
- real(wp) :: av(3) , hv(3) , v1(3) , v2(3)
+ real(wp) :: av(3) , hv(3)! , v1(3) , v2(3)
  real(wp) :: ai    , hi
  real(wp) :: R1 , R2
 
- real(wp) :: th1 , th2
+ !real(wp) :: th1 , th2
 
  real(wp) :: radius_v(3)
  real(wp) :: radius , rati

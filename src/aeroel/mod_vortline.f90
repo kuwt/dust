@@ -176,59 +176,59 @@ subroutine compute_grad_vortline(this, pos, uinf, grad)
  real(wp), intent(in) :: uinf(3)
  real(wp), intent(out) :: grad(3,3)
 
- integer :: indp1 , indm1 , i1 , i2 , i
+ integer  :: i1 , i2
  real(wp) :: R1(3) , R2(3) , a1(3) , a2(3) , l(3) , a
  real(wp) :: R1v(3,1) , R2v(3,1) , a1v(3,1) , a2v(3,1) , lv(3,1)
  real(wp) :: lx(3,3) , aa1(3,3) , aa2(3,3) , ax1(3,3) , ax2(3,3) , al1(3,3) , al2(3,3)
  real(wp) :: del , a2del2
 
- !TODO: add far field approximations
- !radius_v = pos-this%cen
- !radius   = norm2(radius_v)
- ! del = sim_param % RankineRad
- del = sim_param % VortexRad
+  !TODO: add far field approximations
+  !radius_v = pos-this%cen
+  !radius   = norm2(radius_v)
+  ! del = sim_param % RankineRad
+  del = sim_param % VortexRad
 
- if(associated(this%mag)) then
+  if(associated(this%mag)) then
 
-   i1 = 1 ;  i2 = 2
+    i1 = 1 ;  i2 = 2
 
-   l = this%edge_uni(:)
-   lv(:,1) = l
+    l = this%edge_uni(:)
+    lv(:,1) = l
 
-   R1 = pos-this%ver(:,i1) ;   a1 = cross( l , R1 )
-   R2 = pos-this%ver(:,i2) ;   a2 = cross( l , R2 )
-   a = norm2(a1)  ! = norm(a2)
-   a2del2 = a**2.0_wp + del**2.0_wp
+    R1 = pos-this%ver(:,i1) ;   a1 = cross( l , R1 )
+    R2 = pos-this%ver(:,i2) ;   a2 = cross( l , R2 )
+    a = norm2(a1)  ! = norm(a2)
+    a2del2 = a**2.0_wp + del**2.0_wp
 
-   R1v(:,1) = R1 ;  a1v(:,1) = a1
-   R2v(:,1) = R2 ;  a2v(:,1) = a2
+    R1v(:,1) = R1 ;  a1v(:,1) = a1
+    R2v(:,1) = R2 ;  a2v(:,1) = a2
 
-   lx(:,1) = (/  0.0_wp ,  l(3)   , -l(2)   /)
-   lx(:,2) = (/ -l(3)   ,  0.0_wp ,  l(1)   /)
-   lx(:,3) = (/  l(2)   , -l(1)   ,  0.0_wp /)
+    lx(:,1) = (/  0.0_wp ,  l(3)   , -l(2)   /)
+    lx(:,2) = (/ -l(3)   ,  0.0_wp ,  l(1)   /)
+    lx(:,3) = (/  l(2)   , -l(1)   ,  0.0_wp /)
 
-   aa1 = matmul( a1v , transpose(a1v) )
-   ax1 = matmul( a1v , transpose(R1v) )
-   al1 = matmul( a1v , transpose( lv) )
-   aa2 = matmul( a2v , transpose(a2v) )
-   ax2 = matmul( a2v , transpose(R2v) )
-   al2 = matmul( a2v , transpose( lv) )
+    aa1 = matmul( a1v , transpose(a1v) )
+    ax1 = matmul( a1v , transpose(R1v) )
+    al1 = matmul( a1v , transpose( lv) )
+    aa2 = matmul( a2v , transpose(a2v) )
+    ax2 = matmul( a2v , transpose(R2v) )
+    al2 = matmul( a2v , transpose( lv) )
 
-   grad = &
-    + 1.0_wp / ( a2del2**1.5_wp * norm2(R1) ) * &
-      ( (   a * lx &
-          + ( 1.0_wp/a - 3.0_wp*a/a2del2 ) * matmul(aa1,lx) ) * sum(l*R1) &
-      + a * ( al1 - ax1 * sum( l * R1 ) / norm2(R1)**2.0_wp ) )  &
-    - 1.0_wp / ( a2del2**1.5_wp * norm2(R2) ) * &
-      ( (   a * lx &
-          + ( 1.0_wp/a - 3.0_wp*a/a2del2 ) * matmul(aa2,lx) ) * sum(l*R2) &
-      + a * ( al2 - ax2 * sum( l * R2 ) / norm2(R2)**2.0_wp ) )
+    grad = &
+     + 1.0_wp / ( a2del2**1.5_wp * norm2(R1) ) * &
+       ( (   a * lx &
+           + ( 1.0_wp/a - 3.0_wp*a/a2del2 ) * matmul(aa1,lx) ) * sum(l*R1) &
+       + a * ( al1 - ax1 * sum( l * R1 ) / norm2(R1)**2.0_wp ) )  &
+     - 1.0_wp / ( a2del2**1.5_wp * norm2(R2) ) * &
+       ( (   a * lx &
+           + ( 1.0_wp/a - 3.0_wp*a/a2del2 ) * matmul(aa2,lx) ) * sum(l*R2) &
+       + a * ( al2 - ax2 * sum( l * R2 ) / norm2(R2)**2.0_wp ) )
 
-   grad = grad*this%mag
+    grad = grad*this%mag
 
- else
-   grad = 0.0_wp
- endif
+  else
+    grad = 0.0_wp
+  endif
 
 
 end subroutine compute_grad_vortline

@@ -393,7 +393,7 @@ subroutine compute_der_ker(this,diff,delta,pexp)
  real(wp) :: kmod, Rnorm2
  real(wp) :: sum1, sum2
  real(wp), allocatable :: bk(:)
- real(wp) :: diffnorm
+ !real(wp) :: diffnorm
 
 
 
@@ -407,13 +407,6 @@ subroutine compute_der_ker(this,diff,delta,pexp)
   Rnorm2 = sum(diff**2) + delta**2
   !Singular
   !Rnorm2 = sum(diff**2)
-  !diffnorm = norm2(diff)
-  !if(diffnorm .gt. delta) then
-  !  Rnorm2 = diffnorm**2
-  !else
-  !  Rnorm2 = delta**3/diffnorm
-  !endif
-
 
   do k=0,pexp%degree;  do j=0,pexp%degree-k; do i=0,pexp%degree-j-k;
     kmod = real(k+j+i,wp)

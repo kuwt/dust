@@ -362,7 +362,7 @@ subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
   reyn = aero_par(3)
 
   ! al must be cyclic in [-180.0,180.0]
-  al = -floor((al+180.0_wp)/360.0_wp) * 360.0_wp + al
+  al = -real(floor((al+180.0_wp)/360.0_wp),wp) * 360.0_wp + al
   aero_par(1) = al
 
   cf1 = 0.0_wp

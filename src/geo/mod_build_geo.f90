@@ -2143,7 +2143,7 @@ subroutine cigar2D(L,R,RN,n,x,y)
   real(wp) :: tc, lhalf, cc, dphi, phi, s
   integer  :: i
 
-  real(wp), parameter :: st = 0.29983, &
+  real(wp), parameter :: st = 0.29983_wp, &
                          pi = acos(-1.0_wp)
 
   tc    = 2.0_wp*R/RN*st

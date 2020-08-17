@@ -521,41 +521,41 @@ end subroutine compute_dforce_dummy
 !
 subroutine compute_dforce_jukowski_vortlatt(this)
  class(t_vortlatt), intent(inout) :: this
- real(wp) :: vel_w(3), gam(3)
+ real(wp) :: gam(3)
 
- integer :: i_stripe, j
+ integer :: i_stripe
 
- ! === Steady contribution (KJ) ===
- gam = cross ( this % vel_ctr_pt, this%edge_vec(:,1) )
+  ! === Steady contribution (KJ) ===
+  gam = cross ( this % vel_ctr_pt, this%edge_vec(:,1) )
 
- i_stripe = size(this%stripe_elem)
+  i_stripe = size(this%stripe_elem)
 
- if ( i_stripe .gt. 1 ) then
+  if ( i_stripe .gt. 1 ) then
 
-   this%dforce = sim_param%rho_inf * gam &
-               * ( this%mag - this%stripe_elem(i_stripe-1)%p%mag )
+    this%dforce = sim_param%rho_inf * gam &
+                * ( this%mag - this%stripe_elem(i_stripe-1)%p%mag )
 
- else
+  else
 
-   this%dforce = sim_param%rho_inf * gam * this%mag
+    this%dforce = sim_param%rho_inf * gam * this%mag
 
- end if
+  end if
 
- ! === Unsteady contribution ===
- this%dforce = this%dforce &
-             - sim_param%rho_inf * this%area * ( &
-               this%didou_dt * this%nor + this%mag * this%dn_dt )
- ! ! if statement to avoid singularities
- ! if ( norm2( this % vel_ctr_pt ) .gt. &
- !        max( 0.001_wp, 0.001_wp *norm2(sim_param%u_inf) ) ) then
- !   this%dforce = this%dforce &
- !               + sim_param%rho_inf * this%area * this%didou_dt &
- !               * gam / norm2(gam)  ! direction
- ! else
- !   this%dforce = this%dforce &
- !               + sim_param%rho_inf * this%area * this%didou_dt &
- !               * this%nor
- ! end if
+  ! === Unsteady contribution ===
+  this%dforce = this%dforce &
+              - sim_param%rho_inf * this%area * ( &
+                this%didou_dt * this%nor + this%mag * this%dn_dt )
+  ! ! if statement to avoid singularities
+  ! if ( norm2( this % vel_ctr_pt ) .gt. &
+  !        max( 0.001_wp, 0.001_wp *norm2(sim_param%u_inf) ) ) then
+  !   this%dforce = this%dforce &
+  !               + sim_param%rho_inf * this%area * this%didou_dt &
+  !               * gam / norm2(gam)  ! direction
+  ! else
+  !   this%dforce = this%dforce &
+  !               + sim_param%rho_inf * this%area * this%didou_dt &
+  !               * this%nor
+  ! end if
 
 
 end subroutine compute_dforce_jukowski_vortlatt
