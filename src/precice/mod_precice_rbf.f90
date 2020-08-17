@@ -126,8 +126,8 @@ subroutine build_connectivity(this, rr, ee)
 
  
   !> === Surface centers ===
-  allocate(this%cen%ind(this%n_wei, np)); this%cen%ind = 0
-  allocate(this%cen%wei(this%n_wei, np)); this%cen%wei = 0.0_wp
+  allocate(this%cen%ind(this%n_wei, ne)); this%cen%ind = 0
+  allocate(this%cen%wei(this%n_wei, ne)); this%cen%wei = 0.0_wp
 
   deallocate(dist_all); allocate(dist_all(ns)); dist_all = 0.0_wp
 

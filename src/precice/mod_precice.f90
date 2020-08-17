@@ -350,9 +350,11 @@ subroutine update_force( this, geo, elems )
   real(wp) :: theta
   real(wp) :: eps = 1.0e-9_wp
 
-  integer :: i, j, i_comp, iw, ip, ip_p
+  integer :: i, j, i_comp, iw, ip, ip_p, ih, ia, ib
 
   integer :: j_for, j_mom, j_rot, j_pos
+
+  real :: alpha
 
   do j = 1, size(this%fields)
     if ( trim(this%fields(j)%fname) .eq. 'Position') j_pos = j
@@ -510,6 +512,8 @@ subroutine update_force( this, geo, elems )
         this%fields(j_for)%fdata = 0.0_wp
         this%fields(j_mom)%fdata = 0.0_wp
 
+        !> === Aerodynamic mesh to structural nodes ===
+        !  w/o considering hinge rotations
         do i = 1, size(comp%el)
           do iw = 1, size(comp%rbf%cen%ind,1)
 
@@ -535,10 +539,46 @@ subroutine update_force( this, geo, elems )
 !           write(*,*) comp%el(i)%dforce
 !           ! debug ---
 
-
           end do
-
         end do
+        
+        ! -------------------------------------------------------------------------------
+        !>  === Add hinge motion: START ===
+        ! -------------------------------------------------------------------------------
+        !> === Aerodynamic mesh to hinge nodes ===
+        ! - reduce forces and moments to hinge nodes
+        ! - update "structural" nodes
+        do ih = 1, comp%n_hinges
+          if ( trim(comp%hinge(ih)%input_type) .eq. 'coupling' ) then
+            
+            !> 0. Update node force and moments, before update with coupled hinge actions
+            do i = 1, size( comp%hinge(ih)%rot%node_id, 1 ) ! loop over aero nodes in 
+                                                            ! rigid rotation region
+              ! ib = 
+              ! ip = 
+              ! ia =
+              ! alpha = 0.0_wp  ! *** to do *** compute alpha
+              ! this%fields(j_for)%fdata(:,ip) = this%fields(j_for)%fdata(:,ip) &
+              !   - alpha * &
+
+            end do
+
+
+
+
+            !> 1. Reduce forces and moments to hinge nodes
+            !> 1.1 Rigid rotation
+
+            !> 1.2 Chordwise blending region
+            ! *** to do ***
+
+
+          end if
+        end do
+        ! -------------------------------------------------------------------------------
+        !>  === Add hinge motion: END ===
+        ! -------------------------------------------------------------------------------
+
 
       end if
     end if
@@ -811,11 +851,17 @@ subroutine update_elems( this, geo, elems )
           if ( trim(comp%hinge(ih)%input_type) .eq. 'coupling' ) then
             
             !> Update hinge nodes
-            write(*,*) ' Update "coupled" hinge. '
             comp%hinge(ih) % act % rr = & 
                 this%fields(j_pos)%fdata(:,comp%hinge(ih)%i_points_precice)
 
-            !> 0. Reset nodes: coupled hinge prescribed absolute motion and not relative motion
+            !> 0. Update node position and velocity, before update with coupled hinge motion,
+            !   r = ( 1 - alpha ) * r_beam + alpha * r_hinge
+            !   v = ( 1 - alpha ) * v_beam + alpha * v_hinge ,
+            ! where:
+            ! - <alpha> is the spanwise weight,
+            ! - r,v_beam  the position and the velocity due to the motion of the structural
+            !   part of the model, 
+            ! - r,v_hinge the position and the velocity due to the motion of the hinge nodes
             do i = 1, size( comp%hinge(ih)%rot %node_id )
               ip = comp%hinge(ih)%rot%node_id(i)
               geo%points(:,ip)     = geo%points(:,ip) * &
@@ -830,8 +876,8 @@ subroutine update_elems( this, geo, elems )
               geo%points_vel(:,ip) = geo%points_vel(:,ip) * &
                                      ( 1.0_wp - comp%hinge(ih)%blen%span_wei(i) )
             end do
-            ! old implementation: all the nodes were reset. Impossible to treat spanwise blending
-            ! *** not efficient, but effective: some geo%points(:,ip) are reset more than once
+            ! ! old implementation: all the nodes were reset. Impossible to treat
+            ! ! spanwise blending
             ! do i = 1, comp%hinge(ih)%n_nodes
             !   do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
             !     !> Hinge-to-local connectivity
@@ -867,7 +913,7 @@ subroutine update_elems( this, geo, elems )
                   - sin(theta) * nx + ( 1.0_wp - cos(theta) ) * matmul(nx, nx)
 
               !> === Surface nodes ===
-              !> Update points
+              !> 1.1. Update points: rigid rotation
               do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
 
                 !> Reference difference
@@ -917,6 +963,13 @@ subroutine update_elems( this, geo, elems )
                    ( comp%hinge(ih) % act % rr(:,i) + matmul( Rot, chord ) )
 
               end do
+
+              !> 1.2. Chordwise blending region
+              do ib = 1, size(comp%hinge(ih)%blen%n2h(i)%p2h)
+                ! *** to do ***
+              end do
+
+
             end do
 
             !> 2. Update velocity with weighted rigid motion, after the new position
@@ -929,6 +982,7 @@ subroutine update_elems( this, geo, elems )
               omega = this%fields(j_ome)%fdata(:,comp%hinge(ih)%i_points_precice(i))
 
               !> === Surface nodes ===
+              !> 2.1. Rigid rotation region
               do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
 
                 !> Connectivity
@@ -941,6 +995,12 @@ subroutine update_elems( this, geo, elems )
                    ( vel + cross( omega, &
                                   geo%points(:,ip) - comp%hinge(ih) % act % rr(:,i) ) )
               end do
+
+              !> 2.2. Chordwise blending region
+              do ib = 1, size(comp%hinge(ih)%blen%n2h(i)%p2h)
+                ! *** to do ***
+              end do
+
             end do
 
           end if

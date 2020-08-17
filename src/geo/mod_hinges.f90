@@ -453,15 +453,15 @@ subroutine build_connectivity(this, loc_points)
 
   ! check ---
   write(*,*) ' Check in t_hinge%build_connectivity() '
-  write(*,*) ' shape(this%rot %node_id) : ' ,  shape(this%rot %node_id)
+  write(*,*) ' shape(this%rot %node_id) : ' ,  shape(this%rot %node_id )
   do iw = 1, size(this%rot %node_id,1)
     write(*,*) this%rot %node_id(iw)
   end do
-  write(*,*) ' shape(this%rot %ind    ) : ' ,  shape(this%rot %ind    )
+  write(*,*) ' shape(this%rot %ind    ) : ' ,  shape(this%rot %ind     )
   do iw = 1, size(this%rot %ind,2)
     write(*,*) this%rot %ind(:,iw)
   end do
-  write(*,*) ' shape(this%rot %wei    ) : ' ,  shape(this%rot %wei    )
+  write(*,*) ' shape(this%rot %wei    ) : ' ,  shape(this%rot %wei     )
   do iw = 1, size(this%rot %wei,2)
     write(*,*) this%rot %wei(:,iw)
   end do
@@ -469,19 +469,19 @@ subroutine build_connectivity(this, loc_points)
   do iw = 1, size(this%rot %span_wei,1)
     write(*,*) this%rot %span_wei(iw)
   end do
-  write(*,*) ' shape(this%blen%node_id) : ' ,  shape(this%blen%node_id)
+  write(*,*) ' shape(this%blen%node_id) : ' ,  shape(this%blen%node_id )
   do iw = 1, size(this%blen%node_id,1)
     write(*,*) this%blen%node_id(iw)
   end do
-  write(*,*) ' shape(this%blen%ind    ) : ' ,  shape(this%blen%ind    )
+  write(*,*) ' shape(this%blen%ind    ) : ' ,  shape(this%blen%ind     )
   do iw = 1, size(this%blen%ind,2)
     write(*,*) this%blen%ind(:,iw)
   end do
-  write(*,*) ' shape(this%blen%wei    ) : ' ,  shape(this%blen%wei    )
+  write(*,*) ' shape(this%blen%wei    ) : ' ,  shape(this%blen%wei     )
   do iw = 1, size(this%blen%wei,2)
     write(*,*) this%blen%wei(:,iw)
   end do
-  write(*,*) ' shape(this%blen%span_wei):' ,  shape(this%blen%span_wei)
+  write(*,*) ' shape(this%blen%span_wei): ' ,  shape(this%blen%span_wei)
   do iw = 1, size(this%blen%span_wei,1)
     write(*,*) this%blen%span_wei(iw)
   end do
