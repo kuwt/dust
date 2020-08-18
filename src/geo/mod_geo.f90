@@ -1063,8 +1063,10 @@ subroutine load_components(geo, in_file, out_file, te)
         geo%components(i_comp)%hinge(ih)%act%rr = &
                                       geo%components(i_comp)%hinge(ih)%ref%rr
 
-        !> Build hinge connectivity and weights
+        !> Build hinge connectivity and weights, for grid nodes
         call geo%components(i_comp)%hinge(ih)%build_connectivity( rr )
+        ! and for cell centers
+        call geo%components(i_comp)%hinge(ih)%build_connectivity_cen( rr, ee )
 
       end do
 

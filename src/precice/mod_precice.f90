@@ -20,7 +20,7 @@ use mod_math, only: &
     cross
 
 use mod_geometry, only: &
-    t_geo
+    t_geo, t_geo_component
 
 use mod_aeroel, only: &
     t_pot_elem_p
@@ -30,6 +30,9 @@ use mod_wake, only: &
 
 use mod_liftlin, only: &
     t_liftlin
+
+use mod_hinges, only: &
+    t_hinge
 
 implicit none
 
@@ -89,6 +92,7 @@ type :: t_precice
   procedure, pass(this) :: initialize_mesh
   procedure, pass(this) :: initialize_fields
   procedure, pass(this) :: update_force
+  procedure, pass(this) :: update_force_coupled_hinge
   procedure, pass(this) :: update_elems
   procedure, pass(this) :: update_near_field_wake
 
@@ -550,35 +554,15 @@ subroutine update_force( this, geo, elems )
         ! - update "structural" nodes
         do ih = 1, comp%n_hinges
           if ( trim(comp%hinge(ih)%input_type) .eq. 'coupling' ) then
-            
-            !> 0. Update node force and moments, before update with coupled hinge actions
-            do i = 1, size( comp%hinge(ih)%rot%node_id, 1 ) ! loop over aero nodes in 
-                                                            ! rigid rotation region
-              ! ib = 
-              ! ip = 
-              ! ia =
-              ! alpha = 0.0_wp  ! *** to do *** compute alpha
-              ! this%fields(j_for)%fdata(:,ip) = this%fields(j_for)%fdata(:,ip) &
-              !   - alpha * &
-
-            end do
-
-
-
-
-            !> 1. Reduce forces and moments to hinge nodes
-            !> 1.1 Rigid rotation
-
-            !> 1.2 Chordwise blending region
-            ! *** to do ***
-
+          
+            !> Update structural forcing, taking into account hinges
+            call this % update_force_coupled_hinge( comp, comp%hinge(ih) )
 
           end if
         end do
         ! -------------------------------------------------------------------------------
         !>  === Add hinge motion: END ===
         ! -------------------------------------------------------------------------------
-
 
       end if
     end if
@@ -619,6 +603,94 @@ subroutine update_force( this, geo, elems )
 
  
 end subroutine update_force
+
+!----------------------------------------------------------------
+!> Update structural forces, taking into account coupled hinges
+subroutine update_force_coupled_hinge( this, comp, hinge )
+  class(t_precice)     , intent(inout) :: this
+  type(t_geo_component), intent(inout) :: comp
+  type(t_hinge)        , intent(inout) :: hinge
+
+  integer :: i, j, n_nodes, nj
+  integer :: a, h, b
+  real(wp) :: al_ah, w_ah, w_ab
+ 
+  !> check input type
+  if ( trim(comp%coupling_type) .ne. 'rbf' ) then
+    write(*,*) ' Error in update_force_coupled_hinge( comp, hinge ). '
+    write(*,*) ' So far, comp%coupling_type must be .eq. "rbf", but  '
+    write(*,*) ' comp%coupling_type: ', trim(comp%coupling_type)
+    write(*,*) ' Stop. '; stop
+  end if
+
+  !> Rot
+  n_nodes = size( hinge%rot_cen%node_id )
+  do i = 1, n_nodes
+
+    a     = hinge%rot_cen%node_id(i)
+    al_ah = hinge%rot_cen%span_wei(i)
+
+    !> Update f_h, f_h += ...
+    nj = size( hinge%rot_cen%ind, 1 )
+    do j = 1, nj
+
+      h    = hinge%rot_cen%ind(j,i)
+      w_ah = hinge%rot_cen%wei(j,i)
+
+      !> Update f_h
+      ! *** to do ***
+
+    end do
+
+    !> Update f_b, f_b -= ...
+    nj = size( comp%rbf%cen%ind, 1 )
+    do j = 1, nj
+
+      b    = comp%rbf%cen%ind(j,a)
+      w_ab = comp%rbf%cen%wei(j,a)
+
+      !> Update f_b
+      ! *** to do ***
+
+    end do
+
+  end do
+
+  !> Blen
+  n_nodes = size( hinge%blen_cen%node_id )
+  do i = 1, n_nodes
+
+    a     = hinge%blen_cen%node_id(i)
+    al_ah = hinge%blen_cen%span_wei(i)
+
+    !> Update f_h, f_h += ...
+    nj = size( hinge%blen_cen%ind, 1 )
+    do j = 1, nj
+
+      h    = hinge%blen_cen%ind(j,i)
+      w_ah = hinge%blen_cen%wei(j,i)
+
+      !> Update f_h
+      ! *** to do ***
+
+    end do
+
+    !> Update f_b, f_b -= ...
+    nj = size( comp%rbf%cen%ind, 1 )
+    do j = 1, nj
+
+      b    = comp%rbf%cen%ind(j,a)
+      w_ab = comp%rbf%cen%wei(j,a)
+
+      !> Update f_b
+      ! *** to do ***
+
+    end do
+
+  end do
+
+
+end subroutine update_force_coupled_hinge
 
 !----------------------------------------------------------------
 !> Update force/moment fields

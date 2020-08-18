@@ -103,7 +103,8 @@ end type t_n2h_conn
 ! ---------------------------------------------------------------
 !> Hinge connectivity, meant for rigid rotation and bleding regions
 type :: t_hinge_conn
-  !> Local index of the nodes performing the desired motion
+  
+  !> Local index of the nodes (or cell center) performing the desired motion
   integer, allocatable :: node_id(:)
   !> Surface node performing motion vs. hinge node connectivity
   integer , allocatable :: ind(:,:)
@@ -115,6 +116,7 @@ type :: t_hinge_conn
   real(wp), allocatable :: span_wei(:)
   !> Node to hinge connectivity array of objs
   type(t_n2h_conn), allocatable :: n2h(:)
+
 end type t_hinge_conn
 
 ! ---------------------------------------------------------------
@@ -200,16 +202,18 @@ type :: t_hinge
   !> Actual configuration
   type(t_hinge_config) :: act
 
-  !> Connectivity for the rigid rotation motion of a ``control surface''
-  type(t_hinge_conn) :: rot
+  !> Connectivity for the rigid rotation motion of a ``control surface'',
+  ! both for grid nodes and cell centers
+  type(t_hinge_conn) :: rot , rot_cen
   !> Connectivity of the blending region to avoid irregular behavior
   ! with a ``control surface'' large rotation (blending region extends
   ! from -offset to offset qualitatively in the ref_dir of the hinge)
-  type(t_hinge_conn) :: blen
+  type(t_hinge_conn) :: blen, blen_cen
 
   contains
 
   procedure, pass(this) :: build_connectivity
+  procedure, pass(this) :: build_connectivity_cen
   procedure, pass(this) :: init_theta
   procedure, pass(this) :: from_reference_to_actual_config ! empty (useless?)
   procedure, pass(this) :: update_hinge_nodes
@@ -265,7 +269,7 @@ subroutine build_connectivity(this, loc_points)
   ! end do
   ! ! debug ---
 
-  !> N. of surfae and hinge nodes
+  !> N. of surface and hinge nodes
   nb = size(loc_points,2)
   nh = this%n_nodes
 
@@ -447,46 +451,325 @@ subroutine build_connectivity(this, loc_points)
   !write(*,*) ' stop in mod_hinges/build_connectivity'; stop
   ! check ---
 
-  ! (???) old comment?
-  !> Spanwise weights to avoid spanwise irregular behaviors
-  ! (???)
+  ! ! check ---
+  ! write(*,*) ' Check in t_hinge%build_connectivity() '
+  ! write(*,*) ' shape(this%rot %node_id) : ' ,  shape(this%rot %node_id )
+  ! do iw = 1, size(this%rot %node_id,1)
+  !   write(*,*) this%rot %node_id(iw)
+  ! end do
+  ! write(*,*) ' shape(this%rot %ind    ) : ' ,  shape(this%rot %ind     )
+  ! do iw = 1, size(this%rot %ind,2)
+  !   write(*,*) this%rot %ind(:,iw)
+  ! end do
+  ! write(*,*) ' shape(this%rot %wei    ) : ' ,  shape(this%rot %wei     )
+  ! do iw = 1, size(this%rot %wei,2)
+  !   write(*,*) this%rot %wei(:,iw)
+  ! end do
+  ! write(*,*) ' shape(this%rot %span_wei): ' ,  shape(this%rot %span_wei)
+  ! do iw = 1, size(this%rot %span_wei,1)
+  !   write(*,*) this%rot %span_wei(iw)
+  ! end do
+  ! write(*,*) ' shape(this%blen%node_id) : ' ,  shape(this%blen%node_id )
+  ! do iw = 1, size(this%blen%node_id,1)
+  !   write(*,*) this%blen%node_id(iw)
+  ! end do
+  ! write(*,*) ' shape(this%blen%ind    ) : ' ,  shape(this%blen%ind     )
+  ! do iw = 1, size(this%blen%ind,2)
+  !   write(*,*) this%blen%ind(:,iw)
+  ! end do
+  ! write(*,*) ' shape(this%blen%wei    ) : ' ,  shape(this%blen%wei     )
+  ! do iw = 1, size(this%blen%wei,2)
+  !   write(*,*) this%blen%wei(:,iw)
+  ! end do
+  ! write(*,*) ' shape(this%blen%span_wei): ' ,  shape(this%blen%span_wei)
+  ! do iw = 1, size(this%blen%span_wei,1)
+  !   write(*,*) this%blen%span_wei(iw)
+  ! end do
+  ! ! write(*,*) ' stop in t_hinge%build_connectivity() ' ; stop
+  ! ! check ---
 
-  ! check ---
-  write(*,*) ' Check in t_hinge%build_connectivity() '
-  write(*,*) ' shape(this%rot %node_id) : ' ,  shape(this%rot %node_id )
-  do iw = 1, size(this%rot %node_id,1)
-    write(*,*) this%rot %node_id(iw)
+  !> Explicit deallocations
+  deallocate(rrb, rrh, dist_all, wei_v, ind_v)
+  deallocate(rot_node_id, rot_ind, rot_wei, rot_span_wei)
+  deallocate(ble_node_id, ble_ind, ble_wei, ble_span_wei)
+  deallocate(rot_i2h, rot_p2h, rot_w2h, rot_s2h) ! *****
+  deallocate(ble_i2h, ble_p2h, ble_w2h, ble_s2h) ! *****
+
+end subroutine build_connectivity
+
+! ---------------------------------------------------------------
+!> Build connectivity betweeen hinge nodes and cell centers of the
+! aerodynamic grid
+subroutine build_connectivity_cen(this, rr, ee)
+  class(t_hinge), intent(inout) :: this
+  real(wp),       intent(in)    :: rr(:,:) ! loc_points_in
+  integer ,       intent(in)    :: ee(:,:)
+
+  !> Cell centers (to be evaluated), whose connectivity with the 
+  ! hinge nodes is created in this subroutine
+  real(wp), allocatable :: loc_points(:,:)
+
+  real(wp) :: hinge_width
+  integer  :: n_nodes
+  integer  :: nb, nh, ib, ih, iw, i
+  real(wp), allocatable :: rrb(:,:), rrh(:,:)
+  real(wp) :: Rot(3,3) = 0.0_wp
+
+  real(wp) :: span_wei
+  real(wp), allocatable :: dist_all(:), wei_v(:)
+  integer , allocatable ::              ind_v(:)
+
+  integer , allocatable :: rot_node_id(:) , ble_node_id(:)
+  integer , allocatable :: rot_ind(:,:)   , ble_ind(:,:)
+  real(wp), allocatable :: rot_wei(:,:)   , ble_wei(:,:)
+  real(wp), allocatable :: rot_span_wei(:), ble_span_wei(:)
+
+  integer , allocatable :: rot_p2h(:,:)   ! *** to do *** improve the actual inefficient
+  real(wp), allocatable :: rot_w2h(:,:)   ! and memory intensive implementation
+  integer , allocatable :: rot_i2h(:)     ! Look for ***** in this routine
+  real(wp), allocatable :: rot_s2h(:,:)
+  integer , allocatable :: ble_p2h(:,:)   ! *** to do *** improve the actual inefficient
+  real(wp), allocatable :: ble_w2h(:,:)   ! and memory intensive implementation
+  integer , allocatable :: ble_i2h(:)     ! Look for ***** in this routine
+  real(wp), allocatable :: ble_s2h(:,:)
+
+  integer :: nrot, nble
+
+  !> N. of surface elements (cell centers) and hinge nodes
+  nb = size(ee,2)
+  nh = this%n_nodes
+
+  !> Cell centers, as the average of the element nodes
+  allocate(loc_points(3,nb)); loc_points = 0.0_wp
+  do ib = 1, nb
+
+    n_nodes = 0
+
+    do i = 1, size(ee,1)
+      if ( ee(i,ib) .ne. 0 ) then
+        n_nodes = n_nodes + 1
+        loc_points(:,ib) = loc_points(:,ib) + rr(:,ee(i,ib))
+      end if
+    end do
+
+    loc_points(:,ib) = loc_points(:,ib) / n_nodes
+
   end do
-  write(*,*) ' shape(this%rot %ind    ) : ' ,  shape(this%rot %ind     )
-  do iw = 1, size(this%rot %ind,2)
-    write(*,*) this%rot %ind(:,iw)
+
+  !> Coordinates in the hinge reference frame
+  ! Rotation matrix, build with the local ortonormal ref.frame of
+  ! the first hinge node
+  Rot(1,:) = this % ref % v(:,1)
+  Rot(2,:) = this % ref % h(:,1)
+  Rot(3,:) = this % ref % n(:,1)
+
+  allocate( rrb(3,nb) );  allocate( rrh(3,nh) )
+  do ib = 1, nb
+    rrb(:,ib) = matmul( Rot, loc_points(:,ib) - this%ref%rr(:,1) )
   end do
-  write(*,*) ' shape(this%rot %wei    ) : ' ,  shape(this%rot %wei     )
-  do iw = 1, size(this%rot %wei,2)
-    write(*,*) this%rot %wei(:,iw)
+  do ib = 1, nh
+    rrh(:,ib) = matmul( Rot, this%ref%rr(:,ib) - this%ref%rr(:,1) )
   end do
-  write(*,*) ' shape(this%rot %span_wei): ' ,  shape(this%rot %span_wei)
-  do iw = 1, size(this%rot %span_wei,1)
-    write(*,*) this%rot %span_wei(iw)
+
+  ! ! debug ---
+  ! write(*,*) ' rrb : '
+  ! do ib = 1, nb
+  !   write(*,*) rrb(:,ib)
+  ! end do
+  ! write(*,*) ' rrh : '
+  ! do ib = 1, nh
+  !   write(*,*) rrh(:,ib)
+  ! end do
+  ! ! debug ---
+
+  ! hinge width, measured in the hinge direction
+  hinge_width = rrh(2,nh) - rrh(2,1)
+
+  !> Compute connectivity and weights
+  ! Allocate auxiliary node_id(:), ind(:,:), wei(:,:) arrays
+  allocate(rot_node_id(        nb));  rot_node_id = 0
+  allocate(ble_node_id(        nb));  ble_node_id = 0
+  allocate(rot_ind(this%n_wei, nb));      rot_ind = 0
+  allocate(ble_ind(this%n_wei, nb));      ble_ind = 0
+  allocate(rot_wei(this%n_wei, nb));      rot_wei = 0.0_wp
+  allocate(ble_wei(this%n_wei, nb));      ble_wei = 0.0_wp
+  allocate(rot_span_wei(       nb)); rot_span_wei = 0.0_wp
+  allocate(ble_span_wei(       nb)); ble_span_wei = 0.0_wp
+
+  ! diff_all and dist_all auxiliaary arrays
+  allocate(dist_all(   nh)); dist_all = 0.0_wp
+
+  ! auxiliary matrix for hinge to surf connectivity
+  ! ***** to do ***** improve the implementation
+  allocate(rot_p2h(nh,nb)); rot_p2h = 0      ;  allocate(ble_p2h(nh,nb)); ble_p2h = 0
+  allocate(rot_w2h(nh,nb)); rot_w2h = 0.0_wp ;  allocate(ble_w2h(nh,nb)); ble_w2h = 0.0_wp
+  allocate(rot_i2h(nh   )); rot_i2h = 0      ;  allocate(ble_i2h(nh   )); ble_i2h = 0
+  allocate(rot_s2h(nh,nb)); rot_s2h = 0.0_wp ;  allocate(ble_s2h(nh,nb)); ble_s2h = 0.0_wp
+
+  nrot = 0; nble = 0
+  ! Loop over all the surface points
+  do ib = 1, nb
+
+    ! if ( ( rrb(2,ib) .gt. 0.0_wp ) .and. ( rrb(2,ib) .lt. hinge_width ) ) then
+    if ( ( rrb(2,ib) .gt. -this%span_blending ) .and. &
+         ( rrb(2,ib) .lt.  this%span_blending + hinge_width ) ) then
+
+      if ( rrb(1,ib) .lt. -this%offset ) then
+        ! do nothing
+      elseif ( rrb(1,ib) .gt. this%offset ) then ! rigid rotation
+
+        nrot = nrot + 1
+        rot_node_id(nrot) = ib
+
+        do ih = 1, nh
+          dist_all(ih) = abs( rrb(2,ib) - rrh(2,ih) )
+        end do
+
+        !> Weights in chordwise direction
+        call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
+
+        wei_v = 1.0_wp / max( wei_v, 1e-9_wp ) **this%w_order
+        wei_v = wei_v / sum(wei_v)
+        
+        !> Weights in spanwise direction
+        if ( rrb(2,ib) .lt. 0.0_wp ) then
+          span_wei = 1.0_wp + rrb(2,ib) / this%span_blending
+        elseif( rrb(2,ib) .lt. hinge_width ) then
+          span_wei = 1.0_wp
+        else
+          span_wei = 1.0_wp - ( rrb(2,ib) - hinge_width ) / this%span_blending
+        endif
+
+        rot_wei(   :,nrot) = wei_v
+        rot_ind(   :,nrot) = ind_v
+        rot_span_wei(nrot) = span_wei
+
+        ! *****
+        do iw = 1, this%n_wei
+          rot_i2h(ind_v(iw)) = rot_i2h(ind_v(iw)) + 1
+          rot_p2h(ind_v(iw),   rot_i2h(ind_v(iw))) = ib
+          rot_w2h(ind_v(iw),   rot_i2h(ind_v(iw))) = wei_v(iw)
+          rot_s2h(ind_v(iw),   rot_i2h(ind_v(iw))) = span_wei
+        end do
+        ! *****
+
+      else ! blending region
+
+        nble = nble + 1
+        ble_node_id(nble) = ib
+
+        do ih = 1, nh
+          dist_all(ih) = abs( rrb(2,ib) - rrh(2,ih) )
+        end do
+
+        call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
+
+        !> Weights in chordwise direction
+        wei_v = 1.0_wp / max( wei_v, 1e-9_wp ) **this%w_order
+        wei_v = wei_v / sum(wei_v)
+        
+        !> Weights in spanwise direction
+        if ( rrb(2,ib) .lt. 0.0_wp ) then
+          span_wei = 1.0_wp + rrb(2,ib) / this%span_blending
+        elseif( rrb(2,ib) .lt. hinge_width ) then
+          span_wei = 1.0_wp
+        else
+          span_wei = 1.0_wp - ( rrb(2,ib) - hinge_width ) / this%span_blending
+        endif
+
+        ble_wei(   :,nble) = wei_v
+        ble_ind(   :,nble) = ind_v
+        ble_span_wei(nble) = span_wei
+
+        ! *****
+        do iw = 1, this%n_wei
+          ble_i2h(ind_v(iw)) = ble_i2h(ind_v(iw)) + 1
+          ble_p2h(ind_v(iw),   ble_i2h(ind_v(iw))) = ib
+          ble_w2h(ind_v(iw),   ble_i2h(ind_v(iw))) = wei_v(iw)
+          ble_s2h(ind_v(iw),   ble_i2h(ind_v(iw))) = span_wei
+        end do
+        ! *****
+
+      end if
+
+    end if
+
   end do
-  write(*,*) ' shape(this%blen%node_id) : ' ,  shape(this%blen%node_id )
-  do iw = 1, size(this%blen%node_id,1)
-    write(*,*) this%blen%node_id(iw)
+
+  !> Fill hinge object, with the connectivity and weight arrays
+  allocate(this% rot_cen%node_id(        nrot)); this% rot_cen%node_id = rot_node_id( 1:nrot)
+  allocate(this% rot_cen%ind(this%n_wei, nrot)); this% rot_cen%ind     = rot_ind(  :, 1:nrot)
+  allocate(this% rot_cen%wei(this%n_wei, nrot)); this% rot_cen%wei     = rot_wei(  :, 1:nrot)
+  allocate(this% rot_cen%span_wei(       nrot)); this% rot_cen%span_wei= rot_span_wei(1:nrot)
+  allocate(this%blen_cen%node_id(        nble)); this%blen_cen%node_id = ble_node_id( 1:nble)
+  allocate(this%blen_cen%ind(this%n_wei, nble)); this%blen_cen%ind     = ble_ind(  :, 1:nble)
+  allocate(this%blen_cen%wei(this%n_wei, nble)); this%blen_cen%wei     = ble_wei(  :, 1:nble)
+  allocate(this%blen_cen%span_wei(       nble)); this%blen_cen%span_wei= ble_span_wei(1:nble)
+  allocate(this% rot_cen%n2h(nh))
+  allocate(this%blen_cen%n2h(nh))
+  do ih = 1, nh
+    allocate(this% rot_cen%n2h(ih)%p2h ( rot_i2h(ih) )) ; &
+             this% rot_cen%n2h(ih)%p2h = rot_p2h( ih, 1:rot_i2h(ih) )
+    allocate(this% rot_cen%n2h(ih)%w2h ( rot_i2h(ih) )) ; &
+             this% rot_cen%n2h(ih)%w2h = rot_w2h( ih, 1:rot_i2h(ih) )
+    allocate(this% rot_cen%n2h(ih)%s2h ( rot_i2h(ih) )) ; &
+             this% rot_cen%n2h(ih)%s2h = rot_s2h( ih, 1:rot_i2h(ih) )
+    allocate(this%blen_cen%n2h(ih)%p2h ( ble_i2h(ih) )) ; &
+             this%blen_cen%n2h(ih)%p2h = ble_p2h( ih, 1:ble_i2h(ih) )
+    allocate(this%blen_cen%n2h(ih)%w2h ( ble_i2h(ih) )) ; &
+             this%blen_cen%n2h(ih)%w2h = ble_w2h( ih, 1:ble_i2h(ih) )
+    allocate(this%blen_cen%n2h(ih)%s2h ( ble_i2h(ih) )) ; &
+             this%blen_cen%n2h(ih)%s2h = ble_s2h( ih, 1:ble_i2h(ih) )
   end do
-  write(*,*) ' shape(this%blen%ind    ) : ' ,  shape(this%blen%ind     )
-  do iw = 1, size(this%blen%ind,2)
-    write(*,*) this%blen%ind(:,iw)
-  end do
-  write(*,*) ' shape(this%blen%wei    ) : ' ,  shape(this%blen%wei     )
-  do iw = 1, size(this%blen%wei,2)
-    write(*,*) this%blen%wei(:,iw)
-  end do
-  write(*,*) ' shape(this%blen%span_wei): ' ,  shape(this%blen%span_wei)
-  do iw = 1, size(this%blen%span_wei,1)
-    write(*,*) this%blen%span_wei(iw)
-  end do
+
+  ! ! check ---
+  ! do ih = 1, nh
+  !   write(*,*) ' rot_cen%n2h(', ih,  ') %p2h, %w2h, %s2h'
+  !   do iw = 1, rot_i2h(ih)
+  !     write(*,*) this% rot_cen%n2h(ih)%p2h, &
+  !                this% rot_cen%n2h(ih)%w2h, &
+  !                this% rot_cen%n2h(ih)%s2h
+  !   end do
+  ! end do
+  ! !write(*,*) ' stop in mod_hinges/build_connectivity'; stop
+  ! ! check ---
+
+  ! ! check ---
+  ! write(*,*) ' Check in t_hinge%build_connectivity_cen() '
+  ! write(*,*) ' shape(this%rot_cen%node_id) : ' ,  shape(this%rot_cen%node_id )
+  ! do iw = 1, size(this%rot_cen%node_id,1)
+  !   write(*,*) this%rot_cen%node_id(iw)
+  ! end do
+  ! write(*,*) ' shape(this%rot_cen%ind    ) : ' ,  shape(this%rot_cen%ind     )
+  ! do iw = 1, size(this%rot_cen%ind,2)
+  !   write(*,*) this%rot_cen%ind(:,iw)
+  ! end do
+  ! write(*,*) ' shape(this%rot_cen%wei    ) : ' ,  shape(this%rot_cen%wei     )
+  ! do iw = 1, size(this%rot_cen%wei,2)
+  !   write(*,*) this%rot_cen%wei(:,iw)
+  ! end do
+  ! write(*,*) ' shape(this%rot_cen%span_wei): ' ,  shape(this%rot_cen%span_wei)
+  ! do iw = 1, size(this%rot_cen%span_wei,1)
+  !   write(*,*) this%rot_cen%span_wei(iw)
+  ! end do
+  ! write(*,*) ' shape(this%blen_cen%node_id) : ' ,  shape(this%blen_cen%node_id )
+  ! do iw = 1, size(this%blen_cen%node_id,1)
+  !   write(*,*) this%blen_cen%node_id(iw)
+  ! end do
+  ! write(*,*) ' shape(this%blen_cen%ind    ) : ' ,  shape(this%blen_cen%ind     )
+  ! do iw = 1, size(this%blen_cen%ind,2)
+  !   write(*,*) this%blen_cen%ind(:,iw)
+  ! end do
+  ! write(*,*) ' shape(this%blen_cen%wei    ) : ' ,  shape(this%blen_cen%wei     )
+  ! do iw = 1, size(this%blen_cen%wei,2)
+  !   write(*,*) this%blen_cen%wei(:,iw)
+  ! end do
+  ! write(*,*) ' shape(this%blen_cen%span_wei): ' ,  shape(this%blen_cen%span_wei)
+  ! do iw = 1, size(this%blen_cen%span_wei,1)
+  !   write(*,*) this%blen_cen%span_wei(iw)
+  ! end do
   ! write(*,*) ' stop in t_hinge%build_connectivity() ' ; stop
-  ! check ---
+  ! ! check ---
 
   !> Explicit deallocations
   deallocate(rrb, rrh, dist_all, wei_v, ind_v)
@@ -496,7 +779,7 @@ subroutine build_connectivity(this, loc_points)
   deallocate(ble_i2h, ble_p2h, ble_w2h, ble_s2h) ! *****
 
 
-end subroutine build_connectivity
+end subroutine build_connectivity_cen
 
 ! ---------------------------------------------------------------
 !> Naif sort
