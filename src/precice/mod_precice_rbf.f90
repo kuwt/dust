@@ -26,6 +26,9 @@ type :: t_precice_rbf
   !> Coupling nodes
   real(wp), allocatable :: nodes(:,:)
 
+  !> Global position of the coupling nodes
+  real(wp), allocatable :: rrb(:,:)
+
   !> Grid nodes connectivity
   type(t_rbf_conn) :: nod
 

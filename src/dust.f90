@@ -887,12 +887,12 @@
       do i = 1, size(precice%fields)
         if ( trim(precice%fields(i)%fio) .eq. 'write' ) then
 
-          ! debug ---
-          ! write(*,*) i
-          ! precice%fields(i)%fdata = 0.0_wp
-          call random_number( precice%fields(i)%fdata ) 
-          precice%fields(i)%fdata = 1.0e-10_wp * precice%fields(i)%fdata 
-          ! debug ---
+          ! ! debug ---
+          ! ! write(*,*) i
+          ! ! precice%fields(i)%fdata = 0.0_wp
+          ! call random_number( precice%fields(i)%fdata ) 
+          ! precice%fields(i)%fdata = 1.0e-10_wp * precice%fields(i)%fdata 
+          ! ! debug ---
 
           if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
             call precicef_write_bsdata( precice%fields(i)%fid, &

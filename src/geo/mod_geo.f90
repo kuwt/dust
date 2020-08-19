@@ -1163,9 +1163,16 @@ subroutine load_components(geo, in_file, out_file, te)
             ind_coupling = (/ ( i3, i3=1, size(ind_coupling,1) ) /)
           end if
 
-          !> Define %rbf%node to compute struct-aero connectivity, with build_connectivity()
-          allocate( geo%components(i_comp)%rbf%nodes(3, np_precice) )
+          !> Define %rbf%nodes to compute struct-aero connectivity, with build_connectivity()
+          ! %rbf%nodes: coordinates of the coupling nodes in the local reference frame
+          ! %rbf%rrb  : coordinates of the coupling nodes in the global reference frame,
+          !             - here only allocated and itialized to a meaningless value,
+          !             - to be updated at each timestep, with data read from precice,
+          !               in t_precice%update_elems
+          allocate( geo%components(i_comp)%rbf%nodes(3, np_precice) , &
+                    geo%components(i_comp)%rbf%rrb  (3, np_precice) )
           geo%components(i_comp)%rbf%nodes = comp_coupling_nodes(:,ind_coupling)
+          geo%components(i_comp)%rbf%rrb   = -333.3_wp
           do ih = 1, n_hinges
             if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
               allocate( geo%components(i_comp)%hinge(ih)%nodes(3,hinge_ind(ih)) )

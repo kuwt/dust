@@ -532,6 +532,7 @@ subroutine update_force( this, geo, elems )
                     comp%rbf%cen%wei(iw,i) * comp%el(i)%dforce
 
             !> Moments
+            ! *** to do *** check this formula: sign of cross( dr, f )?
             this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) + &
                     comp%rbf%cen%wei(iw,i) * ( comp%el(i)%dmom + &
                     cross( comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i)) - comp%el(i)%cen, &
@@ -556,7 +557,7 @@ subroutine update_force( this, geo, elems )
           if ( trim(comp%hinge(ih)%input_type) .eq. 'coupling' ) then
           
             !> Update structural forcing, taking into account hinges
-            call this % update_force_coupled_hinge( comp, comp%hinge(ih) )
+            call this % update_force_coupled_hinge( comp, comp%hinge(ih), j_for, j_mom )
 
           end if
         end do
@@ -606,13 +607,14 @@ end subroutine update_force
 
 !----------------------------------------------------------------
 !> Update structural forces, taking into account coupled hinges
-subroutine update_force_coupled_hinge( this, comp, hinge )
+subroutine update_force_coupled_hinge( this, comp, hinge, j_for, j_mom )
   class(t_precice)     , intent(inout) :: this
   type(t_geo_component), intent(inout) :: comp
   type(t_hinge)        , intent(inout) :: hinge
+  integer              , intent(in)    :: j_for, j_mom
 
   integer :: i, j, n_nodes, nj
-  integer :: a, h, b
+  integer :: a, h, b, ip
   real(wp) :: al_ah, w_ah, w_ab
  
   !> check input type
@@ -623,12 +625,25 @@ subroutine update_force_coupled_hinge( this, comp, hinge )
     write(*,*) ' Stop. '; stop
   end if
 
+  ! ! debug ---
+  ! write(*,*) ' Debug in update_force_coupled_hinges '
+  ! write(*,*) ' precice forces and moments before correction'
+  ! do i = 1, size(this%fields(j_for)%fdata,2)
+  !   write(*,*) this%fields(j_for)%fdata(:,i), '         ' , &
+  !              this%fields(j_mom)%fdata(:,i)
+  ! end do
+  ! ! debug ---
+
   !> Rot
   n_nodes = size( hinge%rot_cen%node_id )
   do i = 1, n_nodes
 
     a     = hinge%rot_cen%node_id(i)
     al_ah = hinge%rot_cen%span_wei(i)
+
+    ! ! debug ---
+    ! write(*,*) ' a, al_ah: ', a, al_ah
+    ! ! debug ---
 
     !> Update f_h, f_h += ...
     nj = size( hinge%rot_cen%ind, 1 )
@@ -637,8 +652,21 @@ subroutine update_force_coupled_hinge( this, comp, hinge )
       h    = hinge%rot_cen%ind(j,i)
       w_ah = hinge%rot_cen%wei(j,i)
 
+      ip   = hinge%i_points_precice(h)
+
+      ! ! debug ---
+      ! write(*,*) ' h, w_ah, ip: ', h, w_ah, ip
+      ! ! debug ---
+
       !> Update f_h
-      ! *** to do ***
+      this%fields(j_for)%fdata(:,ip) = this%fields(j_for)%fdata(:,ip) &
+                                     + al_ah * w_ah * comp%el(a)%dforce
+
+      !> Update m_h
+      this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) &
+        + al_ah * w_ah * ( &
+            comp%el(a)%dmom + &
+            cross( comp%el(a)%cen - hinge%act%rr(:,h) , comp%el(a)%dforce ) )
 
     end do
 
@@ -649,14 +677,29 @@ subroutine update_force_coupled_hinge( this, comp, hinge )
       b    = comp%rbf%cen%ind(j,a)
       w_ab = comp%rbf%cen%wei(j,a)
 
+      ip   = comp%i_points_precice(b)
+
+      ! ! debug ---
+      ! write(*,*) ' b, w_ab, ip: ', b, w_ab, ip
+      ! ! debug ---
+
       !> Update f_b
-      ! *** to do ***
+      this%fields(j_for)%fdata(:,ip) = this%fields(j_for)%fdata(:,ip) &
+                                     - al_ah * w_ab * comp%el(a)%dforce
+
+      !> Update m_b
+      this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) &
+        - al_ah * w_ab * ( &
+            comp%el(a)%dmom + &
+            cross( comp%el(a)%cen - comp%rbf%rrb(:,b) , comp%el(a)%dforce ) )
 
     end do
 
   end do
 
   !> Blen
+  ! *** to do *** use the law of motion in the blending region to obtain
+  ! a consistent interpolation of force and moments (Power_a = Power_b + Power_h)
   n_nodes = size( hinge%blen_cen%node_id )
   do i = 1, n_nodes
 
@@ -670,8 +713,17 @@ subroutine update_force_coupled_hinge( this, comp, hinge )
       h    = hinge%blen_cen%ind(j,i)
       w_ah = hinge%blen_cen%wei(j,i)
 
+      ip   = hinge%i_points_precice(h)
+
       !> Update f_h
-      ! *** to do ***
+      this%fields(j_for)%fdata(:,ip) = this%fields(j_for)%fdata(:,ip) &
+                                     + al_ah * w_ah * comp%el(a)%dforce
+
+      !> Update m_h
+      this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) &
+        + al_ah * w_ah * ( &
+            comp%el(a)%dmom + &
+            cross( comp%el(a)%cen - hinge%act%rr(:,h) , comp%el(a)%dforce ) )
 
     end do
 
@@ -682,12 +734,31 @@ subroutine update_force_coupled_hinge( this, comp, hinge )
       b    = comp%rbf%cen%ind(j,a)
       w_ab = comp%rbf%cen%wei(j,a)
 
+      ip   = comp%i_points_precice(b)
+
       !> Update f_b
-      ! *** to do ***
+      this%fields(j_for)%fdata(:,ip) = this%fields(j_for)%fdata(:,ip) &
+                                     - al_ah * w_ab * comp%el(a)%dforce
+
+      !> Update m_b
+      this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) &
+        - al_ah * w_ab * ( &
+            comp%el(a)%dmom + &
+            cross( comp%el(a)%cen - comp%rbf%rrb(:,b) , comp%el(a)%dforce ) )
 
     end do
 
   end do
+
+  ! ! debug ---
+  ! write(*,*) ' precice forces and moments after correction'
+  ! do i = 1, size(this%fields(j_for)%fdata,2)
+  !   write(*,*) this%fields(j_for)%fdata(:,i), '         ' , &
+  !              this%fields(j_mom)%fdata(:,i)
+  ! end do
+  ! ! debug ---
+  ! write(*,*) ' Stop in update_force_coupled_hinge. '; stop
+  ! ! debug ---
 
 
 end subroutine update_force_coupled_hinge
@@ -882,6 +953,7 @@ subroutine update_elems( this, geo, elems )
             ! === Coupling Node ===
             !> Position
             pos   = this%fields(j_pos)%fdata(:, comp%i_points_precice(comp%rbf%nod%ind(iw,i)))
+            comp%rbf%rrb(:,comp%rbf%nod%ind(iw,i)) = pos
             !> Velocity
             vel   = this%fields(j_vel)%fdata(:, comp%i_points_precice(comp%rbf%nod%ind(iw,i)))
             !> Rotation

@@ -24,8 +24,8 @@ TODO list:
 #B   Implement hinge coupling
 
 DONE list:
-#1   fix TE bug with moving hinges. First wake elements looks to drift towards
-     the LE, w/o being coincidente with the TE of the geometrical component
+#1   fix TE bug with moving hinges. First wake elements look to drift towards
+     the LE, w/o being coincident with the TE of the geometrical component
      (occurring only when the component has Moving = F, and incremental update
      of theta is used, see #2)
 #2   make hinge_deflection consistent for components with Moving = T ( with 
