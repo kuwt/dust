@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -126,7 +126,7 @@ use mod_dust_io, only: &
 
 use mod_octree, only: &
   initialize_octree, sort_particles, t_octree, calculate_multipole, apply_multipole
-  
+
 use mod_vortpart, only: &
   t_vortpart, t_vortpart_p
 implicit none
@@ -193,7 +193,7 @@ type(t_tedge) :: te
 type(t_aero_tab), allocatable :: airfoil_data(:)
 !> Linear system
 type(t_linsys) :: linsys
-!> Wake 
+!> Wake
 type(t_wake) :: wake
 
 !> Timing vars
@@ -281,7 +281,7 @@ call prms%CreateRealOption( 'RankineRad', &
 call prms%CreateRealOption( 'CutoffRad', &
       "Radius of complete cutoff  for vortex induction near core", '0.001')
 
-!== Octree stuff == 
+!== Octree stuff ==
 call prms%CreateRealOption('BoxLength','length of the octree box')
 call prms%CreateIntArrayOption('NBox','number of boxes in each direction','(/1,1,1/)')
 call prms%CreateRealArrayOption( 'OctreeOrigin', "rigid wake velocity" )
@@ -356,7 +356,7 @@ allocate(velocity_fm(3,n_parts,n_parts,n_parts))
 allocate(velocity_fm_long(3,n_parts*n_parts*n_parts))
 ip = 0
 partmag = 1.0_wp/real(n_parts**3,wp)
-do k=1,n_parts; do j=1,n_parts; do i=1,n_parts 
+do k=1,n_parts; do j=1,n_parts; do i=1,n_parts
   parts(i,j,k)%mag => prt_mag(i,j,k)
   parts(i,j,k)%mag = partmag
   parts(i,j,k)%dir = (/1.0_wp, 0.0_wp, 0.0_wp/)
@@ -383,8 +383,8 @@ call printout(message)
 call printout(nl//'====== Performing brute force interactions ======')
 t0 = dust_time()
 velocity_bf = 0.0_wp
-do kq=1,n_parts; do jq=1,n_parts; do iq=1,n_parts 
-  do k=1,n_parts; do j=1,n_parts; do i=1,n_parts 
+do kq=1,n_parts; do jq=1,n_parts; do iq=1,n_parts
+  do k=1,n_parts; do j=1,n_parts; do i=1,n_parts
     if(.not.all( (/i-iq, j-jq, k-kq/) .eq. 0)) then
     R2 = sum((parts(iq,jq,kq)%cen-parts(i,j,k)%cen)**2)+r_Rankine**2
     velocity_bf(:,iq,jq,kq) =  velocity_bf(:,iq,jq,kq) - &
@@ -419,7 +419,7 @@ call printout(message)
 
 !=========CHECKS AND OUTPUT==================
 !ip = 0
-!do kq=1,n_parts; do jq=1,n_parts; do iq=1,n_parts 
+!do kq=1,n_parts; do jq=1,n_parts; do iq=1,n_parts
 !  ip = ip + 1
 !  velocity_fm(:,iq,jq,kq) =  velocity_fm_long(:,ip)
 !enddo; enddo; enddo;
@@ -486,7 +486,7 @@ subroutine copy_geo(sim_param, geo_file, run_id)
 
   !target file name: same as run basename with appendix
   target_file = trim(sim_param%basename)//'_geo.h5'
-  
+
   if (trim(geo_file) .ne. trim(target_file)) then
   !Copy the geometry file
   call execute_command_line('cp '//trim(geo_file)//' '//trim(target_file), &
@@ -531,13 +531,13 @@ subroutine init_timestep(t)
   endif
 
   !If it is the last timestep output the solution, unless dt_out is set
-  !longer than the whole execution, declaring implicitly that no output is 
+  !longer than the whole execution, declaring implicitly that no output is
   !required.
   if((it .eq. nstep) .and. (dt_out .le. tend)) then
     time_2_out = .true.
     time_2_debug_out = .true.
   endif
- 
+
   !if requested, print the output also at the first step (t0)
   if ((t.eq.tstart) .and. output_start) then
     t_last_out = t
@@ -580,7 +580,7 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
  integer :: ie, iv
 
  ! surf_vel and vel_phi
- real(wp), allocatable :: surf_vel(:,:), vel_phi(:,:) 
+ real(wp), allocatable :: surf_vel(:,:), vel_phi(:,:)
  integer :: i_e
 
 
@@ -589,8 +589,8 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
   allocate(conn(4,size(elems))); conn = -666;
   ! surf_vel and vel_phi
   allocate( surf_vel(3,size(elems)), vel_phi(3,size(elems)) )
-  surf_vel = -666.6 ; vel_phi = -666.6 
- 
+  surf_vel = -666.6 ; vel_phi = -666.6
+
   do ie=1,size(elems)
     norm(:,ie) = elems(ie)%p%nor
     cent(:,ie) = elems(ie)%p%cen
@@ -606,9 +606,9 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
 
     ! surf_vel and vel_phi for surfpan only
     select type( el => elems(ie)%p )
-     class is(t_surfpan) 
+     class is(t_surfpan)
       surf_vel(:,ie) = el%surf_vel   ! elems(ie)%p%surf_vel
-      
+
       vel_phi(:,ie) = 0.0_wp
       do i_e = 1 , el%n_ver    ! elems(ie)%p%n_ver
         if ( associated(el%neigh(i_e)%p) ) then !  .and. &
@@ -617,9 +617,9 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
         end if
       end do
       vel_phi(:,ie)  = - vel_phi(:,ie)
- 
+
     end select
-  
+
   enddo
 
   write(sit,'(I4.4)') it
@@ -686,14 +686,14 @@ subroutine debug_ll_printout_geometry(elems, geo, basename, it)
  integer :: ie, iv
 
  ! surf_vel and vel_phi
- real(wp), allocatable :: surf_vel(:,:), vel_phi(:,:) 
+ real(wp), allocatable :: surf_vel(:,:), vel_phi(:,:)
  integer :: i_e
 
 
   allocate(norm(3,size(elems)), cent(3,size(elems)), velb(3,size(elems)))
   allocate(el(4,size(elems))); el = 0
   allocate(conn(4,size(elems))); conn = -666;
- 
+
   do ie=1,size(elems)
     norm(:,ie) = elems(ie)%p%nor
     cent(:,ie) = elems(ie)%p%cen
@@ -707,7 +707,7 @@ subroutine debug_ll_printout_geometry(elems, geo, basename, it)
       endif
     enddo
 
-  
+
   enddo
 
   write(sit,'(I4.4)') it

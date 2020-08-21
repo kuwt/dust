@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -68,7 +68,7 @@ use mod_hdf5_io, only: &
    open_hdf5_group, &
    close_hdf5_group, &
 !  write_hdf5, &
-   read_hdf5 
+   read_hdf5
 !  read_hdf5_al, &
 !  check_dset_hdf5
 
@@ -106,7 +106,7 @@ character(len=max_char_len) :: msg
 
 contains
 
-! ---------------------------------------------------------------------- 
+! ----------------------------------------------------------------------
 
 subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                      out_frmt , components_names , all_comp , &
@@ -121,7 +121,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
  logical , intent(in) :: all_comp
  integer , intent(in) :: an_start , an_end , an_step
  logical, intent(in) :: average
- 
+
  type(t_geo_component), allocatable :: comps(:)
  character(len=max_char_len) :: filename
  integer(h5loc) :: floc , ploc
@@ -136,7 +136,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
  integer :: nelem , nelem_w, nelem_vp
 
  real(wp), allocatable :: points_ave(:,:)
- 
+
  real(wp) :: u_inf(3)
  real(wp) :: P_inf , rho
 
@@ -147,15 +147,15 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
  type(t_output_var), allocatable :: out_vars(:), ave_out_vars(:)
  type(t_output_var), allocatable :: out_vars_w(:), out_vars_vp(:)
  integer :: nprint , nprint_w, nelem_out
- 
+
  integer :: it, ires
  real(wp) :: t
  character(len=*), parameter :: this_sub_name='post_viz'
 
   write(msg,'(A,I0,A)') nl//'++++++++++ Analysis: ',ia,' visualization'//nl
   call printout(trim(msg))
-  
-  ! Print the wake or not 
+
+  ! Print the wake or not
   out_wake = getlogical(sbprms,'Wake')
   separate_wake = getlogical(sbprms,'SeparateWake')
 
@@ -163,7 +163,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   out_vort = .false.; out_vel = .false.; out_press =.false.; out_cp = .false.
   n_var = countoption(sbprms, 'Variable')
   allocate(var_names(n_var))
-  do i_var = 1, n_var 
+  do i_var = 1, n_var
     var_names(i_var) = getstr(sbprms, 'Variable') ; call LowCase(var_names(i_var))
   enddo
   out_vort = isInList('vorticity',var_names) ! Always lower case string in the code !
@@ -183,49 +183,49 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   if(out_turbvisc) nprint = nprint+1
   allocate(out_vars(nprint))
   if(average) allocate(ave_out_vars(nprint))
-  !for the wake 
+  !for the wake
   if(out_wake) then
     allocate(out_vars_w(nprint))
     allocate(out_vars_vp(nprint))
   endif
-  
-  
+
+
   ! Load the components (just once)
   call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
-  
-  
+
+
   call load_components_postpro(comps, points, nelem, floc, &
                                components_names, all_comp)
-  
+
   call close_hdf5_file(floc)
-  
-  
+
+
   if(out_wake .and. average) call error(this_sub_name, this_mod_name, &
   'Cannot output an averaged wake visualization. Remove the wake or avoid &
   &averaging')
 
   ! Prepare_geometry_postpro
   call prepare_geometry_postpro(comps)
-  
+
   ! Time loop
   ires = 0
   do it = an_start, an_end, an_step
     ires = ires+1
-  
-    ! Open the file 
+
+    ! Open the file
     write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
     call open_hdf5_file(trim(filename),floc)
-  
+
     ! Load free-stream parameters
     call open_hdf5_group(floc,'Parameters',ploc)
     call read_hdf5(u_inf,'u_inf',ploc)
     call read_hdf5(P_inf,'P_inf',ploc)
     call read_hdf5(rho,'rho_inf',ploc)
     call close_hdf5_group(ploc)
-  
+
     ! Load the references
     call load_refs(floc,refs_R,refs_off)
-  
+
     ! Move the points
     call update_points_postpro(comps, points, refs_R, refs_off)
     !expand the actuator disks
@@ -238,7 +238,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
       points_ave = points_ave*(real(ires-1,wp)/real(ires,wp)) + &
                    points_exp/real(ires,wp)
     endif
-  
+
     !Load the results ! TODO: check this routine and the content of the files to be read
     ! TODO : compute the missing quantities
     if(out_surfvel) then
@@ -246,13 +246,13 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     else
       call load_res(floc, comps, vort, press, t)
     endif
-  
+
     !Prepare the variable for output
     nelem_out = size(vort)
     ! TODO: compute/or read pressure and velocity field. Now set equal to zero
     allocate(  vel(size( vort,1)) ) ; vel = 0.0_wp
     allocate(   cp(size(press,1)) ) ;  cp = 0.0_wp
-    
+
     i_var = 1
     if(out_vort) then
       call add_output_var(out_vars(i_var), vort, 'Singularity_Intensity', &
@@ -275,7 +275,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
       call add_output_var(out_vars(i_var), press, 'Pressure',.false.)
       i_var = i_var +1
     endif
-  
+
     if(average) then
       if( ires .eq. 1) then
         call copy_output_vars(out_vars, ave_out_vars, .true.)
@@ -286,13 +286,13 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                                 out_vars(i_var)%var/real(ires,wp)
       enddo
     endif
-    
+
     if(.not. average) then
       ! Output filename
       write(filename,'(A,I4.4)') trim(basename)//'_'//trim(an_name)//'-',it
-      
+
       if (out_wake) then
-        
+
         if(out_turbvisc) then
           call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort, &
                            vpvort_v, vpturbvisc)
@@ -301,7 +301,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
         endif
         nelem_w = size(welems,2)
         nelem_vp = size(vppoints,2)
-        
+
         i_var = 1
         if(out_vort) then
           call add_output_var(out_vars_w(i_var), wvort, &
@@ -356,7 +356,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                  'Vorticity',.true.)
           i_var = i_var +1
         endif
-  
+
         !Output the results (with wake)
         select case (trim(out_frmt))
          case ('tecplot')
@@ -376,13 +376,13 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
            call error('dust_post','','Unknown format '//trim(out_frmt)//&
                       ' for visualization output')
          end select
-      
+
         deallocate (wpoints, welems,  wvort)
         call clear_output_vars(out_vars_w)
         call clear_output_vars(out_vars_vp)
-  
+
       else
-        
+
         !Output the results (without wake)
         select case (trim(out_frmt))
          case ('tecplot')
@@ -397,24 +397,24 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
            call error('dust_post','','Unknown format '//trim(out_frmt)//&
                       ' for visualization output')
          end select
-  
+
       endif !output wake
 
     endif !not average
-  
+
     call close_hdf5_file(floc)
-  
+
     deallocate(refs_R, refs_off)
     !deallocate(print_var_names, print_vars)
     call clear_output_vars(out_vars)
-  
+
     if (allocated(vort   ) ) deallocate(vort )
     if (allocated(press  ) ) deallocate(press)
     if (allocated(surfvel) ) deallocate(surfvel)
     if (allocated(vel    ) ) deallocate(vel  )
     if (allocated(cp     ) ) deallocate(cp   )
-  
-  
+
+
   end do ! Time loop
 
   !Print the average
@@ -437,20 +437,20 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     call clear_output_vars(ave_out_vars)
     deallocate(ave_out_vars)
   endif
-  
+
   deallocate(points)
   call destroy_elements(comps)
   deallocate(comps)
   !deallocate(var_names)
   deallocate(out_vars)
   if(out_wake) deallocate(out_vars_w, out_vars_vp)
-  
-  
+
+
   write(msg,'(A,I0,A)') nl//'++++++++++ Visualization done'//nl
   call printout(trim(msg))
 
 end subroutine post_viz
 
-! ---------------------------------------------------------------------- 
+! ----------------------------------------------------------------------
 
 end module mod_post_viz

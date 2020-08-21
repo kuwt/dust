@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -75,7 +75,7 @@ initialize_hdf5, destroy_hdf5
 implicit none
 
 !Input
-character(len=*), parameter :: input_file_name_def = 'dust_pre.in' 
+character(len=*), parameter :: input_file_name_def = 'dust_pre.in'
 character(len=max_char_len) :: input_file_name
 character(len=max_char_len) :: output_file_name
 character(len=max_char_len) :: output_file_name_read
@@ -102,19 +102,19 @@ call initialize_hdf5()
 
 !------ Input reading ------
 
-if(command_argument_count().gt.0) then                                         
-  call get_command_argument(1,value=input_file_name)                           
-else                                                                           
-  input_file_name = input_file_name_def                                        
-endif   
+if(command_argument_count().gt.0) then
+  call get_command_argument(1,value=input_file_name)
+else
+  input_file_name = input_file_name_def
+endif
 
 
-if(command_argument_count().gt.1) then                                         
-  call get_command_argument(2,value=output_file_name)                           
+if(command_argument_count().gt.1) then
+  call get_command_argument(2,value=output_file_name)
   cmd_set_filename = .true.
 else
   cmd_set_filename = .false.
-endif   
+endif
 
 
 !call prms%CreateRealOption( 'tstart', "Starting time", '0.0')

@@ -1,3 +1,7 @@
+0.5.17-b
+* Added divergence filtering in the particles wake evolution
+* Small improvements
+
 0.5.16-b
 * Minor improvements on warnings and parameters
 

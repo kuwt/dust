@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,8 +36,8 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte           <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
@@ -76,12 +76,12 @@ contains
 
 subroutine read_mesh_parametric(mesh_file,ee,rr, &
                      npoints_chord_tot,nelem_span_tot)
- 
+
  character(len=*), intent(in) :: mesh_file
- integer  , allocatable, intent(out) :: ee(:,:) 
- real(wp) , allocatable, intent(out) :: rr(:,:) 
+ integer  , allocatable, intent(out) :: ee(:,:)
+ real(wp) , allocatable, intent(out) :: rr(:,:)
  integer  , intent(out), optional    :: npoints_chord_tot, nelem_span_tot
- 
+
  type(t_parse) :: pmesh_prs
  integer :: ee_size , rr_size
 
@@ -94,7 +94,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
  real(wp), allocatable :: ref_point(:)
  ! data read from file
  ! sections ---
- real(wp)         , allocatable :: chord_list(:) , twist_list(:) 
+ real(wp)         , allocatable :: chord_list(:) , twist_list(:)
  character(len=48), allocatable :: airfoil_list(:)
  ! regions  ---
  integer , allocatable :: nelem_span_list(:)
@@ -115,7 +115,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
  character :: ElType
  real(wp), allocatable :: chord_fraction(:), span_fraction(:)
  character(len=max_char_len) :: type_chord
- integer :: i1  
+ integer :: i1
 
  integer :: iSec
  real(wp) :: dy_actual_airfoils , dy_sections , csi , twist_rad
@@ -182,7 +182,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
   nelem_chord = getint(pmesh_prs,'nelem_chord')
   ElType  = getstr(pmesh_prs,'ElType')
-   
+
   nSections = countoption(pmesh_prs,'chord')
   nRegions  = countoption(pmesh_prs,'span')
 
@@ -190,7 +190,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   if ( nSections .ne. nRegions + 1 ) then
     call error(this_sub_name, this_mod_name, 'Unconsistent input: &
          &nSections .ne. nRegions. Stop.')
-  end if 
+  end if
 
   ref_chord_fraction = getreal(pmesh_prs,'reference_chord_fraction')
   ref_point          = getrealarray(pmesh_prs,'starting_point',3)
@@ -246,14 +246,14 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   else
    write(*,*) ' mesh_file   : ' , trim(mesh_file)
    write(*,*) ' n_type_span : ' , n_type_span
-   write(*,*) ' nRegions    : ' , nRegions    
+   write(*,*) ' nRegions    : ' , nRegions
    call error(this_sub_name, this_mod_name, 'Unconsistent input: &
          &n_type_span .ne. nRegions. Stop.')
   end if
 
   allocate(chord_list  (nSections))  ; chord_list = 0.0_wp
   allocate(twist_list  (nSections))  ; twist_list = 0.0_wp
-  allocate(airfoil_list(nSections)) 
+  allocate(airfoil_list(nSections))
   do iSection= 1,nSections
     chord_list(iSection)   = getreal(pmesh_prs,'chord')
     twist_list(iSection)   = getreal(pmesh_prs,'twist')
@@ -261,7 +261,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   enddo
 
   if (ElType.eq.'p') then
-    nelem_chord_tot = 2 * nelem_chord 
+    nelem_chord_tot = 2 * nelem_chord
   else
     nelem_chord_tot = nelem_chord
   endif
@@ -287,7 +287,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
   allocate(rr(3,rr_size)) ; rr = 0.0_wp
 
-  ! get chordwise division 
+  ! get chordwise division
   allocate(chord_fraction(nelem_chord+1))
   type_chord = getstr(pmesh_prs,'type_chord')
   call define_division(type_chord, nelem_chord, chord_fraction)
@@ -298,7 +298,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   allocate(rrSection1(3,npoint_chord_tot)) ; rrSection1 = 0.0_wp
   allocate(rrSection2(3,npoint_chord_tot)) ; rrSection2 = 0.0_wp
 
-  ! Initialise dr_ref for the definition of the actual reference_point 
+  ! Initialise dr_ref for the definition of the actual reference_point
   !  of each bay (by updating)
   dx_ref = ref_point(1)       ! 0.0_wp
   dy_ref = ref_point(2)       ! 0.0_wp
@@ -324,7 +324,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     write(*,*) ' Region ' , iRegion , ' / ' , nRegions
 ! check ----
 
-    if ( iRegion .gt. 1 ) then  ! first section = last section of the previous region 
+    if ( iRegion .gt. 1 ) then  ! first section = last section of the previous region
       rrSection1 = rrSection2
     else                        ! build points
       write(*,*) ' nelem_chord_tot ' , nelem_chord_tot
@@ -336,7 +336,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
       write(*,*) size(rrSection1,1) , size(rrSection1,2)
       write(*,*) size(xySection1,1) , size(xySection1,2)
-      rrSection1(1,:) = xySection1(1,:) + ref_point(1)  
+      rrSection1(1,:) = xySection1(1,:) + ref_point(1)
       rrSection1(2,:) = 0.0_wp          + ref_point(2)     ! <--- read from region structure
       rrSection1(3,:) = xySection1(2,:) + ref_point(3)
 
@@ -357,10 +357,10 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                            ref_point, xySection2 )
 
     else ! interpolation
-       
+
       do iSec = iRegion + 1 , nRegions+1
         if ( airfoil_list(iSec) .ne. 'interp' ) then
-          dy_actual_airfoils = sum( abs(span_list(iRegion:iSec-1)) ) 
+          dy_actual_airfoils = sum( abs(span_list(iRegion:iSec-1)) )
         exit
         end if
       end do
@@ -390,15 +390,15 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
            reshape( (/ cos(twist_rad), sin(twist_rad) , &
                       -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
                                                           xyAirfoil1 )
-  
+
 !     xySection2(1,:) = ( (1-csi) * xyAirfoil1(1,:) + &
 !                            csi  * xyAirfoil2(1,:) ) * chord_list(iRegion+1)
 !     xySection2(2,:) = ( (1-csi) * xyAirfoil1(2,:) + &
-!                            csi  * xyAirfoil2(2,:) ) * chord_list(iRegion+1) 
+!                            csi  * xyAirfoil2(2,:) ) * chord_list(iRegion+1)
       xySection2 = ( (1-csi) * xyAirfoil1 + &
                         csi  * xyAirfoil2 ) * chord_list(iRegion+1)
       xySection2(1,:) = xySection2(1,:) - ref_chord_fraction
-      
+
       twist_rad = twist_list(iRegion+1) * 4.0_wp * atan(1.0_wp) / 180.0_wp
       xySection2 = matmul( &
            reshape( (/ cos(twist_rad),-sin(twist_rad) , &
@@ -419,9 +419,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     !> save before update
     dx_ref_1 = dx_ref ;  dy_ref_1 = dy_ref ;  dz_ref_1 = dz_ref
 
-    dx_ref = span_list(iRegion) * tan( sweep_list(iRegion)* pi / 180.0_wp ) + dx_ref 
-    dy_ref = span_list(iRegion)                                             + dy_ref 
-    dz_ref = span_list(iRegion) * tan( dihed_list(iRegion)* pi / 180.0_wp ) + dz_ref 
+    dx_ref = span_list(iRegion) * tan( sweep_list(iRegion)* pi / 180.0_wp ) + dx_ref
+    dy_ref = span_list(iRegion)                                             + dy_ref
+    dz_ref = span_list(iRegion) * tan( dihed_list(iRegion)* pi / 180.0_wp ) + dz_ref
 
     rrSection2(1,:) = xySection2(1,:) + dx_ref
     rrSection2(2,:) = 0.0_wp          + dy_ref  ! <--- read from region structure
@@ -430,39 +430,39 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     ! Interpolation of the nodes of the region i (between sections i and i+1)
     do i1 = 1 , nelem_span_list(iRegion)
 
-      ista = iend + 1 
+      ista = iend + 1
       iend = iend + npoint_chord_tot
 
       if ( .not. twist_linear_interp ) then
 
         ! write(*,*) ; write(*,* )' *** twist_linear_interp = F *** ' ; write(*,*)
 
-        if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then    
+        if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then
           ! uniform spacing in span
           rr(:,ista:iend) = rrSection1 + real(i1,wp) / &
                             real(nelem_span_list(iRegion),wp) * &
                             ( rrSection2 - rrSection1 )
-        else if ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then    
+        else if ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then
           ! cosine  spacing in span
           rr(:,ista:iend) = 0.5_wp * ( rrSection1 + rrSection2 ) - &
                             0.5_wp * ( rrSection2 - rrSection1 ) * &
-                      cos( real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
-        else if ( trim(type_span_list(iRegion)) .eq. 'cosineOB' ) then    
+                      cos( real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
+        else if ( trim(type_span_list(iRegion)) .eq. 'cosineOB' ) then
           ! cosine  spacing in span: outboard refinement
           rr(:,ista:iend) = rrSection1 + &
                           ( rrSection2 - rrSection1 ) * &
-              sin( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
-        else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then    
+              sin( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
+        else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then
           ! cosine  spacing in span: inboard refinement
           rr(:,ista:iend) = rrSection2 - &
                           ( rrSection2 - rrSection1 ) * &
-              cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
+              cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
         else
           write(*,*) ' mesh_file   : ' , trim(mesh_file)
-          write(*,*) ' type_span_list(',iRegion,') : ' , trim(type_span_list(iRegion)) 
+          write(*,*) ' type_span_list(',iRegion,') : ' , trim(type_span_list(iRegion))
           call error(this_sub_name, this_mod_name, 'Unconsistent input: &
                 & type_span must be equal to uniform, cosine, cosineIB, cosineOB.')
-        end if 
+        end if
 
       else !-> linear interpolation of the twist angle
 
@@ -471,12 +471,12 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         allocate(rr_tw(  2,npoint_chord_tot))
         allocate(rr_tw_1(2,npoint_chord_tot))
         allocate(rr_tw_2(2,npoint_chord_tot))
- 
-        ! === Transform sections back to local reference frames === 
+
+        ! === Transform sections back to local reference frames ===
         ! Section 1
-        !> remove offset in x,z 
-        rr_tw_1(1,:) = rrSection1(1,:) - dx_ref_1 
-        rr_tw_1(2,:) = rrSection1(3,:) - dz_ref_1 
+        !> remove offset in x,z
+        rr_tw_1(1,:) = rrSection1(1,:) - dx_ref_1
+        rr_tw_1(2,:) = rrSection1(3,:) - dz_ref_1
         !> rotate section back ( coord. in the local ref. frame )
         twist_rad = twist_list(iRegion) * pi/180.0_wp
         rr_tw_1 = matmul( &
@@ -484,7 +484,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                         -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
                                                                rr_tw_1 )
         ! Section 2
-        !> remove offset in x,z 
+        !> remove offset in x,z
         rr_tw_2(1,:) = rrSection2(1,:) - dx_ref
         rr_tw_2(2,:) = rrSection2(3,:) - dz_ref
         !> rotate section back ( coord. in the local ref. frame )
@@ -494,19 +494,19 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                         -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
                                                                rr_tw_2 )
         ! === Interpolation weight ===
-        if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then    
+        if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then
           interp_weight = real(i1,wp) / real(nelem_span_list(iRegion),wp)
-        else if ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then    
+        else if ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then
           interp_weight = 0.5_wp * ( &
                         1.0_wp - cos( real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) ) )
-        else if ( trim(type_span_list(iRegion)) .eq. 'cosineOB' ) then    
-          interp_weight = sin( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
-        else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then    
-          interp_weight = 1.0_wp - cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
-          ! interp_weight = cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) ) 
+        else if ( trim(type_span_list(iRegion)) .eq. 'cosineOB' ) then
+          interp_weight = sin( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
+        else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then
+          interp_weight = 1.0_wp - cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
+          ! interp_weight = cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
         else
           write(*,*) ' mesh_file   : ' , trim(mesh_file)
-          write(*,*) ' type_span_list(',iRegion,') : ' , trim(type_span_list(iRegion)) 
+          write(*,*) ' type_span_list(',iRegion,') : ' , trim(type_span_list(iRegion))
           call error(this_sub_name, this_mod_name, 'Unconsistent input: &
                 & type_span must be equal to uniform, cosine, cosineIB, cosineOB.')
         end if
@@ -532,7 +532,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
 
       end if
-    
+
     end do
 
 
@@ -547,7 +547,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   npoints_chord_tot = npoint_chord_tot
   ! optional output ----
 
- 
+
 end subroutine read_mesh_parametric
 
 !-------------------------------------------------------------------------------
@@ -580,11 +580,11 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   ! Airfoil geometry +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   ! - read coordinate from file: if <airfoil> is 'xxxxxx.dat'
   ! - build as a member of a airfoil family:
-  !   - NACA 4-digit: NACAmpss 
+  !   - NACA 4-digit: NACAmpss
   !   - NACA 5-digit: NACAxxxxx
   !   - ...
   if ( airfoil(len_trim(airfoil)-3 : len_trim(airfoil)) .eq. '.dat' ) then
-    
+
     call check_file_exists(airfoil, this_sub_name, this_mod_name)
     call read_airfoil ( airfoil , trim(type_chord) , ElType , nelem_chord , point_list )
     do i1 = 1 , size(point_list,2)
@@ -597,8 +597,8 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
                         points_mean_line , point_list )
 
       if ( ElType .eq. 'v' ) then
-        deallocate(point_list) 
-        allocate( point_list(size(points_mean_line,1),size(points_mean_line,2)) ) 
+        deallocate(point_list)
+        allocate( point_list(size(points_mean_line,1),size(points_mean_line,2)) )
         point_list = points_mean_line
       end if
 
@@ -607,12 +607,12 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
                         points_mean_line , point_list )
 
       if ( ElType .eq. 'v' ) then
-        deallocate(point_list) 
-        allocate( point_list(size(points_mean_line,1),size(points_mean_line,2)) ) 
+        deallocate(point_list)
+        allocate( point_list(size(points_mean_line,1),size(points_mean_line,2)) )
         point_list = points_mean_line
       end if
     end if
- 
+
   else
     call error(this_sub_name, this_mod_name, ' only 4-digit and some 5-digit &
       &NACA airfoils implemented. Provide the coordinates of the airfoil as&
@@ -650,7 +650,7 @@ subroutine naca4digits(airfoil_name, nelem_chord,&
   character :: str1
   character(len=2) :: str2
   integer :: ierr
- 
+
   str1 = airfoil_name(1:1)
   read(str1,*,iostat=ierr) mm
   str1 = airfoil_name(2:2)
@@ -670,8 +670,8 @@ subroutine naca4digits(airfoil_name, nelem_chord,&
 
   do iPoint = 1,nelem_chord+1
 
-    xa = chord_fraction(iPoint)  
-   
+    xa = chord_fraction(iPoint)
+
     ! Define mean line ml and local slope theta
     ml = 0.0_wp
     theta = 0.0_wp
@@ -708,7 +708,7 @@ subroutine naca4digits(airfoil_name, nelem_chord,&
   allocate(points(2,2*nelem_chord+1))
   points(:,            1:  nelem_chord  ) = points_lower(:,nelem_chord+1:2:-1)
   points(:,nelem_chord+1:2*nelem_chord+1) = points_upper
-  
+
 
 endsubroutine naca4digits
 
@@ -730,7 +730,7 @@ subroutine naca5digits(airfoil_name, nelem_chord,&
  character(len=2) :: str2
  integer :: ierr
  character(len=*), parameter :: this_sub_name = 'naca5digits'
- 
+
 
   str1 = airfoil_name(1:1)
   read(str1,*,iostat=ierr) L
@@ -749,7 +749,7 @@ subroutine naca5digits(airfoil_name, nelem_chord,&
   select case(P)
    case(1)
     r = 0.0580_wp
-    k1 = 361.400_wp  
+    k1 = 361.400_wp
    case(2)
     r = 0.1260_wp
     k1 = 51.640_wp
@@ -779,8 +779,8 @@ subroutine naca5digits(airfoil_name, nelem_chord,&
 
   do iPoint = 1,nelem_chord+1
 
-    xa = chord_fraction(iPoint)  
-   
+    xa = chord_fraction(iPoint)
+
     ! Define mean line ml and local slope theta
     ml = 0.0_wp
     theta = 0.0_wp
@@ -810,7 +810,7 @@ subroutine naca5digits(airfoil_name, nelem_chord,&
   allocate(points(2,2*nelem_chord+1))
   points(:,            1:  nelem_chord  ) = points_lower(:,nelem_chord+1:2:-1)
   points(:,nelem_chord+1:2*nelem_chord+1) = points_upper
-  
+
 
 endsubroutine naca5digits
 
@@ -824,8 +824,8 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr )
  integer         , intent(in) :: nelems_chord
  real(wp)        , allocatable , intent(out):: rr(:,:)
 
- integer :: nelems_chord_tot 
- real(wp) , allocatable :: rr_geo(:,:) 
+ integer :: nelems_chord_tot
+ real(wp) , allocatable :: rr_geo(:,:)
  integer :: np_geo
  real(wp) , allocatable :: csi_half(:) , csi(:)
  real(wp) , allocatable :: st_geo(:) , s_geo(:)
@@ -863,7 +863,7 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr )
  case('cosineTE' , 'cosineOB')
    do i1 = 1 , nelems_chord+1
      csi_half(i1) = (1.0_wp - cos(pi/2.0_wp*real(i1-1,wp) &
-                                  /real(nelems_chord,wp)) ) 
+                                  /real(nelems_chord,wp)) )
    end do
  case default
  end select
@@ -887,7 +887,7 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr )
    write(*,*)
   ! check ----
 
- allocate(st_geo(np_geo),s_geo(np_geo)) 
+ allocate(st_geo(np_geo),s_geo(np_geo))
  st_geo = 0.0_wp ; s_geo = 0.0_wp
  ! st_geo(1) = s_geo(1) = 0.0_wp
 
@@ -907,10 +907,10 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr )
        ds_geo = s_geo(i2)-s_geo(i2-1)
        rr(:,i1) = (csi(i1)-s_geo(i2-1))/ds_geo * rr_geo(:,i2) + &
                   (s_geo(i2)-csi(i1)  )/ds_geo * rr_geo(:,i2-1)
-       exit 
+       exit
      end if
 
-   end do 
+   end do
  end do
 
  do i1 = 1 , size(rr,2)
@@ -936,20 +936,20 @@ subroutine define_division(type_mesh, nelem, division)
   select case (trim(type_mesh))
   case ("uniform")
     do iPoint = 1,nelem+1
-      division(iPoint) = (real(iPoint,wp)-1)*step
+      division(iPoint) = (real(iPoint-1,wp))*step
     enddo
   case ("cosine")
     do iPoint = 1,nelem+1
-      division(iPoint) = (1.0_wp - cos(pi*(real(iPoint,wp)-1)*step))/2.0_wp
+      division(iPoint) = (1.0_wp - cos(pi*(real(iPoint-1,wp))*step))/2.0_wp
     enddo
   case ("cosineLE", "cosineIB")
     do iPoint = 1,nelem+1
-      division(iPoint) = 1.0_wp - cos(pi/2.0_wp*(real(iPoint,wp)-1)*step)
+      division(iPoint) = 1.0_wp - cos(pi/2.0_wp*(real(iPoint-1,wp))*step)
     enddo
   case ("cosineTE", "cosineOB")
     do iPoint = 1,nelem+1
 !     division(iPoint) = - cos(pi/2.0_wp*((iPoint-1)*step+1.0_wp))
-      division(iPoint) = sin(pi/2.0_wp*((real(iPoint,wp)-1)*step))
+      division(iPoint) = sin(pi/2.0_wp*((real(iPoint-1,wp))*step))
     enddo
   case default
     ! TODO: error in this case
@@ -961,8 +961,8 @@ end subroutine define_division
 
 subroutine read_actuatordisk_parametric(mesh_file,ee,rr)
  character(len=*), intent(in) :: mesh_file
- integer  , allocatable, intent(out) :: ee(:,:) 
- real(wp) , allocatable, intent(out) :: rr(:,:) 
+ integer  , allocatable, intent(out) :: ee(:,:)
+ real(wp) , allocatable, intent(out) :: rr(:,:)
 
  real(wp), allocatable :: x(:), y(:)
  type(t_parse) :: pmesh_prs
@@ -981,7 +981,7 @@ subroutine read_actuatordisk_parametric(mesh_file,ee,rr)
 
   !read the parameters
   call pmesh_prs%read_options(trim(mesh_file),printout_val=.true.)
-  
+
   ElType = getstr(pmesh_prs,'ElType')
 
   if(trim(ElType) .ne. 'a') call error(this_sub_name, this_mod_name, &
@@ -992,7 +992,7 @@ subroutine read_actuatordisk_parametric(mesh_file,ee,rr)
   nstep = getint(pmesh_prs,'nstep')
   ax = getint(pmesh_prs,'Axis')
 
-  
+
   allocate(x(nstep), y(nstep))
 
   do ip = 1, nstep

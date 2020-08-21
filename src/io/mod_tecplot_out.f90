@@ -1,4 +1,4 @@
-!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\. 
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
 !...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
@@ -9,13 +9,13 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani, 
-!!                         Matteo   Tugnoli, 
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
 !! This file is part of DUST, an aerodynamic solver for complex
 !! configurations.
-!! 
+!!
 !! Permission is hereby granted, free of charge, to any person
 !! obtaining a copy of this software and associated documentation
 !! files (the "Software"), to deal in the Software without
@@ -24,10 +24,10 @@
 !! copies of the Software, and to permit persons to whom the
 !! Software is furnished to do so, subject to the following
 !! conditions:
-!! 
+!!
 !! The above copyright notice and this permission notice shall be
 !! included in all copies or substantial portions of the Software.
-!! 
+!!
 !! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 !! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 !! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -36,15 +36,15 @@
 !! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 !! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 !! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!! Authors: 
+!!
+!! Authors:
 !!          Federico Fonte             <federico.fonte@outlook.com>
 !!          Davide Montagnani       <davide.montagnani@gmail.com>
 !!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
 !!=========================================================================
 
 module mod_tecplot_out
- 
+
 use mod_param, only: &
   wp, max_char_len, nl
 
@@ -81,7 +81,7 @@ subroutine tec_out_sol_bin(rr, ee, vort, w_rr, w_ee, w_vort, t, out_filename)
  integer, intent(in)  :: w_ee(:,:)
  real(wp), intent(in) :: w_vort(:)
  real(wp), intent(in) :: t
- character(len=*), intent(in) :: out_filename 
+ character(len=*), intent(in) :: out_filename
 
  character, parameter :: zc = char(0)
  integer :: npoints, ncells, ne
@@ -116,7 +116,7 @@ subroutine tec_out_sol_bin(rr, ee, vort, w_rr, w_ee, w_vort, t, out_filename)
        form='unformatted',iostat=ierr)
 
   !magic number
-  buffer_char = "#!TDV112" ;  write(fu) trim(buffer_char) 
+  buffer_char = "#!TDV112" ;  write(fu) trim(buffer_char)
 
   !integer 1 to set the byte order
   write(fu) int(1,s_size)
@@ -135,7 +135,7 @@ subroutine tec_out_sol_bin(rr, ee, vort, w_rr, w_ee, w_vort, t, out_filename)
   call put_tec_string('Y',fu)
   call put_tec_string('Z',fu)
   call put_tec_string('Vort',fu)
- 
+
   !BODY
   !Zone marker
   write(fu) zoneMarker
@@ -153,8 +153,8 @@ subroutine tec_out_sol_bin(rr, ee, vort, w_rr, w_ee, w_vort, t, out_filename)
   write(fu) real(t,d_size)
 
   !"not used, set to -1"
-  write(fu) int(-1,s_size) 
-  
+  write(fu) int(-1,s_size)
+
   !Zone type: 0 ordered, 3 unstructured quadrilateral
   write(fu) int(3,s_size)
 
@@ -177,10 +177,10 @@ subroutine tec_out_sol_bin(rr, ee, vort, w_rr, w_ee, w_vort, t, out_filename)
   ! n.points, n.elems
   write(fu) int(size(rr,2),s_size)
   write(fu) int(size(ee,2),s_size)
-  
+
   ! All zero, three fields, for future use
   write(fu) int(0,s_size) , int(0,s_size) , int(0,s_size)
-  
+
   !"no more auxilliary name/value pairs"
   write(fu) int(0,s_size)
 
@@ -203,8 +203,8 @@ subroutine tec_out_sol_bin(rr, ee, vort, w_rr, w_ee, w_vort, t, out_filename)
   write(fu) real(t,d_size)
 
   !"not used, set to -1"
-  write(fu) int(-1,s_size) 
-  
+  write(fu) int(-1,s_size)
+
   !Zone type: 0 ordered, 3 unstructured quadrilateral
   write(fu) int(3,s_size)
 
@@ -227,17 +227,17 @@ subroutine tec_out_sol_bin(rr, ee, vort, w_rr, w_ee, w_vort, t, out_filename)
   ! n.points, n.elems
   write(fu) int(size(w_rr,2),s_size)
   write(fu) int(size(w_ee,2),s_size)
-  
+
   ! All zero, three fields, for future use
   write(fu) int(0,s_size) , int(0,s_size) , int(0,s_size)
-  
+
   !"no more auxilliary name/value pairs"
   write(fu) int(0,s_size)
 
 
   !DATA
   write(fu) eohMarker
-  
+
   !BODY
   !Zone marker
   write(fu) zoneMarker
@@ -258,7 +258,7 @@ subroutine tec_out_sol_bin(rr, ee, vort, w_rr, w_ee, w_vort, t, out_filename)
 
   !sharing connectivity? -1 no sharing
   write(fu) int(-1,s_size)
-  
+
   !Min and max of all the variables
   !x
   write(fu) dble(minval( rr(1,:) ))
@@ -295,7 +295,7 @@ subroutine tec_out_sol_bin(rr, ee, vort, w_rr, w_ee, w_vort, t, out_filename)
       write(fu) int(ee(:,i1)-1, s_size)
     endif
   end do
- 
+
 
   !WAKE
   !Zone marker
@@ -317,7 +317,7 @@ subroutine tec_out_sol_bin(rr, ee, vort, w_rr, w_ee, w_vort, t, out_filename)
 
   !sharing connectivity? -1 no sharing
   write(fu) int(-1,s_size)
-  
+
   !Min and max of all the variables
   !x
   write(fu) dble(minval( w_rr(1,:) ))
@@ -358,7 +358,7 @@ subroutine tec_out_sol_bin(rr, ee, vort, w_rr, w_ee, w_vort, t, out_filename)
 
 
   close(fu)
-  
+
 
 end subroutine tec_out_sol_bin
 
@@ -368,7 +368,7 @@ subroutine tec_out_viz(out_filename, t, &
                        rr, ee, vars,  &
                      w_rr, w_ee, w_vars, &
                      vp_rr, vp_vars)
- character(len=*), intent(in) :: out_filename 
+ character(len=*), intent(in) :: out_filename
  real(wp), intent(in) :: t
  real(wp), intent(in) :: rr(:,:)
  integer, intent(in)  :: ee(:,:)
@@ -412,7 +412,7 @@ subroutine tec_out_viz(out_filename, t, &
       nvars_tot = nvars_tot + 1
     endif
   enddo
-  
+
   if(got_wake) then
     nw = size(w_ee,2) !number of wake elements
     npoints_w = size(w_rr,2)
@@ -448,7 +448,7 @@ subroutine tec_out_viz(out_filename, t, &
        form='unformatted',iostat=ierr)
 
   !magic number
-  buffer_char = "#!TDV112" ;  write(fu) trim(buffer_char) 
+  buffer_char = "#!TDV112" ;  write(fu) trim(buffer_char)
 
   !integer 1 to set the byte order
   write(fu) int(1,s_size)
@@ -475,7 +475,7 @@ subroutine tec_out_viz(out_filename, t, &
       call put_tec_string(trim(vars(iv)%var_name),fu)
     endif
   enddo
- 
+
   !BODY
   !Zone marker
   write(fu) zoneMarker
@@ -493,8 +493,8 @@ subroutine tec_out_viz(out_filename, t, &
   write(fu) real(t,d_size)
 
   !"not used, set to -1"
-  write(fu) int(-1,s_size) 
-  
+  write(fu) int(-1,s_size)
+
   !Zone type: 0 ordered, 3 unstructured quadrilateral
   write(fu) int(3,s_size)
 
@@ -519,10 +519,10 @@ subroutine tec_out_viz(out_filename, t, &
   ! n.points, n.elems
   write(fu) int(size(rr,2),s_size)
   write(fu) int(size(ee,2),s_size)
-  
+
   ! All zero, three fields, for future use
   write(fu) int(0,s_size) , int(0,s_size) , int(0,s_size)
-  
+
   !"no more auxilliary name/value pairs"
   write(fu) int(0,s_size)
 
@@ -545,8 +545,8 @@ subroutine tec_out_viz(out_filename, t, &
     write(fu) real(t,d_size)
 
     !"not used, set to -1"
-    write(fu) int(-1,s_size) 
-    
+    write(fu) int(-1,s_size)
+
     !Zone type: 0 ordered, 3 unstructured quadrilateral
     write(fu) int(3,s_size)
 
@@ -571,10 +571,10 @@ subroutine tec_out_viz(out_filename, t, &
     ! n.points, n.elems
     write(fu) int(size(w_rr,2),s_size)
     write(fu) int(size(w_ee,2),s_size)
-    
+
     ! All zero, three fields, for future use
     write(fu) int(0,s_size) , int(0,s_size) , int(0,s_size)
-    
+
     !"no more auxilliary name/value pairs"
     write(fu) int(0,s_size)
   endif
@@ -597,8 +597,8 @@ subroutine tec_out_viz(out_filename, t, &
     write(fu) real(t,d_size)
 
     !"not used, set to -1"
-    write(fu) int(-1,s_size) 
-    
+    write(fu) int(-1,s_size)
+
     !Zone type: 0 ordered, 3 unstructured quadrilateral
     write(fu) int(0,s_size)
 
@@ -611,14 +611,14 @@ subroutine tec_out_viz(out_filename, t, &
 
     !Number of miscellaneous somethings
     write(fu) int(0,s_size)
-    
+
     !imax
     write(fu) int(nvp, s_size)
     !jmax
     write(fu) int(1,s_size)
     !kmax
     write(fu) int(1,s_size)
-    
+
     !"no more auxilliary name/value pairs"
     write(fu) int(0,s_size)
   endif
@@ -626,7 +626,7 @@ subroutine tec_out_viz(out_filename, t, &
 
   !DATA
   write(fu) eohMarker
-  
+
   !BODY
   !Zone marker
   write(fu) zoneMarker
@@ -649,7 +649,7 @@ subroutine tec_out_viz(out_filename, t, &
 
   !sharing connectivity? -1 no sharing
   write(fu) int(-1,s_size)
-  
+
   !Min and max of all the variables
   !x
   write(fu) dble(minval( rr(1,:) ))
@@ -711,7 +711,7 @@ subroutine tec_out_viz(out_filename, t, &
       write(fu) int(ee(:,i1)-1, s_size)
     endif
   end do
- 
+
 
   !WAKE
   if(got_wake) then
@@ -725,7 +725,7 @@ subroutine tec_out_viz(out_filename, t, &
     do iv = 1,nvars_tot
       write(fu) int(2,s_size)
     enddo
-    
+
     if (w_passive) then
       !Has passive variables?
       write(fu) int(1,s_size)
@@ -761,7 +761,7 @@ subroutine tec_out_viz(out_filename, t, &
 
     !sharing connectivity? -1 no sharing
     write(fu) int(-1,s_size)
-    
+
     !Min and max of all the variables
     !x
     write(fu) dble(minval( w_rr(1,:) ))
@@ -842,7 +842,7 @@ subroutine tec_out_viz(out_filename, t, &
     do iv = 1,nvars_tot
       write(fu) int(2,s_size)
     enddo
-    
+
     if (vp_passive) then
       !Has passive variables?
       write(fu) int(1,s_size)
@@ -878,7 +878,7 @@ subroutine tec_out_viz(out_filename, t, &
 
     !sharing connectivity? -1 no sharing
     write(fu) int(-1,s_size)
-    
+
     !Min and max of all the variables
     !x
     write(fu) dble(minval( vp_rr(1,:) ))
@@ -935,7 +935,7 @@ subroutine tec_out_viz(out_filename, t, &
     enddo
 
   endif
-  
+
   close(fu)
 
 end subroutine tec_out_viz
@@ -943,14 +943,14 @@ end subroutine tec_out_viz
 !----------------------------------------------------------------------
 
 subroutine tec_out_box(out_filename, time, xpoints, ypoints, zpoints, vars, var_names)
- character(len=*), intent(in) :: out_filename 
+ character(len=*), intent(in) :: out_filename
  real(wp), intent(in) :: time
  real(wp), intent(in) :: xpoints(:)
  real(wp), intent(in) :: ypoints(:)
  real(wp), intent(in) :: zpoints(:)
  real(wp), intent(in) :: vars(:,:)
  character(len=*), intent(in) :: var_names(:)
- 
+
  character, parameter :: zc = char(0)
  integer :: fu, ierr, i1, i2, i3
  real(kind=4)  , parameter :: zoneMarker = 299.0
@@ -966,7 +966,7 @@ subroutine tec_out_box(out_filename, time, xpoints, ypoints, zpoints, vars, var_
        form='unformatted',iostat=ierr)
 
   !magic number
-  buffer_char = "#!TDV112" ;  write(fu) trim(buffer_char) 
+  buffer_char = "#!TDV112" ;  write(fu) trim(buffer_char)
 
   !integer 1 to set the byte order
   write(fu) int(1,s_size)
@@ -987,7 +987,7 @@ subroutine tec_out_box(out_filename, time, xpoints, ypoints, zpoints, vars, var_
   do iv = 1,nvars
     call put_tec_string(trim(var_names(iv)),fu)
   enddo
-  
+
   !Zone marker
   write(fu) zoneMarker
 
@@ -1004,8 +1004,8 @@ subroutine tec_out_box(out_filename, time, xpoints, ypoints, zpoints, vars, var_
   write(fu) real(time,d_size)
 
   !"not used, set to -1"
-  write(fu) int(-1,s_size) 
-  
+  write(fu) int(-1,s_size)
+
   !Zone type: 0 ordered, 3 unstructured quadrilateral
   write(fu) int(0,s_size)
 
@@ -1086,12 +1086,12 @@ end subroutine
 !---------------------------------------------------------------------
 
 subroutine tec_out_probes(out_filename, time, vars, var_names, zone_names)
- character(len=*), intent(in) :: out_filename 
+ character(len=*), intent(in) :: out_filename
  real(wp), intent(in) :: time(:)
  real(wp), intent(in) :: vars(:,:,:)
  character(len=*), intent(in) :: var_names(:)
  character(len=*), intent(in) :: zone_names(:)
- 
+
  character, parameter :: zc = char(0)
  integer :: fu, ierr, i1
  real(kind=4)  , parameter :: zoneMarker = 299.0
@@ -1109,7 +1109,7 @@ subroutine tec_out_probes(out_filename, time, vars, var_names, zone_names)
        form='unformatted',iostat=ierr)
 
   !magic number
-  buffer_char = "#!TDV112" ;  write(fu) trim(buffer_char) 
+  buffer_char = "#!TDV112" ;  write(fu) trim(buffer_char)
 
   !integer 1 to set the byte order
   write(fu) int(1,s_size)
@@ -1128,7 +1128,7 @@ subroutine tec_out_probes(out_filename, time, vars, var_names, zone_names)
   do iv = 1,nvars
     call put_tec_string(trim(var_names(iv)),fu)
   enddo
-  
+
   !A single zone for each probe
   do ip = 1,nprobes
     !Zone marker
@@ -1147,8 +1147,8 @@ subroutine tec_out_probes(out_filename, time, vars, var_names, zone_names)
     write(fu) real(0.0_wp,d_size)
 
     !"not used, set to -1"
-    write(fu) int(-1,s_size) 
-    
+    write(fu) int(-1,s_size)
+
     !Zone type: 0 ordered, 3 unstructured quadrilateral
     write(fu) int(0,s_size)
 
@@ -1227,7 +1227,7 @@ end subroutine tec_out_probes
 
 subroutine tec_out_sectional(out_filename, time, vars, span, span_size, &
                              ll_vars)
- character(len=*), intent(in) :: out_filename 
+ character(len=*), intent(in) :: out_filename
  real(wp), intent(in) :: time(:)
  real(wp), intent(in) :: vars(:,:,:)
  real(wp), intent(in) :: span(:)
@@ -1236,7 +1236,7 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size, &
  character(len=*), parameter :: var_names(4) = (/ 'Fx' , 'Fy' , 'Fz' , 'Mo' /)
  character(len=21) :: ll_var_names(9)
 
- 
+
  character, parameter :: zc = char(0)
  integer :: fu, ierr, i, j
  real(kind=4)  , parameter :: zoneMarker = 299.0
@@ -1263,7 +1263,7 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size, &
        form='unformatted',iostat=ierr)
 
   !magic number
-  buffer_char = "#!TDV112" ;  write(fu) trim(buffer_char) 
+  buffer_char = "#!TDV112" ;  write(fu) trim(buffer_char)
 
   !integer 1 to set the byte order
   write(fu) int(1,s_size)
@@ -1289,7 +1289,7 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size, &
       call put_tec_string(trim(ll_var_names(iv)),fu)
     enddo
   endif
-  
+
   !Zone marker
   write(fu) zoneMarker
 
@@ -1306,8 +1306,8 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size, &
   write(fu) real(0.0_wp,d_size)
 
   !"not used, set to -1"
-  write(fu) int(-1,s_size) 
-  
+  write(fu) int(-1,s_size)
+
   !Zone type: 0 ordered, 3 unstructured quadrilateral
   write(fu) int(0,s_size)
 
@@ -1415,11 +1415,11 @@ end subroutine tec_out_sectional
 !---------------------------------------------------------------------
 
 subroutine tec_out_loads(out_filename, time, force, moment)
- character(len=*), intent(in) :: out_filename 
+ character(len=*), intent(in) :: out_filename
  real(wp), intent(in) :: time(:)
  real(wp), intent(in) :: force(:,:)
  real(wp), intent(in) :: moment(:,:)
- 
+
  character, parameter :: zc = char(0)
  integer :: fu, ierr, i1, iv, timelen
  real(kind=4)  , parameter :: zoneMarker = 299.0
@@ -1433,7 +1433,7 @@ subroutine tec_out_loads(out_filename, time, force, moment)
        form='unformatted',iostat=ierr)
 
   !magic number
-  buffer_char = "#!TDV112" ;  write(fu) trim(buffer_char) 
+  buffer_char = "#!TDV112" ;  write(fu) trim(buffer_char)
 
   !integer 1 to set the byte order
   write(fu) int(1,s_size)
@@ -1455,7 +1455,7 @@ subroutine tec_out_loads(out_filename, time, force, moment)
   call put_tec_string('M1',fu)
   call put_tec_string('M2',fu)
   call put_tec_string('M3',fu)
-  
+
   !Zone marker
   write(fu) zoneMarker
 
@@ -1472,8 +1472,8 @@ subroutine tec_out_loads(out_filename, time, force, moment)
   write(fu) real(0.0_wp,d_size)
 
   !"not used, set to -1"
-  write(fu) int(-1,s_size) 
-  
+  write(fu) int(-1,s_size)
+
   !Zone type: 0 ordered, 3 unstructured quadrilateral
   write(fu) int(0,s_size)
 
@@ -1556,12 +1556,12 @@ subroutine put_tec_string(str, fu)
 
  integer :: sl, i
  character, parameter :: zc = char(0)
- 
+
  sl = len(trim(str))
 
  do i = 1, sl
    write(fu) ichar(str(i:i))
- enddo 
+ enddo
  write(fu) ichar(zc)
 
 end subroutine put_tec_string
