@@ -542,12 +542,23 @@ subroutine update_force( this, geo, elems )
             this%fields(j_for)%fdata(:,ip) = this%fields(j_for)%fdata(:,ip) + &
                     comp%rbf%cen%wei(iw,i) * comp%el(i)%dforce
 
-            ! !> Moments
-            ! ! *** to do *** check this formula: sign of cross( dr, f )?
-            ! this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) + &
-            !         comp%rbf%cen%wei(iw,i) * ( comp%el(i)%dmom + &
-            !         cross( comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i)) - comp%el(i)%cen, &
-            !                comp%el(i)%dforce ) )
+            !> Moments
+            ! *** to do *** check this formula: sign of cross( dr, f )?
+            ! bugfix (30-08-2020), this%fields(j_pos)%fdata(:,ip) instead of
+            ! comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i))
+            this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) + &
+                    comp%rbf%cen%wei(iw,i) * ( comp%el(i)%dmom + &
+                    cross( comp%el(i)%cen - this%fields(j_pos)%fdata(:,ip) , &
+                           comp%el(i)%dforce ) )
+!           ! debug ---
+!           write(*,*) ' i, iw, ip : ', i, iw, ip
+!           write(*,*) ' comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i)): ', &
+!                        comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i))
+!           write(*,*) ' this%fields(j_pos)%fdata(:,ip)          : ', &
+!                        this%fields(j_pos)%fdata(:,ip)
+!           write(*,*) ' comp%el(i)%cen                          : ', &
+!                        comp%el(i)%cen
+!           write(*,*)
 
 !           ! debug ---
 !           write(*,*) i, iw, comp%rbf%cen%ind(iw,i)

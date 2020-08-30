@@ -910,6 +910,7 @@
                                         precice%mesh%node_ids, &
                                         precice%fields(i)%fdata )
           endif
+
           ! check ---
           write(*,*) ' precice%mesh%nnodes : ', precice%mesh%nnodes
           write(*,*) i, precice%fields(i)%fid, precice%fields(i)%fname
@@ -918,6 +919,7 @@
           end do
           write(*,*)
           ! check ---
+
         end if
       end do
 
