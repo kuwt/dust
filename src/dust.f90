@@ -711,11 +711,23 @@
       !> Update dust geometry ( elems and first wake panels )
       call precice % update_elems( geo, elems_tot )
 
+      ! ! debug ---
+      ! write(*,*) ' debug in dust.f90, l.715. geo%points:'
+      ! do i_el = 1, size(geo%points,2)
+      !   write(*,*) geo%points(:,i_el)
+      ! end do
+      ! write(*,*) ' debug in dust.f90, l.715. elems_tot(1)%p%ver: '
+      ! do i_el = 1, size(elems_tot(1)%p%ver,2)
+      !   write(*,*) elems_tot(1)%p%i_ver(i_el), ': ', elems_tot(1)%p%ver(:,i_el)
+      ! end do
+      ! ! debug ---
+
       !> Update geo_data()
       do i_el = 1, size(elems_tot)
         call elems_tot(i_el)%p%calc_geo_data( &
                                geo%points(:,elems_tot(i_el)%p%i_ver) )
       end do
+
       !> Update near-field wake
       call precice % update_near_field_wake( geo, wake )
 
@@ -887,13 +899,6 @@
       do i = 1, size(precice%fields)
         if ( trim(precice%fields(i)%fio) .eq. 'write' ) then
 
-          ! ! debug ---
-          ! ! write(*,*) i
-          ! ! precice%fields(i)%fdata = 0.0_wp
-          ! call random_number( precice%fields(i)%fdata ) 
-          ! precice%fields(i)%fdata = 1.0e-10_wp * precice%fields(i)%fdata 
-          ! ! debug ---
-
           if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
             call precicef_write_bsdata( precice%fields(i)%fid, &
                                         precice%mesh%nnodes  , &
@@ -905,10 +910,19 @@
                                         precice%mesh%node_ids, &
                                         precice%fields(i)%fdata )
           endif
+          ! check ---
+          write(*,*) ' precice%mesh%nnodes : ', precice%mesh%nnodes
+          write(*,*) i, precice%fields(i)%fid, precice%fields(i)%fname
+          do i_el = 1, size(precice%fields(i)%fdata,2)
+            write(*,*) precice%fields(i)%fdata(:,i_el)
+          end do
+          write(*,*)
+          ! check ---
         end if
       end do
 
       call precicef_action_required( precice%read_it_checkp, bool )
+
       if ( bool .eq. 1 ) then ! timestep not converged
         !> Reload checkpoint state
         do j = 1, size(precice%fields)

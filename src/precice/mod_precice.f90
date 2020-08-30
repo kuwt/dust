@@ -235,6 +235,14 @@ subroutine initialize_mesh( this, geo )
         !   geo%components(i_comp)%rbf%nodes
         ! old ---
         ! new, w/ hinges ---
+        ! debug ---
+        write(*,*) ' debug in mod_precice.f90, l.240'
+        write(*,*) ' i_comp: ', i_comp
+        write(*,*) ' i_points_precice,      rbf%nodes: '
+        do ih = 1, size(geo%components(i_comp)%rbf%nodes,2)
+          write(*,*) geo%components(i_comp)%i_points_precice(ih), '       ', geo%components(i_comp)%rbf%nodes(:,ih)
+        end do
+        ! debug ---
         this%mesh%nodes(:,geo%components(i_comp)%i_points_precice) = &
           geo%components(i_comp)%rbf%nodes
         ! new, w/ hinges ---
@@ -512,9 +520,12 @@ subroutine update_force( this, geo, elems )
       !> rbf coupling ----------------------------------------------------------
       elseif ( trim(comp%coupling_type) .eq. 'rbf' ) then
 
-        !> Forces and moments by accumulation 
-        this%fields(j_for)%fdata = 0.0_wp
-        this%fields(j_mom)%fdata = 0.0_wp
+        !> Forces and moments by accumulation, only those belonging to the comp
+        do i = 1, size( comp%i_points_precice )
+          ip = comp%i_points_precice( i )
+          this%fields(j_for)%fdata(:,ip) = 0.0_wp
+          this%fields(j_mom)%fdata(:,ip) = 0.0_wp
+        end do
 
         !> === Aerodynamic mesh to structural nodes ===
         !  w/o considering hinge rotations
@@ -531,12 +542,13 @@ subroutine update_force( this, geo, elems )
             this%fields(j_for)%fdata(:,ip) = this%fields(j_for)%fdata(:,ip) + &
                     comp%rbf%cen%wei(iw,i) * comp%el(i)%dforce
 
-            !> Moments
-            ! *** to do *** check this formula: sign of cross( dr, f )?
-            this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) + &
-                    comp%rbf%cen%wei(iw,i) * ( comp%el(i)%dmom + &
-                    cross( comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i)) - comp%el(i)%cen, &
-                           comp%el(i)%dforce ) )
+            ! !> Moments
+            ! ! *** to do *** check this formula: sign of cross( dr, f )?
+            ! this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) + &
+            !         comp%rbf%cen%wei(iw,i) * ( comp%el(i)%dmom + &
+            !         cross( comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i)) - comp%el(i)%cen, &
+            !                comp%el(i)%dforce ) )
+
 !           ! debug ---
 !           write(*,*) i, iw, comp%rbf%cen%ind(iw,i)
 !           write(*,*) comp%el(i)%cen
@@ -787,6 +799,11 @@ subroutine update_elems( this, geo, elems )
     if ( trim(this%fields(j)%fname) .eq. 'AngularVelocity') j_ome = j
   end do
 
+  ! ! debug ---
+  ! write(*,*) ' ################################### '
+  ! write(*,*) ' debug in t_precice % update_elems() '
+  ! write(*,*) ' ################################### '
+
   !> Update elems
   ! *** to do *** build and exploit the connectivity preCICE-dust
   do i_comp = 1, size(geo%components)
@@ -938,18 +955,31 @@ subroutine update_elems( this, geo, elems )
       !> rbf coupling ----------------------------------------------------------
       elseif ( trim(comp%coupling_type) .eq. 'rbf' ) then
 
-        !> Reset, before accumulation
-        geo%points     = 0.0_wp
-        geo%points_vel = 0.0_wp
+        ! debug ---
+        write(*,*) ' comp n. ', comp%comp_id, ' rbf'
+        
+        !> Reset, before accumulation, only nodes belonging to the component
+        do i = 1, size(comp%i_points)
+          ip = comp%i_points(i)
+          geo%points    (:,ip) = 0.0_wp
+          geo%points_vel(:,ip) = 0.0_wp
+        end do
 
         !> Update surface quantities, as the weighted averages of the structure
         ! quantities, w/o considering rotations of the hinges
         do i = 1, size(comp%i_points)
-         
+
           ip = comp%i_points(i)
+
+          ! ! debug ---
+          ! write(*,*) ' comp%i_points(', i, '/', size(comp%i_points),' ) = ip = ', ip
 
           do iw = 1, size(comp%rbf%nod%ind,1)
 
+            ! debug ---
+            ! write(*,*) ' comp%loc_points: ' , comp%loc_points(:,i)
+            ! write(*,*) ' comp%rbf%nodes : ' , comp%rbf%nodes(:,comp%rbf%nod%ind(iw,i))
+            ! debug ---
             ! === Coupling Node ===
             !> Position
             pos   = this%fields(j_pos)%fdata(:, comp%i_points_precice(comp%rbf%nod%ind(iw,i)))
@@ -983,6 +1013,12 @@ subroutine update_elems( this, geo, elems )
             geo%points_vel(:, ip) = geo%points_vel(:, ip) + &
                                 comp%rbf%nod%wei(iw,i) * ( vel + cross( omega, chord_rot ) )
           end do
+
+          ! ! debug ---
+          ! ! write(*,*) ' chord_rot      : ' , chord_rot
+          ! write(*,*) ' pos            : ' , geo%points(:,ip)
+          ! ! write(*,*)
+          ! ! debug ---
 
         end do
 
@@ -1216,7 +1252,7 @@ subroutine update_near_field_wake( this, geo, wake )
   real(wp) :: eps = 1.0e-9_wp
 
   integer :: icomp
-  integer :: ip, ir, i_point, p1, p2, j, j_rot
+  integer :: ip, ir, i_point, p1, p2, j, j_rot, iw
 
   ! write(*,*) ' Debug in mod_precice.f90/update_near_field_wake '
   ! write(*,*) ' geo%points: '
@@ -1301,11 +1337,22 @@ subroutine update_near_field_wake( this, geo, wake )
         icomp = wake%pan_gen_icomp(ip)
         associate( comp => geo%components(icomp) )
         
+          iw = wake%pan_gen_points(1,ip) - minval(comp%i_points) + 1
+          ! ! debug ---
+          ! write(*,*) ' debug in mod_precice.f90/update_near_field_wake(), l.1340 '
+          ! write(*,*) ' comp%comp_id: ', comp%comp_id
+          ! write(*,*) ' ip, wake%pan_gen_points(1,ip), iw ' , &
+          !              ip, wake%pan_gen_points(1,ip), iw
+          ! write(*,*) ' comp%rbf%nod%ind(1,iw) ', &
+          !              comp%rbf%nod%ind(1,iw)
+          ! write(*,*)
+          ! ! debug ---
+
           ! *** to do ***
           ! So far, t_te inherits orientation ONLY from the closest coupling node,
           ! without interpolation with rbf coefficients
           n_rot = this%fields(j_rot)%fdata(:, &
-                   comp%i_points_precice( comp%rbf%nod%ind(1,wake%pan_gen_points(1,ip)) ) )
+                   comp%i_points_precice( comp%rbf%nod%ind(1,iw) ) )
           theta = norm2( n_rot )
           if ( theta .lt. eps ) then;  n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /);  theta = 0.0_wp
           else                      ;  n_rot = n_rot / theta

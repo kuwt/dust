@@ -1064,12 +1064,12 @@ subroutine load_components(geo, in_file, out_file, te)
                                       geo%components(i_comp)%hinge(ih)%ref%rr
 
         !> Build hinge connectivity and weights, for grid nodes
+        write(*,*) ; write(*,*) ' hinge n.', ih 
         call geo%components(i_comp)%hinge(ih)%build_connectivity( rr )
         ! and for cell centers
         call geo%components(i_comp)%hinge(ih)%build_connectivity_cen( rr, ee )
 
       end do
-
 
 #if USE_PRECICE
       !> PreCICE coupling ------------------------------------------------------
@@ -1161,6 +1161,7 @@ subroutine load_components(geo, in_file, out_file, te)
             end do
           else
             ind_coupling = (/ ( i3, i3=1, size(ind_coupling,1) ) /)
+            geo%components(i_comp)%i_points_precice = ind_coupling + points_offset_precice
           end if
 
           !> Define %rbf%nodes to compute struct-aero connectivity, with build_connectivity()

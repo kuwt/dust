@@ -259,7 +259,9 @@ subroutine build_connectivity(this, loc_points)
   integer :: nrot, nble
 
   ! ! debug ---
+  ! write(*,*) ' ................................................ '
   ! write(*,*) ' Debug in hinge%build_connectivity(), loc_points: '
+  ! write(*,*) ' ................................................ '
   ! do iw = 1, size(loc_points,2)
   !   write(*,*) loc_points(:,iw)
   ! end do
