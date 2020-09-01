@@ -532,10 +532,6 @@ subroutine update_force( this, geo, elems )
         do i = 1, size(comp%el)
           do iw = 1, size(comp%rbf%cen%ind,1)
 
-!           ! debug ---
-!           write(*,*) ' iw, i, comp%rbf%cen%ind(iw,i): ', &
-!                        iw, i, comp%rbf%cen%ind(iw,i)
-
             ip = comp%i_points_precice( comp%rbf%cen%ind(iw,i) )
 
             !> Force
@@ -559,7 +555,6 @@ subroutine update_force( this, geo, elems )
 !           write(*,*) ' comp%el(i)%cen                          : ', &
 !                        comp%el(i)%cen
 !           write(*,*)
-
 !           ! debug ---
 !           write(*,*) i, iw, comp%rbf%cen%ind(iw,i)
 !           write(*,*) comp%el(i)%cen
@@ -810,10 +805,10 @@ subroutine update_elems( this, geo, elems )
     if ( trim(this%fields(j)%fname) .eq. 'AngularVelocity') j_ome = j
   end do
 
-  ! ! debug ---
-  ! write(*,*) ' ################################### '
-  ! write(*,*) ' debug in t_precice % update_elems() '
-  ! write(*,*) ' ################################### '
+  ! debug ---
+  write(*,*) ' ################################### '
+  write(*,*) ' debug in t_precice % update_elems() '
+  write(*,*) ' ################################### '
 
   !> Update elems
   ! *** to do *** build and exploit the connectivity preCICE-dust
@@ -1054,14 +1049,14 @@ subroutine update_elems( this, geo, elems )
             !   part of the model, 
             ! - r,v_hinge the position and the velocity due to the motion of the hinge nodes
             do i = 1, size( comp%hinge(ih)%rot %node_id )
-              ip = comp%hinge(ih)%rot%node_id(i)
+              ip = comp%i_points( comp%hinge(ih)%rot%node_id(i) )
               geo%points(:,ip)     = geo%points(:,ip) * &
                                      ( 1.0_wp - comp%hinge(ih)%rot %span_wei(i) )
               geo%points_vel(:,ip) = geo%points_vel(:,ip) * &
                                      ( 1.0_wp - comp%hinge(ih)%rot %span_wei(i) )
             end do
             do i = 1, size( comp%hinge(ih)%blen%node_id )
-              ip = comp%hinge(ih)%blen%node_id(i)
+              ip = comp%i_points( comp%hinge(ih)%blen%node_id(i) )
               geo%points(:,ip)     = geo%points(:,ip) * &
                                      ( 1.0_wp - comp%hinge(ih)%blen%span_wei(i) )
               geo%points_vel(:,ip) = geo%points_vel(:,ip) * &
@@ -1196,6 +1191,14 @@ subroutine update_elems( this, geo, elems )
 
           end if
         end do
+
+        ! ! debug ---
+        ! write(*,*) ' Debug in update_elems, l.1200. geo%points = '
+        ! do i = 1, size(geo%points,2)
+        !   write(*,*) i, ' : ', geo%points(:,i)
+        ! end do
+        ! ! debug ---
+
         ! write(*,*) ' Stop in mod_precice/update_elems().'; stop
         ! -------------------------------------------------------------------------------
         !>  === Add hinge motion: END ===

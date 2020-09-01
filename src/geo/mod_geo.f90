@@ -1602,6 +1602,8 @@ subroutine load_components(geo, in_file, out_file, te)
 #endif
 
 
+  ! write(*,*) ' stop in mod_geo.f90/load_components(), l.1605 '; stop
+
 end subroutine load_components
 
 !----------------------------------------------------------------------

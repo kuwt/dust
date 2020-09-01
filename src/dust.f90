@@ -714,8 +714,9 @@
       ! ! debug ---
       ! write(*,*) ' debug in dust.f90, l.715. geo%points:'
       ! do i_el = 1, size(geo%points,2)
-      !   write(*,*) geo%points(:,i_el)
+      !   write(*,*) i_el, ' :   ', geo%points(:,i_el)
       ! end do
+      ! write(*,*) ' stop in dust.f90, l.719. '; stop
       ! write(*,*) ' debug in dust.f90, l.715. elems_tot(1)%p%ver: '
       ! do i_el = 1, size(elems_tot(1)%p%ver,2)
       !   write(*,*) elems_tot(1)%p%i_ver(i_el), ': ', elems_tot(1)%p%ver(:,i_el)

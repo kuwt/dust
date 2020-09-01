@@ -165,17 +165,18 @@ subroutine build_connectivity(this, rr, ee)
 
   ! stop
 
-  ! ! check ---
-  ! write(*,*) 
-  ! write(*,*) ' Check in t_precice_rbf % build_connectivity, %nod '
-  ! do ip = 1, np
-  !   write(*,*) this%nod%ind(:,ip), this%nod%wei(:,ip)
-  ! end do
-  ! write(*,*) 
-  ! write(*,*) ' Check in t_precice_rbf % build_connectivity, %cen '
-  ! do ie = 1, ne
-  !   write(*,*) this%cen%ind(:,ie), this%cen%wei(:,ie)
-  ! end do
+  ! check ---
+  write(*,*) 
+  write(*,*) ' Check in t_precice_rbf % build_connectivity, %nod '
+  do ip = 1, np
+    write(*,*) this%nod%ind(:,ip), this%nod%wei(:,ip)
+  end do
+  write(*,*) 
+  write(*,*) ' Check in t_precice_rbf % build_connectivity, %cen '
+  do ie = 1, ne
+    write(*,*) this%cen%ind(:,ie), this%cen%wei(:,ie)
+  end do
+  write(*,*) 
   ! write(*,*) 
   ! write(*,*) ' Stop.'
   ! write(*,*) 

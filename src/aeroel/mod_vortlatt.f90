@@ -634,11 +634,13 @@ subroutine calc_geo_data_vortlatt(this, vert)
   nsides = this%n_ver
 
   ! ! debug ---
-  ! write(*,*) ' debug in calc_geo_data_vortlatt(), id: ', this%id
-  ! do is = 1, nsides
-  !   if ( allocated(this%i_ver) ) write(*,'(I5,A)',advance='no') this%i_ver(is), ': '
-  !   write(*,*) vert(:,is), this%ver(:,is)
-  ! end do
+  ! if ( this%id .ne. 0 ) then
+  !   write(*,*) ' debug in calc_geo_data_vortlatt(), id: ', this%id
+  !   do is = 1, nsides
+  !     if ( allocated(this%i_ver) ) write(*,'(I5,A)',advance='no') this%i_ver(is), ': '
+  !     write(*,*) vert(:,is), '          ', this%ver(:,is)
+  !   end do
+  ! end if
   ! ! debug ---
 
   ! center
