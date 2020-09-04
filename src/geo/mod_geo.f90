@@ -1012,8 +1012,8 @@ subroutine load_components(geo, in_file, out_file, te)
         call read_hdf5( geo%components(i_comp)%hinge(ih)%ref_dir, &
                                                         'Ref_Dir', hiloc)
         call read_hdf5_al( geo%components(i_comp)%hinge(ih)%ref%rr, 'rr', hiloc)
-        geo%components(i_comp)%hinge(ih)%n_nodes = size( &
-           geo%components(i_comp)%hinge(ih)%ref%rr, 2)
+        geo%components(i_comp)%hinge(ih)%n_nodes = &
+                                   size( geo%components(i_comp)%hinge(ih)%ref%rr, 2)
         ! ! debug ---
         ! write(*,*) ' Debug in load_component(). %ref%rr : '
         ! do i = 1, geo%components(i_comp)%hinge(ih)%n_nodes 
@@ -1069,7 +1069,24 @@ subroutine load_components(geo, in_file, out_file, te)
         ! and for cell centers
         call geo%components(i_comp)%hinge(ih)%build_connectivity_cen( rr, ee )
 
+        !> build_connectivity_hin() below, around l.1200 for 'rbf' coupling
+        ! if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
+        !   ! and between hinge nodes and other structural nodes
+        !   call geo%components(i_comp)%hinge(ih)%build_connectivity_hin( rr )
+        ! end if
+
       end do
+
+      ! debug ---
+      do ih = 1, n_hinges
+        write(*,*) ' Comp n. ', i_comp, '; Hinge n. ', ih
+        do i3 = 1, size(geo%components(i_comp)%hinge(ih)%ref%h,2)
+          write(*,*) geo%components(i_comp)%hinge(ih)%ref%h(:,i3), '    ', &
+                     geo%components(i_comp)%hinge(ih)%ref%v(:,i3), '    ', &
+                     geo%components(i_comp)%hinge(ih)%ref%n(:,i3)
+        end do
+      end do
+      ! debug ---
 
 #if USE_PRECICE
       !> PreCICE coupling ------------------------------------------------------
@@ -1141,6 +1158,7 @@ subroutine load_components(geo, in_file, out_file, te)
           allocate( ind_coupling( np_precice ) )
           allocate(hinge_ind(n_hinges)) ; hinge_ind = 0 ; comp_ind = 0
 
+          !> Global numbering in i_points_precice: add points_offset_precice
           if ( n_hinges .gt. 0 ) then
             do i3 = 1, size(comp_coupling_nodes,2)
               do ih = 1, n_hinges
@@ -1176,10 +1194,29 @@ subroutine load_components(geo, in_file, out_file, te)
           geo%components(i_comp)%rbf%rrb   = -333.3_wp
           do ih = 1, n_hinges
             if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
+
+              !> Hinge node coordinates in the coupling reference space
               allocate( geo%components(i_comp)%hinge(ih)%nodes(3,hinge_ind(ih)) )
               geo%components(i_comp)%hinge(ih)%nodes = &
                   comp_coupling_nodes(:, geo%components(i_comp)%hinge(ih)%i_points_precice - &
                                          points_offset_precice )
+              
+              !> Connectivity between hinge nodes and other structural nodes
+              call geo%components(i_comp)%hinge(ih)%build_connectivity_hin( & 
+                   comp_coupling_nodes, &
+                   geo%components(i_comp)%hinge(ih)%i_points_precice - points_offset_precice )
+ 
+              ! debug ---
+              write(*,*) ' this%hin%ind, %i_points_precice, %wei: '
+              do i3 = 1, size(geo%components(i_comp)%hinge(ih)%hin%ind,2)
+                write(*,*) i3                                               , '   ' , &
+                           geo%components(i_comp)%hinge(ih)%hin%ind(:,i3)   , '   ' , &
+                           geo%components(i_comp)%i_points_precice( &
+                           geo%components(i_comp)%hinge(ih)%hin%ind(:,i3) ) , '   ' , &
+                           geo%components(i_comp)%hinge(ih)%hin%wei(:,i3)
+              end do
+              write(*,*)
+
             end if
           end do
 
@@ -1194,22 +1231,22 @@ subroutine load_components(geo, in_file, out_file, te)
           allocate(geo%components(i_comp)%c_ref_c(0,0))
           allocate(geo%components(i_comp)%c_ref_p(0,0))
 
-          ! check ---
-          write(*,*) ' comp(',i_comp,')%rbf%nodes : '
-          do i3 = 1, size(geo%components(i_comp)%rbf%nodes,2)
-            write(*,*) geo%components(i_comp)%i_points_precice(i3), &
-                       geo%components(i_comp)%rbf%nodes(:,i3)
-          end do
-          write(*,*) ' hinges '
-          do ih = 1, n_hinges
-            write(*,*) ' comp(',i_comp,')%hinge(',ih,')%nodes : '
-            do i3 = 1, size(geo%components(i_comp)%hinge(ih)%nodes,2)
-              write(*,*) geo%components(i_comp)%hinge(ih)%i_points_precice(i3), &
-                         geo%components(i_comp)%hinge(ih)%nodes(:,i3)
-            end do
-          end do
-          ! write(*,*) ' stop. '; stop
-          ! check ---
+          ! ! check ---
+          ! write(*,*) ' comp(',i_comp,')%rbf%nodes : '
+          ! do i3 = 1, size(geo%components(i_comp)%rbf%nodes,2)
+          !   write(*,*) geo%components(i_comp)%i_points_precice(i3), &
+          !              geo%components(i_comp)%rbf%nodes(:,i3)
+          ! end do
+          ! write(*,*) ' hinges '
+          ! do ih = 1, n_hinges
+          !   write(*,*) ' comp(',i_comp,')%hinge(',ih,')%nodes : '
+          !   do i3 = 1, size(geo%components(i_comp)%hinge(ih)%nodes,2)
+          !     write(*,*) geo%components(i_comp)%hinge(ih)%i_points_precice(i3), &
+          !                geo%components(i_comp)%hinge(ih)%nodes(:,i3)
+          !   end do
+          ! end do
+          ! ! write(*,*) ' stop. '; stop
+          ! ! check ---
 
           deallocate(ind_coupling, hinge_ind)
 
@@ -1601,8 +1638,6 @@ subroutine load_components(geo, in_file, out_file, te)
   allocate(geo%points_vel(3, size(geo%points,2))); geo%points_vel = 0.0_wp
 #endif
 
-
-  ! write(*,*) ' stop in mod_geo.f90/load_components(), l.1605 '; stop
 
 end subroutine load_components
 

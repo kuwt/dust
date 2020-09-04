@@ -1185,10 +1185,19 @@ subroutine update_elems( this, geo, elems )
               !> 2.2. Chordwise blending region
               do ib = 1, size(comp%hinge(ih)%blen%n2h(i)%p2h)
                 ! *** to do ***
+                !> Update ref.frames attached to the non-rotating structure
+
+                !> Compute aileron deflection
+                theta = 0.0_wp
+
+                !> Update surface nodes (see mod_hinges.f90/hinge_deflection() )
+
               end do
 
             end do
 
+          else
+            write(*,*) ' comp%hinge(ih)%input_type must be equale to <coupling>. Stop '; stop
           end if
         end do
 
