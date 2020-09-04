@@ -216,7 +216,11 @@ type :: t_hinge
   type(t_hinge_conn) :: blen, blen_cen
   !> Connectivity between hinge nodes and non-rotating structural nodes,
   ! read from mbdyn through preCICE
-  type(t_hinge_conn) :: hin 
+  type(t_hinge_conn) :: hin
+
+  !> Interpolated rotation vector of the hinge nodes, attached to the non-
+  ! rotating part of the component 
+  real(wp), allocatable :: hin_rot(:,:)
 
   contains
 
@@ -846,6 +850,9 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
     this%hin%wei(:,i_h) = wei_v
 
   end do
+
+  !> Allocate t_hinge%hin_rot
+  allocate( this%hin_rot(3,n_h) ); this%hin_rot = -333.3_wp
 
   ! debug ---
   write(*,*) ' this%hin%ind, %i_points_precice, %wei: '

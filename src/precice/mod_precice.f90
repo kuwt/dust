@@ -1040,6 +1040,20 @@ subroutine update_elems( this, geo, elems )
             comp%hinge(ih) % act % rr = & 
                 this%fields(j_pos)%fdata(:,comp%hinge(ih)%i_points_precice)
 
+            !> Update hinge node reference frame attached to the non-rotating structure
+            comp%hinge(ih) % hin_rot = 0.0_wp
+            do i = 1, size(comp%hinge(ih)%hin%ind,2)
+              do j = 1, size(comp%hinge(ih)%hin%ind,1)
+
+                n_rot = this%fields(j_rot)%fdata(:, &
+                       comp%i_points_precice( comp%hinge(ih)%hin%ind(j,i) ) )
+
+                comp%hinge(ih) % hin_rot(:,i) = comp%hinge(ih) % hin_rot(:,i) + &
+                                                comp%hinge(ih) % hin % wei(j,i) * n_rot
+
+              end do
+            end do
+
             !> 0. Update node position and velocity, before update with coupled hinge motion,
             !   r = ( 1 - alpha ) * r_beam + alpha * r_hinge
             !   v = ( 1 - alpha ) * v_beam + alpha * v_hinge ,
