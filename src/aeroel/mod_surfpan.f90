@@ -1087,6 +1087,7 @@ subroutine create_chtls_stencil_surfpan( this , R_g )
   deallocate(C,CQ,Cls_tilde,iCls_tilde,chtls_tmp)
   deallocate(A,B,V,W,Q,R)
 
+
 end subroutine create_chtls_stencil_surfpan
 
 !----------------------------------------------------------------------
@@ -1104,13 +1105,6 @@ subroutine calc_geo_data_surfpan(this,vert)
 
   this%ver = vert
   nsides = this%n_ver
-
-  ! debug ---
-  write(*,*) ' this%id: ', this%id
-  do is = 1, nsides
-    write(*,*) this%ver(:,is)
-  end do
-  ! debug ---
 
   ! center
   this%cen =  sum ( this%ver,2 ) / real(nsides,wp)

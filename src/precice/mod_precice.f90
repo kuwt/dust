@@ -1077,6 +1077,14 @@ subroutine update_elems( this, geo, elems )
 
         end do
 
+!       ! debug ---
+!       write(*,*) ' i, geo%points '
+!       do  j = 1, size(geo%points,2)
+!         write(*,*) j, ' : ', geo%points(:,j)
+!       end do
+!       write(*,*) ' stop in mod_precice, l.1160 '; stop
+!       ! debug ---
+
         !> *** to do *** move to a function: update_elems_coupled_hinges(), here in mod_precice
         !> *** to do *** blending regions
         ! -------------------------------------------------------------------------------
@@ -1129,8 +1137,10 @@ subroutine update_elems( this, geo, elems )
             end do
 
             !> 0. Update node position and velocity, before update with coupled hinge motion,
-            !   r = ( 1 - alpha ) * r_beam + alpha * r_hinge
-            !   v = ( 1 - alpha ) * v_beam + alpha * v_hinge ,
+            !   r = ( 1 - alpha ) * r_beam + alpha * r_hinge =
+            !     = r_beam + alpha * ( r_hinge - r_beam ) = r_beam + alpha * dr
+            !   v = ( 1 - alpha ) * v_beam + alpha * v_hinge =
+            !     = v_beam + alpha * ( v_hinge - v_beam ) = v_beam + alpha * dv
             ! where:
             ! - <alpha> is the spanwise weight,
             ! - r,v_beam  the position and the velocity due to the motion of the structural
@@ -1143,25 +1153,13 @@ subroutine update_elems( this, geo, elems )
               geo%points_vel(:,ip) = geo%points_vel(:,ip) * &
                                      ( 1.0_wp - comp%hinge(ih)%rot %span_wei(i) )
             end do
-            do i = 1, size( comp%hinge(ih)%blen%node_id )
-              ip = comp%i_points( comp%hinge(ih)%blen%node_id(i) )
-              geo%points(:,ip)     = geo%points(:,ip) * &
-                                     ( 1.0_wp - comp%hinge(ih)%blen%span_wei(i) )
-              geo%points_vel(:,ip) = geo%points_vel(:,ip) * &
-                                     ( 1.0_wp - comp%hinge(ih)%blen%span_wei(i) )
-            end do
-            ! ! old implementation: all the nodes were reset. Impossible to treat
-            ! ! spanwise blending
-            ! do i = 1, comp%hinge(ih)%n_nodes
-            !   do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
-            !     !> Hinge-to-local connectivity
-            !     ip = comp%hinge(ih)%rot%n2h(i)%p2h(ib)
-            !     !> Local-to-global connectivity
-            !     ip = comp%i_points(ip)
-            !     !> Reset position and velocity
-            !     geo%points(:,ip) = 0.0_wp
-            !     geo%points_vel(:,ip) = 0.0_wp
-            !   end do
+            ! old: add relavitve displacement for blending region
+            ! do i = 1, size( comp%hinge(ih)%blen%node_id )
+            !   ip = comp%i_points( comp%hinge(ih)%blen%node_id(i) )
+            !   geo%points(:,ip)     = geo%points(:,ip) * &
+            !                          ( 1.0_wp - comp%hinge(ih)%blen%span_wei(i) )
+            !   geo%points_vel(:,ip) = geo%points_vel(:,ip) * &
+            !                          ( 1.0_wp - comp%hinge(ih)%blen%span_wei(i) )
             ! end do
 
             !> From motion of hinge nodes to surface motion
@@ -1252,14 +1250,11 @@ subroutine update_elems( this, geo, elems )
               !> 1.2. Chordwise blending region
               do ib = 1, size(comp%hinge(ih)%blen%n2h(i)%p2h)
                 
-                ! debug ---
-                write(*,*) ' comp%hinge(ih)%offset: ' , &
-                             comp%hinge(ih)%offset
-                do  j = 1, size(geo%points,2)
-                  write(*,*) j, ' : ', geo%points(:,j)
-                end do
-                stop
-                ! debug ---
+!               ! debug ---
+!               write(*,*) ' comp%hinge(ih)%offset: ' , &
+!                            comp%hinge(ih)%offset
+!               stop
+!               ! debug ---
                 
                 ii = comp%hinge(ih)%blen%n2h(i)%p2h(ib)
                 ip = comp%i_points(ii)  ! Local-to-global connectivity
@@ -1280,6 +1275,7 @@ subroutine update_elems( this, geo, elems )
         
                 !> Update coordinates
                 geo%points(:,ip) = geo%points(:,ip) + &
+                           comp%hinge(ih)%blen%n2h(i)%s2h(ib) * &
                            comp%hinge(ih)%blen%n2h(i)%w2h(ib) * &
                          ( xqp * comp%hinge(ih)%act%v(:,i) + &
                            yqp * comp%hinge(ih)%act%n(:,i) )
