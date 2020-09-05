@@ -2277,22 +2277,28 @@ subroutine update_geometry(geo, t, update_static)
                                               geo%refs(comp%ref_id)%f_g )
       !> hinge rotation, theta
       call comp%hinge(ih)%update_theta( t )
+
+      !> Allocating contiguous array to pass to %hinge_deflection procedure
+      allocate(rr_hinge_contig(3,size(comp%i_points)))
+      rr_hinge_contig = geo%points(:, comp%i_points)
+       
+      call comp%hinge(ih)%hinge_deflection( rr_hinge_contig, t )
+      geo%points(:, comp%i_points) = rr_hinge_contig
+  
+      deallocate(rr_hinge_contig)
+
     else
-      ! *** to do ***
-      ! do nothing?
+      
+      !> Updated in mod_precice/update_elems
+
     end if
-
-    !> Allocating contiguous array to pass to %hinge_deflection procedure
-    allocate(rr_hinge_contig(3,size(comp%i_points)))
-    rr_hinge_contig = geo%points(:, comp%i_points)
-     
-    call comp%hinge(ih)%hinge_deflection( rr_hinge_contig, t )
-    geo%points(:, comp%i_points) = rr_hinge_contig
-
-    deallocate(rr_hinge_contig)
 
   end do
 
+  ! *** to do ***
+  ! Update surface velocity, considering both hinges with prescribed motion
+  ! and those coupled with the structural components
+  ! *** to do ***
   if ( comp%n_hinges .gt. 0 ) then
     !> Then update geometrical data, position and velocity of the elem centers
     do ie = 1,size(comp%el)
@@ -2312,13 +2318,14 @@ subroutine update_geometry(geo, t, update_static)
       !> Evaluate dvel_h, delta velocity due to hinge motion, with first
       ! order finite difference
       comp%el(ie)%dvel_h = ( comp%el(ie)%dcen_h - comp%el(ie)%dcen_h_old ) / &
-                                                                   sim_param%dt
+                                                                 sim_param % dt
       !> Update on-body velocity
       comp%el(ie)%ub = comp%el(ie)%ub + comp%el(ie)%dvel_h 
 
       !> Update time derivative of the unit normal vector
-      comp%el(ie)%dn_dt = ( comp%el(ie)%nor - comp%el(ie)%nor_old ) / &
-                                                                 sim_param % dt
+      comp%el(ie)%dn_dt = comp%el(ie)%dn_dt + &
+                        ( comp%el(ie)%nor - comp%el(ie)%nor_old ) / &
+                                                                sim_param % dt
     end do
   end if
   !> Hinges -----------------------------------------------------------

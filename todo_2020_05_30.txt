@@ -20,8 +20,13 @@ TODO list:
      b.c. by transpiration, without moving the geometry and refactorizing the
      linear system.
 
-#A   Implement general coupling
-#B   Implement hinge coupling
+#A   Implement general coupling ~v
+#B   Implement hinge coupling   ~v
+#B1  >>> update surface velocity, due to hinge rotation:
+       distinguish between hinges with prescribed motions (as implemented in 
+       geo/mod_geo/update_geometry(), l. 2300 approx) and hinges coupled with
+       the structural model
+
 
 DONE list:
 #1   fix TE bug with moving hinges. First wake elements look to drift towards

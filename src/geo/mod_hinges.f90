@@ -1064,9 +1064,9 @@ subroutine hinge_deflection( this, rr, t, postpro )
     deallocate(rr_in)
 
   else  !> Coupled hinge
-    ! *** to do ***
-    ! ...
-    ! ...
+
+    ! see precice/mod_precice.f90/t_precice % update_elems()
+    
   end if
 
 end subroutine hinge_deflection
