@@ -947,7 +947,7 @@ subroutine update_hinge_nodes( this, R, of )
 
   else !> Coupling with dynamics solver
 
-    ! *** todo ***
+    ! see precice/mod_precice.f90/t_precice % update_elems(), l.1100 approx
 
   end if
 
@@ -1044,8 +1044,8 @@ subroutine hinge_deflection( this, rr, t, postpro )
           yc = cos(th1)/sin(th1) * this%offset * ( 1.0_wp + cos(th1) ) + &
                                    this%offset * sin(th1)
           !> Some auxiliary quantities
-          xq = sum( ( rr(:,ii) - this%act%rr(:,ih) ) * this%act%v(:,ih) )
-          yq = sum( ( rr(:,ii) - this%act%rr(:,ih) ) * this%act%n(:,ih) )
+          xq = sum( ( rr_in(:,ii) - this%act%rr(:,ih) ) * this%act%v(:,ih) )
+          yq = sum( ( rr_in(:,ii) - this%act%rr(:,ih) ) * this%act%n(:,ih) )
           thp = 0.5_wp * ( xq + this%offset ) / this%offset * th1
           xqp = yc*sin(thp)          - this%offset - yq*sin(thp) - xq
           yqp = yc*(1.0_wp-cos(thp))               + yq*cos(thp) - yq

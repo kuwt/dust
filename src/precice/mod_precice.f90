@@ -1,3 +1,48 @@
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
+!.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
+!..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
+!...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
+!....\/\\\......\/\\\.\/\\\......\/\\\.....\///\\...........\/\\\......
+!.....\/\\\......\/\\\.\/\\\......\/\\\.......\///\\\........\/\\\......
+!......\/\\\....../\\\..\//\\\...../\\\../\\\....\//\\\.......\/\\\......
+!.......\/\\\\\\\\\\\/....\///\\\\\\\\/..\///\\\\\\\\\/........\/\\\......
+!........\///////////........\////////......\/////////..........\///.......
+!!=========================================================================
+!!
+!! Copyright (C) 2018-2020 Davide   Montagnani,
+!!                         Matteo   Tugnoli,
+!!                         Federico Fonte
+!!
+!! This file is part of DUST, an aerodynamic solver for complex
+!! configurations.
+!!
+!! Permission is hereby granted, free of charge, to any person
+!! obtaining a copy of this software and associated documentation
+!! files (the "Software"), to deal in the Software without
+!! restriction, including without limitation the rights to use,
+!! copy, modify, merge, publish, distribute, sublicense, and/or sell
+!! copies of the Software, and to permit persons to whom the
+!! Software is furnished to do so, subject to the following
+!! conditions:
+!!
+!! The above copyright notice and this permission notice shall be
+!! included in all copies or substantial portions of the Software.
+!!
+!! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+!! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+!! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+!! NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+!! HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+!! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+!! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+!! OTHER DEALINGS IN THE SOFTWARE.
+!!
+!! Authors:
+!!          Federico Fonte             <federico.fonte@outlook.com>
+!!          Davide Montagnani       <davide.montagnani@gmail.com>
+!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!=========================================================================
+
 module mod_precice
 
 ! *** to do ***
@@ -17,7 +62,7 @@ use mod_handling, only: &
     error
 
 use mod_math, only: &
-    cross
+    cross, rotation_vector_combination
 
 use mod_geometry, only: &
     t_geo, t_geo_component
@@ -240,7 +285,8 @@ subroutine initialize_mesh( this, geo )
         write(*,*) ' i_comp: ', i_comp
         write(*,*) ' i_points_precice,      rbf%nodes: '
         do ih = 1, size(geo%components(i_comp)%rbf%nodes,2)
-          write(*,*) geo%components(i_comp)%i_points_precice(ih), '       ', geo%components(i_comp)%rbf%nodes(:,ih)
+          write(*,*) geo%components(i_comp)%i_points_precice(ih), '       ', &
+                     geo%components(i_comp)%rbf%nodes(:,ih)
         end do
         ! debug ---
         this%mesh%nodes(:,geo%components(i_comp)%i_points_precice) = &
@@ -788,11 +834,14 @@ subroutine update_elems( this, geo, elems )
   type(t_geo)       , intent(inout) :: geo
   type(t_pot_elem_p), intent(inout) :: elems(:)
  
-  integer :: i,j, i_comp, ip, iw, ih, ib
+  integer :: i,j, i_comp, ip, iw, ih, ib, ii
   real(wp) :: n_rot(3), chord(3), chord_rot(3), omega(3), pos(3), vel(3)
+  real(wp) :: r_drot(3), n_drot(3)
   real(wp) :: theta
+  real(wp) :: Rot_mat(3,3)
   real(wp) :: eps = 1.0e-9_wp
   integer :: j_pos, j_vel, j_rot, j_ome
+  real(wp) :: th1, yc, xq, yq, thp, xqp, yqp
 
   real(wp) :: Rot(3,3), nx(3,3)
 
@@ -1052,6 +1101,31 @@ subroutine update_elems( this, geo, elems )
                                                 comp%hinge(ih) % hin % wei(j,i) * n_rot
 
               end do
+
+              !> Update h,v,n reference frame attached to the non-rotating hinge nodes
+              ! From rotation vector to rotation matrix
+              theta = norm2(comp%hinge(ih)%hin_rot(:,i))
+              if ( theta .ne. 0.0_wp ) then
+                Rot_mat(1,:) = ( 1.0_wp - cos(theta) ) * n_rot(1) * n_rot / theta**2.0_wp
+                Rot_mat(2,:) = ( 1.0_wp - cos(theta) ) * n_rot(2) * n_rot / theta**2.0_wp
+                Rot_mat(3,:) = ( 1.0_wp - cos(theta) ) * n_rot(3) * n_rot / theta**2.0_wp
+                Rot_mat(1,:) = Rot_mat(1,:) + &
+                  (/ cos(theta)*theta   ,-sin(theta)*n_rot(3), sin(theta)*n_rot(2) /)/theta
+                Rot_mat(2,:) = Rot_mat(2,:) + &
+                  (/ sin(theta)*n_rot(3), cos(theta)*theta   ,-sin(theta)*n_rot(1) /)/theta
+                Rot_mat(3,:) = Rot_mat(3,:) + &
+                  (/-sin(theta)*n_rot(2), sin(theta)*n_rot(1), cos(theta)*theta    /)/theta
+                
+                comp%hinge(ih) % act % h = matmul( Rot_mat, comp%hinge(ih) % ref % h )
+                comp%hinge(ih) % act % v = matmul( Rot_mat, comp%hinge(ih) % ref % v )
+                comp%hinge(ih) % act % n = matmul( Rot_mat, comp%hinge(ih) % ref % n )
+              else
+                comp%hinge(ih) % act % h = comp%hinge(ih) % ref % h
+                comp%hinge(ih) % act % v = comp%hinge(ih) % ref % v
+                comp%hinge(ih) % act % n = comp%hinge(ih) % ref % n
+
+              end if
+
             end do
 
             !> 0. Update node position and velocity, before update with coupled hinge motion,
@@ -1112,6 +1186,17 @@ subroutine update_elems( this, geo, elems )
                                0.0_wp, 0.0_wp, 1.0_wp /), (/3,3/) ) &
                   - sin(theta) * nx + ( 1.0_wp - cos(theta) ) * matmul(nx, nx)
 
+
+              !> Evaluate hinge deflection, theta, from the relative position of the rotating
+              ! and non-rotating ref.frames
+              call rotation_vector_combination( &
+                  this%fields(j_rot)%fdata(:, &
+                      comp%hinge(ih)%i_points_precice( i ) ), &
+                 -comp%hinge(ih) % hin_rot(:,i), r_drot, theta, n_drot )
+              ! ! debug ---
+              ! write(*,*) ' theta,   n_rot : ', theta, '      ', n_rot
+              ! ! debug ---
+
               !> === Surface nodes ===
               !> 1.1. Update points: rigid rotation
               do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
@@ -1166,9 +1251,40 @@ subroutine update_elems( this, geo, elems )
 
               !> 1.2. Chordwise blending region
               do ib = 1, size(comp%hinge(ih)%blen%n2h(i)%p2h)
-                ! *** to do ***
-              end do
+                
+                ! debug ---
+                write(*,*) ' comp%hinge(ih)%offset: ' , &
+                             comp%hinge(ih)%offset
+                do  j = 1, size(geo%points,2)
+                  write(*,*) j, ' : ', geo%points(:,j)
+                end do
+                stop
+                ! debug ---
+                
+                ii = comp%hinge(ih)%blen%n2h(i)%p2h(ib)
+                ip = comp%i_points(ii)  ! Local-to-global connectivity
+                
+                th1 = -theta * comp%hinge(ih)%blen%n2h(i)%s2h(ib)
+                !> coordinate of the centre of the circle used for blending,
+                ! in the n-direction
+                yc = cos(th1)/sin(th1) * comp%hinge(ih)%offset * ( 1.0_wp + cos(th1) ) + &
+                                         comp%hinge(ih)%offset * sin(th1)
+                !> Some auxiliary quantities
+                xq = sum( ( geo%points(:,ip) - comp%hinge(ih)%act%rr(:,i) ) * &
+                                               comp%hinge(ih)%act%v( :,i) )
+                yq = sum( ( geo%points(:,ip) - comp%hinge(ih)%act%rr(:,i) ) * &
+                                               comp%hinge(ih)%act%n( :,i) )
+                thp = 0.5_wp * ( xq + comp%hinge(ih)%offset ) / comp%hinge(ih)%offset * th1
+                xqp = yc*sin(thp)   - comp%hinge(ih)%offset - yq*sin(thp) - xq
+                yqp = yc*(1.0_wp-cos(thp))                  + yq*cos(thp) - yq
+        
+                !> Update coordinates
+                geo%points(:,ip) = geo%points(:,ip) + &
+                           comp%hinge(ih)%blen%n2h(i)%w2h(ib) * &
+                         ( xqp * comp%hinge(ih)%act%v(:,i) + &
+                           yqp * comp%hinge(ih)%act%n(:,i) )
 
+              end do
 
             end do
 
@@ -1436,7 +1552,7 @@ subroutine update_near_field_wake( this, geo, wake )
   enddo
 
 end subroutine update_near_field_wake
-
 !----------------------------------------------------------------
+
 
 end module mod_precice
