@@ -438,6 +438,14 @@ subroutine press_normvel_der(geo, elems, surf_vel_SurfPan_old)
 
       el%dUn_dt = sum( el%nor * ( el%ub - & 
              surf_vel_SurfPan_old( i_el , : ) ) ) / sim_param%dt
+!     ! debug ---
+!     if ( i_el .eq. 1 ) then
+!       write(*,*) ' ############################################## '
+!       write(*,*) ' dUn_dt: ' , el%dUn_dt,  el%ub, surf_vel_SurfPan_old( i_el, : )
+!       write(*,*) ' ############################################## '
+!     end if
+!     ! debug ---
+
 !            surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) ) / sim_param%dt ! <<< mod-2018-12-21
 
       ! Compute GradS_Un

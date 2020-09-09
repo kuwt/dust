@@ -625,9 +625,6 @@
         call printout(message)
       endif
 
-      !Calculate the normal velocity derivative for the pressure equation
-      call press_normvel_der(geo, elems, surf_vel_SurfPan_old)
-
 #if USE_PRECICE
       if ( precice_convergence ) then
 #endif
@@ -741,6 +738,9 @@
 
 #else
 #endif
+
+      !Calculate the normal velocity derivative for the pressure equation
+      call press_normvel_der(geo, elems, surf_vel_SurfPan_old)
 
       !------ Assemble the system ------
       !call prepare_wake(wake, geo, sim_param)
