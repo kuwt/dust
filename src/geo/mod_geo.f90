@@ -2261,6 +2261,13 @@ subroutine update_geometry(geo, t, update_static)
 
     end if
 
+  elseif ( comp%coupling .or. update_static ) then
+
+    do ie = 1 , size(comp%el)
+      comp%el(ie)%dn_dt = ( comp%el(ie)%nor - comp%el(ie)%nor_old ) / &
+                                                              sim_param % dt
+    end do
+
   end if  ! if ( .not. comp%coupling )
 
   !> Hinges -----------------------------------------------------------

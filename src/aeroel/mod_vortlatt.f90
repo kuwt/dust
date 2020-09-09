@@ -455,6 +455,10 @@ i_stripe = size(this%stripe_elem)
 
 ! dG_dt = this%didou_dt
 
+! debug ---
+write(*,*) ' this % id, ub ', this%id, this%ub
+stop
+
 if ( i_stripe .gt. 1 ) then
   !this%pres = - sim_param%rho_inf * &
   !      ( norm2(sim_param%u_inf - this%ub) * this%dy / this%area * &
@@ -544,7 +548,8 @@ subroutine compute_dforce_jukowski_vortlatt(this)
  ! === Unsteady contribution ===
  this%dforce = this%dforce &
              - sim_param%rho_inf * this%area * ( &
-               this%didou_dt * this%nor + this%mag * this%dn_dt )
+               this%didou_dt * this%nor ) ! + this%mag * this%dn_dt )
+
 !! debug ---
 !write(*,'(I4,A,3F10.5,A,3F10.5,A,3F10.5,A,3E10.2)') &
 !                  this % id, '     ', this%vel_ctr_pt   , &
@@ -685,7 +690,6 @@ subroutine calc_geo_data_vortlatt(this, vert)
   do is = 1 , nSides
     this%edge_uni(:,is) = this%edge_vec(:,is) / this%edge_len(is)
   end do
-
 
   !TODO: is it necessary to initialize it here?
   this%dforce = 0.0_wp

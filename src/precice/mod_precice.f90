@@ -486,6 +486,15 @@ subroutine update_force( this, geo, elems )
         !> Reset force and moment fields, to be filled by accumulation
         this%fields(j_for)%fdata(:, ip ) = 0.0_wp
         this%fields(j_mom)%fdata(:, ip ) = 0.0_wp
+        do ih = 1, comp%n_hinges
+          if ( trim(comp%hinge(ih)%input_type) .eq. 'coupling' ) then
+            do i = 1, size( comp%hinge(ih)%i_points_precice )
+              ip = comp%hinge(ih)%i_points_precice( i )
+              this%fields(j_for)%fdata(:, ip) = 0.0_wp
+              this%fields(j_mom)%fdata(:, ip) = 0.0_wp
+            end do
+          end if
+        end do
 
         !> Forces
         do i = 1, size(comp%el)
@@ -571,6 +580,15 @@ subroutine update_force( this, geo, elems )
           ip = comp%i_points_precice( i )
           this%fields(j_for)%fdata(:,ip) = 0.0_wp
           this%fields(j_mom)%fdata(:,ip) = 0.0_wp
+        end do
+        do ih = 1, comp%n_hinges
+          if ( trim(comp%hinge(ih)%input_type) .eq. 'coupling' ) then
+            do i = 1, size( comp%hinge(ih)%i_points_precice )
+              ip = comp%hinge(ih)%i_points_precice( i )
+              this%fields(j_for)%fdata(:, ip) = 0.0_wp
+              this%fields(j_mom)%fdata(:, ip) = 0.0_wp
+            end do
+          end if
         end do
 
         !> === Aerodynamic mesh to structural nodes ===
@@ -697,6 +715,7 @@ subroutine update_force_coupled_hinge( this, comp, hinge, j_for, j_mom )
   !              this%fields(j_mom)%fdata(:,i)
   ! end do
   ! ! debug ---
+
 
   !> Rot
   n_nodes = size( hinge%rot_cen%node_id )
@@ -925,8 +944,8 @@ subroutine update_elems( this, geo, elems )
           ! connectivity may be required
           if ( i .lt. size(comp%i_points_precice) ) then
             select type( el => comp%el(i) ); type is(t_liftlin)
-             el%vel_ctr_pt = el%vel_ctr_pt + &
-                            0.5_wp * geo%points_vel(:, comp%i_points( 2*i-1 ) )
+             ! el%vel_ctr_pt = el%vel_ctr_pt + &
+             !                0.5_wp * geo%points_vel(:, comp%i_points( 2*i-1 ) )
              el%ub = el%ub + &
                     0.25_wp * ( geo%points_vel(:, comp%i_points( 2*i-1 ) ) + &
                                 geo%points_vel(:, comp%i_points( 2*i   ) ) )
@@ -934,8 +953,8 @@ subroutine update_elems( this, geo, elems )
           end if
           if ( i .gt. 1 ) then
             select type( el => comp%el(i-1) ); type is(t_liftlin)
-             el%vel_ctr_pt = el%vel_ctr_pt + &
-                            0.5_wp * geo%points_vel(:, comp%i_points( 2*i-1 ) )
+             ! el%vel_ctr_pt = el%vel_ctr_pt + &
+             !                0.5_wp * geo%points_vel(:, comp%i_points( 2*i-1 ) )
              el%ub = el%ub + &
                     0.25_wp * ( geo%points_vel(:, comp%i_points( 2*i-1 ) ) + &
                                 geo%points_vel(:, comp%i_points( 2*i   ) ) )
@@ -1250,35 +1269,33 @@ subroutine update_elems( this, geo, elems )
               !> 1.2. Chordwise blending region
               do ib = 1, size(comp%hinge(ih)%blen%n2h(i)%p2h)
                 
-!               ! debug ---
-!               write(*,*) ' comp%hinge(ih)%offset: ' , &
-!                            comp%hinge(ih)%offset
-!               stop
-!               ! debug ---
-                
                 ii = comp%hinge(ih)%blen%n2h(i)%p2h(ib)
                 ip = comp%i_points(ii)  ! Local-to-global connectivity
                 
                 th1 = -theta * comp%hinge(ih)%blen%n2h(i)%s2h(ib)
-                !> coordinate of the centre of the circle used for blending,
-                ! in the n-direction
-                yc = cos(th1)/sin(th1) * comp%hinge(ih)%offset * ( 1.0_wp + cos(th1) ) + &
-                                         comp%hinge(ih)%offset * sin(th1)
-                !> Some auxiliary quantities
-                xq = sum( ( geo%points(:,ip) - comp%hinge(ih)%act%rr(:,i) ) * &
-                                               comp%hinge(ih)%act%v( :,i) )
-                yq = sum( ( geo%points(:,ip) - comp%hinge(ih)%act%rr(:,i) ) * &
-                                               comp%hinge(ih)%act%n( :,i) )
-                thp = 0.5_wp * ( xq + comp%hinge(ih)%offset ) / comp%hinge(ih)%offset * th1
-                xqp = yc*sin(thp)   - comp%hinge(ih)%offset - yq*sin(thp) - xq
-                yqp = yc*(1.0_wp-cos(thp))                  + yq*cos(thp) - yq
-        
-                !> Update coordinates
-                geo%points(:,ip) = geo%points(:,ip) + &
-                           comp%hinge(ih)%blen%n2h(i)%s2h(ib) * &
-                           comp%hinge(ih)%blen%n2h(i)%w2h(ib) * &
-                         ( xqp * comp%hinge(ih)%act%v(:,i) + &
-                           yqp * comp%hinge(ih)%act%n(:,i) )
+                if ( th1 .ne. 0.0_wp ) then
+                  !> coordinate of the centre of the circle used for blending,
+                  ! in the n-direction
+                  yc = cos(th1)/sin(th1) * comp%hinge(ih)%offset * ( 1.0_wp + cos(th1) ) + &
+                                           comp%hinge(ih)%offset * sin(th1)
+                  !> Some auxiliary quantities
+                  xq = sum( ( geo%points(:,ip) - comp%hinge(ih)%act%rr(:,i) ) * &
+                                                 comp%hinge(ih)%act%v( :,i) )
+                  yq = sum( ( geo%points(:,ip) - comp%hinge(ih)%act%rr(:,i) ) * &
+                                                 comp%hinge(ih)%act%n( :,i) )
+                  thp = 0.5_wp * ( xq + comp%hinge(ih)%offset ) / comp%hinge(ih)%offset * th1
+                  xqp = yc*sin(thp)   - comp%hinge(ih)%offset - yq*sin(thp) - xq
+                  yqp = yc*(1.0_wp-cos(thp))                  + yq*cos(thp) - yq
+          
+                  !> Update coordinates
+                  geo%points(:,ip) = geo%points(:,ip) + &
+                             comp%hinge(ih)%blen%n2h(i)%s2h(ib) * &
+                             comp%hinge(ih)%blen%n2h(i)%w2h(ib) * &
+                           ( xqp * comp%hinge(ih)%act%v(:,i) + &
+                             yqp * comp%hinge(ih)%act%n(:,i) )
+
+                ! else do nothing
+                end if
 
               end do
 
@@ -1299,24 +1316,20 @@ subroutine update_elems( this, geo, elems )
 
                 !> Connectivity
                 ip = comp%hinge(ih)%rot%n2h(i)%p2h(ib)  ! Local numbering
-                ip = comp%i_points(ip)  ! Local-to-global connectivity
+                ip = comp%i_points(ip)                  ! Local-to-global connectivity
                 !> Velocity: v = v_H + Omega_H x ( r - r_H )
                 geo%points_vel(:,ip) = geo%points_vel(:,ip) + &
                      comp%hinge(ih)%rot%n2h(i)%s2h(ib) * &
                      comp%hinge(ih)%rot%n2h(i)%w2h(ib) * &
                    ( vel + cross( omega, &
                                   geo%points(:,ip) - comp%hinge(ih) % act % rr(:,i) ) )
+
               end do
 
               !> 2.2. Chordwise blending region
               do ib = 1, size(comp%hinge(ih)%blen%n2h(i)%p2h)
+
                 ! *** to do ***
-                !> Update ref.frames attached to the non-rotating structure
-
-                !> Compute aileron deflection
-                theta = 0.0_wp
-
-                !> Update surface nodes (see mod_hinges.f90/hinge_deflection() )
 
               end do
 

@@ -782,7 +782,7 @@
         elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
       end do
     !$omp end parallel do
-      res_old = linsys%res
+      ! res_old = linsys%res  ! moved to l.940 approx, when the dt is finalized
 
       if(sim_param%debug_level .ge. 1) then
         write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
@@ -862,12 +862,14 @@
               elems(i_el)%p%pres = sum( elems(i_el)%p%dforce * elems(i_el)%p%nor )&
                                    / elems(i_el)%p%area
 
-    !         ! debug ---
-    !         write(*,'(I4,A,3F10.5,A,3F10.5,A,F10.5)') &
-    !                                i_el, '     ', elems(i_el)%p%dforce, &
-    !                                      '     ', elems(i_el)%p%nor,    &
-    !                                      '     ', elems(i_el)%p%pres
-    !         ! debug ---
+              ! ! debug ---
+              ! write(*,'(I4,A,3F10.5,A,3F10.5,A,3F10.5,A,3F10.5,A,F10.5)') &
+              !                        i_el, '     ', el%vel_ctr_pt, &
+              !                              '     ', el%dforce, &
+              !                              '     ', el%nor,    &
+              !                              '     ', el%dn_dt,  &
+              !                              '     ', el%pres
+              ! ! debug ---
 
           end select
         end do
@@ -939,6 +941,7 @@
         !> Finalize timestep
         ! Do the same actions as a simulation w/o coupling
         ! *** to do *** check if something special is needed
+
 #else
 #endif
 
@@ -999,6 +1002,16 @@
       ! time loop (at the begin w/o precice, at the end w/ precice)?
       !> Update n. time step
       it = it + 1
+
+      !> Save old solution (at the previous dt) of the linear system
+      res_old = linsys%res
+
+      !> Update nor_old (moved from geo/mod_geo.f90/update_geometry(), l.2220 approx
+    !$omp parallel do private(i_el)
+      do i_el = 1 , sel
+        elems(i_el)%p%nor_old = elems(i_el)%p%nor
+      end do
+    !$omp end parallel do
 
       endif ! End of the if statement that check whether the timestep
             ! has converged or not
