@@ -887,6 +887,16 @@ subroutine compute_pres_surfpan(this, R_g)
     force_pres = this%pres    
   endif
 
+! ! OLD PRESSURE EVALUATION
+! ! Bernoulli-based pressure for all the components
+! force_pres  = sim_param%P_inf &
+!   - 0.5_wp * sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp  &
+!   + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
+!            + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
+!            + sim_param%rho_inf * this%didou_dt
+! 
+! this%pres = force_pres
+
   this%dforce = - force_pres * this%area * this%nor
 
 end subroutine compute_pres_surfpan

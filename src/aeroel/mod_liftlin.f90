@@ -1382,13 +1382,13 @@ subroutine calc_geo_data_liftlin(this, vert)
   this%ver = vert
   nsides = this%n_ver
 
-  ! debug ---
-  write(*,*) ' debug in calc_geo_data_vortlatt(), id: ', this%id
-  do is = 1, nsides
-    if ( allocated(this%i_ver) ) write(*,'(I5,A)',advance='no') this%i_ver(is), ': '
-    write(*,*) vert(:,is), '          ', this%ver(:,is)
-  end do
-  ! debug ---
+! ! debug ---
+! write(*,*) ' debug in calc_geo_data_liftin(), id: ', this%id
+! do is = 1, nsides
+!   if ( allocated(this%i_ver) ) write(*,'(I5,A)',advance='no') this%i_ver(is), ': '
+!   write(*,*) vert(:,is), '          ', this%ver(:,is)
+! end do
+! ! debug ---
 
   ! center, for the lifting line is the mid-point
   this%cen =  sum ( this%ver(:,1:2),2 ) / 2.0_wp

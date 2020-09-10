@@ -889,6 +889,30 @@
     !$omp end parallel do
 
 #if USE_PRECICE
+
+!     write(*,*) ' debug in dust.f90, l.890 '
+!     do i = 1, 10
+!     ! !> check mag, pres
+!     ! write(*,*) i, ':  ', elems_ll(i)%p%mag , elems_ll(i+10)%p%mag , elems_ll(i+20)%p%mag, &
+!     !               '   ', elems_ll(i)%p%pres, elems_ll(i+10)%p%pres, elems_ll(i+20)%p%pres
+!     ! !> check nor, dforce ---> issues in the unsteady force contributions
+!     ! write(*,*) i   , ':  ', elems_ll(i   )%p%nor , elems_ll(i   )%p%dforce, &
+!     !                    sum( elems_ll(i   )%p%nor * elems_ll(i   )%p%dforce )
+!     ! write(*,*) i+10, ':  ', elems_ll(i+10)%p%nor , elems_ll(i+10)%p%dforce, &
+!     !                    sum( elems_ll(i+10)%p%nor * elems_ll(i+10)%p%dforce )
+!     ! write(*,*) i+20, ':  ', elems_ll(i+20)%p%nor , elems_ll(i+20)%p%dforce, &
+!     !                    sum( elems_ll(i+20)%p%nor * elems_ll(i+20)%p%dforce )
+!     ! write(*,*)
+!     ! write(*,*) i, ':  ', elems_ll(i   )%p%dGamma_dt , &
+!     !                      elems_ll(i+10)%p%dGamma_dt , &
+!     !                      elems_ll(i+20)%p%dGamma_dt
+!     ! !> check nor, dforce ---> issues in the unsteady force contributions
+!     ! write(*,*) i   , ':  ', elems_ll(i   )%p%dn_dt
+!     ! write(*,*) i+10, ':  ', elems_ll(i+10)%p%dn_dt
+!     ! write(*,*) i+20, ':  ', elems_ll(i+20)%p%dn_dt
+!     ! write(*,*)
+!     end do
+
       !> Update force and moments to be passed to the structural solver
       call precice % update_force( geo, elems_tot )
 
@@ -1008,10 +1032,26 @@
 
       !> Update nor_old (moved from geo/mod_geo.f90/update_geometry(), l.2220 approx
     !$omp parallel do private(i_el)
-      do i_el = 1 , sel
-        elems(i_el)%p%nor_old = elems(i_el)%p%nor
+      do i_el = 1 , size(elems_tot)
+        elems_tot(i_el)%p%nor_old = elems_tot(i_el)%p%nor
       end do
     !$omp end parallel do
+
+!   !$omp parallel do private(i_el)
+!     do i_el = 1 , sel
+!       elems(i_el)%p%nor_old = elems(i_el)%p%nor
+!     end do
+!   !$omp end parallel do
+!   !$omp parallel do private(i_el)
+!     do i_el = 1 , size(elems_ll)
+!       elems_ll(i_el)%p%nor_old = elems_ll(i_el)%p%nor
+!     end do
+!   !$omp end parallel do
+!   !$omp parallel do private(i_el)
+!     do i_el = 1 , size(elems_ad)
+!       elems_ad(i_el)%p%nor_old = elems_ad(i_el)%p%nor
+!     end do
+!   !$omp end parallel do
 
       endif ! End of the if statement that check whether the timestep
             ! has converged or not

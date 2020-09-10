@@ -455,10 +455,6 @@ i_stripe = size(this%stripe_elem)
 
 ! dG_dt = this%didou_dt
 
-! debug ---
-write(*,*) ' this % id, ub ', this%id, this%ub
-stop
-
 if ( i_stripe .gt. 1 ) then
   !this%pres = - sim_param%rho_inf * &
   !      ( norm2(sim_param%u_inf - this%ub) * this%dy / this%area * &
