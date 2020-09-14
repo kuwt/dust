@@ -222,6 +222,10 @@
     !> --- PreCICE --------------------------------------------------
 #endif
 
+    !> debug --------
+    real(wp) :: sum_force(3)
+    !> debug --------
+
 
 #if USE_PRECICE
     !> --- Initialize PreCICE ---------------------------------------
@@ -889,6 +893,17 @@
     !$omp end parallel do
 
 #if USE_PRECICE
+
+      write(*,*) ' ------------------------------------------------------------------- '
+      write(*,*) ' debug in dust.f90, l.890: i, pres, dforce '
+      sum_force = 0.0_wp
+      do i = 1, size(elems_tot)
+        sum_force = sum_force + elems_tot(i)%p%dforce
+        write(*,*) i, ' : ', elems_tot(i)%p%pres, '      ', elems_tot(i)%p%dforce
+      end do
+      write(*,*) '                                                 ', sum_force
+      write(*,*) ' ------------------------------------------------------------------- '
+      write(*,*)
 
 !     write(*,*) ' debug in dust.f90, l.890 '
 !     do i = 1, 10
