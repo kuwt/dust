@@ -1030,6 +1030,16 @@
         end if
       endif
 
+      !> Save old solution (at the previous dt) of the linear system
+      res_old = linsys%res
+
+      !> Update nor_old (moved from geo/mod_geo.f90/update_geometry(), l.2220 approx
+    !$omp parallel do private(i_el)
+      do i_el = 1 , size(elems_tot)
+        elems_tot(i_el)%p%nor_old = elems_tot(i_el)%p%nor
+      end do
+    !$omp end parallel do
+
 
 #if USE_PRECICE
       ! *** to do *** dirty implementation. it-update moved into #if USE_PRECICE
@@ -1041,32 +1051,6 @@
       ! time loop (at the begin w/o precice, at the end w/ precice)?
       !> Update n. time step
       it = it + 1
-
-      !> Save old solution (at the previous dt) of the linear system
-      res_old = linsys%res
-
-      !> Update nor_old (moved from geo/mod_geo.f90/update_geometry(), l.2220 approx
-    !$omp parallel do private(i_el)
-      do i_el = 1 , size(elems_tot)
-        elems_tot(i_el)%p%nor_old = elems_tot(i_el)%p%nor
-      end do
-    !$omp end parallel do
-
-!   !$omp parallel do private(i_el)
-!     do i_el = 1 , sel
-!       elems(i_el)%p%nor_old = elems(i_el)%p%nor
-!     end do
-!   !$omp end parallel do
-!   !$omp parallel do private(i_el)
-!     do i_el = 1 , size(elems_ll)
-!       elems_ll(i_el)%p%nor_old = elems_ll(i_el)%p%nor
-!     end do
-!   !$omp end parallel do
-!   !$omp parallel do private(i_el)
-!     do i_el = 1 , size(elems_ad)
-!       elems_ad(i_el)%p%nor_old = elems_ad(i_el)%p%nor
-!     end do
-!   !$omp end parallel do
 
       endif ! End of the if statement that check whether the timestep
             ! has converged or not

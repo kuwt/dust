@@ -221,18 +221,20 @@ subroutine potential_calc_sou_surfpan(this, sou, dou, pos)
        indp1 = next_qua(i1)
      end if
 
-     R1 = norm2( pos - this%verp(:,i1) )
-     R2 = norm2( pos - this%verp(:,indp1) )
+     R1 = norm2( pos - this%ver(:,i1) )    ! = norm2( pos - this%verp(:,i1) )
+     R2 = norm2( pos - this%ver(:,indp1) ) ! = norm2( pos - this%verp(:,indp1) )
      ! si = this%edge_len(i1)
      souLog = log( (R1+R2+this%edge_len(i1)) / (R1+R2-this%edge_len(i1)) )
 
 
-     if ( abs(R1+R2-this%edge_len(i1)) < 1e-10_wp ) then
+     !if ( abs(R1+R2-this%edge_len(i1)) < 1e-10_wp ) then
+     if ( R1+R2-this%edge_len(i1) < 1e-10_wp ) then
        write(*,*) ' elem%id  : ' , this%id
        write(*,*) ' elem%cen : ' , this%cen
        write(*,*) ' R1                   : ', R1
        write(*,*) ' R2                   : ', R2
        write(*,*) ' elem%edge_len(',i1,'): ', this%edge_len(i1)
+       write(*,*) '     R1+R2-len%edge_len(',i1,') : ',     R1+R2-this%edge_len(i1) 
        write(*,*) ' abs(R1+R2-len%edge_len(',i1,')): ', abs(R1+R2-this%edge_len(i1))
        write(*,*) ' pos      : ' , pos
        do i2 = 1, this%n_ver
@@ -387,6 +389,7 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
  integer :: j1 , ipres
  real(wp) :: b1
 
+
 ! RHS for \phi equation --------------------------
   linsys%b(ie) = 0.0_wp
   !Components not moving, no body velocity in the boundary condition
@@ -394,6 +397,7 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
 ! RHS for Bernoulli polynomial equation ----------
   ipres = linsys%idSurfPanG2L(ie) 
   linsys%b_pres(ipres) = 0.0_wp
+
 
   ! Static part ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   ! + \phi equation ------------------------------
@@ -899,6 +903,7 @@ subroutine compute_pres_surfpan(this, R_g)
 
   this%dforce = - force_pres * this%area * this%nor
 
+
 end subroutine compute_pres_surfpan
 
 !----------------------------------------------------------------------
@@ -1070,11 +1075,11 @@ subroutine create_chtls_stencil_surfpan( this , R_g )
     allocate(this%chtls_stencil( 3 , n_neigh + 1 ) ) ; this%chtls_stencil = 0.0_wp
   end if
  
-  !> debug ---
-  write(*,*) ' iCls_tilde: '
-  write(*,*)   iCls_tilde(1,1), iCls_tilde(1,2)
-  write(*,*)   iCls_tilde(2,1), iCls_tilde(2,2)
-  !> debug ---
+! !> debug ---
+! write(*,*) ' iCls_tilde: '
+! write(*,*)   iCls_tilde(1,1), iCls_tilde(1,2)
+! write(*,*)   iCls_tilde(2,1), iCls_tilde(2,2)
+! !> debug ---
 
   r1 = R(1,1) 
   allocate(chtls_tmp( 3 , n_neigh + 1 )) ; chtls_tmp = 0.0_wp
