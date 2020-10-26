@@ -214,7 +214,7 @@ subroutine initialize_mesh( this, geo )
           nnodes = nnodes + dnnodes
         else
           write(*,*) ' Error in initialize mesh. CouplingType=ll '&
-                     'while comp_el_type .ne. l. Stop'; stop
+                      'while comp_el_type .ne. l. Stop'; stop
         end if
       elseif ( trim(coupling_type) .eq. 'rigid' ) then 
         !> rigid coupling
