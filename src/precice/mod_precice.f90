@@ -65,7 +65,7 @@ use mod_math, only: &
     cross, rotation_vector_combination
 
 use mod_geometry, only: &
-    t_geo, t_geo_component
+    t_geo, t_geo_component 
 
 use mod_aeroel, only: &
     t_pot_elem_p
@@ -370,7 +370,7 @@ subroutine initialize_fields( this )
       this%fields(nf)%fio   = trim(   io_list(i))
       this%fields(nf)%ftype = trim( type_list(i))
       call precicef_get_data_id( trim(this%fields(nf)%fname), &
-                                 this%mesh%mesh_id, this%fields(nf)%fid )
+                                this%mesh%mesh_id, this%fields(nf)%fid )
       !> Allocate and initialize fields to zero *** to do *** where to write initial data?
       if ( trim(this%fields(nf)%ftype) .eq. 'scalar' ) then
         allocate( this%fields(nf)%fdata(1, this%mesh%nnodes) )
@@ -606,18 +606,28 @@ subroutine update_force( this, geo, elems )
             ! *** to do *** check this formula: sign of cross( dr, f )?
             ! bugfix (30-08-2020), this%fields(j_pos)%fdata(:,ip) instead of
             ! comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i))
+
+            ! debug ---
+            ! ================================================================================
+            !!! IF to activate only for ll element with RBF coupling!!!!       
+            if ( comp%comp_el_type(1:1) .eq. 'l' ) then         
+              comp%el(i)%cen =  sum ( comp%el(i)%ver(:,1:2),2 ) / 2.0_wp !! only for l component
+            endif 
+
             this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) + &
-                    comp%rbf%cen%wei(iw,i) * ( comp%el(i)%dmom + &
-                    cross( comp%el(i)%cen - this%fields(j_pos)%fdata(:,ip) , &
-                           comp%el(i)%dforce ) )
+                    comp%rbf%cen%wei(iw,i) * ( comp%el(i)%dmom)  + &
+                    cross( comp%el(i)%cen  - this%fields(j_pos)%fdata(:,ip) , &
+                    comp%el(i)%dforce ) 
 !           ! debug ---
-!           write(*,*) ' i, iw, ip : ', i, iw, ip
-!           write(*,*) ' comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i)): ', &
-!                        comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i))
-!           write(*,*) ' this%fields(j_pos)%fdata(:,ip)          : ', &
-!                        this%fields(j_pos)%fdata(:,ip)
-!           write(*,*) ' comp%el(i)%cen                          : ', &
-!                        comp%el(i)%cen
+            !write(*,*) ' i, iw, ip : ', i, iw, ip
+!           !write(*,*) ' comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i)): ', &
+!           !             comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i))
+            !write(*,*) ' this%fields(j_pos)%fdata(:,ip)          : ', &
+            !            this%fields(j_pos)%fdata(:,ip)
+            !write(*,*) ' comp%el(i)%cen                          : ', &
+            !            comp%el(i)%cen
+            !write(*,*) 'comp%el(i)%dforce                        : ', &
+            !            comp%el(i)%dforce
 !           write(*,*)
 !           ! debug ---
 !           write(*,*) i, iw, comp%rbf%cen%ind(iw,i)

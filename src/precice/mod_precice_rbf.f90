@@ -146,12 +146,15 @@ subroutine build_connectivity(this, rr, ee)
       end if
     end do
     cen = cen / dble(n)
-
+    
     !> Distance of the surface nodes from the structural nodes
     do is = 1, ns
       dist_all(is) = norm2( cen - this%nodes(:,is) )
     end do
+    
+    
 
+    
     call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
 
     !> Weight, inverse of the norm, avoid singularities

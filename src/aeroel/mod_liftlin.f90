@@ -1391,6 +1391,7 @@ subroutine calc_geo_data_liftlin(this, vert)
 
   ! center, for the lifting line is the mid-point
   this%cen =  sum ( this%ver(:,1:2),2 ) / 2.0_wp
+  
 ! this%cen =  sum ( this%ver,2 ) / real(nsides,wp) ! <<<< NO ! ............
 ! ... %cen coinces with control point. %cen must be c/2 far from the ll ...
 ! ... if the non penetration b.c. is used ( u_rel.n = 0 )               ...
@@ -1458,7 +1459,7 @@ subroutine calc_geo_data_liftlin(this, vert)
   !> 2 * pi * | x_CP - x{1/4*c} | * cos(lambda)
   this%d_2pi_coslambda = norm2( this%cen - this%ctr_pt ) * &
                          2.0_wp * pi * cos_lambda
-  ! !> overwrite centre
+  ! !> overwrite centre 
   this%cen    = this%ctr_pt
   !
   ! === Piszkin, Lewinski (1976) LL model for swept wings ===

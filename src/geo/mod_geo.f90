@@ -390,7 +390,7 @@ contains
 !!    and vortex rings before, then lifting lines and finally actuator disks
 subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
                       te, elems_impl, elems_expl, elems_ad, elems_ll, &
-                    elems_tot, airfoil_data, target_file, run_id)
+                      elems_tot, airfoil_data, target_file, run_id)
  character(len=*), intent(in) :: geo_file_name
  character(len=*), intent(inout) :: ref_file_name
  character(len=*), intent(in) :: in_file_name
@@ -1826,6 +1826,8 @@ subroutine calc_geo_data_pan(elem,vert)
 
   ! center
   elem%cen =  sum ( vert,2 ) / real(nsides,wp)
+  write(*,*) 'elem%cen da mod_geo: ', elem%cen 
+
 
   ! unit normal and area
   if ( nsides .eq. 4 ) then
@@ -1919,8 +1921,8 @@ subroutine calc_geo_data_ll(elem,vert)
   elem%ver = vert
 
   ! center, for the lifting line is the mid-point
-  elem%cen =  sum ( vert(:,1:2),2 ) / 2.0_wp
-
+  elem%cen =  sum ( vert(:,1:2),2 ) / 2.0_wp 
+  write(*,*) 'elem%cen: ', elem%cen
   ! unit normal and area
   if ( nsides .eq. 4 ) then
     nor = cross( vert(:,3) - vert(:,1) , &
