@@ -171,6 +171,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  !> Hinge ---
  integer :: n_hinges, n_nodes
  type(t_parse), pointer :: hinge_prs
+ type(t_parse), pointer :: fun_prs, file_prs, coupling_prs
  type(t_hinge_input), allocatable :: hinges(:)
  character(len=max_char_len) :: hinge_str
  character(len=2) :: hinge_id
@@ -272,7 +273,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   call geo_prs%CreateStringOption('Offset_xac_file','Filename of the &
               &chordwise input')
   !hinges
-  call hinge_input_parser( geo_prs, hinge_prs )
+  call hinge_input_parser( geo_prs, hinge_prs, fun_prs, file_prs, coupling_prs )
   !symmtery
   call geo_prs%CreateLogicalOption('mesh_symmetry',&
                'Reflect and double the geometry?', 'F')
@@ -1007,6 +1008,15 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   call new_hdf5_group(comp_loc, 'Hinges', hinge_loc)
   call write_hdf5(n_hinges, 'n_hinges', hinge_loc)
   do i = 1 , n_hinges
+
+    !> Rotation
+    if ( coupled_comp) then
+      if ( trim(coupling_type) .eq. 'rbf' ) then
+        hinges(i)%rr      = matmul( transpose(coupling_node_rot), hinges(i)%rr      )
+        hinges(i)%ref_dir = matmul( transpose(coupling_node_rot), hinges(i)%ref_dir )
+      end if
+    end if
+
     write(hinge_id,'(I2.2)') i
     hinge_str = 'Hinge_'//hinge_id
     call new_hdf5_group(hinge_loc, trim(hinge_str), hinge_i_loc)
@@ -1017,9 +1027,15 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     call write_hdf5(hinges(i)%offset            , 'Offset'                  , hinge_i_loc)
     call write_hdf5(hinges(i)%span_blending     , 'Spanwise_Blending'       , hinge_i_loc)
     call write_hdf5(hinges(i)%rotation_input    , 'Hinge_Rotation_Input'    , hinge_i_loc)
-    call write_hdf5(hinges(i)%rotation_amplitude, 'Hinge_Rotation_Amplitude', hinge_i_loc)
-    call write_hdf5(hinges(i)%rotation_omega    , 'Hinge_Rotation_Omega'    , hinge_i_loc)
-    call write_hdf5(hinges(i)%rotation_phase    , 'Hinge_Rotation_Phase'    , hinge_i_loc)
+    !> Hinge_Rotation_Input = function:...
+    ! (for other input types, dummy values, not to be used. Not a clean implementation)
+    call write_hdf5(hinges(i)%rotation_amplitude, 'Amplitude', hinge_i_loc)
+    call write_hdf5(hinges(i)%rotation_omega    , 'Omega'    , hinge_i_loc)
+    call write_hdf5(hinges(i)%rotation_phase    , 'Phase'    , hinge_i_loc)
+    !> Hinge_Rotation_Input = coupling
+    if ( trim(hinges(i)%rotation_input) .eq. 'coupling' ) then
+        call write_hdf5(hinges(i)%coupling_nodes, 'Coupling_Nodes', hinge_i_loc )
+    endif
     call close_hdf5_group(hinge_i_loc)
   end do
   call close_hdf5_group(hinge_loc)
@@ -1037,6 +1053,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   !> Finalize parser
   call finalizeparameters(geo_prs)
 
+
 end subroutine build_component
 
 !----------------------------------------------------------------------
@@ -1050,7 +1067,7 @@ end subroutine build_component
 subroutine symmetry_mesh(ee, rr, cent, norm)
  integer, allocatable, intent(inout) :: ee(:,:)
  real(wp), allocatable, intent(inout) :: rr(:,:)
- real(wp), intent(in) :: cent(3), norm(3)
+ real(wp), intent(in) :: cent(3), norm(3) 
 
  real(wp) :: n(3), d, l
  integer, allocatable :: ee_temp(:,:)

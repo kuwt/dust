@@ -393,6 +393,7 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
  integer :: j1 , ipres
  real(wp) :: b1
 
+
 ! RHS for \phi equation --------------------------
   linsys%b(ie) = 0.0_wp
   !Components not moving, no body velocity in the boundary condition
@@ -400,6 +401,7 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
 ! RHS for Bernoulli polynomial equation ----------
   ipres = linsys%idSurfPanG2L(ie)
   linsys%b_pres(ipres) = 0.0_wp
+
 
   ! Static part ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   ! + \phi equation ------------------------------
@@ -893,7 +895,18 @@ subroutine compute_pres_surfpan(this, R_g)
     force_pres = this%pres
   endif
 
+! ! OLD PRESSURE EVALUATION
+! ! Bernoulli-based pressure for all the components
+! force_pres  = sim_param%P_inf &
+!   - 0.5_wp * sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp  &
+!   + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
+!            + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
+!            + sim_param%rho_inf * this%didou_dt
+! 
+! this%pres = force_pres
+
   this%dforce = - force_pres * this%area * this%nor
+
 
 end subroutine compute_pres_surfpan
 
@@ -1066,6 +1079,15 @@ subroutine create_chtls_stencil_surfpan( this , R_g )
     allocate(this%chtls_stencil( 3 , n_neigh + 1 ) ) ; this%chtls_stencil = 0.0_wp
   end if
  
+<<<<<<< HEAD
+=======
+! !> debug ---
+! write(*,*) ' iCls_tilde: '
+! write(*,*)   iCls_tilde(1,1), iCls_tilde(1,2)
+! write(*,*)   iCls_tilde(2,1), iCls_tilde(2,2)
+! !> debug ---
+
+>>>>>>> precice_coupling
   r1 = R(1,1) 
   allocate(chtls_tmp( 3 , n_neigh + 1 )) ; chtls_tmp = 0.0_wp
   chtls_tmp(  1,n_neigh + 1 ) = 1.0_wp / R(1,1)
@@ -1086,6 +1108,7 @@ subroutine create_chtls_stencil_surfpan( this , R_g )
 
   deallocate(C,CQ,Cls_tilde,iCls_tilde,chtls_tmp)
   deallocate(A,B,V,W,Q,R)
+
 
 end subroutine create_chtls_stencil_surfpan
 

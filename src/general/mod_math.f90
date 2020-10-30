@@ -54,7 +54,7 @@ use mod_handling, only: &
 
 implicit none
 
-public :: cross , linear_interp , compute_qr
+public :: cross , linear_interp , compute_qr, rotation_vector_combination
 
 private
 
@@ -233,6 +233,74 @@ subroutine compute_qr ( A , Q , R )
   deallocate(tau,work)
 
 end subroutine compute_qr
+
+!----------------------------------------------------------------
+!> Combination of two rotations, provided as rotation vectors r1, r2
+! x: original vector
+! y: rotated vector
+! R1: rotation matrix from rotation vector r1, r1 -> R1
+! R2: rotation matrix from rotation vector r2, r2 -> R2
+!   y = R1 * R2 * x = R * x
+! Inputs: r1, r2
+! Outputs: r, th, n
+! R <- r = th * n, with |n| = 1
+!
+subroutine rotation_vector_combination( r1, r2, r, th, n )
+  real(wp),              intent(in)  :: r1(3), r2(3)
+  real(wp),              intent(out) :: r(3)
+  real(wp),              intent(out) :: n(3)
+  real(wp),              intent(out) :: th
+
+  real(wp) :: n1(3), n2(3), q1(4), q2(4), qs(4)
+  real(wp) :: th1, th2, sin_t_2, cos_t_2
+
+  if ( ( size(r1) .ne. 3 ) .or. ( size(r2) .ne. 3 ) ) then
+    write(*,*) ' Wrong input dimensions in rotation_vector_combinations. Stop '
+  end if
+
+  th1 = norm2(r1)
+  if ( th1 .ne. 0.0_wp ) then
+    n1 = r1 / th1
+    q1 = (/ cos(th1/2), n1(1)*sin(th1/2), &
+                        n1(2)*sin(th1/2), &
+                        n1(3)*sin(th1/2) /)
+  else
+    q1 = (/ 1.0_wp, 0.0_wp, 0.0_wp, 0.0_wp /)
+  end if
+  th2 = norm2(r2)
+  if ( th2 .ne. 0.0_wp ) then
+    n2 = r2 / th2
+    q2 = (/ cos(th2/2), n2(1)*sin(th2/2), &
+                        n2(2)*sin(th2/2), &
+                        n2(3)*sin(th2/2) /)
+  else
+    q2 = (/ 1.0_wp, 0.0_wp, 0.0_wp, 0.0_wp /)
+  end if
+
+  !> Quaternion qs = q1 * q2 = cos(th/2) + sin(th/2) n · (i,j,k)
+  qs = (/ &
+       q1(1)*q2(1) - q1(2)*q2(2) - q1(3)*q2(3) - q1(4)*q2(4) , &
+       q1(1)*q2(2) + q1(2)*q2(1) + q1(3)*q2(4) - q1(4)*q2(3) , &
+       q1(1)*q2(3) + q1(3)*q2(1) + q1(4)*q2(2) - q1(2)*q2(4) , &
+       q1(1)*q2(4) + q1(4)*q2(1) + q1(2)*q2(3) - q1(3)*q2(2)   &
+       /)
+
+  !> Rotation vector
+  sin_t_2 = norm2(qs(2:4))
+  if ( sin_t_2 .eq. 0.0_wp ) then
+    n = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
+    cos_t_2 = 1.0_wp
+    th = 0.0_wp
+  else
+    n = qs(2:4) / sin_t_2
+    cos_t_2 = qs(1)
+    th = 2.0_wp * atan2( sin_t_2, cos_t_2 )
+  end if
+
+  r = th * n
+
+
+end subroutine rotation_vector_combination
 
 ! ----------------------------------------------------------------------
 

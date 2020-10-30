@@ -1164,10 +1164,10 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
                              /(1.0_wp+fp_damp)
       max_mag_ll = max(max_mag_ll,abs(elems_ll(i_l)%p%mag))
     enddo
+ 
+    diff_v(ic) = diff/max(max_mag_ll,1e-9_wp)
 
-    diff_v(ic) = diff/max_mag_ll
-
-    if ( diff/max_mag_ll .le. fp_tol ) exit ! convergence
+    if ( diff/max(max_mag_ll,1e-9_wp) .le. fp_tol ) exit ! convergence
 
   enddo !solver iterations
   if(ic .ge. fp_maxIter) then
@@ -1293,7 +1293,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   if(sim_param%debug_level .ge. 3) then
     write(msg,*) 'iterations: ',ic; call printout(trim(msg))
     write(msg,*) 'diff',diff; call printout(trim(msg))
-    write(msg,*) 'diff/max_mag_ll:',diff/max_mag_ll; call printout(trim(msg))
+    write(msg,*) 'diff/max_mag_ll:',diff/max(max_mag_ll,1e-9_wp); call printout(trim(msg))
   endif
 
   ! useful arrays ---
@@ -1381,6 +1381,14 @@ subroutine calc_geo_data_liftlin(this, vert)
   this%ver = vert
   nsides = this%n_ver
 
+! ! debug ---
+! write(*,*) ' debug in calc_geo_data_liftin(), id: ', this%id
+! do is = 1, nsides
+!   if ( allocated(this%i_ver) ) write(*,'(I5,A)',advance='no') this%i_ver(is), ': '
+!   write(*,*) vert(:,is), '          ', this%ver(:,is)
+! end do
+! ! debug ---
+
   ! center, for the lifting line is the mid-point
   this%cen =  sum ( this%ver(:,1:2),2 ) / 2.0_wp
 ! this%cen =  sum ( this%ver,2 ) / real(nsides,wp) ! <<<< NO ! ............
@@ -1415,9 +1423,9 @@ subroutine calc_geo_data_liftlin(this, vert)
 
   ! unit vector
   do is = 1 , nSides
-    ! debug ---
-    write(*,*) is, this%edge_vec(:,is), this%edge_len(is)
-    ! debug ---
+    ! ! debug ---
+    ! write(*,*) is, this%edge_vec(:,is), this%edge_len(is)
+    ! ! debug ---
     this%edge_uni(:,is) = this%edge_vec(:,is) / this%edge_len(is)
   end do
 

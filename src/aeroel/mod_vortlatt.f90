@@ -544,7 +544,7 @@ subroutine compute_dforce_jukowski_vortlatt(this)
   ! === Unsteady contribution ===
   this%dforce = this%dforce &
               - sim_param%rho_inf * this%area * ( &
-                this%didou_dt * this%nor + this%mag * this%dn_dt )
+                this%didou_dt * this%nor ) !+ this%mag * this%dn_dt )
   ! ! if statement to avoid singularities
   ! if ( norm2( this % vel_ctr_pt ) .gt. &
   !        max( 0.001_wp, 0.001_wp *norm2(sim_param%u_inf) ) ) then
@@ -620,6 +620,16 @@ subroutine calc_geo_data_vortlatt(this, vert)
   this%ver = vert
   nsides = this%n_ver
 
+  ! ! debug ---
+  ! if ( this%id .ne. 0 ) then
+  !   write(*,*) ' debug in calc_geo_data_vortlatt(), id: ', this%id
+  !   do is = 1, nsides
+  !     if ( allocated(this%i_ver) ) write(*,'(I5,A)',advance='no') this%i_ver(is), ': '
+  !     write(*,*) vert(:,is), '          ', this%ver(:,is)
+  !   end do
+  ! end if
+  ! ! debug ---
+
   ! center
   this%cen =  sum ( this%ver,2 ) / real(nsides,wp)
 
@@ -662,7 +672,6 @@ subroutine calc_geo_data_vortlatt(this, vert)
   do is = 1 , nSides
     this%edge_uni(:,is) = this%edge_vec(:,is) / this%edge_len(is)
   end do
-
 
   !TODO: is it necessary to initialize it here?
   this%dforce = 0.0_wp

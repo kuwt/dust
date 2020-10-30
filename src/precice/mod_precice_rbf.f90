@@ -26,6 +26,9 @@ type :: t_precice_rbf
   !> Coupling nodes
   real(wp), allocatable :: nodes(:,:)
 
+  !> Global position of the coupling nodes
+  real(wp), allocatable :: rrb(:,:)
+
   !> Grid nodes connectivity
   type(t_rbf_conn) :: nod
 
@@ -126,8 +129,8 @@ subroutine build_connectivity(this, rr, ee)
 
  
   !> === Surface centers ===
-  allocate(this%cen%ind(this%n_wei, np)); this%cen%ind = 0
-  allocate(this%cen%wei(this%n_wei, np)); this%cen%wei = 0.0_wp
+  allocate(this%cen%ind(this%n_wei, ne)); this%cen%ind = 0
+  allocate(this%cen%wei(this%n_wei, ne)); this%cen%wei = 0.0_wp
 
   deallocate(dist_all); allocate(dist_all(ns)); dist_all = 0.0_wp
 
@@ -162,22 +165,23 @@ subroutine build_connectivity(this, rr, ee)
 
   ! stop
 
-! ! check ---
-! write(*,*) 
-! write(*,*) ' Check in t_precice_rbf % build_connectivity, %nod '
-! do ip = 1, np
-!   write(*,*) this%nod%ind(:,ip), this%nod%wei(:,ip)
-! end do
-! write(*,*) 
-! write(*,*) ' Check in t_precice_rbf % build_connectivity, %cen '
-! do ie = 1, ne
-!   write(*,*) this%cen%ind(:,ie), this%cen%wei(:,ie)
-! end do
-! write(*,*) 
-! write(*,*) ' Stop.'
-! write(*,*) 
-! stop
-! ! check ---
+  ! check ---
+  write(*,*) 
+  write(*,*) ' Check in t_precice_rbf % build_connectivity, %nod '
+  do ip = 1, np
+    write(*,*) this%nod%ind(:,ip), this%nod%wei(:,ip)
+  end do
+  write(*,*) 
+  write(*,*) ' Check in t_precice_rbf % build_connectivity, %cen '
+  do ie = 1, ne
+    write(*,*) this%cen%ind(:,ie), this%cen%wei(:,ie)
+  end do
+  write(*,*) 
+  ! write(*,*) 
+  ! write(*,*) ' Stop.'
+  ! write(*,*) 
+  ! stop
+  ! ! check ---
 
   !> Deallocate and cleaning
   if ( allocated(dist_all) )  deallocate(dist_all)

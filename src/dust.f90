@@ -222,6 +222,10 @@ type(t_octree) :: octree
     !> --- PreCICE --------------------------------------------------
 #endif
 
+    !> debug --------
+    real(wp) :: sum_force(3)
+    !> debug --------
+
 
 #if USE_PRECICE
     !> --- Initialize PreCICE ---------------------------------------
@@ -628,9 +632,6 @@ it = 0
     call printout(message)
   endif
 
-  !Calculate the normal velocity derivative for the pressure equation
-  call press_normvel_der(geo, elems, surf_vel_SurfPan_old)
-
 #if USE_PRECICE
       if ( precice_convergence ) then
 #endif
@@ -668,6 +669,9 @@ end if
         call precicef_mark_action_fulfilled( precice%write_it_checkp )
       end if
 
+      ! check ---
+      write(*,*) ' precice%mesh%nnodes : ', precice%mesh%nnodes
+      ! check ---
       !> Read data from structural solver
       do i = 1, size(precice%fields)
         if ( trim(precice%fields(i)%fio) .eq. 'read' ) then
@@ -691,6 +695,7 @@ end if
                                        precice%fields(i)%fdata )
           endif
           ! check ---
+          write(*,*) ' precice%mesh%nnodes : ', precice%mesh%nnodes
           write(*,*) i, precice%fields(i)%fid, precice%fields(i)%fname
           do i_el = 1, size(precice%fields(i)%fdata,2)
             write(*,*) precice%fields(i)%fdata(:,i_el)
@@ -700,12 +705,34 @@ end if
         end if
       end do
 
+      ! write(*,*) ' write something, before stop in dust.f90, l.700 '
+      ! read(*,*)
+
+      ! ! check ---
+      ! stop
+      ! ! check ---
+
       !> Update dust geometry ( elems and first wake panels )
       call precice % update_elems( geo, elems_tot )
+
+      ! ! debug ---
+      ! write(*,*) ' debug in dust.f90, l.715. geo%points:'
+      ! do i_el = 1, size(geo%points,2)
+      !   write(*,*) i_el, ' :   ', geo%points(:,i_el)
+      ! end do
+      ! write(*,*) ' stop in dust.f90, l.719. '; stop
+      ! write(*,*) ' debug in dust.f90, l.715. elems_tot(1)%p%ver: '
+      ! do i_el = 1, size(elems_tot(1)%p%ver,2)
+      !   write(*,*) elems_tot(1)%p%i_ver(i_el), ': ', elems_tot(1)%p%ver(:,i_el)
+      ! end do
+      ! ! debug ---
+
+      !> Update geo_data()
       do i_el = 1, size(elems_tot)
         call elems_tot(i_el)%p%calc_geo_data( &
                                geo%points(:,elems_tot(i_el)%p%i_ver) )
       end do
+
       !> Update near-field wake
       call precice % update_near_field_wake( geo, wake )
 
@@ -718,6 +745,9 @@ end if
 
 #else
 #endif
+
+      !Calculate the normal velocity derivative for the pressure equation
+      call press_normvel_der(geo, elems, surf_vel_SurfPan_old)
 
   !------ Assemble the system ------
   !call prepare_wake(wake, geo, sim_param)
@@ -760,7 +790,7 @@ end if
     elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
   end do
 !$omp end parallel do
-  res_old = linsys%res
+  ! res_old = linsys%res  ! moved to l.940 approx, when the dt is finalized
 
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
@@ -840,12 +870,14 @@ end if
           elems(i_el)%p%pres = sum( elems(i_el)%p%dforce * elems(i_el)%p%nor )&
                                / elems(i_el)%p%area
 
-    !         ! debug ---
-    !         write(*,'(I4,A,3F10.5,A,3F10.5,A,F10.5)') &
-    !                                i_el, '     ', elems(i_el)%p%dforce, &
-    !                                      '     ', elems(i_el)%p%nor,    &
-    !                                      '     ', elems(i_el)%p%pres
-    !         ! debug ---
+              ! ! debug ---
+              ! write(*,'(I4,A,3F10.5,A,3F10.5,A,3F10.5,A,3F10.5,A,F10.5)') &
+              !                        i_el, '     ', el%vel_ctr_pt, &
+              !                              '     ', el%dforce, &
+              !                              '     ', el%nor,    &
+              !                              '     ', el%dn_dt,  &
+              !                              '     ', el%pres
+              ! ! debug ---
 
       end select
     end do
@@ -865,6 +897,41 @@ end if
 !$omp end parallel do
 
 #if USE_PRECICE
+
+      write(*,*) ' ------------------------------------------------------------------- '
+      write(*,*) ' debug in dust.f90, l.890: i, pres, dforce '
+      sum_force = 0.0_wp
+      do i = 1, size(elems_tot)
+        sum_force = sum_force + elems_tot(i)%p%dforce
+        write(*,*) i, ' : ', elems_tot(i)%p%pres, '      ', elems_tot(i)%p%dforce
+      end do
+      write(*,*) '                                                 ', sum_force
+      write(*,*) ' ------------------------------------------------------------------- '
+      write(*,*)
+
+!     write(*,*) ' debug in dust.f90, l.890 '
+!     do i = 1, 10
+!     ! !> check mag, pres
+!     ! write(*,*) i, ':  ', elems_ll(i)%p%mag , elems_ll(i+10)%p%mag , elems_ll(i+20)%p%mag, &
+!     !               '   ', elems_ll(i)%p%pres, elems_ll(i+10)%p%pres, elems_ll(i+20)%p%pres
+!     ! !> check nor, dforce ---> issues in the unsteady force contributions
+!     ! write(*,*) i   , ':  ', elems_ll(i   )%p%nor , elems_ll(i   )%p%dforce, &
+!     !                    sum( elems_ll(i   )%p%nor * elems_ll(i   )%p%dforce )
+!     ! write(*,*) i+10, ':  ', elems_ll(i+10)%p%nor , elems_ll(i+10)%p%dforce, &
+!     !                    sum( elems_ll(i+10)%p%nor * elems_ll(i+10)%p%dforce )
+!     ! write(*,*) i+20, ':  ', elems_ll(i+20)%p%nor , elems_ll(i+20)%p%dforce, &
+!     !                    sum( elems_ll(i+20)%p%nor * elems_ll(i+20)%p%dforce )
+!     ! write(*,*)
+!     ! write(*,*) i, ':  ', elems_ll(i   )%p%dGamma_dt , &
+!     !                      elems_ll(i+10)%p%dGamma_dt , &
+!     !                      elems_ll(i+20)%p%dGamma_dt
+!     ! !> check nor, dforce ---> issues in the unsteady force contributions
+!     ! write(*,*) i   , ':  ', elems_ll(i   )%p%dn_dt
+!     ! write(*,*) i+10, ':  ', elems_ll(i+10)%p%dn_dt
+!     ! write(*,*) i+20, ':  ', elems_ll(i+20)%p%dn_dt
+!     ! write(*,*)
+!     end do
+
       !> Update force and moments to be passed to the structural solver
       call precice % update_force( geo, elems_tot )
 
@@ -877,6 +944,7 @@ end if
       !> Write force and moments to structural solver
       do i = 1, size(precice%fields)
         if ( trim(precice%fields(i)%fio) .eq. 'write' ) then
+
           if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
             call precicef_write_bsdata( precice%fields(i)%fid, &
                                         precice%mesh%nnodes  , &
@@ -888,10 +956,21 @@ end if
                                         precice%mesh%node_ids, &
                                         precice%fields(i)%fdata )
           endif
+
+          ! check ---
+          write(*,*) ' precice%mesh%nnodes : ', precice%mesh%nnodes
+          write(*,*) i, precice%fields(i)%fid, precice%fields(i)%fname
+          do i_el = 1, size(precice%fields(i)%fdata,2)
+            write(*,*) precice%fields(i)%fdata(:,i_el)
+          end do
+          write(*,*)
+          ! check ---
+
         end if
       end do
 
       call precicef_action_required( precice%read_it_checkp, bool )
+
       if ( bool .eq. 1 ) then ! timestep not converged
         !> Reload checkpoint state
         do j = 1, size(precice%fields)
@@ -905,6 +984,7 @@ end if
         !> Finalize timestep
         ! Do the same actions as a simulation w/o coupling
         ! *** to do *** check if something special is needed
+
 #else
 #endif
 
@@ -953,6 +1033,16 @@ end if
           call complete_wake(wake, geo, elems_tot)
     end if
   endif
+
+      !> Save old solution (at the previous dt) of the linear system
+      res_old = linsys%res
+
+      !> Update nor_old (moved from geo/mod_geo.f90/update_geometry(), l.2220 approx
+    !$omp parallel do private(i_el)
+      do i_el = 1 , size(elems_tot)
+        elems_tot(i_el)%p%nor_old = elems_tot(i_el)%p%nor
+      end do
+    !$omp end parallel do
 
 
 #if USE_PRECICE
