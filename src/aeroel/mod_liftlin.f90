@@ -840,7 +840,7 @@ subroutine solve_liftlin_piszkin( &
     ! - referred to the ref.point of the elem,
     !   ( here, cen of the elem = cen of the liftlin (for liftlin elems) )
     el%dmom = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
-                   el%chord * el%area * c_m(i_l,3)
+                   el%chord * el%area * c_m(i_l,3) * el%bnorm_cen
 
     ! a_v updated by AVLloads, in compute_dforce_jukowski
     el%alpha = a_v(i_l) * 180_wp/pi
@@ -1282,7 +1282,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     ! - referred to the ref.point of the elem,
     !   ( here, cen of the elem = cen of the liftlin (for liftlin elems) )
     el%dmom = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
-                   el%chord * el%area * c_m(i_l,3)
+                   el%chord * el%area * c_m(i_l,3) * el%bnorm_cen
 
     el%alpha = a_v(i_l) * 180_wp/pi
     el%vel_2d = u_v(i_l)

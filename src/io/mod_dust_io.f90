@@ -139,7 +139,7 @@ subroutine save_status(geo, wake, it, time, run_id)
  character(len=max_char_len) :: ref_name
  integer :: ie, ne
  real(wp), allocatable :: vort(:), cp(:) , pres(:)
- real(wp), allocatable :: dforce(:,:), surf_vel(:,:)
+ real(wp), allocatable :: dforce(:,:), dmom(:,:), surf_vel(:,:)
  real(wp), allocatable :: turbvisc(:)
  real(wp), allocatable :: points_w(:,:,:), cent(:,:,:) , vel_w(:,:,:)
  real(wp), allocatable :: vort_v(:,:)
@@ -186,18 +186,20 @@ subroutine save_status(geo, wake, it, time, run_id)
     call new_hdf5_group(gloc2, 'Solution', gloc3)
 
     ne = size(geo%components(icomp)%el)
-    allocate(vort(ne), cp(ne) , pres(ne) , dforce(3,ne) )
+    allocate(vort(ne), cp(ne) , pres(ne) , dforce(3,ne), dmom(3,ne) )
     do ie = 1,ne
      vort(ie) = geo%components(icomp)%el(ie)%mag
      !cp(ie) = geo%components(icomp)%el(ie)%cp
      pres(ie) = geo%components(icomp)%el(ie)%pres
      dforce(:,ie) = geo%components(icomp)%el(ie)%dforce
+     dmom(:,ie) = geo%components(icomp)%el(ie)%dmom
     enddo
     call write_hdf5(vort,'Vort',gloc3)
     !call write_hdf5(cp,'Cp',gloc3)
     call write_hdf5(pres,'Pres',gloc3)
     call write_hdf5(dforce,'dF',gloc3)
-    deallocate(vort, cp, pres, dforce)
+    call write_hdf5(dmom,'dMom',gloc3)
+    deallocate(vort, cp, pres, dforce, dmom)
 
     !Output the surface velocity
     if ( trim( geo%components(icomp)%comp_el_type ) .eq. 'p' ) then
