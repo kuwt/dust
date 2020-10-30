@@ -197,7 +197,10 @@ subroutine potential_calc_sou_surfpan(this, sou, dou, pos)
 
    sou = this%area / radius
 
-   if ( isnan(sou) ) then
+   !if ( isnan(sou) ) then
+   !workaround to use only standard fortran: by definition a NaN is not equal
+   !even to itself
+   if ( sou .ne. sou ) then
      call error(this_sub_name, this_mod_name, 'Divide by zero in sources &
       &far field approximation')
    end if
@@ -902,7 +905,7 @@ subroutine compute_pres_surfpan(this, R_g)
 !   + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
 !            + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
 !            + sim_param%rho_inf * this%didou_dt
-! 
+!
 ! this%pres = force_pres
 
   this%dforce = - force_pres * this%area * this%nor
@@ -1078,17 +1081,8 @@ subroutine create_chtls_stencil_surfpan( this , R_g )
   if ( .not. allocated(this%chtls_stencil) ) then
     allocate(this%chtls_stencil( 3 , n_neigh + 1 ) ) ; this%chtls_stencil = 0.0_wp
   end if
- 
-<<<<<<< HEAD
-=======
-! !> debug ---
-! write(*,*) ' iCls_tilde: '
-! write(*,*)   iCls_tilde(1,1), iCls_tilde(1,2)
-! write(*,*)   iCls_tilde(2,1), iCls_tilde(2,2)
-! !> debug ---
 
->>>>>>> precice_coupling
-  r1 = R(1,1) 
+  r1 = R(1,1)
   allocate(chtls_tmp( 3 , n_neigh + 1 )) ; chtls_tmp = 0.0_wp
   chtls_tmp(  1,n_neigh + 1 ) = 1.0_wp / R(1,1)
   chtls_tmp(2:3,1 : n_neigh ) = matmul( iCls_tilde , &

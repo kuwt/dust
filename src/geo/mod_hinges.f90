@@ -103,7 +103,7 @@ end type t_n2h_conn
 ! ---------------------------------------------------------------
 !> Hinge connectivity, meant for rigid rotation and bleding regions
 type :: t_hinge_conn
-  
+
   !> Local index of the nodes (or cell center) performing the desired motion
   integer, allocatable :: node_id(:)
   !> Surface node performing motion vs. hinge node connectivity
@@ -202,7 +202,7 @@ type :: t_hinge
   !> Actual configuration
   type(t_hinge_config) :: act
   !> Actual configuration of the nodes attached to the non-rotating structure
-  ! (defined and used only for coupled hinges, to determine the rotation of the 
+  ! (defined and used only for coupled hinges, to determine the rotation of the
   !  rotating surface, w.r.t. the structure, and evaluate the motion of the
   !  surface in the blending region)
   type(t_hinge_config) :: fix
@@ -219,7 +219,7 @@ type :: t_hinge
   type(t_hinge_conn) :: hin
 
   !> Interpolated rotation vector of the hinge nodes, attached to the non-
-  ! rotating part of the component 
+  ! rotating part of the component
   real(wp), allocatable :: hin_rot(:,:)
 
   contains
@@ -295,9 +295,9 @@ subroutine build_connectivity(this, loc_points)
   Rot(2,:) = this % ref % h(:,1)
   Rot(3,:) = this % ref % n(:,1)
   ! ! debug ---
-  ! write(*,*) ' v: ', Rot(1,:) 
-  ! write(*,*) ' h: ', Rot(2,:) 
-  ! write(*,*) ' n: ', Rot(3,:) 
+  ! write(*,*) ' v: ', Rot(1,:)
+  ! write(*,*) ' h: ', Rot(2,:)
+  ! write(*,*) ' n: ', Rot(3,:)
   ! ! debug ---
 
 
@@ -357,7 +357,7 @@ subroutine build_connectivity(this, loc_points)
 
         wei_v = 1.0_wp / max( wei_v, 1e-9_wp ) **this%w_order
         wei_v = wei_v / sum(wei_v)
-        
+
         !> Weights in spanwise direction
         if ( rrb(2,ib) .lt. 0.0_wp ) then
           span_wei = 1.0_wp + rrb(2,ib) / this%span_blending
@@ -394,7 +394,7 @@ subroutine build_connectivity(this, loc_points)
         !> Weights in chordwise direction
         wei_v = 1.0_wp / max( wei_v, 1e-9_wp ) **this%w_order
         wei_v = wei_v / sum(wei_v)
-        
+
         !> Weights in spanwise direction
         if ( rrb(2,ib) .lt. 0.0_wp ) then
           span_wei = 1.0_wp + rrb(2,ib) / this%span_blending
@@ -510,7 +510,7 @@ subroutine build_connectivity_cen(this, rr, ee)
   real(wp),       intent(in)    :: rr(:,:) ! loc_points_in
   integer ,       intent(in)    :: ee(:,:)
 
-  !> Cell centers (to be evaluated), whose connectivity with the 
+  !> Cell centers (to be evaluated), whose connectivity with the
   ! hinge nodes is created in this subroutine
   real(wp), allocatable :: loc_points(:,:)
 
@@ -635,7 +635,7 @@ subroutine build_connectivity_cen(this, rr, ee)
 
         wei_v = 1.0_wp / max( wei_v, 1e-9_wp ) **this%w_order
         wei_v = wei_v / sum(wei_v)
-        
+
         !> Weights in spanwise direction
         if ( rrb(2,ib) .lt. 0.0_wp ) then
           span_wei = 1.0_wp + rrb(2,ib) / this%span_blending
@@ -672,7 +672,7 @@ subroutine build_connectivity_cen(this, rr, ee)
         !> Weights in chordwise direction
         wei_v = 1.0_wp / max( wei_v, 1e-9_wp ) **this%w_order
         wei_v = wei_v / sum(wei_v)
-        
+
         !> Weights in spanwise direction
         if ( rrb(2,ib) .lt. 0.0_wp ) then
           span_wei = 1.0_wp + rrb(2,ib) / this%span_blending
@@ -803,7 +803,8 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
   integer :: i_b, i_h, i_t
   integer :: nb, nh, nt
 
-  integer, allocatable :: ind(:)
+  !integer, allocatable :: ind(:)
+  integer :: ind
 
   !> Find hinge and structural nodes in rr_t array, collecting all the nodes
   n_t = size(rr_t,2)
@@ -814,15 +815,21 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
   do i_t = 1, n_t
     if ( any( ind_h .eq. i_t ) ) then
       i_h = i_h + 1
-      ind = ind_h( findloc(ind_h, value=i_t) )
-      rr_h(:,i_h) = rr_t(:, ind(1) )
+      !ind = ind_h( findloc(ind_h, value=i_t) )
+      !workaround for older compilers
+      do ind = 1,size(ind_h)
+        if (ind_h(ind) .eq. i_t) exit
+      enddo
+
+      !rr_h(:,i_h) = rr_t(:, ind(1) )
+      rr_h(:,i_h) = rr_t(:, ind )
     else
       i_b = i_b + 1
       rr_b(:,i_b) = rr_t(:,i_t)
       ind_b(i_b) = i_b
     end if
   end do
-  
+
   !> Allocate and fill hinge%hin object
   allocate(this%hin%node_id(       n_h)); this%hin%node_id = -333 ! useless
   allocate(this%hin%ind(this%n_wei,n_h))
@@ -844,7 +851,7 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
 
     wei_v = 1.0_wp / max( wei_v, 1e-9_wp ) **this%w_order
     wei_v = wei_v / sum(wei_v)
-    
+
     ! this%hin%node_id(i_h) = i_h
     this%hin%ind(:,i_h) = ind_b(ind_v)
     this%hin%wei(:,i_h) = wei_v
@@ -939,7 +946,7 @@ subroutine update_hinge_nodes( this, R, of )
     this % act % rr(1,:) = this % act % rr(1,:) + of(1)
     this % act % rr(2,:) = this % act % rr(2,:) + of(2)
     this % act % rr(3,:) = this % act % rr(3,:) + of(3)
-  
+
     !> Actual configuration: node orientation
     this % act % h = matmul( R, this % ref % h )
     this % act % v = matmul( R, this % ref % v )
@@ -1006,24 +1013,24 @@ subroutine hinge_deflection( this, rr, t, postpro )
     if ( present(postpro) ) then;  local_postpro = postpro
     else                        ;  local_postpro = default_postpro
     end if
-  
+
     allocate(rr_in(size(rr,1),size(rr,2))); rr_in = rr
-  
+
     !> n.nodes in the rigid-rotation and in the blending regions
     nrot = size(this%rot %node_id)
     nble = size(this%blen%node_id)
-  
+
     do ih = 1, this%n_nodes
-  
+
       th =   this % theta(ih) * pi/180.0_wp
-  
+
       if ( th .ne. 0.0_wp ) then ! (equality check on real?)
-  
+
         ! Rotation matrix
         nx(1,:) = (/            0.0_wp, -this%act%h(3,ih),  this%act%h(2,ih) /)
         nx(2,:) = (/  this%act%h(3,ih),            0.0_wp, -this%act%h(1,ih) /)
         nx(3,:) = (/ -this%act%h(2,ih),  this%act%h(1,ih),            0.0_wp /)
-  
+
         !> Rigid rotation
         do ib = 1, size(this%rot%n2h(ih)%p2h)
           ii = this%rot%n2h(ih)%p2h(ib)
@@ -1033,10 +1040,10 @@ subroutine hinge_deflection( this, rr, t, postpro )
                      this%rot%n2h(ih)%w2h(ib) * &
                      matmul( Rot_I, rr_in(:,ii)-this%act%rr(:,ih) )
         end do
-  
+
         !> Blending region
         do ib = 1, size(this%blen%n2h(ih)%p2h)
-  
+
           ii = this%blen%n2h(ih)%p2h(ib)
           th1 = -th * this%blen%n2h(ih)%s2h(ib)
           !> coordinate of the centre of the circle used for blending,
@@ -1049,24 +1056,24 @@ subroutine hinge_deflection( this, rr, t, postpro )
           thp = 0.5_wp * ( xq + this%offset ) / this%offset * th1
           xqp = yc*sin(thp)          - this%offset - yq*sin(thp) - xq
           yqp = yc*(1.0_wp-cos(thp))               + yq*cos(thp) - yq
-  
+
           !> Update coordinates
           rr(:,ii) = rr(:,ii) + &
                      this%blen%n2h(ih)%w2h(ib) * &
                    ( xqp * this%act%v(:,ih) + yqp * this%act%n(:,ih) )
-  
+
         end do
-  
+
       end if
-  
+
     end do
-  
+
     deallocate(rr_in)
 
   else  !> Coupled hinge
 
     ! see precice/mod_precice.f90/t_precice % update_elems()
-    
+
   end if
 
 end subroutine hinge_deflection
@@ -1182,7 +1189,7 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
          hinges(i) % rotation_amplitude = getreal(fun_prs,'Amplitude')
          hinges(i) % rotation_omega     = getreal(fun_prs,'Omega')
          hinges(i) % rotation_phase     = getreal(fun_prs,'Phase')
-       
+
        elseif ( trim(hinges(i)%rotation_input) .eq. 'from_file' ) then
          write(*,*) ' Error in t_hinge%build_hinge(): rotation_input = from_file &
                     &not implemented yet.'; stop
@@ -1212,8 +1219,8 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
 
          !> Set "default" values of the function: inputs
          hinges(i) % rotation_amplitude = 1.0_wp
-         hinges(i) % rotation_omega     = 0.0_wp 
-         hinges(i) % rotation_phase     = 0.0_wp 
+         hinges(i) % rotation_omega     = 0.0_wp
+         hinges(i) % rotation_phase     = 0.0_wp
 
        end if
      end if
