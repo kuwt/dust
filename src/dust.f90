@@ -1066,8 +1066,8 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   if(sim_param%n_wake_panels .lt. 1) then
     sim_param%n_wake_panels = 1
     call warning('dust','dust','imposed a number of wake panels rows &
-                &LOWER THAN 1. At least one row of panels is mandatory, &
-                &the simulation will proceed with "n_wake_panels = 1"')
+                 &LOWER THAN 1. At least one row of panels is mandatory, &
+                 &the simulation will proceed with "n_wake_panels = 1"')
   endif
   sim_param%n_wake_particles = getint(prms, 'n_wake_particles')
   sim_param%particles_box_min = getrealarray(prms, 'particles_box_min',3)

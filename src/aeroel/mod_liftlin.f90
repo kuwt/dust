@@ -646,9 +646,9 @@ subroutine solve_liftlin_piszkin( &
                    el%chord / sim_param%mu_inf
 
         ! Read the aero coeff from .c81 tables
-        call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil , &
-                                   (/alpha_avg, mach, reynolds/) , sim_param , &
-                                                      aero_coeff , dcl_v(i_l) )
+        call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil, &
+                                (/alpha_avg, mach, reynolds/), aero_coeff, &
+                                dcl_v(i_l) )
         cl = aero_coeff(1)   ! cl needed for the iterative process
 
         ! Compute the "equivalent" intensity of the vortex line
@@ -1063,8 +1063,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
         ! Read the aero coeff from .c81 tables
         call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil , &
-                                   (/alpha, mach, reynolds/) , sim_param , &
-                                                              aero_coeff )
+                                   (/alpha, mach, reynolds/), aero_coeff )
         cl = aero_coeff(1)   ! cl needed for the iterative process
 
         ! Compute the "equivalent" intensity of the vortex line

@@ -936,20 +936,20 @@ subroutine define_division(type_mesh, nelem, division)
   select case (trim(type_mesh))
   case ("uniform")
     do iPoint = 1,nelem+1
-      division(iPoint) = (real(iPoint,wp)-1)*step
+      division(iPoint) = (real(iPoint-1,wp))*step
     enddo
   case ("cosine")
     do iPoint = 1,nelem+1
-      division(iPoint) = (1.0_wp - cos(pi*(real(iPoint,wp)-1)*step))/2.0_wp
+      division(iPoint) = (1.0_wp - cos(pi*(real(iPoint-1,wp))*step))/2.0_wp
     enddo
   case ("cosineLE", "cosineIB")
     do iPoint = 1,nelem+1
-      division(iPoint) = 1.0_wp - cos(pi/2.0_wp*(real(iPoint,wp)-1)*step)
+      division(iPoint) = 1.0_wp - cos(pi/2.0_wp*(real(iPoint-1,wp))*step)
     enddo
   case ("cosineTE", "cosineOB")
     do iPoint = 1,nelem+1
 !     division(iPoint) = - cos(pi/2.0_wp*((iPoint-1)*step+1.0_wp))
-      division(iPoint) = sin(pi/2.0_wp*((real(iPoint,wp)-1)*step))
+      division(iPoint) = sin(pi/2.0_wp*((real(iPoint-1,wp))*step))
     enddo
   case default
     ! TODO: error in this case

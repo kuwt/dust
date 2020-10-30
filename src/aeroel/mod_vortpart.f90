@@ -137,7 +137,7 @@ subroutine compute_vel_vortpart (this, pos, uinf, vel)
  real(wp), intent(in) :: uinf(3)
  real(wp), intent(out) :: vel(3)
 
- real(wp) :: vvort(3)
+ !real(wp) :: vvort(3)
  real(wp) :: dist(3), distn, c, d
 
 
@@ -191,7 +191,7 @@ subroutine compute_stretch_vortpart (this, pos, alpha, stretch)
  real(wp), intent(in) :: alpha(3)
  real(wp), intent(out) :: stretch(3)
 
- real(wp) :: dist(3), distn, Sr, dSr, vecprod(3), c, d
+ real(wp) :: dist(3), distn, vecprod(3), c, d !, Sr, dSr
 
   !TODO: add far field approximations
 
