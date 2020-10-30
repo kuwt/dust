@@ -401,11 +401,11 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       close(21)
 
       allocate(coupling_nodes(3,n_coupling_nodes)); coupling_nodes = 0.0_wp
-      
+
       open(unit=21, file=trim(coupling_node_file))
       write(*,*) ' n_coupling_nodes: ', n_coupling_nodes
       do i = 1, n_coupling_nodes
-        read(21,*) coupling_nodes(:,i) ; write(*,*) coupling_nodes(:,i) 
+        read(21,*) coupling_nodes(:,i) ; write(*,*) coupling_nodes(:,i)
       end do
       close(21)
     end if
@@ -564,6 +564,68 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       rr = rr * scaling
     endif
 
+#if USE_PRECICE
+    !> *** to do *** symmetry and mirror. So far, finalize run with an error
+    if ( coupled_comp ) then
+      if ( mesh_symmetry .or. mesh_mirror ) then
+        call warning(this_sub_name, this_mod_name, &
+                    'It is me, you know who. I have no idea if the&
+                   & coupling is going to work with simmetry or mirroring. &
+                   &Only life and time will tell. YOUR life and time')
+      end if
+    end if
+    if ( coupled_comp ) then
+      write(*,*) ' coupling_type: ', trim(coupling_type)
+      if ( trim(coupling_type) .eq. 'll' ) then
+        call error(this_sub_name, this_mod_name, &
+                    'It is not possible to couple with lifting lines method&
+                    &generic cgns meshes')
+      elseif ( trim(coupling_type) .eq. 'rigid' ) then
+        !> Rigid coupling between a rigid component and a "structural" node,
+        ! defined as an input, coupling_node. This node represents the
+        ! reference configuration for data communication between the aerodynamic
+        ! and the structural solvers
+
+        allocate(c_ref_p(3, size(rr,2))); c_ref_p = 0.0_wp
+        do i =1, size(c_ref_p,2)
+          !> Offset
+          c_ref_p(:,i) = rr(:,i) - coupling_node
+          !> Orientation
+          c_ref_p(:,i) = matmul( transpose(coupling_node_rot), &
+                                 c_ref_p(:,i) )
+        end do
+
+        allocate(c_ref_c(3, size(ee,2))); c_ref_c = 0.0_wp
+        do i =1, size(c_ref_c,2)
+          n_non_zero = 0
+          do j = 1, 4
+            if ( ee(j,i) .ne. 0 ) then
+              n_non_zero = n_non_zero + 1
+              c_ref_c(:,i) = c_ref_c(:,i) + rr(:,ee(j,i))
+            end if
+          end do
+          !> Offset
+          c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero) - coupling_node
+          !> Orientation
+          c_ref_c(:,i) = matmul( transpose(coupling_node_rot), &
+                                 c_ref_c(:,i) )
+        end do
+
+        !> Write to hdf5 geo file
+        call write_hdf5(c_ref_p,'c_ref_p',geo_loc)
+        call write_hdf5(c_ref_c,'c_ref_c',geo_loc)
+
+      elseif ( trim(coupling_type) .eq. 'rbf' ) then
+
+        call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)
+
+        rr = matmul( transpose(coupling_node_rot), rr )
+
+      end if
+
+    end if
+#endif
+
    case('revolution')
 
       if ( countoption(geo_prs,'MeshFile') .lt. 1 ) then
@@ -707,7 +769,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       end if
     end if
     if ( coupled_comp ) then
-      write(*,*) ' coupling_type: ', trim(coupling_type) 
+      write(*,*) ' coupling_type: ', trim(coupling_type)
       if ( trim(coupling_type) .eq. 'll' ) then
         !> Compute the reference chord vector, for geometry transformation
         ! of the deformable component. Meant for blades, wings defined using
@@ -742,7 +804,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
       elseif ( trim(coupling_type) .eq. 'rigid' ) then
         !> Rigid coupling between a rigid component and a "structural" node,
-        ! defined as an input, coupling_node. This node represents the 
+        ! defined as an input, coupling_node. This node represents the
         ! reference configuration for data communication between the aerodynamic
         ! and the structural solvers
 
@@ -1067,7 +1129,7 @@ end subroutine build_component
 subroutine symmetry_mesh(ee, rr, cent, norm)
  integer, allocatable, intent(inout) :: ee(:,:)
  real(wp), allocatable, intent(inout) :: rr(:,:)
- real(wp), intent(in) :: cent(3), norm(3) 
+ real(wp), intent(in) :: cent(3), norm(3)
 
  real(wp) :: n(3), d, l
  integer, allocatable :: ee_temp(:,:)
