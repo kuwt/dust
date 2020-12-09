@@ -2,3 +2,11 @@
 *.o
 *.mod
 src/general/mod_version.f90
+*.asv
+*.bylog
+*.f06
+*.f04
+*.vtk
+*.vtu
+*.op2
+
