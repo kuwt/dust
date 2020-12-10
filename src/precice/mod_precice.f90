@@ -590,6 +590,9 @@ subroutine update_force( this, geo, elems )
           end if
         end do
 
+        write(*,*) 'Position from precice' , this%fields(1)%fdata
+
+
         !> === Aerodynamic mesh to structural nodes ===
         !  w/o considering hinge rotations
         do i = 1, size(comp%el)
@@ -1049,7 +1052,7 @@ subroutine update_elems( this, geo, elems )
           ip = comp%i_points(i)
 
           ! ! debug ---
-          ! write(*,*) ' comp%i_points(', i, '/', size(comp%i_points),' ) = ip = ', ip
+          write(*,*) ' comp%i_points(', i, '/', size(comp%i_points),' ) = ip = ', ip
 
           do iw = 1, size(comp%rbf%nod%ind,1)
 
@@ -1065,7 +1068,10 @@ subroutine update_elems( this, geo, elems )
             vel   = this%fields(j_vel)%fdata(:, comp%i_points_precice(comp%rbf%nod%ind(iw,i)))
             !> Rotation
             n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(comp%rbf%nod%ind(iw,i)))
+            comp%rbf%rrb_rot(:,comp%rbf%nod%ind(iw,i)) = n_rot
+            write(*,*) 'rrb_rot' , comp%rbf%rrb_rot
             theta = norm2( n_rot )
+            write(*,*) 'theta' , theta
             if ( theta .lt. eps ) then
               n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
               theta = 0.0_wp

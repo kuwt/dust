@@ -1191,7 +1191,8 @@ subroutine load_components(geo, in_file, out_file, te)
           !             - to be updated at each timestep, with data read from precice,
           !               in t_precice%update_elems
           allocate( geo%components(i_comp)%rbf%nodes(3, np_precice) , &
-                    geo%components(i_comp)%rbf%rrb  (3, np_precice) )
+                    geo%components(i_comp)%rbf%rrb  (3, np_precice) , &
+                    geo%components(i_comp)%rbf%rrb_rot  (3, np_precice))
           geo%components(i_comp)%rbf%nodes = comp_coupling_nodes(:,ind_coupling)
           geo%components(i_comp)%rbf%rrb   = -333.3_wp
           do ih = 1, n_hinges

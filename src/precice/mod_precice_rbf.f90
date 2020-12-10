@@ -28,7 +28,8 @@ type :: t_precice_rbf
 
   !> Global position of the coupling nodes
   real(wp), allocatable :: rrb(:,:)
-
+  !> Orientation of the coupling nodes
+  real(wp), allocatable :: rrb_rot(:,:)
   !> Grid nodes connectivity
   type(t_rbf_conn) :: nod
 
@@ -79,20 +80,26 @@ subroutine build_connectivity(this, rr, ee)
   !> Number of coupling nodes of the structure
   ns = size(this%nodes,2)
 
-  ! ! debug ---
-  ! write(*,*) ' shape(rr): ', shape(rr)
-  ! write(*,*) ' shape(ee): ', shape(ee)
+   ! debug ---
+   write(*,*) ' shape(rr): ', shape(rr)
+   write(*,*) ' shape(ee): ', shape(ee)
 
-  ! write(*,*); write(*,*) ' rr: '
-  ! do ip = 1, np
-  !   write(*,*) rr(:,ip)
-  ! end do
-  ! write(*,*); write(*,*) ' this%nodes: '
-  ! do is = 1, ns
-  !   write(*,*) this%nodes(:,is)
-  ! end do
-  ! ! debug ---
-
+   write(*,*); write(*,*) ' rr: '
+   do ip = 1, np
+     write(*,*) rr(:,ip)
+   end do
+   write(*,*); write(*,*) ' ee: '
+   do ip = 1, ne
+     write(*,*) ee(:,ip)
+   end do
+   write(*,*); write(*,*) ' this%nodes: '
+   do is = 1, ns
+     write(*,*) this%nodes(:,is)
+   end do
+   
+   ! debug ---
+ !write(*,*) 'rrb MBDyn nodes Position' , geo%components(i_comp)%rbf%rrb 
+ !write(*,*) 'rrb MBDyn nodes Orientation' , rrb_rot
   !> === Surface nodes ===
   allocate(this%nod%ind(this%n_wei, np)); this%nod%ind = 0
   allocate(this%nod%wei(this%n_wei, np)); this%nod%wei = 0.0_wp
