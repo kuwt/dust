@@ -544,7 +544,15 @@ subroutine compute_dforce_jukowski_vortlatt(this)
   ! === Unsteady contribution ===
   this%dforce = this%dforce &
               - sim_param%rho_inf * this%area * ( &
-                this%didou_dt * this%nor ) !+ this%mag * this%dn_dt )
+                this%didou_dt * this%nor+ this%mag * this%dn_dt)
+  !write(*,*) 'this%didou_dt' ,            this%didou_dt
+  !write(*,*) 'this%nor' ,                 this%nor
+  !write(*,*) 'this%mag' ,                 this%mag
+  !write(*,*) 'this%dn_dt' ,               this%dn_dt
+  !write(*,*) ' '
+  !write(*,*) 'this%didou_dt * this%nor ', this%didou_dt * this%nor
+  !write(*,*) 'this%mag * this%dn_dt' ,    this%mag * this%dn_dt
+  !write(*,*) ' '
   ! ! if statement to avoid singularities
   ! if ( norm2( this % vel_ctr_pt ) .gt. &
   !        max( 0.001_wp, 0.001_wp *norm2(sim_param%u_inf) ) ) then

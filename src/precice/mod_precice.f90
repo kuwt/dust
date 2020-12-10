@@ -155,7 +155,6 @@ subroutine initialize(this)
   ! *** to do *** read %config_file_name as an input
   !> Default input for dust in a preCICE coupled simulation
   this % config_file_name = './../precice-config.xml'
-  !this % config_file_name = './../precice-config.xml'
   this % solver_name = 'dust'
   this %   mesh_name = 'dust_mesh'
   this % comm_rank = 0
@@ -281,9 +280,9 @@ subroutine initialize_mesh( this, geo )
         ! old ---
         ! new, w/ hinges ---
         ! debug ---
-        write(*,*) ' debug in mod_precice.f90, l.240'
-        write(*,*) ' i_comp: ', i_comp
-        write(*,*) ' i_points_precice,      rbf%nodes: '
+        !write(*,*) ' debug in mod_precice.f90, l.240'
+        !write(*,*) ' i_comp: ', i_comp
+        !write(*,*) ' i_points_precice,      rbf%nodes: '
         do ih = 1, size(geo%components(i_comp)%rbf%nodes,2)
           write(*,*) geo%components(i_comp)%i_points_precice(ih), '       ', &
                      geo%components(i_comp)%rbf%nodes(:,ih)
@@ -312,10 +311,10 @@ subroutine initialize_mesh( this, geo )
   end do
 
   !> check ---
-  write(*,*) ' PreCICE, mesh % nodes: '
-  do i = 1 , nnodes
-    write(*,*) this%mesh%nodes(:,i)
-  end do
+  !write(*,*) ' PreCICE, mesh % nodes: '
+  !do i = 1 , nnodes
+  !  write(*,*) this%mesh%nodes(:,i)
+  !end do
 
   !> Initialize mesh ============================================
   !> Nodes
@@ -607,7 +606,6 @@ subroutine update_force( this, geo, elems )
             ! bugfix (30-08-2020), this%fields(j_pos)%fdata(:,ip) instead of
             ! comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i))
 
-            ! debug ---
             ! ================================================================================
             !!! IF to activate only for ll element with RBF coupling!!!!       
             if ( comp%comp_el_type(1:1) .eq. 'l' ) then         
@@ -615,26 +613,21 @@ subroutine update_force( this, geo, elems )
             endif 
 
             this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) + &
-                    comp%rbf%cen%wei(iw,i) * ( comp%el(i)%dmom)  + &
+                    comp%rbf%cen%wei(iw,i) *( ( comp%el(i)%dmom)  + &
                     cross( comp%el(i)%cen  - this%fields(j_pos)%fdata(:,ip) , &
-                    comp%el(i)%dforce ) 
+                    comp%el(i)%dforce ) )
 !           ! debug ---
             !write(*,*) ' i, iw, ip : ', i, iw, ip
-!           !write(*,*) ' comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i)): ', &
-!           !             comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i))
+            !write(*,*) ' comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i)): ', &
+            !             comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i))
             !write(*,*) ' this%fields(j_pos)%fdata(:,ip)          : ', &
             !            this%fields(j_pos)%fdata(:,ip)
             !write(*,*) ' comp%el(i)%cen                          : ', &
             !            comp%el(i)%cen
             !write(*,*) 'comp%el(i)%dforce                        : ', &
             !            comp%el(i)%dforce
-!           write(*,*)
-!           ! debug ---
-!           write(*,*) i, iw, comp%rbf%cen%ind(iw,i)
-!           write(*,*) comp%el(i)%cen
-!           write(*,*) comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i))
-!           write(*,*) comp%el(i)%dforce
-!           ! debug ---
+            !write(*,*) 'comp%rbf%cen%wei(iw,i)): ', &
+            !            comp%rbf%cen%wei(iw,i)            
 
           end do
         end do
@@ -884,9 +877,9 @@ subroutine update_elems( this, geo, elems )
   end do
 
   ! debug ---
-  write(*,*) ' ################################### '
-  write(*,*) ' debug in t_precice % update_elems() '
-  write(*,*) ' ################################### '
+  !write(*,*) ' ################################### '
+  !write(*,*) ' debug in t_precice % update_elems() '
+  !write(*,*) ' ################################### '
 
   !> Update elems
   ! *** to do *** build and exploit the connectivity preCICE-dust

@@ -670,8 +670,6 @@ end if
       end if
 
       ! check ---
-      write(*,*) ' precice%mesh%nnodes : ', precice%mesh%nnodes
-      ! check ---
       !> Read data from structural solver
       do i = 1, size(precice%fields)
         if ( trim(precice%fields(i)%fio) .eq. 'read' ) then
@@ -898,16 +896,16 @@ end if
 
 #if USE_PRECICE
 
-      write(*,*) ' ------------------------------------------------------------------- '
-      write(*,*) ' debug in dust.f90, l.890: i, pres, dforce '
+      !write(*,*) ' ------------------------------------------------------------------- '
+      !write(*,*) ' debug in dust.f90, l.890: i, pres, dforce '
       sum_force = 0.0_wp
       do i = 1, size(elems_tot)
         sum_force = sum_force + elems_tot(i)%p%dforce
-        write(*,*) i, ' : ', elems_tot(i)%p%pres, '      ', elems_tot(i)%p%dforce
+      !  write(*,*) i, ' : ', elems_tot(i)%p%pres, '      ', elems_tot(i)%p%dforce
       end do
-      write(*,*) '                                                 ', sum_force
-      write(*,*) ' ------------------------------------------------------------------- '
-      write(*,*)
+      !write(*,*) '                                                 ', sum_force
+      !write(*,*) ' ------------------------------------------------------------------- '
+      !write(*,*)
 
 !     write(*,*) ' debug in dust.f90, l.890 '
 !     do i = 1, 10
@@ -958,12 +956,12 @@ end if
           endif
 
           ! check ---
-          write(*,*) ' precice%mesh%nnodes : ', precice%mesh%nnodes
-          write(*,*) i, precice%fields(i)%fid, precice%fields(i)%fname
-          do i_el = 1, size(precice%fields(i)%fdata,2)
-            write(*,*) precice%fields(i)%fdata(:,i_el)
-          end do
-          write(*,*)
+          !write(*,*) ' precice%mesh%nnodes : ', precice%mesh%nnodes
+          !write(*,*) i, precice%fields(i)%fid, precice%fields(i)%fname
+          !do i_el = 1, size(precice%fields(i)%fdata,2)
+          !  write(*,*) precice%fields(i)%fdata(:,i_el)
+          !end do
+          !write(*,*)
           ! check ---
 
         end if

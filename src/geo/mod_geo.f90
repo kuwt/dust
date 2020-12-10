@@ -2268,7 +2268,8 @@ subroutine update_geometry(geo, t, update_static)
   elseif ( comp%coupling .or. update_static ) then
 
     do ie = 1 , size(comp%el)
-      if ( mod(ie,10) .eq. 0 )  write(*,*) ' el%id : ', ie, comp%el(ie)%nor, comp%el(ie)%nor_old
+      ! debug??
+      !if ( mod(ie,10) .eq. 0 )  write(*,*) ' el%id : ', ie, comp%el(ie)%nor, comp%el(ie)%nor_old 
       comp%el(ie)%dn_dt = ( comp%el(ie)%nor - comp%el(ie)%nor_old ) / &
                                                               sim_param % dt
     end do

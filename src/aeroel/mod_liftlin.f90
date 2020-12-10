@@ -111,6 +111,7 @@ type, extends(c_expl_elem) :: t_liftlin
   real(wp)              :: alpha_isolated
   real(wp)              :: vel_2d_isolated
   real(wp)              :: vel_outplane_isolated
+  real(wp)              :: alpha_unsteady
 
   !> new field for load computations
   real(wp) :: vel_ctr_pt(3)
@@ -472,7 +473,7 @@ subroutine solve_liftlin_piszkin( &
  logical :: load_avl , adaptive_reg
  real(wp) :: e_l(3) , e_d(3)
  real(wp), allocatable :: Gamma_old(:)
-
+ 
  type(t_liftlin), pointer :: el
 
  integer, intent(in) :: it
@@ -701,6 +702,9 @@ subroutine solve_liftlin_piszkin( &
         !> "2D correction" of the induced angle
         alpha_2d = el%mag / ( pi * el%chord * unorm ) *180.0_wp/pi
         alpha = alpha - alpha_2d
+        !> unsteady contribution
+        !a_v(i_l) = alpha - ((-el%chord/2_wp) * 0.01_wp/norm2(uinf))
+
         ! =========================================================
 
         a_v(i_l) = alpha
@@ -736,11 +740,12 @@ subroutine solve_liftlin_piszkin( &
   endif
 
   ! Overwrite a_v, a_v = alpha_avg_v, because load computation uses a_v
-  a_v = alpha_avg_v * pi/180.0_wp
-
+  a_v = alpha_avg_v * pi/180.0_wp ! - ((-el%chord/2_wp) * 0.01_wp/norm2(uinf))
+ 
   ! === Update el % alpha === ( here or updated values below, as in Piszkin? )
   do i_l = 1 , size(elems_ll)
-    elems_ll(i_l)%p%alpha_ll = a_v(i_l) * 180.0_wp/pi
+    elems_ll(i_l)%p%alpha_ll = a_v(i_l) * 180.0_wp/pi 
+    
   end do
 
   ! === Update dGamma_dt field ===
@@ -783,7 +788,7 @@ subroutine solve_liftlin_piszkin( &
 
       !> Unsteady contribution
       el%dforce = el%dforce &
-                  - sim_param%rho_inf * el%area * ( &
+                  + sim_param%rho_inf * el%area * ( &
                   el%dGamma_dt  * el%nor + el%mag * el%dn_dt )
       ! el%dforce = el%dforce &
       !             - sim_param%rho_inf * el%area * el%dGamma_dt &
@@ -818,7 +823,7 @@ subroutine solve_liftlin_piszkin( &
 
       !> Unsteady contribution
       el%dforce = el%dforce &
-                  - sim_param%rho_inf * el%area * ( &
+                  + sim_param%rho_inf * el%area * ( &
                   el%dGamma_dt  * el%nor + el%mag * el%dn_dt )
       ! el%dforce = el%dforce &
       !             - sim_param%rho_inf * el%area * el%dGamma_dt &
@@ -1224,7 +1229,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
       !> Unsteady contribution
       el%dforce = el%dforce &
-                  - sim_param%rho_inf * el%area * ( &
+                  + sim_param%rho_inf * el%area * ( &
                   el%dGamma_dt  * el%nor + el%mag * el%dn_dt )
       !el%dforce = el%dforce &
       !            - sim_param%rho_inf * el%area * el%dGamma_dt &
@@ -1259,7 +1264,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
       !> Unsteady contribution
       el%dforce = el%dforce &
-                  - sim_param%rho_inf * el%area * ( &
+                  + sim_param%rho_inf * el%area * ( &
                   el%dGamma_dt  * el%nor + el%mag * el%dn_dt )
       !el%dforce = el%dforce &
       !            - sim_param%rho_inf * el%area * el%dGamma_dt &
@@ -1440,7 +1445,7 @@ subroutine calc_geo_data_liftlin(this, vert)
 
   ! -- 0.75 chord -- look for other "0.75 chord" tag
   ! correct the chord value ----
-  this%chord = sum(this%edge_len((/2,4/)))*0.5_wp
+  this%chord = sum(this%edge_len((/2,4/)))*0.5_wp * 4_wp / 3_wp
 ! this%chord = this%chord / 0.75_wp
 
   ! === Piszkin, Lewinski (1976) LL model for swept wings ===
