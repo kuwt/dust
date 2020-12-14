@@ -66,7 +66,7 @@ subroutine build_connectivity(this, rr, ee)
   real(wp),             intent(in)    :: rr(:,:)
   integer ,             intent(in)    :: ee(:,:)
   
-  real(wp), allocatable :: dist_all(:), wei_v(:)
+  real(wp), allocatable :: diff_all(:,:), diff_all_transpose(:,:), dist_all(:), mat_dist_all(:,:), wei_v(:), Wnorm(:,:)
   integer , allocatable ::              ind_v(:)
   real(wp) :: cen(3)
 
@@ -81,7 +81,7 @@ subroutine build_connectivity(this, rr, ee)
   ns = size(this%nodes,2)
 
    ! debug ---
-   write(*,*) ' shape(rr): ', shape(rr)
+   !write(*,*) ' shape(rr): ', shape(rr)
    write(*,*) ' shape(ee): ', shape(ee)
 
    write(*,*); write(*,*) ' rr: '
@@ -96,7 +96,7 @@ subroutine build_connectivity(this, rr, ee)
    do is = 1, ns
      write(*,*) this%nodes(:,is)
    end do
-   
+   write(*,*) 'BBBBBBBBBBBBB'
    ! debug ---
  !write(*,*) 'rrb MBDyn nodes Position' , geo%components(i_comp)%rbf%rrb 
  !write(*,*) 'rrb MBDyn nodes Orientation' , rrb_rot
@@ -104,15 +104,37 @@ subroutine build_connectivity(this, rr, ee)
   allocate(this%nod%ind(this%n_wei, np)); this%nod%ind = 0
   allocate(this%nod%wei(this%n_wei, np)); this%nod%wei = 0.0_wp
 
+  allocate(diff_all(3,ns)); diff_all = 0.0_wp
+  allocate(diff_all_transpose(ns,3)); diff_all_transpose = 0.0_wp
   allocate(dist_all(ns)); dist_all = 0.0_wp
-
+  allocate(mat_dist_all(ns,ns)); mat_dist_all = 0.0_wp
+  allocate(Wnorm(3,3));
+  Wnorm(1,1) = 0.001_wp; 
+  Wnorm(2,2) = 1.0_wp;
+  Wnorm(3,3) = 0.001_wp;
+  write(*,*) 'shape: Wnorm' , shape(Wnorm(:,:))
   do ip = 1, np
 
     !> Distance of the surface nodes from the structural nodes
     do is = 1, ns
-      dist_all(is) = norm2( rr(:,ip) - this%nodes(:,is) )
-      ! write(*,*) this%nodes(:,is), '         ', dist_all(is)
+
+      !dist_all(is) = norm2( rr(:,ip) - this%nodes(:,is) )  ! OLD
+      diff_all(:,is)  = rr(:,ip) - this%nodes(:,is)       ! ok
+  
     end do
+
+    mat_dist_all(:,:)   =  matmul(Wnorm , diff_all)       ! ok
+    diff_all_transpose(:,:)  =  transpose(diff_all(:,:))
+    !write(*,*) 'shape: diff_all_transpose' , shape(diff_all_transpose)
+    !write(*,*) 'diff_all_transpose' , (diff_all_transpose)
+    mat_dist_all(:,:)   =  matmul(diff_all_transpose(:,:) , mat_dist_all(1:3,:)) 
+    !write(*,*) 'shape: mat_dist_all' , shape(mat_dist_all)
+    !write(*,*) 'mat_dist_all' , mat_dist_all
+    do is = 1, ns 
+      dist_all(is) = sqrt(mat_dist_all(is,is))
+      !write(*,*) 'dist_all_is' , dist_all(is)
+    end do
+
 
     call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
 
@@ -121,7 +143,7 @@ subroutine build_connectivity(this, rr, ee)
 
     ! ! debug ---
     ! write(*,*) ' ip, rr(:,ip)', ip, rr(:,ip)
-    ! write(*,*) ' wei_v: ' , wei_v
+    write(*,*) ' wei_v: ' , wei_v
     ! write(*,*) ' ind_v: ' , ind_v
     ! ! debug ---
 
@@ -226,6 +248,5 @@ subroutine sort_vector_real( vec, nel, sor, ind )
 
 
 end subroutine sort_vector_real
-
 
 end module mod_precice_rbf
