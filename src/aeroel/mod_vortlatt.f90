@@ -542,9 +542,9 @@ subroutine compute_dforce_jukowski_vortlatt(this)
   end if
 
   ! === Unsteady contribution ===
-  this%dforce = this%dforce &
-              - sim_param%rho_inf * this%area * ( &
-                this%didou_dt * this%nor+ this%mag * this%dn_dt)
+  !this%dforce = this%dforce &
+  !            - sim_param%rho_inf * this%area * ( &
+  !              this%didou_dt * this%nor) !+ this%mag * this%dn_dt)
   !write(*,*) 'this%didou_dt' ,            this%didou_dt
   !write(*,*) 'this%nor' ,                 this%nor
   !write(*,*) 'this%mag' ,                 this%mag

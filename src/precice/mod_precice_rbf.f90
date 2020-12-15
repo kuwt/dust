@@ -2,6 +2,8 @@ module mod_precice_rbf
 
 use mod_param, only: &
     wp
+!use mod_geometry, only: &
+!    t_geo, t_geo_component 
 
 implicit none
 
@@ -96,7 +98,6 @@ subroutine build_connectivity(this, rr, ee)
    do is = 1, ns
      write(*,*) this%nodes(:,is)
    end do
-   write(*,*) 'BBBBBBBBBBBBB'
    ! debug ---
  !write(*,*) 'rrb MBDyn nodes Position' , geo%components(i_comp)%rbf%rrb 
  !write(*,*) 'rrb MBDyn nodes Orientation' , rrb_rot
@@ -119,20 +120,15 @@ subroutine build_connectivity(this, rr, ee)
     do is = 1, ns
 
       !dist_all(is) = norm2( rr(:,ip) - this%nodes(:,is) )  ! OLD
-      diff_all(:,is)  = rr(:,ip) - this%nodes(:,is)       ! ok
+      diff_all(:,is)  = rr(:,ip) - this%nodes(:,is)  
   
     end do
 
-    mat_dist_all(:,:)   =  matmul(Wnorm , diff_all)       ! ok
+    mat_dist_all(:,:)   =  matmul(Wnorm , diff_all)    
     diff_all_transpose(:,:)  =  transpose(diff_all(:,:))
-    !write(*,*) 'shape: diff_all_transpose' , shape(diff_all_transpose)
-    !write(*,*) 'diff_all_transpose' , (diff_all_transpose)
     mat_dist_all(:,:)   =  matmul(diff_all_transpose(:,:) , mat_dist_all(1:3,:)) 
-    !write(*,*) 'shape: mat_dist_all' , shape(mat_dist_all)
-    !write(*,*) 'mat_dist_all' , mat_dist_all
     do is = 1, ns 
       dist_all(is) = sqrt(mat_dist_all(is,is))
-      !write(*,*) 'dist_all_is' , dist_all(is)
     end do
 
 
@@ -141,21 +137,10 @@ subroutine build_connectivity(this, rr, ee)
     wei_v = 1.0_wp / max( wei_v, 1e-9_wp )**this%w_order
     wei_v = wei_v / sum(wei_v)
 
-    ! ! debug ---
-    ! write(*,*) ' ip, rr(:,ip)', ip, rr(:,ip)
-    write(*,*) ' wei_v: ' , wei_v
-    ! write(*,*) ' ind_v: ' , ind_v
-    ! ! debug ---
-
     this%nod%wei(:,ip) = wei_v
     this%nod%ind(:,ip) = ind_v
 
   enddo
-
-  ! ! debug ---
-  ! write(*,*) ' stop in mod_precice_rbf/build_connectivity().'; stop
-  ! ! debug ---
-
  
   !> === Surface centers ===
   allocate(this%cen%ind(this%n_wei, ne)); this%cen%ind = 0
@@ -167,21 +152,36 @@ subroutine build_connectivity(this, rr, ee)
 
     !> Compute element center
     ! *** to do *** elem center for 'll'
-    cen = 0.0_wp; n = 0
-    do ip = 1, 4
-      if ( ee(ip,ie) .ne. 0 ) then
-        n = n + 1
-        cen = cen + rr(:,ee(ip,ie))
-      end if
-    end do
-    cen = cen / dble(n)
+    cen = 0.0_wp; n = 0  
+    !do i_comp = 1, size(geo%components)
+    !  associate( comp => geo%components(i_comp))
+    !
+    !  if ( comp%comp_el_type(1:1) .eq. 'l' ) then         
+    !    cen =  sum ( rr(:,1:2),2 ) / 2.0_wp !! only for l component
+     ! else
+        do ip = 1, 4
+          if ( ee(ip,ie) .ne. 0 ) then
+            n = n + 1
+            cen = cen + rr(:,ee(ip,ie))
+          end if
+        end do
+        cen = cen / dble(n)
+      !end if
+      !end associate
+    !end do 
     
-    !> Distance of the surface nodes from the structural nodes
-    do is = 1, ns
-      dist_all(is) = norm2( cen - this%nodes(:,is) )
-    end do
-    
-    
+      !> Distance of the surface nodes from the structural nodes
+      do is = 1, ns
+        !dist_all(is) = norm2( cen - this%nodes(:,is) ) !OLD
+        diff_all(:,is)  = cen - this%nodes(:,is)  
+      end do
+
+      mat_dist_all(:,:)   =  matmul(Wnorm , diff_all)    
+      diff_all_transpose(:,:)  =  transpose(diff_all(:,:))
+      mat_dist_all(:,:)   =  matmul(diff_all_transpose(:,:) , mat_dist_all(1:3,:)) 
+      do is = 1, ns 
+        dist_all(is) = sqrt(mat_dist_all(is,is))
+      end do
 
     
     call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
