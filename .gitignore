@@ -9,4 +9,9 @@ src/general/mod_version.f90
 *.vtk
 *.vtu
 *.op2
-
+*.out
+*.jnt
+*.mod
+*.frc
+*.ine
+build/
