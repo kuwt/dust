@@ -3,40 +3,54 @@ module mod_precice_rbf
 use mod_param, only: &
     wp
 !use mod_geometry, only: &
-!    t_geo, t_geo_component 
+!    t_geo, t_geo_component
 
 implicit none
 
 private
 
-public :: t_precice_rbf
+public :: c_coupling_interpolate, t_standard_rbf, t_ll_rbf
 
 !> Connectivity, indices and weights of the structural nodes driving
 ! the surface points
 type :: t_rbf_conn
 
   !> Indices (surface to structure)
-  integer,  allocatable :: ind(:,:) 
+  integer,  allocatable :: ind(:,:)
   !> Weights (surface to structure)
   real(wp), allocatable :: wei(:,:)
 
 end type t_rbf_conn
 
-!> RBF coupling structures
-type :: t_precice_rbf
-
+type, abstract :: c_coupling_interpolate
   !> Coupling nodes
   real(wp), allocatable :: nodes(:,:)
-
   !> Global position of the coupling nodes
   real(wp), allocatable :: rrb(:,:)
   !> Orientation of the coupling nodes
   real(wp), allocatable :: rrb_rot(:,:)
   !> Grid nodes connectivity
   type(t_rbf_conn) :: nod
-
   !> Elem centers connectivity
   type(t_rbf_conn) :: cen
+
+  contains
+  procedure(i_build_connectivity), deferred, pass(this) :: build_connectivity
+
+end type
+
+abstract interface
+ subroutine i_build_connectivity(this, rr, ee)
+   import :: c_coupling_interpolate, wp
+   class(c_coupling_interpolate), intent(inout) :: this
+   real(wp),             intent(in)    :: rr(:,:)
+   integer ,             intent(in)    :: ee(:,:)
+ end subroutine
+end interface
+
+
+!> RBF coupling structures
+type, extends(c_coupling_interpolate) :: t_standard_rbf
 
   !> --- Parameters of rbf interpolation ---
   !> Number of points for transferring the motion from the structure to the
@@ -52,9 +66,30 @@ type :: t_precice_rbf
 
   contains
 
-  procedure, pass(this) :: build_connectivity
+  procedure, pass(this) :: build_connectivity => build_connectivity_rbf
 
-end type t_precice_rbf
+end type t_standard_rbf
+
+!> RBF coupling structures
+type, extends(c_coupling_interpolate) :: t_ll_rbf
+
+  !> --- Parameters of rbf interpolation ---
+  !> Number of points for transferring the motion from the structure to the
+  ! surface, through a weighted average
+  ! *** to do *** hardcoded, so far. Read as an input, with a default value,
+  ! equal to 2 (or 1?)
+  integer :: n_wei = 2
+
+  !> Order of the norm used for computing distance-based weights
+  ! *** to do *** hardcoded, so far. Read as an input, with a default value,
+  ! equal to 1 (or 2?)
+  integer :: w_order = 1
+
+  contains
+
+  procedure, pass(this) :: build_connectivity => build_connectivity_ll
+
+end type t_ll_rbf
 
 !> --------------------------------------------------------------
 contains
@@ -63,11 +98,11 @@ contains
 !----------------------------------------------------------------
 !> Read local coordinates of surface nodes, rr, and build data for
 ! structure to surface interpolation of the motion
-subroutine build_connectivity(this, rr, ee)
+subroutine build_connectivity_rbf(this, rr, ee)
   class(t_precice_rbf), intent(inout) :: this
   real(wp),             intent(in)    :: rr(:,:)
   integer ,             intent(in)    :: ee(:,:)
-  
+
   real(wp), allocatable :: diff_all(:,:), diff_all_transpose(:,:), dist_all(:), mat_dist_all(:,:), wei_v(:), Wnorm(:,:)
   integer , allocatable ::              ind_v(:)
   real(wp) :: cen(3)
@@ -99,7 +134,7 @@ subroutine build_connectivity(this, rr, ee)
      write(*,*) this%nodes(:,is)
    end do
    ! debug ---
- !write(*,*) 'rrb MBDyn nodes Position' , geo%components(i_comp)%rbf%rrb 
+ !write(*,*) 'rrb MBDyn nodes Position' , geo%components(i_comp)%rbf%rrb
  !write(*,*) 'rrb MBDyn nodes Orientation' , rrb_rot
   !> === Surface nodes ===
   allocate(this%nod%ind(this%n_wei, np)); this%nod%ind = 0
@@ -110,7 +145,7 @@ subroutine build_connectivity(this, rr, ee)
   allocate(dist_all(ns)); dist_all = 0.0_wp
   allocate(mat_dist_all(ns,ns)); mat_dist_all = 0.0_wp
   allocate(Wnorm(3,3));
-  Wnorm(1,1) = 0.001_wp; 
+  Wnorm(1,1) = 0.001_wp;
   Wnorm(2,2) = 1.0_wp;
   Wnorm(3,3) = 0.001_wp;
   write(*,*) 'shape: Wnorm' , shape(Wnorm(:,:))
@@ -120,14 +155,14 @@ subroutine build_connectivity(this, rr, ee)
     do is = 1, ns
 
       !dist_all(is) = norm2( rr(:,ip) - this%nodes(:,is) )  ! OLD
-      diff_all(:,is)  = rr(:,ip) - this%nodes(:,is)  
-  
+      diff_all(:,is)  = rr(:,ip) - this%nodes(:,is)
+
     end do
 
-    mat_dist_all(:,:)   =  matmul(Wnorm , diff_all)    
+    mat_dist_all(:,:)   =  matmul(Wnorm , diff_all)
     diff_all_transpose(:,:)  =  transpose(diff_all(:,:))
-    mat_dist_all(:,:)   =  matmul(diff_all_transpose(:,:) , mat_dist_all(1:3,:)) 
-    do is = 1, ns 
+    mat_dist_all(:,:)   =  matmul(diff_all_transpose(:,:) , mat_dist_all(1:3,:))
+    do is = 1, ns
       dist_all(is) = sqrt(mat_dist_all(is,is))
     end do
 
@@ -141,7 +176,7 @@ subroutine build_connectivity(this, rr, ee)
     this%nod%ind(:,ip) = ind_v
 
   enddo
- 
+
   !> === Surface centers ===
   allocate(this%cen%ind(this%n_wei, ne)); this%cen%ind = 0
   allocate(this%cen%wei(this%n_wei, ne)); this%cen%wei = 0.0_wp
@@ -152,11 +187,11 @@ subroutine build_connectivity(this, rr, ee)
 
     !> Compute element center
     ! *** to do *** elem center for 'll'
-    cen = 0.0_wp; n = 0  
+    cen = 0.0_wp; n = 0
     !do i_comp = 1, size(geo%components)
     !  associate( comp => geo%components(i_comp))
     !
-    !  if ( comp%comp_el_type(1:1) .eq. 'l' ) then         
+    !  if ( comp%comp_el_type(1:1) .eq. 'l' ) then
     !    cen =  sum ( rr(:,1:2),2 ) / 2.0_wp !! only for l component
      ! else
         do ip = 1, 4
@@ -168,22 +203,22 @@ subroutine build_connectivity(this, rr, ee)
         cen = cen / dble(n)
       !end if
       !end associate
-    !end do 
-    
+    !end do
+
       !> Distance of the surface nodes from the structural nodes
       do is = 1, ns
         !dist_all(is) = norm2( cen - this%nodes(:,is) ) !OLD
-        diff_all(:,is)  = cen - this%nodes(:,is)  
+        diff_all(:,is)  = cen - this%nodes(:,is)
       end do
 
-      mat_dist_all(:,:)   =  matmul(Wnorm , diff_all)    
+      mat_dist_all(:,:)   =  matmul(Wnorm , diff_all)
       diff_all_transpose(:,:)  =  transpose(diff_all(:,:))
-      mat_dist_all(:,:)   =  matmul(diff_all_transpose(:,:) , mat_dist_all(1:3,:)) 
-      do is = 1, ns 
+      mat_dist_all(:,:)   =  matmul(diff_all_transpose(:,:) , mat_dist_all(1:3,:))
+      do is = 1, ns
         dist_all(is) = sqrt(mat_dist_all(is,is))
       end do
 
-    
+
     call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
 
     !> Weight, inverse of the norm, avoid singularities
@@ -198,20 +233,20 @@ subroutine build_connectivity(this, rr, ee)
   ! stop
 
   ! check ---
-  write(*,*) 
+  write(*,*)
   write(*,*) ' Check in t_precice_rbf % build_connectivity, %nod '
   do ip = 1, np
     write(*,*) this%nod%ind(:,ip), this%nod%wei(:,ip)
   end do
-  write(*,*) 
+  write(*,*)
   write(*,*) ' Check in t_precice_rbf % build_connectivity, %cen '
   do ie = 1, ne
     write(*,*) this%cen%ind(:,ie), this%cen%wei(:,ie)
   end do
-  write(*,*) 
-  ! write(*,*) 
+  write(*,*)
+  ! write(*,*)
   ! write(*,*) ' Stop.'
-  ! write(*,*) 
+  ! write(*,*)
   ! stop
   ! ! check ---
 
@@ -221,7 +256,24 @@ subroutine build_connectivity(this, rr, ee)
   if ( allocated(ind_v   ) )  deallocate(ind_v   )
 
 
-end subroutine build_connectivity
+end subroutine build_connectivity_rbf
+
+!----------------------------------------------------------------------
+
+subroutine build_connectivity_ll(this, rr, ee)
+  class(t_precice_rbf), intent(inout) :: this
+  real(wp),             intent(in)    :: rr(:,:)
+  integer ,             intent(in)    :: ee(:,:)
+
+
+  !do stuff here!
+
+  !NOTE: please, if some parts of the polymorphic subroutine are equal,
+  !DO NOT copy-paste them: create another subroutine that does that stuff
+  !and call it from both the instancies of the polimorphic subroutine
+
+
+end subroutine build_connectivity_ll
 
 ! ---------------------------------------------------------------
 !> Naif sort, copied from mod_hinges

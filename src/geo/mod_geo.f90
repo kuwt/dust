@@ -119,7 +119,7 @@ use mod_hdf5_io, only: &
 
 #if USE_PRECICE
 use mod_precice_rbf, only: &
-  t_precice_rbf
+  c_coupling_interpolate, t_standard_rbf, t_ll_rbf
 #endif
 
 !----------------------------------------------------------------------
@@ -163,7 +163,7 @@ type :: t_geo_component
  !> Coupling type: 'll', 'rigid', 'rbf'
  character(len=max_char_len) :: coupling_type
 
- !> Coupling node: local coordinates (in the component local ref.frame) 
+ !> Coupling node: local coordinates (in the component local ref.frame)
  ! of the coupling node (why initilized?)
  real(wp) :: coupling_node(3) = 0.0_wp
 
@@ -172,7 +172,7 @@ type :: t_geo_component
  real(wp) :: coupling_node_rot(3,3) = 0.0_wp
 
 #if USE_PRECICE
- type(t_precice_rbf) :: rbf
+ type(c_coupling_interpolate), allocatable :: rbf
 #endif
 
  !> Id of the component (warning: not always defined)
@@ -228,7 +228,7 @@ type :: t_geo_component
  integer ,allocatable :: i_airfoil_e(:,:)
 
 #if USE_PRECICE
- !> Chord vector reference, required to assign the motion ot the 
+ !> Chord vector reference, required to assign the motion ot the
  ! TE of a deformable LL element, knowing the LE motion
  real(wp), allocatable :: c_ref_p(:,:)
  !> "Chord" vector reference, referred to the center of the elements
@@ -306,7 +306,7 @@ type :: t_geo
  real(wp), allocatable :: points(:,:)
 
 #if USE_PRECICE
- !> Velocity of the points (element vertexes), to be used by 
+ !> Velocity of the points (element vertexes), to be used by
  ! coupled components
  real(wp), allocatable :: points_vel(:,:)
 #endif
@@ -726,7 +726,7 @@ subroutine load_components(geo, in_file, out_file, te)
  real(wp), allocatable :: xac_p(:)
  real(wp), allocatable :: comp_coupling_nodes(:,:)
  integer :: points_offset_precice, np_precice, np_precice_tot
-#endif 
+#endif
  !> Hinges
  integer :: n_hinges, ih
  real(wp) :: rotation_amplitude
@@ -1016,7 +1016,7 @@ subroutine load_components(geo, in_file, out_file, te)
                                    size( geo%components(i_comp)%hinge(ih)%ref%rr, 2)
         ! ! debug ---
         ! write(*,*) ' Debug in load_component(). %ref%rr : '
-        ! do i = 1, geo%components(i_comp)%hinge(ih)%n_nodes 
+        ! do i = 1, geo%components(i_comp)%hinge(ih)%n_nodes
         !   write(*,*) geo%components(i_comp)%hinge(ih)%ref%rr(:,i)
         ! end do
         ! ! debug ---
@@ -1064,7 +1064,7 @@ subroutine load_components(geo, in_file, out_file, te)
                                       geo%components(i_comp)%hinge(ih)%ref%rr
 
         !> Build hinge connectivity and weights, for grid nodes
-        write(*,*) ; write(*,*) ' hinge n.', ih 
+        write(*,*) ; write(*,*) ' hinge n.', ih
         call geo%components(i_comp)%hinge(ih)%build_connectivity( rr )
         ! and for cell centers
         call geo%components(i_comp)%hinge(ih)%build_connectivity_cen( rr, ee )
@@ -1116,9 +1116,9 @@ subroutine load_components(geo, in_file, out_file, te)
           elseif ( trim(comp_coupling_type) .eq. 'rigid' ) then
             ! For rigid coupling, the motion of all the nodes of the components
             ! is defined through the motion of the coupling_node
-            np_precice = 1 
+            np_precice = 1
           end if
-          !> Allocate and fill i_points_precice array containing the 
+          !> Allocate and fill i_points_precice array containing the
           ! connectivity between dust with PreCICE nodes
           allocate(geo%components(i_comp)%i_points_precice( np_precice ))
           geo%components(i_comp)%i_points_precice = &
@@ -1133,10 +1133,17 @@ subroutine load_components(geo, in_file, out_file, te)
           ! allocate(geo%components(i_comp)%rbf%wei  (0,0))
 
         elseif ( trim(comp_coupling_type) .eq. 'rbf' ) then
-          
+
+          !> Choose here the type of interpolation
+          if (comp_el_type(1:1) .eq. 'l') then
+            allocate(t_ll_rbf::geo%components(i_comp)%rbf)
+          else
+            allocate(t_standard_rbf::geo%components(i_comp)%rbf)
+          endif
+
           !> Load all the coupling nodes, both structural and hinges
           call read_hdf5_al( comp_coupling_nodes, 'CouplingNodes', geo_loc )
-          
+
           !> Find n. nodes of coupled hinges
           n_nodes_coupling_hinges = 0
           do ih = 1, n_hinges
@@ -1184,6 +1191,8 @@ subroutine load_components(geo, in_file, out_file, te)
             geo%components(i_comp)%i_points_precice = ind_coupling + points_offset_precice
           end if
 
+
+
           !> Define %rbf%nodes to compute struct-aero connectivity, with build_connectivity()
           ! %rbf%nodes: coordinates of the coupling nodes in the local reference frame
           ! %rbf%rrb  : coordinates of the coupling nodes in the global reference frame,
@@ -1203,12 +1212,12 @@ subroutine load_components(geo, in_file, out_file, te)
               geo%components(i_comp)%hinge(ih)%nodes = &
                   comp_coupling_nodes(:, geo%components(i_comp)%hinge(ih)%i_points_precice - &
                                          points_offset_precice )
-              
+
               !> Connectivity between hinge nodes and other structural nodes
-              call geo%components(i_comp)%hinge(ih)%build_connectivity_hin( & 
+              call geo%components(i_comp)%hinge(ih)%build_connectivity_hin( &
                    comp_coupling_nodes, &
                    geo%components(i_comp)%hinge(ih)%i_points_precice - points_offset_precice )
- 
+
               ! debug ---
               write(*,*) ' this%hin%ind, %i_points_precice, %wei: '
               do i3 = 1, size(geo%components(i_comp)%hinge(ih)%hin%ind,2)
@@ -1366,7 +1375,7 @@ subroutine load_components(geo, in_file, out_file, te)
           !> Open hinge group
           write(hinge_id_str,'(I2.2)') ih
           call new_hdf5_group(hloc2, 'Hinge_'//hinge_id_str, hiloc)
-  
+
           !> read input and fill component%hinge fields
           call write_hdf5( geo%components(i_comp)%hinge(ih)%nodes_input, &
                                                             'Nodes_Input', hiloc)
@@ -1387,9 +1396,9 @@ subroutine load_components(geo, in_file, out_file, te)
           call write_hdf5( geo%components(i_comp)%hinge(ih)%f_phase, &
                                                    'Hinge_Rotation_Phase', hiloc)
           call close_hdf5_group(hiloc)
-  
+
         end do
-        
+
         call close_hdf5_group(hloc2)
 
         !> Hinges -------------------------------------------------------------
@@ -1827,7 +1836,7 @@ subroutine calc_geo_data_pan(elem,vert)
 
   ! center
   elem%cen =  sum ( vert,2 ) / real(nsides,wp)
-  write(*,*) 'elem%cen da mod_geo: ', elem%cen 
+  write(*,*) 'elem%cen da mod_geo: ', elem%cen
 
 
   ! unit normal and area
@@ -1922,7 +1931,7 @@ subroutine calc_geo_data_ll(elem,vert)
   elem%ver = vert
 
   ! center, for the lifting line is the mid-point
-  elem%cen =  sum ( vert(:,1:2),2 ) / 2.0_wp 
+  elem%cen =  sum ( vert(:,1:2),2 ) / 2.0_wp
   write(*,*) 'elem%cen: ', elem%cen
   ! unit normal and area
   if ( nsides .eq. 4 ) then
@@ -2222,7 +2231,7 @@ subroutine update_geometry(geo, t, update_static)
   ! Update only rigid components, or update at first timestep
   ! *** to do *** quite a dirty implementation
   if ( ( .not. comp%coupling ) .or. update_static ) then
-  
+
     if (comp%moving .or. update_static) then
 
       !> store %nor at previous time step, for moving, used few lines
@@ -2270,7 +2279,7 @@ subroutine update_geometry(geo, t, update_static)
 
     do ie = 1 , size(comp%el)
       ! debug??
-      !if ( mod(ie,10) .eq. 0 )  write(*,*) ' el%id : ', ie, comp%el(ie)%nor, comp%el(ie)%nor_old 
+      !if ( mod(ie,10) .eq. 0 )  write(*,*) ' el%id : ', ie, comp%el(ie)%nor, comp%el(ie)%nor_old
       comp%el(ie)%dn_dt = ( comp%el(ie)%nor - comp%el(ie)%nor_old ) / &
                                                               sim_param % dt
     end do
@@ -2295,14 +2304,14 @@ subroutine update_geometry(geo, t, update_static)
       !> Allocating contiguous array to pass to %hinge_deflection procedure
       allocate(rr_hinge_contig(3,size(comp%i_points)))
       rr_hinge_contig = geo%points(:, comp%i_points)
-       
+
       call comp%hinge(ih)%hinge_deflection( rr_hinge_contig, t )
       geo%points(:, comp%i_points) = rr_hinge_contig
-  
+
       deallocate(rr_hinge_contig)
 
     else
-      
+
       !> Updated in mod_precice/update_elems
 
     end if
@@ -2316,25 +2325,25 @@ subroutine update_geometry(geo, t, update_static)
   if ( comp%n_hinges .gt. 0 ) then
     !> Then update geometrical data, position and velocity of the elem centers
     do ie = 1,size(comp%el)
-  
+
       !> Save dcen_h at previous timestep
       comp%el(ie)%dcen_h_old = comp%el(ie)%dcen_h
-  
+
       !> Save the position of the centre, before hinge rotation
       comp%el(ie)%dcen_h = comp%el(ie)%cen
-  
+
       !> Update new position of the centers, taking into account hinge motions
       call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
-  
+
       !> Evaluate dcen_h, delta position due to hinge motion
       comp%el(ie)%dcen_h = comp%el(ie)%cen - comp%el(ie)%dcen_h
-  
+
       !> Evaluate dvel_h, delta velocity due to hinge motion, with first
       ! order finite difference
       comp%el(ie)%dvel_h = ( comp%el(ie)%dcen_h - comp%el(ie)%dcen_h_old ) / &
                                                                  sim_param % dt
       !> Update on-body velocity
-      comp%el(ie)%ub = comp%el(ie)%ub + comp%el(ie)%dvel_h 
+      comp%el(ie)%ub = comp%el(ie)%ub + comp%el(ie)%dvel_h
 
       !> Update time derivative of the unit normal vector
       comp%el(ie)%dn_dt = comp%el(ie)%dn_dt + &
@@ -2346,7 +2355,7 @@ subroutine update_geometry(geo, t, update_static)
 
   end associate
  enddo
- 
+
 
 end subroutine update_geometry
 
