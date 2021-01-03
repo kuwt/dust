@@ -182,17 +182,15 @@ subroutine dat_out_sectional (basename, compname, y_cen, y_span, time, &
 
   ! Some checks --------
   if ( size(y_cen) .ne. size(sec_loads,2) ) then
-    write(*,*) ' size(sec_loads,2) : ' , size(sec_loads,2)
-    write(*,*) ' size(y_cen)       : ' , size(y_cen)
-    call error(trim(this_mod_name),'','Inconsistent inputs.&
+    call internal_error(trim(this_mod_name),'','Inconsistent inputs.&
             & size(sec_loads,2) .ne. size(y_cen). Stop ')
   end if
   if ( size(sec_loads,1) .ne. nt ) then
-    call error(trim(this_mod_name),'','Inconsistent inputs.&
+    call internal_error(trim(this_mod_name),'','Inconsistent inputs.&
             & size(sec_loads,1) .ne. size(time). Stop ')
   end if
   if ( size(sec_loads,3) .ne. 4 ) then
-    call error(trim(this_mod_name),'','Inconsistent inputs.&
+    call internal_error(trim(this_mod_name),'','Inconsistent inputs.&
             & size(sec_loads,3) .ne. 4. Stop ')
   end if
 

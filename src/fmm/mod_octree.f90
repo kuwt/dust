@@ -1386,8 +1386,6 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
           stretch_elem = stretch_elem + &
               matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
         enddo
-        !DEBUG
-        !write(*,*) ' stretch, stretch_elem : ' , norm2(stretch), norm2(stretch_elem)
         stretch = stretch + stretch_elem
       endif
 

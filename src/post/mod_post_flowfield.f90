@@ -54,7 +54,7 @@ use mod_sim_param, only: &
   sim_param
 
 use mod_handling, only: &
-  error, warning
+  error, warning, printout
 
 use mod_geometry, only: &
   t_geo, t_geo_component, destroy_elements
@@ -105,6 +105,7 @@ public :: post_flowfield
 private
 
 character(len=max_char_len), parameter :: this_mod_name = 'mod_post_flowfield'
+character(len=max_char_len) :: msg
 
 contains
 
@@ -168,7 +169,8 @@ character(len=max_char_len) :: filename
 character(len=max_char_len), parameter :: &
    this_sub_name = 'post_flowfield'
 
-    write(*,*) nl//' Analysis:',ia,' post_flowfield() +++++++++ '//nl
+  write(msg,'(A,I0,A)') nl//'++++++++++ Analysis: ',ia,' flowfield'//nl
+  call printout(trim(msg))
 
 ! Select all the components
 !   components_names is allocated in load_components_postpro()
@@ -191,7 +193,6 @@ if ( n_vars .eq. 0 ) then ! default: velocity | pressure | vorticity
 else
  do i_var = 1 , n_vars
   var_name = getstr(sbprms,'Variable')
-  write(*,*) ' trim(var_name) : ' , trim(var_name) ; call LowCase(var_name)
   select case(trim(var_name))
    case ( 'velocity' ) ; probe_vel = .true.
    case ( 'pressure' ) ; probe_p   = .true.
@@ -527,7 +528,8 @@ deallocate(var_names,vars_n)
 call destroy_elements(comps)
 deallocate(comps,components_names)
 
-    write(*,*) nl//' post_flowfield done.'//nl
+  write(msg,'(A,I0,A)') nl//'++++++++++ Flowfield done'//nl
+  call printout(trim(msg))
 
 end subroutine post_flowfield
 

@@ -132,7 +132,7 @@ integer , intent(in) :: an_start , an_end , an_step
 logical , intent(in) :: average
 
 type(t_geo_component), allocatable :: comps(:)
-character(len=max_char_len) :: cname !, msg
+character(len=max_char_len) :: cname
 integer(h5loc) :: floc, gloc, cloc
 real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
 real(wp), allocatable :: vort(:), cp(:)
@@ -719,12 +719,12 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
            ! (a) check if the elements belong to less than three sections --> otherwise ERROR
            if ( maxval(secVert(1:nver) ) &
               - minval(secVert(1:nver) ) .gt. 1 ) then
-             write(*,*) ' comps(id_comp)%comp_name : ' , comps(id_comp)%comp_name
-             write(*,*) ' ie : ' , ie
-             write(*,*) ' secVert : ' , secVert(1:nver)
-             call warning('dust_post','','The element above belongs to more than two&
-                  & sections in sectional_loads analysis. STOP')
-             return
+             write(msg,'(A)') 'The analyzed component '&
+              &//comps(id_comp)%comp_name//' has an element which spans more &
+              &than two sections, this cannot be handled. This generally means &
+              &that an element is significantly wider than the section spacing,&
+              & try reducing the number of sections'
+             call error(this_mod_name,this_sub_name,msg)
            end if
            ! (b)
            if ( all(  secVert .eq. secVert(1) ) ) then

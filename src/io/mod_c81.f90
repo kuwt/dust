@@ -245,7 +245,6 @@ subroutine read_c81_table ( filen , coeff )
         ! --- al(cl=0) ---
         alcl0 = alMin
         do iAl = 1 , cl1
-!          write(*,*)'alpha, cl',coeff%aero_coeff(iRe)%coeff(1)%par1(iAl),coeff%aero_coeff(iRe)%coeff(1)%cf(iAl  ,iMa)
           if ( ( coeff%aero_coeff(iRe)%coeff(1)%par1(iAl) .ge. alMin ) .and. &
                ( coeff%aero_coeff(iRe)%coeff(1)%par1(iAl) .lt. alMax ) ) then
             if ( coeff%aero_coeff(iRe)%coeff(1)%cf(iAl  ,iMa) * &
