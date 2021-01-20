@@ -704,7 +704,7 @@ subroutine solve_liftlin_piszkin( &
         alpha = alpha - alpha_2d
         !> unsteady contribution
         !a_v(i_l) = alpha - ((-el%chord/2_wp) * 0.01_wp/norm2(uinf))
-
+        
         ! =========================================================
 
         a_v(i_l) = alpha
@@ -788,10 +788,10 @@ subroutine solve_liftlin_piszkin( &
 
       !> Unsteady contribution
       el%dforce = el%dforce &
-                  + sim_param%rho_inf * el%area * ( &
+                  - sim_param%rho_inf * el%area * ( &
                   el%dGamma_dt  * el%nor + el%mag * el%dn_dt )
       ! el%dforce = el%dforce &
-      !             - sim_param%rho_inf * el%area * el%dGamma_dt &
+      !             + sim_param%rho_inf * el%area * el%dGamma_dt &
       !             * e_l ! lift direction
 
       !> Update aerodynamic coefficients and AOA, and pressure
@@ -823,10 +823,10 @@ subroutine solve_liftlin_piszkin( &
 
       !> Unsteady contribution
       el%dforce = el%dforce &
-                  + sim_param%rho_inf * el%area * ( &
+                  - sim_param%rho_inf * el%area * ( &
                   el%dGamma_dt  * el%nor + el%mag * el%dn_dt )
       ! el%dforce = el%dforce &
-      !             - sim_param%rho_inf * el%area * el%dGamma_dt &
+      !             + sim_param%rho_inf * el%area * el%dGamma_dt &
       !             * e_l ! lift direction
 
       !> Update aerodynamic coefficients and AOA, and pressure
@@ -845,7 +845,7 @@ subroutine solve_liftlin_piszkin( &
     ! - referred to the ref.point of the elem,
     !   ( here, cen of the elem = cen of the liftlin (for liftlin elems) )
     el%dmom = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
-                   el%chord * el%area * c_m(i_l,3) * el%bnorm_cen
+                   el%chord * el%area * c_m(i_l,3) * el%bnorm_cen 
 
     ! a_v updated by AVLloads, in compute_dforce_jukowski
     el%alpha = a_v(i_l) * 180_wp/pi
@@ -1229,10 +1229,10 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
       !> Unsteady contribution
       el%dforce = el%dforce &
-                  + sim_param%rho_inf * el%area * ( &
+                  - sim_param%rho_inf * el%area * ( &
                   el%dGamma_dt  * el%nor + el%mag * el%dn_dt )
       !el%dforce = el%dforce &
-      !            - sim_param%rho_inf * el%area * el%dGamma_dt &
+      !            + sim_param%rho_inf * el%area * el%dGamma_dt &
       !            * e_l ! lift direction
 
       !> Update aerodynamic coefficients and AOA, and pressure
@@ -1264,10 +1264,10 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
       !> Unsteady contribution
       el%dforce = el%dforce &
-                  + sim_param%rho_inf * el%area * ( &
+                  - sim_param%rho_inf * el%area * ( &
                   el%dGamma_dt  * el%nor + el%mag * el%dn_dt )
       !el%dforce = el%dforce &
-      !            - sim_param%rho_inf * el%area * el%dGamma_dt &
+      !            + sim_param%rho_inf * el%area * el%dGamma_dt &
       !            * e_l ! lift direction
 
       !> Update aerodynamic coefficients and AOA, and pressure
@@ -1445,7 +1445,7 @@ subroutine calc_geo_data_liftlin(this, vert)
 
   ! -- 0.75 chord -- look for other "0.75 chord" tag
   ! correct the chord value ----
-  this%chord = sum(this%edge_len((/2,4/)))*0.5_wp * 4_wp / 3_wp
+  this%chord = sum(this%edge_len((/2,4/)))*0.5_wp  * 4_wp / 3_wp
 ! this%chord = this%chord / 0.75_wp
 
   ! === Piszkin, Lewinski (1976) LL model for swept wings ===
@@ -1458,7 +1458,10 @@ subroutine calc_geo_data_liftlin(this, vert)
   cos_lambda  = norm2( cross( this%tang_cen , -this%edge_uni(:,1) ) )
 
   !> modified ~3/4 control point
+  !this%ctr_pt = this%cen + this%tang_cen * this%chord / 2.0_wp
   this%ctr_pt = this%cen + this%tang_cen * this%chord / 2.0_wp
+  !write(*,*) 'CENTRI' , this%cen
+  !write(*,*) 'CTR POINT' , this%ctr_pt
   ! this%ctr_pt = this%cen + this%tang_cen * this%chord / ( 2.0_wp * cos_lambda )
 
   !> 2 * pi * | x_CP - x{1/4*c} | * cos(lambda)
