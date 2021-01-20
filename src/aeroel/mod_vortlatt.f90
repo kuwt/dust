@@ -106,6 +106,7 @@ type, extends(c_impl_elem) :: t_vortlatt
   !procedure, pass(this) :: compute_dforce   => compute_dforce_vortlatt
   !Dummy for intel workaround
   procedure, pass(this) :: compute_pres     => compute_pres_dummy
+  procedure, pass(this) :: compute_pres_vortlatt     => compute_pres_vortlatt
   procedure, pass(this) :: compute_dforce   => compute_dforce_dummy
   procedure, pass(this) :: calc_geo_data    => calc_geo_data_vortlatt
   procedure, pass(this) :: get_vort_vel     => get_vort_vel_vortlatt
@@ -442,9 +443,9 @@ end subroutine compute_grad_vortlatt
 !!  s.t. vec{dforce} = pres * vec{n}  ( since vec{n} = vec{n_upper} )
 !!
 !! see compute_dforce_vortlatt
-subroutine compute_pres_vortlatt(this, R_g)
+subroutine compute_pres_vortlatt(this) !, R_g)
   class(t_vortlatt), intent(inout) :: this
-  real(wp)         , intent(in)    :: R_g(3,3)
+  !real(wp)         , intent(in)    :: R_g(3,3)
 !type(t_elem_p), intent(in) :: elems(:)
 
 integer  :: i_stripe
@@ -472,7 +473,7 @@ else
   !           dG_dt )
   ! the same...
   this%pres = - sim_param%rho_inf * &
-        ( norm2(sim_param%u_inf +this%uvort - this%ub) * this%dy / this%area * &
+        ( norm2(sim_param%u_inf + this%uvort - this%ub) * this%dy / this%area * &
                this%mag + &
              this%didou_dt ) ! dG_dt )
 end if
@@ -542,9 +543,9 @@ subroutine compute_dforce_jukowski_vortlatt(this)
   end if
 
   ! === Unsteady contribution ===
-  !this%dforce = this%dforce &
-  !            - sim_param%rho_inf * this%area * ( &
-  !              this%didou_dt * this%nor) !+ this%mag * this%dn_dt)
+  this%dforce = this%dforce &
+              - sim_param%rho_inf * this%area * ( &
+                this%didou_dt * this%nor) !+ this%mag * this%dn_dt)
   !write(*,*) 'this%didou_dt' ,            this%didou_dt
   !write(*,*) 'this%nor' ,                 this%nor
   !write(*,*) 'this%mag' ,                 this%mag

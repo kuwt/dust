@@ -863,10 +863,14 @@ end if
           ! compute dforce using AVL formula
           call el%compute_dforce_jukowski()
           ! update the pressure field, p = df.n / area
-          !el%pres = sum( el%dforce * el%nor ) / el%area
+          el%pres = sum( el%dforce * el%nor ) / el%area
+          ! ALTERNATIVE:
+          !call el%compute_pres_vortlatt()
+          !elems(i_el)%p%dforce = elems(i_el)%p%pres * elems(i_el)%p%area * elems(i_el)%p%nor
+
           !ifort bug workaround
-          elems(i_el)%p%pres = sum( elems(i_el)%p%dforce * elems(i_el)%p%nor )&
-                               / elems(i_el)%p%area
+          !elems(i_el)%p%pres = sum( elems(i_el)%p%dforce * elems(i_el)%p%nor )&
+          !                     / elems(i_el)%p%area
 
               ! ! debug ---
               ! write(*,'(I4,A,3F10.5,A,3F10.5,A,3F10.5,A,3F10.5,A,F10.5)') &
