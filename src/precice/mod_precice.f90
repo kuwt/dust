@@ -301,6 +301,7 @@ subroutine initialize_mesh( this, geo )
             ! new, w/ hinges ---
             this%mesh%nodes(:,geo%components(i_comp)%hinge(ih)%i_points_precice) = &
               geo%components(i_comp)%hinge(ih)%nodes
+            !write(*,*) 'MESH_NODES' , this%mesh%nodes(:,geo%components(i_comp)%hinge(ih)%i_points_precice)
             ! new, w/ hinges ---
             nnodes = nnodes + dnnodes
             write(*,*) ' ih, dnnodes, nnodes : ' , ih, dnnodes, nnodes
@@ -613,12 +614,18 @@ subroutine update_force( this, geo, elems )
             !!! IF to activate only for ll element with RBF coupling!!!!       
             if ( comp%comp_el_type(1:1) .eq. 'l' ) then         
               comp%el(i)%cen =  sum ( comp%el(i)%ver(:,1:2),2 ) / 2.0_wp !! only for l component
+            !  write(*,*) 'VERT 1' , comp%el(i)%ver(:,1)
+            !  write(*,*) 'VERT 2' , comp%el(i)%ver(:,2)
+            !  write(*,*) 'VERT 3' , comp%el(i)%ver(:,3)
+            !  write(*,*) 'VERT 4' , comp%el(i)%ver(:,4)
+            !  write(*,*) 'CEN'    , comp%el(i)%cen
             endif 
 
             this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) + &
                     comp%rbf%cen%wei(iw,i) *( ( comp%el(i)%dmom)  + &
                     cross( comp%el(i)%cen  - this%fields(j_pos)%fdata(:,ip) , &
                     comp%el(i)%dforce ) )
+            !write(*,*) 'D_mom' , comp%el(i)%dmom
 !           ! debug ---
             !write(*,*) ' i, iw, ip : ', i, iw, ip
             !write(*,*) ' comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i)): ', &
@@ -1052,7 +1059,7 @@ subroutine update_elems( this, geo, elems )
           ip = comp%i_points(i)
 
           ! ! debug ---
-          write(*,*) ' comp%i_points(', i, '/', size(comp%i_points),' ) = ip = ', ip
+          !write(*,*) ' comp%i_points(', i, '/', size(comp%i_points),' ) = ip = ', ip
 
           do iw = 1, size(comp%rbf%nod%ind,1)
 
@@ -1069,9 +1076,9 @@ subroutine update_elems( this, geo, elems )
             !> Rotation
             n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(comp%rbf%nod%ind(iw,i)))
             comp%rbf%rrb_rot(:,comp%rbf%nod%ind(iw,i)) = n_rot
-            write(*,*) 'rrb_rot' , comp%rbf%rrb_rot
+            !write(*,*) 'rrb_rot' , comp%rbf%rrb_rot
             theta = norm2( n_rot )
-            write(*,*) 'theta' , theta
+            !write(*,*) 'theta' , theta
             if ( theta .lt. eps ) then
               n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
               theta = 0.0_wp
@@ -1199,6 +1206,7 @@ subroutine update_elems( this, geo, elems )
               !> Rotation vector and rotation matrix
               n_rot = this%fields(j_rot)%fdata(:,comp%hinge(ih)%i_points_precice(i))
               theta = norm2( n_rot )
+
               if ( theta .lt. eps ) then
                 n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /); theta = 0.0_wp
               else
@@ -1211,7 +1219,9 @@ subroutine update_elems( this, geo, elems )
                                0.0_wp, 1.0_wp, 0.0_wp, &
                                0.0_wp, 0.0_wp, 1.0_wp /), (/3,3/) ) &
                   - sin(theta) * nx + ( 1.0_wp - cos(theta) ) * matmul(nx, nx)
-
+                  !write(*,*) Rot(1,:), '       ', chord(1) 
+                  !write(*,*) Rot(2,:), '       ', chord(2)
+                  !write(*,*) Rot(3,:), '       ', chord(3)
 
               !> Evaluate hinge deflection, theta, from the relative position of the rotating
               ! and non-rotating ref.frames
@@ -1220,7 +1230,7 @@ subroutine update_elems( this, geo, elems )
                       comp%hinge(ih)%i_points_precice( i ) ), &
                  -comp%hinge(ih) % hin_rot(:,i), r_drot, theta, n_drot )
               ! ! debug ---
-              ! write(*,*) ' theta,   n_rot : ', theta, '      ', n_rot
+              !write(*,*) ' theta,   n_rot : ', theta, '      ', n_rot
               ! ! debug ---
 
               !> === Surface nodes ===
@@ -1232,49 +1242,52 @@ subroutine update_elems( this, geo, elems )
                 chord = comp%loc_points(:,ip) - comp%hinge(ih)%nodes(:,i)
                 
                 ! debug ---
-                ! write(*,*) ' ih, i, ib: ', ih, i, ib
-                ! write(*,*) comp%hinge(ih)%rot%n2h(i)%p2h(ib), &
-                !            comp%hinge(ih)%rot%n2h(i)%w2h(ib)
-                ! write(*,*) ' comp%loc_points(:,ip) : ', &
-                !              comp%loc_points(:,ip)
+                 !write(*,*) ' ih, i, ib: ', ih, i, ib
+                 !write(*,*) comp%hinge(ih)%rot%n2h(i)%p2h(ib), &
+                 !           comp%hinge(ih)%rot%n2h(i)%w2h(ib)
+                 !write(*,*) ' comp%loc_points(:,ip) : ', &
+                 !             comp%loc_points(:,ip)
                 ! debug ---
 
                 ! ! debug ---
-                ! write(*,*) ' hinge id: ', ih, &
-                !            ' i/hinge%n_nodes: ' , i,'/', comp%hinge(ih)%n_nodes, &
-                !            ' ib: ', ib
-                ! write(*,*) '  local numbering: ', ip
-                ! write(*,*) ' ip, comp%loc_points(:,ip):        ', comp%loc_points(:,ip), ip
-                ! write(*,*) ' ih, i, comp%hinge(ih)%nodes(:,i): ', &
-
-                !                                            comp%hinge(ih)%nodes(:,i), ih, i
-                ! write(*,*) ' chord                           : ', chord
+                 !write(*,*) ' hinge id: ', ih, &
+                 !           ' i/hinge%n_nodes: ' , i,'/', comp%hinge(ih)%n_nodes, &
+                 !           ' ib: ', ib
+                 !write(*,*) '  local numbering: ', ip
+                 !write(*,*) ' ip, comp%loc_points(:,ip):        ', comp%loc_points(:,ip), ip
+                 !write(*,*) ' ih, i, comp%hinge(ih)%nodes(:,i): ', &
+                 !                                           comp%hinge(ih)%nodes(:,i), ih, i
+                 !write(*,*) ' chord                           : ', chord
                 ! ! debug ---
                 
                 ip = comp%i_points(ip)  ! Local-to-global connectivity
                 ! ! debug ---
-                ! write(*,*) ' -------- '
-                ! write(*,*) ' ip, i, ib: ', ip, i, ib
-                ! write(*,*) ' comp%hinge(ih)%rot%n2h(i)%w2h(ib): ', &
-                !              comp%hinge(ih)%rot%n2h(i)%w2h(ib) 
-                ! write(*,*) ' comp%hinge(ih) % act % rr(:,i)   : ', &
-                !              comp%hinge(ih) % act % rr(:,i)
-                ! write(*,*) ' Rot,       chord: '
-                ! write(*,*) Rot(1,:), '       ', chord(1) 
-                ! write(*,*) Rot(2,:), '       ', chord(2)
-                ! write(*,*) Rot(3,:), '       ', chord(3)
-                ! write(*,*) ' global numbering: ', ip
-                ! write(*,*) ' ------ ' 
+                 !write(*,*) ' -------- '
+                 !write(*,*) ' ip, i, ib: ', ip, i, ib
+                 !write(*,*) ' comp%hinge(ih)%rot%n2h(i)%w2h(ib): ', &
+                 !             comp%hinge(ih)%rot%n2h(i)%w2h(ib) 
+                 !write(*,*) ' comp%hinge(ih) % act % rr(:,i)   : ', &
+                 !             comp%hinge(ih) % act % rr(:,i)
+                 !write(*,*) ' Rot,       chord: '
+                 !write(*,*) Rot(1,:), '       ', chord(1) 
+                 !write(*,*) Rot(2,:), '       ', chord(2)
+                 !write(*,*) Rot(3,:), '       ', chord(3)
+                 !write(*,*) ' global numbering: ', ip
+                 !write(*,*) ' ------ ' 
                 ! ! debug ---
-
+                !write(*,*) ' GEO_POINTS: ', geo%points(:,ip)
                 !> Position: absolute position (!)
                 geo%points(:,ip) = geo%points(:,ip) + &
                      comp%hinge(ih)%rot%n2h(i)%s2h(ib) * &
                      comp%hinge(ih)%rot%n2h(i)%w2h(ib) * &
-                   ( comp%hinge(ih) % act % rr(:,i) + matmul( Rot, chord ) )
-
+                   ( comp%hinge(ih) % act % rr(:,i) + matmul( transpose(Rot), chord ) )
+                   !write(*,*) ' GEO_POINTS: ', geo%points(:,ip)
+                   !write(*,*) 'c1' , comp%hinge(ih)%rot%n2h(i)%s2h(ib)
+                   !write(*,*) 'c2' , comp%hinge(ih)%rot%n2h(i)%w2h(ib)
+                   !write(*,*) 'c3' , comp%hinge(ih) % act % rr(:,i)
+                   !write(*,*) 'c4' , matmul( Rot, chord )
               end do
-
+                  
               !> 1.2. Chordwise blending region
               do ib = 1, size(comp%hinge(ih)%blen%n2h(i)%p2h)
                 
@@ -1302,7 +1315,7 @@ subroutine update_elems( this, geo, elems )
                              comp%hinge(ih)%blen%n2h(i)%w2h(ib) * &
                            ( xqp * comp%hinge(ih)%act%v(:,i) + &
                              yqp * comp%hinge(ih)%act%n(:,i) )
-
+                  !write(*,*) ' GEO_POINTS: ', geo%points(:,ip)
                 ! else do nothing
                 end if
 
@@ -1350,10 +1363,10 @@ subroutine update_elems( this, geo, elems )
         end do
 
         ! ! debug ---
-        ! write(*,*) ' Debug in update_elems, l.1200. geo%points = '
-        ! do i = 1, size(geo%points,2)
-        !   write(*,*) i, ' : ', geo%points(:,i)
-        ! end do
+         write(*,*) ' Debug in update_elems, l.1200. geo%points = '
+         do i = 1, size(geo%points,2)
+           write(*,*) i, ' : ', geo%points(:,i)
+         end do
         ! ! debug ---
 
         ! write(*,*) ' Stop in mod_precice/update_elems().'; stop

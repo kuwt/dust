@@ -272,16 +272,16 @@ subroutine build_connectivity(this, loc_points)
   integer :: nrot, nble
 
   ! ! debug ---
-  ! write(*,*) ' ................................................ '
-  ! write(*,*) ' Debug in hinge%build_connectivity(), loc_points: '
-  ! write(*,*) ' ................................................ '
-  ! do iw = 1, size(loc_points,2)
-  !   write(*,*) loc_points(:,iw)
-  ! end do
-  ! write(*,*) ' Debug in hinge%build_connectivity(), ref%rr: '
-  ! do iw = 1, size(this%ref%rr,2)
-  !   write(*,*) this%ref%rr(:,iw)
-  ! end do
+   write(*,*) ' ................................................ '
+   write(*,*) ' Debug in hinge%build_connectivity(), loc_points: '
+   write(*,*) ' ................................................ '
+   do iw = 1, size(loc_points,2)
+     write(*,*) loc_points(:,iw)
+   end do
+   write(*,*) ' Debug in hinge%build_connectivity(), ref%rr: '
+   do iw = 1, size(this%ref%rr,2)
+     write(*,*) this%ref%rr(:,iw)
+   end do
   ! ! debug ---
 
   !> N. of surface and hinge nodes
@@ -340,14 +340,16 @@ subroutine build_connectivity(this, loc_points)
     ! if ( ( rrb(2,ib) .gt. 0.0_wp ) .and. ( rrb(2,ib) .lt. hinge_width ) ) then
     if ( ( rrb(2,ib) .gt. -this%span_blending ) .and. &
          ( rrb(2,ib) .lt.  this%span_blending + hinge_width ) ) then
-
+          !write(*,*) 'rrb(1,ib)' , rrb(1,ib)
       if ( rrb(1,ib) .lt. -this%offset ) then
         ! do nothing
       elseif ( rrb(1,ib) .gt. this%offset ) then ! rigid rotation
 
         nrot = nrot + 1
         rot_node_id(nrot) = ib
-
+        ! debug
+        write(*,*) 'rot_node_id(nrot)' , rot_node_id(nrot)
+        ! debug
         do ih = 1, nh
           dist_all(ih) = abs( rrb(2,ib) - rrh(2,ih) )
         end do
@@ -371,12 +373,18 @@ subroutine build_connectivity(this, loc_points)
         rot_ind(   :,nrot) = ind_v
         rot_span_wei(nrot) = span_wei
 
+        ! debug
+        !write(*,*) 'WEI_V' , wei_v
+        !write(*,*) 'IND_V' , ind_v
+        !write(*,*) 'SPAN_WEI' , span_wei
+
         ! *****
         do iw = 1, this%n_wei
           rot_i2h(ind_v(iw)) = rot_i2h(ind_v(iw)) + 1
           rot_p2h(ind_v(iw),   rot_i2h(ind_v(iw))) = ib
           rot_w2h(ind_v(iw),   rot_i2h(ind_v(iw))) = wei_v(iw)
           rot_s2h(ind_v(iw),   rot_i2h(ind_v(iw))) = span_wei
+
         end do
         ! *****
 
@@ -422,7 +430,6 @@ subroutine build_connectivity(this, loc_points)
     end if
 
   end do
-
   !> Fill hinge object, with the connectivity and weight arrays
   allocate(this%rot %node_id(        nrot)); this%rot %node_id = rot_node_id( 1:nrot)
   allocate(this%rot %ind(this%n_wei, nrot)); this%rot %ind     = rot_ind(  :, 1:nrot)
@@ -444,14 +451,14 @@ subroutine build_connectivity(this, loc_points)
   end do
 
   ! check ---
-  do ih = 1, nh
-    write(*,*) ' rot%n2h(', ih,  ') %p2h, %w2h, %s2h'
-    do iw = 1, rot_i2h(ih)
-      write(*,*) this%rot %n2h(ih)%p2h, &
-                 this%rot %n2h(ih)%w2h, &
-                 this%rot %n2h(ih)%s2h
-    end do
-  end do
+  !do ih = 1, nh
+  !  write(*,*) ' rot%n2h(', ih,  ') %p2h, %w2h, %s2h'
+  !  do iw = 1, rot_i2h(ih)
+  !    write(*,*) this%rot %n2h(ih)%p2h, &
+  !               this%rot %n2h(ih)%w2h, &
+  !               this%rot %n2h(ih)%s2h
+  !  end do
+  !end do
   ! check ---
 
   ! ! check ---
@@ -570,25 +577,27 @@ subroutine build_connectivity_cen(this, rr, ee)
 
   allocate( rrb(3,nb) );  allocate( rrh(3,nh) )
   do ib = 1, nb
-    rrb(:,ib) = matmul( Rot, loc_points(:,ib) - this%ref%rr(:,1) )
+    !mesh points in dust reference with zero located at first hinge point
+    rrb(:,ib) = matmul( Rot, loc_points(:,ib) - this%ref%rr(:,1) )  
   end do
   do ib = 1, nh
-    rrh(:,ib) = matmul( Rot, this%ref%rr(:,ib) - this%ref%rr(:,1) )
+    !hinge points in dust reference with zero located at first hinge point
+    rrh(:,ib) = matmul( Rot, this%ref%rr(:,ib) - this%ref%rr(:,1) ) 
   end do
 
-  ! ! debug ---
-  ! write(*,*) ' rrb : '
-  ! do ib = 1, nb
-  !   write(*,*) rrb(:,ib)
-  ! end do
-  ! write(*,*) ' rrh : '
-  ! do ib = 1, nh
-  !   write(*,*) rrh(:,ib)
-  ! end do
-  ! ! debug ---
+  ! debug ---
+  !write(*,*) ' rrb : '
+  !do ib = 1, nb
+  !  write(*,*) rrb(:,ib)
+  !end do
+  !write(*,*) ' rrh : '
+  !do ib = 1, nh
+  !  write(*,*) rrh(:,ib)
+  !end do
+  ! debug ---
 
-  ! hinge width, measured in the hinge direction
-  hinge_width = rrh(2,nh) - rrh(2,1)
+  ! hinge width, measured in the hinge direction (span)
+  hinge_width = rrh(2,nh) - rrh(2,1)  !dh
 
   !> Compute connectivity and weights
   ! Allocate auxiliary node_id(:), ind(:,:), wei(:,:) arrays
@@ -648,6 +657,8 @@ subroutine build_connectivity_cen(this, rr, ee)
         rot_wei(   :,nrot) = wei_v
         rot_ind(   :,nrot) = ind_v
         rot_span_wei(nrot) = span_wei
+
+        write(*,*) 'WEI_V' , wei_v
 
         ! *****
         do iw = 1, this%n_wei
@@ -862,12 +873,12 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
   allocate( this%hin_rot(3,n_h) ); this%hin_rot = -333.3_wp
 
   ! debug ---
-  write(*,*) ' this%hin%ind, %i_points_precice, %wei: '
-  do i_h = 1, n_h
-    write(*,*) i_h, this%hin%ind(:,i_h), &
-                    this%hin%wei(:,i_h)
-  end do
-  write(*,*)
+  !write(*,*) ' this%hin%ind, %i_points_precice, %wei: '
+  !do i_h = 1, n_h
+  !  write(*,*) i_h, this%hin%ind(:,i_h), &
+  !                  this%hin%wei(:,i_h)
+  !end do
+  !write(*,*)
   ! write(*,*) ' stop in geo/mod_hinges/build_connectivity_hin() '; stop
   ! debug ---
 
@@ -1203,6 +1214,8 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
          if ( trim(hinge_node_subset) .eq. 'range' ) then
            id_1 = getint(coupling_prs,'Coupling_Node_First')
            id_2 = getint(coupling_prs,'Coupling_Node_Last' )
+           !write(*,*) 'id_1' , ID_1
+           !write(*,*) 'id_2' , ID_2
            ! *** to do *** add some checks on node numbering ???
 
            allocate( hinges(i) % coupling_nodes( id_2-id_1+1 ) )
