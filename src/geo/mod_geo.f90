@@ -1166,10 +1166,12 @@ subroutine load_components(geo, in_file, out_file, te)
               do ih = 1, n_hinges
                 if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
                   if ( .not. ( any(geo%components(i_comp)%hinge(ih)%i_coupling_nodes .eq. i3 ) ) ) then
+                    if (ih .eq. 1) then
                     !> Structural node
                     comp_ind = comp_ind + 1
                     ind_coupling( comp_ind ) = i3
                     geo%components(i_comp)%i_points_precice( comp_ind ) = i3 + points_offset_precice
+                    end if
                   else
                     !> Hinge node, ih-th hinge
                     hinge_ind(ih) = hinge_ind(ih) + 1

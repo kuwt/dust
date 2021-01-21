@@ -1363,10 +1363,10 @@ subroutine update_elems( this, geo, elems )
         end do
 
         ! ! debug ---
-         write(*,*) ' Debug in update_elems, l.1200. geo%points = '
-         do i = 1, size(geo%points,2)
-           write(*,*) i, ' : ', geo%points(:,i)
-         end do
+        ! write(*,*) ' Debug in update_elems, l.1200. geo%points = '
+        ! do i = 1, size(geo%points,2)
+        !   write(*,*) i, ' : ', geo%points(:,i)
+        ! end do
         ! ! debug ---
 
         ! write(*,*) ' Stop in mod_precice/update_elems().'; stop
