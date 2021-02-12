@@ -1,0 +1,38 @@
+
+! Simulation names
+basename       = ./Output/wings
+
+! Timings ---------------------
+tstart = 0.0
+tend = 0.2
+dt = 0.00125
+dt_out = 0.00125
+output_start = T
+!debug_level = 50
+! reference values ---------------------
+u_inf = (/50.0, 0.0, 0.0/)
+rho = 1.225
+p_inf = 101000
+
+! geometry input -----------------
+GeometryFile = geo_input.h5
+ReferenceFile = References.in
+
+! Model parameters -------------------
+FMM = F
+Vortstretch = F
+Diffusion = F
+PenetrationAvoidance = T
+
+! wake parameters  -------------
+n_wake_panels = 1
+!ImplicitPanelScale = 0.3
+!ImplicitPanelMinVel  = 1.0 e -8
+
+! --- model parameters ---
+!FarFieldRatioDoublet = 10.0
+!FarFieldRatioSource  = 10.0
+!DoubletThreshold     = 1.0 e -6
+RankineRad = 0.001
+VortexRad = 0.001
+!CutoffRad = 0.001
