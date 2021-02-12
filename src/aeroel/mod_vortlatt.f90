@@ -71,6 +71,7 @@ use mod_math, only: &
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
+
 !----------------------------------------------------------------------
 
 implicit none
@@ -114,7 +115,7 @@ type, extends(c_impl_elem) :: t_vortlatt
 
   procedure, pass(this) :: get_vel_ctr_pt   => get_vel_ctr_pt_vortlatt
   procedure, pass(this) :: compute_dforce_jukowski => &
-                           compute_dforce_jukowski_vortlatt
+                          compute_dforce_jukowski_vortlatt
 
 end type
 
@@ -180,7 +181,7 @@ end subroutine build_row_vortlatt
 !! called just once at the beginning of the simulation, and saves the AIC
 !! coefficients for te static part and the static contribution to the rhs
 subroutine build_row_static_vortlatt(this, elems, expl_elems, linsys, &
-                                   uinf, ie, ista, iend)
+                                  uinf, ie, ista, iend)
 class(t_vortlatt), intent(inout) :: this
 type(t_impl_elem_p), intent(in)       :: elems(:)
 type(t_expl_elem_p), intent(in)       :: expl_elems(:)
@@ -236,7 +237,7 @@ end subroutine build_row_static_vortlatt
 !! The rhs of the equation for a vortex ring is updated  adding the
 !! the contribution of velocity due to the lifting lines
 subroutine add_expl_vortlatt(this, expl_elems, linsys, uinf, &
-                           ie, ista, iend)
+                          ie, ista, iend)
 class(t_vortlatt), intent(inout) :: this
 type(t_expl_elem_p), intent(in)       :: expl_elems(:)
 type(t_linsys), intent(inout)    :: linsys
@@ -273,7 +274,7 @@ end subroutine add_expl_vortlatt
 !! The rhs of the equation for a surface panel is updated  adding the
 !! the contribution of velocity due to the wake
 subroutine add_wake_vortlatt(this, wake_elems, impl_wake_ind, linsys, uinf, &
-                           ie, ista, iend)
+                          ie, ista, iend)
 class(t_vortlatt), intent(inout) :: this
 type(t_pot_elem_p), intent(in)       :: wake_elems(:)
 integer, intent(in)             :: impl_wake_ind(:,:)
@@ -454,28 +455,16 @@ this%pres = 0.0_wp
 
 i_stripe = size(this%stripe_elem)
 
-! dG_dt = this%didou_dt
-
 if ( i_stripe .gt. 1 ) then
-  !this%pres = - sim_param%rho_inf * &
-  !      ( norm2(sim_param%u_inf - this%ub) * this%dy / this%area * &
-  !      ( elems(this%id)%p%mag - this%stripe_elem(i_stripe-1)%p%mag ) + &
-  !           dG_dt )
-  ! dunno why elems(this%id)%p%mag was used
   this%pres = - sim_param%rho_inf * &
         ( norm2(sim_param%u_inf + this%uvort - this%ub) * this%dy / this%area * &
         ( this%mag - this%stripe_elem(i_stripe-1)%p%mag ) + &
-             this%didou_dt ) ! dG_dt )
+            this%didou_dt ) 
 else
-  !this%pres = - sim_param%rho_inf * &
-  !      ( norm2(sim_param%u_inf - this%ub) * this%dy / this%area * &
-  !             elems(this%id)%p%mag + &
-  !           dG_dt )
-  ! the same...
   this%pres = - sim_param%rho_inf * &
         ( norm2(sim_param%u_inf + this%uvort - this%ub) * this%dy / this%area * &
-               this%mag + &
-             this%didou_dt ) ! dG_dt )
+              this%mag + &
+            this%didou_dt ) 
 end if
 
 end subroutine compute_pres_vortlatt
@@ -524,48 +513,29 @@ subroutine compute_dforce_jukowski_vortlatt(this)
  class(t_vortlatt), intent(inout) :: this
  real(wp) :: gam(3)
 
- integer :: i_stripe
+ integer  :: i_stripe
+ real(wp) :: mach
 
+  ! Prandt -- Glauert correction for compressibility effect
+  mach = abs(norm2(sim_param%u_inf) / sim_param%a_inf)
   ! === Steady contribution (KJ) ===
   gam = cross ( this % vel_ctr_pt, this%edge_vec(:,1) )
-
   i_stripe = size(this%stripe_elem)
-
   if ( i_stripe .gt. 1 ) then
 
     this%dforce = sim_param%rho_inf * gam &
-                * ( this%mag - this%stripe_elem(i_stripe-1)%p%mag )
+                * ( this%mag - this%stripe_elem(i_stripe-1)%p%mag )  / sqrt(1 - mach**2)
 
   else
 
-    this%dforce = sim_param%rho_inf * gam * this%mag
-
+    this%dforce = sim_param%rho_inf * gam * this%mag  / sqrt(1 - mach**2)
+    
   end if
 
   ! === Unsteady contribution ===
   this%dforce = this%dforce &
               - sim_param%rho_inf * this%area * ( &
-                this%didou_dt * this%nor) !+ this%mag * this%dn_dt)
-  !write(*,*) 'this%didou_dt' ,            this%didou_dt
-  !write(*,*) 'this%nor' ,                 this%nor
-  !write(*,*) 'this%mag' ,                 this%mag
-  !write(*,*) 'this%dn_dt' ,               this%dn_dt
-  !write(*,*) ' '
-  !write(*,*) 'this%didou_dt * this%nor ', this%didou_dt * this%nor
-  !write(*,*) 'this%mag * this%dn_dt' ,    this%mag * this%dn_dt
-  !write(*,*) ' '
-  ! ! if statement to avoid singularities
-  ! if ( norm2( this % vel_ctr_pt ) .gt. &
-  !        max( 0.001_wp, 0.001_wp *norm2(sim_param%u_inf) ) ) then
-  !   this%dforce = this%dforce &
-  !               + sim_param%rho_inf * this%area * this%didou_dt &
-  !               * gam / norm2(gam)  ! direction
-  ! else
-  !   this%dforce = this%dforce &
-  !               + sim_param%rho_inf * this%area * this%didou_dt &
-  !               * this%nor
-  ! end if
-
+                this%didou_dt * this%nor)
 
 end subroutine compute_dforce_jukowski_vortlatt
 
@@ -581,36 +551,31 @@ end subroutine compute_dforce_jukowski_vortlatt
 ! - the rotational part of the velocity, collected in this%uvort    !!!
 ! ------------------------------------------------------------------- !
 subroutine get_vel_ctr_pt_vortlatt(this, elems, wake_elems)
- class(t_vortlatt), intent(inout) :: this
- type(t_pot_elem_p),intent(in):: elems(:)
- type(t_pot_elem_p),intent(in):: wake_elems(:)
+class(t_vortlatt), intent(inout) :: this
+type(t_pot_elem_p),intent(in):: elems(:)
+type(t_pot_elem_p),intent(in):: wake_elems(:)
 
- real(wp) :: v(3),x0(3)
- integer :: j
+real(wp) :: v(3), x0(3)
+integer :: j
 
- ! Initialisation to zero
- this%vel_ctr_pt = 0.0_wp
+! Initialisation to zero
+this%vel_ctr_pt = 0.0_wp
 
- ! Control point at 1/4-fraction of the chord
- x0 = this%cen + (this%edge_vec(:,4)-this%edge_vec(:,2))/4.0_wp
+! Control point at 1/4-fraction of the chord
+x0 = this%cen + (this%edge_vec(:,4)-this%edge_vec(:,2))/4.0_wp
 
- !=== Compute the velocity from all the elements ===
- do j = 1,size(wake_elems)  ! wake panels
-
-   call wake_elems(j)%p%compute_vel(x0,sim_param%u_inf,v)
-   this%vel_ctr_pt = this%vel_ctr_pt + v
-
- enddo
-
- do j = 1,size(elems) ! body elements
-
-   call elems(j)%p%compute_vel(x0,sim_param%u_inf,v)
-   this%vel_ctr_pt = this%vel_ctr_pt + v
-
- enddo
-
- this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp*pi) &
-               + sim_param%u_inf + this%uvort - this%ub
+!=== Compute the velocity from all the elements ===
+do j = 1,size(wake_elems)  ! wake panels
+  call wake_elems(j)%p%compute_vel(x0,sim_param%u_inf,v)
+  this%vel_ctr_pt = this%vel_ctr_pt + v
+enddo
+do j = 1,size(elems) ! body elements
+  call elems(j)%p%compute_vel(x0,sim_param%u_inf,v)
+  this%vel_ctr_pt = this%vel_ctr_pt + v
+enddo
+! induced velocity on leading edge side
+this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp*pi) &
+              + sim_param%u_inf + this%uvort - this%ub
 
 end subroutine get_vel_ctr_pt_vortlatt
 
@@ -620,35 +585,23 @@ end subroutine get_vel_ctr_pt_vortlatt
 !! The subroutine calculates all the relevant geometrical quantities of a
 !! vortex lattice panel
 subroutine calc_geo_data_vortlatt(this, vert)
- class(t_vortlatt), intent(inout) :: this
- real(wp), intent(in) :: vert(:,:)
+class(t_vortlatt), intent(inout) :: this
+real(wp), intent(in) :: vert(:,:)
 
- integer :: nsides, is
- real(wp):: nor(3), tanl(3)
+integer :: nsides, is
+real(wp):: nor(3), tanl(3)
 
   this%ver = vert
   nsides = this%n_ver
-
-  ! ! debug ---
-  ! if ( this%id .ne. 0 ) then
-  !   write(*,*) ' debug in calc_geo_data_vortlatt(), id: ', this%id
-  !   do is = 1, nsides
-  !     if ( allocated(this%i_ver) ) write(*,'(I5,A)',advance='no') this%i_ver(is), ': '
-  !     write(*,*) vert(:,is), '          ', this%ver(:,is)
-  !   end do
-  ! end if
-  ! ! debug ---
-
-  ! center
   this%cen =  sum ( this%ver,2 ) / real(nsides,wp)
 
   ! unit normal and area
   if ( nsides .eq. 4 ) then
     nor = cross( this%ver(:,3) - this%ver(:,1) , &
-                 this%ver(:,4) - this%ver(:,2)     )
+                this%ver(:,4) - this%ver(:,2)     )
   else if ( nSides .eq. 3 ) then
     nor = cross( this%ver(:,3) - this%ver(:,2) , &
-                 this%ver(:,1) - this%ver(:,2)     )
+                this%ver(:,1) - this%ver(:,2)     )
   end if
 
   this%area = 0.5_wp * norm2(nor)

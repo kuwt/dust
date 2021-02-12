@@ -516,9 +516,9 @@ if(sim_param%use_fmm) then
   call printout(nl//'====== Initializing Octree ======')
   t0 = dust_time()
   call initialize_octree(sim_param%BoxLength, sim_param%NBox, &
-                         sim_param%OctreeOrigin, sim_param%NOctreeLevels, &
-                         sim_param%MinOctreePart, sim_param%MultipoleDegree, &
-                         sim_param%RankineRad, octree)
+                        sim_param%OctreeOrigin, sim_param%NOctreeLevels, &
+                        sim_param%MinOctreePart, sim_param%MultipoleDegree, &
+                        sim_param%RankineRad, octree)
   t1 = dust_time()
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
@@ -529,12 +529,12 @@ endif
 call printout(nl//'====== Initializing Wake ======')
 
 call initialize_wake(wake, geo, te, sim_param%n_wake_panels, &
-       sim_param%n_wake_panels, sim_param%n_wake_particles)
+      sim_param%n_wake_panels, sim_param%n_wake_particles)
 
 call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
 call initialize_linsys(linsys, geo, elems, elems_expl, &
-                       wake ) ! sim_param%u_inf)
+                      wake ) ! sim_param%u_inf)
 !call initialize_pressure_sys(linsys, geo, elems)
 
 t1 = dust_time()
@@ -825,11 +825,11 @@ end if
    end if
   end if
 
-  !------ Compute loads -------
-  ! Implicit elements: vortex rings and 3d-panels
-  ! 2019-07-23: D.Isola suggested to implement AVL formula for VL elements
-  ! so far, select type() to keep the old formulation for t_surfpan and
-  ! use AVL formula for t_vortlatt
+!------ Compute loads -------
+! Implicit elements: vortex rings and 3d-panels
+! 2019-07-23: D.Isola suggested to implement AVL formula for VL elements
+! so far, select type() to keep the old formulation for t_surfpan and
+! use AVL formula for t_vortlatt
 !$omp parallel do private(i_el)
   do i_el = 1 , sel
 
@@ -867,6 +867,7 @@ end if
           ! ALTERNATIVE:
           !call el%compute_pres_vortlatt()
           !elems(i_el)%p%dforce = elems(i_el)%p%pres * elems(i_el)%p%area * elems(i_el)%p%nor
+          !write(*,*) 'F:  ', el%dforce
 
           !ifort bug workaround
           !elems(i_el)%p%pres = sum( elems(i_el)%p%dforce * elems(i_el)%p%nor )&

@@ -799,6 +799,7 @@ subroutine compute_pres_surfpan(this, R_g)
   real(wp) :: f(5)    ! <- max n_ver of a surfpan = 4 ; +1 for the constraint eqn
 
   integer :: i_e , n_neigh
+  real(wp) :: mach
 
 ! This routine contains the velocity update as well. TODO, move to a dedicated routine
 ! Two methods have been implemented for surface velocity computation:
@@ -908,7 +909,10 @@ subroutine compute_pres_surfpan(this, R_g)
 !
 ! this%pres = force_pres
 
-  this%dforce = - force_pres * this%area * this%nor
+  ! Prandt -- Glauert correction for compressibility effect
+  mach = abs(norm2(sim_param%u_inf) / sim_param%a_inf)
+  
+  this%dforce = - force_pres * this%area * this%nor / sqrt(1 - mach**2)
 
 
 end subroutine compute_pres_surfpan
