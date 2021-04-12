@@ -760,14 +760,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     end if
 
 #if USE_PRECICE
-    !> *** to do *** symmetry and mirror. So far, finalize run with an error
-    if ( coupled_comp ) then
-      if ( mesh_symmetry .or. mesh_mirror ) then
-        call error(this_sub_name, this_mod_name, &
-                    'So far, mesh_symmetry and mesh_mirror &
-                    &not implemented for coupled components')
-      end if
-    end if
+
     if ( coupled_comp ) then
       write(*,*) ' coupling_type: ', trim(coupling_type)
       if ( trim(coupling_type) .eq. 'll' ) then
@@ -848,9 +841,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     end if
 #endif
 
-
-
-   case('pointwise')
+  case('pointwise')
 
     mesh_file = geo_file
 
@@ -930,6 +921,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   !=====
   !===== Mirror: reflect the mesh
   !=====
+  
   if ( mesh_mirror ) then
 
     select case (trim(mesh_file_type))
@@ -937,14 +929,14 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call mirror_mesh(ee, rr, mirror_point, mirror_normal)
       case('parametric','pointwise')
         call mirror_mesh_structured(ee, rr,  &
-                                       npoints_chord_tot , nelems_span , &
-                                       mirror_point, mirror_normal)
+                                      npoints_chord_tot , nelems_span , &
+                                      mirror_point, mirror_normal)
 
       case default
         call error(this_sub_name, this_mod_name,&
-             'Mirror routines implemented for MeshFileType = &
-             & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
-             'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
+            'Mirror routines implemented for MeshFileType = &
+            & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
+            'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
     end select
 
   end if
@@ -1448,6 +1440,7 @@ subroutine mirror_mesh_structured( ee, rr, &
  integer :: i1
 
  character(len=*), parameter :: this_sub_name = 'mirror_mesh_structured'
+
 
   ! no check on sewing: the component is only mirrored,
   ! and the user must be carefully define it

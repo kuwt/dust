@@ -234,6 +234,7 @@ type(t_octree) :: octree
 #endif
 
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
+
 t00 = dust_time()
 
 call get_run_id(run_id)
@@ -285,8 +286,8 @@ call prms%CreateLogicalOption('reset_time','reset the time from previous &
 call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
                                                        '(/1.0, 0.0, 0.0/)')
 call prms%CreateRealOption( 'u_ref', "reference velocity")             !
-call prms%CreateRealOption( 'P_inf', "free stream pressure", '0.0')    !
-call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')   !
+call prms%CreateRealOption( 'P_inf', "free stream pressure", '101325')    !
+call prms%CreateRealOption( 'rho_inf', "free stream density", '1.225')   !
 call prms%CreateRealOption( 'a_inf', "Speed of sound", '340.0')        ! m/s   for dimensional sim
 call prms%CreateRealOption( 'mu_inf', "Dynamic viscosity", '0.000018') ! kg/ms
 

@@ -110,8 +110,8 @@ subroutine build_connectivity(this, rr, ee)
   allocate(dist_all(ns)); dist_all = 0.0_wp
   allocate(mat_dist_all(ns,ns)); mat_dist_all = 0.0_wp
   allocate(Wnorm(3,3));
-  Wnorm(1,1) = 0.001_wp; 
-  Wnorm(2,2) = 1.0_wp;
+  Wnorm(1,1) = 1.0_wp; 
+  Wnorm(2,2) = 0.001_wp;
   Wnorm(3,3) = 0.001_wp;
   write(*,*) 'shape: Wnorm' , shape(Wnorm(:,:))
   do ip = 1, np
