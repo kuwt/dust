@@ -831,25 +831,45 @@ end if
 ! 2019-07-23: D.Isola suggested to implement AVL formula for VL elements
 ! so far, select type() to keep the old formulation for t_surfpan and
 ! use AVL formula for t_vortlatt
-!$omp parallel do private(i_el)
-  do i_el = 1 , sel
+#if USE_PRECICE
+  !$omp parallel do private(i_el)
+    do i_el = 1 , sel
 
-    ! ifort bugs workaround:
-    ! apparently it is not possible to call polymorphic methods inside
-    ! select cases for intel, need to call these for all elements and for the
-    ! vortex lattices it is going to be a dummy empty function call
+      ! ifort bugs workaround:
+      ! apparently it is not possible to call polymorphic methods inside
+      ! select cases for intel, need to call these for all elements and for the
+      ! vortex lattices it is going to be a dummy empty function call
 
-!           write(*,*) ' i_el : ', i_el
-!           write(*,*) ' elems(i_el)%p%comp_id): ', elems(i_el)%p%comp_id
-!           write(*,*) ' geo%components()%ref_id: ', &
-!                        geo%components(elems(i_el)%p%comp_id)%ref_id
+      !write(*,*) ' i_el : ', i_el
+      !write(*,*) ' elems(i_el)%p%comp_id): ', elems(i_el)%p%comp_id
+      !write(*,*) ' geo%components()%ref_id: ', &
+      !             geo%components(elems(i_el)%p%comp_id)%ref_id
+      call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
+                geo%components(elems(i_el)%p%comp_id)%coupling_node_rot)
+      call elems(i_el)%p%compute_dforce()
 
-        call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
-                geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g)
-        call elems(i_el)%p%compute_dforce()
+    end do
+  !$omp end parallel do
+#else
+  !$omp parallel do private(i_el)
+    do i_el = 1 , sel
 
-  end do
-!$omp end parallel do
+      ! ifort bugs workaround:
+      ! apparently it is not possible to call polymorphic methods inside
+      ! select cases for intel, need to call these for all elements and for the
+      ! vortex lattices it is going to be a dummy empty function call
+
+      !write(*,*) ' i_el : ', i_el
+      !write(*,*) ' elems(i_el)%p%comp_id): ', elems(i_el)%p%comp_id
+      !write(*,*) ' geo%components()%ref_id: ', &
+      !             geo%components(elems(i_el)%p%comp_id)%ref_id
+      call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
+              geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g)
+      call elems(i_el)%p%compute_dforce()
+
+    end do
+  !$omp end parallel do
+#endif
 
   ! ifort bugs workaround:
   ! since even if the following calls looks thread safe, they mess up with
