@@ -272,16 +272,16 @@ subroutine build_connectivity(this, loc_points)
   integer :: nrot, nble
 
   ! ! debug ---
-   write(*,*) ' ................................................ '
-   write(*,*) ' Debug in hinge%build_connectivity(), loc_points: '
-   write(*,*) ' ................................................ '
-   do iw = 1, size(loc_points,2)
-     write(*,*) loc_points(:,iw)
-   end do
-   write(*,*) ' Debug in hinge%build_connectivity(), ref%rr: '
-   do iw = 1, size(this%ref%rr,2)
-     write(*,*) this%ref%rr(:,iw)
-   end do
+   !write(*,*) ' ................................................ '
+   !write(*,*) ' Debug in hinge%build_connectivity(), loc_points: '
+   !write(*,*) ' ................................................ '
+   !do iw = 1, size(loc_points,2)
+   !  write(*,*) loc_points(:,iw)
+   !end do
+   !write(*,*) ' Debug in hinge%build_connectivity(), ref%rr: '
+   !do iw = 1, size(this%ref%rr,2)
+   ! write(*,*) this%ref%rr(:,iw)
+   !end do
   ! ! debug ---
 
   !> N. of surface and hinge nodes
@@ -348,7 +348,7 @@ subroutine build_connectivity(this, loc_points)
         nrot = nrot + 1
         rot_node_id(nrot) = ib
         ! debug
-        write(*,*) 'rot_node_id(nrot)' , rot_node_id(nrot)
+        ! write(*,*) 'rot_node_id(nrot)' , rot_node_id(nrot)
         ! debug
         do ih = 1, nh
           dist_all(ih) = abs( rrb(2,ib) - rrh(2,ih) )

@@ -666,11 +666,12 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   do i=1,geo%nelem_impl
     select type(el=>elems_impl(i)%p) ; class is(t_surfpan)
       el%surf_vel = 0.0_wp
-      call el%create_local_velocity_stencil( &    ! elems_tot, &
-              geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
-      ! chtls stencil
-      call el%create_chtls_stencil( &             ! elems_tot, &
-              geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
+      
+        call el%create_local_velocity_stencil( &    ! elems_tot, &
+                geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
+        ! chtls stencil
+        call el%create_chtls_stencil( &             ! elems_tot, &
+                geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
     end select
   end do
 
@@ -943,7 +944,7 @@ subroutine load_components(geo, in_file, out_file, te)
       geo%components(i_comp)%coupling_type     = trim(comp_coupling_type)
       geo%components(i_comp)%coupling_node     =      comp_coupling_node
       geo%components(i_comp)%coupling_node_rot =      comp_coupling_node_rot
-
+      
       !> Overwrite moving,
       !>> if n_hinges .gt. 0
       ! *** to do *** avoid moving = .true. if hinge_input is constant
@@ -1253,7 +1254,7 @@ subroutine load_components(geo, in_file, out_file, te)
           ! ! write(*,*) ' stop. '; stop
           ! ! check ---
 
-          deallocate(ind_coupling, hinge_ind)
+          deallocate(ind_coupling, hinge_ind)  !FIXME SIGABRT: Process abort signal.
 
         endif
       else
@@ -1320,6 +1321,7 @@ subroutine load_components(geo, in_file, out_file, te)
                           'CouplingNode',cloc2)
           call write_hdf5(geo%components(i_comp)%coupling_node_rot, &
                           'CouplingNodeOrientation',cloc2)
+          
         else
           call write_hdf5('false','Coupled',cloc2)
           call write_hdf5('none', 'CouplingType',cloc2)

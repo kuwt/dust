@@ -851,7 +851,11 @@ subroutine compute_pres_surfpan(this, R_g)
   ! Rotation of the result =====================================
   ! - The stencil is computed in the local ref.sys. at the beginning of the code
   ! - The velocity is computed at each timestep
-  vel_phi = matmul( R_g , vel_phi ) ! transpose(R_g) ???
+  
+  vel_phi = matmul( (R_g) , vel_phi ) 
+
+  !write(*,*) 'vel_phi', vel_phi
+
   ! Rotation of the result =====================================
 
   ! vel = u_inf + vel_phi + vel_rot
@@ -895,6 +899,8 @@ subroutine compute_pres_surfpan(this, R_g)
       + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
                + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
                + sim_param%rho_inf * this%didou_dt
+
+    !write(*,*) 'this%surf_vel', this%surf_vel
   else
     force_pres = this%pres 
   endif
@@ -1042,7 +1048,7 @@ subroutine create_chtls_stencil_surfpan( this , R_g )
   integer :: n_neigh
   integer :: i_n , i_nn
 
-
+  ! write(*,*) 'R_g_chtls_stencil_surfpan', R_g
   ! # of neighbouring elements
   n_neigh = 0
   do i_n = 1 , this%n_ver
