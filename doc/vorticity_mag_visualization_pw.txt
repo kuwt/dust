@@ -1,0 +1,18 @@
+# import the body .vtu
+# import the flow field file ff.vtr
+# on flow field velocity:
+	Filters -> ComputeDerivatives
+		Vectors: velocity
+		Output Vector Type: Vorticity
+		Output Tensor Type: Vector Gradient
+	Filters -> CellDataToPointData
+	Filters -> Calculator
+		Attribute Type: Point Data
+		Result Array Name: Vorticity_mag
+		Operation: mag(Vorticity)
+	Filters -> Contour
+		Contour By: Vorticity_mag
+		flag -> Compute Normals & Generate Triangles
+
+At the end activate the visibility only on Contour.
+NOTE: if visualization appears to coarse (separated blobs and isolated particles) try to increase the slicing of your 3d box (Nxyz).
