@@ -1,3 +1,4 @@
+
 !./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
@@ -500,6 +501,7 @@ call finalizeParameters(prms)
 #if USE_PRECICE
       call precice % initialize_mesh( geo )
       call precice % initialize_fields()
+      call precicef_initialize(precice % dt_precice)
 
 !     !> check ---
 !     do i = 1, size(precice%fields)
@@ -584,7 +586,7 @@ end if
 #if USE_PRECICE
       call precicef_ongoing(   precice % is_ongoing)
       write(*,*) ' is coupling ongoing: ', precice % is_ongoing
-      call precicef_initialize(precice % dt_precice)
+      !call precicef_initialize(precice % dt_precice)
       call precicef_ongoing(   precice % is_ongoing)
 
       precice_convergence = .true.
