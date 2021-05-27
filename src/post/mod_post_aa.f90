@@ -119,8 +119,7 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
  real(wp), allocatable :: points(:,:)
  integer :: nelem
 
- real(wp) :: u_inf(3)
- real(wp) :: P_inf , rho, mu_inf, a_inf, time
+ real(wp) :: time
 
  integer :: fid_out, fid_time
 
@@ -166,19 +165,12 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
   do it = an_start, an_end, an_step
     ires = ires+1
 
-
     ! Open the file
     write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
     call open_hdf5_file(trim(filename),floc)
 
     ! Load free-stream parameters
     call open_hdf5_group(floc,'Parameters',ploc)
-    call read_hdf5(u_inf,'u_inf',ploc)
-    call read_hdf5(P_inf,'P_inf',ploc)
-    call read_hdf5(rho,'rho_inf',ploc)
-    !get from the attributes
-    call read_hdf5_attr(mu_inf,'mu_inf',floc)
-    call read_hdf5_attr(a_inf,'a_inf',floc)
     call read_hdf5(time,'time',floc)
     call close_hdf5_group(ploc)
 
@@ -213,7 +205,7 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
       if (.not. mult .or. &
                (mult .and. (trim(comp_root) .ne. trim(last_mult) ))) then
         ! Output filename
-        write(filename,'(A,I4.4,A)') trim(basename)//'_'//trim(an_name)//&
+        write(filename,'(A,I0,A)') trim(basename)//'_'//trim(an_name)//&
           '_'//trim(compname)//'-',it,'.dat'
         ! check if the file unit is still open from a previous file
         last_mult = trim(compname)
@@ -224,22 +216,19 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
         open(unit=fid_out,file=trim(filename))
 
         !write the header here
-        call dat_out_aa_header( fid_out, time, P_inf, rho, a_inf, mu_inf, u_inf  )
+        call dat_out_aa_header( fid_out, time )
       endif
 
-      write(fid_out, '(A,I3.3)') trim(compname)//' ',imult
+      !write(fid_out, '(A,I3.3)') trim(compname)//' ',imult
+      write(fid_out, '(A,I3.3)') 'Comp ',imult
       !cycle on elements
       do ie = 1,size(comp%el)
-      select type(el =>comp%el(ie))
-        !print a line of the file for each element
-
-       type is(t_surfpan)
-        call dat_out_aa( fid_out, el%cen, el%nor, el%area, el%ub, &
-                         el%surf_vel, el%dforce )
-       class default
-        call dat_out_aa( fid_out, el%cen, el%nor, el%area, el%ub, &
-                         (/0.0_wp, 0.0_wp, 0.0_wp/), el%dforce )
-      end select
+        !GFORTRAN BUG: the associate is much cleaner, but crashes gfortran 5.4
+        !associate(el => comp%el(ie))
+        !call dat_out_aa( fid_out, el%cen, el%nor, el%ub, el%area, el%dforce )
+        call dat_out_aa( fid_out, comp%el(ie)%cen, comp%el(ie)%nor, &
+           comp%el(ie)%ub, comp%el(ie)%area, comp%el(ie)%dforce )
+        !end associate
       enddo
     end associate
     enddo
@@ -262,7 +251,6 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
   end do ! Time loop
 
   close(fid_time)
-
 
   deallocate(points)
   call destroy_elements(comps)
