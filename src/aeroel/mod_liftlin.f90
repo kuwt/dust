@@ -1445,7 +1445,7 @@ subroutine calc_geo_data_liftlin(this, vert)
 
   ! -- 0.75 chord -- look for other "0.75 chord" tag
   ! correct the chord value ----
-  this%chord = sum(this%edge_len((/2,4/)))*0.5_wp  * 4_wp / 3_wp
+  this%chord = sum(this%edge_len((/2,4/)))*0.5_wp 
 ! this%chord = this%chord / 0.75_wp
 
   ! === Piszkin, Lewinski (1976) LL model for swept wings ===
