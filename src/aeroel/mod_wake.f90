@@ -1622,32 +1622,32 @@ subroutine compute_vel_from_all(elems, wake, pos, vel)
 
   !calculate the influence of the solid bodies
   do ie=1,size(elems)
-    call elems(ie)%p%compute_vel(pos, sim_param%u_inf, v)
+    call elems(ie)%p%compute_vel(pos, v)
     vel = vel + v/(4*pi)
   enddo
 
   ! calculate the influence of the wake panels
   do ie=1,size(wake%pan_p)
-    call wake%pan_p(ie)%p%compute_vel(pos, sim_param%u_inf, v)
+    call wake%pan_p(ie)%p%compute_vel(pos, v)
     vel = vel + v/(4*pi)
   enddo
 
   ! calculate the influence of the wake rings
   do ie=1,size(wake%rin_p)
-    call wake%rin_p(ie)%p%compute_vel(pos, sim_param%u_inf, v)
+    call wake%rin_p(ie)%p%compute_vel(pos, v)
     vel = vel+ v/(4*pi)
   enddo
 
   !calculate the influence of the end vortex
   !TODO: check what happens when it is not active
   do ie=1,size(wake%end_vorts)
-    call wake%end_vorts(ie)%compute_vel(pos, sim_param%u_inf, v)
+    call wake%end_vorts(ie)%compute_vel(pos, v)
     vel = vel+ v/(4*pi)
   enddo
 
   !calculate the influence of particles
   do ie=1,size(wake%part_p)
-    call wake%part_p(ie)%p%compute_vel(pos, sim_param%u_inf, v)
+    call wake%part_p(ie)%p%compute_vel(pos, v)
     vel = vel+ v/(4*pi)
   enddo
 
