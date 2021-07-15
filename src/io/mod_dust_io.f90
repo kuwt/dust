@@ -346,9 +346,9 @@ subroutine save_status(geo, wake, it, time, run_id)
   allocate(turbvisc(wake%n_prt))
   allocate(vel_w(3,wake%n_prt,1))
   !> debug ---
-  write(*,*) ' ++++ debug in mod_dust_io.f90 ++++ '
-  write(*,*) ' wake%n_prt: ', wake%n_prt  
-  write(*,*) ' ++++ debug in mod_dust_io.f90 ++++ ' 
+  !write(*,*) ' ++++ debug in mod_dust_io.f90 ++++ '
+  !write(*,*) ' wake%n_prt: ', wake%n_prt  
+  !write(*,*) ' ++++ debug in mod_dust_io.f90 ++++ ' 
   !> debug ---
   do ip = 1, wake%n_prt
     points_w(:,ip,1) = wake%part_p(ip)%p%cen
