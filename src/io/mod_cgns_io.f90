@@ -117,6 +117,8 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
 ! integer, allocatable :: ee_cgns(:)
 
  integer :: i1 , i , ielem, ielem_section, iNode
+ 
+ integer, allocatable :: ConnectOffset(:)
 
  character(len=*), parameter :: this_sub_name = 'read_mesh_cgns'
 
@@ -320,11 +322,11 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
         else
           allocate(pdata(3))
         end if
-
-        call CG_ELEMENTS_READ_F(INDEX_FILE, ibase, izone, isec, &
-                                elemcg, pdata, ier)
-        if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
-
+        
+        allocate(ConnectOffset(nelem))
+        call CG_POLY_ELEMENTS_READ_F(INDEX_FILE, ibase, izone, isec, &
+                                elemcg, ConnectOffset, pdata, ier)
+        if ( ier /= ALL_OK ) call CG_ERROR_PRINT_F()
 
         !  Store data, mixed elements get special treatment
         if (eltype == 'mixed') then
