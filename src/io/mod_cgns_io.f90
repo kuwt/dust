@@ -323,11 +323,13 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
           allocate(pdata(3))
         end if
         
-        allocate(ConnectOffset(nelem))
+        allocate(ConnectOffset(nelem+1))
         call CG_POLY_ELEMENTS_READ_F(INDEX_FILE, ibase, izone, isec, &
                                 elemcg, ConnectOffset, pdata, ier)
         if ( ier /= ALL_OK ) call CG_ERROR_PRINT_F()
-
+        
+        deallocate(ConnectOffset)
+        
         !  Store data, mixed elements get special treatment
         if (eltype == 'mixed') then
           allocate(nmixed(mixed))
