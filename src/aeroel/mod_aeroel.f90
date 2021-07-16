@@ -247,7 +247,7 @@ end type c_expl_elem
 !! The static part od the rhs should already be initialized, and the
 !! moving contribution is just added to the static one.
 abstract interface
-  subroutine i_build_row(this, elems, linsys, ie, ista, iend)
+  subroutine i_build_row(this, elems, linsys, uinf, ie, ista, iend)
     import :: wp
     import :: c_impl_elem
     import :: t_impl_elem_p
@@ -256,6 +256,7 @@ abstract interface
     class(c_impl_elem), intent(inout)  :: this
     type(t_impl_elem_p), intent(in)    :: elems(:)
     type(t_linsys), intent(inout) :: linsys
+    real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
     integer, intent(in)           :: ista, iend
   end subroutine
@@ -280,7 +281,7 @@ end interface
 !! should be the static ones ordered at the beginning of the array
 abstract interface
   subroutine i_build_row_static(this, elems, expl_elems, linsys, &
-                                ie, ista, iend)
+                                uinf, ie, ista, iend)
     import :: wp
     import :: c_impl_elem
     import :: t_impl_elem_p
@@ -291,6 +292,7 @@ abstract interface
     type(t_impl_elem_p), intent(in)    :: elems(:)
     type(t_expl_elem_p), intent(in)    :: expl_elems(:)
     type(t_linsys), intent(inout) :: linsys
+    real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
     integer, intent(in)           :: ista, iend
   end subroutine
@@ -313,7 +315,7 @@ end interface
 !! The stationary part is updated once at the beginning of the simulation
 !! while the moving one is updated each timestep
 abstract interface
-  subroutine i_add_wake(this, wake_elems, impl_wake_ind, linsys, &
+  subroutine i_add_wake(this, wake_elems, impl_wake_ind, linsys, uinf, &
                         ie, ista, iend)
     import :: wp
     import :: c_impl_elem
@@ -324,6 +326,7 @@ abstract interface
     type(t_pot_elem_p), intent(in)    :: wake_elems(:)
     integer, intent(in)           :: impl_wake_ind(:,:)
     type(t_linsys), intent(inout) :: linsys
+    real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
     integer, intent(in)           :: ista
     integer, intent(in)           :: iend
@@ -341,7 +344,7 @@ end interface
 !! and just retrieved, while the contribution due to the moving components
 !! is calculated and added
 abstract interface
-  subroutine i_add_expl(this, expl_elems, linsys, &
+  subroutine i_add_expl(this, expl_elems, linsys, uinf, &
                         ie, ista, iend)
     import :: wp
     import :: c_impl_elem
@@ -351,6 +354,7 @@ abstract interface
     class(c_impl_elem), intent(inout)  :: this
     type(t_expl_elem_p), intent(in)    :: expl_elems(:)
     type(t_linsys), intent(inout) :: linsys
+    real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
     integer, intent(in)           :: ista
     integer, intent(in)           :: iend
@@ -401,11 +405,12 @@ end interface
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 abstract interface
-  subroutine i_compute_vel(this, pos, vel)
+  subroutine i_compute_vel(this, pos, uinf, vel)
     import :: c_elem , wp
     implicit none
     class(c_elem), intent(in) :: this
     real(wp), intent(in) :: pos(:)
+    real(wp), intent(in) :: uinf(3)
     real(wp), intent(out) :: vel(3)
   end subroutine
 end interface
@@ -419,11 +424,12 @@ end interface
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 abstract interface
-  subroutine i_compute_grad(this, pos, grad)
+  subroutine i_compute_grad(this, pos, uinf, grad)
     import :: c_elem , wp
     implicit none
     class(c_elem), intent(in) :: this
     real(wp), intent(in) :: pos(:)
+    real(wp), intent(in) :: uinf(3)
     real(wp), intent(out) :: grad(3,3)
   end subroutine
 end interface

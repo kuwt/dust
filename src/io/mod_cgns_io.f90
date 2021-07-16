@@ -117,6 +117,8 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
 ! integer, allocatable :: ee_cgns(:)
 
  integer :: i1 , i , ielem, ielem_section, iNode
+ 
+ integer, allocatable :: ConnectOffset(:)
 
  character(len=*), parameter :: this_sub_name = 'read_mesh_cgns'
 
@@ -155,7 +157,10 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
 !  Special case for 2d: if icelldim=2 we assume a pure 2d mesh with
 !  coordinates in x and y only (not a surface mesh in 3d)
 
-  if ((icelldim == 2) .and. (ndim > icelldim)) ndim = icelldim
+! Check.
+!So far it makes work a mesh done from surface cad (not from solid cad) 
+
+!  if ((icelldim == 2) .and. (ndim > icelldim)) ndim = icelldim
 
 !  Number of zones. Assume a zone is a region. Loop over the zones
 
@@ -320,12 +325,14 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
         else
           allocate(pdata(3))
         end if
-
-        call CG_ELEMENTS_READ_F(INDEX_FILE, ibase, izone, isec, &
-                                elemcg, pdata, ier)
-        if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
-
-
+        
+        allocate(ConnectOffset(nelem+1))
+        call CG_POLY_ELEMENTS_READ_F(INDEX_FILE, ibase, izone, isec, &
+                                elemcg, ConnectOffset, pdata, ier)
+        if ( ier /= ALL_OK ) call CG_ERROR_PRINT_F()
+        
+        deallocate(ConnectOffset)
+        
         !  Store data, mixed elements get special treatment
         if (eltype == 'mixed') then
           allocate(nmixed(mixed))

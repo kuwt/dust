@@ -173,9 +173,10 @@ end subroutine compute_psi_actdisk
 !! WARNING: the velocity calculated, to be consistent with the formulation of
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
-subroutine compute_vel_actdisk (this, pos, vel)
+subroutine compute_vel_actdisk (this, pos, uinf, vel)
  class(t_actdisk), intent(in) :: this
  real(wp), intent(in) :: pos(:)
+ real(wp), intent(in) :: uinf(3)
  real(wp), intent(out) :: vel(3)
 
  real(wp) :: vdou(3)
@@ -197,9 +198,10 @@ end subroutine compute_vel_actdisk
 !! WARNING: the velocity calculated, to be consistent with the formulation of
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
-subroutine compute_grad_actdisk (this, pos, grad)
+subroutine compute_grad_actdisk (this, pos, uinf, grad)
  class(t_actdisk), intent(in) :: this
  real(wp), intent(in) :: pos(:)
+ real(wp), intent(in) :: uinf(3)
  real(wp), intent(out) :: grad(3,3)
 
  real(wp) :: grad_dou(3,3)
@@ -215,9 +217,10 @@ subroutine compute_grad_actdisk (this, pos, grad)
 end subroutine compute_grad_actdisk
 
 !----------------------------------------------------------------------
-subroutine compute_cp_actdisk (this, elems)
+subroutine compute_cp_actdisk (this, elems, uinf)
  class(t_actdisk), intent(inout) :: this
  type(t_elem_p), intent(in) :: elems(:)
+ real(wp), intent(in) :: uinf(:)
 
  character(len=*), parameter      :: this_sub_name='compute_cp_actdisk'
 
@@ -296,10 +299,11 @@ end subroutine update_actdisk
 !----------------------------------------------------------------------
 
 !TODO: is this really necessary?
-subroutine solve_actdisk(elems_ll, elems_tot, elems_wake, airfoil_data)
+subroutine solve_actdisk(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
  type(t_expl_elem_p), intent(inout) :: elems_ll(:)
  type(t_elem_p), intent(in)    :: elems_tot(:)
  type(t_elem_p), intent(in)    :: elems_wake(:)
+ real(wp), intent(in)          :: uinf(3)
  type(t_aero_tab),  intent(in) :: airfoil_data(:)
 
 end subroutine solve_actdisk

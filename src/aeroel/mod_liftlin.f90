@@ -212,10 +212,11 @@ end subroutine compute_psi_liftlin
 !! WARNING: the velocity calculated, to be consistent with the formulation of
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
-subroutine compute_vel_liftlin (this, pos, vel)
+subroutine compute_vel_liftlin (this, pos, uinf, vel)
  class(t_liftlin), intent(in) :: this
  real(wp), intent(in) :: pos(:)
 
+ real(wp), intent(in) :: uinf(3)
  real(wp), intent(out) :: vel(3)
 
  real(wp) :: vdou(3)
@@ -236,10 +237,11 @@ end subroutine compute_vel_liftlin
 !! WARNING: the velocity calculated, to be consistent with the formulation of
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
-subroutine compute_grad_liftlin (this, pos, grad)
+subroutine compute_grad_liftlin (this, pos, uinf, grad)
  class(t_liftlin), intent(in) :: this
  real(wp), intent(in) :: pos(:)
 
+ real(wp), intent(in) :: uinf(3)
  real(wp), intent(out) :: grad(3,3)
 
  real(wp) :: grad_dou(3,3)
@@ -255,9 +257,10 @@ end subroutine compute_grad_liftlin
 
 !----------------------------------------------------------------------
 
-subroutine compute_cp_liftlin (this, elems)
+subroutine compute_cp_liftlin (this, elems, uinf)
  class(t_liftlin), intent(inout) :: this
  type(t_elem_p), intent(in) :: elems(:)
+ real(wp), intent(in) :: uinf(:)
 
  character(len=*), parameter      :: this_sub_name='compute_cp_liftlin'
 
@@ -514,19 +517,19 @@ subroutine solve_liftlin_piszkin( &
 !$omp parallel do private(i_l, j, v) schedule(dynamic)
   do i_l = 1,size(elems_ll)
     do j = 1,size(elems_impl) ! body panels: liftlin, vor che tenga contotlat
-      call elems_impl(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)
+      call elems_impl(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
     do j = 1,size(elems_ad) ! actuator disks
-      call elems_ad(j)%p%compute_vel(  elems_ll(i_l)%p%cen,v)
+      call elems_ad(j)%p%compute_vel(  elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
     do j = 1,size(elems_wake) ! wake panels
-      call elems_wake(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)
+      call elems_wake(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
     do j = 1,size(elems_vort) ! wake vort
-      call elems_vort(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)
+      call elems_vort(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
       vel_w     (:,i_l) = vel_w     (:,i_l) + v
       vel_w_vort(:,i_l) = vel_w_vort(:,i_l) + v
     enddo
@@ -673,7 +676,7 @@ subroutine solve_liftlin_piszkin( &
       ! compute velocity
       vel = 0.0_wp
       do j = 1,size(elems_ll)
-        call elems_ll(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)
+        call elems_ll(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
         vel = vel + v
       enddo
       ui_v(i_l,:) = vel / ( 4.0_wp * pi )
@@ -955,19 +958,19 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 !$omp parallel do private(i_l, j, v) schedule(dynamic)
   do i_l = 1,size(elems_ll)
     do j = 1,size(elems_impl) ! body panels: liftlin, vor che tenga contotlat
-      call elems_impl(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)
+      call elems_impl(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
     do j = 1,size(elems_ad) ! actuator disks
-      call elems_ad(j)%p%compute_vel(  elems_ll(i_l)%p%cen,v)
+      call elems_ad(j)%p%compute_vel(  elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
     do j = 1,size(elems_wake) ! wake panels
-      call elems_wake(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)
+      call elems_wake(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
     do j = 1,size(elems_vort) ! wake vort
-      call elems_vort(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)
+      call elems_vort(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
       vel_w     (:,i_l) = vel_w(:,i_l) + v
       vel_w_vort(:,i_l) = vel_w_vort(:,i_l) + v
     enddo
@@ -1030,7 +1033,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       ! compute velocity
       vel = 0.0_wp
       do j = 1,size(elems_ll)
-        call elems_ll(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)
+        call elems_ll(j)%p%compute_vel(elems_ll(i_l)%p%cen,uinf,v)
         vel = vel + v
       enddo
 
@@ -1350,14 +1353,14 @@ subroutine get_vel_ctr_pt_liftlin(this, elems, wake_elems)
  !=== Compute the velocity from all the elements ===
  do j = 1,size(wake_elems)  ! wake panels
 
-   call wake_elems(j)%p%compute_vel(x0,v)
+   call wake_elems(j)%p%compute_vel(x0,sim_param%u_inf,v)
    this%vel_ctr_pt = this%vel_ctr_pt + v
 
  enddo
 
  do j = 1,size(elems) ! body elements
 
-   call elems(j)%p%compute_vel(x0,v)
+   call elems(j)%p%compute_vel(x0,sim_param%u_inf,v)
    this%vel_ctr_pt = this%vel_ctr_pt + v
 
  enddo

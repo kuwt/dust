@@ -183,7 +183,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
 
     !build one row
     call elems(ie)%p%build_row_static(elems, expl_elems, linsys, &
-                                      ie, 1, linsys%nstatic)
+                                      uinf, ie, 1, linsys%nstatic)
   enddo
 !$omp end parallel do
 
@@ -203,7 +203,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
     !call elems(ie)%p%add_wake((/wake_elems%pan_p, wake_rings%pan_p/), &
     !                wake_elems%gen_elems_id, linsys,uinf,ie,1,linsys%nstatic)
     call elems(ie)%p%add_wake((/wake%pan_p, wake%rin_p/), &
-                    wake%pan_gen_elems_id, linsys,ie,1,linsys%nstatic)
+                    wake%pan_gen_elems_id, linsys,uinf,ie,1,linsys%nstatic)
 
     !link the solution into the elements
     elems(ie)%p%mag => linsys%res(ie)
@@ -333,7 +333,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
 !$omp do schedule(dynamic)
   do ie = 1,nst
 
-    call elems(ie)%p%build_row(elems,linsys,ie,nst+1,ntot)
+    call elems(ie)%p%build_row(elems,linsys,uinf,ie,nst+1,ntot)
 
   enddo
 !$omp end do nowait
@@ -342,7 +342,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
 !$omp do
   do ie = nst+1,ntot
 
-    call elems(ie)%p%build_row(elems,linsys,ie,1,ntot)
+    call elems(ie)%p%build_row(elems,linsys,uinf,ie,1,ntot)
 
   enddo
 !$omp end do
@@ -362,9 +362,9 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
 !$omp do schedule(dynamic)
   do ie = 1,nst
 
-    call elems(ie)%p%add_wake((/wake%pan_p, wake%rin_p/), wake%pan_gen_elems_id, linsys,ie,nst+1,ntot)
+    call elems(ie)%p%add_wake((/wake%pan_p, wake%rin_p/), wake%pan_gen_elems_id, linsys,uinf,ie,nst+1,ntot)
 
-    call elems(ie)%p%add_expl(expl_elems, linsys,ie,linsys%nstatic_expl+1,linsys%n_expl)
+    call elems(ie)%p%add_expl(expl_elems, linsys,uinf,ie,linsys%nstatic_expl+1,linsys%n_expl)
 
   enddo
 !$omp end do nowait
@@ -373,9 +373,9 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
 !$omp do
   do ie = nst+1,ntot
 
-    call elems(ie)%p%add_wake((/wake%pan_p, wake%rin_p/), wake%pan_gen_elems_id, linsys,ie,1,ntot)
+    call elems(ie)%p%add_wake((/wake%pan_p, wake%rin_p/), wake%pan_gen_elems_id, linsys,uinf,ie,1,ntot)
 
-    call elems(ie)%p%add_expl(expl_elems, linsys,ie,1,linsys%n_expl)
+    call elems(ie)%p%add_expl(expl_elems, linsys,uinf,ie,1,linsys%n_expl)
 
   enddo
 !$omp end do

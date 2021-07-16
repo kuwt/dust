@@ -131,9 +131,10 @@ end subroutine initialize_vortpart
 !! WARNING: the velocity calculated, to be consistent with the formulation of
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
-subroutine compute_vel_vortpart (this, pos, vel)
+subroutine compute_vel_vortpart (this, pos, uinf, vel)
  class(t_vortpart), intent(in) :: this
  real(wp), intent(in) :: pos(:)
+ real(wp), intent(in) :: uinf(3)
  real(wp), intent(out) :: vel(3)
 
  !real(wp) :: vvort(3)
@@ -166,9 +167,10 @@ end subroutine compute_vel_vortpart
 
 !----------------------------------------------------------------------
 
-subroutine compute_grad_vortpart(this, pos, grad)
+subroutine compute_grad_vortpart(this, pos, uinf, grad)
  class(t_vortpart), intent(in) :: this
  real(wp), intent(in) :: pos(:)
+ real(wp), intent(in) :: uinf(3)
  real(wp), intent(out) :: grad(3,3)
 
  grad = 0.0_wp

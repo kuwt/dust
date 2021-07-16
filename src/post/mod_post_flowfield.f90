@@ -355,7 +355,7 @@ do it = an_start, an_end, an_step ! Time history
         do ic = 1,size(comps) ! Loop on components
          do ie = 1 , size( comps(ic)%el ) ! Loop on elems of the comp
           call comps(ic)%el(ie)%compute_vel( (/ xbox(ix) , ybox(iy) , zbox(iz) /) , &
-                                               v )
+                                              u_inf , v )
           vel_probe = vel_probe + v/(4*pi)
          end do
         end do
@@ -364,7 +364,7 @@ do it = an_start, an_end, an_step ! Time history
         do ie = 1, size(wake_elems)
           call wake_elems(ie)%p%compute_vel( &
                    (/ xbox(ix) , ybox(iy) , zbox(iz) /) , &
-                    v )
+                   u_inf , v )
           vel_probe = vel_probe + v/(4*pi)
         enddo
 
