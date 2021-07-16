@@ -655,7 +655,7 @@ subroutine get_vort_vel_vortlatt(this, vort_elems)
  this%uvort = 0.0_wp
 
  do iv=1,size(vort_elems)
-   call vort_elems(iv)%p%compute_vel(this%cen, vel)
+   call vort_elems(iv)%p%compute_vel(this%cen, sim_param%u_inf, vel)
    this%uvort = this%uvort + vel/(4*pi)
  enddo
 
