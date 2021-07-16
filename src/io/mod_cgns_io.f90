@@ -157,7 +157,10 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
 !  Special case for 2d: if icelldim=2 we assume a pure 2d mesh with
 !  coordinates in x and y only (not a surface mesh in 3d)
 
-  if ((icelldim == 2) .and. (ndim > icelldim)) ndim = icelldim
+! Check.
+!So far it makes work a mesh done from surface cad (not from solid cad) 
+
+!  if ((icelldim == 2) .and. (ndim > icelldim)) ndim = icelldim
 
 !  Number of zones. Assume a zone is a region. Loop over the zones
 
