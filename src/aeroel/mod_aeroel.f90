@@ -405,12 +405,11 @@ end interface
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 abstract interface
-  subroutine i_compute_vel(this, pos, uinf, vel)
+  subroutine i_compute_vel(this, pos, vel)
     import :: c_elem , wp
     implicit none
     class(c_elem), intent(in) :: this
     real(wp), intent(in) :: pos(:)
-    real(wp), intent(in) :: uinf(3)
     real(wp), intent(out) :: vel(3)
   end subroutine
 end interface

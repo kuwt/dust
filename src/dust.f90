@@ -1028,6 +1028,7 @@ end if
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
   !  next iteration)
+
   t0 = dust_time()
   if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
     !   write(*,*) ' =================== call update_wake ==================== '

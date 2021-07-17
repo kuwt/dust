@@ -393,20 +393,22 @@ end subroutine compute_psi_vortlatt
 !! WARNING: the velocity calculated, to be consistent with the formulation of
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
-subroutine compute_vel_vortlatt(this, pos, uinf, vel)
+subroutine compute_vel_vortlatt(this, pos, vel)
 class(t_vortlatt), intent(in) :: this
 real(wp), intent(in) :: pos(:)
-real(wp), intent(in) :: uinf(3)
 real(wp), intent(out) :: vel(3)
 
 real(wp) :: vdou(3)
 
 
+!WRITE(*,*) "vel vortlatt"
+!WRITE(*,*) "pos ", pos
+!WRITE(*,*)
 ! doublet ---
 call velocity_calc_doublet(this, vdou, pos)
-
+!WRITE(*,*) "vdou ", vdou
 vel = vdou*this%mag
-
+!stop
 end subroutine compute_vel_vortlatt
 
 !----------------------------------------------------------------------
@@ -566,11 +568,11 @@ x0 = this%cen + (this%edge_vec(:,4)-this%edge_vec(:,2))/4.0_wp
 
 !=== Compute the velocity from all the elements ===
 do j = 1,size(wake_elems)  ! wake panels
-  call wake_elems(j)%p%compute_vel(x0,sim_param%u_inf,v)
+  call wake_elems(j)%p%compute_vel(x0,v)
   this%vel_ctr_pt = this%vel_ctr_pt + v
 enddo
 do j = 1,size(elems) ! body elements
-  call elems(j)%p%compute_vel(x0,sim_param%u_inf,v)
+  call elems(j)%p%compute_vel(x0,v)
   this%vel_ctr_pt = this%vel_ctr_pt + v
 enddo
 ! induced velocity on leading edge side
@@ -655,7 +657,7 @@ subroutine get_vort_vel_vortlatt(this, vort_elems)
  this%uvort = 0.0_wp
 
  do iv=1,size(vort_elems)
-   call vort_elems(iv)%p%compute_vel(this%cen, sim_param%u_inf, vel)
+   call vort_elems(iv)%p%compute_vel(this%cen, vel)
    this%uvort = this%uvort + vel/(4*pi)
  enddo
 

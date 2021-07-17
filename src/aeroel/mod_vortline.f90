@@ -121,10 +121,9 @@ end subroutine initialize_vortline
 !! WARNING: the velocity calculated, to be consistent with the formulation of
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
-subroutine compute_vel_vortline (this, pos, uinf, vel)
+subroutine compute_vel_vortline (this, pos, vel)
  class(t_vortline), intent(in) :: this
  real(wp), intent(in) :: pos(:)
- real(wp), intent(in) :: uinf(3)
  real(wp), intent(out) :: vel(3)
 
  real(wp) :: vdou(3)

@@ -333,7 +333,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 !$omp parallel do private(ie, v) reduction(+:vel_probe)
        do ie = 1 , size( comps(ic)%el )
 
-        call comps(ic)%el(ie)%compute_vel( rr_probes(:,ip) , u_inf , v )
+        call comps(ic)%el(ie)%compute_vel( rr_probes(:,ip) , v )
         vel_probe = vel_probe + v/(4*pi)
 
        end do
@@ -343,7 +343,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 
 !$omp parallel do private( ie, v) reduction(+:vel_probe)
       do ie = 1, size(wake_elems)
-        call wake_elems(ie)%p%compute_vel( rr_probes(:,ip) , u_inf , v )
+        call wake_elems(ie)%p%compute_vel( rr_probes(:,ip) , v )
         vel_probe = vel_probe + v/(4*pi)
       enddo
 !$omp end parallel do

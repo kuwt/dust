@@ -735,10 +735,9 @@ end subroutine compute_psi_surfpan
 !! WARNING: the velocity calculated, to be consistent with the formulation of
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
-subroutine compute_vel_surfpan(this, pos , uinf, vel )
+subroutine compute_vel_surfpan(this, pos, vel )
   class(t_surfpan), intent(in) :: this
   real(wp), intent(in) :: pos(:)
-  real(wp), intent(in) :: uinf(3)
   real(wp), intent(out) :: vel(3)
 
   real(wp) :: vdou(3) , vsou(3)
@@ -750,7 +749,7 @@ subroutine compute_vel_surfpan(this, pos , uinf, vel )
   ! source ----
   call velocity_calc_sou_surfpan(this, vsou, pos)
 
-  vel = vdou*this%mag - vsou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
+  vel = vdou*this%mag - vsou*( sum(this%nor*(this%ub-sim_param%u_inf-this%uvort)) )
   ! vel = - vsou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
 
 end subroutine compute_vel_surfpan
@@ -1205,7 +1204,7 @@ subroutine get_vort_vel_surfpan(this, vort_elems)
  this%uvort = 0.0_wp
 
  do iv=1,size(vort_elems)
-   call vort_elems(iv)%p%compute_vel(this%cen, sim_param%u_inf, vel)
+   call vort_elems(iv)%p%compute_vel(this%cen, vel)
    this%uvort = this%uvort + vel/(4*pi)
  enddo
 
