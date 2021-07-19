@@ -183,7 +183,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
 
     !build one row
     call elems(ie)%p%build_row_static(elems, expl_elems, linsys, &
-                                      uinf, ie, 1, linsys%nstatic)
+                                      ie, 1, linsys%nstatic)
   enddo
 !$omp end parallel do
 
@@ -333,7 +333,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
 !$omp do schedule(dynamic)
   do ie = 1,nst
 
-    call elems(ie)%p%build_row(elems,linsys,uinf,ie,nst+1,ntot)
+    call elems(ie)%p%build_row(elems,linsys,ie,nst+1,ntot)
 
   enddo
 !$omp end do nowait
@@ -342,7 +342,7 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
 !$omp do
   do ie = nst+1,ntot
 
-    call elems(ie)%p%build_row(elems,linsys,uinf,ie,1,ntot)
+    call elems(ie)%p%build_row(elems,linsys,ie,1,ntot)
 
   enddo
 !$omp end do

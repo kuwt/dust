@@ -131,11 +131,10 @@ contains
 !! Only the dynamic part of the linear system is actually built here:
 !! the rest of the system was already built in the \ref build_row_static
 !! subroutine.
-subroutine build_row_vortlatt(this, elems, linsys, uinf, ie, ista, iend)
+subroutine build_row_vortlatt(this, elems, linsys, ie, ista, iend)
  class(t_vortlatt), intent(inout) :: this
  type(t_impl_elem_p), intent(in)  :: elems(:)
  type(t_linsys), intent(inout)    :: linsys
- real(wp), intent(in)             :: uinf(:)
  integer, intent(in)              :: ie
  integer, intent(in)              :: ista, iend
 
@@ -147,7 +146,7 @@ subroutine build_row_vortlatt(this, elems, linsys, uinf, ie, ista, iend)
     do j1 = 1,ista-1
 
       linsys%b(ie) = linsys%b(ie) +  &
-          linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-uinf-elems(j1)%p%uvort))
+          linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-sim_param%u_inf-elems(j1)%p%uvort))
     enddo
 
   ! ista and iend will be the end of the unknowns vector, containing
@@ -160,12 +159,12 @@ subroutine build_row_vortlatt(this, elems, linsys, uinf, ie, ista, iend)
     if (ie .eq. j1) then
       !diagonal, we are certainly employing vortrin, enforce the b.c. on ie
       linsys%b(ie) = linsys%b(ie) + &
-                b1*sum(elems(ie)%p%nor*(elems(ie)%p%ub-uinf-elems(j1)%p%uvort))
+                b1*sum(elems(ie)%p%nor*(elems(ie)%p%ub-sim_param%u_inf-elems(j1)%p%uvort))
     else
       ! off-diagonal: if it is a vortrin b1 is zero, if it is a surfpan
       ! enforce the boundary condition on it (j1)
       linsys%b(ie) = linsys%b(ie) + &
-                b1*sum(elems(j1)%p%nor*(elems(j1)%p%ub-uinf-elems(j1)%p%uvort))
+                b1*sum(elems(j1)%p%nor*(elems(j1)%p%ub-sim_param%u_inf-elems(j1)%p%uvort))
     endif
 
   end do
@@ -181,12 +180,11 @@ end subroutine build_row_vortlatt
 !! called just once at the beginning of the simulation, and saves the AIC
 !! coefficients for te static part and the static contribution to the rhs
 subroutine build_row_static_vortlatt(this, elems, expl_elems, linsys, &
-                                  uinf, ie, ista, iend)
+                                  ie, ista, iend)
 class(t_vortlatt), intent(inout) :: this
 type(t_impl_elem_p), intent(in)       :: elems(:)
 type(t_expl_elem_p), intent(in)       :: expl_elems(:)
 type(t_linsys), intent(inout)    :: linsys
-real(wp), intent(in)             :: uinf(:)
 integer, intent(in)              :: ie
 integer, intent(in)              :: ista, iend
 

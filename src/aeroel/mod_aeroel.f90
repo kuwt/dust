@@ -247,7 +247,7 @@ end type c_expl_elem
 !! The static part od the rhs should already be initialized, and the
 !! moving contribution is just added to the static one.
 abstract interface
-  subroutine i_build_row(this, elems, linsys, uinf, ie, ista, iend)
+  subroutine i_build_row(this, elems, linsys, ie, ista, iend)
     import :: wp
     import :: c_impl_elem
     import :: t_impl_elem_p
@@ -256,7 +256,6 @@ abstract interface
     class(c_impl_elem), intent(inout)  :: this
     type(t_impl_elem_p), intent(in)    :: elems(:)
     type(t_linsys), intent(inout) :: linsys
-    real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
     integer, intent(in)           :: ista, iend
   end subroutine
@@ -281,7 +280,7 @@ end interface
 !! should be the static ones ordered at the beginning of the array
 abstract interface
   subroutine i_build_row_static(this, elems, expl_elems, linsys, &
-                                uinf, ie, ista, iend)
+                                ie, ista, iend)
     import :: wp
     import :: c_impl_elem
     import :: t_impl_elem_p
@@ -292,7 +291,6 @@ abstract interface
     type(t_impl_elem_p), intent(in)    :: elems(:)
     type(t_expl_elem_p), intent(in)    :: expl_elems(:)
     type(t_linsys), intent(inout) :: linsys
-    real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
     integer, intent(in)           :: ista, iend
   end subroutine

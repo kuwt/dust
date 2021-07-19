@@ -385,11 +385,10 @@ end subroutine gradient_calc_sou_surfpan
 !! Only the dynamic part of the linear system is actually built here:
 !! the rest of the system was already built in the \ref build_row_static
 !! subroutine.
-subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
+subroutine build_row_surfpan(this, elems, linsys, ie, ista, iend)
  class(t_surfpan), intent(inout) :: this
  type(t_impl_elem_p), intent(in)      :: elems(:)
  type(t_linsys), intent(inout)   :: linsys
- real(wp), intent(in)            :: uinf(:)
  integer, intent(in)             :: ie
  integer, intent(in)             :: ista, iend
 
@@ -411,7 +410,7 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
   do j1 = 1,ista-1
 
     linsys%b(ie) = linsys%b(ie) + &
-          linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-uinf-elems(j1)%p%uvort))
+          linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-sim_param%u_inf-elems(j1)%p%uvort))
   enddo
 
   ! + Bernoulli polynomial equation --------------
@@ -433,7 +432,7 @@ subroutine build_row_surfpan(this, elems, linsys, uinf, ie, ista, iend)
     ! + \phi equation ----------------------------
     !Add the contribution to the rhs with the
     linsys%b(ie) = linsys%b(ie) &
-              + b1* sum(elems(j1)%p%nor*(elems(j1)%p%ub-uinf-elems(j1)%p%uvort))
+              + b1* sum(elems(j1)%p%nor*(elems(j1)%p%ub-sim_param%u_inf-elems(j1)%p%uvort))
 
     ! + Bernoulli polynomial equation ------------
     !Add the contribution to the rhs
@@ -459,12 +458,11 @@ end subroutine build_row_surfpan
 !! called just once at the beginning of the simulation, and saves the AIC
 !! coefficients for te static part and the static contribution to the rhs
 subroutine build_row_static_surfpan(this, elems, expl_elems, linsys, &
-                                    uinf, ie, ista, iend)
+                                    ie, ista, iend)
  class(t_surfpan), intent(inout) :: this
  type(t_impl_elem_p), intent(in)      :: elems(:)
  type(t_expl_elem_p), intent(in)      :: expl_elems(:)
  type(t_linsys), intent(inout)   :: linsys
- real(wp), intent(in)            :: uinf(:)
  integer, intent(in)             :: ie
  integer, intent(in)             :: ista, iend
 
