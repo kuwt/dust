@@ -1368,19 +1368,19 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
         stretch_elem = 0.0_wp
         ! Influence of the body elements
         do ie=1,size(elem)
-          call elem(ie)%p%compute_grad(pos, sim_param%u_inf, grad_elem)
+          call elem(ie)%p%compute_grad(pos, grad_elem)
           stretch_elem = stretch_elem + &
               matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
         enddo
         ! Influence of the wake panels
         do ie=1,size(wpan)
-          call wpan(ie)%p%compute_grad(pos, sim_param%u_inf, grad_elem)
+          call wpan(ie)%p%compute_grad(pos, grad_elem)
           stretch_elem = stretch_elem + &
               matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
         enddo
         ! Influence of the end vortex
         do ie=1,size(wvort)
-          call wvort(ie)%compute_grad(pos, sim_param%u_inf, grad_elem)
+          call wvort(ie)%compute_grad(pos, grad_elem)
           stretch_elem = stretch_elem + &
               matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
         enddo

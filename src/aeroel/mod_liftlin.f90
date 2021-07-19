@@ -236,11 +236,10 @@ end subroutine compute_vel_liftlin
 !! WARNING: the velocity calculated, to be consistent with the formulation of
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
-subroutine compute_grad_liftlin (this, pos, uinf, grad)
+subroutine compute_grad_liftlin (this, pos, grad)
  class(t_liftlin), intent(in) :: this
  real(wp), intent(in) :: pos(:)
 
- real(wp), intent(in) :: uinf(3)
  real(wp), intent(out) :: grad(3,3)
 
  real(wp) :: grad_dou(3,3)

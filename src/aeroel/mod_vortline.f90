@@ -169,10 +169,9 @@ end subroutine compute_vel_vortline
 
 !----------------------------------------------------------------------
 
-subroutine compute_grad_vortline(this, pos, uinf, grad)
+subroutine compute_grad_vortline(this, pos, grad)
  class(t_vortline), intent(in) :: this
  real(wp), intent(in) :: pos(:)
- real(wp), intent(in) :: uinf(3)
  real(wp), intent(out) :: grad(3,3)
 
  integer  :: i1 , i2

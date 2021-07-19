@@ -166,10 +166,9 @@ end subroutine compute_vel_vortpart
 
 !----------------------------------------------------------------------
 
-subroutine compute_grad_vortpart(this, pos, uinf, grad)
+subroutine compute_grad_vortpart(this, pos, grad)
  class(t_vortpart), intent(in) :: this
  real(wp), intent(in) :: pos(:)
- real(wp), intent(in) :: uinf(3)
  real(wp), intent(out) :: grad(3,3)
 
  grad = 0.0_wp
