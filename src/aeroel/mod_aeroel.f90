@@ -313,7 +313,7 @@ end interface
 !! The stationary part is updated once at the beginning of the simulation
 !! while the moving one is updated each timestep
 abstract interface
-  subroutine i_add_wake(this, wake_elems, impl_wake_ind, linsys, uinf, &
+  subroutine i_add_wake(this, wake_elems, impl_wake_ind, linsys, &
                         ie, ista, iend)
     import :: wp
     import :: c_impl_elem
@@ -324,7 +324,6 @@ abstract interface
     type(t_pot_elem_p), intent(in)    :: wake_elems(:)
     integer, intent(in)           :: impl_wake_ind(:,:)
     type(t_linsys), intent(inout) :: linsys
-    real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
     integer, intent(in)           :: ista
     integer, intent(in)           :: iend
@@ -342,7 +341,7 @@ end interface
 !! and just retrieved, while the contribution due to the moving components
 !! is calculated and added
 abstract interface
-  subroutine i_add_expl(this, expl_elems, linsys, uinf, &
+  subroutine i_add_expl(this, expl_elems, linsys, &
                         ie, ista, iend)
     import :: wp
     import :: c_impl_elem
@@ -352,7 +351,6 @@ abstract interface
     class(c_impl_elem), intent(inout)  :: this
     type(t_expl_elem_p), intent(in)    :: expl_elems(:)
     type(t_linsys), intent(inout) :: linsys
-    real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
     integer, intent(in)           :: ista
     integer, intent(in)           :: iend

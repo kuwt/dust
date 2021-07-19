@@ -215,10 +215,9 @@ subroutine compute_grad_actdisk (this, pos, grad)
 end subroutine compute_grad_actdisk
 
 !----------------------------------------------------------------------
-subroutine compute_cp_actdisk (this, elems, uinf)
+subroutine compute_cp_actdisk (this, elems)
  class(t_actdisk), intent(inout) :: this
  type(t_elem_p), intent(in) :: elems(:)
- real(wp), intent(in) :: uinf(:)
 
  character(len=*), parameter      :: this_sub_name='compute_cp_actdisk'
 

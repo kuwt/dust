@@ -513,13 +513,12 @@ end subroutine build_row_static_surfpan
 !!
 !! The rhs of the equation for a surface panel is updated  adding the
 !! the contribution of potential due to the wake
-subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, uinf, &
+subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
                             ie,ista, iend)
  class(t_surfpan), intent(inout) :: this
  type(t_pot_elem_p), intent(in)      :: wake_elems(:)
  integer, intent(in)             :: impl_wake_ind(:,:)
  type(t_linsys), intent(inout)   :: linsys
- real(wp), intent(in)            :: uinf(:)
  integer, intent(in)             :: ie
  integer, intent(in)             :: ista
  integer, intent(in)             :: iend
@@ -628,12 +627,11 @@ end subroutine correct_pressure_kutta_surfpan
 !!
 !! The rhs of the equation for a surface panel is updated  adding the
 !! the contribution of potential due to the lifting lines
-subroutine add_expl_surfpan(this, expl_elems, linsys, uinf, &
+subroutine add_expl_surfpan(this, expl_elems, linsys, &
                             ie,ista, iend)
  class(t_surfpan), intent(inout) :: this
  type(t_expl_elem_p), intent(in)      :: expl_elems(:)
  type(t_linsys), intent(inout)   :: linsys
- real(wp), intent(in)            :: uinf(:)
  integer, intent(in)             :: ie
  integer, intent(in)             :: ista
  integer, intent(in)             :: iend

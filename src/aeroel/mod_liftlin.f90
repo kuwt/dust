@@ -255,10 +255,9 @@ end subroutine compute_grad_liftlin
 
 !----------------------------------------------------------------------
 
-subroutine compute_cp_liftlin (this, elems, uinf)
+subroutine compute_cp_liftlin (this, elems)
  class(t_liftlin), intent(inout) :: this
  type(t_elem_p), intent(in) :: elems(:)
- real(wp), intent(in) :: uinf(:)
 
  character(len=*), parameter      :: this_sub_name='compute_cp_liftlin'
 
