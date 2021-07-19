@@ -76,6 +76,9 @@ use mod_c81, only: &
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
+  
+use mod_wind, only: &
+  variable_wind
 !----------------------------------------------------------------------
 
 implicit none
@@ -496,7 +499,6 @@ subroutine solve_liftlin_piszkin( &
   ! adaptive ll regularisation
   adaptive_reg = sim_param%llArtificialViscosityAdaptive
 
-  uinf = sim_param%u_inf
 
   !> allocate and fill Gamma_old array of the ll intensity at previous dt
   allocate(Gamma_old(size(elems_ll)))
@@ -569,10 +571,11 @@ subroutine solve_liftlin_piszkin( &
   ! Remove the "out-of-plane" component of the relative velocity:
   ! 2d-velocity to enter the airfoil look-up-tables
   ! IS THIS LOOP USED? (u_v) seems to be overwritten few lines down)
-!$omp parallel do private(i_l, el) schedule(dynamic,4)
+!$omp parallel do private(i_l, el, uinf) schedule(dynamic,4)
   do i_l=1,size(elems_ll)
    !select type(el => elems_ll(i_l)%p)
    !type is(t_liftlin)
+   uinf = variable_wind(el%cen,sim_param%time)
      el => elems_ll(i_l)%p
      u_v(i_l) = norm2((uinf-el%ub) - &
          el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
@@ -621,7 +624,7 @@ subroutine solve_liftlin_piszkin( &
 
     ! === Update LL intensity ===
 !$omp parallel do private(i_l, el, j, v, vel, up, unorm, alpha, alpha_avg, alpha_2d, mach, &
-!$omp& reynolds, aero_coeff, cl) schedule(dynamic,4)
+!$omp& reynolds, aero_coeff, cl, uinf) schedule(dynamic,4)
     do i_l = 1,size(elems_ll)
 
       !select type(el => elems_ll(i_l)%p) ; type is(t_liftlin)
@@ -631,6 +634,7 @@ subroutine solve_liftlin_piszkin( &
         alpha_avg = alpha_avg_v(i_l) ! * 180.0_wp/pi
 
         ! overall relative velocity computed in the centre of the ll elem
+        uinf = variable_wind(el%cen,sim_param%time)
         vel = ui_v(i_l,:) + uinf - el%ub + vel_w(:,i_l)
         ! "effective" velocity = proj. of vel in the n-t plane
         !!! up =  el%nor*sum(el%nor*vel) + el%tang_cen*sum(el%tang_cen*vel)
@@ -667,7 +671,7 @@ subroutine solve_liftlin_piszkin( &
 
     ! === Update AOA and velocity ===
 !$omp parallel do private(i_l, el, j, v, vel, up, unorm, alpha, alpha_2d, mach, &
-!$omp& reynolds, aero_coeff, cl) schedule(dynamic,4)
+!$omp& reynolds, aero_coeff, cl, uinf) schedule(dynamic,4)
     do i_l = 1,size(elems_ll)
 
       ! compute velocity
@@ -682,6 +686,7 @@ subroutine solve_liftlin_piszkin( &
       el => elems_ll(i_l)%p
 
         ! overall relative velocity computed in the centre of the ll elem
+        uinf = variable_wind(el%cen,sim_param%time)
         vel = vel/(4.0_wp*pi) + uinf - el%ub + vel_w(:,i_l)
         ! "effective" velocity = proj. of vel in the n-t plane
         up =  el%nor*sum(el%nor*vel) + el%tang_cen*sum(el%tang_cen*vel)
@@ -937,7 +942,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   ! param for load computation
   load_avl   = sim_param%llLoadsAVL
 
-  uinf = sim_param%u_inf
 
   !> allocate and fill Gamma_old array of the ll intensity at previous dt
   allocate(Gamma_old(size(elems_ll)))
@@ -1004,11 +1008,12 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   ! Remove the "out-of-plane" component of the relative velocity:
   ! 2d-velocity to enter the airfoil look-up-tables
   ! IS THIS LOOP USED? (u_v) seems to be overwritten few lines down)
-!$omp parallel do private(i_l, el) schedule(dynamic,4)
+!$omp parallel do private(i_l, el, uinf) schedule(dynamic,4)
   do i_l=1,size(elems_ll)
    !select type(el => elems_ll(i_l)%p)
    !type is(t_liftlin)
      el => elems_ll(i_l)%p
+     uinf = variable_wind(el%cen,sim_param%time)
      u_v(i_l) = norm2((uinf-el%ub) - &
          el%bnorm_cen*sum(el%bnorm_cen*(uinf-el%ub)))
      el%vel_2d_isolated = norm2((uinf-el%ub) - &
@@ -1024,7 +1029,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     diff = 0.0_wp             ! max diff ("norm \infty")
     max_mag_ll = 0.0_wp
 !$omp parallel do private(i_l, el, j, v, vel, up, unorm, alpha, alpha_2d, mach, &
-!$omp& reynolds, aero_coeff, cl) schedule(dynamic,4)
+!$omp& reynolds, aero_coeff, cl, uinf) schedule(dynamic,4)
     do i_l = 1,size(elems_ll)
 
       ! compute velocity
@@ -1038,6 +1043,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       el => elems_ll(i_l)%p
 
         ! overall relative velocity computed in the centre of the ll elem
+        uinf = variable_wind(el%cen,sim_param%time)
         vel = vel/(4.0_wp*pi) + uinf - el%ub + vel_w(:,i_l)
         ! "effective" velocity = proj. of vel in the n-t plane
         up =  el%nor*sum(el%nor*vel) + el%tang_cen*sum(el%tang_cen*vel)
@@ -1338,7 +1344,7 @@ subroutine get_vel_ctr_pt_liftlin(this, elems, wake_elems)
  type(t_pot_elem_p),intent(in):: elems(:)
  type(t_pot_elem_p),intent(in):: wake_elems(:)
 
- real(wp) :: v(3),x0(3)
+ real(wp) :: v(3),x0(3), uinf(3)
  integer :: j
 
  ! Initialisation to zero
@@ -1362,8 +1368,9 @@ subroutine get_vel_ctr_pt_liftlin(this, elems, wake_elems)
 
  enddo
 
+ uinf = variable_wind(this%ctr_pt, sim_param%time)
  this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp*pi) &
-               + sim_param%u_inf + this%uvort - this%ub
+               + uinf + this%uvort - this%ub
 
  this%al_ctr_pt = atan2( sum(this%vel_ctr_pt * this%nor     ) , &
                          sum(this%vel_ctr_pt * this%tang_cen) )

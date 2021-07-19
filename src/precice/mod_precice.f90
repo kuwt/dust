@@ -78,6 +78,9 @@ use mod_liftlin, only: &
 
 use mod_hinges, only: &
     t_hinge
+    
+use mod_wind, only: &
+  variable_wind
 
 implicit none
 
