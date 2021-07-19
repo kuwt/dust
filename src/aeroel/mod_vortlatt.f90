@@ -400,15 +400,11 @@ real(wp), intent(out) :: vel(3)
 
 real(wp) :: vdou(3)
 
-
-!WRITE(*,*) "vel vortlatt"
-!WRITE(*,*) "pos ", pos
-!WRITE(*,*)
 ! doublet ---
 call velocity_calc_doublet(this, vdou, pos)
-!WRITE(*,*) "vdou ", vdou
+
 vel = vdou*this%mag
-!stop
+
 end subroutine compute_vel_vortlatt
 
 !----------------------------------------------------------------------

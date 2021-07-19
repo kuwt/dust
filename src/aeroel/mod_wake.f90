@@ -893,7 +893,7 @@ subroutine update_wake(wake, elems, octree)
   !if(wake%pan_wake_len .lt. wake%nmax_pan) np = np + 1
   if(.not.wake%full_panels) np = np + 1
 
-!!$omp parallel do collapse(2) private(pos_p, vel_p, ie, ipan, iw) schedule(dynamic)
+!$omp parallel do collapse(2) private(pos_p, vel_p, ie, ipan, iw) schedule(dynamic)
   do ipan = 3,np
     do iw = 1,wake%n_pan_points
       pos_p = point_old(:,iw,ipan-1)
@@ -918,7 +918,7 @@ subroutine update_wake(wake, elems, octree)
       end if
     enddo
   enddo
-!!$omp end parallel do
+!$omp end parallel do
 
   !if the wake is full, calculate another row of points to generate the
   !particles
@@ -926,7 +926,7 @@ subroutine update_wake(wake, elems, octree)
     if(.not.allocated(points_end)) allocate(points_end(3,wake%n_pan_points))
 
     ! create another row of points
-!!$omp parallel do private(iw, pos_p, vel_p) schedule(dynamic)
+!$omp parallel do private(iw, pos_p, vel_p) schedule(dynamic)
     do iw = 1,wake%n_pan_points
       pos_p = point_old(:,iw,wake%pan_wake_len+1)
       vel_p = 0.0_wp
@@ -939,7 +939,7 @@ subroutine update_wake(wake, elems, octree)
       !update the position in time
       points_end(:,iw) = pos_p + vel_p*sim_param%dt*sim_param%ndt_update_wake
     enddo
-!!$omp end parallel do
+!$omp end parallel do
   endif
 
 
@@ -979,7 +979,7 @@ subroutine update_wake(wake, elems, octree)
   !calculate the velocities at the old positions of the points and then
   !update the positions
 
-!!$omp parallel do private(pos_p, vel_p, ip, ir)
+!$omp parallel do private(pos_p, vel_p, ip, ir)
   do ip = 1,size(points,2)
     do ir = 1,size(points,3)
       pos_p = points(:,ip,ir)
@@ -992,7 +992,7 @@ subroutine update_wake(wake, elems, octree)
                         vel_p*sim_param%dt*sim_param%ndt_update_wake
     enddo !ir
   enddo !ip
-!!$omp end parallel do
+!$omp end parallel do
 
   !if the wake is full, calculate another row of points to generate the
   !particles
@@ -1037,7 +1037,7 @@ subroutine update_wake(wake, elems, octree)
   !==>    Particles: evolve the position in time
 
   !calculate the velocities at the points
-!!$omp parallel do private(pos_p, vel_p, ip, iq,  stretch, diff, df, str, ru, rotu)
+!$omp parallel do private(pos_p, vel_p, ip, iq,  stretch, diff, df, str, ru, rotu)
   do ip = 1, wake%n_prt
     wake%part_p(ip)%p%vel_old = wake%part_p(ip)%p%vel
     wake%part_p(ip)%p%stretch_old = wake%part_p(ip)%p%stretch
@@ -1102,7 +1102,7 @@ subroutine update_wake(wake, elems, octree)
 
 
   enddo
-!!$omp end parallel do
+!$omp end parallel do
 
   if (sim_param%use_fmm) then
     t0 = dust_time()
@@ -1323,7 +1323,7 @@ subroutine complete_wake(wake, geo, elems)
   !==> Particles: update the position and intensity in time, avoid penetration
   !               and chech if remain into the boundaries
   n_part = wake%n_prt
-!!$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n,vel_in,vel_out)
+!$omp parallel do schedule(dynamic,4) private(ip,pos_p,alpha_p,alpha_p_n,vel_in,vel_out)
   do ip = 1, n_part
     !if(sim_param%HCAS) then
     !  hcas_reltime = (sim_param%time-sim_param%t0)/sim_param%hcas_time
@@ -1370,16 +1370,16 @@ subroutine complete_wake(wake, geo, elems)
         endif
       else
         wake%part_p(ip)%p%free = .true.
-!!$omp atomic update
+!$omp atomic update
         wake%n_prt = wake%n_prt -1
-!!$omp end atomic
+!$omp end atomic
       endif
     endif
     !nullify(wake%part_p(ip)%p%npos)
     !nullify(wake%part_p(ip)%p%vel)
     !if(sim_param%use_vs) nullify(wake%part_p(ip)%p%stretch)
   enddo
-!!$omp end parallel do
+!$omp end parallel do
 
   !==> Particles: if the panel wake is at the end, create a particle
   if(wake%full_panels) then
