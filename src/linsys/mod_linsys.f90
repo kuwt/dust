@@ -116,7 +116,6 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
  !type(t_wake_panels), intent(inout) :: wake_elems
  !type(t_wake_rings), intent(inout) :: wake_rings
  type(t_wake), intent(inout) :: wake
- real(wp) :: uinf(3)
  real(wp) :: rhoinf , Pinf
  integer :: ie, ntot, info, nst, i, j
 
@@ -125,7 +124,6 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, &
 
 
   ! Free-stream conditions
-  uinf   = sim_param%u_inf
   Pinf   = sim_param%P_inf
   rhoinf = sim_param%rho_inf
 
@@ -304,13 +302,11 @@ subroutine assemble_linsys(linsys, geo, elems,  expl_elems, &
  !type(t_wake_rings), intent(in) ::  wake_rings
  type(t_wake), intent(in) ::  wake
 !real(wp), intent(in) :: uinf(:)
- real(wp) :: uinf(3)
  real(wp) :: rhoinf , Pinf
 
  integer :: ie, nst, ntot
 
  ! Free-stream conditions
- uinf   = sim_param%u_inf
  Pinf   = sim_param%P_inf
  rhoinf = sim_param%rho_inf
 
