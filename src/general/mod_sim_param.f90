@@ -250,6 +250,17 @@ type t_sim_param
     !> Reset the time after restart
     logical :: reset_time
 
+  !Variable wind
+  !> Gust 
+  logical :: use_gust
+  !> Gust type
+  character(len=max_char_len) :: GustType
+  !> Gust parameters
+  real(wp) :: gust_origin(3)
+  real(wp) :: gust_direction(3)
+  real(wp) :: gust_u_ds
+  real(wp) :: gust_gradient
+
 contains
 
   procedure, pass(this) :: save_param => save_sim_param

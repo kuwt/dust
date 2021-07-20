@@ -407,6 +407,14 @@ call prms%CreateLogicalOption('HCAS','Hover Convergence Augmentation System',&
 call prms%CreateRealOption('HCAS_time','HCAS deployment time')
 call prms%CreateRealArrayOption('HCAS_velocity','HCAS velocity')
 
+! variable_wind
+call prms%CreateLogicalOption('Gust','Gust perturbation','F')
+call prms%CreateStringOption('GustType','Gust model','AMC')
+call prms%CreateRealArrayOption('GustOrigin','Gust origin point')
+call prms%CreateRealArrayOption('GustDirection','Gust direction vector')
+call prms%CreateRealOption('GustUDS','Gust design velocity')
+call prms%CreateRealOption('GustGradient','Gust gradient')
+
 ! get the parameters and print them out
 call printout(nl//'====== Input parameters: ======')
 call check_file_exists(input_file_name,'dust main')
@@ -1329,6 +1337,16 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     sim_param%hcas_time = getreal(prms,'HCAS_time')
     sim_param%hcas_vel = getrealarray(prms,'HCAS_velocity',3)
   endif
+
+  !variable_wind
+  sim_param%use_gust = getlogical(prms, 'Gust')
+  if(sim_param%use_gust) then
+    sim_param%GustType = getstr(prms,'GustType')
+    sim_param%gust_origin = getrealarray(prms, 'GustOrigin',3)
+    sim_param%gust_direction = getrealarray(prms, 'GustDirection',3)
+    sim_param%gust_u_ds = getreal(prms,'GustUDS')
+    sim_param%gust_gradient = getreal(prms,'GustGradient')
+  end if
 
   !Manage restart
   sim_param%restart_from_file = getlogical(prms,'restart_from_file')
