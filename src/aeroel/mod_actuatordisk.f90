@@ -296,11 +296,10 @@ end subroutine update_actdisk
 !----------------------------------------------------------------------
 
 !TODO: is this really necessary?
-subroutine solve_actdisk(elems_ll, elems_tot, elems_wake,  uinf, airfoil_data)
+subroutine solve_actdisk(elems_ll, elems_tot, elems_wake, airfoil_data)
  type(t_expl_elem_p), intent(inout) :: elems_ll(:)
  type(t_elem_p), intent(in)    :: elems_tot(:)
  type(t_elem_p), intent(in)    :: elems_wake(:)
- real(wp), intent(in)          :: uinf(3)
  type(t_aero_tab),  intent(in) :: airfoil_data(:)
 
 end subroutine solve_actdisk
