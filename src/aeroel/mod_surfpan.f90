@@ -574,13 +574,12 @@ end subroutine add_wake_surfpan
 ! This routine removes the extra terms added in add_wake_surfpan.
 ! -> OBS: the input IE is already the panel id in the surfpan numeration
 subroutine correct_pressure_kutta_surfpan(this, wake_elems, impl_wake_ind, &
-                 linsys, uinf, ie,ista, iend)
+                 linsys, ie,ista, iend)
 
  class(t_surfpan), intent(inout) :: this
  type(t_pot_elem_p), intent(in)      :: wake_elems(:)
  integer, intent(in)             :: impl_wake_ind(:,:)
  type(t_linsys), intent(inout)   :: linsys
- real(wp), intent(in)            :: uinf(:)
  integer, intent(in)             :: ie
  integer, intent(in)             :: ista
  integer, intent(in)             :: iend
