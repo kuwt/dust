@@ -92,6 +92,9 @@ use mod_vtk_out, only: &
 use mod_post_load, only: &
   load_refs , load_res, load_wake_post
 
+use mod_wind, only: &
+  variable_wind
+
 implicit none
 
 public :: post_flowfield
@@ -369,7 +372,8 @@ do it = an_start, an_end, an_step ! Time history
         enddo
 
         ! + u_inf
-        vel_probe = vel_probe + u_inf
+        
+        vel_probe = vel_probe + variable_wind((/ xbox(ix) , ybox(iy) , zbox(iz) /), t)
 
 
       end if
@@ -383,6 +387,7 @@ do it = an_start, an_end, an_step ! Time history
         ! rho * dphi/dt + P + 0.5*rho*V^2 = P_infty + 0.5*rho*V_infty^2
         !TODO: add:
         ! - add the unsteady term: -rho*dphi/dt
+        !WIND TODO
         pres_probe = P_inf + 0.5_wp*rho*norm2(u_inf)**2 - 0.5_wp*rho*norm2(vel_probe)**2
         vars(i_var_v+1,ipp) = pres_probe
 

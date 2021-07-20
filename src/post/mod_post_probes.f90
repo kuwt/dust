@@ -94,7 +94,8 @@ use mod_tecplot_out, only: &
 use mod_dat_out, only: &
   dat_out_probes_header
 
-
+use mod_wind, only: &
+  variable_wind
 
 implicit none
 
@@ -348,7 +349,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
       enddo
 !$omp end parallel do
 
-      vel_probe = vel_probe + u_inf
+      vel_probe = vel_probe + variable_wind(rr_probes(:,ip), t)
     end if
 
     if(probe_vel) then

@@ -68,6 +68,8 @@ use mod_vortpart, only: &
 use mod_multipole, only: &
   t_multipole, t_polyexp, t_ker_der, set_multipole_param
 
+use mod_wind, only: &
+  variable_wind
 !----------------------------------------------------------------------
 
 implicit none
@@ -1360,7 +1362,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       enddo
 
       !at last, add the free stream velocity
-      vel = vel + sim_param%u_inf
+      vel = vel + variable_wind(pos, sim_param%time)
       octree%leaves(lv)%p%cell_parts(ip)%p%vel = vel
 
       !> Vortex stretching from other elements

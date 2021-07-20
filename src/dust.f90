@@ -148,6 +148,9 @@ use mod_octree, only: &
           t_precice
 #endif
 
+use mod_wind, only: &
+  variable_wind
+
 implicit none
 
 !run-id
@@ -1549,7 +1552,7 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
           f(n_neigh) = - ( el%neigh(i_e)%p%mag - el%mag )
         end if
       end do
-      f(n_neigh+1) = sum(el%nor * (-sim_param%u_inf - el%uvort + el%ub) )
+      f(n_neigh+1) = sum(el%nor * (-variable_wind(el%cen, sim_param%time) - el%uvort + el%ub) )
       vel_phi(:,ie) = matmul( el%chtls_stencil , f(1:n_neigh+1) )
 
 

@@ -104,6 +104,9 @@ use mod_octree, only: &
 
 !$ use omp_lib, only: &
 !$   omp_get_thread_num, omp_get_num_threads
+
+use mod_wind, only: &
+  variable_wind
 !----------------------------------------------------------------------
 
 implicit none
@@ -316,7 +319,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
  integer :: iw, ip, nsides
  integer :: ic, nad, ie, npt, id, ir, nend
  integer :: p1, p2
- real(wp) :: dist(3) , vel_te(3)
+ real(wp) :: dist(3) , vel_te(3), wind(3)
 
 ! real(wp) , parameter :: te_min_v = 1.0_wp ! hard-coded
 ! replaced with sim_param%min_vel_at_te
@@ -470,13 +473,14 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
             geo%refs(wake%pan_gen_ref(ip))%G_g, &
             geo%refs(wake%pan_gen_ref(ip))%f_g, &
             vel_te )
-    if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
+    wind = variable_wind(wake%w_start_points(:,ip), sim_param%time)        
+    if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
 
       dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
 
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                   dist*wake%pan_gen_scaling(ip)* &
-                  norm2(sim_param%u_inf-vel_te)* &
+                  norm2(wind-vel_te)* &
                   sim_param%dt*sim_param%ndt_update_wake / norm2(dist)
   ! normalisation occurs here! --------------------------------------^
 
@@ -1262,7 +1266,7 @@ subroutine complete_wake(wake, geo, elems)
  real(wp) :: dist(3) , vel_te(3), pos_p(3)
  real(wp) :: dir(3), partvec(3), ave, alpha_p(3), alpha_p_n
  integer  :: k, n_part
- real(wp) :: vel_in(3), vel_out(3)
+ real(wp) :: vel_in(3), vel_out(3), wind(3)
 
  ! flow separation variables
  integer :: i_comp , i_elem , n_elem
@@ -1284,10 +1288,11 @@ subroutine complete_wake(wake, geo, elems)
             geo%refs(wake%pan_gen_ref(ip))%G_g, &
             geo%refs(wake%pan_gen_ref(ip))%f_g, &
             vel_te )
-    if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
+    wind = variable_wind(wake%w_start_points(:,ip), sim_param%time)        
+    if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) + &
                           dist*wake%pan_gen_scaling(ip)* &
-                          norm2(sim_param%u_inf-vel_te)* &
+                          norm2(wind-vel_te)* &
                           sim_param%dt*sim_param%ndt_update_wake / norm2(dist)
   ! normalisation occurs here! -------------------------------------------^
     else
