@@ -141,14 +141,14 @@ subroutine build_row_vortlatt(this, elems, linsys, ie, ista, iend)
  integer, intent(in)              :: ista, iend
 
  integer :: j1
- real(wp) :: b1, uinf(3)
+ real(wp) :: b1, wind(3)
   !Not moving components, in the rhs contribution there is no body velocity
   !linsys%b(ie) = sum(linsys%b_static(:,ie) * (-uinf))
   linsys%b(ie) = 0.0_wp
     do j1 = 1,ista-1
-      uinf = variable_wind(elems(j1)%p%cen, sim_param%time)
+      wind = variable_wind(elems(j1)%p%cen, sim_param%time)
       linsys%b(ie) = linsys%b(ie) +  &
-          linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-uinf-elems(j1)%p%uvort))
+          linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-wind-elems(j1)%p%uvort))
     enddo
 
   ! ista and iend will be the end of the unknowns vector, containing
@@ -160,15 +160,15 @@ subroutine build_row_vortlatt(this, elems, linsys, ie, ista, iend)
 
     if (ie .eq. j1) then
       !diagonal, we are certainly employing vortrin, enforce the b.c. on ie
-      uinf = variable_wind(elems(ie)%p%cen, sim_param%time)
+      wind = variable_wind(elems(ie)%p%cen, sim_param%time)
       linsys%b(ie) = linsys%b(ie) + &
-                b1*sum(elems(ie)%p%nor*(elems(ie)%p%ub-uinf-elems(j1)%p%uvort))
+                b1*sum(elems(ie)%p%nor*(elems(ie)%p%ub-wind-elems(j1)%p%uvort))
     else
       ! off-diagonal: if it is a vortrin b1 is zero, if it is a surfpan
       ! enforce the boundary condition on it (j1)
-      uinf = variable_wind(elems(j1)%p%cen, sim_param%time)
+      wind = variable_wind(elems(j1)%p%cen, sim_param%time)
       linsys%b(ie) = linsys%b(ie) + &
-                b1*sum(elems(j1)%p%nor*(elems(j1)%p%ub-uinf-elems(j1)%p%uvort))
+                b1*sum(elems(j1)%p%nor*(elems(j1)%p%ub-wind-elems(j1)%p%uvort))
     endif
 
   end do
@@ -447,22 +447,22 @@ subroutine compute_pres_vortlatt(this) !, R_g)
 !type(t_elem_p), intent(in) :: elems(:)
 
 integer  :: i_stripe
-real(wp) :: uinf(3)
+real(wp) :: wind(3)
 
 this%pres = 0.0_wp
 
 i_stripe = size(this%stripe_elem)
 
 if ( i_stripe .gt. 1 ) then
-  uinf = variable_wind(this%cen, sim_param%time)
+  wind = variable_wind(this%cen, sim_param%time)
   this%pres = - sim_param%rho_inf * &
-        ( norm2(uinf + this%uvort - this%ub) * this%dy / this%area * &
+        ( norm2(wind + this%uvort - this%ub) * this%dy / this%area * &
         ( this%mag - this%stripe_elem(i_stripe-1)%p%mag ) + &
             this%didou_dt ) 
 else
-  uinf = variable_wind(this%cen, sim_param%time)
+  wind = variable_wind(this%cen, sim_param%time)
   this%pres = - sim_param%rho_inf * &
-        ( norm2(uinf + this%uvort - this%ub) * this%dy / this%area * &
+        ( norm2(wind + this%uvort - this%ub) * this%dy / this%area * &
               this%mag + &
             this%didou_dt ) 
 end if
@@ -511,14 +511,14 @@ end subroutine compute_dforce_dummy
 !
 subroutine compute_dforce_jukowski_vortlatt(this)
  class(t_vortlatt), intent(inout) :: this
- real(wp) :: gam(3), uinf(3)
+ real(wp) :: gam(3), wind(3)
 
  integer  :: i_stripe
  real(wp) :: mach
 
   ! Prandt -- Glauert correction for compressibility effect
-  uinf = variable_wind(this%cen, sim_param%time)
-  mach = abs(norm2(uinf) / sim_param%a_inf)
+  wind = variable_wind(this%cen, sim_param%time)
+  mach = abs(norm2(wind) / sim_param%a_inf)
   ! === Steady contribution (KJ) ===
   gam = cross ( this % vel_ctr_pt, this%edge_vec(:,1) )
   i_stripe = size(this%stripe_elem)
@@ -556,7 +556,7 @@ class(t_vortlatt), intent(inout) :: this
 type(t_pot_elem_p),intent(in):: elems(:)
 type(t_pot_elem_p),intent(in):: wake_elems(:)
 
-real(wp) :: v(3), x0(3), uinf(3)
+real(wp) :: v(3), x0(3), wind(3)
 integer :: j
 
 ! Initialisation to zero
@@ -575,9 +575,9 @@ do j = 1,size(elems) ! body elements
   this%vel_ctr_pt = this%vel_ctr_pt + v
 enddo
 ! induced velocity on leading edge side
-uinf = variable_wind(this%cen, sim_param%time)
+wind = variable_wind(this%cen, sim_param%time)
 this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp*pi) &
-              + uinf + this%uvort - this%ub
+              + wind + this%uvort - this%ub
 
 end subroutine get_vel_ctr_pt_vortlatt
 

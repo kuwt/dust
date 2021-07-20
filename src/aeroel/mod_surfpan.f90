@@ -396,7 +396,7 @@ subroutine build_row_surfpan(this, elems, linsys, ie, ista, iend)
 
  integer :: j1 , ipres
  real(wp) :: b1
- real(wp) :: uinf(3)
+ real(wp) :: wind(3)
 
 ! RHS for \phi equation --------------------------
   linsys%b(ie) = 0.0_wp
@@ -410,9 +410,9 @@ subroutine build_row_surfpan(this, elems, linsys, ie, ista, iend)
   ! Static part ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   ! + \phi equation ------------------------------
   do j1 = 1,ista-1
-    uinf = variable_wind(elems(j1)%p%cen, sim_param%time)
+    wind = variable_wind(elems(j1)%p%cen, sim_param%time)
     linsys%b(ie) = linsys%b(ie) + &
-          linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-uinf-elems(j1)%p%uvort))
+          linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-wind-elems(j1)%p%uvort))
   enddo
 
   ! + Bernoulli polynomial equation --------------
@@ -433,9 +433,9 @@ subroutine build_row_surfpan(this, elems, linsys, ie, ista, iend)
 
     ! + \phi equation ----------------------------
     !Add the contribution to the rhs with the
-    uinf = variable_wind(elems(j1)%p%cen, sim_param%time)
+    wind = variable_wind(elems(j1)%p%cen, sim_param%time)
     linsys%b(ie) = linsys%b(ie) &
-              + b1* sum(elems(j1)%p%nor*(elems(j1)%p%ub-uinf-elems(j1)%p%uvort))
+              + b1* sum(elems(j1)%p%nor*(elems(j1)%p%ub-wind-elems(j1)%p%uvort))
 
     ! + Bernoulli polynomial equation ------------
     !Add the contribution to the rhs
@@ -739,7 +739,7 @@ subroutine compute_vel_surfpan(this, pos, vel )
   real(wp), intent(in) :: pos(:)
   real(wp), intent(out) :: vel(3)
 
-  real(wp) :: vdou(3) , vsou(3), uinf(3)
+  real(wp) :: vdou(3) , vsou(3), wind(3)
 
 
   ! doublet ---
@@ -748,8 +748,8 @@ subroutine compute_vel_surfpan(this, pos, vel )
   ! source ----
   call velocity_calc_sou_surfpan(this, vsou, pos)
 
-  uinf = variable_wind(this%cen, sim_param%time)
-  vel = vdou*this%mag - vsou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
+  wind = variable_wind(this%cen, sim_param%time)
+  vel = vdou*this%mag - vsou*( sum(this%nor*(this%ub-wind-this%uvort)) )
   ! vel = - vsou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
 
 end subroutine compute_vel_surfpan
@@ -770,7 +770,7 @@ subroutine compute_grad_surfpan(this, pos, grad )
   real(wp), intent(out) :: grad(3,3)
 
   real(wp) :: grad_dou(3,3) , grad_sou(3,3)
-  real(wp) :: uinf(3)
+  real(wp) :: wind(3)
 
   ! doublet ---
   call gradient_calc_doublet(this, grad_dou, pos)
@@ -778,9 +778,9 @@ subroutine compute_grad_surfpan(this, pos, grad )
   ! source ----
   call gradient_calc_sou_surfpan(this, grad_sou, pos)
 
-  uinf = variable_wind(this%cen,sim_param%time)
+  wind = variable_wind(this%cen,sim_param%time)
   grad = grad_dou*this%mag &
-       - grad_sou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
+       - grad_sou*( sum(this%nor*(this%ub-wind-this%uvort)) )
 
   ! vel = - vsou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
 
@@ -800,7 +800,7 @@ subroutine compute_pres_surfpan(this, R_g)
 
   integer :: i_e , n_neigh
   real(wp) :: mach
-  real(wp) :: uinf(3)
+  real(wp) :: wind(3)
 
 ! This routine contains the velocity update as well. TODO, move to a dedicated routine
 ! Two methods have been implemented for surface velocity computation:
@@ -845,8 +845,8 @@ subroutine compute_pres_surfpan(this, R_g)
       f(n_neigh) = - ( this%neigh(i_e)%p%mag - this%mag )
     end if
   end do
-  uinf = variable_wind(this%cen, sim_param%time)
-  f(n_neigh+1) = sum(this%nor * (-uinf - this%uvort + this%ub) )
+  wind = variable_wind(this%cen, sim_param%time)
+  f(n_neigh+1) = sum(this%nor * (-wind - this%uvort + this%ub) )
 
   vel_phi = matmul( this%chtls_stencil , f(1:n_neigh+1) )
 
@@ -861,7 +861,7 @@ subroutine compute_pres_surfpan(this, R_g)
   ! Rotation of the result =====================================
 
   ! vel = u_inf + vel_phi + vel_rot
-  this%surf_vel = uinf + vel_phi + this%uvort
+  this%surf_vel = wind + vel_phi + this%uvort
 
   ! pressure -------------------------------------------------
   ! unsteady problems  : P = P_inf + 0.5*rho_inf*V_inf^2
@@ -890,7 +890,7 @@ subroutine compute_pres_surfpan(this, R_g)
   !> (a.2) trick of setting B_inf = P_inf + 0.5 * rhoinf * uinf^2.0 ===
   this%pres = this%pres_sol &
             - 0.5_wp*sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp &
-            + 0.5_wp*sim_param%rho_inf * norm2(uinf)**2.0_wp &
+            + 0.5_wp*sim_param%rho_inf * norm2(wind)**2.0_wp &
             + sim_param%P_inf
 
   if (this%moving) then
@@ -898,7 +898,7 @@ subroutine compute_pres_surfpan(this, R_g)
     ! TODO: to be updated and treated w/ Uhlman's equation formulation
     force_pres  = sim_param%P_inf &
       - 0.5_wp * sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp  &
-      + 0.5_wp * sim_param%rho_inf * norm2(uinf)**2.0_wp &
+      + 0.5_wp * sim_param%rho_inf * norm2(wind)**2.0_wp &
                + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
                + sim_param%rho_inf * this%didou_dt
 
@@ -918,7 +918,7 @@ subroutine compute_pres_surfpan(this, R_g)
 ! this%pres = force_pres
 
   ! Prandt -- Glauert correction for compressibility effect
-  mach = abs(norm2(uinf) / sim_param%a_inf)
+  mach = abs(norm2(wind) / sim_param%a_inf)
   
   this%dforce = - (force_pres - sim_param%P_inf) * this%area * this%nor / sqrt(1 - mach**2)
 
