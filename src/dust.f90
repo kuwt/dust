@@ -414,6 +414,7 @@ call prms%CreateRealArrayOption('GustOrigin','Gust origin point')
 call prms%CreateRealArrayOption('GustDirection','Gust direction vector')
 call prms%CreateRealOption('GustUDS','Gust design velocity')
 call prms%CreateRealOption('GustGradient','Gust gradient')
+call prms%CreateRealOption('GustStartTime','Gust starting time','0.0')
 
 ! get the parameters and print them out
 call printout(nl//'====== Input parameters: ======')
@@ -1346,6 +1347,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     sim_param%gust_direction = getrealarray(prms, 'GustDirection',3)
     sim_param%gust_u_ds = getreal(prms,'GustUDS')
     sim_param%gust_gradient = getreal(prms,'GustGradient')
+    sim_param%gust_time = getreal(prms,'GustStartTime')
   end if
 
   !Manage restart

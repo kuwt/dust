@@ -260,6 +260,7 @@ type t_sim_param
   real(wp) :: gust_direction(3)
   real(wp) :: gust_u_ds
   real(wp) :: gust_gradient
+  real(wp) :: gust_time
 
 contains
 

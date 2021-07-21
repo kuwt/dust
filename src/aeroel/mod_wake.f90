@@ -1672,7 +1672,9 @@ subroutine get_vel_free(this, elems, wake, pos, vel_hcas, vel)
 
   call compute_vel_from_all(elems, wake, pos, vel)
 
-  vel = vel + sim_param%u_inf
+  !vel = vel + sim_param%u_inf
+  vel = vel + variable_wind(pos, sim_param%time)
+  
   if (sim_param%HCAS) vel = vel + vel_hcas
 
 end subroutine get_vel_free
