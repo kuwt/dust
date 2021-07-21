@@ -66,7 +66,6 @@ real(wp), intent(in) :: time
 
 real(wp) :: wind(3)
 
-character(len=4) :: gust_type
 real(wp) :: gust_origin(3), gust_direction(3), gust_u_ds, gust_gradient
 
 real(wp) :: s
@@ -75,10 +74,8 @@ real(wp) :: s
 
 wind = sim_param%u_inf
 
-gust_type = sim_param%GustType
-
 if (sim_param%use_gust) then
-  select case(trim(gust_type))
+  select case(trim(sim_param%GustType))
     case('ACM')
       gust_origin = sim_param%gust_origin
       gust_direction = sim_param%gust_direction
@@ -88,6 +85,16 @@ if (sim_param%use_gust) then
       s = sum((pos-(gust_origin+sim_param%u_inf*time))*sim_param%u_inf)/norm2(sim_param%u_inf)
       
       wind = wind + gust_u_ds/2*(1-COS(pi*s/gust_gradient))
+    
+    case('linear')
+      gust_origin = sim_param%gust_origin
+      gust_direction = sim_param%gust_direction
+      gust_u_ds = sim_param%gust_u_ds
+      gust_gradient = sim_param%gust_gradient
+      
+      s = sum((pos-(gust_origin+sim_param%u_inf*time))*sim_param%u_inf)/norm2(sim_param%u_inf)
+      
+      wind = wind + s*gust_u_ds/gust_gradient*(/0.0, 0.0, 1.0/)
     case default
   end select
 end if
