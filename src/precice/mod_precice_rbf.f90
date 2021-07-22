@@ -48,7 +48,7 @@ type :: t_precice_rbf
   !> Order of the norm used for computing distance-based weights
   ! *** to do *** hardcoded, so far. Read as an input, with a default value,
   ! equal to 1 (or 2?)
-  integer :: w_order = 1
+  real(wp) :: w_order = 1.0_wp
 
   contains
 
