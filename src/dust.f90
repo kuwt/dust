@@ -411,8 +411,11 @@ call prms%CreateRealArrayOption('HCAS_velocity','HCAS velocity')
 call prms%CreateLogicalOption('Gust','Gust perturbation','F')
 call prms%CreateStringOption('GustType','Gust model','AMC')
 call prms%CreateRealArrayOption('GustOrigin','Gust origin point')
-call prms%CreateRealArrayOption('GustDirection','Gust direction vector')
-call prms%CreateRealOption('GustUDS','Gust design velocity')
+call prms%CreateRealArrayOption('GustFrontDirection','Gust front direction vector')
+call prms%CreateRealArrayOption('GustFrontSpeed','Gust front speed')
+call prms%CreateRealOption('GustUDes','Design gust velocity')
+call prms%CreateRealArrayOption('GustPerturbationDirection','Gust perturbation & 
+                              direction vector','(/0.0, 0.0, 1.0/)')
 call prms%CreateRealOption('GustGradient','Gust gradient')
 call prms%CreateRealOption('GustStartTime','Gust starting time','0.0')
 
@@ -1344,10 +1347,20 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   if(sim_param%use_gust) then
     sim_param%GustType = getstr(prms,'GustType')
     sim_param%gust_origin = getrealarray(prms, 'GustOrigin',3)
-    sim_param%gust_direction = getrealarray(prms, 'GustDirection',3)
-    sim_param%gust_u_ds = getreal(prms,'GustUDS')
-    sim_param%gust_gradient = getreal(prms,'GustGradient')
+    if(countoption(prms,'GustFrontDirection') .gt. 0) then
+      sim_param%gust_front_direction = getrealarray(prms, 'GustFrontDirection',3)
+    else
+      sim_param%gust_front_direction = sim_param%u_inf
+    end if
+    if(countoption(prms,'GustFrontSpeed') .gt. 0) then
+      sim_param%gust_front_speed = getreal(prms, 'GustFrontSpeed')
+    else
+      sim_param%gust_front_speed = norm2(sim_param%u_inf)
+    end if
+    sim_param%gust_u_des = getreal(prms,'GustUDes')
+    sim_param%gust_perturb_direction = getrealarray(prms,'GustPerturbationDirection',3)
     sim_param%gust_time = getreal(prms,'GustStartTime')
+    sim_param%gust_gradient = getreal(prms,'GustGradient')
   end if
 
   !Manage restart

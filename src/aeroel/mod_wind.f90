@@ -66,11 +66,10 @@ real(wp), intent(in) :: time
 
 real(wp) :: wind(3)
 
-real(wp) :: gust_origin(3), gust_direction(3), gust_u_ds, gust_gradient, gust_time
+real(wp) :: gust_origin(3), gust_front_direction(3), gust_front_speed, & 
+            gust_u_des, gust_perturb_direction(3), gust_gradient, gust_time
 
 real(wp) :: s
-
-!TODO implement reference frames?
 
 wind = sim_param%u_inf
 
@@ -78,24 +77,29 @@ if (sim_param%use_gust) then
   select case(trim(sim_param%GustType))
     case('ACM')
       gust_origin = sim_param%gust_origin
-      gust_direction = sim_param%gust_direction
-      gust_u_ds = sim_param%gust_u_ds
+      gust_front_direction = sim_param%gust_front_direction/norm2(sim_param%gust_front_direction)
+      gust_front_speed = sim_param%gust_front_speed
+      gust_u_des = sim_param%gust_u_des
+      gust_perturb_direction = sim_param%gust_perturb_direction/norm2(sim_param%gust_perturb_direction)
       gust_gradient = sim_param%gust_gradient
       gust_time = sim_param%gust_time
       
       ! penetration distance
       ! distance from the gust front, negative for the gust approaching
-      s = -sum((pos-(gust_origin+sim_param%u_inf*(time-gust_time)))*sim_param%u_inf)/norm2(sim_param%u_inf)
+      s = -sum((pos-(gust_origin+gust_front_speed*gust_front_direction*(time-gust_time)))*gust_front_direction)
       
       if (s .GE. 0.0 .AND. s .LT. 2*gust_gradient) then
-        wind = wind + gust_u_ds/2*(1-COS(pi*s/gust_gradient))
+        wind = wind + gust_u_des/2*(1-COS(pi*s/gust_gradient))
       end if
       
-    case('linear')
+    case('linear') ! for testing
       gust_origin = sim_param%gust_origin
-      gust_direction = sim_param%gust_direction
-      gust_u_ds = sim_param%gust_u_ds
+      gust_front_direction = sim_param%gust_front_direction/norm2(sim_param%gust_front_direction)
+      gust_front_speed = sim_param%gust_front_speed
+      gust_u_des = sim_param%gust_u_des
+      gust_perturb_direction = sim_param%gust_perturb_direction/norm2(sim_param%gust_perturb_direction)
       gust_gradient = sim_param%gust_gradient
+      gust_time = sim_param%gust_time
       
       s = sum((pos-(gust_origin+sim_param%u_inf*time))*sim_param%u_inf)/norm2(sim_param%u_inf)
       
