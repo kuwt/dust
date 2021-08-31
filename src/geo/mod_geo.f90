@@ -726,6 +726,7 @@ subroutine load_components(geo, in_file, out_file, te)
  real(wp), allocatable :: c_ref_c(:,:)
  real(wp), allocatable :: xac_p(:)
  real(wp), allocatable :: comp_coupling_nodes(:,:)
+ real(wp) :: coupling_node_rot(3,3)
  integer :: points_offset_precice, np_precice, np_precice_tot
 #endif 
  !> Hinges
@@ -1225,8 +1226,9 @@ subroutine load_components(geo, in_file, out_file, te)
 
             end if
           end do
-
-          call geo%components(i_comp)%rbf%build_connectivity( rr, ee )
+          
+          coupling_node_rot = geo%components(i_comp)%coupling_node_rot
+          call geo%components(i_comp)%rbf%build_connectivity( rr, ee, coupling_node_rot)
 
           !> Update offset of precice/dust coupling nodes
           points_offset_precice = points_offset_precice + np_precice_tot

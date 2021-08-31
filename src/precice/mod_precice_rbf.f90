@@ -63,9 +63,11 @@ contains
 !----------------------------------------------------------------
 !> Read local coordinates of surface nodes, rr, and build data for
 ! structure to surface interpolation of the motion
-subroutine build_connectivity(this, rr, ee)
+subroutine build_connectivity(this, rr, ee, coupling_node_rot)
   class(t_precice_rbf), intent(inout) :: this
   real(wp),             intent(in)    :: rr(:,:)
+  real(wp),             intent(in)    :: coupling_node_rot(3,3)
+  
   integer ,             intent(in)    :: ee(:,:)
   
   real(wp), allocatable :: diff_all(:,:), diff_all_transpose(:,:), dist_all(:), mat_dist_all(:,:), wei_v(:), Wnorm(:,:)
@@ -98,9 +100,7 @@ subroutine build_connectivity(this, rr, ee)
    do is = 1, ns
      write(*,*) this%nodes(:,is)
    end do
-   ! debug ---
- !write(*,*) 'rrb MBDyn nodes Position' , geo%components(i_comp)%rbf%rrb 
- !write(*,*) 'rrb MBDyn nodes Orientation' , rrb_rot
+
   !> === Surface nodes ===
   allocate(this%nod%ind(this%n_wei, np)); this%nod%ind = 0
   allocate(this%nod%wei(this%n_wei, np)); this%nod%wei = 0.0_wp
@@ -113,7 +113,9 @@ subroutine build_connectivity(this, rr, ee)
   Wnorm(1,1) = 0.001_wp;
   Wnorm(2,2) = 1.0_wp;
   Wnorm(3,3) = 0.001_wp;
-  write(*,*) 'shape: Wnorm' , shape(Wnorm(:,:))
+
+  Wnorm = matmul(transpose(coupling_node_rot),(matmul(Wnorm,coupling_node_rot)))
+
   do ip = 1, np
 
     !> Distance of the surface nodes from the structural nodes
