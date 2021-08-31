@@ -752,7 +752,7 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
   !> Re-open and close result hdf5 file and groups
   call open_hdf5_file ( trim(filen), floc )
   call open_hdf5_group( floc, 'Components', gloc )
-  write(cname,'(A,I3.3)') 'Comp', i_comp
+  write(cname,'(A,I3.3)') 'Comp', comp%comp_id !i_comp
   call open_hdf5_group( gloc, trim(cname), cloc )
   call open_hdf5_group( cloc, 'Hinges', hloc )
   do ih = 1, comp%n_hinges
