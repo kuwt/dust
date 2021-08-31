@@ -270,18 +270,19 @@ subroutine build_connectivity(this, loc_points)
   real(wp), allocatable :: ble_s2h(:,:)
 
   integer :: nrot, nble
+  real(wp) :: wei_hinge, x_hinge, z_hinge
 
   ! ! debug ---
-   !write(*,*) ' ................................................ '
-   !write(*,*) ' Debug in hinge%build_connectivity(), loc_points: '
-   !write(*,*) ' ................................................ '
-   !do iw = 1, size(loc_points,2)
-   !  write(*,*) loc_points(:,iw)
-   !end do
-   !write(*,*) ' Debug in hinge%build_connectivity(), ref%rr: '
-   !do iw = 1, size(this%ref%rr,2)
-   ! write(*,*) this%ref%rr(:,iw)
-   !end do
+    !write(*,*) ' ................................................ '
+    !write(*,*) ' Debug in hinge%build_connectivity(), loc_points: '
+    !write(*,*) ' ................................................ '
+    !do iw = 1, size(loc_points,2)
+    !  write(*,*) loc_points(:,iw)
+    !end do
+    !write(*,*) ' Debug in hinge%build_connectivity(), ref%rr: '
+    !do iw = 1, size(this%ref%rr,2)
+    ! write(*,*) this%ref%rr(:,iw)
+    !end do
   ! ! debug ---
 
   !> N. of surface and hinge nodes
@@ -303,15 +304,19 @@ subroutine build_connectivity(this, loc_points)
 
   allocate( rrb(3,nb) );  allocate( rrh(3,nh) )
   do ib = 1, nb
-    rrb(:,ib) = matmul( Rot, loc_points(:,ib) - this%ref%rr(:,1) )
+    !rrb(:,ib) = matmul( Rot, loc_points(:,ib) - this%ref%rr(:,1) )
+    rrb(:,ib) = loc_points(:,ib)
   end do
+
   do ib = 1, nh
-    rrh(:,ib) = matmul( Rot, this%ref%rr(:,ib) - this%ref%rr(:,1) )
+    rrh(:,ib) = this%ref%rr(:,ib) - this%ref%rr(:,1)
   end do
 
   ! hinge width, measured in the hinge direction
   hinge_width = rrh(2,nh) - rrh(2,1)
 
+
+  write(*,*) 'rrb' , rrb
   !> Compute connectivity and weights
   ! Allocate auxiliary node_id(:), ind(:,:), wei(:,:) arrays
   allocate(rot_node_id(        nb));  rot_node_id = 0
@@ -332,24 +337,22 @@ subroutine build_connectivity(this, loc_points)
   allocate(rot_w2h(nh,nb)); rot_w2h = 0.0_wp ;  allocate(ble_w2h(nh,nb)); ble_w2h = 0.0_wp
   allocate(rot_i2h(nh   )); rot_i2h = 0      ;  allocate(ble_i2h(nh   )); ble_i2h = 0
   allocate(rot_s2h(nh,nb)); rot_s2h = 0.0_wp ;  allocate(ble_s2h(nh,nb)); ble_s2h = 0.0_wp
-
+  
   nrot = 0; nble = 0
   ! Loop over all the surface points
   do ib = 1, nb
 
-    ! if ( ( rrb(2,ib) .gt. 0.0_wp ) .and. ( rrb(2,ib) .lt. hinge_width ) ) then
-    if ( ( rrb(2,ib) .gt. -this%span_blending ) .and. &
-         ( rrb(2,ib) .lt.  this%span_blending + hinge_width ) ) then
-          !write(*,*) 'rrb(1,ib)' , rrb(1,ib)
-      if ( rrb(1,ib) .lt. -this%offset ) then
-        ! do nothing
-      elseif ( rrb(1,ib) .gt. this%offset ) then ! rigid rotation
+    if ((rrb(2,ib) .gt. this%ref%rr(2,1)) .and. (rrb(2,ib) .lt. this%ref%rr(2,nh))) then
 
+      wei_hinge = (rrb(2,ib) - this%ref%rr(2,1)) / (this%ref%rr(2,nh)- this%ref%rr(2,1))
+      x_hinge = this%ref%rr(1,1) + wei_hinge*(this%ref%rr(1,nh)- this%ref%rr(1,1))
+      z_hinge = this%ref%rr(3,1) + wei_hinge*(this%ref%rr(3,nh)- this%ref%rr(3,1))
+
+      if (rrb(1,ib) .gt. (this%offset + x_hinge)) then
+        
         nrot = nrot + 1
         rot_node_id(nrot) = ib
-        ! debug
-        ! write(*,*) 'rot_node_id(nrot)' , rot_node_id(nrot)
-        ! debug
+
         do ih = 1, nh
           dist_all(ih) = abs( rrb(2,ib) - rrh(2,ih) )
         end do
@@ -361,22 +364,22 @@ subroutine build_connectivity(this, loc_points)
         wei_v = wei_v / sum(wei_v)
 
         !> Weights in spanwise direction
-        if ( rrb(2,ib) .lt. 0.0_wp ) then
+        if ( rrb(2,ib) .lt. (this%ref%rr(2,1) + this%span_blending) ) then
           span_wei = 1.0_wp + rrb(2,ib) / this%span_blending
-        elseif( rrb(2,ib) .lt. hinge_width ) then
+        elseif( rrb(2,ib) .lt. (this%ref%rr(2,nh) - this%span_blending)  ) then
           span_wei = 1.0_wp
         else
           span_wei = 1.0_wp - ( rrb(2,ib) - hinge_width ) / this%span_blending
         endif
-
+        
         rot_wei(   :,nrot) = wei_v
         rot_ind(   :,nrot) = ind_v
         rot_span_wei(nrot) = span_wei
 
         ! debug
-        !write(*,*) 'WEI_V' , wei_v
-        !write(*,*) 'IND_V' , ind_v
-        !write(*,*) 'SPAN_WEI' , span_wei
+        write(*,*) 'WEI_V' , wei_v
+        write(*,*) 'IND_V' , ind_v
+        write(*,*) 'SPAN_WEI' , span_wei
 
         ! *****
         do iw = 1, this%n_wei
@@ -384,11 +387,10 @@ subroutine build_connectivity(this, loc_points)
           rot_p2h(ind_v(iw),   rot_i2h(ind_v(iw))) = ib
           rot_w2h(ind_v(iw),   rot_i2h(ind_v(iw))) = wei_v(iw)
           rot_s2h(ind_v(iw),   rot_i2h(ind_v(iw))) = span_wei
-
         end do
         ! *****
 
-      else ! blending region
+      elseif (rrb(1,ib) .lt. (this%offset + x_hinge) .and. rrb(1,ib) .gt. (x_hinge - this%offset))  then ! blending region
 
         nble = nble + 1
         ble_node_id(nble) = ib
@@ -404,14 +406,14 @@ subroutine build_connectivity(this, loc_points)
         wei_v = wei_v / sum(wei_v)
 
         !> Weights in spanwise direction
-        if ( rrb(2,ib) .lt. 0.0_wp ) then
+        if ( rrb(2,ib) .lt. (this%ref%rr(2,1) + this%span_blending) ) then
           span_wei = 1.0_wp + rrb(2,ib) / this%span_blending
-        elseif( rrb(2,ib) .lt. hinge_width ) then
+        elseif( rrb(2,ib) .lt. (this%ref%rr(2,nh) - this%span_blending)  ) then
           span_wei = 1.0_wp
         else
           span_wei = 1.0_wp - ( rrb(2,ib) - hinge_width ) / this%span_blending
         endif
-
+        
         ble_wei(   :,nble) = wei_v
         ble_ind(   :,nble) = ind_v
         ble_span_wei(nble) = span_wei
@@ -424,12 +426,14 @@ subroutine build_connectivity(this, loc_points)
           ble_s2h(ind_v(iw),   ble_i2h(ind_v(iw))) = span_wei
         end do
         ! *****
-
+      else
       end if
 
+    else
     end if
-
+    
   end do
+
   !> Fill hinge object, with the connectivity and weight arrays
   allocate(this%rot %node_id(        nrot)); this%rot %node_id = rot_node_id( 1:nrot)
   allocate(this%rot %ind(this%n_wei, nrot)); this%rot %ind     = rot_ind(  :, 1:nrot)
