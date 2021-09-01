@@ -1214,20 +1214,21 @@ subroutine load_components(geo, in_file, out_file, te)
                    geo%components(i_comp)%hinge(ih)%i_points_precice - points_offset_precice )
  
               ! debug ---
-              write(*,*) ' this%hin%ind, %i_points_precice, %wei: '
-              do i3 = 1, size(geo%components(i_comp)%hinge(ih)%hin%ind,2)
-                write(*,*) i3                                               , '   ' , &
-                           geo%components(i_comp)%hinge(ih)%hin%ind(:,i3)   , '   ' , &
-                           geo%components(i_comp)%i_points_precice( &
-                           geo%components(i_comp)%hinge(ih)%hin%ind(:,i3) ) , '   ' , &
-                           geo%components(i_comp)%hinge(ih)%hin%wei(:,i3)
-              end do
-              write(*,*)
+              !write(*,*) ' this%hin%ind, %i_points_precice, %wei: '
+              !do i3 = 1, size(geo%components(i_comp)%hinge(ih)%hin%ind,2)
+              !  write(*,*) i3                                               , '   ' , &
+              !             geo%components(i_comp)%hinge(ih)%hin%ind(:,i3)   , '   ' , &
+              !             geo%components(i_comp)%i_points_precice( &
+              !             geo%components(i_comp)%hinge(ih)%hin%ind(:,i3) ) , '   ' , &
+              !             geo%components(i_comp)%hinge(ih)%hin%wei(:,i3)
+              !end do
+              !write(*,*)
 
             end if
           end do
           
           coupling_node_rot = geo%components(i_comp)%coupling_node_rot
+          
           call geo%components(i_comp)%rbf%build_connectivity( rr, ee, coupling_node_rot)
 
           !> Update offset of precice/dust coupling nodes
