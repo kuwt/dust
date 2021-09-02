@@ -168,7 +168,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
  integer(h5loc) :: gloc, cloc , geo_loc
  integer :: n_comp, i_comp, n_comp_tot, i_comp_tot , i_comp_tmp
  integer :: parametric_nelems_span , parametric_nelems_chor
-
+ real(wp) :: coupling_node_rot(3,3) = 0.0_wp
  !> Hinges
  integer(h5loc) :: hiloc, hloc
  integer :: ih, n_hinges
@@ -463,9 +463,14 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
                 3,comps(i_comp)%hinge(ih)%n_nodes ) )
         comps(i_comp)%hinge(ih)%act%rr = &
                                       comps(i_comp)%hinge(ih)%ref%rr
-
-        !> Build hinge connectivity and weights
-        call comps(i_comp)%hinge(ih)%build_connectivity( rr )
+#if USE_PRECICE
+        coupling_node_rot = comps(i_comp)%coupling_node_rot
+#else
+        coupling_node_rot(1,:) = (/ 1._wp, 0._wp, 0._wp/)
+        coupling_node_rot(2,:) = (/ 0._wp, 1._wp, 0._wp/) 
+        coupling_node_rot(3,:) = (/ 0._wp, 0._wp, 1._wp/)
+#endif  
+        call comps(i_comp)%hinge(ih)%build_connectivity( rr, coupling_node_rot)
 
       end do
 
@@ -752,7 +757,7 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
   !> Re-open and close result hdf5 file and groups
   call open_hdf5_file ( trim(filen), floc )
   call open_hdf5_group( floc, 'Components', gloc )
-  write(cname,'(A,I3.3)') 'Comp', i_comp
+  write(cname,'(A,I3.3)') 'Comp', comp%comp_id !i_comp
   call open_hdf5_group( gloc, trim(cname), cloc )
   call open_hdf5_group( cloc, 'Hinges', hloc )
   do ih = 1, comp%n_hinges
