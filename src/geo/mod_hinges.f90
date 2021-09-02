@@ -242,9 +242,10 @@ contains
 ! ---------------------------------------------------------------
 !> Build hinge connectivity from component nodes rr, expressed in the
 ! local reference frame, and the hinge nodes.
-subroutine build_connectivity(this, loc_points)
+subroutine build_connectivity(this, loc_points, coupling_node_rot)
   class(t_hinge), intent(inout) :: this
   real(wp),       intent(in)    :: loc_points(:,:)
+  real(wp),       intent(in)    :: coupling_node_rot(3,3)
 
   real(wp) :: hinge_width
   integer  :: nb, nh, ib, ih, iw
@@ -272,9 +273,10 @@ subroutine build_connectivity(this, loc_points)
   integer :: nrot, nble
   real(wp) :: wei_hinge, x_hinge, z_hinge
 
-#if USE_PRECICE
-  real(wp) :: Rot_coupling(3,3) = 0.0_wp
-#endif
+
+  allocate(wei_v(this%n_wei))
+  allocate(ind_v(this%n_wei))
+
   ! ! debug ---
     !write(*,*) ' ................................................ '
     !write(*,*) ' Debug in hinge%build_connectivity(), loc_points: '
@@ -299,72 +301,35 @@ subroutine build_connectivity(this, loc_points)
   Rot(2,:) = this % ref % h(:,1)
   Rot(3,:) = this % ref % n(:,1)
   
-  !!! DUST ALONE !!!! 
-  Rot(1,:) = this % ref % v(:,1)
-  Rot(2,:) = this % ref % h(:,1)
-  Rot(3,:) = this % ref % n(:,1)
-
   allocate( rrb(3,nb) );  allocate( rrh(3,nh) )
   
-
-  
-  !!!!!!!!!!!!!!!!!!!!!!
-  !!!!PRECICE !!!!!!!!!!
-#if USE_PRECICE
-
-  Rot_coupling(1,:) = (/0.86603, -0.5,0.0/) ! coupling node orientation 
-  Rot_coupling(2,:) = (/0.5, 0.86603, 0.0/)
-  Rot_coupling(3,:) = (/0, 0, 1/)
-  
-  ! ! debug ---
-  ! write(*,*) ' v: ', Rot(1,:)
-  ! write(*,*) ' h: ', Rot(2,:)
-  ! write(*,*) ' n: ', Rot(3,:)
-  ! ! debug ---
-
+  !rotate the hinge nodes (from coupling_nodes file) to recover the value 
+  !of the component.in input
+  this%ref%rr(:,1) = matmul( (coupling_node_rot),this%ref%rr(:,1))
+  this%ref%rr(:,2) = matmul( (coupling_node_rot),this%ref%rr(:,2))
 
   do ib = 1, nb
-    !rrb(:,ib) = matmul( Rot, loc_points(:,ib))! - this%ref%rr(:,1) )
-    rrb(:,ib) =  matmul( transpose(Rot_coupling), loc_points(:,ib))
+    rrb(:,ib) =  matmul( (coupling_node_rot), loc_points(:,ib))
   end do
 
   do ib = 1, nh
     rrh(:,ib) =  this%ref%rr(:,ib) - this%ref%rr(:,1)
   end do
 
-  
-    this%ref%rr(:,1) = (/ 1.43301, 1.48205, 0.0/) ! node hinge from parser!!! 
-    this%ref%rr(:,2) = (/ 2.43301, 3.2141, 0.0/)
-#else
-  do ib = 1, nb
-    !mesh points in dust reference with zero located at first hinge point
-    !rrb(:,ib) = matmul( Rot, loc_points(:,ib) - this%ref%rr(:,1) )  
-    rrb(:,ib) = loc_points(:,ib) 
-  end do
-  do ib = 1, nh
-    !hinge points in dust reference with zero located at first hinge point
-    !rrh(:,ib) = matmul( Rot, this%ref%rr(:,ib) - this%ref%rr(:,1) ) 
-    rrh(:,ib) = this%ref%rr(:,ib) - this%ref%rr(:,1)
-  end do
-#endif 
-
-  !!! FINE PRECICE !!!!  
   ! hinge width, measured in the hinge direction
   hinge_width = rrh(2,nh) - rrh(2,1)
-  
-  
-  write(*,*) ' ................................................ '
-  write(*,*) ' Debug in hinge%build_connectivity(), loc_points: '
-  write(*,*) ' ................................................ '
-  do iw = 1, nb
-      write(*,*) rrb(:,iw)
-  end do
-  write(*,*) ' Debug in hinge%build_connectivity(), ref%rr: '
-  do iw = 1, nh
-    write(*,*) this%ref%rr(:,iw)
-  end do
-  
-  !write(*,*) 'rrb' , rrb
+
+  !write(*,*) ' ................................................ '
+  !write(*,*) ' Debug in hinge%build_connectivity(), loc_points: '
+  !write(*,*) ' ................................................ '
+  !do iw = 1, nb
+  !    write(*,*) rrb(:,iw)
+  !end do
+  !write(*,*) ' Debug in hinge%build_connectivity(), ref%rr: '
+  !do iw = 1, nh
+  !  write(*,*) this%ref%rr(:,iw)
+  !end do
+
   !> Compute connectivity and weights
   ! Allocate auxiliary node_id(:), ind(:,:), wei(:,:) arrays
   allocate(rot_node_id(        nb));  rot_node_id = 0
@@ -387,8 +352,6 @@ subroutine build_connectivity(this, loc_points)
   allocate(rot_s2h(nh,nb)); rot_s2h = 0.0_wp ;  allocate(ble_s2h(nh,nb)); ble_s2h = 0.0_wp
   
   nrot = 0; nble = 0
-
-  write(*,*) 'this%ref%rr', this%ref%rr
 
   ! Loop over all the surface points
   do ib = 1, nb
@@ -479,8 +442,6 @@ subroutine build_connectivity(this, loc_points)
     end if
     
   end do
-
-  
 
   !> Fill hinge object, with the connectivity and weight arrays
   allocate(this%rot %node_id(        nrot)); this%rot %node_id = rot_node_id( 1:nrot)
@@ -564,10 +525,11 @@ end subroutine build_connectivity
 ! ---------------------------------------------------------------
 !> Build connectivity betweeen hinge nodes and cell centers of the
 ! aerodynamic grid
-subroutine build_connectivity_cen(this, rr, ee)
+subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
   class(t_hinge), intent(inout) :: this
   real(wp),       intent(in)    :: rr(:,:) ! loc_points_in
   integer ,       intent(in)    :: ee(:,:)
+  real(wp),       intent(in)    :: coupling_node_rot(3,3)
 
   !> Cell centers (to be evaluated), whose connectivity with the
   ! hinge nodes is created in this subroutine
@@ -599,9 +561,10 @@ subroutine build_connectivity_cen(this, rr, ee)
 
   integer :: nrot, nble
   real(wp) :: wei_hinge, x_hinge, z_hinge
-#if USE_PRECICE
-  real(wp) :: Rot_coupling(3,3) = 0.0_wp
-#endif
+
+  allocate(wei_v(this%n_wei))
+  allocate(ind_v(this%n_wei))
+
   !> N. of surface elements (cell centers) and hinge nodes
   nb = size(ee,2)
   nh = this%n_nodes
@@ -634,47 +597,18 @@ subroutine build_connectivity_cen(this, rr, ee)
 
   allocate( rrb(3,nb) );  allocate( rrh(3,nh) )
   
-
-
-  !!!!!!!!!!!!!!!!!!!!!!
-  !!!!PRECICE !!!!!!!!!!
-#if USE_PRECICE
-  Rot_coupling(1,:) = (/0.86603, -0.5,0.0/) ! coupling node orientation 
-  Rot_coupling(2,:) = (/0.5, 0.86603, 0.0/)
-  Rot_coupling(3,:) = (/0, 0, 1/)
-  
-  ! ! debug ---
-  ! write(*,*) ' v: ', Rot(1,:)
-  ! write(*,*) ' h: ', Rot(2,:)
-  ! write(*,*) ' n: ', Rot(3,:)
-  ! ! debug ---
-
+  !rotate the hinge nodes (from coupling_nodes file) to recover the value 
+  !of the component.in input
+  this%ref%rr(:,1) = matmul( (coupling_node_rot),this%ref%rr(:,1))
+  this%ref%rr(:,2) = matmul( (coupling_node_rot),this%ref%rr(:,2))
 
   do ib = 1, nb
-    !rrb(:,ib) = matmul( Rot, loc_points(:,ib))! - this%ref%rr(:,1) )
-    rrb(:,ib) =  matmul( transpose(Rot_coupling), loc_points(:,ib))
+    rrb(:,ib) =  matmul( (coupling_node_rot), loc_points(:,ib))
   end do
 
   do ib = 1, nh
     rrh(:,ib) =  this%ref%rr(:,ib) - this%ref%rr(:,1)
   end do
-
-  
-    this%ref%rr(:,1) = (/ 1.43301, 1.48205, 0.0/) ! node hinge from parser!!! 
-    this%ref%rr(:,2) = (/ 2.43301, 3.2141, 0.0/)
-#else
-  do ib = 1, nb
-    !mesh points in dust reference with zero located at first hinge point
-    !rrb(:,ib) = matmul( Rot, loc_points(:,ib) - this%ref%rr(:,1) )  
-    rrb(:,ib) = loc_points(:,ib) 
-  end do
-  do ib = 1, nh
-    !hinge points in dust reference with zero located at first hinge point
-    !rrh(:,ib) = matmul( Rot, this%ref%rr(:,ib) - this%ref%rr(:,1) ) 
-    rrh(:,ib) = this%ref%rr(:,ib) - this%ref%rr(:,1)
-  end do
-#endif
-  !!! FINE PRECICE !!!! 
 
   ! hinge width, measured in the hinge direction (span)
   hinge_width = rrh(2,nh) - rrh(2,1)  !dh
@@ -738,11 +672,6 @@ subroutine build_connectivity_cen(this, rr, ee)
         rot_wei(   :,nrot) = wei_v
         rot_ind(   :,nrot) = ind_v
         rot_span_wei(nrot) = span_wei
-
-        ! debug
-        !write(*,*) 'WEI_V' , wei_v
-        !write(*,*) 'IND_V' , ind_v
-        !write(*,*) 'SPAN_WEI' , span_wei
 
         ! *****
         do iw = 1, this%n_wei
@@ -810,17 +739,17 @@ subroutine build_connectivity_cen(this, rr, ee)
   allocate(this%blen_cen%n2h(nh))
   do ih = 1, nh
     allocate(this% rot_cen%n2h(ih)%p2h ( rot_i2h(ih) )) ; &
-             this% rot_cen%n2h(ih)%p2h = rot_p2h( ih, 1:rot_i2h(ih) )
+            this% rot_cen%n2h(ih)%p2h = rot_p2h( ih, 1:rot_i2h(ih) )
     allocate(this% rot_cen%n2h(ih)%w2h ( rot_i2h(ih) )) ; &
-             this% rot_cen%n2h(ih)%w2h = rot_w2h( ih, 1:rot_i2h(ih) )
+            this% rot_cen%n2h(ih)%w2h = rot_w2h( ih, 1:rot_i2h(ih) )
     allocate(this% rot_cen%n2h(ih)%s2h ( rot_i2h(ih) )) ; &
-             this% rot_cen%n2h(ih)%s2h = rot_s2h( ih, 1:rot_i2h(ih) )
+            this% rot_cen%n2h(ih)%s2h = rot_s2h( ih, 1:rot_i2h(ih) )
     allocate(this%blen_cen%n2h(ih)%p2h ( ble_i2h(ih) )) ; &
-             this%blen_cen%n2h(ih)%p2h = ble_p2h( ih, 1:ble_i2h(ih) )
+            this%blen_cen%n2h(ih)%p2h = ble_p2h( ih, 1:ble_i2h(ih) )
     allocate(this%blen_cen%n2h(ih)%w2h ( ble_i2h(ih) )) ; &
-             this%blen_cen%n2h(ih)%w2h = ble_w2h( ih, 1:ble_i2h(ih) )
+            this%blen_cen%n2h(ih)%w2h = ble_w2h( ih, 1:ble_i2h(ih) )
     allocate(this%blen_cen%n2h(ih)%s2h ( ble_i2h(ih) )) ; &
-             this%blen_cen%n2h(ih)%s2h = ble_s2h( ih, 1:ble_i2h(ih) )
+            this%blen_cen%n2h(ih)%s2h = ble_s2h( ih, 1:ble_i2h(ih) )
   end do
 
   !> Explicit deallocations
@@ -852,6 +781,9 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
 
   !integer, allocatable :: ind(:)
   integer :: ind
+
+  allocate(wei_v(this%n_wei))
+  allocate(ind_v(this%n_wei))
 
   !> Find hinge and structural nodes in rr_t array, collecting all the nodes
   n_t = size(rr_t,2)
@@ -905,7 +837,7 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
     this%hin%wei(:,i_h) = wei_v
 
   end do
-
+  
   !> Allocate t_hinge%hin_rot
   allocate( this%hin_rot(3,n_h) ); this%hin_rot = -333.3_wp
 
@@ -927,14 +859,16 @@ end subroutine build_connectivity_hin
 subroutine sort_vector_real( vec, nel, sor, ind )
   real(wp), intent(inout) :: vec(:)
   integer , intent(in) :: nel
-  real(wp), allocatable, intent(out):: sor(:)
-  integer , allocatable, intent(out):: ind(:)
+  real(wp), intent(inout):: sor(:)
+  integer , intent(inout):: ind(:)
 
   real(wp):: maxv
   integer :: i
 
-  allocate(sor(nel)); sor = 0.0_wp
-  allocate(ind(nel)); ind = 0
+  !allocate(sor(nel)); 
+  sor = 0.0_wp
+  !allocate(ind(nel));
+  ind = 0
 
   maxv = maxval( vec )
   do i = 1, nel
@@ -1196,9 +1130,9 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
        do j = 1, hinges(i)%n_nodes
          hinges(i) % rr(:,j) = hinges(i) % node1 + &
                              ( hinges(i) % node2 - hinges(i) % node1 ) * &
-                             dble(j-1)/dble(hinges(i)%n_nodes-1)
+                             dble(j-1)/dble(hinges(i)%n_nodes-1)          
        end do
-
+       
      elseif ( trim(hinges(i) % nodes_input) .eq. 'from_file' ) then
        ! *** to do *** fill dummy node1, node2, n_nodes fields
        hinges(i) % node_file = getstr(hinge_prs,'Node_File')

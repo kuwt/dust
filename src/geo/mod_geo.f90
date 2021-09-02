@@ -726,9 +726,10 @@ subroutine load_components(geo, in_file, out_file, te)
  real(wp), allocatable :: c_ref_c(:,:)
  real(wp), allocatable :: xac_p(:)
  real(wp), allocatable :: comp_coupling_nodes(:,:)
- real(wp) :: coupling_node_rot(3,3)
+ !real(wp) :: coupling_node_rot(3,3)
  integer :: points_offset_precice, np_precice, np_precice_tot
 #endif 
+ real(wp) :: coupling_node_rot(3,3) = 0.0_wp
  !> Hinges
  integer :: n_hinges, ih
  real(wp) :: rotation_amplitude
@@ -945,7 +946,15 @@ subroutine load_components(geo, in_file, out_file, te)
       geo%components(i_comp)%coupling_type     = trim(comp_coupling_type)
       geo%components(i_comp)%coupling_node     =      comp_coupling_node
       geo%components(i_comp)%coupling_node_rot =      comp_coupling_node_rot
-      
+
+#if USE_PRECICE
+      coupling_node_rot = geo%components(i_comp)%coupling_node_rot
+#else
+      coupling_node_rot(1,:) = (/ 1._wp, 0._wp, 0._wp/)
+      coupling_node_rot(2,:) = (/ 0._wp, 1._wp, 0._wp/) 
+      coupling_node_rot(3,:) = (/ 0._wp, 0._wp, 1._wp/)
+#endif  
+
       !> Overwrite moving,
       !>> if n_hinges .gt. 0
       ! *** to do *** avoid moving = .true. if hinge_input is constant
@@ -1064,12 +1073,13 @@ subroutine load_components(geo, in_file, out_file, te)
         !> *** to do *** Only for non-coupled hinges?
         geo%components(i_comp)%hinge(ih)%act%rr = &
                                       geo%components(i_comp)%hinge(ih)%ref%rr
-
+        write(*,*) 'NODE', geo%components(i_comp)%hinge(ih)%ref%rr
         !> Build hinge connectivity and weights, for grid nodes
+
         write(*,*) ; write(*,*) ' hinge n.', ih 
-        call geo%components(i_comp)%hinge(ih)%build_connectivity( rr )
+        call geo%components(i_comp)%hinge(ih)%build_connectivity( rr, coupling_node_rot )
         ! and for cell centers
-        call geo%components(i_comp)%hinge(ih)%build_connectivity_cen( rr, ee )
+        call geo%components(i_comp)%hinge(ih)%build_connectivity_cen( rr, ee, coupling_node_rot)
 
         !> build_connectivity_hin() below, around l.1200 for 'rbf' coupling
         ! if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
@@ -1211,7 +1221,7 @@ subroutine load_components(geo, in_file, out_file, te)
               !> Connectivity between hinge nodes and other structural nodes
               call geo%components(i_comp)%hinge(ih)%build_connectivity_hin( & 
                    comp_coupling_nodes, &
-                   geo%components(i_comp)%hinge(ih)%i_points_precice - points_offset_precice )
+                   geo%components(i_comp)%hinge(ih)%i_points_precice - points_offset_precice)
  
               ! debug ---
               !write(*,*) ' this%hin%ind, %i_points_precice, %wei: '
@@ -1226,9 +1236,7 @@ subroutine load_components(geo, in_file, out_file, te)
 
             end if
           end do
-          
-          coupling_node_rot = geo%components(i_comp)%coupling_node_rot
-          
+                    
           call geo%components(i_comp)%rbf%build_connectivity( rr, ee, coupling_node_rot)
 
           !> Update offset of precice/dust coupling nodes
