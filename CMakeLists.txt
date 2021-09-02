@@ -1,5 +1,5 @@
 #Specify minimum version of Cmake
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required(VERSION 2.6...3.21)
 enable_language (Fortran)
 #Project name
 project(Dust)
