@@ -1166,8 +1166,10 @@ subroutine update_elems( this, geo, elems )
                   (/-sin(theta)*n_rot(2), sin(theta)*n_rot(1), cos(theta)*theta    /)/theta
                 
                 comp%hinge(ih) % act % h = matmul( Rot_mat, comp%hinge(ih) % ref % h )
+                !write(*,*) 'comp%hinge(ih) % act % h', comp%hinge(ih) % act % h
                 comp%hinge(ih) % act % v = matmul( Rot_mat, comp%hinge(ih) % ref % v )
                 comp%hinge(ih) % act % n = matmul( Rot_mat, comp%hinge(ih) % ref % n )
+                write(*,*) 'comp%hinge(ih) % act % n', comp%hinge(ih) % act % n
               else
                 comp%hinge(ih) % act % h = comp%hinge(ih) % ref % h
                 comp%hinge(ih) % act % v = comp%hinge(ih) % ref % v
@@ -1211,8 +1213,8 @@ subroutine update_elems( this, geo, elems )
               !> === Hinge nodes ===
               !> Rotation vector and rotation matrix
               n_rot = this%fields(j_rot)%fdata(:,comp%hinge(ih)%i_points_precice(i))
-              theta = norm2( n_rot )
-
+              theta = norm2(n_rot)
+              !write(*,*) 'n_rot', n_rot
               if ( theta .lt. eps ) then
                 n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /); theta = 0.0_wp
               else
@@ -1297,10 +1299,14 @@ subroutine update_elems( this, geo, elems )
               !> 1.2. Chordwise blending region
               do ib = 1, size(comp%hinge(ih)%blen%n2h(i)%p2h)
                 
+                
                 ii = comp%hinge(ih)%blen%n2h(i)%p2h(ib)
                 ip = comp%i_points(ii)  ! Local-to-global connectivity
-                
-                th1 = -theta * comp%hinge(ih)%blen%n2h(i)%s2h(ib)
+                if (n_rot(2) .lt. 0) then
+                  th1 = theta * comp%hinge(ih)%blen%n2h(i)%s2h(ib)
+                else
+                  th1 = -theta * comp%hinge(ih)%blen%n2h(i)%s2h(ib)
+                endif
                 if ( th1 .ne. 0.0_wp ) then
                   !> coordinate of the centre of the circle used for blending,
                   ! in the n-direction
