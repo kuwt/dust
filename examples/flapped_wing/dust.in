@@ -1,0 +1,63 @@
+! Simulation names 
+basename = ./Output/test
+
+! Geometry input -----------------
+GeometryFile = geo_input.h5 
+ReferenceFile = References.in 
+
+! Timings ---------------------
+tstart = 0.000000 
+tend = 1.000000 
+dt = 0.01
+dt_out = 0.01
+output_start = T 
+ndt_update_wake = 1
+!debug_level = 0 
+
+! Reference values ---------------------
+rho_inf = 1.020000 
+u_inf = (/10, 0., 0./)
+! Model parameters -------------------
+particles_box_min = (/  -9, -16, -4 /)
+particles_box_max = (/  23,  16,  4/)
+FMM = T
+! octree parameters--------------------
+BoxLength = 8
+NBox = (/4, 4 , 1/)
+OctreeOrigin = (/-9 , -16 , -4/)
+NOctreeLevels = 6
+MinOctreePart = 5
+MultipoleDegree = 2
+Vortstretch = T
+Diffusion = T
+! Wake parameters  -------------
+n_wake_panels = 3
+n_wake_particles = 200000
+! wake regularisation
+DivergenceFiltering = T
+FilterTimescale = 40
+RankineRad=0.03  
+VortexRad = 0.05 
+CutoffRad = 0.001
+! lifting lines solver-----------------
+LLtol = 1.0e-6
+LLdamp = 20
+LLReynoldsCorrections = F
+LLMaxIter = 400
+
+! --- Lifting Lines parameters ---
+!LLsolver = GammaMethod ! AlphaMethod !GammaMethod
+!!LLReynoldsCorrections = F
+!!LLReynoldsCorrectionsNfact = 0.2
+!LLmaxIter = 400
+!LLtol = 1.0 e -6
+!LLdamp = 20.0
+!!LLstallRegularisation = T
+!LLstallRegularisationNelems = 1
+!LLstallRegularizationsNiters = 1
+!!LLstallRegularizationAlphaStall = 15
+!LLartificialViscosity = 100000
+!!LLartificialViscosityAdaptive = T
+!!LLartificialViscosityAdaptive_Alpha = 15
+!!LLartificialViscosityAdaptive_dAlpha = 3
+!LLloadsAVL = T

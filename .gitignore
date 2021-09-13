@@ -15,3 +15,4 @@ src/general/mod_version.f90
 *.frc
 *.ine
 build/
+*.h5
