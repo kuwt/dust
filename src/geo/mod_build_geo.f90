@@ -649,8 +649,49 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     endif
     
 #if USE_PRECICE
-    !> *** to do *** symmetry and mirror. So far, finalize run with an error
+    
     if ( coupled_comp ) then
+
+      if ( mesh_symmetry .or. mesh_mirror ) then
+          
+        if ( mesh_mirror ) then
+          select case (trim(mesh_file_type))
+            case('cgns', 'basic', 'revolution' )  ! TODO: check basic
+              call mirror_mesh(ee, rr, mirror_point, mirror_normal)
+            case('parametric','pointwise')
+              call mirror_mesh_structured(ee, rr,  &
+                                            npoints_chord_tot , nelems_span , &
+                                            mirror_point, mirror_normal)
+      
+            case default
+              call error(this_sub_name, this_mod_name,&
+                  'Mirror routines implemented for MeshFileType = &
+                  & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
+                  'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
+          end select
+      
+        end if
+        if ( mesh_symmetry ) then
+          select case (trim(mesh_file_type))
+            case('cgns', 'basic', 'revolution' )  ! TODO: check basic
+              call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
+      
+            case('parametric','pointwise')
+              call symmetry_mesh_structured(ee, rr,  &
+                                             npoints_chord_tot , nelems_span , &
+                                             symmetry_point, symmetry_normal, rr_sym)
+                nelems_span_tot = 2*nelems_span
+
+            case default
+             call error(this_sub_name, this_mod_name,&
+                   'Symmetry routines implemented for MeshFileType = &
+                   & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
+                   'MeshFileType = '//trim(mesh_file_type))
+          end select
+      
+        end if
+      end if
+
       write(*,*) ' coupling_type: ', trim(coupling_type)
       if ( trim(coupling_type) .eq. 'll' ) then
         call error(this_sub_name, this_mod_name, &
@@ -694,16 +735,16 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       elseif ( trim(coupling_type) .eq. 'rbf' ) then
 
         call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)
-        write(*,*) 'RR_pre' , rr
+        !write(*,*) 'RR_pre' , rr
         rr = matmul( transpose(coupling_node_rot), rr )
-        write(*,*) 'RR_post' , rr
+        !write(*,*) 'RR_post' , rr
 
       end if
 
     end if
 #endif
 
-   case('revolution')
+  case('revolution')
 
       if ( countoption(geo_prs,'MeshFile') .lt. 1 ) then
 
@@ -775,7 +816,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         rr = rr * scaling
       endif
 
-   case('parametric')
+  case('parametric')
 
     mesh_file = geo_file
     if ( (ElType .eq. 'v') .or. (ElType .eq. 'p')  ) then
@@ -835,15 +876,14 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call write_hdf5(radius,'Radius', comp_loc)
 
     end if
-
+    
 #if USE_PRECICE
 
     if ( coupled_comp ) then
-
+      
         if ( mesh_symmetry .or. mesh_mirror ) then
-
+          
           if ( mesh_mirror ) then
-
             select case (trim(mesh_file_type))
               case('cgns', 'basic', 'revolution' )  ! TODO: check basic
                 call mirror_mesh(ee, rr, mirror_point, mirror_normal)
