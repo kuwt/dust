@@ -2022,7 +2022,7 @@ subroutine calc_geo_data_ad(elem,vert)
 
   ! center, for the lifting line is the mid-point
   elem%cen =  sum ( vert,2 ) / real(nsides,wp)
-
+  
   elem%area = 0.0_wp; elem%nor = 0.0_wp
   do is = 1, nsides
     nxt = 1+mod(is,nsides)
@@ -2285,7 +2285,13 @@ subroutine update_geometry(geo, t, update_static)
 
     do ie = 1 , size(comp%el)
       ! debug??
-      !if ( mod(ie,10) .eq. 0 )  write(*,*) ' el%id : ', ie, comp%el(ie)%nor, comp%el(ie)%nor_old 
+      if (ie .eq. 10 ) then 
+        write(*,*) 'comp%el(ie)%nor_old ', comp%el(ie)%nor_old 
+        write(*,*) 'sim_param%time_old  ', sim_param%time_old
+        write(*,*) 'comp%el(ie)%nor     ', comp%el(ie)%nor
+        write(*,*) 'sim_param%time      ', sim_param%time
+      end if
+      
       comp%el(ie)%dn_dt = ( comp%el(ie)%nor - comp%el(ie)%nor_old ) / &
                                                               sim_param % dt
     end do

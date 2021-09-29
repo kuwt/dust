@@ -85,6 +85,8 @@ type t_sim_param
   real(wp) , allocatable :: time_vec(:)
   !> Actual time
   real(wp) :: time
+  !> Previous time
+  real(wp) :: time_old  
   !> ndt between 2 wake updates
   integer :: ndt_update_wake
 

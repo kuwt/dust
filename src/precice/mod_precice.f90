@@ -74,7 +74,7 @@ use mod_wake, only: &
     t_wake
 
 use mod_liftlin, only: &
-    t_liftlin
+    t_liftlin, t_liftlin_p
 
 use mod_hinges, only: &
     t_hinge
