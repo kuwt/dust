@@ -94,7 +94,8 @@ use mod_tecplot_out, only: &
 use mod_dat_out, only: &
   dat_out_probes_header
 
-
+use mod_wind, only: &
+  variable_wind
 
 implicit none
 
@@ -333,7 +334,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 !$omp parallel do private(ie, v) reduction(+:vel_probe)
        do ie = 1 , size( comps(ic)%el )
 
-        call comps(ic)%el(ie)%compute_vel( rr_probes(:,ip) , u_inf , v )
+        call comps(ic)%el(ie)%compute_vel( rr_probes(:,ip) , v )
         vel_probe = vel_probe + v/(4*pi)
 
        end do
@@ -343,12 +344,12 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 
 !$omp parallel do private( ie, v) reduction(+:vel_probe)
       do ie = 1, size(wake_elems)
-        call wake_elems(ie)%p%compute_vel( rr_probes(:,ip) , u_inf , v )
+        call wake_elems(ie)%p%compute_vel( rr_probes(:,ip) , v )
         vel_probe = vel_probe + v/(4*pi)
       enddo
 !$omp end parallel do
 
-      vel_probe = vel_probe + u_inf
+      vel_probe = vel_probe + variable_wind(rr_probes(:,ip), t)
     end if
 
     if(probe_vel) then

@@ -132,7 +132,6 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
  real(wp) :: M_ref(3) , M_bas(3)
  real(wp) :: F_ave(3), M_ave(3)
  real(wp), allocatable :: force(:,:), moment(:,:)
- real(wp) :: u_inf(3)
  real(wp) :: P_inf , rho
  integer :: ic , it , ie , ierr , ires , fid_out , nstep
  real(wp), allocatable :: time(:)
@@ -233,7 +232,6 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
 
     ! Load u_inf --------------------------------
     call open_hdf5_group(floc,'Parameters',ploc)
-    call read_hdf5(u_inf,'u_inf',ploc)
     call read_hdf5(P_inf,'P_inf',ploc)
     call read_hdf5(rho,'rho_inf',ploc)
     call close_hdf5_group(ploc)

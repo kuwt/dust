@@ -143,10 +143,9 @@ subroutine assemble_pressure_sys(linsys, geo, elems, wake)
  integer :: ie, ip, iw, p1, p2, inext, is
  integer :: ipp(4) , iww(4), ntot
  real(wp) :: elcen(3), dist(3), dist2(3)
- real(wp) :: Pinf, rhoinf, uinf(3)
+ real(wp) :: Pinf, rhoinf
 
   ! Free-stream conditions
-  uinf   = sim_param%u_inf
   Pinf   = sim_param%P_inf
   rhoinf = sim_param%rho_inf
   ntot = linsys%rank

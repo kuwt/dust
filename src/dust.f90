@@ -148,6 +148,9 @@ use mod_octree, only: &
           t_precice
 #endif
 
+use mod_wind, only: &
+  variable_wind
+
 implicit none
 
 !run-id
@@ -403,6 +406,18 @@ call prms%CreateLogicalOption('HCAS','Hover Convergence Augmentation System',&
                                'F')
 call prms%CreateRealOption('HCAS_time','HCAS deployment time')
 call prms%CreateRealArrayOption('HCAS_velocity','HCAS velocity')
+
+! variable_wind
+call prms%CreateLogicalOption('Gust','Gust perturbation','F')
+call prms%CreateStringOption('GustType','Gust model','AMC')
+call prms%CreateRealArrayOption('GustOrigin','Gust origin point')
+call prms%CreateRealArrayOption('GustFrontDirection','Gust front direction vector')
+call prms%CreateRealArrayOption('GustFrontSpeed','Gust front speed')
+call prms%CreateRealOption('GustUDes','Design gust velocity')
+call prms%CreateRealArrayOption('GustPerturbationDirection','Gust perturbation & 
+                              direction vector','(/0.0, 0.0, 1.0/)')
+call prms%CreateRealOption('GustGradient','Gust gradient')
+call prms%CreateRealOption('GustStartTime','Gust starting time','0.0')
 
 ! get the parameters and print them out
 call printout(nl//'====== Input parameters: ======')
@@ -1028,6 +1043,7 @@ end if
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
   !  next iteration)
+
   t0 = dust_time()
   if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
     !   write(*,*) ' =================== call update_wake ==================== '
@@ -1326,6 +1342,27 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     sim_param%hcas_vel = getrealarray(prms,'HCAS_velocity',3)
   endif
 
+  !variable_wind
+  sim_param%use_gust = getlogical(prms, 'Gust')
+  if(sim_param%use_gust) then
+    sim_param%GustType = getstr(prms,'GustType')
+    sim_param%gust_origin = getrealarray(prms, 'GustOrigin',3)
+    if(countoption(prms,'GustFrontDirection') .gt. 0) then
+      sim_param%gust_front_direction = getrealarray(prms, 'GustFrontDirection',3)
+    else
+      sim_param%gust_front_direction = sim_param%u_inf
+    end if
+    if(countoption(prms,'GustFrontSpeed') .gt. 0) then
+      sim_param%gust_front_speed = getreal(prms, 'GustFrontSpeed')
+    else
+      sim_param%gust_front_speed = norm2(sim_param%u_inf)
+    end if
+    sim_param%gust_u_des = getreal(prms,'GustUDes')
+    sim_param%gust_perturb_direction = getrealarray(prms,'GustPerturbationDirection',3)
+    sim_param%gust_time = getreal(prms,'GustStartTime')
+    sim_param%gust_gradient = getreal(prms,'GustGradient')
+  end if
+
   !Manage restart
   sim_param%restart_from_file = getlogical(prms,'restart_from_file')
   if (sim_param%restart_from_file) then
@@ -1548,7 +1585,7 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
           f(n_neigh) = - ( el%neigh(i_e)%p%mag - el%mag )
         end if
       end do
-      f(n_neigh+1) = sum(el%nor * (-sim_param%u_inf - el%uvort + el%ub) )
+      f(n_neigh+1) = sum(el%nor * (-variable_wind(el%cen, sim_param%time) - el%uvort + el%ub) )
       vel_phi(:,ie) = matmul( el%chtls_stencil , f(1:n_neigh+1) )
 
 
