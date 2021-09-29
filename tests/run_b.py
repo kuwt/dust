@@ -13,6 +13,7 @@ pars.add_argument('-t','--tolerance', nargs='?', help='tolerance for the test',
                   required=False, default=1e-10, type=float)
 pars.add_argument('-r','--release', nargs='?', help='release to check with',
                   required=False, default='0.5.14')
+
 args = pars.parse_args()
 exe_path = args.exe_path
 exe_path = os.path.abspath(exe_path)
@@ -57,7 +58,8 @@ for i, run in enumerate(runs):
   folder = './Output/'
   res = '_res_0011'
 
-  ref_filename = folder+ref_name+vers+res+suffix
+  #ref_filename = folder+ref_name+vers+res+suffix
+  ref_filename = folder+ref_name+res+suffix
   check_filename = folder+check_name+res+suffix
   ref_file = h5py.File(ref_filename, 'r')
   check_file = h5py.File(check_filename, 'r')

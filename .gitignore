@@ -16,3 +16,5 @@ src/general/mod_version.f90
 *.ine
 build/
 *.h5
+!test/
+.vscode

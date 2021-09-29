@@ -1,8 +1,8 @@
 ! Simulation names
+!basename       = ./Output/ref_dynamic_base
+!basename_debug =  ./Debug/ref_dynamic_base
 basename       = ./Output/test_dynamic_base
 basename_debug =  ./Debug/test_dynamic_base
-!basename       = ./Output/ref_dynamic_base_0-5-13
-!basename_debug =  ./Debug/ref_dynamic_base_0-5-13
 
 ! geometry input -----------------
 GeometryFile = geo_input.h5

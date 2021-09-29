@@ -61,7 +61,8 @@ for i, run in enumerate(runs):
   folder = './Output/'
   res = '_res_0011'
 
-  ref_filename = folder+ref_name+vers+res+suffix
+  #ref_filename = folder+ref_name+vers+res+suffix
+  ref_filename = folder+ref_name+res+suffix
   check_filename = folder+check_name+res+suffix
   ref_file = h5py.File(ref_filename, 'r')
   check_file = h5py.File(check_filename, 'r')
