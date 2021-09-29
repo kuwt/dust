@@ -68,6 +68,8 @@ use mod_vortpart, only: &
 use mod_multipole, only: &
   t_multipole, t_polyexp, t_ker_der, set_multipole_param
 
+use mod_wind, only: &
+  variable_wind
 !----------------------------------------------------------------------
 
 implicit none
@@ -1249,7 +1251,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
           do ipp = 1,octree%leaves(lv)%p%neighbours(i,j,k)%p%npart
 
             call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
-                 %compute_vel(pos, sim_param%u_inf, v)
+                 %compute_vel(pos, v)
             vel = vel +v/(4.0_wp*pi)
             if(sim_param%use_vs) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
@@ -1280,7 +1282,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
        do ipp = 1,octree%leaves(lv)%p%leaf_neigh(iln)%p%npart
 
          call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
-              %compute_vel(pos, sim_param%u_inf, v)
+              %compute_vel(pos, v)
          vel = vel +v/(4.0_wp*pi)
          if(sim_param%use_vs) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
@@ -1308,7 +1310,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       do ipp = 1,octree%leaves(lv)%p%npart
         if (ipp .ne. ip) then
           call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_vel(pos, &
-                                                        sim_param%u_inf, v)
+                                                         v)
           vel = vel +v/(4.0_wp*pi)
           if(sim_param%use_vs) then
             call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_stretch(pos, &
@@ -1337,30 +1339,30 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       !Calculate the interactions with all the other elements
       !calculate the influence of the solid bodies
       do ie=1,size(elem)
-        call elem(ie)%p%compute_vel(pos, sim_param%u_inf, v)
+        call elem(ie)%p%compute_vel(pos,  v)
         vel = vel + v/(4*pi)
       enddo
 
       ! calculate the influence of the wake panels
       do ie=1,size(wpan)
-        call wpan(ie)%p%compute_vel(pos, sim_param%u_inf, v)
+        call wpan(ie)%p%compute_vel(pos,  v)
         vel = vel + v/(4*pi)
       enddo
 
       ! calculate the influence of the wake rings
       do ie=1,size(wrin)
-        call wrin(ie)%p%compute_vel(pos, sim_param%u_inf, v)
+        call wrin(ie)%p%compute_vel(pos,  v)
         vel = vel+ v/(4*pi)
       enddo
 
       !calculate the influence of the end vortex
       do ie=1,size(wvort)
-        call wvort(ie)%compute_vel(pos, sim_param%u_inf, v)
+        call wvort(ie)%compute_vel(pos,  v)
         vel = vel+ v/(4*pi)
       enddo
 
       !at last, add the free stream velocity
-      vel = vel + sim_param%u_inf
+      vel = vel + variable_wind(pos, sim_param%time)
       octree%leaves(lv)%p%cell_parts(ip)%p%vel = vel
 
       !> Vortex stretching from other elements
@@ -1368,19 +1370,19 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
         stretch_elem = 0.0_wp
         ! Influence of the body elements
         do ie=1,size(elem)
-          call elem(ie)%p%compute_grad(pos, sim_param%u_inf, grad_elem)
+          call elem(ie)%p%compute_grad(pos, grad_elem)
           stretch_elem = stretch_elem + &
               matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
         enddo
         ! Influence of the wake panels
         do ie=1,size(wpan)
-          call wpan(ie)%p%compute_grad(pos, sim_param%u_inf, grad_elem)
+          call wpan(ie)%p%compute_grad(pos, grad_elem)
           stretch_elem = stretch_elem + &
               matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
         enddo
         ! Influence of the end vortex
         do ie=1,size(wvort)
-          call wvort(ie)%compute_grad(pos, sim_param%u_inf, grad_elem)
+          call wvort(ie)%compute_grad(pos, grad_elem)
           stretch_elem = stretch_elem + &
               matmul(transpose(grad_elem),alpha)/(4.0_wp*pi)
         enddo
@@ -1462,7 +1464,7 @@ subroutine apply_multipole_panels(octree, elem)
           do ipp = 1,octree%leaves(lv)%p%neighbours(i,j,k)%p%npart
 
             call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
-                 %compute_vel(pos, sim_param%u_inf, v)
+                 %compute_vel(pos, v)
             vel = vel +v/(4.0_wp*pi)
           enddo
         endif
@@ -1474,7 +1476,7 @@ subroutine apply_multipole_panels(octree, elem)
        do ipp = 1,octree%leaves(lv)%p%leaf_neigh(iln)%p%npart
 
          call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
-              %compute_vel(pos, sim_param%u_inf, v)
+              %compute_vel(pos,  v)
          vel = vel +v/(4.0_wp*pi)
        enddo
       enddo
@@ -1482,7 +1484,7 @@ subroutine apply_multipole_panels(octree, elem)
       !finally interact with the particles inside the cell
       do ipp = 1,octree%leaves(lv)%p%npart
         call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_vel(pos, &
-                                                      sim_param%u_inf, v)
+                                                      v)
         vel = vel +v/(4.0_wp*pi)
       enddo
 

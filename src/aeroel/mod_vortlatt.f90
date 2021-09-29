@@ -72,6 +72,8 @@ use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
+use mod_wind, only: &
+  variable_wind
 !----------------------------------------------------------------------
 
 implicit none
@@ -131,23 +133,22 @@ contains
 !! Only the dynamic part of the linear system is actually built here:
 !! the rest of the system was already built in the \ref build_row_static
 !! subroutine.
-subroutine build_row_vortlatt(this, elems, linsys, uinf, ie, ista, iend)
+subroutine build_row_vortlatt(this, elems, linsys, ie, ista, iend)
  class(t_vortlatt), intent(inout) :: this
  type(t_impl_elem_p), intent(in)  :: elems(:)
  type(t_linsys), intent(inout)    :: linsys
- real(wp), intent(in)             :: uinf(:)
  integer, intent(in)              :: ie
  integer, intent(in)              :: ista, iend
 
  integer :: j1
- real(wp) :: b1
+ real(wp) :: b1, wind(3)
   !Not moving components, in the rhs contribution there is no body velocity
   !linsys%b(ie) = sum(linsys%b_static(:,ie) * (-uinf))
   linsys%b(ie) = 0.0_wp
     do j1 = 1,ista-1
-
+      wind = variable_wind(elems(j1)%p%cen, sim_param%time)
       linsys%b(ie) = linsys%b(ie) +  &
-          linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-uinf-elems(j1)%p%uvort))
+          linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-wind-elems(j1)%p%uvort))
     enddo
 
   ! ista and iend will be the end of the unknowns vector, containing
@@ -159,13 +160,15 @@ subroutine build_row_vortlatt(this, elems, linsys, uinf, ie, ista, iend)
 
     if (ie .eq. j1) then
       !diagonal, we are certainly employing vortrin, enforce the b.c. on ie
+      wind = variable_wind(elems(ie)%p%cen, sim_param%time)
       linsys%b(ie) = linsys%b(ie) + &
-                b1*sum(elems(ie)%p%nor*(elems(ie)%p%ub-uinf-elems(j1)%p%uvort))
+                b1*sum(elems(ie)%p%nor*(elems(ie)%p%ub-wind-elems(j1)%p%uvort))
     else
       ! off-diagonal: if it is a vortrin b1 is zero, if it is a surfpan
       ! enforce the boundary condition on it (j1)
+      wind = variable_wind(elems(j1)%p%cen, sim_param%time)
       linsys%b(ie) = linsys%b(ie) + &
-                b1*sum(elems(j1)%p%nor*(elems(j1)%p%ub-uinf-elems(j1)%p%uvort))
+                b1*sum(elems(j1)%p%nor*(elems(j1)%p%ub-wind-elems(j1)%p%uvort))
     endif
 
   end do
@@ -181,12 +184,11 @@ end subroutine build_row_vortlatt
 !! called just once at the beginning of the simulation, and saves the AIC
 !! coefficients for te static part and the static contribution to the rhs
 subroutine build_row_static_vortlatt(this, elems, expl_elems, linsys, &
-                                  uinf, ie, ista, iend)
+                                  ie, ista, iend)
 class(t_vortlatt), intent(inout) :: this
 type(t_impl_elem_p), intent(in)       :: elems(:)
 type(t_expl_elem_p), intent(in)       :: expl_elems(:)
 type(t_linsys), intent(inout)    :: linsys
-real(wp), intent(in)             :: uinf(:)
 integer, intent(in)              :: ie
 integer, intent(in)              :: ista, iend
 
@@ -236,12 +238,11 @@ end subroutine build_row_static_vortlatt
 !!
 !! The rhs of the equation for a vortex ring is updated  adding the
 !! the contribution of velocity due to the lifting lines
-subroutine add_expl_vortlatt(this, expl_elems, linsys, uinf, &
+subroutine add_expl_vortlatt(this, expl_elems, linsys, &
                           ie, ista, iend)
 class(t_vortlatt), intent(inout) :: this
 type(t_expl_elem_p), intent(in)       :: expl_elems(:)
 type(t_linsys), intent(inout)    :: linsys
-real(wp), intent(in)             :: uinf(:)
 integer, intent(in)              :: ie
 integer, intent(in)             :: ista
 integer, intent(in)             :: iend
@@ -273,13 +274,12 @@ end subroutine add_expl_vortlatt
 !!
 !! The rhs of the equation for a surface panel is updated  adding the
 !! the contribution of velocity due to the wake
-subroutine add_wake_vortlatt(this, wake_elems, impl_wake_ind, linsys, uinf, &
+subroutine add_wake_vortlatt(this, wake_elems, impl_wake_ind, linsys, &
                           ie, ista, iend)
 class(t_vortlatt), intent(inout) :: this
 type(t_pot_elem_p), intent(in)       :: wake_elems(:)
 integer, intent(in)             :: impl_wake_ind(:,:)
 type(t_linsys), intent(inout)    :: linsys
-real(wp), intent(in)             :: uinf(:)
 integer, intent(in)              :: ie
 integer, intent(in)             :: ista
 integer, intent(in)             :: iend
@@ -393,14 +393,12 @@ end subroutine compute_psi_vortlatt
 !! WARNING: the velocity calculated, to be consistent with the formulation of
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
-subroutine compute_vel_vortlatt(this, pos, uinf, vel)
+subroutine compute_vel_vortlatt(this, pos, vel)
 class(t_vortlatt), intent(in) :: this
 real(wp), intent(in) :: pos(:)
-real(wp), intent(in) :: uinf(3)
 real(wp), intent(out) :: vel(3)
 
 real(wp) :: vdou(3)
-
 
 ! doublet ---
 call velocity_calc_doublet(this, vdou, pos)
@@ -419,10 +417,9 @@ end subroutine compute_vel_vortlatt
 !! WARNING: the velocity calculated, to be consistent with the formulation of
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
-subroutine compute_grad_vortlatt(this, pos, uinf, grad)
+subroutine compute_grad_vortlatt(this, pos, grad)
 class(t_vortlatt), intent(in) :: this
 real(wp), intent(in) :: pos(:)
-real(wp), intent(in) :: uinf(3)
 real(wp), intent(out) :: grad(3,3)
 
 real(wp) :: grad_dou(3,3)
@@ -450,19 +447,22 @@ subroutine compute_pres_vortlatt(this) !, R_g)
 !type(t_elem_p), intent(in) :: elems(:)
 
 integer  :: i_stripe
+real(wp) :: wind(3)
 
 this%pres = 0.0_wp
 
 i_stripe = size(this%stripe_elem)
 
 if ( i_stripe .gt. 1 ) then
+  wind = variable_wind(this%cen, sim_param%time)
   this%pres = - sim_param%rho_inf * &
-        ( norm2(sim_param%u_inf + this%uvort - this%ub) * this%dy / this%area * &
+        ( norm2(wind + this%uvort - this%ub) * this%dy / this%area * &
         ( this%mag - this%stripe_elem(i_stripe-1)%p%mag ) + &
             this%didou_dt ) 
 else
+  wind = variable_wind(this%cen, sim_param%time)
   this%pres = - sim_param%rho_inf * &
-        ( norm2(sim_param%u_inf + this%uvort - this%ub) * this%dy / this%area * &
+        ( norm2(wind + this%uvort - this%ub) * this%dy / this%area * &
               this%mag + &
             this%didou_dt ) 
 end if
@@ -511,13 +511,14 @@ end subroutine compute_dforce_dummy
 !
 subroutine compute_dforce_jukowski_vortlatt(this)
  class(t_vortlatt), intent(inout) :: this
- real(wp) :: gam(3)
+ real(wp) :: gam(3), wind(3)
 
  integer  :: i_stripe
  real(wp) :: mach
 
   ! Prandt -- Glauert correction for compressibility effect
-  mach = abs(norm2(sim_param%u_inf) / sim_param%a_inf)
+  wind = variable_wind(this%cen, sim_param%time)
+  mach = abs(norm2(wind) / sim_param%a_inf)
   ! === Steady contribution (KJ) ===
   gam = cross ( this % vel_ctr_pt, this%edge_vec(:,1) )
   i_stripe = size(this%stripe_elem)
@@ -555,7 +556,7 @@ class(t_vortlatt), intent(inout) :: this
 type(t_pot_elem_p),intent(in):: elems(:)
 type(t_pot_elem_p),intent(in):: wake_elems(:)
 
-real(wp) :: v(3), x0(3)
+real(wp) :: v(3), x0(3), wind(3)
 integer :: j
 
 ! Initialisation to zero
@@ -566,16 +567,17 @@ x0 = this%cen + (this%edge_vec(:,4)-this%edge_vec(:,2))/4.0_wp
 
 !=== Compute the velocity from all the elements ===
 do j = 1,size(wake_elems)  ! wake panels
-  call wake_elems(j)%p%compute_vel(x0,sim_param%u_inf,v)
+  call wake_elems(j)%p%compute_vel(x0,v)
   this%vel_ctr_pt = this%vel_ctr_pt + v
 enddo
 do j = 1,size(elems) ! body elements
-  call elems(j)%p%compute_vel(x0,sim_param%u_inf,v)
+  call elems(j)%p%compute_vel(x0,v)
   this%vel_ctr_pt = this%vel_ctr_pt + v
 enddo
 ! induced velocity on leading edge side
+wind = variable_wind(this%cen, sim_param%time)
 this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp*pi) &
-              + sim_param%u_inf + this%uvort - this%ub
+              + wind + this%uvort - this%ub
 
 end subroutine get_vel_ctr_pt_vortlatt
 
@@ -644,10 +646,9 @@ end subroutine calc_geo_data_vortlatt
 
 !----------------------------------------------------------------------
 
-subroutine get_vort_vel_vortlatt(this, vort_elems, uinf)
+subroutine get_vort_vel_vortlatt(this, vort_elems)
  class(t_vortlatt), intent(inout)  :: this
  type(t_vort_elem_p), intent(in)    :: vort_elems(:)
- real(wp), intent(in) :: uinf(3)
 
  integer :: iv
  real(wp) :: vel(3)
@@ -656,7 +657,7 @@ subroutine get_vort_vel_vortlatt(this, vort_elems, uinf)
  this%uvort = 0.0_wp
 
  do iv=1,size(vort_elems)
-   call vort_elems(iv)%p%compute_vel(this%cen, uinf, vel)
+   call vort_elems(iv)%p%compute_vel(this%cen, vel)
    this%uvort = this%uvort + vel/(4*pi)
  enddo
 

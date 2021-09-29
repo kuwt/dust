@@ -78,6 +78,9 @@ use mod_liftlin, only: &
 
 use mod_hinges, only: &
     t_hinge
+    
+use mod_wind, only: &
+  variable_wind
 
 implicit none
 
@@ -1443,7 +1446,7 @@ subroutine update_near_field_wake( this, geo, wake )
   type(t_geo)       , intent(in)    :: geo
   type(t_wake)      , intent(inout) :: wake
 
-  real(wp) :: n_rot(3), dist(3), vel_te(3)
+  real(wp) :: n_rot(3), dist(3), vel_te(3), wind(3)
   real(wp) :: theta
   real(wp) :: eps = 1.0e-9_wp
 
@@ -1482,11 +1485,12 @@ subroutine update_near_field_wake( this, geo, wake )
         dist = dist/norm2(dist)
 
         vel_te = geo%points_vel(:, wake%pan_gen_icomp(ip))
-
-        if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
+        wind = variable_wind(geo%points(:,wake%pan_gen_icomp),sim_param%time)
+        
+        if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
              dist*wake%pan_gen_scaling(ip)* &
-             norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist) * &
+             norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &
              sim_param%ndt_update_wake
         else
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
@@ -1512,11 +1516,13 @@ subroutine update_near_field_wake( this, geo, wake )
               ( 1.0_wp - cos(theta) ) * sum( wake%pan_gen_dir(:,ip)*n_rot ) * n_rot
 
         vel_te = geo%points_vel(:, wake%pan_gen_icomp(ip))
-
-        if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
+        
+        wind = variable_wind(geo%points(:,wake%pan_gen_icomp),sim_param%time)
+        
+        if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
              dist*wake%pan_gen_scaling(ip)* &
-             norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist) * &
+             norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &
              sim_param%ndt_update_wake
         else
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
@@ -1559,11 +1565,11 @@ subroutine update_near_field_wake( this, geo, wake )
                 ( 1.0_wp - cos(theta) ) * sum( wake%pan_gen_dir(:,ip)*n_rot ) * n_rot
   
           vel_te = geo%points_vel(:, wake%pan_gen_icomp(ip))
-  
-          if ( norm2(sim_param%u_inf-vel_te) .gt. sim_param%min_vel_at_te ) then
+          wind = variable_wind(geo%points(:,wake%pan_gen_icomp),sim_param%time)
+          if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
             wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                dist*wake%pan_gen_scaling(ip)* &
-               norm2(sim_param%u_inf-vel_te)*sim_param%dt / norm2(dist) * &
+               norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &
                sim_param%ndt_update_wake
           else
             wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
