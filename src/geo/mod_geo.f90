@@ -2285,12 +2285,12 @@ subroutine update_geometry(geo, t, update_static)
 
     do ie = 1 , size(comp%el)
       ! debug??
-      if (ie .eq. 10 ) then 
-        write(*,*) 'comp%el(ie)%nor_old ', comp%el(ie)%nor_old 
-        write(*,*) 'sim_param%time_old  ', sim_param%time_old
-        write(*,*) 'comp%el(ie)%nor     ', comp%el(ie)%nor
-        write(*,*) 'sim_param%time      ', sim_param%time
-      end if
+      !if (ie .eq. 10 ) then 
+        !write(*,*) 'comp%el(ie)%nor_old ', comp%el(ie)%nor_old 
+        !write(*,*) 'sim_param%time_old  ', sim_param%time_old
+        !write(*,*) 'comp%el(ie)%nor     ', comp%el(ie)%nor
+        !write(*,*) 'sim_param%time      ', sim_param%time
+      !end if
       
       comp%el(ie)%dn_dt = ( comp%el(ie)%nor - comp%el(ie)%nor_old ) / &
                                                               sim_param % dt

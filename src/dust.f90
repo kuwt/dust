@@ -721,12 +721,12 @@ end if
                                        precice%fields(i)%fdata )
           endif
           ! check ---
-          write(*,*) ' precice%mesh%nnodes : ', precice%mesh%nnodes
-          write(*,*) i, precice%fields(i)%fid, precice%fields(i)%fname
-          do i_el = 1, size(precice%fields(i)%fdata,2)
-            write(*,*) precice%fields(i)%fdata(:,i_el)
-          end do
-          write(*,*)
+          !write(*,*) ' precice%mesh%nnodes : ', precice%mesh%nnodes
+          !write(*,*) i, precice%fields(i)%fid, precice%fields(i)%fname
+          !do i_el = 1, size(precice%fields(i)%fdata,2)
+          !  write(*,*) precice%fields(i)%fdata(:,i_el)
+          !end do
+          !write(*,*)
           ! check ---
         end if
       end do

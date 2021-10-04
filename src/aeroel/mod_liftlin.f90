@@ -794,13 +794,13 @@ subroutine solve_liftlin_piszkin( &
                   - sim_param%rho_inf * el%area * ( &
                   el%dGamma_dt  * el%nor + el%mag * el%dn_dt )
 
-      write(*,*) 'debug mod_liftlin.f90 l.795'
-      write(*,*) 'sim_param%time      ', sim_param%time
-      write(*,*) 'sim_param%time_old  ', sim_param%time_old
-      write(*,*) 'el%dGamma_dt        ', el%dGamma_dt
-      write(*,*) 'el%nor              ', el%nor
-      write(*,*) 'el%mag              ', el%mag
-      write(*,*) 'el%dn_dt            ', el%dn_dt
+      !write(*,*) 'debug mod_liftlin.f90 l.795'
+      !write(*,*) 'sim_param%time      ', sim_param%time
+      !write(*,*) 'sim_param%time_old  ', sim_param%time_old
+      !write(*,*) 'el%dGamma_dt        ', el%dGamma_dt
+      !write(*,*) 'el%nor              ', el%nor
+      !write(*,*) 'el%mag              ', el%mag
+      !write(*,*) 'el%dn_dt            ', el%dn_dt
 
       ! el%dforce = el%dforce &
       !             + sim_param%rho_inf * el%area * el%dGamma_dt &
@@ -1207,7 +1207,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   endif
 
   ! === Update dGamma_dt field ===
-  write(*,*) 'GAMMA'
   do i_l = 1,size(elems_ll)
     !elems_ll(i_l)%p%dGamma_dt = ( elems_ll(i_l)%p%mag - elems_ll(i_l)%p%Gamma_old) / &
     !                              sim_param%dt
@@ -1264,13 +1263,13 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
                   - sim_param%rho_inf * el%area * ( &
                   el%dGamma_dt  * el%nor + el%mag * el%dn_dt )
 
-      write(*,*) 'debug mod_liftlin.f90 l.1259'
-      write(*,*) 'sim_param%time      ', sim_param%time
-      write(*,*) 'sim_param%time_old  ', sim_param%time_old
-      write(*,*) 'el%dGamma_dt        ', el%dGamma_dt
-      write(*,*) 'el%nor              ', el%nor
-      write(*,*) 'el%mag              ', el%mag
-      write(*,*) 'el%dn_dt            ', el%dn_dt
+      !write(*,*) 'debug mod_liftlin.f90 l.1259'
+      !write(*,*) 'sim_param%time      ', sim_param%time
+      !write(*,*) 'sim_param%time_old  ', sim_param%time_old
+      !write(*,*) 'el%dGamma_dt        ', el%dGamma_dt
+      !write(*,*) 'el%nor              ', el%nor
+      !write(*,*) 'el%mag              ', el%mag
+      !write(*,*) 'el%dn_dt            ', el%dn_dt
             
       !el%dforce = el%dforce &
       !            + sim_param%rho_inf * el%area * el%dGamma_dt &

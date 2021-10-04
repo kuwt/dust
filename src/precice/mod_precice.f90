@@ -600,7 +600,7 @@ subroutine update_force( this, geo, elems )
           end if
         end do
 
-        write(*,*) 'Position from precice' , this%fields(1)%fdata
+        !write(*,*) 'Position from precice' , this%fields(1)%fdata
 
 
         !> === Aerodynamic mesh to structural nodes ===
@@ -1052,7 +1052,7 @@ subroutine update_elems( this, geo, elems )
       elseif ( trim(comp%coupling_type) .eq. 'rbf' ) then
 
         ! debug ---
-        write(*,*) ' comp n. ', comp%comp_id, ' rbf'
+        !write(*,*) ' comp n. ', comp%comp_id, ' rbf'
         
         !> Reset, before accumulation, only nodes belonging to the component
         do i = 1, size(comp%i_points)
