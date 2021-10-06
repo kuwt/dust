@@ -1,0 +1,8 @@
+
+Reference_Tag = WingRef
+Parent_Tag = 0
+Origin = (/0.0, 0.0, 0.0/)
+Orientation = (/1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0/)
+Multiple = F
+Moving = F
+
