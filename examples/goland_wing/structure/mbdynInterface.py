@@ -5,6 +5,7 @@ from mbc_py_interface import mbcNodal
 import precice
 from precice import *
 
+import numpy as np
 
 class MBDynInterface:
   """ MBDyn interface collecting kinematic and forces """
