@@ -57,38 +57,16 @@ https://github.com/precice/precice/wiki/Dependencies
 
 !! Install and make
 -----------------
-	$ wget https://github.com/precice/precice/archive/v2.1.0.tar.gz
-	$ tar -xzvf v2.1.0.tar.gz
-	$ cd precice-2.1.0
+	
+# PreCICE
+# for Ubuntu 20.04
 
-	$ mkdir build && cd build
-	$ cmake -DBUILD_SHARED_LIBS=ON ..
-	$ make -j4
+wget https://github.com/precice/precice/releases/download/v2.2.1/libprecice2_2.2.1_focal.deb
 
-	$ make test
-	# make install
-	$ make test_install
-
-! linking preCICE
-----------------
-(inside .bashrc	-->)
-	export PKG_CONFIG_PATH=/<path_to_precice_folder>/build:$PKG_CONFIG_PATH
+$ apt install ./libprecice2_2.2.1_focal.deb
+$ pip3 install --user pyprecice
 
 
-!! python-bindings
-------------------
-	$ apt install pip3 --upgrade pip
-	$ pip3 install --user pyprecice
-	$ pip3 install --user https://github.com/precice/python-bindings/archive/master.zip
-
-	$ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PRECICE_ROOT/build/last
-	$ python3 -c "import precice"
-
-
-!! fortran-module
------------------
-	$ git clone https://github.com/precice/fortran-module.git
-	$ make
 
 
 ================================================================
