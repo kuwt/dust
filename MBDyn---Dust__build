@@ -79,7 +79,7 @@ $ pip3 install --user pyprecice
 
 	$ mkdir build
 	$ cd build
-	# apt install libcgns3.4 libcgns-dev libhdf5-dev	(check 3.? version)
+	# apt install libcgns3.4 libcgns-dev libhdf5-dev libopenblas0
 	$ ccmake ../
 	$ make
 	
