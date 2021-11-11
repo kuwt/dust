@@ -1208,12 +1208,12 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   ! === Update dGamma_dt field ===
   do i_l = 1,size(elems_ll)
-    !elems_ll(i_l)%p%dGamma_dt = ( elems_ll(i_l)%p%mag - elems_ll(i_l)%p%Gamma_old) / &
-    !                              sim_param%dt
+    elems_ll(i_l)%p%dGamma_dt = ( elems_ll(i_l)%p%mag - elems_ll(i_l)%p%Gamma_old) / &
+                                  sim_param%dt
     if (sim_param%time .lt. 1e-9_wp) then
     else
-      elems_ll(i_l)%p%dGamma_dt = ( 3*elems_ll(i_l)%p%mag - 4*elems_ll(i_l)%p%Gamma_old + elems_ll(i_l)%p%Gamma_old_old) / &
-                                  (2*sim_param%dt)                       
+      !elems_ll(i_l)%p%dGamma_dt = ( 3*elems_ll(i_l)%p%mag - 4*elems_ll(i_l)%p%Gamma_old + elems_ll(i_l)%p%Gamma_old_old) / &
+       !                           (2*sim_param%dt)                       
     endif
                                   !if (i_l .eq. 10) then
     !  write(*,*) 'sim_param%time', sim_param%time
