@@ -50,6 +50,9 @@ module mod_post_probes
 use mod_param, only: &
   wp, nl, max_char_len, extended_char_len , pi, ascii_real
 
+use mod_sim_param, only: &
+  sim_param
+
 use mod_handling, only: &
   error, warning  , info, printout, dust_time, t_realtime, new_file_unit
 
@@ -309,7 +312,11 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
    call read_hdf5(P_inf,'P_inf',ploc)
    call read_hdf5(rho,'rho_inf',ploc)
    call close_hdf5_group(ploc)
-
+   
+   sim_param%u_inf = u_inf
+   sim_param%P_inf = P_inf
+   sim_param%rho_inf = rho
+   
    ! Load the references and move the points ---
    call load_refs(floc,refs_R,refs_off)
    call update_points_postpro(comps, points, refs_R, refs_off, &

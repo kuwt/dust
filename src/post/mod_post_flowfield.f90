@@ -50,6 +50,9 @@ module mod_post_flowfield
 use mod_param, only: &
   wp, nl, max_char_len, extended_char_len , pi
 
+use mod_sim_param, only: &
+  sim_param
+
 use mod_handling, only: &
   error, warning
 
@@ -324,6 +327,10 @@ do it = an_start, an_end, an_step ! Time history
   call read_hdf5(P_inf,'P_inf',ploc)
   call read_hdf5(rho,'rho_inf',ploc)
   call close_hdf5_group(ploc)
+
+  sim_param%u_inf = u_inf
+  sim_param%P_inf = P_inf
+  sim_param%rho_inf = rho
 
   ! Load the references and move the points ---
   call load_refs(floc,refs_R,refs_off,refs_G,refs_f)
