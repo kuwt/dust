@@ -561,6 +561,8 @@ if(sim_param%debug_level .ge. 1) then
   call printout(message)
 endif
 
+
+
 ! Restart --------------
 !------ Reloading ------
 if (sim_param%restart_from_file) then
@@ -577,9 +579,15 @@ else ! Set to zero the intensity of all the singularities
      elems(i_el)%p%mag = 0.0_wp
   end do
   do i_el = 1 , size(elems_expl) ! explicit elements (ll, ad)
-     elems_expl(i_el)%p%mag = 0.0_wp
+    elems_expl(i_el)%p%mag = 0.0_wp
+    
   end do
-
+  if (size(elems_ll) .gt. 0) then
+    do i_el = 1, size(elems_ll)
+      elems_ll(i_el)%p%Gamma_old = 0.0_wp
+      elems_ll(i_el)%p%Gamma_old_old = 0.0_wp
+    end do
+  endif 
 endif
 
 t22 = dust_time()
@@ -615,6 +623,7 @@ end if
 !====== Time Cycle ======
 call printout(nl//'////////// Performing Computations //////////')
 time = sim_param%t0
+sim_param%time_old = sim_param%t0 + 1
 t_last_out = time; t_last_debug_out = time
 time_no_out = 0.0_wp; time_no_out_debug = 0.0_wp
 
@@ -635,12 +644,13 @@ t11 = dust_time()
 it = 0
 #if USE_PRECICE
     it = 1
-    do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .eq. 1 ) )
+    do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .eq. 1 ) ) ! start time cycle 
 #else
     do while ( ( it .lt. nstep ) )
       it = it + 1
 #endif
-
+  sim_param%time_old = sim_param%time
+  
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,I5,A,I5,A,F9.4)') nl//'--> Step ',it,' of ', &
                                       nstep, ' simulation time: ', time
@@ -819,17 +829,25 @@ end if
 
   !------ Update the explicit part ------  % v-----implicit elems: p,v
   if ( size(elems_ll) .gt. 0 ) then
-   if ( trim(sim_param%llSolver) .eq. 'GammaMethod' ) then ! Gamma-method
-    call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
-            (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it)
-   elseif ( trim(sim_param%llSolver) .eq. 'AlphaMethod' ) then
-    call solve_liftlin_piszkin(elems_ll, elems_tot, elems , elems_ad , &
+
+    if ( trim(sim_param%llSolver) .eq. 'GammaMethod' ) then ! Gamma-method
+      if (sim_param%time .gt. sim_param%time_old)  then
+        do i_el = 1, size(elems_ll)
+          elems_ll(i_el)%p%Gamma_old_old = elems_ll(i_el)%p%Gamma_old
+          elems_ll(i_el)%p%Gamma_old = elems_ll(i_el)%p%mag 
+        enddo
+      endif
+      call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
+              (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it)
+      
+    elseif ( trim(sim_param%llSolver) .eq. 'AlphaMethod' ) then
+      call solve_liftlin_piszkin(elems_ll, elems_tot, elems , elems_ad , &
             (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it,&
-             al_kernel )
-   else
+            al_kernel )
+  else
     call error('dust','dust',' Wrong string for LLsolver. &
-         &This parameter should have been set equal to "GammaMethod" (default) &
-         &in init_sim_param() routine. Something went wrong. Stop')
+          &This parameter should have been set equal to "GammaMethod" (default) &
+          &in init_sim_param() routine. Something went wrong. Stop')
 
 !   call solve_liftlin_optim(elems_ll, elems_tot, elems , elems_ad , &
 !           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it, &
@@ -1097,7 +1115,6 @@ end if
       ! time loop (at the begin w/o precice, at the end w/ precice)?
       !> Update n. time step
       it = it + 1
-
       endif ! End of the if statement that check whether the timestep
             ! has converged or not
 #endif

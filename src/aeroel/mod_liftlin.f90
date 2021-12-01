@@ -115,7 +115,8 @@ type, extends(c_expl_elem) :: t_liftlin
   real(wp)              :: vel_2d_isolated
   real(wp)              :: vel_outplane_isolated
   real(wp)              :: alpha_unsteady
-
+  real(wp)              :: Gamma_old
+  real(wp)              :: Gamma_old_old
   !> new field for load computations
   real(wp) :: vel_ctr_pt(3)
   real(wp) ::  al_ctr_pt
@@ -792,6 +793,15 @@ subroutine solve_liftlin_piszkin( &
       el%dforce = el%dforce &
                   - sim_param%rho_inf * el%area * ( &
                   el%dGamma_dt  * el%nor + el%mag * el%dn_dt )
+
+      write(*,*) 'debug mod_liftlin.f90 l.795'
+      write(*,*) 'sim_param%time      ', sim_param%time
+      write(*,*) 'sim_param%time_old  ', sim_param%time_old
+      write(*,*) 'el%dGamma_dt        ', el%dGamma_dt
+      write(*,*) 'el%nor              ', el%nor
+      write(*,*) 'el%mag              ', el%mag
+      write(*,*) 'el%dn_dt            ', el%dn_dt
+
       ! el%dforce = el%dforce &
       !             + sim_param%rho_inf * el%area * el%dGamma_dt &
       !             * e_l ! lift direction
@@ -830,7 +840,14 @@ subroutine solve_liftlin_piszkin( &
       ! el%dforce = el%dforce &
       !             + sim_param%rho_inf * el%area * el%dGamma_dt &
       !             * e_l ! lift direction
-
+      write(*,*) 'debug mod_liftlin.f90 l.795'
+      write(*,*) 'sim_param%time      ', sim_param%time
+      write(*,*) 'sim_param%time_old  ', sim_param%time_old
+      write(*,*) 'el%dGamma_dt        ', el%dGamma_dt
+      write(*,*) 'el%nor              ', el%nor
+      write(*,*) 'el%mag              ', el%mag
+      write(*,*) 'el%dn_dt            ', el%dn_dt
+            
       !> Update aerodynamic coefficients and AOA, and pressure
       c_m(i_l,1) = sum( el % dforce * e_l ) / &
         ( 0.5_wp * sim_param%rho_inf * u_v(i_l) ** 2.0_wp * el%area )
@@ -854,7 +871,7 @@ subroutine solve_liftlin_piszkin( &
     el%vel_2d = u_v(i_l)
     el%aero_coeff = c_m(i_l,:)
 
-   !end select
+    !end select
   end do
 
   if(sim_param%debug_level .ge. 3) then
@@ -896,6 +913,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
  real(wp) :: cl
  real(wp), allocatable :: aero_coeff(:)
  real(wp), allocatable :: dou_temp(:)
+ real(wp), allocatable :: alpha_temp(:)
 
  ! mach and reynolds number for each el
  real(wp) :: mach , reynolds
@@ -906,7 +924,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
  !> sim_param
  ! fixed point algorithm for ll
- real(wp) :: fp_tol , fp_damp , diff
+ real(wp) :: fp_tol , fp_damp , diff, diff_alpha
  integer  :: fp_maxIter
  ! stall regularisation: params read as inputs
  logical  :: stall_regularisation
@@ -916,8 +934,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
  ! load computation
  logical :: load_avl
  real(wp) :: e_l(3) , e_d(3)
- real(wp), allocatable :: Gamma_old(:)
-
+ 
  real(wp) :: max_mag_ll
 
  type(t_liftlin), pointer :: el
@@ -944,13 +961,14 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
 
   !> allocate and fill Gamma_old array of the ll intensity at previous dt
-  allocate(Gamma_old(size(elems_ll)))
-  do i_l = 1 , size(elems_ll)
-    Gamma_old(i_l) = elems_ll(i_l)%p%mag
-  end do
+  !allocate(Gamma_old(size(elems_ll)))
+  !do i_l = 1 , size(elems_ll)
+  !  Gamma_old(i_l) = elems_ll(i_l)%p%mag
+  !end do
 
   !> allocate temporary arrays
   allocate(dou_temp(size(elems_ll))) ; dou_temp = 0.0_wp
+  allocate(alpha_temp(size(elems_ll))) ; alpha_temp = 0.0_wp
 
   !=== Compute the velocity from all the elements except for liftling elems ===
   ! and store it outside the loop, since it is constant
@@ -1027,6 +1045,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   do ic = 1, fp_maxIter
     diff = 0.0_wp             ! max diff ("norm \infty")
+    diff_alpha = 0.0_wp
     max_mag_ll = 0.0_wp
 !$omp parallel do private(i_l, el, j, v, vel, up, unorm, alpha, alpha_2d, mach, &
 !$omp& reynolds, aero_coeff, cl, wind) schedule(dynamic,4)
@@ -1050,34 +1069,35 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
         u_v(i_l) = norm2(up)
         unorm = u_v(i_l)      ! velocity w/o induced velocity
 
-        ! Angle of incidence (full velocity)
-        alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
-        alpha = alpha * 180.0_wp/pi  ! .c81 tables defined with angles in [deg]
+      ! Angle of incidence (full velocity)
+      alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
+      alpha = alpha * 180.0_wp/pi  ! .c81 tables defined with angles in [deg]
 
-        ! === Piszkin, Lewinski (1976) LL model for swept wings ===
-        ! the control point is approximately at 3/4 of the chord, but the induced
-        ! angle of incidence needs to be modified, introducing a "2D correction"
-        !
-        !> "2D correction" of the induced angle
-        alpha_2d = el%mag / ( pi * el%chord * unorm ) *180.0_wp/pi
-        alpha = alpha - alpha_2d
-        ! =========================================================
+      ! === Piszkin, Lewinski (1976) LL model for swept wings ===
+      ! the control point is approximately at 3/4 of the chord, but the induced
+      ! angle of incidence needs to be modified, introducing a "2D correction"
+      !
+      !> "2D correction" of the induced angle
+      alpha_2d = el%mag / ( pi * el%chord * unorm ) *180.0_wp/pi
+      alpha = alpha - alpha_2d
+      ! =========================================================
 
-        ! compute local Reynolds and Mach numbers for the section
-        ! needed to enter the LUT (.c81) of aerodynamic loads (2d airfoil)
-        mach     = unorm / sim_param%a_inf
-        reynolds = sim_param%rho_inf * unorm * &
-                   el%chord / sim_param%mu_inf
+      ! compute local Reynolds and Mach numbers for the section
+      ! needed to enter the LUT (.c81) of aerodynamic loads (2d airfoil)
+      mach     = unorm / sim_param%a_inf
+      reynolds = sim_param%rho_inf * unorm * &
+                    el%chord / sim_param%mu_inf
 
         ! Read the aero coeff from .c81 tables
-        call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil , &
-                                   (/alpha, mach, reynolds/), aero_coeff )
-        cl = aero_coeff(1)   ! cl needed for the iterative process
+      call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil , &
+                                (/alpha, mach, reynolds/), aero_coeff )
+      cl = aero_coeff(1)   ! cl needed for the iterative process
 
-        ! Compute the "equivalent" intensity of the vortex line
-        dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
+      ! Compute the "equivalent" intensity of the vortex line
+      dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
+      alpha_temp(i_l) = alpha
 !$omp atomic
-        diff = max(diff,abs(elems_ll(i_l)%p%mag-dou_temp(i_l)))
+      diff = max(diff,abs(elems_ll(i_l)%p%mag-dou_temp(i_l)))
 !$omp end atomic
 
         c_m(i_l,:) = aero_coeff
@@ -1088,8 +1108,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
     enddo  ! i_l
 !$omp end parallel do
-
-
     ! === Stall regularisation ===
     ! avoid "unphysical" stall on an elem between 2 elems without stall. Check
     ! ll section of nn_stall elems, with nn_stall \in (1,llRegularisationNelems)
@@ -1168,33 +1186,44 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
     ! === Update ll intensity ===
     do i_l = 1,size(elems_ll)
+
       elems_ll(i_l)%p%mag = ( dou_temp(i_l)+ fp_damp*elems_ll(i_l)%p%mag )&
-                             /(1.0_wp+fp_damp)
+                              /(1.0_wp+fp_damp)
+      !elems_ll(i_l)%p%mag = ( dou_temp(i_l)+ fp_damp*elems_ll(i_l)%p%Gamma_old )&
+      !                       /(1.0_wp+fp_damp)
+
       max_mag_ll = max(max_mag_ll,abs(elems_ll(i_l)%p%mag))
     enddo
- 
+
     diff_v(ic) = diff/max(max_mag_ll,1e-9_wp)
 
     if ( diff/max(max_mag_ll,1e-9_wp) .le. fp_tol ) exit ! convergence
 
   enddo !solver iterations
   if(ic .ge. fp_maxIter) then
-    write(msg,'(A,I0,A)') 'Lifting lines iterative solution NOT CONVERGED &
+    write(msg,'(A,I0,A)') 'Lifting lines iterative solution NOT CONVERGED &   
                            &after ',fp_maxIter,' iterations'
     call warning(this_sub_name, this_mod_name, msg)
   endif
 
-! write(msg_4,'(I4.4)') it
-! open(unit=21,file=trim(sim_param%basename_debug)//'_conv_'//msg_4//'.dat')
-! do i_l = 1 , ic-1
-!   write(21,*) diff_v(i_l)
-! end do
-! close(21)
-
   ! === Update dGamma_dt field ===
+  write(*,*) 'GAMMA'
   do i_l = 1,size(elems_ll)
-    elems_ll(i_l)%p%dGamma_dt = ( elems_ll(i_l)%p%mag - Gamma_old(i_l) ) / &
-                                  sim_param%dt
+    !elems_ll(i_l)%p%dGamma_dt = ( elems_ll(i_l)%p%mag - elems_ll(i_l)%p%Gamma_old) / &
+    !                              sim_param%dt
+    if (sim_param%time .lt. 1e-9_wp) then
+    else
+      elems_ll(i_l)%p%dGamma_dt = ( 3*elems_ll(i_l)%p%mag - 4*elems_ll(i_l)%p%Gamma_old + elems_ll(i_l)%p%Gamma_old_old) / &
+                                  (2*sim_param%dt)                       
+    endif
+                                  !if (i_l .eq. 10) then
+    !  write(*,*) 'sim_param%time', sim_param%time
+    !  write(*,*) 'sim_param%time_old', sim_param%time_old
+    !  write(*,*) 'elems_ll(i_l)%p%Gamma_old', elems_ll(i_l)%p%Gamma_old
+    !  write(*,*) 'elems_ll(i_l)%p%mag', elems_ll(i_l)%p%mag
+    !  write(*,*) 'elems_ll(i_l)%p%dGamma_dt', elems_ll(i_l)%p%dGamma_dt
+    !end if
+
   end do
 
   ! === Loads computation ===
@@ -1234,6 +1263,15 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       el%dforce = el%dforce &
                   - sim_param%rho_inf * el%area * ( &
                   el%dGamma_dt  * el%nor + el%mag * el%dn_dt )
+
+      write(*,*) 'debug mod_liftlin.f90 l.1259'
+      write(*,*) 'sim_param%time      ', sim_param%time
+      write(*,*) 'sim_param%time_old  ', sim_param%time_old
+      write(*,*) 'el%dGamma_dt        ', el%dGamma_dt
+      write(*,*) 'el%nor              ', el%nor
+      write(*,*) 'el%mag              ', el%mag
+      write(*,*) 'el%dn_dt            ', el%dn_dt
+            
       !el%dforce = el%dforce &
       !            + sim_param%rho_inf * el%area * el%dGamma_dt &
       !            * e_l ! lift direction
@@ -1305,7 +1343,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   endif
 
   ! useful arrays ---
-  deallocate(dou_temp, vel_w, vel_w_vort, Gamma_old)
+  deallocate(dou_temp, vel_w, vel_w_vort)
   deallocate(a_v,c_m,u_v)
 
 
