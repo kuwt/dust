@@ -1069,24 +1069,24 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
         u_v(i_l) = norm2(up)
         unorm = u_v(i_l)      ! velocity w/o induced velocity
 
-      ! Angle of incidence (full velocity)
-      alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
-      alpha = alpha * 180.0_wp/pi  ! .c81 tables defined with angles in [deg]
+        ! Angle of incidence (full velocity)
+        alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
+        alpha = alpha * 180.0_wp/pi  ! .c81 tables defined with angles in [deg]
 
-      ! === Piszkin, Lewinski (1976) LL model for swept wings ===
-      ! the control point is approximately at 3/4 of the chord, but the induced
-      ! angle of incidence needs to be modified, introducing a "2D correction"
-      !
-      !> "2D correction" of the induced angle
-      alpha_2d = el%mag / ( pi * el%chord * unorm ) *180.0_wp/pi
-      alpha = alpha - alpha_2d
-      ! =========================================================
+        ! === Piszkin, Lewinski (1976) LL model for swept wings ===
+        ! the control point is approximately at 3/4 of the chord, but the induced
+        ! angle of incidence needs to be modified, introducing a "2D correction"
+        !
+        !> "2D correction" of the induced angle
+        alpha_2d = el%mag / ( pi * el%chord * unorm ) *180.0_wp/pi
+        alpha = alpha - alpha_2d
+        ! =========================================================
 
-      ! compute local Reynolds and Mach numbers for the section
-      ! needed to enter the LUT (.c81) of aerodynamic loads (2d airfoil)
-      mach     = unorm / sim_param%a_inf
-      reynolds = sim_param%rho_inf * unorm * &
-                    el%chord / sim_param%mu_inf
+        ! compute local Reynolds and Mach numbers for the section
+        ! needed to enter the LUT (.c81) of aerodynamic loads (2d airfoil)
+        mach     = unorm / sim_param%a_inf
+        reynolds = sim_param%rho_inf * unorm * &
+                   el%chord / sim_param%mu_inf
 
         ! Read the aero coeff from .c81 tables
       call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil , &
