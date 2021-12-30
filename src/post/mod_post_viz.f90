@@ -95,6 +95,9 @@ use mod_post_load, only: &
 use mod_vtk_utils, only: &
   t_output_var, add_output_var, copy_output_vars, clear_output_vars
 
+use mod_wind, only: &
+  variable_wind
+
 implicit none
 
 public :: post_viz
@@ -254,6 +257,8 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     ! TODO: compute/or read pressure and velocity field. Now set equal to zero
     allocate(  vel(size( vort,1)) ) ; vel = 0.0_wp
     allocate(   cp(size(press,1)) ) ;  cp = 0.0_wp
+    ! pressure coefficient
+    cp = (press - P_inf)/(0.5*rho*norm2(u_inf)**2)
 
     i_var = 1
     if(out_vort) then
@@ -278,6 +283,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
       i_var = i_var +1
     endif
 
+    
     if(average) then
       if( ires .eq. 1) then
         call copy_output_vars(out_vars, ave_out_vars, .true.)
