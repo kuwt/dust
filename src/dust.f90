@@ -915,7 +915,7 @@ end if
       select type( el => elems(i_el)%p )
         class is(t_vortlatt)
           ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
-          call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/) )
+          call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/), wake%vort_p)
           ! compute dforce using AVL formula
           call el%compute_dforce_jukowski()
           ! update the pressure field, p = df.n / area
