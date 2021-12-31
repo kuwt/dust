@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 !> Module to generate the geometry from different kinds of inputs, from mesh
@@ -401,7 +403,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     if ( mesh_symmetry .or. mesh_mirror ) then
       coupling_node_rot_mir = reshape( &
                           getrealarray(geo_prs, 'CouplingNodeOrientationMirror', 9), &
-                          (/3,3/) )  
+                          (/3,3/) )
     end if
     write(*,*) 'CouplingNodeOrientationMirror' , coupling_node_rot_mir
     if (  trim(coupling_type) .eq. 'rbf' ) then
@@ -541,7 +543,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   call write_hdf5(     coupling_node_rot_mir ,'CouplingNodeOrientationMirror',comp_loc)
 
   call new_hdf5_group(comp_loc, 'Geometry', geo_loc)
-  
+
   !=====
   !===== Read the input files
   !=====
@@ -564,7 +566,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     if (scaling .ne. 1.0_wp) then
       rr = rr * scaling
     endif
-    
+
 #if USE_PRECICE
     !> *** to do *** symmetry and mirror. So far, finalize run with an error
     if ( coupled_comp ) then
@@ -647,13 +649,13 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     if (scaling .ne. 1.0_wp) then
       rr = rr * scaling
     endif
-    
+
 #if USE_PRECICE
-    
+
     if ( coupled_comp ) then
 
       if ( mesh_symmetry .or. mesh_mirror ) then
-          
+
         if ( mesh_mirror ) then
           select case (trim(mesh_file_type))
             case('cgns', 'basic', 'revolution' )  ! TODO: check basic
@@ -662,20 +664,20 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
               call mirror_mesh_structured(ee, rr,  &
                                             npoints_chord_tot , nelems_span , &
                                             mirror_point, mirror_normal)
-      
+
             case default
               call error(this_sub_name, this_mod_name,&
                   'Mirror routines implemented for MeshFileType = &
                   & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
                   'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
           end select
-      
+
         end if
         if ( mesh_symmetry ) then
           select case (trim(mesh_file_type))
             case('cgns', 'basic', 'revolution' )  ! TODO: check basic
               call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
-      
+
             case('parametric','pointwise')
               call symmetry_mesh_structured(ee, rr,  &
                                              npoints_chord_tot , nelems_span , &
@@ -688,7 +690,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                    & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
                    'MeshFileType = '//trim(mesh_file_type))
           end select
-      
+
         end if
       end if
 
@@ -876,13 +878,13 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call write_hdf5(radius,'Radius', comp_loc)
 
     end if
-    
+
 #if USE_PRECICE
 
     if ( coupled_comp ) then
-      
+
         if ( mesh_symmetry .or. mesh_mirror ) then
-          
+
           if ( mesh_mirror ) then
             select case (trim(mesh_file_type))
               case('cgns', 'basic', 'revolution' )  ! TODO: check basic
@@ -891,20 +893,20 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                 call mirror_mesh_structured(ee, rr,  &
                                               npoints_chord_tot , nelems_span , &
                                               mirror_point, mirror_normal)
-        
+
               case default
                 call error(this_sub_name, this_mod_name,&
                     'Mirror routines implemented for MeshFileType = &
                     & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
                     'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
             end select
-        
+
           end if
           if ( mesh_symmetry ) then
             select case (trim(mesh_file_type))
               case('cgns', 'basic', 'revolution' )  ! TODO: check basic
                 call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
-        
+
               case('parametric','pointwise')
                 call symmetry_mesh_structured(ee, rr,  &
                                                npoints_chord_tot , nelems_span , &
@@ -926,10 +928,10 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                      & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
                      'MeshFileType = '//trim(mesh_file_type))
             end select
-        
+
           end if
         end if
-  
+
       write(*,*) ' coupling_type: ', trim(coupling_type)
       if ( trim(coupling_type) .eq. 'll' ) then
         !> Compute the reference chord vector, for geometry transformation
@@ -1005,7 +1007,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         if ( mesh_symmetry ) then
           write(*,*) 'SHAPE_A' , shape(rr)
           write(*,*) 'SHAPE_B' , shape(rr(1:size(rr,2)-size(rr_sym,2),: ))
-          
+
           rr(:,1:(size(rr,2)-size(rr_sym,2))) = matmul( transpose(coupling_node_rot), rr(:,1:size(rr,2)-size(rr_sym,2) ))
           rr(:,size(rr,2)-size(rr_sym,2)+1:size(rr,2)) = matmul( transpose(coupling_node_rot_mir), rr_sym )
         else
@@ -1019,7 +1021,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         !do i = 1, size(rr_sym,2)
         !  write(*,*) rr_sym(:,i)
         !end do
-        
+
       end if
 
     end if
@@ -1130,7 +1132,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     end select
 
   end if
-#endif 
+#endif
 
   !=====
   !===== Write the geometry and connectivity

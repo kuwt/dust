@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 
@@ -347,8 +349,8 @@ subroutine save_status(geo, wake, it, time, run_id)
   allocate(vel_w(3,wake%n_prt,1))
   !> debug ---
   !write(*,*) ' ++++ debug in mod_dust_io.f90 ++++ '
-  !write(*,*) ' wake%n_prt: ', wake%n_prt  
-  !write(*,*) ' ++++ debug in mod_dust_io.f90 ++++ ' 
+  !write(*,*) ' wake%n_prt: ', wake%n_prt
+  !write(*,*) ' ++++ debug in mod_dust_io.f90 ++++ '
   !> debug ---
   do ip = 1, wake%n_prt
     points_w(:,ip,1) = wake%part_p(ip)%p%cen

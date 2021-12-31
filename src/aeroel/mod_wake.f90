@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 
@@ -473,7 +475,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
             geo%refs(wake%pan_gen_ref(ip))%G_g, &
             geo%refs(wake%pan_gen_ref(ip))%f_g, &
             vel_te )
-    wind = variable_wind(wake%w_start_points(:,ip), sim_param%time)        
+    wind = variable_wind(wake%w_start_points(:,ip), sim_param%time)
     if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
 
       dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
@@ -783,7 +785,7 @@ subroutine prepare_wake(wake, elems, octree)
   !> Debug ---
   !write(*,*) ' ####### debug in prepare_wake() ######### '
   !write(*,*) ' wake%full_panels : ' , wake%full_panels
-  !write(*,*) ' wake%n_prt       : ' , wake%n_prt      
+  !write(*,*) ' wake%n_prt       : ' , wake%n_prt
   !> Debug ---
 
   !==>Recreate sturctures and pointers, if particles are present
@@ -860,14 +862,14 @@ subroutine update_wake(wake, elems, octree)
   !> debug ---
   !write(*,*) ' *** In update_wake *** '
   !write(*,*) '    wake%pan_wake_len : ' , wake%pan_wake_len
-  !write(*,*) '    wake%nmax_pan     : ' , wake%nmax_pan    
-  !write(*,*) '    wake%full_panels  : ' , wake%full_panels 
+  !write(*,*) '    wake%nmax_pan     : ' , wake%nmax_pan
+  !write(*,*) '    wake%full_panels  : ' , wake%full_panels
   !> debug ---
 
   if(wake%pan_wake_len .eq. wake%nmax_pan) wake%full_panels=.true.
 
   !> debug ---
-  !write(*,*) '    wake%full_panels  : ' , wake%full_panels 
+  !write(*,*) '    wake%full_panels  : ' , wake%full_panels
   !> debug ---
 
   !==> Panels:  Update the first row of vortex intensities:
@@ -1288,7 +1290,7 @@ subroutine complete_wake(wake, geo, elems)
             geo%refs(wake%pan_gen_ref(ip))%G_g, &
             geo%refs(wake%pan_gen_ref(ip))%f_g, &
             vel_te )
-    wind = variable_wind(wake%w_start_points(:,ip), sim_param%time)        
+    wind = variable_wind(wake%w_start_points(:,ip), sim_param%time)
     if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) + &
                           dist*wake%pan_gen_scaling(ip)* &
@@ -1361,7 +1363,7 @@ subroutine complete_wake(wake, geo, elems)
           endif
           !Explicit Euler
           alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
-                          wake%part_p(ip)%p%stretch* & 
+                          wake%part_p(ip)%p%stretch* &
                           sim_param%dt*sim_param%ndt_update_wake
           alpha_p_n = norm2(alpha_p)
 
@@ -1674,7 +1676,7 @@ subroutine get_vel_free(this, elems, wake, pos, vel_hcas, vel)
 
   !vel = vel + sim_param%u_inf
   vel = vel + variable_wind(pos, sim_param%time)
-  
+
   if (sim_param%HCAS) vel = vel + vel_hcas
 
 end subroutine get_vel_free

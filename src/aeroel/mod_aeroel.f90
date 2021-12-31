@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 !> Module containing the upper level definitions of the aerodynamic
@@ -188,7 +190,7 @@ type, abstract, extends(c_elem) :: c_pot_elem
   real(wp) :: dcen_h_old(3) ! = 0.0_wp
   !> Delta velocity, due to hinge motion of the element center, evaluated
   ! with finite difference method: dvel_h = ( dcen_h - dcen_h_old ) / dt
-  real(wp) :: dvel_h(3) ! = 0.0_wp 
+  real(wp) :: dvel_h(3) ! = 0.0_wp
 
   contains
 

@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 
@@ -467,9 +469,9 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         coupling_node_rot = comps(i_comp)%coupling_node_rot
 #else
         coupling_node_rot(1,:) = (/ 1._wp, 0._wp, 0._wp/)
-        coupling_node_rot(2,:) = (/ 0._wp, 1._wp, 0._wp/) 
+        coupling_node_rot(2,:) = (/ 0._wp, 1._wp, 0._wp/)
         coupling_node_rot(3,:) = (/ 0._wp, 0._wp, 1._wp/)
-#endif  
+#endif
         call comps(i_comp)%hinge(ih)%build_connectivity( rr, coupling_node_rot)
 
       end do
@@ -752,7 +754,7 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
   endif
 #endif
 
-  
+
   !> Hinges ----------------------------------------------------------------
   !> Re-open and close result hdf5 file and groups
   call open_hdf5_file ( trim(filen), floc )
@@ -761,7 +763,7 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
   call open_hdf5_group( gloc, trim(cname), cloc )
   call open_hdf5_group( cloc, 'Hinges', hloc )
   do ih = 1, comp%n_hinges
-    
+
     !> Read hinge node position, orientation and theta
     write(hinge_id_str,'(I2.2)') ih
     call open_hdf5_group( hloc, 'Hinge_'//hinge_id_str, hiloc)
@@ -782,7 +784,7 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
     deallocate(rr_hinge_contig)
 
     call close_hdf5_group(hiloc)
-    
+
   end do
 
   call close_hdf5_group(hloc)

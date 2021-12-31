@@ -1,9 +1,56 @@
+!./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
+!.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
+!..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
+!...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
+!....\/\\\......\/\\\.\/\\\......\/\\\.....\///\\...........\/\\\......
+!.....\/\\\......\/\\\.\/\\\......\/\\\.......\///\\\........\/\\\......
+!......\/\\\....../\\\..\//\\\...../\\\../\\\....\//\\\.......\/\\\......
+!.......\/\\\\\\\\\\\/....\///\\\\\\\\/..\///\\\\\\\\\/........\/\\\......
+!........\///////////........\////////......\/////////..........\///.......
+!!=========================================================================
+!!
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
+!!                         Matteo   Tugnoli,
+!!                         Federico Fonte
+!!
+!! This file is part of DUST, an aerodynamic solver for complex
+!! configurations.
+!!
+!! Permission is hereby granted, free of charge, to any person
+!! obtaining a copy of this software and associated documentation
+!! files (the "Software"), to deal in the Software without
+!! restriction, including without limitation the rights to use,
+!! copy, modify, merge, publish, distribute, sublicense, and/or sell
+!! copies of the Software, and to permit persons to whom the
+!! Software is furnished to do so, subject to the following
+!! conditions:
+!!
+!! The above copyright notice and this permission notice shall be
+!! included in all copies or substantial portions of the Software.
+!!
+!! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+!! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+!! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+!! NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+!! HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+!! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+!! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+!! OTHER DEALINGS IN THE SOFTWARE.
+!!
+!! Authors:
+!!          Davide Montagnani
+!!=========================================================================
+
+
+
 module mod_precice_rbf
 
 use mod_param, only: &
     wp
 !use mod_geometry, only: &
-!    t_geo, t_geo_component 
+!    t_geo, t_geo_component
 
 implicit none
 
@@ -16,7 +63,7 @@ public :: t_precice_rbf
 type :: t_rbf_conn
 
   !> Indices (surface to structure)
-  integer,  allocatable :: ind(:,:) 
+  integer,  allocatable :: ind(:,:)
   !> Weights (surface to structure)
   real(wp), allocatable :: wei(:,:)
 
@@ -67,9 +114,9 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
   class(t_precice_rbf), intent(inout) :: this
   real(wp),             intent(in)    :: rr(:,:)
   real(wp),             intent(in)    :: coupling_node_rot(3,3)
-  
+
   integer ,             intent(in)    :: ee(:,:)
-  
+
   real(wp), allocatable :: diff_all(:,:), diff_all_transpose(:,:), dist_all(:), mat_dist_all(:,:), wei_v(:), Wnorm(:,:)
   integer , allocatable ::              ind_v(:)
   real(wp) :: cen(3)
@@ -122,14 +169,14 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
     do is = 1, ns
 
       !dist_all(is) = norm2( rr(:,ip) - this%nodes(:,is) )  ! OLD
-      diff_all(:,is)  = rr(:,ip) - this%nodes(:,is)  
-  
+      diff_all(:,is)  = rr(:,ip) - this%nodes(:,is)
+
     end do
 
-    mat_dist_all(:,:)   =  matmul(Wnorm , diff_all)    
+    mat_dist_all(:,:)   =  matmul(Wnorm , diff_all)
     diff_all_transpose(:,:)  =  transpose(diff_all(:,:))
-    mat_dist_all(:,:)   =  matmul(diff_all_transpose(:,:) , mat_dist_all(1:3,:)) 
-    do is = 1, ns 
+    mat_dist_all(:,:)   =  matmul(diff_all_transpose(:,:) , mat_dist_all(1:3,:))
+    do is = 1, ns
       dist_all(is) = sqrt(mat_dist_all(is,is))
     end do
 
@@ -143,7 +190,7 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
     this%nod%ind(:,ip) = ind_v
 
   enddo
- 
+
   !> === Surface centers ===
   allocate(this%cen%ind(this%n_wei, ne)); this%cen%ind = 0
   allocate(this%cen%wei(this%n_wei, ne)); this%cen%wei = 0.0_wp
@@ -154,11 +201,11 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
 
     !> Compute element center
     ! *** to do *** elem center for 'll'
-    cen = 0.0_wp; n = 0  
+    cen = 0.0_wp; n = 0
     !do i_comp = 1, size(geo%components)
     !  associate( comp => geo%components(i_comp))
     !
-    !  if ( comp%comp_el_type(1:1) .eq. 'l' ) then         
+    !  if ( comp%comp_el_type(1:1) .eq. 'l' ) then
     !    cen =  sum ( rr(:,1:2),2 ) / 2.0_wp !! only for l component
      ! else
         do ip = 1, 4
@@ -170,22 +217,22 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
         cen = cen / dble(n)
       !end if
       !end associate
-    !end do 
-    
+    !end do
+
       !> Distance of the surface nodes from the structural nodes
       do is = 1, ns
         !dist_all(is) = norm2( cen - this%nodes(:,is) ) !OLD
-        diff_all(:,is)  = cen - this%nodes(:,is)  
+        diff_all(:,is)  = cen - this%nodes(:,is)
       end do
 
-      mat_dist_all(:,:)   =  matmul(Wnorm , diff_all)    
+      mat_dist_all(:,:)   =  matmul(Wnorm , diff_all)
       diff_all_transpose(:,:)  =  transpose(diff_all(:,:))
-      mat_dist_all(:,:)   =  matmul(diff_all_transpose(:,:) , mat_dist_all(1:3,:)) 
-      do is = 1, ns 
+      mat_dist_all(:,:)   =  matmul(diff_all_transpose(:,:) , mat_dist_all(1:3,:))
+      do is = 1, ns
         dist_all(is) = sqrt(mat_dist_all(is,is))
       end do
 
-    
+
     call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
 
     !> Weight, inverse of the norm, avoid singularities
@@ -200,20 +247,20 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
   ! stop
 
   ! check ---
-  write(*,*) 
+  write(*,*)
   write(*,*) ' Check in t_precice_rbf % build_connectivity, %nod '
   do ip = 1, np
     write(*,*) this%nod%ind(:,ip), this%nod%wei(:,ip)
   end do
-  write(*,*) 
+  write(*,*)
   write(*,*) ' Check in t_precice_rbf % build_connectivity, %cen '
   do ie = 1, ne
     write(*,*) this%cen%ind(:,ie), this%cen%wei(:,ie)
   end do
-  write(*,*) 
-  ! write(*,*) 
+  write(*,*)
+  ! write(*,*)
   ! write(*,*) ' Stop.'
-  ! write(*,*) 
+  ! write(*,*)
   ! stop
   ! ! check ---
 

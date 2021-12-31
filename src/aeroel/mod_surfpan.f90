@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 
@@ -852,8 +854,8 @@ subroutine compute_pres_surfpan(this, R_g)
   ! Rotation of the result =====================================
   ! - The stencil is computed in the local ref.sys. at the beginning of the code
   ! - The velocity is computed at each timestep
-  
-  vel_phi = matmul( (R_g) , vel_phi ) 
+
+  vel_phi = matmul( (R_g) , vel_phi )
 
   !write(*,*) 'vel_phi', vel_phi
 
@@ -903,7 +905,7 @@ subroutine compute_pres_surfpan(this, R_g)
 
     !write(*,*) 'this%surf_vel', this%surf_vel
   else
-    force_pres = this%pres 
+    force_pres = this%pres
   endif
 
 ! ! OLD PRESSURE EVALUATION
@@ -918,7 +920,7 @@ subroutine compute_pres_surfpan(this, R_g)
 
   ! Prandt -- Glauert correction for compressibility effect
   mach = abs(norm2(wind) / sim_param%a_inf)
-  
+
   this%dforce = - (force_pres - sim_param%P_inf) * this%area * this%nor / sqrt(1 - mach**2)
 
 end subroutine compute_pres_surfpan
@@ -1201,7 +1203,7 @@ subroutine get_vort_vel_surfpan(this, vort_elems)
 
  integer :: iv
  real(wp) :: vel(3)
- 
+
  !> Initialize to zero, before accumulation
  this%uvort = 0.0_wp
 

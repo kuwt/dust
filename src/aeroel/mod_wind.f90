@@ -1,3 +1,4 @@
+
 !./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
@@ -9,7 +10,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,20 +41,14 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
-!!=========================================================================
-!!
 !!          Andrea Colli          <andrea.colli@polimi.it>
-!!
 !!=========================================================================
 
 module mod_wind
 
 use mod_param, only: &
   wp, pi
-  
+
 use mod_sim_param, only: &
   sim_param
 
@@ -59,14 +56,14 @@ implicit none
 
 contains
 
-function variable_wind(pos, time) result(wind) 
+function variable_wind(pos, time) result(wind)
 
 real(wp), intent(in) :: pos(3)
 real(wp), intent(in) :: time
 
 real(wp) :: wind(3)
 
-real(wp) :: gust_origin(3), gust_front_direction(3), gust_front_speed, & 
+real(wp) :: gust_origin(3), gust_front_direction(3), gust_front_speed, &
             gust_u_des, gust_perturb_direction(3), gust_gradient, gust_time
 
 real(wp) :: s
@@ -83,15 +80,15 @@ if (sim_param%use_gust) then
       gust_perturb_direction = sim_param%gust_perturb_direction/norm2(sim_param%gust_perturb_direction)
       gust_gradient = sim_param%gust_gradient
       gust_time = sim_param%gust_time
-      
+
       ! penetration distance
       ! distance from the gust front, negative for the gust approaching
       s = -sum((pos-(gust_origin+gust_front_speed*gust_front_direction*(time-gust_time)))*gust_front_direction)
-      
+
       if (s .GE. 0.0 .AND. s .LT. 2*gust_gradient) then
         wind = wind + gust_u_des/2*(1-COS(pi*s/gust_gradient))
       end if
-      
+
     case('linear') ! for testing
       gust_origin = sim_param%gust_origin
       gust_front_direction = sim_param%gust_front_direction/norm2(sim_param%gust_front_direction)
@@ -100,9 +97,9 @@ if (sim_param%use_gust) then
       gust_perturb_direction = sim_param%gust_perturb_direction/norm2(sim_param%gust_perturb_direction)
       gust_gradient = sim_param%gust_gradient
       gust_time = sim_param%gust_time
-      
+
       s = sum((pos-(gust_origin+sim_param%u_inf*time))*sim_param%u_inf)/norm2(sim_param%u_inf)
-      
+
       wind = wind + pos(1)*(/0.0, 0.0, 0.1/)!s*gust_u_ds/gust_gradient*(/0.0, 0.0, 0.1/)
     case default
   end select

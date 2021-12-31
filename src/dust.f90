@@ -1,4 +1,5 @@
 
+
 !./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
@@ -10,7 +11,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -39,9 +42,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 !> This is the main file of the DUST solver
@@ -414,7 +417,7 @@ call prms%CreateRealArrayOption('GustOrigin','Gust origin point')
 call prms%CreateRealArrayOption('GustFrontDirection','Gust front direction vector')
 call prms%CreateRealArrayOption('GustFrontSpeed','Gust front speed')
 call prms%CreateRealOption('GustUDes','Design gust velocity')
-call prms%CreateRealArrayOption('GustPerturbationDirection','Gust perturbation & 
+call prms%CreateRealArrayOption('GustPerturbationDirection','Gust perturbation &
                               direction vector','(/0.0, 0.0, 1.0/)')
 call prms%CreateRealOption('GustGradient','Gust gradient')
 call prms%CreateRealOption('GustStartTime','Gust starting time','0.0')
@@ -580,14 +583,14 @@ else ! Set to zero the intensity of all the singularities
   end do
   do i_el = 1 , size(elems_expl) ! explicit elements (ll, ad)
     elems_expl(i_el)%p%mag = 0.0_wp
-    
+
   end do
   if (size(elems_ll) .gt. 0) then
     do i_el = 1, size(elems_ll)
       elems_ll(i_el)%p%Gamma_old = 0.0_wp
       elems_ll(i_el)%p%Gamma_old_old = 0.0_wp
     end do
-  endif 
+  endif
 endif
 
 t22 = dust_time()
@@ -644,13 +647,13 @@ t11 = dust_time()
 it = 0
 #if USE_PRECICE
     it = 1
-    do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .eq. 1 ) ) ! start time cycle 
+    do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .eq. 1 ) ) ! start time cycle
 #else
     do while ( ( it .lt. nstep ) )
       it = it + 1
 #endif
   sim_param%time_old = sim_param%time
-  
+
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,I5,A,I5,A,F9.4)') nl//'--> Step ',it,' of ', &
                                       nstep, ' simulation time: ', time
@@ -834,12 +837,12 @@ end if
       if (sim_param%time .gt. sim_param%time_old)  then
         do i_el = 1, size(elems_ll)
           elems_ll(i_el)%p%Gamma_old_old = elems_ll(i_el)%p%Gamma_old
-          elems_ll(i_el)%p%Gamma_old = elems_ll(i_el)%p%mag 
+          elems_ll(i_el)%p%Gamma_old = elems_ll(i_el)%p%mag
         enddo
       endif
       call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
               (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it)
-      
+
     elseif ( trim(sim_param%llSolver) .eq. 'AlphaMethod' ) then
       call solve_liftlin_piszkin(elems_ll, elems_tot, elems , elems_ad , &
             (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it,&

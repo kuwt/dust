@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 !> Module containing the specific subroutines for the lifting line
@@ -76,7 +78,7 @@ use mod_c81, only: &
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
-  
+
 use mod_wind, only: &
   variable_wind
 !----------------------------------------------------------------------
@@ -474,7 +476,7 @@ subroutine solve_liftlin_piszkin( &
  logical :: load_avl , adaptive_reg
  real(wp) :: e_l(3) , e_d(3)
  real(wp), allocatable :: Gamma_old(:)
- 
+
  type(t_liftlin), pointer :: el
 
  integer, intent(in) :: it
@@ -707,7 +709,7 @@ subroutine solve_liftlin_piszkin( &
         alpha = alpha - alpha_2d
         !> unsteady contribution
         !a_v(i_l) = alpha - ((-el%chord/2_wp) * 0.01_wp/norm2(uinf))
-        
+
         ! =========================================================
 
         a_v(i_l) = alpha
@@ -744,11 +746,11 @@ subroutine solve_liftlin_piszkin( &
 
   ! Overwrite a_v, a_v = alpha_avg_v, because load computation uses a_v
   a_v = alpha_avg_v * pi/180.0_wp ! - ((-el%chord/2_wp) * 0.01_wp/norm2(uinf))
- 
+
   ! === Update el % alpha === ( here or updated values below, as in Piszkin? )
   do i_l = 1 , size(elems_ll)
-    elems_ll(i_l)%p%alpha_ll = a_v(i_l) * 180.0_wp/pi 
-    
+    elems_ll(i_l)%p%alpha_ll = a_v(i_l) * 180.0_wp/pi
+
   end do
 
   ! === Update dGamma_dt field ===
@@ -847,7 +849,7 @@ subroutine solve_liftlin_piszkin( &
       write(*,*) 'el%nor              ', el%nor
       write(*,*) 'el%mag              ', el%mag
       write(*,*) 'el%dn_dt            ', el%dn_dt
-            
+
       !> Update aerodynamic coefficients and AOA, and pressure
       c_m(i_l,1) = sum( el % dforce * e_l ) / &
         ( 0.5_wp * sim_param%rho_inf * u_v(i_l) ** 2.0_wp * el%area )
@@ -864,7 +866,7 @@ subroutine solve_liftlin_piszkin( &
     ! - referred to the ref.point of the elem,
     !   ( here, cen of the elem = cen of the liftlin (for liftlin elems) )
     el%dmom = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
-                   el%chord * el%area * c_m(i_l,3) * el%bnorm_cen 
+                   el%chord * el%area * c_m(i_l,3) * el%bnorm_cen
 
     ! a_v updated by AVLloads, in compute_dforce_jukowski
     el%alpha = a_v(i_l) * 180_wp/pi
@@ -934,7 +936,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
  ! load computation
  logical :: load_avl
  real(wp) :: e_l(3) , e_d(3)
- 
+
  real(wp) :: max_mag_ll
 
  type(t_liftlin), pointer :: el
@@ -1201,7 +1203,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   enddo !solver iterations
   if(ic .ge. fp_maxIter) then
-    write(msg,'(A,I0,A)') 'Lifting lines iterative solution NOT CONVERGED &   
+    write(msg,'(A,I0,A)') 'Lifting lines iterative solution NOT CONVERGED &
                            &after ',fp_maxIter,' iterations'
     call warning(this_sub_name, this_mod_name, msg)
   endif
@@ -1213,7 +1215,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     !if (sim_param%time .lt. 1e-9_wp) then
     !else
       !elems_ll(i_l)%p%dGamma_dt = ( 3*elems_ll(i_l)%p%mag - 4*elems_ll(i_l)%p%Gamma_old + elems_ll(i_l)%p%Gamma_old_old) / &
-                                  !(2*sim_param%dt)                       
+                                  !(2*sim_param%dt)
     !endif
                                   !if (i_l .eq. 10) then
     !  write(*,*) 'sim_param%time', sim_param%time
@@ -1270,7 +1272,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       !write(*,*) 'el%nor              ', el%nor
       !write(*,*) 'el%mag              ', el%mag
       !write(*,*) 'el%dn_dt            ', el%dn_dt
-            
+
       !el%dforce = el%dforce &
       !            + sim_param%rho_inf * el%area * el%dGamma_dt &
       !            * e_l ! lift direction
@@ -1437,7 +1439,7 @@ subroutine calc_geo_data_liftlin(this, vert)
 
   ! center, for the lifting line is the mid-point
   this%cen =  sum ( this%ver(:,1:2),2 ) / 2.0_wp
-  
+
 ! this%cen =  sum ( this%ver,2 ) / real(nsides,wp) ! <<<< NO ! ............
 ! ... %cen coinces with control point. %cen must be c/2 far from the ll ...
 ! ... if the non penetration b.c. is used ( u_rel.n = 0 )               ...
@@ -1486,7 +1488,7 @@ subroutine calc_geo_data_liftlin(this, vert)
 
   ! -- 0.75 chord -- look for other "0.75 chord" tag
   ! correct the chord value ----
-  this%chord = sum(this%edge_len((/2,4/)))*0.5_wp 
+  this%chord = sum(this%edge_len((/2,4/)))*0.5_wp
 ! this%chord = this%chord / 0.75_wp
 
   ! === Piszkin, Lewinski (1976) LL model for swept wings ===
@@ -1508,7 +1510,7 @@ subroutine calc_geo_data_liftlin(this, vert)
   !> 2 * pi * | x_CP - x{1/4*c} | * cos(lambda)
   this%d_2pi_coslambda = norm2( this%cen - this%ctr_pt ) * &
                          2.0_wp * pi * cos_lambda
-  ! !> overwrite centre 
+  ! !> overwrite centre
   this%cen    = this%ctr_pt
   !
   ! === Piszkin, Lewinski (1976) LL model for swept wings ===
