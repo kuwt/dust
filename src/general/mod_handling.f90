@@ -211,8 +211,9 @@ recursive subroutine internal_error(caller,caller_mod,text)
  ! https://gcc.gnu.org/bugzilla/show_bug.cgi?id=77649
  character(len=len_trim(text)) :: gfortran_bug_text(1)
  character(len=*), parameter :: message_of_the_day = &
-    nl//'What you experienced never happened. Please report this error and &
-    &let our highly trained space raccoons overwrite this timeline'
+    nl//'What you experienced never happened. Please report this error in &
+    &order to let us dispatch our highly trained space raccoons to overwrite &
+    &this timeline'
  character(len=len_trim(text)+len(message_of_the_day)) :: another_text(1)
  character(len=*), parameter :: &
    this_sub_name = 'internal_error'

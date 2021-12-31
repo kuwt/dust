@@ -75,6 +75,7 @@ public :: read_mesh_cgns
 private
 
 character(len=*), parameter :: this_mod_name = 'mod_cgns_io'
+character(len=max_char_len) :: msg
 
 !----------------------------------------------------------------------
 
@@ -134,7 +135,7 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
   call printout(nl//' Loading geometry from cgns file: '//trim(mesh_file))
   call CG_OPEN_F(trim(mesh_file), MODE_READ, index_file, ier)
   if ( ier .ne. ALL_OK ) then
-    write(*,*) ' ** error when reading cgns file'
+    call printout(' CGNS error when reading cgns file!')
     call CG_ERROR_EXIT_F()
   end if
 
@@ -143,10 +144,11 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
   call CG_NBASES_F(INDEX_FILE, nbase, ier)
   if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
   if (nbase /= 1) then
-    write(*,'(A,I2)') ' Number of bases in the cgns file: ', nbase
+    write(msg,'(A,I2)') ' Number of bases in the cgns file: ', nbase
+    call printout(trim(msg))
     !call error(this_sub_name, this_mod_name,'More than one base in the &
     !  &CGNS file, not supported')
-    write(*,'(A)') 'More than one base in the CGNS file, not supported'
+    call printout('More than one base in the CGNS file, not supported')
     call dust_abort()
   end if
   ibase = 1
@@ -170,10 +172,11 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
   if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
 
   if ( nzone .ne. 1 ) then
-    write(*,'(A,I2)') ' Number of zones in the cgns base: ', nzone
+    write(msg,'(A,I2)') ' Number of zones in the cgns base: ', nzone
+    call printout(trim(msg))
     !call error(this_sub_name, this_mod_name,'More than one zon in the &
     !  &CGNS file, not supported')
-    write(*,'(A)') 'More than one zone in the CGNS file, not supported'
+    call printout('More than one zone in the CGNS file, not supported')
     call dust_abort()
   end if
 
@@ -196,16 +199,21 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
     if ( id /= unstructured ) then
       !call error(this_sub_name, this_mod_name,'No unstructured grid was &
       !  &found in the CGNS file')
-      write(*,'(A)') 'No unstructured grid was found in the CGNS file'
+      call printout('No unstructured grid was found in the CGNS file')
       call dust_abort()
     end if
 
     nNodes = isize(1)
 
-    write(*,*)
-    write(*,'(A,I9)') ' Number of nodes:      ', isize(1)
-    write(*,'(A,I9)') ' Number of cells:      ', isize(2)
-    write(*,'(A,I2)') ' Coordinate dimension: ', ndim
+    call printout('CGNS zone recap:'//nl)
+    write(msg,'(A,I9,A)') ' Number of nodes:      ', isize(1),nl
+    call printout(trim(msg))
+    write(msg,'(A,I9,A)') ' Number of cells:      ', isize(2),nl
+    call printout(trim(msg))
+    write(msg,'(A,I2,A)') ' Coordinate dimension: ', ndim,nl
+    call printout(trim(msg))
+    write(msg,'(A,I2,A)') ' Mesh elements dimension: ', icelldim,nl
+    call printout(trim(msg))
 
 
 
@@ -219,7 +227,8 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
 !
     call CG_NSECTIONS_F(INDEX_FILE, ibase, izone, nsec, ier)
     if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
-    write(*,'(A,I3)') ' Number of sections in the zone: ', nsec
+    write(msg,'(A,I3)') ' Number of sections in the zone: ', nsec
+    call printout(trim(msg))
 
 ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ! find the total number of elements and section names
@@ -240,9 +249,10 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
       call StripSpaces(sectionname)
       sectionNames(isec) = sectionname
 
-      write(*,'(A,I3,A,I10,2A)') ' Section number:', isec,&
+      write(msg,'(A,I3,A,I10,2A)') ' Available section number:', isec,&
                            '   Number of elements: ', nelem, &
-                           '   Name: ', trim(sectionname)
+                           '   Name: ', trim(sectionname)//nl
+      call printout(trim(msg))
       ! TODO: why is no longer working with CGNS 3.3?
       ! write(*,'(A,A)')  ' Element type: ', trim(ElementTypeName(ieltype))
       ! write(*,'(A,I9)') ' First parent data: ', parent_flag
@@ -253,30 +263,33 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
     ! Get number of elements considering the selection of sections
     if (nSectionsUsed > 0) then
       nelem_zone = 0
-      write(*,'(A,I3)') ' Number of sections used: ', nSectionsUsed
+      write(msg,'(A,I3)') ' Number of sections to be loaded: ', nSectionsUsed
+      call printout(trim(msg))
 
       do isec = 1, nSectionsUsed
-        write(*,*) ' Section Name: ', trim(sectionNamesUsed(isec))
+        call printout(' Section '//trim(sectionNamesUsed(isec))//&
+          &' will be loaded'//nl)
 
         sectionFound = IsInList(sectionNamesUsed(isec), sectionNames, posSection)
         if (sectionFound) then
           selectedSection(posSection) = .true.
           nelem_zone = nelem_zone + eend(posSection) - estart(posSection) + 1
         else
-          write(*,*) ' ** error: section with name ', trim(sectionNamesUsed(isec)), ' not found'
-          write(*,*) ' **        see above for the list of available sections'
-          write(*,*) ' ** Program stopped'
-          stop
+          call printout('ERROR during CGNS section loading: section with &
+            &name '//trim(sectionNamesUsed(isec))//' not found'//nl//&
+            & '        see above for the list of available sections')
+            call dust_abort()
         endif
       enddo
     else
-      write(*,*)  'All sections will be used'
+      call printout('All found CGNS sections will be loaded')
       ! All sections will be selected
       selectedSection = .true.
       nelem_zone = nend
     endif
 
-    write(*,*) 'Total number of elements: ', nelem_zone
+    write(msg,'(A,I0,A)') 'Total number of loaded elements: ', nelem_zone,nl
+    call printout(trim(msg))
 
     allocate(ee(4,nelem_zone)) ; ee = 0
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -309,9 +322,10 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
           eltype = 'mixed'
           nnod = 9
         case default
-          write(*,*) ' error: unsupported element type: ', ieltype, &
+          write(msg,*) ' error: unsupported CGNS element type: ', ieltype, &
                      'NONE' ! trim(ElementTypeName(ieltype)) TODO: not working in CGNS 3.3
-          stop
+          call printout(trim(msg))
+          call dust_abort()
         end select
 
 
@@ -362,9 +376,10 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
             case(HEXA_8)
               nnod = 8
             case default
-              write(*,*) ' error: unsupported element type: ', elemcg(I,1), &
+              write(msg,*) ' error: unsupported element type: ', elemcg(I,1), &
                          'NONE' ! trim(ElementTypeName(elemcg(I,1))) TODO: not working in CGNS 3.3
-              stop
+              call printout(trim(msg))
+              call dust_abort()
             end select
             ee(1:nnod,ielem) = elemcg(I+1:I+nnod,1)
             nmixed(elemcg(I,1)) = nmixed(elemcg(I,1)) + 1

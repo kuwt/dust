@@ -303,16 +303,6 @@ subroutine save_status(geo, wake, it, time, run_id)
   !call write_hdf5(wake_pan%i_start_points,'StartPoints',gloc1)
   !call write_hdf5(wake_pan%idou(:,1:wake_pan%wake_len),'WakeVort',gloc1)
   call write_hdf5(wake%pan_w_points(:,:,1:wake%pan_wake_len+1),'WakePoints',gloc1 )
-! ! debug ----
-! write(*,*) ' shape(wake%pan_w_points(   :,:,:))                     : ' , &
-!              shape(wake%pan_w_points(   :,:,:))
-! write(*,*) ' shape(wake%pan_w_points(   :,:,1:wake%pan_wake_len+1)) : ' , &
-!              shape(wake%pan_w_points(   :,:,1:wake%pan_wake_len+1))
-! write(*,*) ' shape(wake%pan_w_vel(   :,:,:))                        : ' , &
-!              shape(wake%pan_w_vel(   :,:,:))
-! write(*,*) ' shape(wake%pan_w_vel(   :,:,1:wake%pan_wake_len+1))    : ' , &
-!              shape(wake%pan_w_vel(   :,:,1:wake%pan_wake_len+1))
-! ! debug ----
   call write_hdf5(wake%pan_w_vel(   :,:,1:wake%pan_wake_len+1),'WakeVels'  ,gloc1 ) ! <<<< restart with Bernoulli integral equation
   call write_hdf5(wake%i_start_points,'StartPoints',gloc1)
   call write_hdf5(wake%pan_idou(:,1:wake%pan_wake_len),'WakeVort',gloc1)
@@ -490,11 +480,6 @@ subroutine check_ref(gloc, floc, ref)
 
   call read_hdf5(R,'R',ref_loc)
   call read_hdf5(of,'Offset',ref_loc)
-
-! ! debug ----
-! write(*,*) ' offset : read vs computed '
-! write(*,*) real(of) , '     ' , real(ref%of_g)
-! ! debug ----
 
   if ((.not. all(real(R) .eq. real(ref%R_g))) .or. &
       (.not. all(real(of) .eq. real(ref%of_g))) ) then

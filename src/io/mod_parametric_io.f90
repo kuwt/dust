@@ -199,10 +199,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
   twist_linear_interp= getlogical(pmesh_prs,'twist_linear_interpolation')
 
-! ! debug ---
-!   write(*,*) ' *** twist_linear_interp : ' , twist_linear_interp , ' *** '
-! ! debug ---
-
   !Check the number of inputs
   if(countoption(pmesh_prs,'nelem_span') .ne. nRegions ) &
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
@@ -246,11 +242,13 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       type_span_list(iRegion) = getstr(pmesh_prs,'type_span')
     end do
   else
-   write(*,*) ' mesh_file   : ' , trim(mesh_file)
-   write(*,*) ' n_type_span : ' , n_type_span
-   write(*,*) ' nRegions    : ' , nRegions
-   call error(this_sub_name, this_mod_name, 'Unconsistent input: &
-         &n_type_span .ne. nRegions. Stop.')
+   write(*,*) ' Mesh file   : ' , trim(mesh_file)
+   write(*,*) ' Number of span element distribution type definitions &
+              &(type_span): ' , n_type_span
+   write(*,*) ' Number of regions : ' , nRegions
+   call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+         & the number of type of span element distribution defined is &
+         &different from the number of span regions')
   end if
 
   allocate(chord_list  (nSections))  ; chord_list = 0.0_wp
@@ -322,22 +320,14 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   ! Loop over regions
   do iRegion = 1,nRegions
 
-! check ----
-    write(*,*) ' Region ' , iRegion , ' / ' , nRegions
-! check ----
-
     if ( iRegion .gt. 1 ) then  ! first section = last section of the previous region
       rrSection1 = rrSection2
     else                        ! build points
-      write(*,*) ' nelem_chord_tot ' , nelem_chord_tot
-
       call define_section( chord_list(iRegion), trim(adjustl(airfoil_list(iRegion))), &
                            twist_list(iRegion), ElType, nelem_chord,              &
                            type_chord , chord_fraction, ref_chord_fraction,       &
                            ref_point, xySection1 )
 
-      write(*,*) size(rrSection1,1) , size(rrSection1,2)
-      write(*,*) size(xySection1,1) , size(xySection1,2)
       rrSection1(1,:) = xySection1(1,:) + ref_point(1)
       rrSection1(2,:) = 0.0_wp          + ref_point(2)     ! <--- read from region structure
       rrSection1(3,:) = xySection1(2,:) + ref_point(3)
@@ -412,10 +402,12 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
 
     if ( abs( sweep_list(iRegion) ) .gt. 60.0_wp ) then
-      write(*,*) ' WARNING. abs( sweep_list(iRegion) ) .gt. 60.0_wp. '
+      call warning(this_sub_name, this_mod_name, 'Requested a sweep angle of &
+        &more than 60 degrees. Are you sure of this input?')
     end if
     if ( abs( dihed_list(iRegion) ) .gt. 60.0_wp ) then
-      write(*,*) ' WARNING. abs( sweep_list(iRegion) ) .gt. 60.0_wp. '
+      call warning(this_sub_name, this_mod_name, 'Requested a dihedral angle of &
+        &more than 60 degrees. Are you sure of this input?')
     end if
 
     !> save before update
@@ -437,7 +429,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
       if ( .not. twist_linear_interp ) then
 
-        ! write(*,*) ; write(*,* )' *** twist_linear_interp = F *** ' ; write(*,*)
 
         if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then
           ! uniform spacing in span
@@ -460,15 +451,13 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                           ( rrSection2 - rrSection1 ) * &
               cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
         else
-          write(*,*) ' mesh_file   : ' , trim(mesh_file)
-          write(*,*) ' type_span_list(',iRegion,') : ' , trim(type_span_list(iRegion))
-          call error(this_sub_name, this_mod_name, 'Unconsistent input: &
+          write(*,*) ' Mesh file   : ' , trim(mesh_file)
+          write(*,*) ' type_span   : ' , trim(type_span_list(iRegion))
+          call error(this_sub_name, this_mod_name, 'Incorrect input: &
                 & type_span must be equal to uniform, cosine, cosineIB, cosineOB.')
         end if
 
       else !-> linear interpolation of the twist angle
-
-        ! write(*,*) ; write(*,* )' *** twist_linear_interp = T *** ' ; write(*,*)
 
         allocate(rr_tw(  2,npoint_chord_tot))
         allocate(rr_tw_1(2,npoint_chord_tot))
@@ -507,9 +496,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
           interp_weight = 1.0_wp - cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
           ! interp_weight = cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
         else
-          write(*,*) ' mesh_file   : ' , trim(mesh_file)
-          write(*,*) ' type_span_list(',iRegion,') : ' , trim(type_span_list(iRegion))
-          call error(this_sub_name, this_mod_name, 'Unconsistent input: &
+          write(*,*) ' Mesh file   : ' , trim(mesh_file)
+          write(*,*) ' type_span   : ' , trim(type_span_list(iRegion))
+          call error(this_sub_name, this_mod_name, 'Incorrect input: &
                 & type_span must be equal to uniform, cosine, cosineIB, cosineOB.')
         end if
 
@@ -575,8 +564,6 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
 
   integer :: i1
 
-! write(*,*) ' airfoil input ' , airfoil
-
   twist_rad = twist * 4.0_wp * atan(1.0_wp) / 180.0_wp
 
   ! Airfoil geometry +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -589,9 +576,6 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
 
     call check_file_exists(airfoil, this_sub_name, this_mod_name)
     call read_airfoil ( airfoil , trim(type_chord) , ElType , nelem_chord , point_list )
-    do i1 = 1 , size(point_list,2)
-      write(*,*) point_list(:,i1)
-    end do
 
   else if ( airfoil(1:4) .eq. 'NACA' ) then
     if ( len_trim(airfoil) .eq. 8 ) then      ! NACA 4-digit -------
@@ -833,12 +817,11 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr )
  real(wp) , allocatable :: st_geo(:) , s_geo(:)
  real(wp) :: ds_geo
 
- integer :: fid
+ integer :: fid, ierr
  integer :: i1 , i2
 
  ! Read coordinates
- fid = 21
- write(*,*) ' reading file : **',trim(adjustl(filen)) , '**'
+ call new_file_unit(fid, ierr)
  open(unit=fid,file=trim(adjustl(filen)) )
  read(fid,*) np_geo
  allocate(rr_geo(2,np_geo))
@@ -881,14 +864,6 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr )
    csi = -csi_half(nelems_chord+1:1:-1) + 1.0_wp
  end if
 
-  ! check ----
-   write(*,*) ' csi.  size(csi) = ' , size(csi)
-   do i1 = 1 , size(csi)
-    write(*,*) csi(i1)
-   end do
-   write(*,*)
-  ! check ----
-
  allocate(st_geo(np_geo),s_geo(np_geo))
  st_geo = 0.0_wp ; s_geo = 0.0_wp
  ! st_geo(1) = s_geo(1) = 0.0_wp
@@ -914,11 +889,6 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr )
 
    end do
  end do
-
- do i1 = 1 , size(rr,2)
-  write(*,*) rr(:,i1)
- end do
-
 
 end subroutine read_airfoil
 

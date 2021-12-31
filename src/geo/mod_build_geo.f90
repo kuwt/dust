@@ -1163,10 +1163,10 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       if ( mesh_symmetry ) call update_connectivity_symmetry( ee , rr , neigh )
 
       if ( ElType .eq. 'v' ) then
-        write(*,*) nl//' WARNING: component with id.', comp_id
-        write(*,*) '  defined as ''basic'' with ''vortex ring'' elements:'
-        write(*,*) '  be sure to your input files comply with the conventions '
-        write(*,*) '  of parameteric component structures.'//nl
+        write(msg,'(A)') 'Component named '//trim(comp_tag)//' introduced as &
+          &"basic" with vortex ring elements: be sure that the inputs comply &
+          &with the conventions of parametric component structures'
+        call warning(this_sub_name, this_mod_name, msg)
         !TODO: IMPORTANT: what should be the behaviour here?
         if(.not. suppress_te) call build_te_parametric( ee , rr , ElType ,  &
            npoints_chord_tot , nelems_span_tot , &
@@ -1406,8 +1406,6 @@ subroutine symmetry_mesh_structured( ee, rr, &
    do i1  = 2 , size(rr,2)
      if (     sum( (rr(:,i1)-cent)*norm ) .lt. minmaxPn ) then
        minmaxPn = sum( (rr(:,i1)-cent)*norm )
-       !DEBUG
-       write(*,*) ' i1 , minmaxPn : ' , i1 , minmaxPn
      end if
    end do
    if ( minmaxPn .gt. eps ) then
@@ -1543,9 +1541,6 @@ subroutine symmetry_mesh_structured( ee, rr, &
   call move_alloc(rr_temp, rr)
   call move_alloc(ee_sort, ee)
 
-! ! check ----
-! write(*,*) ' sew_first_sec , sew_last_sec : ' , sew_first_sec , sew_last_sec
-! write(*,*) ' in symmetry_mesh_structured, shape(rr) : ' , shape(rr)
 
 
   if ( allocated(ee_temp) )  deallocate(ee_temp)
@@ -1746,14 +1741,13 @@ subroutine build_connectivity_general ( ee , neigh )
                neigh(iv1,ie1) = ie2
                neigh(iv2,ie2) = ie1
              else
-               write(*,*) ' error : '
-               write(*,*) ' elem1 : ' , ie1
-               write(*,*) ' ee(:,elem1) : ' , ee(:,ie1)
-               write(*,*) ' elem2 : ' , ie2
-               write(*,*) ' ee(:,elem2) : ' , ee(:,ie2)
+               write(*,*) ' first element : ' , ie1
+               write(*,*) ' first element vertices : ' , ee(:,ie1)
+               write(*,*) ' second element : ' , ie2
+               write(*,*) ' second element vertices : ' , ee(:,ie2)
                call error(this_sub_name, this_mod_name, &
                  'Neighbouring elements with opposed normal orientation,&
-                 &this is not allowed. Stop')
+                 &this is not allowed.')
 
              end if
 
@@ -1777,16 +1771,13 @@ subroutine update_connectivity_symmetry( ee , rr , neigh )
 
  integer :: nelem , nelem_2 , nsides1 , nsides2
 
- integer :: i , j , k , l , n_sew_sym
+ integer :: i , j , k , l
 
  real(wp) :: tol = 1e-6_wp ! hardcoded
-
- ! write(*,'(A)',advance='no') 'Update_connectivity_symmetry() ... '
 
  nelem = size(ee,2)
  nelem_2 = nelem / 2
 
- n_sew_sym = 0
  do i = 1 , nelem_2
 
    ! QUAD or TRIA
@@ -1814,11 +1805,6 @@ subroutine update_connectivity_symmetry( ee , rr , neigh )
                  neigh(k,i) = j
                  neigh(l,j) = i
 
-                 ! debug ---
-                 n_sew_sym = n_sew_sym + 1
-!                write(*,*) n_sew_sym , ': ' , i , j
-!                ! debug ---
-
                end if
              end if
 
@@ -1829,8 +1815,6 @@ subroutine update_connectivity_symmetry( ee , rr , neigh )
      end if
    end do
  end do
-
- ! write(*,*)' ... done.'
 
 end subroutine update_connectivity_symmetry
 
@@ -1855,10 +1839,6 @@ character(len=*), parameter :: this_sub_name = 'build_component_parametric'
 
 if ( allocated(neigh) )   deallocate(neigh)
 allocate(neigh(4,size(ee,2))) ; neigh = 0
-
-! write(*,*) ' shape(neigh) : ' , shape(neigh)
-! write(*,*) ' npoints_chord_tot : ' , npoints_chord_tot
-! write(*,*) ' nelems_span       : ' , nelems_span
 
 nelems_chord = npoints_chord_tot - 1
   ! inner strips -----
@@ -1982,11 +1962,6 @@ subroutine merge_nodes_general ( ri , ei , tol , rr , ee , im )
 
                 inext2 = mod(i_v2,nSides2) + 1
                 iprev2 = mod(i_v2+nSides2-2,nSides2) + 1
-! ! debug ----
-!               write(*,*) ' ====== n_merge : ' , n_merge
-!               write(*,*) ' iprev2 , i_v2 , inext2 '
-!               write(*,*)   iprev2 , i_v2 , inext2
-! ! debug ----
 
                 ! find the elem i_e2 where i2 belongs to, and
                 !  find if there is another couple of nodes to be sewed (in another iter.)
@@ -2014,21 +1989,6 @@ subroutine merge_nodes_general ( ri , ei , tol , rr , ee , im )
 
                              ee(i_v2,i_e2) = i1
                              im_tmp(:,n_merge) = (/ i1 , i2 /)
-
-! ! debug -----
-!                            write(*,*) ' +++++++++++++++++++++++ merge=true ' , n_merge
-!                            write(*,*) ' ei(:',i_e2,') : ' , ei(:,i_e2)
-!                            write(*,*) ' ei(:',i_e1,') : ' , ei(:,i_e1)
-!
-!                            write(*,*) ' ei(i_v2,',i_e2,') : ' , ei(i_v2,i_e2)
-!                            write(*,*) ' ei(i_v1,',i_e1,') : ' , ei(i_v1,i_e1)
-!                            write(*,*)
-!
-!                            write(*,*) ' ei(',ind1  ,',',i_e1,') : ' , ei(ind1  ,i_e1)
-!                            write(*,*) ' ei(',iprev2,',',i_e2,') : ' , ei(iprev2,i_e2)
-!                            write(*,*) ' ei(',inext2,',',i_e2,') : ' , ei(inext2,i_e2)
-!                            write(*,*)
-! ! debug -----
 
                         end if
 

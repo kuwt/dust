@@ -218,10 +218,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
   twist_linear_interp= getlogical(pmesh_prs,'twist_linear_interpolation')
 
-! ! debug ---
-!   write(*,*) ' *** twist_linear_interp : ' , twist_linear_interp , ' *** '
-! ! debug ---
-
   !Check the number of inputs
   if(countoption(pmesh_prs,'nelem_span') .ne. nRegions ) &
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
@@ -535,22 +531,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
 ! === new-2019-02-06 ===
 
-! ! check ---
-! write(*,*)
-! write(*,*) ' airfoil_list_actual '
-! do i = 1 , size(airfoil_list_actual)
-!   write(*,*) trim( airfoil_list_actual(i) )
-! end do
-! write(*,*)
-! write(*,*) ' i_airfoil_e      ,      normalised_coord_e '
-! do i = 1 , size(normalised_coord_e,2)
-!   write(*,*) i_airfoil_e(:,i) , '          ' , normalised_coord_e(:,i)
-! end do
-! write(*,*) ' shape(nelem_span_list) : ' , shape(nelem_span_list)
-! do i = 1 , size(nelem_span_list)
-!   write(*,*) nelem_span_list(i)
-! end do
-! ! check ---
 
 
   ! optional output ----
