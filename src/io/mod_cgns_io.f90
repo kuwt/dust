@@ -43,6 +43,7 @@
 !!          Federico Fonte
 !!          Davide Montagnani
 !!          Matteo Tugnoli
+!!          Andrea Colli
 !!=========================================================================
 
 !> Module to treat the most simple input-output from ascii formatted data
@@ -103,25 +104,29 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
  character(len=32) :: basename , zonename , sectionname, coordname(3)
  character(len=72) :: eltype
  integer :: icelldim , ndim , nzone , izone , id , isec , nsec
- integer :: ieltype , nstart , nend , nbelem , nelem , nnod
+ integer :: ieltype ,  nbelem , nelem , nnod
  integer :: nNodes, nNodesUsed, posNode
- integer :: isize(3), iprec , parent_flag
+ integer ::  iprec , parent_flag
  integer :: nelem_zone
  integer :: nSectionsUsed, posSection
  logical :: sectionFound
+ 
+ integer(cgsize_t) :: isize(3), nstart , nend , range_min, range_max
+
 
  real(wp) , allocatable :: coordinateList(:)
  integer, allocatable :: nodeMap(:), nodeList(:)
 
- integer, pointer     :: pdata(:), nmixed(:)
- integer, allocatable :: elemcg(:,:)
+ integer, pointer     :: nmixed(:)
+ integer(cgsize_t), pointer     :: pdata(:)
+ integer(cgsize_t), allocatable :: elemcg(:,:)
 
  integer, allocatable :: estart(:) , eend(:)
 ! integer, allocatable :: ee_cgns(:)
 
  integer :: i1 , i , ielem, ielem_section, iNode
-
- integer, allocatable :: ConnectOffset(:)
+ 
+ integer(cgsize_t), allocatable :: ConnectOffset(:)
 
  character(len=*), parameter :: this_sub_name = 'read_mesh_cgns'
 
@@ -428,8 +433,10 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
       allocate(rr(ndim,nNodesUsed))
       do i = 1, ndim
         coordinateList = 0.0_wp;
+        range_min = 1
+        range_max = isize(1)
         call cg_coord_read_f(INDEX_FILE, ibase, izone, coordname(i), &
-                             iprec, 1, isize(1), coordinateList, ier);
+                             iprec, range_min, range_max, coordinateList, ier);
         if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
 
         do iNode = 1, nNodesUsed
@@ -448,8 +455,10 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
         !TODO: passing rr(1,:) is not a contiguous memory location and
         !needs a temporary, and rises a warning. Consider either using
         !an explicit temporary or a transposition of rr
+        range_min = 1
+        range_max = isize(1)
         call cg_coord_read_f(INDEX_FILE, ibase, izone, coordname(i), &
-                             iprec, 1, isize(1), coordinateList, ier);
+                             iprec, range_min, range_max, coordinateList, ier);
         if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
 
         rr(i,:) = coordinateList
