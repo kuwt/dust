@@ -734,13 +734,8 @@ subroutine load_components(geo, in_file, out_file, te)
  real(wp) :: coupling_node_rot(3,3) = 0.0_wp
  !> Hinges
  integer :: n_hinges, ih
- real(wp) :: rotation_amplitude
  character(len=2) :: hinge_id_str
  integer(h5loc) :: hloc, hiloc, hloc2
- integer, allocatable :: ind_coupling(:)
- integer :: n_nodes_coupling_hinges, n_nodes_coupling_hinge_1
- integer, allocatable :: hinge_ind(:)
- integer :: comp_ind
  ! Parametric elements
  integer :: par_nelems_span , par_nelems_chor
  ! trailing edge ------
@@ -761,8 +756,6 @@ subroutine load_components(geo, in_file, out_file, te)
  integer :: ne_te_prev , nn_te_prev
  real(wp) :: trac, rad
  logical :: rewrite_geo
-
- integer :: i
 
  character(len=*), parameter :: this_sub_name = 'load_components'
 

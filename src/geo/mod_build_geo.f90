@@ -172,7 +172,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  character :: ElType
  character(len=max_char_len) :: mesh_file_type
  !> Hinge ---
- integer :: n_hinges, n_nodes
+ integer :: n_hinges
  type(t_parse), pointer :: hinge_prs
  type(t_parse), pointer :: fun_prs, file_prs, coupling_prs
  type(t_hinge_input), allocatable :: hinges(:)
@@ -186,9 +186,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  real(wp)                    :: coupling_node(3)
  real(wp)                    :: coupling_node_rot(3,3)
  real(wp)                    :: coupling_node_rot_mir(3,3)
- character(len=max_char_len) :: coupling_node_file
- real(wp), allocatable       :: coupling_nodes(:,:)
- integer                   :: n_coupling_nodes, io
  !> Symmetry and mirror ---
  logical :: mesh_symmetry , mesh_mirror
  real(wp) :: symmetry_point(3), symmetry_normal(3)
@@ -228,7 +225,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  integer , allocatable :: neigh_te(:,:) , o_te(:,:)
  real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
 
- integer :: i, j
+ integer :: i
 
 #if USE_PRECICE
  real(wp), allocatable :: c_ref_p(:,:)
@@ -444,7 +441,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call error (this_sub_name, this_mod_name, &
          ' Coupled = T for component'//trim(comp_tag)// &
          ', but no coupled simulation is expected, since dust &
-           has been compiled without #USE_PRECICE option. Stop'//nl)
+           &has been compiled without #USE_PRECICE option. Stop'//nl)
   end if
 #endif
 

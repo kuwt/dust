@@ -560,10 +560,6 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
 
   character(len=*), parameter :: this_sub_name='define_section'
 
-!  character(len=4) :: char_ini4 , char_fin4
-
-  integer :: i1
-
   twist_rad = twist * 4.0_wp * atan(1.0_wp) / 180.0_wp
 
   ! Airfoil geometry +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

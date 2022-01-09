@@ -598,7 +598,7 @@ subroutine read_xac_offset( filen, rr, xac )
 
   real(wp), allocatable :: y_coord(:), yin(:), xacin(:)
 
-  integer :: nel, np, i, io, ny, j
+  integer :: np, i, io, ny, j
   integer :: fid = 21
 
   !> Set y_coord array

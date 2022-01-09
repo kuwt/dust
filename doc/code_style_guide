@@ -19,6 +19,8 @@ If you want to contribute to DUST please read this guide and try to adhere to
 it, even if some of the rules are not actually always 100% enforced in the 
 present version of the code (we are working on it...).
 
+
+
 ==> Functional rules:
 
   => Names
@@ -27,6 +29,8 @@ present version of the code (we are working on it...).
     * Class names shall begin with "c_..."
     * Pointer types (necessary to have array of pointers, damn Fortran) shall
       be named "t_..._p" and contain the pointer member named just "p"
+    * Names should be as meaningful as possible in ENGLISH. Yes, it is
+      necessary to remind this. 
 
   => Type-bound procedures (member functions)
     * In the type declaration they shall be declard
@@ -76,6 +80,11 @@ present version of the code (we are working on it...).
       - new_file_unit to get a free file unit to write
       DO NOT USE: write(*,*), stop or similar calls
 
+  => Logical operators
+    * Please use the Fortran comparison operators (.lt., .le., .gt., .ge.) and
+      logical operators (.and. .or. etc..) in their original form, and not
+      using the C style ones (<,>,<=, == etc..).
+
 ==> Aesthetic rules:
 
     * Truncate the lines after 80 columns
@@ -84,9 +93,18 @@ present version of the code (we are working on it...).
       headers with just one space with respect to the subroutine/function name, 
       while the subroutine/function content should be normally indented with 2 
       spaces
+    * Mullets and disco balls are out of fashion. And so are ALL-UPPER-CASE 
+      keywords. Please avoid them.
     * Separate the subroutines, functions, logical sections of the modules etc.
       with a series of commented dashes
+
 !----------------------------------------------------------------------
       up to column 72, as an homage to the old Gods...
 
 
+
+Disclaimer:
+The author likes good ordered code. For his peace of mind and for the sake of
+every poor soul who has to dive into someone else's code.
+Readable code grants good karma. 
+No, the author does not have OCD. His mom got him tested. 

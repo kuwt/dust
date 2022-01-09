@@ -738,7 +738,6 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
   real(wp), allocatable :: rr_h(:,:), rr_b(:,:)
   integer :: n_b, n_h, n_t
   integer :: i_b, i_h, i_t
-  integer :: nb, nh, nt
 
   !integer, allocatable :: ind(:)
   integer :: ind
@@ -944,7 +943,7 @@ subroutine hinge_deflection( this, rr, t, postpro )
 
   real(wp), allocatable :: rr_in(:,:)
   real(wp) :: th, th1, thp, yc, xq, yq, xqp, yqp
-  real(wp) :: nx(3,3), Rot_I(3,3), Rot(3,3)
+  real(wp) :: nx(3,3), Rot_I(3,3)
   integer :: nrot, nble, ib, ih, ii
 
 

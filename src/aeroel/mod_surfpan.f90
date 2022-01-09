@@ -191,7 +191,7 @@ subroutine potential_calc_sou_surfpan(this, sou, dou, pos)
  real(wp), parameter :: eps_sou  = 1.0e-6_wp
  real(wp), parameter :: ff_ratio = 10.0_wp
 
- integer :: i1, i2
+ integer :: i1
  character(len=*), parameter :: this_sub_name = 'potential_calc_sou_surfpan'
 
  radius = norm2(pos-this%cen)

@@ -271,7 +271,6 @@ function is_multiple(comp_name, name_root, imult) result(ismult)
  integer, intent(out) :: imult
  logical :: ismult
 
- character(len=2) :: suffix
  character(len=*), parameter :: nums='0123456789'
  character(len=*), parameter :: underscore='_'
  integer :: strlen, check

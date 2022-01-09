@@ -51,61 +51,78 @@ use mod_param, only: &
 
 use mod_sim_param, only: &
   sim_param
+!----------------------------------------------------------------------
 
 implicit none
 
+public :: variable_wind
+
+private
+
+!----------------------------------------------------------------------
 contains
+!----------------------------------------------------------------------
 
 function variable_wind(pos, time) result(wind)
 
-real(wp), intent(in) :: pos(3)
-real(wp), intent(in) :: time
+ real(wp), intent(in) :: pos(3)
+ real(wp), intent(in) :: time
 
-real(wp) :: wind(3)
+ real(wp) :: wind(3)
 
-real(wp) :: gust_origin(3), gust_front_direction(3), gust_front_speed, &
-            gust_u_des, gust_perturb_direction(3), gust_gradient, gust_time
+ real(wp) :: gust_origin(3), gust_front_direction(3), gust_front_speed, &
+             gust_u_des, gust_perturb_direction(3), gust_gradient, gust_time
 
-real(wp) :: s
+ real(wp) :: s
 
-wind = sim_param%u_inf
+  wind = sim_param%u_inf
 
-if (sim_param%use_gust) then
-  select case(trim(sim_param%GustType))
-    case('ACM')
-      gust_origin = sim_param%gust_origin
-      gust_front_direction = sim_param%gust_front_direction/norm2(sim_param%gust_front_direction)
-      gust_front_speed = sim_param%gust_front_speed
-      gust_u_des = sim_param%gust_u_des
-      gust_perturb_direction = sim_param%gust_perturb_direction/norm2(sim_param%gust_perturb_direction)
-      gust_gradient = sim_param%gust_gradient
-      gust_time = sim_param%gust_time
+  if (sim_param%use_gust) then
+    select case(trim(sim_param%GustType))
+      case('ACM')
+        gust_origin = sim_param%gust_origin
+        gust_front_direction = sim_param%gust_front_direction/ &
+                                            norm2(sim_param%gust_front_direction)
+        gust_front_speed = sim_param%gust_front_speed
+        gust_u_des = sim_param%gust_u_des
+        gust_perturb_direction = sim_param%gust_perturb_direction/&
+                                          norm2(sim_param%gust_perturb_direction)
+        gust_gradient = sim_param%gust_gradient
+        gust_time = sim_param%gust_time
 
-      ! penetration distance
-      ! distance from the gust front, negative for the gust approaching
-      s = -sum((pos-(gust_origin+gust_front_speed*gust_front_direction*(time-gust_time)))*gust_front_direction)
+        ! penetration distance
+        ! distance from the gust front, negative for the gust approaching
+        s = -sum((pos-(gust_origin+gust_front_speed*gust_front_direction*&
+                                         (time-gust_time)))*gust_front_direction)
 
-      if (s .GE. 0.0 .AND. s .LT. 2*gust_gradient) then
-        wind = wind + gust_u_des/2*(1-COS(pi*s/gust_gradient))
-      end if
+        if (s .ge. 0.0 .and. s .lt. 2.0_wp*gust_gradient) then
+          wind = wind + gust_u_des/2*(1.0_wp-cos(pi*s/gust_gradient))
+        end if
 
-    case('linear') ! for testing
-      gust_origin = sim_param%gust_origin
-      gust_front_direction = sim_param%gust_front_direction/norm2(sim_param%gust_front_direction)
-      gust_front_speed = sim_param%gust_front_speed
-      gust_u_des = sim_param%gust_u_des
-      gust_perturb_direction = sim_param%gust_perturb_direction/norm2(sim_param%gust_perturb_direction)
-      gust_gradient = sim_param%gust_gradient
-      gust_time = sim_param%gust_time
+      case('linear') ! for testing
+        gust_origin = sim_param%gust_origin
+        gust_front_direction = sim_param%gust_front_direction/&
+                                            norm2(sim_param%gust_front_direction)
+        gust_front_speed = sim_param%gust_front_speed
+        gust_u_des = sim_param%gust_u_des
+        gust_perturb_direction = sim_param%gust_perturb_direction/&
+                                          norm2(sim_param%gust_perturb_direction)
+        gust_gradient = sim_param%gust_gradient
+        gust_time = sim_param%gust_time
 
-      s = sum((pos-(gust_origin+sim_param%u_inf*time))*sim_param%u_inf)/norm2(sim_param%u_inf)
+        s = sum((pos-(gust_origin+sim_param%u_inf*time))*sim_param%u_inf)/&
+                                                           norm2(sim_param%u_inf)
 
-      wind = wind + pos(1)*(/0.0, 0.0, 0.1/)!s*gust_u_ds/gust_gradient*(/0.0, 0.0, 0.1/)
-    case default
-  end select
-end if
+        wind = wind + real(pos(1),wp)*(/0.0_wp, 0.0_wp, 0.1_wp/)!s*gust_u_ds/gust_gradient*(/0.0, 0.0, 0.1/)
+      case default
+    end select
+  end if
 
 end function variable_wind
 
+!----------------------------------------------------------------------
+
+
+!----------------------------------------------------------------------
 
 end module mod_wind

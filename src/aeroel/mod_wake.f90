@@ -483,7 +483,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                   dist*wake%pan_gen_scaling(ip)* &
                   norm2(wind-vel_te)* &
-                  sim_param%dt*sim_param%ndt_update_wake / norm2(dist)
+                  sim_param%dt*real(sim_param%ndt_update_wake,wp) / norm2(dist)
   ! normalisation occurs here! --------------------------------------^
 
     else
@@ -1295,13 +1295,13 @@ subroutine complete_wake(wake, geo, elems)
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) + &
                           dist*wake%pan_gen_scaling(ip)* &
                           norm2(wind-vel_te)* &
-                          sim_param%dt*sim_param%ndt_update_wake / norm2(dist)
+                  sim_param%dt*real(sim_param%ndt_update_wake,wp) / norm2(dist)
   ! normalisation occurs here! -------------------------------------------^
     else
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                   dist*wake%pan_gen_scaling(ip)* & ! next line may be commented
                   sim_param%min_vel_at_te* &
-                  sim_param%dt*sim_param%ndt_update_wake / norm2(dist)
+                  sim_param%dt*real(sim_param%ndt_update_wake,wp) / norm2(dist)
     end if
   enddo
 

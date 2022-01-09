@@ -216,7 +216,7 @@ real(wp) , allocatable ::      nor_SurfPan_old(:,:)
 
 real(wp) , allocatable :: al_kernel(:,:) , al_v(:)
 
-integer :: i_el , i, j, sel
+integer :: i_el , i, sel
 
 !octree parameters
 type(t_octree) :: octree
@@ -228,11 +228,6 @@ type(t_octree) :: octree
     logical :: precice_convergence
     !> --- PreCICE --------------------------------------------------
 #endif
-
-    !> debug --------
-    real(wp) :: sum_force(3)
-    !> debug --------
-
 
 #if USE_PRECICE
     !> --- Initialize PreCICE ---------------------------------------
@@ -418,7 +413,7 @@ call prms%CreateRealArrayOption('GustFrontDirection','Gust front direction vecto
 call prms%CreateRealArrayOption('GustFrontSpeed','Gust front speed')
 call prms%CreateRealOption('GustUDes','Design gust velocity')
 call prms%CreateRealArrayOption('GustPerturbationDirection','Gust perturbation &
-                              direction vector','(/0.0, 0.0, 1.0/)')
+                              &direction vector','(/0.0, 0.0, 1.0/)')
 call prms%CreateRealOption('GustGradient','Gust gradient')
 call prms%CreateRealOption('GustStartTime','Gust starting time','0.0')
 
