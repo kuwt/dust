@@ -353,6 +353,7 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
         call CG_POLY_ELEMENTS_READ_F(INDEX_FILE, ibase, izone, isec, &
                                 elemcg, ConnectOffset, pdata, ier)
         if ( ier /= ALL_OK ) call CG_ERROR_PRINT_F()
+        call check_cgns_overflow(elemcg)
 
         deallocate(ConnectOffset)
 
@@ -388,8 +389,7 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
               call printout(trim(msg))
               call dust_abort()
             end select
-            !TODO: insert an overflow check here. REALLY IMPORTANT.
-            ee(1:nnod,ielem) = elemcg(I+1:I+nnod,1)
+            ee(1:nnod,ielem) = int(elemcg(I+1:I+nnod,1),4)
             nmixed(elemcg(I,1)) = nmixed(elemcg(I,1)) + 1
             I = I + nnod + 1
           end do
@@ -399,8 +399,7 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
         else
           do idl = 1, eend(isec) - estart(isec) + 1
             ielem = ielem + 1
-            !TODO: insert an overflow check here. REALLY IMPORTANT.
-            ee(1:nnod,ielem) = elemcg(:,idl)
+            ee(1:nnod,ielem) = int(elemcg(:,idl),4)
           end do
         end if
 
@@ -476,6 +475,31 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
 
 
 end subroutine read_mesh_cgns
+
+!----------------------------------------------------------------------
+
+!>Check the cgns  arrays for overflow
+!!
+!! Newst cgns versions support 8 Byte indexing. We surely do not.
+!! We handle all that arrives from CGNS in the native integer that the current
+!! library uses, but at the end we must cast some of the received data to
+!! our native int4 types. So we need to check for overflow before doing that.
+subroutine check_cgns_overflow(cgns_array)
+ integer(cgsize_t), intent(in) :: cgns_array(:,:)
+
+ integer :: prot_int
+
+ if(any(abs(cgns_array) .gt. huge(prot_int))) then
+
+    call printout('ERROR while importing CGNS data: the file contains data &
+     &bigger than a 4 Byte integer which is used internally for indexing in &
+     &DUST. Either a really gargantuan mesh is being loaded (and there is &
+     & no reason to use it in DUST) or there is some issue with the CGNS file')
+    call dust_abort()
+
+ endif
+
+end subroutine check_cgns_overflow
 
 !----------------------------------------------------------------------
 
