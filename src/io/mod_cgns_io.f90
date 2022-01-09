@@ -93,7 +93,7 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
 
  character(len=*), intent(in) :: mesh_file
  character(len=*), intent(in) :: sectionNamesUsed(:)
- integer  , allocatable, intent(out) :: ee(:,:)
+ integer, allocatable, intent(out) :: ee(:,:)
  real(wp) , allocatable, intent(out) :: rr(:,:)
 
 
@@ -104,13 +104,14 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
  character(len=32) :: basename , zonename , sectionname, coordname(3)
  character(len=72) :: eltype
  integer :: icelldim , ndim , nzone , izone , id , isec , nsec
- integer :: ieltype ,  nbelem , nelem , nnod
- integer :: nNodes, nNodesUsed, posNode
+ integer :: ieltype ,  nbelem, nnod
+ integer ::  nNodesUsed, posNode
+ integer(cgsize_t) :: nNodes, nelem, idl
  integer ::  iprec , parent_flag
- integer :: nelem_zone
+ integer(cgsize_t) :: nelem_zone
  integer :: nSectionsUsed, posSection
  logical :: sectionFound
- 
+
  integer(cgsize_t) :: isize(3), nstart , nend , range_min, range_max
 
 
@@ -121,11 +122,12 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
  integer(cgsize_t), pointer     :: pdata(:)
  integer(cgsize_t), allocatable :: elemcg(:,:)
 
- integer, allocatable :: estart(:) , eend(:)
+ integer(cgsize_t), allocatable :: estart(:) , eend(:)
 ! integer, allocatable :: ee_cgns(:)
 
- integer :: i1 , i , ielem, ielem_section, iNode
- 
+ integer :: i1 , i, ielem_section, iNode
+ integer(cgsize_t) :: ielem
+
  integer(cgsize_t), allocatable :: ConnectOffset(:)
 
  character(len=*), parameter :: this_sub_name = 'read_mesh_cgns'
@@ -386,6 +388,7 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
               call printout(trim(msg))
               call dust_abort()
             end select
+            !TODO: insert an overflow check here. REALLY IMPORTANT.
             ee(1:nnod,ielem) = elemcg(I+1:I+nnod,1)
             nmixed(elemcg(I,1)) = nmixed(elemcg(I,1)) + 1
             I = I + nnod + 1
@@ -394,9 +397,10 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
           deallocate(nmixed)
 
         else
-          do id = 1, eend(isec) - estart(isec) + 1
+          do idl = 1, eend(isec) - estart(isec) + 1
             ielem = ielem + 1
-            ee(1:nnod,ielem) = elemcg(:,id)
+            !TODO: insert an overflow check here. REALLY IMPORTANT.
+            ee(1:nnod,ielem) = elemcg(:,idl)
           end do
         end if
 
