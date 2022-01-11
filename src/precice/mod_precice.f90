@@ -41,6 +41,8 @@
 !!
 !! Authors:
 !!          Davide Montagnani
+!!          Alessandro Cocco
+!!          Alberto Savino
 !!=========================================================================
 
 module mod_precice

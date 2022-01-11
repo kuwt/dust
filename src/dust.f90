@@ -45,6 +45,9 @@
 !!          Federico Fonte
 !!          Davide Montagnani
 !!          Matteo Tugnoli
+!!          Andrea Colli
+!!          Alessandro Cocco
+!!          Alberto Savino
 !!=========================================================================
 
 !> This is the main file of the DUST solver

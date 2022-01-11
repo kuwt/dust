@@ -41,7 +41,7 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Andrea Colli          <andrea.colli@polimi.it>
+!!          Andrea Colli
 !!=========================================================================
 
 module mod_wind

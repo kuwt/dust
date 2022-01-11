@@ -43,6 +43,8 @@
 !!          Federico Fonte
 !!          Davide Montagnani
 !!          Matteo Tugnoli
+!!          Alessandro Cocco
+!!          Alberto Savino
 !!=========================================================================
 
 !> Module to treat the geometry of the solid bodies

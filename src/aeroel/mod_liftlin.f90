@@ -43,6 +43,8 @@
 !!          Federico Fonte
 !!          Davide Montagnani
 !!          Matteo Tugnoli
+!!          Alessandro Cocco
+!!          Alberto Savino
 !!=========================================================================
 
 !> Module containing the specific subroutines for the lifting line

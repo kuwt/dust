@@ -41,6 +41,8 @@
 !!
 !! Authors:
 !!          Davide Montagnani
+!!          Alessandro Cocco
+!!          Alberto Savino
 !!=========================================================================
 
 !> Module for introducing hinges and rotating parts in a component
