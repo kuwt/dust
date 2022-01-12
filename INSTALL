@@ -44,6 +44,8 @@ build it from the git repositories
     make 
     make install
 
+Ubuntu 20.04
+  * apt install libcgns-dev libhdf5-dev libopenblas0
 
 Build instructions for DUST:
 1) create a build folder inside this folder (can be "build" or anything else)

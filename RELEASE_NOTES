@@ -1,3 +1,9 @@
+0.6.0-b
+* Added the aeroelastic interface for communication with preCICE
+* Added hinged surfaces
+* Added variable wind
+* Fixed some bugs
+
 0.5.17-b
 * Added divergence filtering in the particles wake evolution
 * Small improvements
