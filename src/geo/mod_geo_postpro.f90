@@ -714,13 +714,14 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
 #endif
  character(len=*), optional, intent(in) :: filen
  character(max_char_len) :: cname
- integer(h5loc) :: floc, gloc, cloc
+ integer(h5loc) :: floc, gloc, cloc, rloc
 
  real(wp) :: time_todo = 0.0_wp  ! *** to do *** pass time as an input
  integer(h5loc) :: hiloc, hloc
  real(wp), allocatable :: rr_hinge_contig(:,:)
  integer :: i_comp, ie, ih
  character(len=2) :: hinge_id_str
+
 
  do i_comp = 1,size(comps)
   associate(comp => comps(i_comp))
