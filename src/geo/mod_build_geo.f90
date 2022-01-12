@@ -189,6 +189,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  real(wp)                    :: coupling_node(3)
  real(wp)                    :: coupling_node_rot(3,3)
  real(wp)                    :: coupling_node_rot_mir(3,3)
+ character(len=max_char_len) :: coupling_node_file
+ real(wp), allocatable       :: coupling_nodes(:,:)
+ integer                   :: n_coupling_nodes, io
  !> Symmetry and mirror ---
  logical :: mesh_symmetry , mesh_mirror
  real(wp) :: symmetry_point(3), symmetry_normal(3)
@@ -228,7 +231,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
  integer , allocatable :: neigh_te(:,:) , o_te(:,:)
  real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
 
- integer :: i
+ integer :: i, j
 
 #if USE_PRECICE
  real(wp), allocatable :: c_ref_p(:,:)

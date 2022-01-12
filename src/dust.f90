@@ -219,7 +219,7 @@ real(wp) , allocatable ::      nor_SurfPan_old(:,:)
 
 real(wp) , allocatable :: al_kernel(:,:) , al_v(:)
 
-integer :: i_el , i, sel
+integer :: i_el , i, j, sel
 
 !octree parameters
 type(t_octree) :: octree
@@ -231,6 +231,10 @@ type(t_octree) :: octree
     logical :: precice_convergence
     !> --- PreCICE --------------------------------------------------
 #endif
+
+!> debug --------
+real(wp) :: sum_force(3)
+!> debug --------
 
 #if USE_PRECICE
     !> --- Initialize PreCICE ---------------------------------------
