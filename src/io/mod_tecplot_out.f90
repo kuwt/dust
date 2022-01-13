@@ -1081,7 +1081,9 @@ subroutine tec_out_box(out_filename, time, xpoints, ypoints, zpoints, vars, var_
     enddo
   enddo
 
-end subroutine
+  close(fu)
+
+end subroutine tec_out_box
 
 !---------------------------------------------------------------------
 
@@ -1222,6 +1224,8 @@ subroutine tec_out_probes(out_filename, time, vars, var_names, zone_names)
 
 
   enddo
+
+  close(fu)
 
 end subroutine tec_out_probes
 
@@ -1412,6 +1416,8 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size, &
     enddo
   endif
 
+  close(fu)
+
 end subroutine tec_out_sectional
 
 !---------------------------------------------------------------------
@@ -1548,6 +1554,7 @@ subroutine tec_out_loads(out_filename, time, force, moment)
     enddo
   enddo
 
+  close(fu)
 
 end subroutine
 

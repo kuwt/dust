@@ -195,6 +195,7 @@ if ( n_vars .eq. 0 ) then ! default: velocity | pressure | vorticity
 else
  do i_var = 1 , n_vars
   var_name = getstr(sbprms,'Variable')
+  call LowCase(var_name)
   select case(trim(var_name))
    case ( 'velocity' ) ; probe_vel = .true.
    case ( 'pressure' ) ; probe_p   = .true.
