@@ -732,16 +732,16 @@ subroutine load_components(geo, in_file, out_file, te)
  real(wp), allocatable :: comp_coupling_nodes(:,:)
  !real(wp) :: coupling_node_rot(3,3)
  integer :: points_offset_precice, np_precice, np_precice_tot
+ integer :: comp_ind
+ integer, allocatable :: hinge_ind(:)
+ integer, allocatable :: ind_coupling(:)
+ integer :: n_nodes_coupling_hinges, n_nodes_coupling_hinge_1
 #endif
  real(wp) :: coupling_node_rot(3,3) = 0.0_wp
  !> Hinges
  integer :: n_hinges, ih
  character(len=2) :: hinge_id_str
  integer(h5loc) :: hloc, hiloc, hloc2
- integer, allocatable :: ind_coupling(:)
- integer :: n_nodes_coupling_hinges, n_nodes_coupling_hinge_1
- integer, allocatable :: hinge_ind(:)
- integer :: comp_ind
  ! Parametric elements
  integer :: par_nelems_span , par_nelems_chor
  ! trailing edge ------
