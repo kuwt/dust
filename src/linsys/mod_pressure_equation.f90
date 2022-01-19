@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 
@@ -143,10 +145,9 @@ subroutine assemble_pressure_sys(linsys, geo, elems, wake)
  integer :: ie, ip, iw, p1, p2, inext, is
  integer :: ipp(4) , iww(4), ntot
  real(wp) :: elcen(3), dist(3), dist2(3)
- real(wp) :: Pinf, rhoinf, uinf(3)
+ real(wp) :: Pinf, rhoinf
 
   ! Free-stream conditions
-  uinf   = sim_param%u_inf
   Pinf   = sim_param%P_inf
   rhoinf = sim_param%rho_inf
   ntot = linsys%rank
@@ -262,7 +263,7 @@ subroutine assemble_pressure_sys(linsys, geo, elems, wake)
   !> (a.2) trick of setting B_inf = P_inf + 0.5 * rhoinf * uinf^2 = 0 ===
   ! with the proper value of dPres to be subtracted and added to the Pressure
   ! field.
-  linsys%b_pres = linsys%b_pres + 0.0    ! <- useless line!
+  linsys%b_pres = linsys%b_pres + 0.0_wp    ! <- useless line!
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !
   ! END Assemble the RHS of the linear system for the Bernoulli polynomial !
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !
@@ -438,6 +439,14 @@ subroutine press_normvel_der(geo, elems, surf_vel_SurfPan_old)
 
       el%dUn_dt = sum( el%nor * ( el%ub - &
              surf_vel_SurfPan_old( i_el , : ) ) ) / sim_param%dt
+!     ! debug ---
+!     if ( i_el .eq. 1 ) then
+!       write(*,*) ' ############################################## '
+!       write(*,*) ' dUn_dt: ' , el%dUn_dt,  el%ub, surf_vel_SurfPan_old( i_el, : )
+!       write(*,*) ' ############################################## '
+!     end if
+!     ! debug ---
+
 !            surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) ) / sim_param%dt ! <<< mod-2018-12-21
 
       ! Compute GradS_Un

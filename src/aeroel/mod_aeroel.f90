@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 !> Module containing the upper level definitions of the aerodynamic
@@ -127,7 +129,7 @@ type, abstract, extends(c_elem) :: c_pot_elem
   integer, allocatable :: i_ver(:)
 
   !> Element area
-  real(wp)              :: area
+  real(wp)             :: area
 
   !> Element normal vector
   real(wp) :: nor(3)
@@ -181,17 +183,22 @@ type, abstract, extends(c_elem) :: c_pot_elem
   !> Element indices in the component%strip_elem array
   type(t_elem_p), allocatable :: stripe_elem(:)
 
+  !> Hinge motion
+  ! Initialization to zero *** to do: restart??? ***
+  !> Delta position, due to hinge motion of the element center
+  real(wp) :: dcen_h(3)     ! = 0.0_wp
+  real(wp) :: dcen_h_old(3) ! = 0.0_wp
+  !> Delta velocity, due to hinge motion of the element center, evaluated
+  ! with finite difference method: dvel_h = ( dcen_h - dcen_h_old ) / dt
+  real(wp) :: dvel_h(3) ! = 0.0_wp
+
   contains
 
-  procedure(i_compute_pot),    deferred, pass(this) :: compute_pot
-
-  procedure(i_compute_psi),    deferred, pass(this) :: compute_psi
-
-  procedure(i_compute_pres),   deferred, pass(this) :: compute_pres
-
+  procedure(i_compute_pot)   , deferred, pass(this) :: compute_pot
+  procedure(i_compute_psi)   , deferred, pass(this) :: compute_psi
+  procedure(i_compute_pres)  , deferred, pass(this) :: compute_pres
   procedure(i_compute_dforce), deferred, pass(this) :: compute_dforce
-
-  procedure(i_calc_geo_data),  deferred, pass(this) :: calc_geo_data
+  procedure(i_calc_geo_data) , deferred, pass(this) :: calc_geo_data
 
 end type c_pot_elem
 
@@ -211,17 +218,12 @@ type, abstract, extends(c_pot_elem) :: c_impl_elem
 
   contains
 
-  procedure(i_build_row)  , deferred, pass(this)      :: build_row
-
-  procedure(i_build_row_static), deferred, pass(this) :: build_row_static
-
-  procedure(i_add_wake),    deferred, pass(this)      :: add_wake
-
-  procedure(i_add_expl), deferred, pass(this)         :: add_expl
-
-  procedure(i_get_vort_vel), deferred, pass(this)     :: get_vort_vel
-
-  procedure(i_get_bernoulli_source),    deferred, pass(this) :: get_bernoulli_source
+  procedure(i_build_row)           , deferred, pass(this) :: build_row
+  procedure(i_build_row_static)    , deferred, pass(this) :: build_row_static
+  procedure(i_add_wake)            , deferred, pass(this) :: add_wake
+  procedure(i_add_expl)            , deferred, pass(this) :: add_expl
+  procedure(i_get_vort_vel)        , deferred, pass(this) :: get_vort_vel
+  procedure(i_get_bernoulli_source), deferred, pass(this) :: get_bernoulli_source
 
 end type c_impl_elem
 
@@ -247,7 +249,7 @@ end type c_expl_elem
 !! The static part od the rhs should already be initialized, and the
 !! moving contribution is just added to the static one.
 abstract interface
-  subroutine i_build_row(this, elems, linsys, uinf, ie, ista, iend)
+  subroutine i_build_row(this, elems, linsys, ie, ista, iend)
     import :: wp
     import :: c_impl_elem
     import :: t_impl_elem_p
@@ -256,7 +258,6 @@ abstract interface
     class(c_impl_elem), intent(inout)  :: this
     type(t_impl_elem_p), intent(in)    :: elems(:)
     type(t_linsys), intent(inout) :: linsys
-    real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
     integer, intent(in)           :: ista, iend
   end subroutine
@@ -281,7 +282,7 @@ end interface
 !! should be the static ones ordered at the beginning of the array
 abstract interface
   subroutine i_build_row_static(this, elems, expl_elems, linsys, &
-                                uinf, ie, ista, iend)
+                                ie, ista, iend)
     import :: wp
     import :: c_impl_elem
     import :: t_impl_elem_p
@@ -292,7 +293,6 @@ abstract interface
     type(t_impl_elem_p), intent(in)    :: elems(:)
     type(t_expl_elem_p), intent(in)    :: expl_elems(:)
     type(t_linsys), intent(inout) :: linsys
-    real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
     integer, intent(in)           :: ista, iend
   end subroutine
@@ -315,7 +315,7 @@ end interface
 !! The stationary part is updated once at the beginning of the simulation
 !! while the moving one is updated each timestep
 abstract interface
-  subroutine i_add_wake(this, wake_elems, impl_wake_ind, linsys, uinf, &
+  subroutine i_add_wake(this, wake_elems, impl_wake_ind, linsys, &
                         ie, ista, iend)
     import :: wp
     import :: c_impl_elem
@@ -326,7 +326,6 @@ abstract interface
     type(t_pot_elem_p), intent(in)    :: wake_elems(:)
     integer, intent(in)           :: impl_wake_ind(:,:)
     type(t_linsys), intent(inout) :: linsys
-    real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
     integer, intent(in)           :: ista
     integer, intent(in)           :: iend
@@ -344,7 +343,7 @@ end interface
 !! and just retrieved, while the contribution due to the moving components
 !! is calculated and added
 abstract interface
-  subroutine i_add_expl(this, expl_elems, linsys, uinf, &
+  subroutine i_add_expl(this, expl_elems, linsys, &
                         ie, ista, iend)
     import :: wp
     import :: c_impl_elem
@@ -354,7 +353,6 @@ abstract interface
     class(c_impl_elem), intent(inout)  :: this
     type(t_expl_elem_p), intent(in)    :: expl_elems(:)
     type(t_linsys), intent(inout) :: linsys
-    real(wp), intent(in)          :: uinf(:)
     integer, intent(in)           :: ie
     integer, intent(in)           :: ista
     integer, intent(in)           :: iend
@@ -366,14 +364,13 @@ end interface
 !> Get the velocity generated by vortical elements on implicit elements.
 !!
 abstract interface
-  subroutine i_get_vort_vel(this, vort_elems, uinf)
+  subroutine i_get_vort_vel(this, vort_elems)
     import :: c_impl_elem
     import :: t_vort_elem_p
     import :: wp
     implicit none
     class(c_impl_elem), intent(inout)  :: this
     type(t_vort_elem_p), intent(in)    :: vort_elems(:)
-    real(wp), intent(in) :: uinf(3)
   end subroutine
 end interface
 
@@ -406,12 +403,11 @@ end interface
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 abstract interface
-  subroutine i_compute_vel(this, pos, uinf, vel)
+  subroutine i_compute_vel(this, pos, vel)
     import :: c_elem , wp
     implicit none
     class(c_elem), intent(in) :: this
     real(wp), intent(in) :: pos(:)
-    real(wp), intent(in) :: uinf(3)
     real(wp), intent(out) :: vel(3)
   end subroutine
 end interface
@@ -425,12 +421,11 @@ end interface
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 abstract interface
-  subroutine i_compute_grad(this, pos, uinf, grad)
+  subroutine i_compute_grad(this, pos, grad)
     import :: c_elem , wp
     implicit none
     class(c_elem), intent(in) :: this
     real(wp), intent(in) :: pos(:)
-    real(wp), intent(in) :: uinf(3)
     real(wp), intent(out) :: grad(3,3)
   end subroutine
 end interface

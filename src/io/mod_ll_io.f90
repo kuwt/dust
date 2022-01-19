@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 
@@ -61,7 +63,7 @@ use mod_parse, only: &
 
 implicit none
 
-public :: read_mesh_ll
+public :: read_mesh_ll, read_xac_offset
 
 private
 
@@ -215,10 +217,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   ref_point          = getrealarray(pmesh_prs,'starting_point',3)
 
   twist_linear_interp= getlogical(pmesh_prs,'twist_linear_interpolation')
-
-! ! debug ---
-!   write(*,*) ' *** twist_linear_interp : ' , twist_linear_interp , ' *** '
-! ! debug ---
 
   !Check the number of inputs
   if(countoption(pmesh_prs,'nelem_span') .ne. nRegions ) &
@@ -533,22 +531,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
 ! === new-2019-02-06 ===
 
-! ! check ---
-! write(*,*)
-! write(*,*) ' airfoil_list_actual '
-! do i = 1 , size(airfoil_list_actual)
-!   write(*,*) trim( airfoil_list_actual(i) )
-! end do
-! write(*,*)
-! write(*,*) ' i_airfoil_e      ,      normalised_coord_e '
-! do i = 1 , size(normalised_coord_e,2)
-!   write(*,*) i_airfoil_e(:,i) , '          ' , normalised_coord_e(:,i)
-! end do
-! write(*,*) ' shape(nelem_span_list) : ' , shape(nelem_span_list)
-! do i = 1 , size(nelem_span_list)
-!   write(*,*) nelem_span_list(i)
-! end do
-! ! check ---
 
 
   ! optional output ----
@@ -607,5 +589,66 @@ function spacing_weights ( itype, i, n ) result(w)
 
 end function spacing_weights
 
+!----------------------------------------------------------------------
+!> Set offset between xac and the structural coupling node
+subroutine read_xac_offset( filen, rr, xac )
+  character(len=*)     , intent(in)  :: filen
+  real(wp)             , intent(in)  :: rr(:,:)
+  real(wp), allocatable, intent(out) :: xac(:)
+
+  real(wp), allocatable :: y_coord(:), yin(:), xacin(:)
+
+  integer :: np, i, io, ny, j
+  integer :: fid = 21
+
+  !> Set y_coord array
+  np = size(rr,2) / 2
+  allocate(y_coord(np))
+  do i = 1, np
+    y_coord(i) = rr(2,2*i-1)
+  end do
+  !> Non-dimensionalization of y_coord
+  y_coord = ( y_coord - y_coord(1) ) / ( y_coord(np) - y_coord(1) )
+
+  !> Read offset_xac_file
+  open(unit=fid, file=trim(filen))
+  ny = 0
+  do
+    read(fid,*,iostat=io)
+    if ( io .lt. 0 ) then; exit
+    else                 ; ny = ny + 1
+    end if
+  end do
+  close(fid)
+
+  allocate(yin(ny), xacin(ny))
+  open(unit=fid, file=trim(filen))
+  do i = 1, ny
+    read(fid,*) yin(i), xacin(i)
+  end do
+  close(fid)
+
+  !> Non-dimensionalization of yin array
+  yin = ( yin - yin(1) ) / ( yin(ny) - yin(1) )
+
+  !> Interpolation of xacin in xac
+  allocate(xac(np))
+  xac(1)  = xacin(1)
+  xac(np) = xacin(ny)
+  do i = 2, np-1
+    do j = 1, ny-1
+      if ( ( y_coord(i)-yin(j)   .gt. 0.0_wp ) .and. &
+           ( y_coord(i)-yin(j+1) .le. 0.0_wp ) ) then
+        xac(i) = ( xacin(j+1) - xacin(j) ) / &
+                 (   yin(j+1) -   yin(j) ) * &
+                 ( y_coord(i) -   yin(j) ) + xacin(j)
+      end if
+    end do
+  end do
+
+
+end subroutine read_xac_offset
+
+!----------------------------------------------------------------------
 
 end module mod_ll_io

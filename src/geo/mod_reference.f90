@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 
@@ -1126,11 +1128,12 @@ subroutine build_references(refs, reference_file)
          ! check if countoption(Dof) .eq. N_Dofs
          count_dofs = countoption(sbprms,'Dof')
          if ( count_dofs .ne. n_dofs ) then
-           write(*,*) " countoption (...,'Dof') = " , count_dofs
-           write(*,*) " n_dofs                  = " , n_dofs
+           write(*,*) " number of degrees of freedom specified: " , count_dofs
+           write(*,*) " number of degrees of freedom declared:" , n_dofs
            call error(this_sub_name, this_mod_name, ' Error in the input file&
-                  & of the Reference systems (References.in?): number of Dof&
-                  & fields .ne. N_Dofs')
+                  & of the Reference systems, rotor multiple reference frame:&
+                  & the number of degrees of freedom actually specified is &
+                  &different from the one declared in n_dofs')
          end if
 
 
@@ -1270,9 +1273,6 @@ subroutine build_references(refs, reference_file)
                  end do
                else
                  if ( trim(transient_fun) .eq. 'linear' ) then
-!                  ! debug ---
-!                  write(*,*) ' transient time: ' , transient_time
-!                  ! debug ---
                    do it = 1,sim_param%n_timesteps
                      refs(iref)%pol_pos(:,it) = refs(iref)%pole
                      refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
@@ -1294,9 +1294,6 @@ subroutine build_references(refs, reference_file)
                             transient_time &
                           + refs(iref)%Omega * ( sim_param%time_vec(it) - transient_time )
                      end if
-!                    ! debug ---
-!                    write(*,*) refs(iref)%rot_vel(it) , refs(iref)%rot_pos(it)
-!                    ! debug ---
                    end do
                  elseif ( trim(transient_fun) .eq. 'cosine' ) then
                    do it = 1,sim_param%n_timesteps
@@ -1321,9 +1318,6 @@ subroutine build_references(refs, reference_file)
                             transient_time &
                           + refs(iref)%Omega * ( sim_param%time_vec(it) - transient_time )
                      end if
-!                    ! debug ---
-!                    write(*,*) refs(iref)%rot_vel(it) , refs(iref)%rot_pos(it)
-!                    ! debug ---
                    end do
                  end if
                end if
@@ -1793,20 +1787,18 @@ subroutine check_input_from_file( ref_tag_str , pol_rot_str , time_from_file , s
  character(len=*), parameter :: this_sub_name = 'check_input_from_file'
 
  if ( time_from_file(1) .gt. sim_param_time(1) ) then
-    write(*,*) ' input time_vec(1)     : ' , time_from_file(1)
-    write(*,*) ' sim_param%time_vec(1) : ' , sim_param_time(1)
-    call error(this_sub_name, this_mod_name, 'Wrong input file &
-                  &in Motion={'//trim(pol_rot_str)// &
-                   '={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
-                  &'. Initial time value > sim_param%time_vec(1).')
+    write(*,*) ' beginning of the time in motion specification : ' , time_from_file(1)
+    write(*,*) ' beginning of the simulation time : ' , sim_param_time(1)
+    call error(this_sub_name, this_mod_name, 'Error in motion specification &
+      &from  file in reference frame with Reference_Tag'//trim(ref_tag_str)//&
+      &'. Initial time value of the motion greater than initial simulation time.')
  end if
  if ( time_from_file(size(time_from_file)) .gt. sim_param_time(size(sim_param_time)) ) then
-    write(*,*) ' input time_vec(end)     : ' , time_from_file(size(time_from_file))
-    write(*,*) ' sim_param%time_vec(end) : ' , sim_param_time(size(sim_param_time))
-    call error(this_sub_name, this_mod_name, 'Wrong input file &
-                  &in Motion={'//trim(pol_rot_str)// &
-                   '={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str)//&
-                  &'. Final time value < sim_param%time_vec(end).')
+    write(*,*) ' end of the time in motion specification' , time_from_file(size(time_from_file))
+    write(*,*) ' end of the time in simulation time : ' , sim_param_time(size(sim_param_time))
+    call error(this_sub_name, this_mod_name, 'Error in motion specification &
+      &from  file in reference frame with Reference_Tag'//trim(ref_tag_str)//&
+      &'. Final time value of the motion lower than the final simulation time.')
  end if
 
 end subroutine check_input_from_file

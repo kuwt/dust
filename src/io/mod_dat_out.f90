@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 module mod_dat_out
@@ -100,30 +102,28 @@ end subroutine dat_out_loads_header
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_aa_header ( fid , t, P, rho, a, mu, u)
+subroutine dat_out_aa_header ( fid , t)
  integer , intent(in) :: fid
- real(wp), intent(in) :: t, P, rho, a, mu, u(3)
+ real(wp), intent(in) :: t
 
-  write(fid,'(A)') '# Aeroacustics data'
-  write(fid,'(A)') '# Time, free stream: Pressure, density, sound speed, &
-                  &dynamic viscosity, flow velocity'
+  write(fid,'(A)') '# Aeroacoustic Data'
 
-  write(fid,'(8'//ascii_real//')') t, P, rho, a, mu, u
-  write(fid,'(A)') '#  Element centre (3), Element normal (3), Element area, &
-               &Element centre velocity (3), Surface flow velocity on &
-               &element (3), Force acting on element (3)'
+  write(fid,'(A)') '# Time'
+  write(fid,'('//ascii_real//')') t
 
+  write(fid,'(A)') '# Element Center (3), Element Normal (3), &
+               &Element Center Velocity (3), Element Area (1), &
+               &Force Acting on Element (3)'
 
 end subroutine dat_out_aa_header
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_aa ( fid , cen, n, area, vel, surfvel, f)
+subroutine dat_out_aa ( fid , cen, n, vel, area, f)
  integer , intent(in) :: fid
- real(wp), intent(in) :: cen(3), n(3), area, vel(3), surfvel(3), f(3)
+ real(wp), intent(in) :: cen(3), n(3), vel(3), area, f(3)
 
-  write(fid,'(16'//ascii_real//')') cen, n, area, vel, surfvel, f
-
+  write(fid,'(13'//ascii_real//')') cen, n, vel, area, f
 
 end subroutine dat_out_aa
 
@@ -182,17 +182,15 @@ subroutine dat_out_sectional (basename, compname, y_cen, y_span, time, &
 
   ! Some checks --------
   if ( size(y_cen) .ne. size(sec_loads,2) ) then
-    write(*,*) ' size(sec_loads,2) : ' , size(sec_loads,2)
-    write(*,*) ' size(y_cen)       : ' , size(y_cen)
-    call error(trim(this_mod_name),'','Inconsistent inputs.&
+    call internal_error(trim(this_mod_name),'','Inconsistent inputs.&
             & size(sec_loads,2) .ne. size(y_cen). Stop ')
   end if
   if ( size(sec_loads,1) .ne. nt ) then
-    call error(trim(this_mod_name),'','Inconsistent inputs.&
+    call internal_error(trim(this_mod_name),'','Inconsistent inputs.&
             & size(sec_loads,1) .ne. size(time). Stop ')
   end if
   if ( size(sec_loads,3) .ne. 4 ) then
-    call error(trim(this_mod_name),'','Inconsistent inputs.&
+    call internal_error(trim(this_mod_name),'','Inconsistent inputs.&
             & size(sec_loads,3) .ne. 4. Stop ')
   end if
 

@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 !> Module containing the subroutines to perform probes data collection
@@ -49,6 +51,9 @@ module mod_post_probes
 
 use mod_param, only: &
   wp, nl, max_char_len, extended_char_len , pi, ascii_real
+
+use mod_sim_param, only: &
+  sim_param
 
 use mod_handling, only: &
   error, warning  , info, printout, dust_time, t_realtime, new_file_unit
@@ -94,7 +99,8 @@ use mod_tecplot_out, only: &
 use mod_dat_out, only: &
   dat_out_probes_header
 
-
+use mod_wind, only: &
+  variable_wind
 
 implicit none
 
@@ -309,9 +315,14 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
    call read_hdf5(rho,'rho_inf',ploc)
    call close_hdf5_group(ploc)
 
+   sim_param%u_inf = u_inf
+   sim_param%P_inf = P_inf
+   sim_param%rho_inf = rho
+
    ! Load the references and move the points ---
    call load_refs(floc,refs_R,refs_off)
-   call update_points_postpro(comps, points, refs_R, refs_off)
+   call update_points_postpro(comps, points, refs_R, refs_off, &
+                              filen = trim(filename) )
    ! Load the results --------------------------
    call load_res(floc, comps, vort, cp, t)
 
@@ -332,7 +343,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 !$omp parallel do private(ie, v) reduction(+:vel_probe)
        do ie = 1 , size( comps(ic)%el )
 
-        call comps(ic)%el(ie)%compute_vel( rr_probes(:,ip) , u_inf , v )
+        call comps(ic)%el(ie)%compute_vel( rr_probes(:,ip) , v )
         vel_probe = vel_probe + v/(4*pi)
 
        end do
@@ -342,12 +353,12 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 
 !$omp parallel do private( ie, v) reduction(+:vel_probe)
       do ie = 1, size(wake_elems)
-        call wake_elems(ie)%p%compute_vel( rr_probes(:,ip) , u_inf , v )
+        call wake_elems(ie)%p%compute_vel( rr_probes(:,ip) , v )
         vel_probe = vel_probe + v/(4*pi)
       enddo
 !$omp end parallel do
 
-      vel_probe = vel_probe + u_inf
+      vel_probe = vel_probe + variable_wind(rr_probes(:,ip), t)
     end if
 
     if(probe_vel) then

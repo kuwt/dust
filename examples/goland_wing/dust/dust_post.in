@@ -1,0 +1,53 @@
+basename =     Postpro/goland_test
+data_basename = Output/goland_test
+
+Analysis = {
+  Name = vl
+  Type = Viz
+
+  Format = vtk !tecplot
+
+  StartRes = 1
+  EndRes = 2000
+  StepRes = 1
+  Wake = T
+  SeparateWake = T
+  Variable = Velocity
+  Variable = Vorticity
+  Variable = Pressure
+}
+
+
+!Analysis = {
+!Type = flow_field
+!Name = ff
+!StartRes = 872!  psi270
+!EndRes = 872
+!StepRes = 5
+!Format = vtk !tecplot
+!Average = F
+!Variable = pressure 
+!Variable = Velocity
+!Nxyz   = (/  300 ,  60   ,  80   /)
+!!Nxyz = (/ 400, 400 , 240/)
+!!Nxyz = (/ 300, 300 , 180/)
+!Minxyz = (/  -1,  4, -2 /)
+!Maxxyz = (/  14,  7,  2/)
+!}
+!!!
+!!
+
+
+!Analysis = {
+!
+!  
+!  Type = integral_loads
+!  Name = loads
+!  StartRes = 1 
+!  EndRes   = 2000
+!  StepRes  = 1
+!  Format   = dat
+!    
+!  Reference_Tag = 0
+!  
+!}

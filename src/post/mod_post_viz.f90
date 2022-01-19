@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 !> Module containing the subroutines to perform visualizations during
@@ -94,6 +96,9 @@ use mod_post_load, only: &
 
 use mod_vtk_utils, only: &
   t_output_var, add_output_var, copy_output_vars, clear_output_vars
+
+use mod_wind, only: &
+  variable_wind
 
 implicit none
 
@@ -210,6 +215,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   ! Time loop
   ires = 0
   do it = an_start, an_end, an_step
+
     ires = ires+1
 
     ! Open the file
@@ -227,7 +233,8 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     call load_refs(floc,refs_R,refs_off)
 
     ! Move the points
-    call update_points_postpro(comps, points, refs_R, refs_off)
+    call update_points_postpro(comps, points, refs_R, refs_off, &
+                               filen = trim(filename) )
     !expand the actuator disks
     call expand_actdisk_postpro(comps, points, points_exp, elems)
     if(average) then
@@ -252,6 +259,8 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     ! TODO: compute/or read pressure and velocity field. Now set equal to zero
     allocate(  vel(size( vort,1)) ) ; vel = 0.0_wp
     allocate(   cp(size(press,1)) ) ;  cp = 0.0_wp
+    ! pressure coefficient
+    cp = (press - P_inf)/(0.5*rho*norm2(u_inf)**2)
 
     i_var = 1
     if(out_vort) then
@@ -276,6 +285,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
       i_var = i_var +1
     endif
 
+    
     if(average) then
       if( ires .eq. 1) then
         call copy_output_vars(out_vars, ave_out_vars, .true.)

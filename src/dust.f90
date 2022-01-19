@@ -1,3 +1,5 @@
+
+
 !./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
@@ -9,7 +11,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +42,12 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
+!!          Andrea Colli
+!!          Alessandro Cocco
+!!          Alberto Savino
 !!=========================================================================
 
 !> This is the main file of the DUST solver
@@ -142,6 +149,14 @@ use mod_octree, only: &
   initialize_octree, destroy_octree, sort_particles, t_octree, &
   apply_multipole_panels
 
+#if USE_PRECICE
+      use mod_precice, only: &
+          t_precice
+#endif
+
+use mod_wind, only: &
+  variable_wind
+
 implicit none
 
 !run-id
@@ -209,7 +224,27 @@ integer :: i_el , i, sel
 !octree parameters
 type(t_octree) :: octree
 
+#if USE_PRECICE
+    !> --- PreCICE data ---------------------------------------------
+    type(t_precice) :: precice
+    integer :: bool
+    logical :: precice_convergence
+    integer :: j
+    !> debug --------
+    real(wp) :: sum_force(3)
+    !> debug --------
+    !> --- PreCICE --------------------------------------------------
+#endif
+
+
+#if USE_PRECICE
+    !> --- Initialize PreCICE ---------------------------------------
+    call precice % initialize()
+    !> --- Initialize PreCICE: done ---------------------------------
+#endif
+
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
+
 t00 = dust_time()
 
 call get_run_id(run_id)
@@ -233,6 +268,7 @@ call prms%CreateRealOption( 'dt',     "time step")
 call prms%CreateIntOption ( 'timesteps', "number of timesteps")
 call prms%CreateRealOption( 'dt_out', "output time interval")
 call prms%CreateRealOption( 'dt_debug_out', "debug output time interval")
+call prms%CreateIntOption ( 'ndt_update_wake', 'n. dt between two wake updates', '1')
 
 ! input:
 call prms%CreateStringOption('GeometryFile','Main geometry definition file')
@@ -260,8 +296,8 @@ call prms%CreateLogicalOption('reset_time','reset the time from previous &
 call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
                                                        '(/1.0, 0.0, 0.0/)')
 call prms%CreateRealOption( 'u_ref', "reference velocity")             !
-call prms%CreateRealOption( 'P_inf', "free stream pressure", '0.0')    !
-call prms%CreateRealOption( 'rho_inf', "free stream density", '1.0')   !
+call prms%CreateRealOption( 'P_inf', "free stream pressure", '101325')    !
+call prms%CreateRealOption( 'rho_inf', "free stream density", '1.225')   !
 call prms%CreateRealOption( 'a_inf', "Speed of sound", '340.0')        ! m/s   for dimensional sim
 call prms%CreateRealOption( 'mu_inf', "Dynamic viscosity", '0.000018') ! kg/ms
 
@@ -377,6 +413,18 @@ call prms%CreateLogicalOption('HCAS','Hover Convergence Augmentation System',&
 call prms%CreateRealOption('HCAS_time','HCAS deployment time')
 call prms%CreateRealArrayOption('HCAS_velocity','HCAS velocity')
 
+! variable_wind
+call prms%CreateLogicalOption('Gust','Gust perturbation','F')
+call prms%CreateStringOption('GustType','Gust model','AMC')
+call prms%CreateRealArrayOption('GustOrigin','Gust origin point')
+call prms%CreateRealArrayOption('GustFrontDirection','Gust front direction vector')
+call prms%CreateRealArrayOption('GustFrontSpeed','Gust front speed')
+call prms%CreateRealOption('GustUDes','Design gust velocity')
+call prms%CreateRealArrayOption('GustPerturbationDirection','Gust perturbation &
+                              &direction vector','(/0.0, 0.0, 1.0/)')
+call prms%CreateRealOption('GustGradient','Gust gradient')
+call prms%CreateRealOption('GustStartTime','Gust starting time','0.0')
+
 ! get the parameters and print them out
 call printout(nl//'====== Input parameters: ======')
 call check_file_exists(input_file_name,'dust main')
@@ -470,6 +518,21 @@ if(sim_param%debug_level .ge. 15) &
 if(sim_param%debug_level .ge. 7) call ignoredParameters(prms)
 call finalizeParameters(prms)
 
+!> --- Initialize PreCICE mesh and fields -----------------------
+#if USE_PRECICE
+      call precice % initialize_mesh( geo )
+      call precice % initialize_fields()
+      call precicef_initialize(precice % dt_precice)
+
+!     !> check ---
+!     do i = 1, size(precice%fields)
+!       write(*,*) trim(precice%fields(i)%fname), precice%fields(i)%fid
+!     end do
+!     write(*,*) ' Using PreCICE: stop in dust.f90, after the initialization '
+!     write(*,*) ' of the fields and the mesh, used for coupling, l.490.'; stop
+
+#endif
+!> --- Initialize PreCICE mesh and fields: done -----------------
 
 !------ Initialization ------
 
@@ -477,9 +540,9 @@ if(sim_param%use_fmm) then
   call printout(nl//'====== Initializing Octree ======')
   t0 = dust_time()
   call initialize_octree(sim_param%BoxLength, sim_param%NBox, &
-                         sim_param%OctreeOrigin, sim_param%NOctreeLevels, &
-                         sim_param%MinOctreePart, sim_param%MultipoleDegree, &
-                         sim_param%RankineRad, octree)
+                        sim_param%OctreeOrigin, sim_param%NOctreeLevels, &
+                        sim_param%MinOctreePart, sim_param%MultipoleDegree, &
+                        sim_param%RankineRad, octree)
   t1 = dust_time()
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,F9.3,A)') 'Initialized octree in: ' , t1 - t0,' s.'
@@ -490,12 +553,12 @@ endif
 call printout(nl//'====== Initializing Wake ======')
 
 call initialize_wake(wake, geo, te, sim_param%n_wake_panels, &
-       sim_param%n_wake_panels, sim_param%n_wake_particles)
+      sim_param%n_wake_panels, sim_param%n_wake_particles)
 
 call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
 call initialize_linsys(linsys, geo, elems, elems_expl, &
-                       wake ) ! sim_param%u_inf)
+                      wake ) ! sim_param%u_inf)
 !call initialize_pressure_sys(linsys, geo, elems)
 
 t1 = dust_time()
@@ -503,6 +566,8 @@ if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Initialized linear system in: ' , t1 - t0,' s.'
   call printout(message)
 endif
+
+
 
 ! Restart --------------
 !------ Reloading ------
@@ -520,9 +585,15 @@ else ! Set to zero the intensity of all the singularities
      elems(i_el)%p%mag = 0.0_wp
   end do
   do i_el = 1 , size(elems_expl) ! explicit elements (ll, ad)
-     elems_expl(i_el)%p%mag = 0.0_wp
-  end do
+    elems_expl(i_el)%p%mag = 0.0_wp
 
+  end do
+  if (size(elems_ll) .gt. 0) then
+    do i_el = 1, size(elems_ll)
+      elems_ll(i_el)%p%Gamma_old = 0.0_wp
+      elems_ll(i_el)%p%Gamma_old_old = 0.0_wp
+    end do
+  endif
 endif
 
 t22 = dust_time()
@@ -540,9 +611,25 @@ if ( ( size(elems_ll) .gt. 0 ) ) then
 end if
 
 
+!> --- Initialize coupling --------------------------------------
+#if USE_PRECICE
+      call precicef_ongoing(   precice % is_ongoing)
+      write(*,*) ' is coupling ongoing: ', precice % is_ongoing
+      !call precicef_initialize(precice % dt_precice)
+      call precicef_ongoing(   precice % is_ongoing)
+
+      precice_convergence = .true.
+
+      write(*,*) ' is coupling ongoing: ', precice % is_ongoing
+      write(*,*) ' dt_precice         : ', precice % dt_precice
+#endif
+!> --- Initialize PreCICE mesh and fields: done -----------------
+
+
 !====== Time Cycle ======
 call printout(nl//'////////// Performing Computations //////////')
 time = sim_param%t0
+sim_param%time_old = sim_param%t0 + 1
 t_last_out = time; t_last_debug_out = time
 time_no_out = 0.0_wp; time_no_out_debug = 0.0_wp
 
@@ -560,24 +647,38 @@ end if
 
 
 t11 = dust_time()
-do it = 1,nstep
+it = 0
+#if USE_PRECICE
+    it = 1
+    do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .eq. 1 ) ) ! start time cycle
+#else
+    do while ( ( it .lt. nstep ) )
+      it = it + 1
+#endif
+  sim_param%time_old = sim_param%time
 
   if(sim_param%debug_level .ge. 1) then
-    write(message,'(A,I5,A,I5,A,F7.2)') nl//'--> Step ',it,' of ', &
-                                        nstep, ' simulation time: ', time
+    write(message,'(A,I5,A,I5,A,F9.4)') nl//'--> Step ',it,' of ', &
+                                      nstep, ' simulation time: ', time
     call printout(message)
     t22 = dust_time()
     write(message,'(A,F9.3,A)') 'Elapsed wall time: ',t22-t00
     call printout(message)
   endif
 
-  !Calculate the normal velocity derivative for the pressure equation
-  call press_normvel_der(geo, elems, surf_vel_SurfPan_old)
+#if USE_PRECICE
+      if ( precice_convergence ) then
+#endif
+      call init_timestep(time)
+#if USE_PRECICE
+        precice_convergence = .false.
+      end if
+#endif
 
-  !time related checks
-  call init_timestep(time)
-
+if ( mod( it-1, sim_param%ndt_update_wake ) .eq. 0 ) then
+  !   write(*,*) ' =================== call update_wake ==================== '
   call prepare_wake(wake, elems_tot, octree)
+end if
 
   call update_liftlin(elems_ll,linsys)
   call update_actdisk(elems_ad,linsys)
@@ -587,6 +688,98 @@ do it = 1,nstep
             call debug_printout_geometry(elems, geo, basename_debug, it)
   if((sim_param%debug_level .ge. 16).and.time_2_debug_out)&
             call debug_ll_printout_geometry(elems_ll, geo, basename_debug, it)
+
+#if USE_PRECICE
+      !> -------------------------------------------------------------
+      call precicef_action_required( precice%write_it_checkp , bool )
+      if ( bool .eq. 1 ) then ! Save old state
+        !> Save old state: forces and moments
+        do j = 1, size(precice%fields)
+          if ( trim(precice%fields(j)%fio) .eq. 'write' ) then
+            precice%fields(j)%cdata = precice%fields(j)%fdata
+          end if
+        end do
+        !> PreCICE action fulfilled
+        call precicef_mark_action_fulfilled( precice%write_it_checkp )
+      end if
+
+      ! check ---
+      !> Read data from structural solver
+      do i = 1, size(precice%fields)
+        if ( trim(precice%fields(i)%fio) .eq. 'read' ) then
+          if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
+            ! check ---
+            ! write(*,*) ' read scalar field: ', trim(precice%fields(i)%fname)
+            ! check ---
+            call precicef_read_bsdata( precice%fields(i)%fid, &
+                                       precice%mesh%nnodes  , &
+                                       precice%mesh%node_ids, &
+                                       precice%fields(i)%fdata(1,:) )
+          elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
+            ! ! check ---
+            ! write(*,*) ' read vector field: ', trim(precice%fields(i)%fname)
+            ! write(*,*) '    mesh%nnodes  : ' , precice%mesh%nnodes
+            ! write(*,*) '    mesh%nodes_ids: ', precice%mesh%node_ids
+            ! ! check ---
+            call precicef_read_bvdata( precice%fields(i)%fid, &
+                                       precice%mesh%nnodes  , &
+                                       precice%mesh%node_ids, &
+                                       precice%fields(i)%fdata )
+          endif
+          ! check ---
+          !write(*,*) ' precice%mesh%nnodes : ', precice%mesh%nnodes
+          !write(*,*) i, precice%fields(i)%fid, precice%fields(i)%fname
+          !do i_el = 1, size(precice%fields(i)%fdata,2)
+          !  write(*,*) precice%fields(i)%fdata(:,i_el)
+          !end do
+          !write(*,*)
+          ! check ---
+        end if
+      end do
+
+      ! write(*,*) ' write something, before stop in dust.f90, l.700 '
+      ! read(*,*)
+
+      ! ! check ---
+      ! stop
+      ! ! check ---
+
+      !> Update dust geometry ( elems and first wake panels )
+      call precice % update_elems( geo, elems_tot )
+
+      ! ! debug ---
+      ! write(*,*) ' debug in dust.f90, l.715. geo%points:'
+      ! do i_el = 1, size(geo%points,2)
+      !   write(*,*) i_el, ' :   ', geo%points(:,i_el)
+      ! end do
+      ! write(*,*) ' stop in dust.f90, l.719. '; stop
+      ! write(*,*) ' debug in dust.f90, l.715. elems_tot(1)%p%ver: '
+      ! do i_el = 1, size(elems_tot(1)%p%ver,2)
+      !   write(*,*) elems_tot(1)%p%i_ver(i_el), ': ', elems_tot(1)%p%ver(:,i_el)
+      ! end do
+      ! ! debug ---
+
+      !> Update geo_data()
+      do i_el = 1, size(elems_tot)
+        call elems_tot(i_el)%p%calc_geo_data( &
+                               geo%points(:,elems_tot(i_el)%p%i_ver) )
+      end do
+
+      !> Update near-field wake
+      call precice % update_near_field_wake( geo, wake )
+
+      !> Update dt
+      ! *** to do *** : change the way of treating time integration.
+      ! So far, only explicit fixed-dt integration is available.
+      ! The law of motion of the rigid components is evaluated before
+      ! the time loop starts
+      ! dt = min ( dt_dust, dt_precice )
+
+#else
+#endif
+
+      !Calculate the normal velocity derivative for the pressure equation
+      call press_normvel_der(geo, elems, surf_vel_SurfPan_old)
 
   !------ Assemble the system ------
   !call prepare_wake(wake, geo, sim_param)
@@ -629,7 +822,7 @@ do it = 1,nstep
     elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
   end do
 !$omp end parallel do
-  res_old = linsys%res
+  ! res_old = linsys%res  ! moved to l.940 approx, when the dt is finalized
 
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
@@ -642,17 +835,25 @@ do it = 1,nstep
 
   !------ Update the explicit part ------  % v-----implicit elems: p,v
   if ( size(elems_ll) .gt. 0 ) then
-   if ( trim(sim_param%llSolver) .eq. 'GammaMethod' ) then ! Gamma-method
-    call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
-            (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it)
-   elseif ( trim(sim_param%llSolver) .eq. 'AlphaMethod' ) then
-    call solve_liftlin_piszkin(elems_ll, elems_tot, elems , elems_ad , &
+
+    if ( trim(sim_param%llSolver) .eq. 'GammaMethod' ) then ! Gamma-method
+      if (sim_param%time .gt. sim_param%time_old)  then
+        do i_el = 1, size(elems_ll)
+          elems_ll(i_el)%p%Gamma_old_old = elems_ll(i_el)%p%Gamma_old
+          elems_ll(i_el)%p%Gamma_old = elems_ll(i_el)%p%mag
+        enddo
+      endif
+      call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
+              (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it)
+
+    elseif ( trim(sim_param%llSolver) .eq. 'AlphaMethod' ) then
+      call solve_liftlin_piszkin(elems_ll, elems_tot, elems , elems_ad , &
             (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it,&
-             al_kernel )
-   else
+            al_kernel )
+  else
     call error('dust','dust',' Wrong string for LLsolver. &
-         &This parameter should have been set equal to "GammaMethod" (default) &
-         &in init_sim_param() routine. Something went wrong. Stop')
+          &This parameter should have been set equal to "GammaMethod" (default) &
+          &in init_sim_param() routine. Something went wrong. Stop')
 
 !   call solve_liftlin_optim(elems_ll, elems_tot, elems , elems_ad , &
 !           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it, &
@@ -666,25 +867,50 @@ do it = 1,nstep
    end if
   end if
 
-  !------ Compute loads -------
-  ! Implicit elements: vortex rings and 3d-panels
-  ! 2019-07-23: D.Isola suggested to implement AVL formula for VL elements
-  ! so far, select type() to keep the old formulation for t_surfpan and
-  ! use AVL formula for t_vortlatt
-!$omp parallel do private(i_el)
-  do i_el = 1 , sel
+!------ Compute loads -------
+! Implicit elements: vortex rings and 3d-panels
+! 2019-07-23: D.Isola suggested to implement AVL formula for VL elements
+! so far, select type() to keep the old formulation for t_surfpan and
+! use AVL formula for t_vortlatt
+#if USE_PRECICE
+  !$omp parallel do private(i_el)
+    do i_el = 1 , sel
 
-    ! ifort bugs workaround:
-    ! apparently it is not possible to call polymorphic methods inside
-    ! select cases for intel, need to call these for all elements and for the
-    ! vortex lattices it is going to be a dummy empty function call
+      ! ifort bugs workaround:
+      ! apparently it is not possible to call polymorphic methods inside
+      ! select cases for intel, need to call these for all elements and for the
+      ! vortex lattices it is going to be a dummy empty function call
 
-        call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
-                geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g)
-        call elems(i_el)%p%compute_dforce()
+      !write(*,*) ' i_el : ', i_el
+      !write(*,*) ' elems(i_el)%p%comp_id): ', elems(i_el)%p%comp_id
+      !write(*,*) ' geo%components()%ref_id: ', &
+      !             geo%components(elems(i_el)%p%comp_id)%ref_id
+      call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
+                geo%components(elems(i_el)%p%comp_id)%coupling_node_rot)
+      call elems(i_el)%p%compute_dforce()
 
-  end do
-!$omp end parallel do
+    end do
+  !$omp end parallel do
+#else
+  !$omp parallel do private(i_el)
+    do i_el = 1 , sel
+
+      ! ifort bugs workaround:
+      ! apparently it is not possible to call polymorphic methods inside
+      ! select cases for intel, need to call these for all elements and for the
+      ! vortex lattices it is going to be a dummy empty function call
+
+      !write(*,*) ' i_el : ', i_el
+      !write(*,*) ' elems(i_el)%p%comp_id): ', elems(i_el)%p%comp_id
+      !write(*,*) ' geo%components()%ref_id: ', &
+      !             geo%components(elems(i_el)%p%comp_id)%ref_id
+      call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
+              geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g)
+      call elems(i_el)%p%compute_dforce()
+
+    end do
+  !$omp end parallel do
+#endif
 
   ! ifort bugs workaround:
   ! since even if the following calls looks thread safe, they mess up with
@@ -695,14 +921,29 @@ do it = 1,nstep
       select type( el => elems(i_el)%p )
         class is(t_vortlatt)
           ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
-          call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/) )
+          call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/), wake%vort_p)
           ! compute dforce using AVL formula
           call el%compute_dforce_jukowski()
           ! update the pressure field, p = df.n / area
-          !el%pres = sum( el%dforce * el%nor ) / el%area
+          el%pres = sum( el%dforce * el%nor ) / el%area
+          ! ALTERNATIVE:
+          !call el%compute_pres_vortlatt()
+          !elems(i_el)%p%dforce = elems(i_el)%p%pres * elems(i_el)%p%area * elems(i_el)%p%nor
+          !write(*,*) 'F:  ', el%dforce
+
           !ifort bug workaround
-          elems(i_el)%p%pres = sum( elems(i_el)%p%dforce * elems(i_el)%p%nor )&
-                               / elems(i_el)%p%area
+          !elems(i_el)%p%pres = sum( elems(i_el)%p%dforce * elems(i_el)%p%nor )&
+          !                     / elems(i_el)%p%area
+
+              ! ! debug ---
+              ! write(*,'(I4,A,3F10.5,A,3F10.5,A,3F10.5,A,3F10.5,A,F10.5)') &
+              !                        i_el, '     ', el%vel_ctr_pt, &
+              !                              '     ', el%dforce, &
+              !                              '     ', el%nor,    &
+              !                              '     ', el%dn_dt,  &
+              !                              '     ', el%pres
+              ! ! debug ---
+
       end select
     end do
   endif
@@ -720,32 +961,97 @@ do it = 1,nstep
   end do
 !$omp end parallel do
 
-  ! pres_IE +++++
-  !!if ( it .gt. 1 ) then
-  !!  do i_el = 1 , geo%nSurfPan
-  !!    select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
-  !!     ! check UHLMAN's EQN -----
-  !!     el%pres = &
-  !!      linsys%res_pres(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp
-! !!     el%pres = &
-! !!      surfpan_H_IE(i_el) - 0.5*sim_param%rho_inf * norm2(el%surf_vel)**2.0_wp + &
-! !!         sim_param%rho_inf * sum(el%surf_vel*el%ub)
-  !!     ! check UHLMAN's EQN -----
-  !!    end select
-  !!  end do
-  !!
+#if USE_PRECICE
 
-  !!else
-  !!  do i_el = 1 , geo%nSurfPan
-  !!    select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
-  !!     el%pres = 0.0_wp
-  !!    end select
-  !!  end do
-  !!end if
+      !write(*,*) ' ------------------------------------------------------------------- '
+      !write(*,*) ' debug in dust.f90, l.890: i, pres, dforce '
+      sum_force = 0.0_wp
+      do i = 1, size(elems_tot)
+        sum_force = sum_force + elems_tot(i)%p%dforce
+      !  write(*,*) i, ' : ', elems_tot(i)%p%pres, '      ', elems_tot(i)%p%dforce
+      end do
+      !write(*,*) '                                                 ', sum_force
+      !write(*,*) ' ------------------------------------------------------------------- '
+      !write(*,*)
 
+!     write(*,*) ' debug in dust.f90, l.890 '
+!     do i = 1, 10
+!     ! !> check mag, pres
+!     ! write(*,*) i, ':  ', elems_ll(i)%p%mag , elems_ll(i+10)%p%mag , elems_ll(i+20)%p%mag, &
+!     !               '   ', elems_ll(i)%p%pres, elems_ll(i+10)%p%pres, elems_ll(i+20)%p%pres
+!     ! !> check nor, dforce ---> issues in the unsteady force contributions
+!     ! write(*,*) i   , ':  ', elems_ll(i   )%p%nor , elems_ll(i   )%p%dforce, &
+!     !                    sum( elems_ll(i   )%p%nor * elems_ll(i   )%p%dforce )
+!     ! write(*,*) i+10, ':  ', elems_ll(i+10)%p%nor , elems_ll(i+10)%p%dforce, &
+!     !                    sum( elems_ll(i+10)%p%nor * elems_ll(i+10)%p%dforce )
+!     ! write(*,*) i+20, ':  ', elems_ll(i+20)%p%nor , elems_ll(i+20)%p%dforce, &
+!     !                    sum( elems_ll(i+20)%p%nor * elems_ll(i+20)%p%dforce )
+!     ! write(*,*)
+!     ! write(*,*) i, ':  ', elems_ll(i   )%p%dGamma_dt , &
+!     !                      elems_ll(i+10)%p%dGamma_dt , &
+!     !                      elems_ll(i+20)%p%dGamma_dt
+!     ! !> check nor, dforce ---> issues in the unsteady force contributions
+!     ! write(*,*) i   , ':  ', elems_ll(i   )%p%dn_dt
+!     ! write(*,*) i+10, ':  ', elems_ll(i+10)%p%dn_dt
+!     ! write(*,*) i+20, ':  ', elems_ll(i+20)%p%dn_dt
+!     ! write(*,*)
+!     end do
 
-  ! pres_IE +++++
+      !> Update force and moments to be passed to the structural solver
+      call precice % update_force( geo, elems_tot )
 
+      call precicef_ongoing( precice%is_ongoing )
+      if ( precice%is_ongoing .eq. 1 ) then
+        call precicef_advance( precice%dt_precice )
+        write(*,*) ' ++++ dt_precice: ', precice%dt_precice
+      end if
+
+      !> Write force and moments to structural solver
+      do i = 1, size(precice%fields)
+        if ( trim(precice%fields(i)%fio) .eq. 'write' ) then
+
+          if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
+            call precicef_write_bsdata( precice%fields(i)%fid, &
+                                        precice%mesh%nnodes  , &
+                                        precice%mesh%node_ids, &
+                                        precice%fields(i)%fdata(1,:) )
+          elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
+            call precicef_write_bvdata( precice%fields(i)%fid, &
+                                        precice%mesh%nnodes  , &
+                                        precice%mesh%node_ids, &
+                                        precice%fields(i)%fdata )
+          endif
+
+          ! check ---
+          !write(*,*) ' precice%mesh%nnodes : ', precice%mesh%nnodes
+          !write(*,*) i, precice%fields(i)%fid, precice%fields(i)%fname
+          !do i_el = 1, size(precice%fields(i)%fdata,2)
+          !  write(*,*) precice%fields(i)%fdata(:,i_el)
+          !end do
+          !write(*,*)
+          ! check ---
+
+        end if
+      end do
+
+      call precicef_action_required( precice%read_it_checkp, bool )
+
+      if ( bool .eq. 1 ) then ! timestep not converged
+        !> Reload checkpoint state
+        do j = 1, size(precice%fields)
+          if ( trim(precice%fields(j)%fio) .eq. 'write' ) then
+            precice%fields(j)%fdata = precice%fields(j)%cdata
+          end if
+        end do
+        call precicef_mark_action_fulfilled( precice%read_it_checkp )
+      else ! timestep converged
+        precice_convergence = .true.
+        !> Finalize timestep
+        ! Do the same actions as a simulation w/o coupling
+        ! *** to do *** check if something special is needed
+
+#else
+#endif
 
   !----- Print the results -----
   if(time_2_out)  then
@@ -761,8 +1067,12 @@ do it = 1,nstep
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
   !  next iteration)
+
   t0 = dust_time()
-  call update_wake(wake, elems_tot, octree)
+  if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
+    !   write(*,*) ' =================== call update_wake ==================== '
+    call update_wake(wake, elems_tot, octree)
+  end if
   t1 = dust_time()
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,F9.3,A)') 'Updated wake in: ' , t1 - t0,' s.'
@@ -782,9 +1092,38 @@ do it = 1,nstep
   if(it .lt. nstep) then
     !time = min(sim_param%tend, time+sim_param%dt)
     time = min(sim_param%tend, sim_param%time_vec(it+1))
+    !> Update geometry
     call update_geometry(geo, time, .false.)
-    call complete_wake(wake, geo, elems_tot)
+    if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
+      !     write(*,*) ' =================== call complete_wake ==================== '
+          call complete_wake(wake, geo, elems_tot)
+    end if
   endif
+
+      !> Save old solution (at the previous dt) of the linear system
+      res_old = linsys%res
+
+      !> Update nor_old (moved from geo/mod_geo.f90/update_geometry(), l.2220 approx
+    !$omp parallel do private(i_el)
+      do i_el = 1 , size(elems_tot)
+        elems_tot(i_el)%p%nor_old = elems_tot(i_el)%p%nor
+      end do
+    !$omp end parallel do
+
+
+#if USE_PRECICE
+      ! *** to do *** dirty implementation. it-update moved into #if USE_PRECICE
+      ! statement, to avoid double time counter update, when the code is not coupled
+      ! with external softwares through PRECICE.
+      ! #if .not. USE_PRECICE, it-update occurs at the beginning of the time loop,
+      ! approximately at l.615.
+      ! Is there a reasone why it-update should occur in two different places of the
+      ! time loop (at the begin w/o precice, at the end w/ precice)?
+      !> Update n. time step
+      it = it + 1
+      endif ! End of the if statement that check whether the timestep
+            ! has converged or not
+#endif
 
 enddo
 call printout(nl//'\\\\\\\\\\  Computations Finished \\\\\\\\\\')
@@ -793,6 +1132,11 @@ call printout(nl//'\\\\\\\\\\  Computations Finished \\\\\\\\\\')
 deallocate( res_old )
 !===== End Time Cycle ======
 
+!> --- Finalize PreCICE -----------------------------------------
+#if USE_PRECICE
+      call precicef_finalize()
+#endif
+!> --- Finalize PreCICE: done -----------------------------------
 
 !------ Cleanup ------
 !call destroy_wake_panels(wake_panels)
@@ -847,14 +1191,13 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
  integer, intent(inout) :: nout
  logical, intent(inout) :: output_start
 
- real(wp) :: timescale
-
   !timing
   sim_param%t0     = getreal(prms, 'tstart')
   sim_param%tend   = getreal(prms, 'tend')
   sim_param%dt_out = getreal(prms,'dt_out')
   sim_param%debug_level = getint(prms, 'debug_level')
   sim_param%output_detailed_geo = getlogical(prms, 'output_detailed_geo')
+  sim_param%ndt_update_wake = getint(prms, 'ndt_update_wake')
 
   !Reference values
   sim_param%P_inf = getreal(prms,'P_inf')
@@ -1022,6 +1365,27 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     sim_param%hcas_vel = getrealarray(prms,'HCAS_velocity',3)
   endif
 
+  !variable_wind
+  sim_param%use_gust = getlogical(prms, 'Gust')
+  if(sim_param%use_gust) then
+    sim_param%GustType = getstr(prms,'GustType')
+    sim_param%gust_origin = getrealarray(prms, 'GustOrigin',3)
+    if(countoption(prms,'GustFrontDirection') .gt. 0) then
+      sim_param%gust_front_direction = getrealarray(prms, 'GustFrontDirection',3)
+    else
+      sim_param%gust_front_direction = sim_param%u_inf
+    end if
+    if(countoption(prms,'GustFrontSpeed') .gt. 0) then
+      sim_param%gust_front_speed = getreal(prms, 'GustFrontSpeed')
+    else
+      sim_param%gust_front_speed = norm2(sim_param%u_inf)
+    end if
+    sim_param%gust_u_des = getreal(prms,'GustUDes')
+    sim_param%gust_perturb_direction = getrealarray(prms,'GustPerturbationDirection',3)
+    sim_param%gust_time = getreal(prms,'GustStartTime')
+    sim_param%gust_gradient = getreal(prms,'GustGradient')
+  end if
+
   !Manage restart
   sim_param%restart_from_file = getlogical(prms,'restart_from_file')
   if (sim_param%restart_from_file) then
@@ -1070,15 +1434,6 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
                      real(sim_param%n_timesteps,wp)
     sim_param%n_timesteps = sim_param%n_timesteps + 1
                             !add one for the first step
-  endif
-
-  if(sim_param%use_vs) then
-    sim_param%use_divfilt = getlogical(prms,'DivergenceFiltering')
-    if(sim_param%use_divfilt) then
-      timescale = getreal(prms,'FilterTimescale')
-      sim_param%filt_eta = 1.0_wp/(timescale*sim_param%dt)
-    endif
-
   endif
 
 end subroutine init_sim_param
@@ -1253,7 +1608,7 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
           f(n_neigh) = - ( el%neigh(i_e)%p%mag - el%mag )
         end if
       end do
-      f(n_neigh+1) = sum(el%nor * (-sim_param%u_inf - el%uvort + el%ub) )
+      f(n_neigh+1) = sum(el%nor * (-variable_wind(el%cen, sim_param%time) - el%uvort + el%ub) )
       vel_phi(:,ie) = matmul( el%chtls_stencil , f(1:n_neigh+1) )
 
 

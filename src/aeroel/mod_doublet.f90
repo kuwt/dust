@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 !> Module containing subroutines about doublets distributions.
@@ -183,9 +185,6 @@ subroutine potential_calc_doublet(this, dou, pos)
 !      elseif ( dou .gt. +real(this%n_ver-2,wp)*pi - 1.0e-5_wp ) then
 !        dou = dou - real(this%n_ver-2,wp) * pi
 !      else
-!        ! debug ---
-!        write(*,*) ' dou : ' , dou
-!        ! debug ---
 !        dou = 0.0_wp
 !      end if
 !
@@ -213,15 +212,12 @@ subroutine potential_calc_doublet(this, dou, pos)
      end do
 
      ! Correct the result to obtain the solid angle (from Gauss-Bonnet theorem)
+     !TODO: use "sign" here and check the results
      if     ( dou .lt. -real(this%n_ver-2,wp)*pi + 1.0e-5_wp ) then
        dou = dou + real(this%n_ver-2,wp) * pi
      elseif ( dou .gt. +real(this%n_ver-2,wp)*pi - 1.0e-5_wp ) then
        dou = dou - real(this%n_ver-2,wp) * pi
-     else
-!      ! debug ---
-!      write(*,*) ' dou : ' , dou
-!      ! debug ---
-!      ! dou = 0.0_wp
+     !else do nothin, add zero
      end if
 
 !      ! === Latest (partial) implementation ===
@@ -263,9 +259,6 @@ subroutine potential_calc_doublet(this, dou, pos)
 !          else
 !
 !            ! TODO: write regularisation
-! !          ! debug ---
-! !          write(*,*) ' pos_z : ' , pos_z
-! !          ! debug ---
 !
 !          end if
 !
@@ -279,9 +272,6 @@ subroutine potential_calc_doublet(this, dou, pos)
 !      elseif ( dou .gt. +real(this%n_ver-2,wp)*pi - 1.0e-5_wp ) then
 !        dou = dou - real(this%n_ver-2,wp) * pi
 !      else
-! !      ! debug ---
-! !      write(*,*) ' dou : ' , dou
-! !      ! debug ---
 !        dou = 0.0_wp
 !      end if
 !
@@ -452,11 +442,6 @@ subroutine gradient_calc_doublet(this, grad_dou, pos)
    l = this%edge_uni(:,i)
    lv(:,1) = l
 
-! ! debug ---
-!    write(*,*) ' this%n_ver : ' , this%n_ver
-!    write(*,*) ' i1 : ' , i1
-!    write(*,*) ' i2 : ' , i2
-! ! debug ---
    R1 = pos-this%ver(:,i1) ;   a1 = cross( l , R1 )
    R2 = pos-this%ver(:,i2) ;   a2 = cross( l , R2 )
    a = norm2(a1)  ! = norm(a2)
@@ -487,15 +472,6 @@ subroutine gradient_calc_doublet(this, grad_dou, pos)
       + a * ( al2 - ax2 * sum( l * R2 ) / norm2(R2)**2.0_wp ) )
 
  end do
-
-! debug ---
-! write(*,*)
-! write(*,*) grad_dou(1,:)
-! write(*,*) grad_dou(2,:)
-! write(*,*) grad_dou(3,:)
-! write(*,*)
-! stop
-! debug ---
 
 end subroutine gradient_calc_doublet
 

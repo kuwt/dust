@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,10 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
+!!          Andrea Colli
 !!=========================================================================
 
 !> Module to treat the most simple input-output from ascii formatted data
@@ -73,6 +76,7 @@ public :: read_mesh_cgns
 private
 
 character(len=*), parameter :: this_mod_name = 'mod_cgns_io'
+character(len=max_char_len) :: msg
 
 !----------------------------------------------------------------------
 
@@ -89,7 +93,7 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
 
  character(len=*), intent(in) :: mesh_file
  character(len=*), intent(in) :: sectionNamesUsed(:)
- integer  , allocatable, intent(out) :: ee(:,:)
+ integer, allocatable, intent(out) :: ee(:,:)
  real(wp) , allocatable, intent(out) :: rr(:,:)
 
 
@@ -100,23 +104,31 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
  character(len=32) :: basename , zonename , sectionname, coordname(3)
  character(len=72) :: eltype
  integer :: icelldim , ndim , nzone , izone , id , isec , nsec
- integer :: ieltype , nstart , nend , nbelem , nelem , nnod
- integer :: nNodes, nNodesUsed, posNode
- integer :: isize(3), iprec , parent_flag
- integer :: nelem_zone
+ integer :: ieltype ,  nbelem, nnod
+ integer ::  nNodesUsed, posNode
+ integer(cgsize_t) :: nNodes, nelem, idl
+ integer ::  iprec , parent_flag
+ integer(cgsize_t) :: nelem_zone
  integer :: nSectionsUsed, posSection
  logical :: sectionFound
+
+ integer(cgsize_t) :: isize(3), nstart , nend , range_min, range_max
+
 
  real(wp) , allocatable :: coordinateList(:)
  integer, allocatable :: nodeMap(:), nodeList(:)
 
- integer, pointer     :: pdata(:), nmixed(:)
- integer, allocatable :: elemcg(:,:)
+ integer, pointer     :: nmixed(:)
+ integer(cgsize_t), pointer     :: pdata(:)
+ integer(cgsize_t), allocatable :: elemcg(:,:)
 
- integer, allocatable :: estart(:) , eend(:)
+ integer(cgsize_t), allocatable :: estart(:) , eend(:)
 ! integer, allocatable :: ee_cgns(:)
 
- integer :: i1 , i , ielem, ielem_section, iNode
+ integer :: i1 , i, ielem_section, iNode
+ integer(cgsize_t) :: ielem
+
+ integer(cgsize_t), allocatable :: ConnectOffset(:)
 
  character(len=*), parameter :: this_sub_name = 'read_mesh_cgns'
 
@@ -130,7 +142,7 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
   call printout(nl//' Loading geometry from cgns file: '//trim(mesh_file))
   call CG_OPEN_F(trim(mesh_file), MODE_READ, index_file, ier)
   if ( ier .ne. ALL_OK ) then
-    write(*,*) ' ** error when reading cgns file'
+    call printout(' CGNS error when reading cgns file!')
     call CG_ERROR_EXIT_F()
   end if
 
@@ -139,10 +151,11 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
   call CG_NBASES_F(INDEX_FILE, nbase, ier)
   if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
   if (nbase /= 1) then
-    write(*,'(A,I2)') ' Number of bases in the cgns file: ', nbase
+    write(msg,'(A,I2)') ' Number of bases in the cgns file: ', nbase
+    call printout(trim(msg))
     !call error(this_sub_name, this_mod_name,'More than one base in the &
     !  &CGNS file, not supported')
-    write(*,'(A)') 'More than one base in the CGNS file, not supported'
+    call printout('More than one base in the CGNS file, not supported')
     call dust_abort()
   end if
   ibase = 1
@@ -155,7 +168,10 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
 !  Special case for 2d: if icelldim=2 we assume a pure 2d mesh with
 !  coordinates in x and y only (not a surface mesh in 3d)
 
-  if ((icelldim == 2) .and. (ndim > icelldim)) ndim = icelldim
+! Check.
+!So far it makes work a mesh done from surface cad (not from solid cad)
+
+!  if ((icelldim == 2) .and. (ndim > icelldim)) ndim = icelldim
 
 !  Number of zones. Assume a zone is a region. Loop over the zones
 
@@ -163,10 +179,11 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
   if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
 
   if ( nzone .ne. 1 ) then
-    write(*,'(A,I2)') ' Number of zones in the cgns base: ', nzone
+    write(msg,'(A,I2)') ' Number of zones in the cgns base: ', nzone
+    call printout(trim(msg))
     !call error(this_sub_name, this_mod_name,'More than one zon in the &
     !  &CGNS file, not supported')
-    write(*,'(A)') 'More than one zone in the CGNS file, not supported'
+    call printout('More than one zone in the CGNS file, not supported')
     call dust_abort()
   end if
 
@@ -189,16 +206,21 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
     if ( id /= unstructured ) then
       !call error(this_sub_name, this_mod_name,'No unstructured grid was &
       !  &found in the CGNS file')
-      write(*,'(A)') 'No unstructured grid was found in the CGNS file'
+      call printout('No unstructured grid was found in the CGNS file')
       call dust_abort()
     end if
 
     nNodes = isize(1)
 
-    write(*,*)
-    write(*,'(A,I9)') ' Number of nodes:      ', isize(1)
-    write(*,'(A,I9)') ' Number of cells:      ', isize(2)
-    write(*,'(A,I2)') ' Coordinate dimension: ', ndim
+    call printout('CGNS zone recap:'//nl)
+    write(msg,'(A,I9,A)') ' Number of nodes:      ', isize(1),nl
+    call printout(trim(msg))
+    write(msg,'(A,I9,A)') ' Number of cells:      ', isize(2),nl
+    call printout(trim(msg))
+    write(msg,'(A,I2,A)') ' Coordinate dimension: ', ndim,nl
+    call printout(trim(msg))
+    write(msg,'(A,I2,A)') ' Mesh elements dimension: ', icelldim,nl
+    call printout(trim(msg))
 
 
 
@@ -212,7 +234,8 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
 !
     call CG_NSECTIONS_F(INDEX_FILE, ibase, izone, nsec, ier)
     if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
-    write(*,'(A,I3)') ' Number of sections in the zone: ', nsec
+    write(msg,'(A,I3)') ' Number of sections in the zone: ', nsec
+    call printout(trim(msg))
 
 ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ! find the total number of elements and section names
@@ -233,9 +256,10 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
       call StripSpaces(sectionname)
       sectionNames(isec) = sectionname
 
-      write(*,'(A,I3,A,I10,2A)') ' Section number:', isec,&
+      write(msg,'(A,I3,A,I10,2A)') ' Available section number:', isec,&
                            '   Number of elements: ', nelem, &
-                           '   Name: ', trim(sectionname)
+                           '   Name: ', trim(sectionname)//nl
+      call printout(trim(msg))
       ! TODO: why is no longer working with CGNS 3.3?
       ! write(*,'(A,A)')  ' Element type: ', trim(ElementTypeName(ieltype))
       ! write(*,'(A,I9)') ' First parent data: ', parent_flag
@@ -246,30 +270,33 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
     ! Get number of elements considering the selection of sections
     if (nSectionsUsed > 0) then
       nelem_zone = 0
-      write(*,'(A,I3)') ' Number of sections used: ', nSectionsUsed
+      write(msg,'(A,I3)') ' Number of sections to be loaded: ', nSectionsUsed
+      call printout(trim(msg))
 
       do isec = 1, nSectionsUsed
-        write(*,*) ' Section Name: ', trim(sectionNamesUsed(isec))
+        call printout(' Section '//trim(sectionNamesUsed(isec))//&
+          &' will be loaded'//nl)
 
         sectionFound = IsInList(sectionNamesUsed(isec), sectionNames, posSection)
         if (sectionFound) then
           selectedSection(posSection) = .true.
           nelem_zone = nelem_zone + eend(posSection) - estart(posSection) + 1
         else
-          write(*,*) ' ** error: section with name ', trim(sectionNamesUsed(isec)), ' not found'
-          write(*,*) ' **        see above for the list of available sections'
-          write(*,*) ' ** Program stopped'
-          stop
+          call printout('ERROR during CGNS section loading: section with &
+            &name '//trim(sectionNamesUsed(isec))//' not found'//nl//&
+            & '        see above for the list of available sections')
+            call dust_abort()
         endif
       enddo
     else
-      write(*,*)  'All sections will be used'
+      call printout('All found CGNS sections will be loaded')
       ! All sections will be selected
       selectedSection = .true.
       nelem_zone = nend
     endif
 
-    write(*,*) 'Total number of elements: ', nelem_zone
+    write(msg,'(A,I0,A)') 'Total number of loaded elements: ', nelem_zone,nl
+    call printout(trim(msg))
 
     allocate(ee(4,nelem_zone)) ; ee = 0
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -302,9 +329,10 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
           eltype = 'mixed'
           nnod = 9
         case default
-          write(*,*) ' error: unsupported element type: ', ieltype, &
+          write(msg,*) ' error: unsupported CGNS element type: ', ieltype, &
                      'NONE' ! trim(ElementTypeName(ieltype)) TODO: not working in CGNS 3.3
-          stop
+          call printout(trim(msg))
+          call dust_abort()
         end select
 
 
@@ -321,10 +349,13 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
           allocate(pdata(3))
         end if
 
-        call CG_ELEMENTS_READ_F(INDEX_FILE, ibase, izone, isec, &
-                                elemcg, pdata, ier)
-        if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
+        allocate(ConnectOffset(nelem+1))
+        call CG_POLY_ELEMENTS_READ_F(INDEX_FILE, ibase, izone, isec, &
+                                elemcg, ConnectOffset, pdata, ier)
+        if ( ier /= ALL_OK ) call CG_ERROR_PRINT_F()
+        call check_cgns_overflow(elemcg)
 
+        deallocate(ConnectOffset)
 
         !  Store data, mixed elements get special treatment
         if (eltype == 'mixed') then
@@ -353,11 +384,12 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
             case(HEXA_8)
               nnod = 8
             case default
-              write(*,*) ' error: unsupported element type: ', elemcg(I,1), &
+              write(msg,*) ' error: unsupported element type: ', elemcg(I,1), &
                          'NONE' ! trim(ElementTypeName(elemcg(I,1))) TODO: not working in CGNS 3.3
-              stop
+              call printout(trim(msg))
+              call dust_abort()
             end select
-            ee(1:nnod,ielem) = elemcg(I+1:I+nnod,1)
+            ee(1:nnod,ielem) = int(elemcg(I+1:I+nnod,1),4)
             nmixed(elemcg(I,1)) = nmixed(elemcg(I,1)) + 1
             I = I + nnod + 1
           end do
@@ -365,9 +397,9 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
           deallocate(nmixed)
 
         else
-          do id = 1, eend(isec) - estart(isec) + 1
+          do idl = 1, eend(isec) - estart(isec) + 1
             ielem = ielem + 1
-            ee(1:nnod,ielem) = elemcg(:,id)
+            ee(1:nnod,ielem) = int(elemcg(:,idl),4)
           end do
         end if
 
@@ -404,8 +436,10 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
       allocate(rr(ndim,nNodesUsed))
       do i = 1, ndim
         coordinateList = 0.0_wp;
+        range_min = 1
+        range_max = isize(1)
         call cg_coord_read_f(INDEX_FILE, ibase, izone, coordname(i), &
-                             iprec, 1, isize(1), coordinateList, ier);
+                             iprec, range_min, range_max, coordinateList, ier);
         if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
 
         do iNode = 1, nNodesUsed
@@ -424,8 +458,10 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
         !TODO: passing rr(1,:) is not a contiguous memory location and
         !needs a temporary, and rises a warning. Consider either using
         !an explicit temporary or a transposition of rr
+        range_min = 1
+        range_max = isize(1)
         call cg_coord_read_f(INDEX_FILE, ibase, izone, coordname(i), &
-                             iprec, 1, isize(1), coordinateList, ier);
+                             iprec, range_min, range_max, coordinateList, ier);
         if ( ier /= ALL_OK ) call CG_ERROR_EXIT_F()
 
         rr(i,:) = coordinateList
@@ -439,6 +475,31 @@ subroutine read_mesh_cgns(mesh_file, sectionNamesUsed, ee, rr)
 
 
 end subroutine read_mesh_cgns
+
+!----------------------------------------------------------------------
+
+!>Check the cgns  arrays for overflow
+!!
+!! Newst cgns versions support 8 Byte indexing. We surely do not.
+!! We handle all that arrives from CGNS in the native integer that the current
+!! library uses, but at the end we must cast some of the received data to
+!! our native int4 types. So we need to check for overflow before doing that.
+subroutine check_cgns_overflow(cgns_array)
+ integer(cgsize_t), intent(in) :: cgns_array(:,:)
+
+ integer :: prot_int
+
+ if(any(abs(cgns_array) .gt. huge(prot_int))) then
+
+    call printout('ERROR while importing CGNS data: the file contains data &
+     &bigger than a 4 Byte integer which is used internally for indexing in &
+     &DUST. Either a really gargantuan mesh is being loaded (and there is &
+     & no reason to use it in DUST) or there is some issue with the CGNS file')
+    call dust_abort()
+
+ endif
+
+end subroutine check_cgns_overflow
 
 !----------------------------------------------------------------------
 

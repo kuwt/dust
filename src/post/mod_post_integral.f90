@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 !> Module containing the subroutines to perform integral loads calculations
@@ -132,7 +134,6 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
  real(wp) :: M_ref(3) , M_bas(3)
  real(wp) :: F_ave(3), M_ave(3)
  real(wp), allocatable :: force(:,:), moment(:,:)
- real(wp) :: u_inf(3)
  real(wp) :: P_inf , rho
  integer :: ic , it , ie , ierr , ires , fid_out , nstep
  real(wp), allocatable :: time(:)
@@ -233,7 +234,6 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
 
     ! Load u_inf --------------------------------
     call open_hdf5_group(floc,'Parameters',ploc)
-    call read_hdf5(u_inf,'u_inf',ploc)
     call read_hdf5(P_inf,'P_inf',ploc)
     call read_hdf5(rho,'rho_inf',ploc)
     call close_hdf5_group(ploc)
@@ -241,7 +241,8 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
     ! Load the references and move the points ---
     call load_refs(floc,refs_R,refs_off)
     ! Move the points ---------------------------
-    call update_points_postpro(comps, points, refs_R, refs_off)
+    call update_points_postpro(comps, points, refs_R, refs_off, &
+                               filen = trim(filename) )
     ! Load the results --------------------------
     call load_res(floc, comps, vort, cp, t)
 

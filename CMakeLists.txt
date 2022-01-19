@@ -1,5 +1,5 @@
 #Specify minimum version of Cmake
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required(VERSION 2.6...3.21)
 enable_language (Fortran)
 #Project name
 project(Dust)
@@ -34,6 +34,16 @@ ELSE()
   MESSAGE(ERROR "Unknown computational precision")
 ENDIF()
 
+SET(WITH_PRECICE "NO" CACHE STRING "Compile with PreCICE")
+SET_PROPERTY(CACHE WITH_PRECICE PROPERTY STRINGS "NO" "YES")
+IF(WITH_PRECICE STREQUAL "YES")
+  ADD_DEFINITIONS(-DUSE_PRECICE)
+ELSEIF(WITH_PRECICE STREQUAL "NO")
+  # Do nothing
+ELSE()
+  MESSAGE(ERROR "Unknown choice for WITH_PRECICE")
+ENDIF()
+
 
 # =========== COMPILER ========================
 #SET(CMAKE_Fortran_COMPILER "/home/matteo/LocalUtils/gcc/install/bin/gfortran")
@@ -53,6 +63,7 @@ ENDIF (NOT CMAKE_BUILD_TYPE)
 
 IF (CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
   set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp ")
+  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -Wno-unused-function -Wno-character-truncation ")
   set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS} -O3 -g -fopenmp")
   set(CMAKE_Fortran_FLAGS_PROFILE "${CMAKE_Fortran_FLAGS} -O3 -g -fopenmp")
   #set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS} -ggdb -g -O0 -pedantic -Wall -Wconversion -Wconversion-extra -fcheck=all -fcheck=bounds -std=f2008ts -fall-intrinsics -finit-real=snan -ffpe-trap=invalid -finit-integer=-666 -Wintrinsics-std -fbacktrace")
@@ -83,7 +94,7 @@ ENDIF()
 
 # +++++++++++++++++++
 
-#Lapack
+#> Lapack -------------------------------------------------------
 OPTION(DUST_MKL "Use MKL libraries instead of BLAS/LAPACK" OFF)
 IF (DUST_MKL)
 #  SET(BLA_VENDOR "Intel") #search only for intel libraries
@@ -100,20 +111,28 @@ ELSE()
   LIST(APPEND linkedlibs ${LAPACK_LIBRARIES})
 ENDIF()
 
-#HDF5
+#> HDF5 ---------------------------------------------------------
 find_package(HDF5 REQUIRED COMPONENTS C Fortran)
 LIST(APPEND linkedlibs ${HDF5_LIBRARIES})
 
+#> CGNS ---------------------------------------------------------
 # Add CGNS installation (for the moment could not make it look for it autonomously)
 SET(CGNS_INC "/usr/include" CACHE STRING "Include path for cgns headers") 
 SET(CGNS_LIB "/usr/lib" CACHE STRING "Path of the cgns library") 
 LIST(APPEND linkedlibs cgns)
 
+#> PreCICE ------------------------------------------------------
+IF(WITH_PRECICE STREQUAL "YES")
+  SET(PRECICE_INC "/usr/include"   CACHE STRING "Include path for PreCICE fortran interface") 
+  SET(PRECICE_LIB "/usr/local/lib" CACHE STRING "Path of the PreCICE library") 
+  LIST(APPEND linkedlibs precice)
+ENDIF()
+
 #set the includes
-include_directories(${incldirs} ${CGNS_INC} ${HDF5_INCLUDE_DIRS})
+include_directories(${incldirs} ${PRECICE_INC} ${CGNS_INC} ${HDF5_INCLUDE_DIRS})
 
 #set the link path
-link_directories(${CGNS_LIB} ${HDF5_LIBRARY_DIRS})
+link_directories(${PRECICE_LIB} ${CGNS_LIB} ${HDF5_LIBRARY_DIRS})
 
 #Generate the version
 execute_process(COMMAND
@@ -136,6 +155,10 @@ file(GLOB_RECURSE sources ${PROJECT_SOURCE_DIR}/src/geo/*.f90
                           ${PROJECT_SOURCE_DIR}/src/options/*.f90 
                           ${PROJECT_SOURCE_DIR}/src/viscosity/*.f90
                           ${PROJECT_SOURCE_DIR}/src/fmm/*.f90)
+IF (WITH_PRECICE STREQUAL "YES")
+  file(GLOB sources_precice ${PROJECT_SOURCE_DIR}/src/precice/*.f90)
+  list(APPEND sources ${sources_precice} )
+ENDIF()
 
 
 #create a library
@@ -155,6 +178,8 @@ target_link_libraries(dust_pre  dustlib ${linkedlibs})
 add_executable(dust_post  ${PROJECT_SOURCE_DIR}/src/dust_post.f90)
 add_dependencies(dust_post dustlib)
 target_link_libraries(dust_post  dustlib ${linkedlibs})
+
+install(TARGETS dust dust_pre dust_post DESTINATION bin)
 
 #add_executable(dust_potential_test  ${PROJECT_SOURCE_DIR}/src/dust_potential_test.f90)
 #add_dependencies(dust_potential_test dustlib)

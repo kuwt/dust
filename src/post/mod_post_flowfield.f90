@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 !> Module containing the subroutines to perform flowfield visualizations
@@ -50,8 +52,11 @@ module mod_post_flowfield
 use mod_param, only: &
   wp, nl, max_char_len, extended_char_len , pi
 
+use mod_sim_param, only: &
+  sim_param
+
 use mod_handling, only: &
-  error, warning
+  error, warning, printout
 
 use mod_geometry, only: &
   t_geo, t_geo_component, destroy_elements
@@ -92,6 +97,9 @@ use mod_vtk_out, only: &
 use mod_post_load, only: &
   load_refs , load_res, load_wake_post
 
+use mod_wind, only: &
+  variable_wind
+
 implicit none
 
 public :: post_flowfield
@@ -99,6 +107,7 @@ public :: post_flowfield
 private
 
 character(len=max_char_len), parameter :: this_mod_name = 'mod_post_flowfield'
+character(len=max_char_len) :: msg
 
 contains
 
@@ -162,7 +171,8 @@ character(len=max_char_len) :: filename
 character(len=max_char_len), parameter :: &
    this_sub_name = 'post_flowfield'
 
-    write(*,*) nl//' Analysis:',ia,' post_flowfield() +++++++++ '//nl
+  write(msg,'(A,I0,A)') nl//'++++++++++ Analysis: ',ia,' flowfield'//nl
+  call printout(trim(msg))
 
 ! Select all the components
 !   components_names is allocated in load_components_postpro()
@@ -185,7 +195,7 @@ if ( n_vars .eq. 0 ) then ! default: velocity | pressure | vorticity
 else
  do i_var = 1 , n_vars
   var_name = getstr(sbprms,'Variable')
-  write(*,*) ' trim(var_name) : ' , trim(var_name) ; call LowCase(var_name)
+  call LowCase(var_name)
   select case(trim(var_name))
    case ( 'velocity' ) ; probe_vel = .true.
    case ( 'pressure' ) ; probe_p   = .true.
@@ -322,10 +332,15 @@ do it = an_start, an_end, an_step ! Time history
   call read_hdf5(rho,'rho_inf',ploc)
   call close_hdf5_group(ploc)
 
+  sim_param%u_inf = u_inf
+  sim_param%P_inf = P_inf
+  sim_param%rho_inf = rho
+
   ! Load the references and move the points ---
   call load_refs(floc,refs_R,refs_off,refs_G,refs_f)
 
-  call update_points_postpro(comps, points, refs_R, refs_off, refs_G, refs_f)
+  call update_points_postpro(comps, points, refs_R, refs_off, refs_G, refs_f, &
+                             filen = trim(filename) )
 
   ! Load the results --------------------------
   call load_res(floc, comps, vort, cp, t)
@@ -354,7 +369,7 @@ do it = an_start, an_end, an_step ! Time history
         do ic = 1,size(comps) ! Loop on components
          do ie = 1 , size( comps(ic)%el ) ! Loop on elems of the comp
           call comps(ic)%el(ie)%compute_vel( (/ xbox(ix) , ybox(iy) , zbox(iz) /) , &
-                                              u_inf , v )
+                                               v )
           vel_probe = vel_probe + v/(4*pi)
          end do
         end do
@@ -363,12 +378,13 @@ do it = an_start, an_end, an_step ! Time history
         do ie = 1, size(wake_elems)
           call wake_elems(ie)%p%compute_vel( &
                    (/ xbox(ix) , ybox(iy) , zbox(iz) /) , &
-                   u_inf , v )
+                    v )
           vel_probe = vel_probe + v/(4*pi)
         enddo
 
         ! + u_inf
-        vel_probe = vel_probe + u_inf
+
+        vel_probe = vel_probe + variable_wind((/ xbox(ix) , ybox(iy) , zbox(iz) /), t)
 
 
       end if
@@ -382,6 +398,7 @@ do it = an_start, an_end, an_step ! Time history
         ! rho * dphi/dt + P + 0.5*rho*V^2 = P_infty + 0.5*rho*V_infty^2
         !TODO: add:
         ! - add the unsteady term: -rho*dphi/dt
+        !WIND TODO
         pres_probe = P_inf + 0.5_wp*rho*norm2(u_inf)**2 - 0.5_wp*rho*norm2(vel_probe)**2
         vars(i_var_v+1,ipp) = pres_probe
 
@@ -514,7 +531,8 @@ deallocate(var_names,vars_n)
 call destroy_elements(comps)
 deallocate(comps,components_names)
 
-    write(*,*) nl//' post_flowfield done.'//nl
+  write(msg,'(A,I0,A)') nl//'++++++++++ Flowfield done'//nl
+  call printout(trim(msg))
 
 end subroutine post_flowfield
 

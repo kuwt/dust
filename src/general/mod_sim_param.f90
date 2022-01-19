@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 
@@ -85,6 +87,10 @@ type t_sim_param
   real(wp) , allocatable :: time_vec(:)
   !> Actual time
   real(wp) :: time
+  !> Previous time
+  real(wp) :: time_old
+  !> ndt between 2 wake updates
+  integer :: ndt_update_wake
 
   !> Output detailed geometry each timestep
   logical :: output_detailed_geo
@@ -247,6 +253,20 @@ type t_sim_param
     character(len=max_char_len) :: restart_file
     !> Reset the time after restart
     logical :: reset_time
+
+  !Variable wind
+  !> Gust
+  logical :: use_gust
+  !> Gust type
+  character(len=max_char_len) :: GustType
+  !> Gust parameters
+  real(wp) :: gust_origin(3)
+  real(wp) :: gust_front_direction(3)
+  real(wp) :: gust_front_speed
+  real(wp) :: gust_u_des
+  real(wp) :: gust_perturb_direction(3)
+  real(wp) :: gust_gradient
+  real(wp) :: gust_time
 
 contains
 

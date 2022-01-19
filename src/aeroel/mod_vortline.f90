@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 !> Module containing the specific subroutines for a single vortex line
@@ -121,10 +123,9 @@ end subroutine initialize_vortline
 !! WARNING: the velocity calculated, to be consistent with the formulation of
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
-subroutine compute_vel_vortline (this, pos, uinf, vel)
+subroutine compute_vel_vortline (this, pos, vel)
  class(t_vortline), intent(in) :: this
  real(wp), intent(in) :: pos(:)
- real(wp), intent(in) :: uinf(3)
  real(wp), intent(out) :: vel(3)
 
  real(wp) :: vdou(3)
@@ -170,10 +171,9 @@ end subroutine compute_vel_vortline
 
 !----------------------------------------------------------------------
 
-subroutine compute_grad_vortline(this, pos, uinf, grad)
+subroutine compute_grad_vortline(this, pos, grad)
  class(t_vortline), intent(in) :: this
  real(wp), intent(in) :: pos(:)
- real(wp), intent(in) :: uinf(3)
  real(wp), intent(out) :: grad(3,3)
 
  integer  :: i1 , i2

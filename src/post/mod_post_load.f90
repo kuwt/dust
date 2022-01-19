@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 !> Module containing the tools to load the solution for postprocessing
@@ -50,7 +52,7 @@ use mod_param, only: &
   wp, nl, max_char_len, pi
 
 use mod_handling, only: &
-  error, internal_error, warning, info
+  error, internal_error, warning, info, printout
 
 use mod_geometry, only: &
   t_geo, t_geo_component
@@ -91,6 +93,7 @@ public :: load_refs , load_res ,  load_ll, &
 private
 
 character(len=*), parameter :: this_mod_name = 'mod_post_load'
+character(len=max_char_len) :: msg
 
 contains
 
@@ -748,14 +751,8 @@ subroutine check_if_components_exist( components_list , filename )
 
  character(len=*), parameter :: this_sub_name = 'check_if_components_exist'
 
- n_comp_inp = size(components_list) ; write(*,*) ' n_comp_inp : ' , n_comp_inp
- !debug
-  do i_comp = 1 , n_comp_inp
-    write(*,*) 'comp',i_comp,':',components_list(i_comp)
-  end do
+ n_comp_inp = size(components_list)
 
- write(*,*) nl//' ++++ Check component input : '
- write(*,*) ' checking file: ', trim(filename)
  call open_hdf5_file(trim(filename),floc)
  call open_hdf5_group(floc,'Components',gloc)
  call read_hdf5(n_comp_tot,'NComponents',gloc)
@@ -771,23 +768,22 @@ subroutine check_if_components_exist( components_list , filename )
  call close_hdf5_file(floc)
 
  do i1 = 1 , n_comp_inp
-   i_check = 0 ; write(*,*) ' i_check : ' , i_check
    do i2 = 1 , n_comp_tot
      if ( trim(components(i2)) .eq. trim(components_list(i1)) ) &
                                                         i_check = 1
    end do
    if ( i_check .eq. 0 ) then
-     write(*,*) ' All the available SINGLE components are: '
+     write(msg,*) ' All the available SINGLE components in file &
+       &'//trim(filename)//' are: '//nl
+     call printout(trim(msg))
      do i2 = 1 , n_comp_tot
-       write(*,*) i2 , ' : ' , trim(components(i2))
+       write(msg,'(I0,A)') i2 , ' : '//trim(components(i2))//nl
+       call printout(trim(msg))
      end do
      call error(this_sub_name, this_mod_name, &
-              'Component '//trim(components_list(i1))//' received as &
-             &an input does not exist.')
+              'Component '//trim(components_list(i1))//' does not exist.')
    end if
  end do
-
- write(*,*) nl//' ++++ Check component input : OK. '//nl
 
 end subroutine check_if_components_exist
 

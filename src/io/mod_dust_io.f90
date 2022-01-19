@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 
@@ -132,14 +134,14 @@ subroutine save_status(geo, wake, it, time, run_id)
  real(wp), intent(in)            :: time
  integer, intent(in)             :: run_id(10)
 
- integer(h5loc) :: floc, gloc1, gloc2, gloc3, ploc
+ integer(h5loc) :: floc, gloc1, gloc2, gloc3, gloc4, ploc
  character(len=max_char_len) :: comp_name, sit
  integer :: icomp, ncomp
  integer :: iref, nref
  character(len=max_char_len) :: ref_name
  integer :: ie, ne
  real(wp), allocatable :: vort(:), cp(:) , pres(:)
- real(wp), allocatable :: dforce(:,:), surf_vel(:,:)
+ real(wp), allocatable :: dforce(:,:), dmom(:,:), surf_vel(:,:)
  real(wp), allocatable :: turbvisc(:)
  real(wp), allocatable :: points_w(:,:,:), cent(:,:,:) , vel_w(:,:,:)
  real(wp), allocatable :: vort_v(:,:)
@@ -148,7 +150,9 @@ subroutine save_status(geo, wake, it, time, run_id)
  real(wp), allocatable :: alpha(:), vel_2d(:), vel_outplane(:)
  real(wp), allocatable :: alpha_isolated(:), vel_2d_isolated(:)
  real(wp), allocatable :: vel_outplane_isolated(:), aero_coeff(:,:)
- integer :: ir, id, ip, np
+ integer :: ir, id, ip, np, ih
+ ! Hinges
+ character(len=2) :: hinge_id_str
 
   !create the output file
   write(sit,'(I4.4)') it
@@ -186,18 +190,20 @@ subroutine save_status(geo, wake, it, time, run_id)
     call new_hdf5_group(gloc2, 'Solution', gloc3)
 
     ne = size(geo%components(icomp)%el)
-    allocate(vort(ne), cp(ne) , pres(ne) , dforce(3,ne) )
+    allocate(vort(ne), cp(ne) , pres(ne) , dforce(3,ne), dmom(3,ne) )
     do ie = 1,ne
      vort(ie) = geo%components(icomp)%el(ie)%mag
      !cp(ie) = geo%components(icomp)%el(ie)%cp
      pres(ie) = geo%components(icomp)%el(ie)%pres
      dforce(:,ie) = geo%components(icomp)%el(ie)%dforce
+     dmom(:,ie) = geo%components(icomp)%el(ie)%dmom
     enddo
     call write_hdf5(vort,'Vort',gloc3)
     !call write_hdf5(cp,'Cp',gloc3)
     call write_hdf5(pres,'Pres',gloc3)
     call write_hdf5(dforce,'dF',gloc3)
-    deallocate(vort, cp, pres, dforce)
+    call write_hdf5(dmom,'dMom',gloc3)
+    deallocate(vort, cp, pres, dforce, dmom)
 
     !Output the surface velocity
     if ( trim( geo%components(icomp)%comp_el_type ) .eq. 'p' ) then
@@ -245,12 +251,43 @@ subroutine save_status(geo, wake, it, time, run_id)
 
     call close_hdf5_group(gloc3)
 
+    !> Hinges: node position, node orientation(v,h,n), theta, theta_old
+    call new_hdf5_group(gloc2, 'Hinges', gloc3)
+    call write_hdf5(geo%components(icomp)%n_hinges, 'n_hinges', gloc3)
+    do ih = 1, geo%components(icomp)%n_hinges
+      !> Open hinge group
+      write(hinge_id_str,'(I2.2)') ih
+      call new_hdf5_group(gloc3, 'Hinge_'//hinge_id_str, gloc4)
+      associate( comp => geo%components(icomp) )
+        call write_hdf5( comp%hinge(ih)%act%rr, 'act_rr', gloc4 )
+        call write_hdf5( comp%hinge(ih)%act%v , 'act_v ', gloc4 )
+        call write_hdf5( comp%hinge(ih)%act%h , 'act_h ', gloc4 )
+        call write_hdf5( comp%hinge(ih)%act%n , 'act_n ', gloc4 )
+        call write_hdf5( comp%hinge(ih)%theta     , 'theta'     , gloc4 )
+        call write_hdf5( comp%hinge(ih)%theta_old , 'theta_old' , gloc4 )
+      end associate
+      call close_hdf5_group(gloc4)
+    end do
+    call close_hdf5_group(gloc3)
+
     if(sim_param%output_detailed_geo) then
       call new_hdf5_group(gloc2, 'Geometry', gloc3)
       call write_hdf5(geo%points(:,geo%components(icomp)%i_points), &
                       'rr',gloc3)
       call close_hdf5_group(gloc3)
     endif
+
+#if USE_PRECICE
+    if ( geo%components(icomp)%coupling ) then
+      !write(*,*) ' ************************************************* '
+      !write(*,*) ' * write position of coupled component: ', icomp
+      !write(*,*) ' ************************************************* '
+      call new_hdf5_group(gloc2, 'Geometry', gloc3)
+      call write_hdf5(geo%points(:,geo%components(icomp)%i_points), &
+                      'rr',gloc3)
+      call close_hdf5_group(gloc3)
+    end if
+#endif
 
     call close_hdf5_group(gloc2)
   enddo
@@ -266,16 +303,6 @@ subroutine save_status(geo, wake, it, time, run_id)
   !call write_hdf5(wake_pan%i_start_points,'StartPoints',gloc1)
   !call write_hdf5(wake_pan%idou(:,1:wake_pan%wake_len),'WakeVort',gloc1)
   call write_hdf5(wake%pan_w_points(:,:,1:wake%pan_wake_len+1),'WakePoints',gloc1 )
-! ! debug ----
-! write(*,*) ' shape(wake%pan_w_points(   :,:,:))                     : ' , &
-!              shape(wake%pan_w_points(   :,:,:))
-! write(*,*) ' shape(wake%pan_w_points(   :,:,1:wake%pan_wake_len+1)) : ' , &
-!              shape(wake%pan_w_points(   :,:,1:wake%pan_wake_len+1))
-! write(*,*) ' shape(wake%pan_w_vel(   :,:,:))                        : ' , &
-!              shape(wake%pan_w_vel(   :,:,:))
-! write(*,*) ' shape(wake%pan_w_vel(   :,:,1:wake%pan_wake_len+1))    : ' , &
-!              shape(wake%pan_w_vel(   :,:,1:wake%pan_wake_len+1))
-! ! debug ----
   call write_hdf5(wake%pan_w_vel(   :,:,1:wake%pan_wake_len+1),'WakeVels'  ,gloc1 ) ! <<<< restart with Bernoulli integral equation
   call write_hdf5(wake%i_start_points,'StartPoints',gloc1)
   call write_hdf5(wake%pan_idou(:,1:wake%pan_wake_len),'WakeVort',gloc1)
@@ -310,6 +337,11 @@ subroutine save_status(geo, wake, it, time, run_id)
   allocate(vort_v(3,wake%n_prt))
   allocate(turbvisc(wake%n_prt))
   allocate(vel_w(3,wake%n_prt,1))
+  !> debug ---
+  !write(*,*) ' ++++ debug in mod_dust_io.f90 ++++ '
+  !write(*,*) ' wake%n_prt: ', wake%n_prt
+  !write(*,*) ' ++++ debug in mod_dust_io.f90 ++++ '
+  !> debug ---
   do ip = 1, wake%n_prt
     points_w(:,ip,1) = wake%part_p(ip)%p%cen
     vel_w(:,ip,1) = wake%part_p(ip)%p%vel
@@ -448,11 +480,6 @@ subroutine check_ref(gloc, floc, ref)
 
   call read_hdf5(R,'R',ref_loc)
   call read_hdf5(of,'Offset',ref_loc)
-
-! ! debug ----
-! write(*,*) ' offset : read vs computed '
-! write(*,*) real(of) , '     ' , real(ref%of_g)
-! ! debug ----
 
   if ((.not. all(real(R) .eq. real(ref%R_g))) .or. &
       (.not. all(real(of) .eq. real(ref%of_g))) ) then

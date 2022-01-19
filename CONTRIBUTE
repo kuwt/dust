@@ -9,8 +9,11 @@ you, to create a better solution for you, for us and for all the users.
 For suggestions and discussions you can simply reach out to the
 developers emails:
 
-Davide Montagnani: davide.montagnani@gmail.com
+Davide Montagnani:    davide.montagnani@gmail.com
 Matteo Tugnoli:         tugnoli.teo@gmail.com
+Alessandro Cocco      alessandro.cocco@polimi.it
+Andrea Colli            andrea.colli@polimi.it
+Alberto Savino         alberto.savino@polimi.it
 
 If you are using the code and you stumble upon a bug, we will try to 
 address the issue as soon as possible! Please file a bug report by
@@ -42,6 +45,9 @@ and merged into the official repository, the modifications will be
 included in our development and testing flow, and included in a future 
 release, however we will keep you updated on the status of the 
 integration of your contribution. 
+
+If you want your contribution to be homogeneous with the rest of the code, 
+check out the code style guide in the doc/ folder!
 
 We are looking forward to hear from you!
 

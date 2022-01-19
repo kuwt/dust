@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 !> Module to handle basic execution of the code
@@ -209,8 +211,9 @@ recursive subroutine internal_error(caller,caller_mod,text)
  ! https://gcc.gnu.org/bugzilla/show_bug.cgi?id=77649
  character(len=len_trim(text)) :: gfortran_bug_text(1)
  character(len=*), parameter :: message_of_the_day = &
-    nl//'What you experienced never happened. Please report this error and &
-    &let our highly trained space raccoons overwrite this timeline'
+    nl//'What you experienced never happened. Please report this error in &
+    &order to let us dispatch our highly trained space raccoons to overwrite &
+    &this timeline'
  character(len=len_trim(text)+len(message_of_the_day)) :: another_text(1)
  character(len=*), parameter :: &
    this_sub_name = 'internal_error'

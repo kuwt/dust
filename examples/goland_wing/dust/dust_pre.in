@@ -1,0 +1,8 @@
+
+CompName = Wing
+!GeoFile  = wing_ll.in
+GeoFile  = wing.in
+RefTag   = WingRef
+
+FileName = geo_input.h5 
+

@@ -1,5 +1,5 @@
 
-!basename       = ./Output/ref_base_0-5-13
+!basename       = ./Output/ref_base
 basename       = ./Output/test_base
 basename_debug =  ./Debug/nope
 

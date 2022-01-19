@@ -9,7 +9,9 @@
 !........\///////////........\////////......\/////////..........\///.......
 !!=========================================================================
 !!
-!! Copyright (C) 2018-2020 Davide   Montagnani,
+!! Copyright (C) 2018-2022 Politecnico di Milano,
+!!                           with support from A^3 from Airbus
+!!                    and  Davide   Montagnani,
 !!                         Matteo   Tugnoli,
 !!                         Federico Fonte
 !!
@@ -38,9 +40,9 @@
 !! OTHER DEALINGS IN THE SOFTWARE.
 !!
 !! Authors:
-!!          Federico Fonte             <federico.fonte@outlook.com>
-!!          Davide Montagnani       <davide.montagnani@gmail.com>
-!!          Matteo Tugnoli                <tugnoli.teo@gmail.com>
+!!          Federico Fonte
+!!          Davide Montagnani
+!!          Matteo Tugnoli
 !!=========================================================================
 
 
@@ -55,10 +57,10 @@ use mod_param, only: &
   wp, max_char_len , nl, pi
 
 use mod_sim_param, only: &
-  t_sim_param
+  sim_param
 
 use mod_handling, only: &
-  error, warning
+  error, warning, new_file_unit
 
 implicit none
 
@@ -140,13 +142,15 @@ subroutine read_c81_table ( filen , coeff )
   integer :: cp1(3) , cp2(3)
   real(wp) :: dummy
   integer :: dummy_int , iblnk
-  integer :: fid , i1 , iRe , nRe , i_c
+  integer :: fid ,ierr, i1 , iRe , nRe , i_c
   real(wp) :: Re
 
   integer , parameter :: n_coeff = 3   ! cl , cd , cm
 
   ! Reynolds effect corrections ---
-  real(wp) , parameter :: alMin = -5.0_wp , alMax = 5.0_wp
+  !real(wp) , parameter :: alMin = -5.0_wp , alMax = 5.0_wp
+  real(wp) , parameter :: alMin = -180.0_wp , alMax = 180.0_wp
+  real(wp) :: alcl0tmp, alcl0
   integer :: iAl , iMa
   real(wp) :: al1 , al2 , c1 , c2
   integer :: ind_cl0 , istallp , istallm , stall_found
@@ -154,7 +158,7 @@ subroutine read_c81_table ( filen , coeff )
 
   character(len=*), parameter :: this_sub_name = 'read_c81_table'
 
-  fid = 21
+  call new_file_unit(fid,ierr)
   open(unit=fid,file=trim(adjustl(filen)))
   ! First tree lines containing unintelligilbe parameters
   read(fid,*) nRe , dummy_int , dummy_int ! 2 0 0
@@ -199,6 +203,7 @@ subroutine read_c81_table ( filen , coeff )
       allocate(coeff%aero_coeff(iRe)%coeff(i_c)%cf(cp1(i_c),cp2(i_c)))
     end do
 
+
     do i_c = 1 , n_coeff
       read(fid,*) coeff%aero_coeff(iRe)%coeff(i_c)%par2   ! Mach numbers
       do i1 = 1 , cp1(i_c)
@@ -224,74 +229,79 @@ subroutine read_c81_table ( filen , coeff )
         ( coeff%aero_coeff(iRe)%coeff(1)%par1(i1+1) - coeff%aero_coeff(iRe)%coeff(1)%par1(i1-1) )
     end do
 
-    ! === Parameters for corrections for Reynolds number effects ===
-    ! Find clmax, alcl0, cdmin for each (Re,M)
-    allocate(coeff%aero_coeff(iRe)%clmax(cl2)) ; coeff%aero_coeff(iRe)%clmax = -333.0_wp
-    allocate(coeff%aero_coeff(iRe)%alcl0(cl2)) ; coeff%aero_coeff(iRe)%alcl0 = -333.0_wp
-    allocate(coeff%aero_coeff(iRe)%cdmin(cd2)) ; coeff%aero_coeff(iRe)%cdmin = -333.0_wp
-    allocate(coeff%aero_coeff(iRe)%clstall_pos(cd2)) ; coeff%aero_coeff(iRe)%clstall_pos = -333.0_wp
-    allocate(coeff%aero_coeff(iRe)%clstall_neg(cd2)) ; coeff%aero_coeff(iRe)%clstall_neg = -333.0_wp
-    allocate(coeff%aero_coeff(iRe)%alstall_pos(cd2)) ; coeff%aero_coeff(iRe)%alstall_pos = -333.0_wp
-    allocate(coeff%aero_coeff(iRe)%alstall_neg(cd2)) ; coeff%aero_coeff(iRe)%alstall_neg = -333.0_wp
+    if ( sim_param%llReynoldsCorrections ) then
+      ! === Parameters for corrections for Reynolds number effects ===
+      ! Find clmax, alcl0, cdmin for each (Re,M)
+      allocate(coeff%aero_coeff(iRe)%clmax(cl2)) ; coeff%aero_coeff(iRe)%clmax = -333.0_wp
+      allocate(coeff%aero_coeff(iRe)%alcl0(cl2)) ; coeff%aero_coeff(iRe)%alcl0 = -333.0_wp
+      allocate(coeff%aero_coeff(iRe)%cdmin(cd2)) ; coeff%aero_coeff(iRe)%cdmin = -333.0_wp
+      allocate(coeff%aero_coeff(iRe)%clstall_pos(cd2)) ; coeff%aero_coeff(iRe)%clstall_pos = -333.0_wp
+      allocate(coeff%aero_coeff(iRe)%clstall_neg(cd2)) ; coeff%aero_coeff(iRe)%clstall_neg = -333.0_wp
+      allocate(coeff%aero_coeff(iRe)%alstall_pos(cd2)) ; coeff%aero_coeff(iRe)%alstall_pos = -333.0_wp
+      allocate(coeff%aero_coeff(iRe)%alstall_neg(cd2)) ; coeff%aero_coeff(iRe)%alstall_neg = -333.0_wp
 
-    do iMa = 1 , cl2
+      do iMa = 1 , cl2
 
-      ! --- clmax --- cl = coeff(1)
-      coeff%aero_coeff(iRe)%clmax(iMa) = maxval( coeff%aero_coeff(iRe)%coeff(1)%cf(:,iMa) )
+        ! --- clmax --- cl = coeff(1)
+        coeff%aero_coeff(iRe)%clmax(iMa) = maxval( coeff%aero_coeff(iRe)%coeff(1)%cf(:,iMa) )
+        ! --- al(cl=0) ---
+        alcl0 = alMin
+        do iAl = 1 , cl1
+          if ( ( coeff%aero_coeff(iRe)%coeff(1)%par1(iAl) .ge. alMin ) .and. &
+               ( coeff%aero_coeff(iRe)%coeff(1)%par1(iAl) .lt. alMax ) ) then
+            if ( coeff%aero_coeff(iRe)%coeff(1)%cf(iAl  ,iMa) * &
+                 coeff%aero_coeff(iRe)%coeff(1)%cf(iAl+1,iMa) .le. 0.0_wp ) then
 
-      ! --- al(cl=0) ---
-      do iAl = 1 , cl1
-        if ( ( coeff%aero_coeff(iRe)%coeff(1)%par1(iAl) .ge. alMin ) .and. &
-             ( coeff%aero_coeff(iRe)%coeff(1)%par1(iAl) .lt. alMax ) ) then
-          if ( coeff%aero_coeff(iRe)%coeff(1)%cf(iAl  ,iMa) * &
-               coeff%aero_coeff(iRe)%coeff(1)%cf(iAl+1,iMa) .le. 0.0_wp ) then
+              al1 = coeff%aero_coeff(iRe)%coeff(1)%par1(iAl)
+              al2 = coeff%aero_coeff(iRe)%coeff(1)%par1(iAl+1)
+              c1  = coeff%aero_coeff(iRe)%coeff(1)%cf(iAl  ,iMa)
+              c2  = coeff%aero_coeff(iRe)%coeff(1)%cf(iAl+1,iMa)
 
-            al1 = coeff%aero_coeff(iRe)%coeff(1)%par1(iAl)
-            al2 = coeff%aero_coeff(iRe)%coeff(1)%par1(iAl+1)
-            c1  = coeff%aero_coeff(iRe)%coeff(1)%cf(iAl  ,iMa)
-            c2  = coeff%aero_coeff(iRe)%coeff(1)%cf(iAl+1,iMa)
+              alcl0tmp = al1 + (al2-al1) * (-c1)/(c2-c1)
+              if(abs(alcl0tmp)<abs(alcl0)) then
+                alcl0 = alcl0tmp
+                ind_cl0 = iAl  ! index where cl changes sign: later used to find stall+ and stall-
+              endif
 
-            coeff%aero_coeff(iRe)%alcl0(iMa) = al1 + (al2-al1) * (-c1)/(c2-c1)
-
-            ind_cl0 = iAl  ! index where cl changes sign: later used to find stall+ and stall-
-
+            end if
           end if
-        end if
-      end do ! alpha
+        end do ! alpha
+        coeff%aero_coeff(iRe)%alcl0(iMa) = alcl0
 
-      ! --- cdmin --- cd = coeff(2)
-      coeff%aero_coeff(iRe)%cdmin(iMa) = minval( coeff%aero_coeff(iRe)%coeff(2)%cf(:,iMa) )
+        ! --- cdmin --- cd = coeff(2)
+        coeff%aero_coeff(iRe)%cdmin(iMa) = minval( coeff%aero_coeff(iRe)%coeff(2)%cf(:,iMa) )
 
-      ! --- positive and negative stall: alpha and cl ---
-      istallp = ind_cl0 ; istallm = ind_cl0
-      ! positive stall
-      stall_found = 0
-      ! ---
-      do while ( ( istallp+1 .lt. cl1 ) .and. &
-                 ( coeff%aero_coeff(iRe)%coeff(1)%cf(istallp+1,iMa) .gt. &
-                   coeff%aero_coeff(iRe)%coeff(1)%cf(istallp  ,iMa) ) .and. &
-                 ( stall_found .eq. 0 ) &
-                 )
-        istallp = istallp + 1
+        ! --- positive and negative stall: alpha and cl ---
+        istallp = ind_cl0 ; istallm = ind_cl0
+        ! positive stall
+        stall_found = 0
+        ! ---
+        do while ( ( istallp+1 .lt. cl1 ) .and. &
+                   ( coeff%aero_coeff(iRe)%coeff(1)%cf(istallp+1,iMa) .gt. &
+                     coeff%aero_coeff(iRe)%coeff(1)%cf(istallp  ,iMa) ) .and. &
+                   ( stall_found .eq. 0 ) &
+                   )
+          istallp = istallp + 1
 
-      end do
-      ! negative stall
-      stall_found = 0
-      do while ( ( istallm-1 .gt. 1 ) .and. &
-                 ( coeff%aero_coeff(iRe)%coeff(1)%cf(istallm-1,iMa) .lt. &
-                   coeff%aero_coeff(iRe)%coeff(1)%cf(istallm  ,iMa) ) .and. &
-                 ( stall_found .eq. 0 ) )
-        istallm = istallm - 1
+        end do
+        ! negative stall
+        stall_found = 0
+        do while ( ( istallm-1 .gt. 1 ) .and. &
+                   ( coeff%aero_coeff(iRe)%coeff(1)%cf(istallm-1,iMa) .lt. &
+                     coeff%aero_coeff(iRe)%coeff(1)%cf(istallm  ,iMa) ) .and. &
+                   ( stall_found .eq. 0 ) )
+          istallm = istallm - 1
 
-      end do
+        end do
 
-      coeff%aero_coeff(iRe)%alstall_pos(iMa) = coeff%aero_coeff(iRe)%coeff(1)%par1(istallp)
-      coeff%aero_coeff(iRe)%alstall_neg(iMa) = coeff%aero_coeff(iRe)%coeff(1)%par1(istallm)
-      coeff%aero_coeff(iRe)%clstall_pos(iMa) = coeff%aero_coeff(iRe)%coeff(1)%cf(istallp,iMa)
-      coeff%aero_coeff(iRe)%clstall_neg(iMa) = coeff%aero_coeff(iRe)%coeff(1)%cf(istallm,iMa)
+        coeff%aero_coeff(iRe)%alstall_pos(iMa) = coeff%aero_coeff(iRe)%coeff(1)%par1(istallp)
+        coeff%aero_coeff(iRe)%alstall_neg(iMa) = coeff%aero_coeff(iRe)%coeff(1)%par1(istallm)
+        coeff%aero_coeff(iRe)%clstall_pos(iMa) = coeff%aero_coeff(iRe)%coeff(1)%cf(istallp,iMa)
+        coeff%aero_coeff(iRe)%clstall_neg(iMa) = coeff%aero_coeff(iRe)%coeff(1)%cf(istallm,iMa)
 
-    end do ! Mach number
-    ! === Parameters for corrections for Reynolds number effects ===
+      end do ! Mach number
+    endif
+      ! === Parameters for corrections for Reynolds number effects ===
 
   end do ! Reynolds number
 
@@ -308,14 +318,12 @@ end subroutine read_c81_table
 !       clear implementation
 !       ...
 subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
-                                           aero_par_in , sim_param , &
-                                                     aero_coeff , &
+                               aero_par_in, aero_coeff , &
                                                      dcl_da )
   type(t_aero_tab) , intent(in) :: airfoil_data(:)
   real(wp) , intent(in) :: csi
   integer  , intent(in) :: airfoil_id(2)
   real(wp) , intent(in) :: aero_par_in(3) ! (/al,M,Re/)
-  type(t_sim_param) , intent(in) :: sim_param
   real(wp) , allocatable , intent(out) :: aero_coeff(:)
   real(wp) :: aero_par(3) ! (/al,M,Re/)
 
