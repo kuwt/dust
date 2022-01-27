@@ -97,7 +97,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
  ! data read from file
  ! sections ---
  real(wp)         , allocatable :: chord_list(:) , twist_list(:)
- character(len=48), allocatable :: airfoil_list(:)
+ character(len=max_char_len), allocatable :: airfoil_list(:)
  ! regions  ---
  integer , allocatable :: nelem_span_list(:)
  real(wp), allocatable :: span_list(:) , sweep_list(:) , dihed_list(:)
