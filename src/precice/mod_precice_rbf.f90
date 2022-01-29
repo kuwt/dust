@@ -169,15 +169,12 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
 
     !> Distance of the surface nodes from the structural nodes
     do is = 1, ns
-
-      !dist_all(is) = norm2( rr(:,ip) - this%nodes(:,is) )  ! OLD
       diff_all(:,is)  = rr(:,ip) - this%nodes(:,is)
-
     end do
 
-    mat_dist_all(:,:)   =  matmul(Wnorm , diff_all)
-    diff_all_transpose(:,:)  =  transpose(diff_all(:,:))
-    mat_dist_all(:,:)   =  matmul(diff_all_transpose(:,:) , mat_dist_all(1:3,:))
+    ! [ns x ns] =                       [ns x 3]        *     [3 x 3] *  [3 x ns]
+    mat_dist_all(:,:)   =    matmul(transpose(diff_all), matmul(Wnorm , diff_all)) ! interpolation matrix
+    
     do is = 1, ns
       dist_all(is) = sqrt(mat_dist_all(is,is))
     end do
