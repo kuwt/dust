@@ -133,23 +133,6 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
   !> Number of coupling nodes of the structure
   ns = size(this%nodes,2)
 
-   ! debug ---
-   !write(*,*) ' shape(rr): ', shape(rr)
-   write(*,*) ' shape(ee): ', shape(ee)
-
-   write(*,*); write(*,*) ' rr: '
-   do ip = 1, np
-     write(*,*) rr(:,ip)
-   end do
-   write(*,*); write(*,*) ' ee: '
-   do ip = 1, ne
-     write(*,*) ee(:,ip)
-   end do
-   write(*,*); write(*,*) ' this%nodes: '
-   do is = 1, ns
-     write(*,*) this%nodes(:,is)
-   end do
-
   !> === Surface nodes ===
   allocate(this%nod%ind(this%n_wei, np)); this%nod%ind = 0
   allocate(this%nod%wei(this%n_wei, np)); this%nod%wei = 0.0_wp
@@ -158,10 +141,11 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
   allocate(diff_all_transpose(ns,3)); diff_all_transpose = 0.0_wp
   allocate(dist_all(ns)); dist_all = 0.0_wp
   allocate(mat_dist_all(ns,ns)); mat_dist_all = 0.0_wp
-  allocate(Wnorm(3,3));
+  allocate(Wnorm(3,3)); Wnorm = 0.0_wp
   Wnorm(1,1) = 0.001_wp;
   Wnorm(2,2) = 1.0_wp;
   Wnorm(3,3) = 0.001_wp;
+
 
   Wnorm = matmul(transpose(coupling_node_rot),(matmul(Wnorm,coupling_node_rot)))
 
@@ -224,9 +208,8 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
         diff_all(:,is)  = cen - this%nodes(:,is)
       end do
 
-      mat_dist_all(:,:)   =  matmul(Wnorm , diff_all)
-      diff_all_transpose(:,:)  =  transpose(diff_all(:,:))
-      mat_dist_all(:,:)   =  matmul(diff_all_transpose(:,:) , mat_dist_all(1:3,:))
+    ! [ns x ns] =                       [ns x 3]        *     [3 x 3] *  [3 x ns]
+      mat_dist_all(:,:)   =    matmul(transpose(diff_all), matmul(Wnorm , diff_all)) ! interpolation matrix
       do is = 1, ns
         dist_all(is) = sqrt(mat_dist_all(is,is))
       end do
@@ -243,25 +226,7 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
 
   enddo
 
-  ! stop
 
-  ! check ---
-  write(*,*)
-  write(*,*) ' Check in t_precice_rbf % build_connectivity, %nod '
-  do ip = 1, np
-    write(*,*) this%nod%ind(:,ip), this%nod%wei(:,ip)
-  end do
-  write(*,*)
-  write(*,*) ' Check in t_precice_rbf % build_connectivity, %cen '
-  do ie = 1, ne
-    write(*,*) this%cen%ind(:,ie), this%cen%wei(:,ie)
-  end do
-  write(*,*)
-  ! write(*,*)
-  ! write(*,*) ' Stop.'
-  ! write(*,*)
-  ! stop
-  ! ! check ---
 
   !> Deallocate and cleaning
   if ( allocated(dist_all) )  deallocate(dist_all)

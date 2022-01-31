@@ -410,7 +410,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                           getrealarray(geo_prs, 'CouplingNodeOrientationMirror', 9), &
                           (/3,3/) )
     end if
-    write(*,*) 'CouplingNodeOrientationMirror' , coupling_node_rot_mir
+
     if (  trim(coupling_type) .eq. 'rbf' ) then
       !> Open coupling_nodes_file and read nodes for FSI
       n_coupling_nodes = 0; io = 0
@@ -426,7 +426,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       open(unit=21, file=trim(coupling_node_file))
       write(*,*) ' n_coupling_nodes: ', n_coupling_nodes
       do i = 1, n_coupling_nodes
-        read(21,*) coupling_nodes(:,i) ; write(*,*) coupling_nodes(:,i)
+        read(21,*) coupling_nodes(:,i)
       end do
       close(21)
     end if
@@ -1018,15 +1018,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         else
           rr = matmul( transpose(coupling_node_rot), rr )
         end if
-        write(*,*); write(*,*) ' rr: '
-        do i = 1, size(rr,2)
-          write(*,*) rr(:,i)
-        end do
-        !write(*,*); write(*,*) ' rr_sym: '
-        !do i = 1, size(rr_sym,2)
-        !  write(*,*) rr_sym(:,i)
-        !end do
-
       end if
 
     end if

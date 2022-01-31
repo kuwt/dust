@@ -762,6 +762,8 @@ subroutine load_components(geo, in_file, out_file, te)
  integer :: ne_te_prev , nn_te_prev
  real(wp) :: trac, rad
  logical :: rewrite_geo
+ logical :: is_hinge
+ integer, allocatable :: ind_h(:)
 
  character(len=*), parameter :: this_sub_name = 'load_components'
 
@@ -1074,10 +1076,7 @@ subroutine load_components(geo, in_file, out_file, te)
         !> *** to do *** Only for non-coupled hinges?
         geo%components(i_comp)%hinge(ih)%act%rr = &
                                       geo%components(i_comp)%hinge(ih)%ref%rr
-        write(*,*) 'NODE', geo%components(i_comp)%hinge(ih)%ref%rr
         !> Build hinge connectivity and weights, for grid nodes
-
-        write(*,*) ; write(*,*) ' hinge n.', ih
         call geo%components(i_comp)%hinge(ih)%build_connectivity( rr, coupling_node_rot )
         ! and for cell centers
         call geo%components(i_comp)%hinge(ih)%build_connectivity_cen( rr, ee, coupling_node_rot)
@@ -1089,17 +1088,6 @@ subroutine load_components(geo, in_file, out_file, te)
         ! end if
 
       end do
-
-      ! debug ---
-      do ih = 1, n_hinges
-        write(*,*) ' Comp n. ', i_comp, '; Hinge n. ', ih
-        do i3 = 1, size(geo%components(i_comp)%hinge(ih)%ref%h,2)
-          write(*,*) geo%components(i_comp)%hinge(ih)%ref%h(:,i3), '    ', &
-                     geo%components(i_comp)%hinge(ih)%ref%v(:,i3), '    ', &
-                     geo%components(i_comp)%hinge(ih)%ref%n(:,i3)
-        end do
-      end do
-      ! debug ---
 
 #if USE_PRECICE
       !> PreCICE coupling ------------------------------------------------------
@@ -1175,24 +1163,27 @@ subroutine load_components(geo, in_file, out_file, te)
 
           !> Global numbering in i_points_precice: add points_offset_precice
           if ( n_hinges .gt. 0 ) then
-            do i3 = 1, size(comp_coupling_nodes,2)
+            do i3 = 1, np_precice_tot
+              is_hinge = .false.
               do ih = 1, n_hinges
                 if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
-                  if ( .not. ( any(geo%components(i_comp)%hinge(ih)%i_coupling_nodes .eq. i3 ) ) ) then
-                    if (ih .eq. 1) then
-                    !> Structural node
-                    comp_ind = comp_ind + 1
-                    ind_coupling( comp_ind ) = i3
-                    geo%components(i_comp)%i_points_precice( comp_ind ) = i3 + points_offset_precice
-                    end if
-                  else
-                    !> Hinge node, ih-th hinge
-                    hinge_ind(ih) = hinge_ind(ih) + 1
-                    geo%components(i_comp)%hinge(ih)%i_points_precice( hinge_ind(ih) ) = &
-                                                                   i3 + points_offset_precice
+                  if ( any(i3 .eq. geo%components(i_comp)%hinge(ih)%i_coupling_nodes) ) then
+                    is_hinge = .true.
+                    exit
                   end if
                 end if
               end do
+              if (is_hinge) then
+                !> Hinge node, ih-th hinge
+                hinge_ind(ih) = hinge_ind(ih) + 1
+                geo%components(i_comp)%hinge(ih)%i_points_precice( hinge_ind(ih) ) = &
+                                                   i3 + points_offset_precice
+              else                                                    
+                !> Structural node
+                comp_ind = comp_ind + 1
+                ind_coupling( comp_ind ) = i3
+                geo%components(i_comp)%i_points_precice( comp_ind ) = i3 + points_offset_precice
+              end if
             end do
           else
             ind_coupling = (/ ( i3, i3=1, size(ind_coupling,1) ) /)
@@ -1210,6 +1201,21 @@ subroutine load_components(geo, in_file, out_file, te)
                     geo%components(i_comp)%rbf%rrb_rot  (3, np_precice))
           geo%components(i_comp)%rbf%nodes = comp_coupling_nodes(:,ind_coupling)
           geo%components(i_comp)%rbf%rrb   = -333.3_wp
+
+
+        allocate(ind_h(n_nodes_coupling_hinges))
+        i3 = 1  
+        do ih = 1, n_hinges
+          if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
+            !> N. nodes of the actual hinge and update overall count
+            n_nodes_coupling_hinge_1 = size(geo%components(i_comp)%hinge(ih)%i_coupling_nodes,1)
+
+           ind_h(i3:i3+n_nodes_coupling_hinge_1-1) = geo%components(i_comp)%hinge(ih)%i_points_precice - points_offset_precice
+           i3 = i3 +n_nodes_coupling_hinge_1
+          end if
+        end do  
+
+
           do ih = 1, n_hinges
             if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
 
@@ -1221,19 +1227,8 @@ subroutine load_components(geo, in_file, out_file, te)
 
               !> Connectivity between hinge nodes and other structural nodes
               call geo%components(i_comp)%hinge(ih)%build_connectivity_hin( &
-                   comp_coupling_nodes, &
-                   geo%components(i_comp)%hinge(ih)%i_points_precice - points_offset_precice)
-
-              ! debug ---
-              !write(*,*) ' this%hin%ind, %i_points_precice, %wei: '
-              !do i3 = 1, size(geo%components(i_comp)%hinge(ih)%hin%ind,2)
-              !  write(*,*) i3                                               , '   ' , &
-              !             geo%components(i_comp)%hinge(ih)%hin%ind(:,i3)   , '   ' , &
-              !             geo%components(i_comp)%i_points_precice( &
-              !             geo%components(i_comp)%hinge(ih)%hin%ind(:,i3) ) , '   ' , &
-              !             geo%components(i_comp)%hinge(ih)%hin%wei(:,i3)
-              !end do
-              !write(*,*)
+                   comp_coupling_nodes, ind_h) !&
+                   !geo%components(i_comp)%hinge(ih)%i_points_precice - points_offset_precice)
 
             end if
           end do
@@ -1243,30 +1238,11 @@ subroutine load_components(geo, in_file, out_file, te)
           !> Update offset of precice/dust coupling nodes
           points_offset_precice = points_offset_precice + np_precice_tot
 
-          !> allocate dummy c_ref_p(:,:), c_ref_c(:,:)
           ! *** to do *** cleaner implementation of different kinds of coupling
-          ! 2020-08-06: why dummy?
           allocate(geo%components(i_comp)%c_ref_c(0,0))
           allocate(geo%components(i_comp)%c_ref_p(0,0))
 
-          ! ! check ---
-          ! write(*,*) ' comp(',i_comp,')%rbf%nodes : '
-          ! do i3 = 1, size(geo%components(i_comp)%rbf%nodes,2)
-          !   write(*,*) geo%components(i_comp)%i_points_precice(i3), &
-          !              geo%components(i_comp)%rbf%nodes(:,i3)
-          ! end do
-          ! write(*,*) ' hinges '
-          ! do ih = 1, n_hinges
-          !   write(*,*) ' comp(',i_comp,')%hinge(',ih,')%nodes : '
-          !   do i3 = 1, size(geo%components(i_comp)%hinge(ih)%nodes,2)
-          !     write(*,*) geo%components(i_comp)%hinge(ih)%i_points_precice(i3), &
-          !                geo%components(i_comp)%hinge(ih)%nodes(:,i3)
-          !   end do
-          ! end do
-          ! ! write(*,*) ' stop. '; stop
-          ! ! check ---
-
-          deallocate(ind_coupling, hinge_ind)  !FIXME SIGABRT: Process abort signal.
+          deallocate(ind_coupling, hinge_ind, ind_h)  !FIXME SIGABRT: Process abort signal.
 
         endif
       else

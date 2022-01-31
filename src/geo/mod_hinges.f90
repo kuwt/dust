@@ -564,11 +564,6 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
     rrb(:,ib) =  matmul( (coupling_node_rot), loc_points(:,ib))
   end do
 
-  do ib = 1, nh
-    rrh(:,ib) =  this%ref%rr(:,ib) - this%ref%rr(:,1)
-    write(*,*) 'this%ref%rr(:,ib)', ib, this%ref%rr(:,ib)
-  end do
-  write(*,*) 'nh', nh
   ! hinge width, measured in the hinge direction (span)
   hinge_width = rrh(2,nh) - rrh(2,1)  !dh
 
@@ -751,8 +746,9 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
   n_t = size(rr_t,2)
   n_h = size(ind_h);  allocate(rr_h(3,n_h)) ;  rr_h = 0.0_wp
   n_b = n_t - n_h  ;  allocate(rr_b(3,n_b)) ;  rr_b = 0.0_wp
-  allocate(ind_b(n_b)) ;  ind_b = -333
+  allocate(ind_b(n_b)) ;  ind_b = -333.0_wp
   i_h = 0; i_b = 0
+
 
   do i_t = 1, n_t
     if ( any( ind_h .eq. i_t ) ) then
@@ -772,6 +768,7 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
     end if
   end do
 
+
   !> Allocate and fill hinge%hin object
   allocate(this%hin%node_id(       n_h)); this%hin%node_id = -333 ! useless
   allocate(this%hin%ind(this%n_wei,n_h))
@@ -790,7 +787,6 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
 
     !> Weights in chordwise direction
     call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
-
     wei_v = 1.0_wp / max( wei_v, 1e-9_wp ) **this%w_order
     wei_v = wei_v / sum(wei_v)
 
@@ -802,17 +798,6 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
 
   !> Allocate t_hinge%hin_rot
   allocate( this%hin_rot(3,n_h) ); this%hin_rot = -333.3_wp
-
-  ! debug ---
-  !write(*,*) ' this%hin%ind, %i_points_precice, %wei: '
-  !do i_h = 1, n_h
-  !  write(*,*) i_h, this%hin%ind(:,i_h), &
-  !                  this%hin%wei(:,i_h)
-  !end do
-  !write(*,*)
-  ! write(*,*) ' stop in geo/mod_hinges/build_connectivity_hin() '; stop
-  ! debug ---
-
 
 end subroutine build_connectivity_hin
 
