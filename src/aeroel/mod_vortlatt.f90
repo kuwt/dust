@@ -617,10 +617,16 @@ subroutine calc_geo_data_vortlatt(this, vert)
                 this%ver(:,1) - this%ver(:,2)     )
 
   end if
-
+  
   this%area = 0.5_wp * norm2(nor)
-  this%nor = nor / norm2(nor)
+  ! avoid numerical singularities when compiled in debug mode
+  if (norm2(nor) .lt. 1e-16) then 
+    nor(3) = 1e-16_wp
+  end if
 
+
+  this%nor = nor / norm2(nor)
+  
   ! local tangent unit vector as in PANAIR
   tanl = 0.5_wp * ( this%ver(:,nsides) + this%ver(:,1) ) - this%cen
 
