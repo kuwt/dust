@@ -349,6 +349,7 @@ type t_tedge
 
  !> Unit vector at TE nodes
  real(wp), allocatable :: t(:,:)
+ real(wp), allocatable :: t_hinged(:,:)
 
  !> Reference frame of the TE nodes
  integer , allocatable :: ref(:)
@@ -523,7 +524,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   ! already update the geometry for the first time to get the right
   ! starting geometrical condition
   call prepare_geometry(geo)
-  call update_geometry(geo, tstart, update_static=.true.)
+  call update_geometry(geo, te, tstart, update_static=.true.)
 
   if(sim_param%debug_level .ge. 3) then
     call printout(nl//' Geometry details:' )
@@ -981,23 +982,30 @@ subroutine load_components(geo, in_file, out_file, te)
       call read_hdf5_al(ee   ,'ee'   ,geo_loc)
       call read_hdf5_al(rr   ,'rr'   ,geo_loc)
       call read_hdf5_al(neigh,'neigh',geo_loc)
+
       ! element-specific reads
       if ( comp_el_type(1:1) .eq. 'l' ) then
+
         call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc)!(:)
         call read_hdf5_al(nelem_span_list   ,'nelem_span_list'   ,geo_loc)!(:)
         call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)!(:,:)
         call read_hdf5_al(normalised_coord_e,'normalised_coord_e',geo_loc)!(:,:)
         call read_hdf5_al(theta_e,           'theta_e'           ,geo_loc)
+
         allocate(geo%components(i_comp)%airfoil_list(size(airfoil_list)))
         geo%components(i_comp)%airfoil_list = airfoil_list
+
         allocate(geo%components(i_comp)%nelem_span_list(size(nelem_span_list)))
         geo%components(i_comp)%nelem_span_list = nelem_span_list
+
         allocate(geo%components(i_comp)%i_airfoil_e( &
               size(i_airfoil_e,1),size(i_airfoil_e,2)) )
         geo%components(i_comp)%i_airfoil_e = i_airfoil_e
+
         allocate(geo%components(i_comp)%normalised_coord_e( &
               size(normalised_coord_e,1),size(normalised_coord_e,2)))
         geo%components(i_comp)%normalised_coord_e = normalised_coord_e
+
         allocate(geo%components(i_comp)%theta_e(size(theta_e)))
         geo%components(i_comp)%theta_e = theta_e
 
@@ -1017,26 +1025,16 @@ subroutine load_components(geo, in_file, out_file, te)
         call open_hdf5_group(hloc, 'Hinge_'//hinge_id_str, hiloc)
 
         !> read input and fill component%hinge fields
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%nodes_input, &
-                                                         'Nodes_Input', hiloc)
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%offset, &
-                                                         'Offset', hiloc)
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%span_blending, &
-                                              'Spanwise_Blending', hiloc)
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%ref_dir, &
-                                                        'Ref_Dir', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%nodes_input, 'Nodes_Input', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%offset, 'Offset', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%span_blending, 'Spanwise_Blending', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%ref_dir, 'Ref_Dir', hiloc)
         call read_hdf5_al( geo%components(i_comp)%hinge(ih)%ref%rr, 'rr', hiloc)
-        geo%components(i_comp)%hinge(ih)%n_nodes = &
-                                   size( geo%components(i_comp)%hinge(ih)%ref%rr, 2)
-        ! ! debug ---
-        ! write(*,*) ' Debug in load_component(). %ref%rr : '
-        ! do i = 1, geo%components(i_comp)%hinge(ih)%n_nodes
-        !   write(*,*) geo%components(i_comp)%hinge(ih)%ref%rr(:,i)
-        ! end do
-        ! ! debug ---
 
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%input_type, &
-                                            'Hinge_Rotation_Input'    , hiloc)
+        geo%components(i_comp)%hinge(ih)%n_nodes = size( geo%components(i_comp)%hinge(ih)%ref%rr, 2)
+
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%input_type, 'Hinge_Rotation_Input'    , hiloc)
+
         !> Actual input only for input_type = function:..., otherwise dummy inputs
         call read_hdf5( geo%components(i_comp)%hinge(ih)%f_ampl , 'Amplitude', hiloc)
         call read_hdf5( geo%components(i_comp)%hinge(ih)%f_omega, 'Omega', hiloc)
@@ -1046,13 +1044,6 @@ subroutine load_components(geo, in_file, out_file, te)
           call read_hdf5_al( geo%components(i_comp)%hinge(ih)%i_coupling_nodes, &
                             'Coupling_Nodes', hiloc )
         end if
-        ! ! check ---
-        ! write(*,*) ' *** check, mod_geo.f90, l.1025 *** '
-        ! write(*,*) ' i_comp, i_hinge, i_coupling_nodes: ', i_comp, ih
-        ! do i3 = 1, size(geo%components(i_comp)%hinge(ih)%i_coupling_nodes,1)
-        !   write(*,*) i3, ' : ', geo%components(i_comp)%hinge(ih)%i_coupling_nodes(i3)
-        ! end do
-        ! ! check ---
 
         allocate( geo%components(i_comp)%hinge(ih)%theta( &
                   geo%components(i_comp)%hinge(ih)%n_nodes ) )
@@ -1069,6 +1060,7 @@ subroutine load_components(geo, in_file, out_file, te)
                                       geo%components(i_comp)%hinge(ih) )
         call initialize_hinge_config( geo%components(i_comp)%hinge(ih)%act , &
                                       geo%components(i_comp)%hinge(ih) )
+
         ! Allocate and initialize hinge node coords in the actual configuration
         allocate( geo%components(i_comp)%hinge(ih)%act%rr( &
                 3,geo%components(i_comp)%hinge(ih)%n_nodes ) )
@@ -1177,7 +1169,7 @@ subroutine load_components(geo, in_file, out_file, te)
                 !> Hinge node, ih-th hinge
                 hinge_ind(ih) = hinge_ind(ih) + 1
                 geo%components(i_comp)%hinge(ih)%i_points_precice( hinge_ind(ih) ) = &
-                                                   i3 + points_offset_precice
+                                                  i3 + points_offset_precice
               else                                                    
                 !> Structural node
                 comp_ind = comp_ind + 1
@@ -1210,8 +1202,8 @@ subroutine load_components(geo, in_file, out_file, te)
             !> N. nodes of the actual hinge and update overall count
             n_nodes_coupling_hinge_1 = size(geo%components(i_comp)%hinge(ih)%i_coupling_nodes,1)
 
-           ind_h(i3:i3+n_nodes_coupling_hinge_1-1) = geo%components(i_comp)%hinge(ih)%i_points_precice - points_offset_precice
-           i3 = i3 +n_nodes_coupling_hinge_1
+            ind_h(i3:i3+n_nodes_coupling_hinge_1-1) = geo%components(i_comp)%hinge(ih)%i_points_precice - points_offset_precice
+            i3 = i3 +n_nodes_coupling_hinge_1
           end if
         end do  
 
@@ -1223,12 +1215,12 @@ subroutine load_components(geo, in_file, out_file, te)
               allocate( geo%components(i_comp)%hinge(ih)%nodes(3,hinge_ind(ih)) )
               geo%components(i_comp)%hinge(ih)%nodes = &
                   comp_coupling_nodes(:, geo%components(i_comp)%hinge(ih)%i_points_precice - &
-                                         points_offset_precice )
+                                        points_offset_precice )
 
               !> Connectivity between hinge nodes and other structural nodes
               call geo%components(i_comp)%hinge(ih)%build_connectivity_hin( &
-                   comp_coupling_nodes, ind_h) !&
-                   !geo%components(i_comp)%hinge(ih)%i_points_precice - points_offset_precice)
+                  comp_coupling_nodes, ind_h) !&
+                  !geo%components(i_comp)%hinge(ih)%i_points_precice - points_offset_precice)
 
             end if
           end do
@@ -1285,7 +1277,6 @@ subroutine load_components(geo, in_file, out_file, te)
         allocate(e_te(0,0), i_te(2,0), ii_te(2,0), neigh_te(2,0), o_te(2,0),&
                  t_te(3,0))
       endif
-
       !Re-write all that was read in the new output file (cannot just copy
       !the read file since the components order will be changed when emplying
       !the multiple components). If it is restarting with the same name
@@ -1515,6 +1506,7 @@ subroutine load_components(geo, in_file, out_file, te)
         allocate(te%neigh(2,ne_te) ) ; te%neigh = neigh_te
         allocate(te%o    (2,ne_te) ) ; te%o     =     o_te
         allocate(te%t    (3,nn_te) ) ; te%t     =     t_te
+        allocate(te%t_hinged    (3,nn_te) ) ; te%t_hinged     =     0.0_wp
         allocate(te%ref  (  nn_te) ) ; te%ref   = geo%components(i_comp)%ref_id
         allocate(te%icomp(  nn_te) ) ; te%icomp = i_comp
         allocate(te%scaling(  nn_te) )
@@ -2176,8 +2168,9 @@ end function move_points
 !! updated.
 !!
 !! Also the velocity of the centerpoint of the elements is calculated
-subroutine update_geometry(geo, t, update_static)
+subroutine update_geometry(geo, te, t, update_static)
  type(t_geo), intent(inout) :: geo
+ type(t_tedge), intent(inout) ::te
  real(wp), intent(in) :: t
  logical, intent(in) :: update_static
 
@@ -2240,13 +2233,6 @@ subroutine update_geometry(geo, t, update_static)
   elseif ( comp%coupling .or. update_static ) then
 
     do ie = 1 , size(comp%el)
-      ! debug??
-      !if (ie .eq. 10 ) then
-        !write(*,*) 'comp%el(ie)%nor_old ', comp%el(ie)%nor_old
-        !write(*,*) 'sim_param%time_old  ', sim_param%time_old
-        !write(*,*) 'comp%el(ie)%nor     ', comp%el(ie)%nor
-        !write(*,*) 'sim_param%time      ', sim_param%time
-      !end if
 
       comp%el(ie)%dn_dt = ( comp%el(ie)%nor - comp%el(ie)%nor_old ) / &
                                                               sim_param % dt
@@ -2263,6 +2249,7 @@ subroutine update_geometry(geo, t, update_static)
     ! - hinge rotation angle, theta
     ! for non-coupled components only (so far)
     if ( .not. comp%coupling ) then
+       
       !> hinge nodes, points and orientation
       call comp%hinge(ih)%update_hinge_nodes( geo%refs(comp%ref_id)%R_g, &
                                               geo%refs(comp%ref_id)%f_g )
@@ -2272,8 +2259,8 @@ subroutine update_geometry(geo, t, update_static)
       !> Allocating contiguous array to pass to %hinge_deflection procedure
       allocate(rr_hinge_contig(3,size(comp%i_points)))
       rr_hinge_contig = geo%points(:, comp%i_points)
-
-      call comp%hinge(ih)%hinge_deflection( rr_hinge_contig, t )
+      te%t_hinged = te%t
+      call comp%hinge(ih)%hinge_deflection( rr_hinge_contig, t, te%i, te%t_hinged )
       geo%points(:, comp%i_points) = rr_hinge_contig
 
       deallocate(rr_hinge_contig)

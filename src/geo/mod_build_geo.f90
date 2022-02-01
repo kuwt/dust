@@ -1245,7 +1245,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     call write_hdf5(scale_te,'scale_te',te_loc)
     call close_hdf5_group(te_loc)
   endif
-
   !> Hinges ---
   call new_hdf5_group(comp_loc, 'Hinges', hinge_loc)
   call write_hdf5(n_hinges, 'n_hinges', hinge_loc)

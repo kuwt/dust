@@ -920,8 +920,10 @@ end subroutine update_theta
 ! ---------------------------------------------------------------
 !> Update the coordinates rr of the points of the surface, after
 ! hinge deflection
-subroutine hinge_deflection( this, rr, t, postpro )
+subroutine hinge_deflection( this, rr, t,te_i, te_t, postpro )
   class(t_hinge), intent(inout) :: this
+  real(wp), optional, intent(inout) :: te_t(:,:)
+  integer, optional, intent(in) :: te_i(:,:)
   real(wp)      , intent(inout) :: rr(:,:)
   real(wp)      , intent(in)    :: t
   logical, optional, intent(in) :: postpro
@@ -931,7 +933,8 @@ subroutine hinge_deflection( this, rr, t, postpro )
   real(wp), allocatable :: rr_in(:,:)
   real(wp) :: th, th1, thp, yc, xq, yq, xqp, yqp
   real(wp) :: nx(3,3), Rot_I(3,3)
-  integer :: nrot, nble, ib, ih, ii
+  integer :: nrot, nble, ib, ih, ii, it
+
 
 
   if ( trim(this%input_type) .ne. 'coupling' ) then
@@ -964,11 +967,17 @@ subroutine hinge_deflection( this, rr, t, postpro )
         do ib = 1, size(this%rot%n2h(ih)%p2h)
           ii = this%rot%n2h(ih)%p2h(ib)
           th1 = th * this%rot%n2h(ih)%s2h(ib)
-          Rot_I = sin(th1) * nx + ( 1.0_wp - cos(th1) ) * matmul( nx, nx )
+          
+          Rot_I = sin(th1) * nx + ( 1.0_wp - cos(th1) ) * matmul( nx, nx )       
           rr(:,ii) = rr(:,ii) + &
                      this%rot%n2h(ih)%w2h(ib) * &
                      matmul( Rot_I, rr_in(:,ii)-this%act%rr(:,ih) )
+
         end do
+
+        
+
+
 
         !> Blending region
         do ib = 1, size(this%blen%n2h(ih)%p2h)
@@ -992,10 +1001,33 @@ subroutine hinge_deflection( this, rr, t, postpro )
                    ( xqp * this%act%v(:,ih) + yqp * this%act%n(:,ih) )
 
         end do
+      
 
       end if
 
     end do
+
+    if (present(te_t)) then           
+      do it = 1, SIZE(te_t,2)
+        do ih = 1, this%n_nodes
+          th =   this % theta(ih) * pi/180.0_wp
+          ! Rotation matrix
+            nx(1,:) = (/            0.0_wp, -this%act%h(3,ih),  this%act%h(2,ih) /)
+            nx(2,:) = (/  this%act%h(3,ih),            0.0_wp, -this%act%h(1,ih) /)
+            nx(3,:) = (/ -this%act%h(2,ih),  this%act%h(1,ih),            0.0_wp /)
+
+            do ib = 1, size(this%rot%n2h(ih)%p2h)
+              ii = this%rot%n2h(ih)%p2h(ib)
+              th1 = th * this%rot%n2h(ih)%s2h(ib)
+              Rot_I = sin(th1) * nx + ( 1.0_wp - cos(th1) ) * matmul( nx, nx )
+              if (te_i(1,it) .eq. ii) then ! hinge node is also trailing edge node
+                te_t(:,it) =te_t(:,it) + this%rot%n2h(ih)%w2h(ib) * matmul( Rot_I, te_t(:,it))
+          
+              end if
+            end do
+        end do
+      end do
+    end if  
 
     deallocate(rr_in)
 
@@ -1021,10 +1053,15 @@ subroutine initialize_hinge_config( h_config, hinge )
   !> rr0, rr1 (useless?)
   h_config%rr0 = hinge%ref%rr(:,1)
   h_config%rr1 = hinge%ref%rr(:,hinge%n_nodes)
-  hv = h_config%rr1 - h_config%rr0;  hv = hv / norm2(hv)
+
+  hv = h_config%rr1 - h_config%rr0
+  hv = hv / norm2(hv)
   vv = hinge%ref_dir / norm2(hinge%ref_dir)
-  nv = cross( vv, hv ); nv = nv / norm2(nv)
-  vv = cross( hv, nv ); vv = vv / norm2(vv)  ! useless normalization
+
+  nv = cross( vv, hv )
+  nv = nv / norm2(nv)
+  vv = cross( hv, nv )
+  vv = vv / norm2(vv)  ! useless normalization
 
   !> h, v, n
   allocate( h_config%h(3, hinge%n_nodes) )

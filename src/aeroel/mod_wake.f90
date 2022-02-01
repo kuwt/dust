@@ -326,6 +326,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
 ! real(wp) , parameter :: te_min_v = 1.0_wp ! hard-coded
 ! replaced with sim_param%min_vel_at_te
 
+
   if (sim_param%rigid_wake) then
     allocate(t_rigid_wake::wake_movement)
   else
@@ -424,8 +425,12 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   !  wake%gen_elems(2,iw)%p => el
   !end select
   !enddo
+
+  ! FIX FOR TE WITH HINGES
+  
+
   wake%pan_gen_points = te%i
-  wake%pan_gen_dir = te%t
+  wake%pan_gen_dir = te%t_hinged
   wake%pan_gen_ref = te%ref
   wake%pan_gen_icomp = te%icomp
   wake%pan_gen_scaling = te%scaling
@@ -470,11 +475,12 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
 
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1,wake%n_pan_points
-!   dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
+  !dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
     call calc_node_vel( wake%w_start_points(:,ip), &
             geo%refs(wake%pan_gen_ref(ip))%G_g, &
             geo%refs(wake%pan_gen_ref(ip))%f_g, &
             vel_te )
+
     wind = variable_wind(wake%w_start_points(:,ip), sim_param%time)
     if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
 

@@ -881,10 +881,6 @@ end if
       ! select cases for intel, need to call these for all elements and for the
       ! vortex lattices it is going to be a dummy empty function call
 
-      !write(*,*) ' i_el : ', i_el
-      !write(*,*) ' elems(i_el)%p%comp_id): ', elems(i_el)%p%comp_id
-      !write(*,*) ' geo%components()%ref_id: ', &
-      !             geo%components(elems(i_el)%p%comp_id)%ref_id
       call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
                 geo%components(elems(i_el)%p%comp_id)%coupling_node_rot)
       call elems(i_el)%p%compute_dforce()
@@ -900,10 +896,6 @@ end if
       ! select cases for intel, need to call these for all elements and for the
       ! vortex lattices it is going to be a dummy empty function call
 
-      !write(*,*) ' i_el : ', i_el
-      !write(*,*) ' elems(i_el)%p%comp_id): ', elems(i_el)%p%comp_id
-      !write(*,*) ' geo%components()%ref_id: ', &
-      !             geo%components(elems(i_el)%p%comp_id)%ref_id
       call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
               geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g)
       call elems(i_el)%p%compute_dforce()
@@ -935,14 +927,6 @@ end if
           !elems(i_el)%p%pres = sum( elems(i_el)%p%dforce * elems(i_el)%p%nor )&
           !                     / elems(i_el)%p%area
 
-              ! ! debug ---
-              ! write(*,'(I4,A,3F10.5,A,3F10.5,A,3F10.5,A,3F10.5,A,F10.5)') &
-              !                        i_el, '     ', el%vel_ctr_pt, &
-              !                              '     ', el%dforce, &
-              !                              '     ', el%nor,    &
-              !                              '     ', el%dn_dt,  &
-              !                              '     ', el%pres
-              ! ! debug ---
 
       end select
     end do
@@ -963,39 +947,11 @@ end if
 
 #if USE_PRECICE
 
-      !write(*,*) ' ------------------------------------------------------------------- '
-      !write(*,*) ' debug in dust.f90, l.890: i, pres, dforce '
       sum_force = 0.0_wp
       do i = 1, size(elems_tot)
         sum_force = sum_force + elems_tot(i)%p%dforce
-      !  write(*,*) i, ' : ', elems_tot(i)%p%pres, '      ', elems_tot(i)%p%dforce
       end do
-      !write(*,*) '                                                 ', sum_force
-      !write(*,*) ' ------------------------------------------------------------------- '
-      !write(*,*)
 
-!     write(*,*) ' debug in dust.f90, l.890 '
-!     do i = 1, 10
-!     ! !> check mag, pres
-!     ! write(*,*) i, ':  ', elems_ll(i)%p%mag , elems_ll(i+10)%p%mag , elems_ll(i+20)%p%mag, &
-!     !               '   ', elems_ll(i)%p%pres, elems_ll(i+10)%p%pres, elems_ll(i+20)%p%pres
-!     ! !> check nor, dforce ---> issues in the unsteady force contributions
-!     ! write(*,*) i   , ':  ', elems_ll(i   )%p%nor , elems_ll(i   )%p%dforce, &
-!     !                    sum( elems_ll(i   )%p%nor * elems_ll(i   )%p%dforce )
-!     ! write(*,*) i+10, ':  ', elems_ll(i+10)%p%nor , elems_ll(i+10)%p%dforce, &
-!     !                    sum( elems_ll(i+10)%p%nor * elems_ll(i+10)%p%dforce )
-!     ! write(*,*) i+20, ':  ', elems_ll(i+20)%p%nor , elems_ll(i+20)%p%dforce, &
-!     !                    sum( elems_ll(i+20)%p%nor * elems_ll(i+20)%p%dforce )
-!     ! write(*,*)
-!     ! write(*,*) i, ':  ', elems_ll(i   )%p%dGamma_dt , &
-!     !                      elems_ll(i+10)%p%dGamma_dt , &
-!     !                      elems_ll(i+20)%p%dGamma_dt
-!     ! !> check nor, dforce ---> issues in the unsteady force contributions
-!     ! write(*,*) i   , ':  ', elems_ll(i   )%p%dn_dt
-!     ! write(*,*) i+10, ':  ', elems_ll(i+10)%p%dn_dt
-!     ! write(*,*) i+20, ':  ', elems_ll(i+20)%p%dn_dt
-!     ! write(*,*)
-!     end do
 
       !> Update force and moments to be passed to the structural solver
       call precice % update_force( geo, elems_tot )
@@ -1022,14 +978,6 @@ end if
                                         precice%fields(i)%fdata )
           endif
 
-          ! check ---
-          !write(*,*) ' precice%mesh%nnodes : ', precice%mesh%nnodes
-          !write(*,*) i, precice%fields(i)%fid, precice%fields(i)%fname
-          !do i_el = 1, size(precice%fields(i)%fdata,2)
-          !  write(*,*) precice%fields(i)%fdata(:,i_el)
-          !end do
-          !write(*,*)
-          ! check ---
 
         end if
       end do
@@ -1093,7 +1041,7 @@ end if
     !time = min(sim_param%tend, time+sim_param%dt)
     time = min(sim_param%tend, sim_param%time_vec(it+1))
     !> Update geometry
-    call update_geometry(geo, time, .false.)
+    call update_geometry(geo, te, time, .false.)
     if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
       !     write(*,*) ' =================== call complete_wake ==================== '
           call complete_wake(wake, geo, elems_tot)
