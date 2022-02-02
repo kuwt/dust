@@ -895,7 +895,7 @@ subroutine update_wake(wake, elems, octree)
 
   !Save the old positions for the integration
   allocate(point_old(size(wake%pan_w_points,1),size(wake%pan_w_points,2), &
-                                               size(wake%pan_w_points,3)))
+                                              size(wake%pan_w_points,3)))
   point_old = wake%pan_w_points
 
   !calculate the velocities at the old positions of the points and then
@@ -1264,10 +1264,11 @@ end subroutine update_wake
 
 !> Prepare the first row of panels to be inserted inside the linear system
 !!
-subroutine complete_wake(wake, geo, elems)
+subroutine complete_wake(wake, geo, elems, te)
  type(t_wake), target, intent(inout) :: wake
  type(t_geo), intent(in) :: geo
  type(t_pot_elem_p), intent(in) :: elems(:)
+ type(t_tedge), intent(inout) ::te
 
  integer  :: p1, p2
  integer  :: ip, iw, ipan, id, is, nprev
@@ -1288,7 +1289,7 @@ subroutine complete_wake(wake, geo, elems)
   wake%w_start_points = 0.5_wp * (geo%points(:,wake%pan_gen_points(1,:)) + &
                                   geo%points(:,wake%pan_gen_points(2,:)))
   wake%pan_w_points(:,:,1) = wake%w_start_points
-
+  wake%pan_gen_dir = te%t_hinged
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1,wake%n_pan_points
     dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
@@ -1302,6 +1303,7 @@ subroutine complete_wake(wake, geo, elems)
                           dist*wake%pan_gen_scaling(ip)* &
                           norm2(wind-vel_te)* &
                   sim_param%dt*real(sim_param%ndt_update_wake,wp) / norm2(dist)
+
   ! normalisation occurs here! -------------------------------------------^
     else
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &

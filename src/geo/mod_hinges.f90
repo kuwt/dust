@@ -946,7 +946,8 @@ subroutine hinge_deflection( this, rr, t,te_i, te_t, postpro )
     else                        ;  local_postpro = default_postpro
     end if
 
-    allocate(rr_in(size(rr,1),size(rr,2))); rr_in = rr
+    allocate(rr_in(size(rr,1),size(rr,2)))
+    rr_in = rr
 
     !> n.nodes in the rigid-rotation and in the blending regions
     nrot = size(this%rot %node_id)
@@ -970,15 +971,12 @@ subroutine hinge_deflection( this, rr, t,te_i, te_t, postpro )
           
           Rot_I = sin(th1) * nx + ( 1.0_wp - cos(th1) ) * matmul( nx, nx )       
           rr(:,ii) = rr(:,ii) + &
-                     this%rot%n2h(ih)%w2h(ib) * &
-                     matmul( Rot_I, rr_in(:,ii)-this%act%rr(:,ih) )
+                      this%rot%n2h(ih)%w2h(ib) * &
+                      matmul( Rot_I, rr_in(:,ii)-this%act%rr(:,ih) )
 
         end do
 
         
-
-
-
         !> Blending region
         do ib = 1, size(this%blen%n2h(ih)%p2h)
 
@@ -1002,7 +1000,6 @@ subroutine hinge_deflection( this, rr, t,te_i, te_t, postpro )
 
         end do
       
-
       end if
 
     end do
@@ -1020,8 +1017,9 @@ subroutine hinge_deflection( this, rr, t,te_i, te_t, postpro )
               ii = this%rot%n2h(ih)%p2h(ib)
               th1 = th * this%rot%n2h(ih)%s2h(ib)
               Rot_I = sin(th1) * nx + ( 1.0_wp - cos(th1) ) * matmul( nx, nx )
+              
               if (te_i(1,it) .eq. ii) then ! hinge node is also trailing edge node
-                te_t(:,it) =te_t(:,it) + this%rot%n2h(ih)%w2h(ib) * matmul( Rot_I, te_t(:,it))
+                te_t(:,it) = te_t(:,it) + this%rot%n2h(ih)%w2h(ib) * matmul( Rot_I, te_t(:,it))
           
               end if
             end do
