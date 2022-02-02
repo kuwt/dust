@@ -737,12 +737,14 @@ end subroutine update_force_coupled_hinge
 
 !----------------------------------------------------------------
 !> Update force/moment fields
-subroutine update_elems( this, geo, elems )
+subroutine update_elems( this, geo, elems, te_i, te_t )
   class(t_precice)  , intent(inout) :: this
   type(t_geo)       , intent(inout) :: geo
   type(t_pot_elem_p), intent(inout) :: elems(:)
+  real(wp), optional, intent(inout) :: te_t(:,:)
+  integer, optional, intent(in) :: te_i(:,:)
 
-  integer :: i,j, i_comp, ip, iw, ih, ib, ii
+  integer :: i,j, i_comp, ip, iw, ih, ib, ii, it
   real(wp) :: n_rot(3), chord(3), chord_rot(3), omega(3), pos(3), vel(3)
   real(wp) :: r_drot(3), n_drot(3)
   real(wp) :: theta
@@ -1127,6 +1129,63 @@ subroutine update_elems( this, geo, elems )
               end do
 
             end do
+            
+            if (present(te_t)) then  
+            !> Update trailing edge direction
+            do it = 1, SIZE(te_t,2)
+            do i = 1, comp%hinge(ih)%n_nodes ! hinge nodes
+
+              !> === Hinge nodes ===
+              !> Rotation vector and rotation matrix
+              n_rot = this%fields(j_rot)%fdata(:,comp%hinge(ih)%i_points_precice(i))
+              theta = norm2(n_rot)
+              !write(*,*) 'n_rot', n_rot
+              if ( theta .lt. eps ) then
+                n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /); theta = 0.0_wp
+              else
+                n_rot = n_rot / theta
+              end if
+              nx(1,:) = (/    0.0_wp, -n_rot(3),  n_rot(2) /)
+              nx(2,:) = (/  n_rot(3),    0.0_wp, -n_rot(1) /)
+              nx(3,:) = (/ -n_rot(2),  n_rot(1),    0.0_wp /)
+              Rot = reshape( (/1.0_wp, 0.0_wp, 0.0_wp, &
+                               0.0_wp, 1.0_wp, 0.0_wp, &
+                               0.0_wp, 0.0_wp, 1.0_wp /), (/3,3/) ) &
+                  - sin(theta) * nx + ( 1.0_wp - cos(theta) ) * matmul(nx, nx)
+
+              !> Evaluate hinge deflection, theta, from the relative position of the rotating
+              ! and non-rotating ref.frames
+              call rotation_vector_combination( &
+                  this%fields(j_rot)%fdata(:, &
+                      comp%hinge(ih)%i_points_precice( i ) ), &
+                 -comp%hinge(ih) % hin_rot(:,i), r_drot, theta, n_drot )
+
+
+              !> === Surface nodes ===
+              !> 1.1. Update points: rigid rotation
+              do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
+
+                !> Reference difference
+                ip = comp%hinge(ih)%rot%n2h(i)%p2h(ib)  ! Local numbering
+                
+                !ip = comp%i_points(ip)  ! Local-to-global connectivity
+                !> Position: absolute position (!)
+                if (te_i(1,it) .eq. ii) then ! hinge node is also trailing edge node
+                  te_t(:,it) = te_t(:,it) + &
+                  comp%hinge(ih)%rot%n2h(i)%s2h(ib) * &
+                  comp%hinge(ih)%rot%n2h(i)%w2h(ib) * &
+                ( comp%hinge(ih) % act % rr(:,i) + matmul( transpose(Rot), te_t(:,it) ) )
+            
+                end if
+              end do
+
+            end do
+          end do
+          end if
+
+
+
+
 
             !> 2. Update velocity with weighted rigid motion, after the new position
             ! of the nodes has been evaluated

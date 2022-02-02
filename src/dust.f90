@@ -745,7 +745,7 @@ end if
       ! ! check ---
 
       !> Update dust geometry ( elems and first wake panels )
-      call precice % update_elems( geo, elems_tot )
+      call precice % update_elems( geo, elems_tot, te%i, te%t_hinged )
 
       ! ! debug ---
       ! write(*,*) ' debug in dust.f90, l.715. geo%points:'
