@@ -1004,7 +1004,9 @@ subroutine hinge_deflection( this, rr, t,te_i, te_t, postpro )
 
     end do
 
-    if (present(te_t)) then           
+    if (present(te_t)) then     
+      
+      ! Rotate trailing edge direction in the rigid-rotation region
       do it = 1, SIZE(te_t,2)
         do ih = 1, this%n_nodes
           th =   this % theta(ih) * pi/180.0_wp
@@ -1025,6 +1027,7 @@ subroutine hinge_deflection( this, rr, t,te_i, te_t, postpro )
             end do
         end do
       end do
+
     end if  
 
     deallocate(rr_in)

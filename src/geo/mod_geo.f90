@@ -349,7 +349,7 @@ type t_tedge
 
  !> Unit vector at TE nodes
  real(wp), allocatable :: t(:,:)
- real(wp), allocatable :: t_hinged(:,:)
+ real(wp), allocatable :: t_hinged(:,:) ! considering hinge deflection
 
  !> Reference frame of the TE nodes
  integer , allocatable :: ref(:)
@@ -2241,6 +2241,10 @@ subroutine update_geometry(geo, te, t, update_static)
   end if  ! if ( .not. comp%coupling )
 
   !> Hinges -----------------------------------------------------------
+
+  !> Get trailing edge direction to be rotated for hinge deflection
+  te%t_hinged = te%t
+  
   do ih = 1, comp%n_hinges
 
     !> Update:
@@ -2259,7 +2263,7 @@ subroutine update_geometry(geo, te, t, update_static)
       !> Allocating contiguous array to pass to %hinge_deflection procedure
       allocate(rr_hinge_contig(3,size(comp%i_points)))
       rr_hinge_contig = geo%points(:, comp%i_points)
-      te%t_hinged = te%t
+      
       call comp%hinge(ih)%hinge_deflection( rr_hinge_contig, t, te%i, te%t_hinged )
       geo%points(:, comp%i_points) = rr_hinge_contig
 
