@@ -745,7 +745,7 @@ end if
       ! ! check ---
 
       !> Update dust geometry ( elems and first wake panels )
-      call precice % update_elems( geo, elems_tot, te%i, te%t_hinged )
+      call precice % update_elems( geo, elems_tot, te )
 
       ! ! debug ---
       ! write(*,*) ' debug in dust.f90, l.715. geo%points:'
@@ -766,7 +766,7 @@ end if
       end do
 
       !> Update near-field wake
-      call precice % update_near_field_wake( geo, wake )
+      call precice % update_near_field_wake( geo, wake, te%t_hinged )
 
       !> Update dt
       ! *** to do *** : change the way of treating time integration.

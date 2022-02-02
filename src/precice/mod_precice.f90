@@ -67,7 +67,7 @@ use mod_math, only: &
     cross, rotation_vector_combination
 
 use mod_geometry, only: &
-    t_geo, t_geo_component
+    t_geo, t_geo_component, t_tedge
 
 use mod_aeroel, only: &
     t_pot_elem_p
@@ -737,14 +737,13 @@ end subroutine update_force_coupled_hinge
 
 !----------------------------------------------------------------
 !> Update force/moment fields
-subroutine update_elems( this, geo, elems, te_i, te_t )
+subroutine update_elems( this, geo, elems, te )
   class(t_precice)  , intent(inout) :: this
   type(t_geo)       , intent(inout) :: geo
   type(t_pot_elem_p), intent(inout) :: elems(:)
-  real(wp), optional, intent(inout) :: te_t(:,:)
-  integer, optional, intent(in) :: te_i(:,:)
-
-  integer :: i,j, i_comp, ip, iw, ih, ib, ii, it
+  type(t_tedge), optional, intent(inout) :: te
+  integer :: count
+  integer :: i,j, i_comp, ip, iw, ih, ib, ii, it, il
   real(wp) :: n_rot(3), chord(3), chord_rot(3), omega(3), pos(3), vel(3)
   real(wp) :: r_drot(3), n_drot(3)
   real(wp) :: theta
@@ -764,6 +763,7 @@ subroutine update_elems( this, geo, elems, te_i, te_t )
     if ( trim(this%fields(j)%fname) .eq. 'AngularVelocity') j_ome = j
   end do
 
+  te%t_hinged = te%t
   !> Update elems
   ! *** to do *** build and exploit the connectivity preCICE-dust
   do i_comp = 1, size(geo%components)
@@ -1002,6 +1002,7 @@ subroutine update_elems( this, geo, elems, te_i, te_t )
               ! From rotation vector to rotation matrix
               theta = norm2(comp%hinge(ih)%hin_rot(:,i))
               if ( theta .ne. 0.0_wp ) then
+
                 Rot_mat(1,:) = ( 1.0_wp - cos(theta) ) * n_rot(1) * n_rot / theta**2.0_wp
                 Rot_mat(2,:) = ( 1.0_wp - cos(theta) ) * n_rot(2) * n_rot / theta**2.0_wp
                 Rot_mat(3,:) = ( 1.0_wp - cos(theta) ) * n_rot(3) * n_rot / theta**2.0_wp
@@ -1130,62 +1131,50 @@ subroutine update_elems( this, geo, elems, te_i, te_t )
 
             end do
             
-            if (present(te_t)) then  
-            !> Update trailing edge direction
-            do it = 1, SIZE(te_t,2)
-            do i = 1, comp%hinge(ih)%n_nodes ! hinge nodes
+            if (present(te)) then  
+              !> Update trailing edge direction
+              do it = 1, size(te%t_hinged,2)
+                do i = 1, comp%hinge(ih)%n_nodes ! hinge nodes
 
-              !> === Hinge nodes ===
-              !> Rotation vector and rotation matrix
-              n_rot = this%fields(j_rot)%fdata(:,comp%hinge(ih)%i_points_precice(i))
-              theta = norm2(n_rot)
-              !write(*,*) 'n_rot', n_rot
-              if ( theta .lt. eps ) then
-                n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /); theta = 0.0_wp
-              else
-                n_rot = n_rot / theta
-              end if
-              nx(1,:) = (/    0.0_wp, -n_rot(3),  n_rot(2) /)
-              nx(2,:) = (/  n_rot(3),    0.0_wp, -n_rot(1) /)
-              nx(3,:) = (/ -n_rot(2),  n_rot(1),    0.0_wp /)
-              Rot = reshape( (/1.0_wp, 0.0_wp, 0.0_wp, &
-                               0.0_wp, 1.0_wp, 0.0_wp, &
-                               0.0_wp, 0.0_wp, 1.0_wp /), (/3,3/) ) &
-                  - sin(theta) * nx + ( 1.0_wp - cos(theta) ) * matmul(nx, nx)
+                  !> === Hinge nodes ===
+                  !> Rotation vector and rotation matrix
+                  n_rot = this%fields(j_rot)%fdata(:,comp%hinge(ih)%i_points_precice(i))
+                  theta = norm2(n_rot)
+                  !write(*,*) 'n_rot', n_rot
+                  if ( theta .lt. eps ) then
+                  n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /); theta = 0.0_wp
+                  else
+                    n_rot = n_rot / theta
+                  end if
 
-              !> Evaluate hinge deflection, theta, from the relative position of the rotating
-              ! and non-rotating ref.frames
-              call rotation_vector_combination( &
-                  this%fields(j_rot)%fdata(:, &
-                      comp%hinge(ih)%i_points_precice( i ) ), &
-                 -comp%hinge(ih) % hin_rot(:,i), r_drot, theta, n_drot )
-
-
-              !> === Surface nodes ===
-              !> 1.1. Update points: rigid rotation
-              do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
-
-                !> Reference difference
-                ip = comp%hinge(ih)%rot%n2h(i)%p2h(ib)  ! Local numbering
+                  nx(1,:) = (/    0.0_wp, -n_rot(3),  n_rot(2) /)
+                  nx(2,:) = (/  n_rot(3),    0.0_wp, -n_rot(1) /)
+                  nx(3,:) = (/ -n_rot(2),  n_rot(1),    0.0_wp /)
                 
-                !ip = comp%i_points(ip)  ! Local-to-global connectivity
-                !> Position: absolute position (!)
-                if (te_i(1,it) .eq. ii) then ! hinge node is also trailing edge node
-                  te_t(:,it) = te_t(:,it) + &
-                  comp%hinge(ih)%rot%n2h(i)%s2h(ib) * &
-                  comp%hinge(ih)%rot%n2h(i)%w2h(ib) * &
-                ( comp%hinge(ih) % act % rr(:,i) + matmul( transpose(Rot), te_t(:,it) ) )
-            
-                end if
+                  do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
+
+                    ip = comp%hinge(ih)%rot%n2h(i)%p2h(ib)  ! Local numbering
+                    
+                    il = comp%i_points(ip)  ! Local-to-global connectivity
+                    !th1 = theta !* comp%hinge(ih)%rot%n2h(i)%s2h(ib)
+                    th1 = theta * comp%hinge(ih)%rot%n2h(i)%w2h(ib) 
+                    Rot = sin(th1) * nx + ( 1.0_wp - cos(th1) ) * matmul( nx, nx )
+                  
+                    if (te%i(1,it) .eq. il) then ! hinge node is also trailing edge node
+                    
+                      te%t_hinged(:,it) = te%t_hinged(:,it) + comp%hinge(ih)%rot%n2h(i)%s2h(ib) &
+                                          !* comp%hinge(ih)%rot%n2h(i)%w2h(ib) &
+                                        * matmul( Rot, te%t_hinged(:,it))   
+                    
+                      te%t_hinged(:,it) = te%t_hinged(:,it)/norm2(te%t_hinged(:,it))
+
+                    end if
+
+                  end do
+
+                end do
               end do
-
-            end do
-          end do
-          end if
-
-
-
-
+            end if
 
             !> 2. Update velocity with weighted rigid motion, after the new position
             ! of the nodes has been evaluated
@@ -1202,13 +1191,13 @@ subroutine update_elems( this, geo, elems, te_i, te_t )
 
                 !> Connectivity
                 ip = comp%hinge(ih)%rot%n2h(i)%p2h(ib)  ! Local numbering
-                ip = comp%i_points(ip)                  ! Local-to-global connectivity
+                il = comp%i_points(ip)                  ! Local-to-global connectivity
                 !> Velocity: v = v_H + Omega_H x ( r - r_H )
-                geo%points_vel(:,ip) = geo%points_vel(:,ip) + &
+                geo%points_vel(:,il) = geo%points_vel(:,il) + &
                      comp%hinge(ih)%rot%n2h(i)%s2h(ib) * &
                      comp%hinge(ih)%rot%n2h(i)%w2h(ib) * &
                    ( vel + cross( omega, &
-                                  geo%points(:,ip) - comp%hinge(ih) % act % rr(:,i) ) )
+                                  geo%points(:,il) - comp%hinge(ih) % act % rr(:,i) ) )
 
               end do
 
@@ -1254,10 +1243,10 @@ subroutine update_elems( this, geo, elems, te_i, te_t )
 
       else !
         call error('update_elems','mod_precice', &
-                   ' Wrong CouplingType: '//trim(comp%coupling_type)// &
-                   ' for component: '//trim(comp%comp_name)// &
-                   '. So far, available CouplingType inputs are: ll, rigid, rbf.'// &
-                   ' Stop.'); stop
+                  ' Wrong CouplingType: '//trim(comp%coupling_type)// &
+                  ' for component: '//trim(comp%comp_name)// &
+                  '. So far, available CouplingType inputs are: ll, rigid, rbf.'// &
+                  ' Stop.'); stop
       end if
 
     end if ! if coupling
@@ -1269,11 +1258,12 @@ end subroutine update_elems
 
 !----------------------------------------------------------------
 !> Update near field wake
-subroutine update_near_field_wake( this, geo, wake )
+subroutine update_near_field_wake( this, geo, wake, te_t_hinged )
   class(t_precice)  , intent(inout) :: this
   type(t_geo)       , intent(in)    :: geo
   type(t_wake)      , intent(inout) :: wake
 
+  real(wp), intent(in) :: te_t_hinged(:,:)
   real(wp) :: n_rot(3), dist(3), vel_te(3), wind(3)
   real(wp) :: theta
   real(wp) :: eps = 1.0e-9_wp
@@ -1287,6 +1277,8 @@ subroutine update_near_field_wake( this, geo, wake )
     if ( trim(this%fields(j)%fname) .eq. 'Rotation' )  j_rot = j
   end do
 
+  wake%pan_gen_dir = te_t_hinged
+  
   !> First row of points of the panel wake
   wake%w_start_points = 0.5_wp * (geo%points(:,wake%pan_gen_points(1,:)) + &
                                   geo%points(:,wake%pan_gen_points(2,:)))
@@ -1373,23 +1365,29 @@ subroutine update_near_field_wake( this, geo, wake )
           else                      ;  n_rot = n_rot / theta
           end if
 
-          dist =  cos(theta) * wake%pan_gen_dir(:,ip) + &
-                  sin(theta) * cross( n_rot, wake%pan_gen_dir(:,ip) ) + &
-                ( 1.0_wp - cos(theta) ) * sum( wake%pan_gen_dir(:,ip)*n_rot ) * n_rot
-
+          !dist =  cos(theta) * wake%pan_gen_dir(:,ip) + &
+          !        sin(theta) * cross( n_rot, wake%pan_gen_dir(:,ip) ) + &
+          !      ( 1.0_wp - cos(theta) ) * sum( wake%pan_gen_dir(:,ip)*n_rot ) * n_rot
+          dist = wake%pan_gen_dir(:,ip)
           vel_te = geo%points_vel(:, wake%pan_gen_icomp(ip))
           wind = variable_wind(geo%points(:,wake%pan_gen_icomp),sim_param%time)
+        
           if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
+
             wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-               dist*wake%pan_gen_scaling(ip)* &
-               norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &
-               sim_param%ndt_update_wake
+                                        dist*wake%pan_gen_scaling(ip)* &
+                                        norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &
+                                        sim_param%ndt_update_wake
+          
           else
+          
             wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-               dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
-               sim_param%min_vel_at_te*sim_param%dt * &
-               sim_param%ndt_update_wake
+                dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
+                sim_param%min_vel_at_te*sim_param%dt * &
+                sim_param%ndt_update_wake
+          
           end if
+        
         end associate
 
       else

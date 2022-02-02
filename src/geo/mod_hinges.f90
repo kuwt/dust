@@ -1007,7 +1007,7 @@ subroutine hinge_deflection( this, rr, t,te_i, te_t, postpro )
     if (present(te_t)) then     
       
       ! Rotate trailing edge direction in the rigid-rotation region
-      do it = 1, SIZE(te_t,2)
+      do it = 1, size(te_t,2)
         do ih = 1, this%n_nodes
           th =   this % theta(ih) * pi/180.0_wp
           ! Rotation matrix
@@ -1060,6 +1060,11 @@ subroutine initialize_hinge_config( h_config, hinge )
   vv = hinge%ref_dir / norm2(hinge%ref_dir)
 
   nv = cross( vv, hv )
+  
+  if (norm2(nv) .le. 1e-16) then ! workaround for debug compiling 
+    nv(3) = 1e-16
+  endif
+
   nv = nv / norm2(nv)
   vv = cross( hv, nv )
   vv = vv / norm2(vv)  ! useless normalization
