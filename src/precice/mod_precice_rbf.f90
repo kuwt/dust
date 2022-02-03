@@ -51,8 +51,6 @@ module mod_precice_rbf
 
 use mod_param, only: &
     wp
-!use mod_geometry, only: &
-!    t_geo, t_geo_component
 
 implicit none
 
@@ -64,10 +62,10 @@ public :: t_precice_rbf
 ! the surface points
 type :: t_rbf_conn
 
-  !> Indices (surface to structure)
-  integer,  allocatable :: ind(:,:)
-  !> Weights (surface to structure)
-  real(wp), allocatable :: wei(:,:)
+!> Indices (surface to structure)
+integer,  allocatable :: ind(:,:)
+!> Weights (surface to structure)
+real(wp), allocatable :: wei(:,:)
 
 end type t_rbf_conn
 
@@ -79,8 +77,10 @@ type :: t_precice_rbf
 
   !> Global position of the coupling nodes
   real(wp), allocatable :: rrb(:,:)
+
   !> Orientation of the coupling nodes
   real(wp), allocatable :: rrb_rot(:,:)
+
   !> Grid nodes connectivity
   type(t_rbf_conn) :: nod
 
@@ -119,17 +119,20 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
 
   integer ,             intent(in)    :: ee(:,:)
 
-  real(wp), allocatable :: diff_all(:,:), diff_all_transpose(:,:), dist_all(:), mat_dist_all(:,:), wei_v(:), Wnorm(:,:)
-  integer , allocatable ::              ind_v(:)
-  real(wp) :: cen(3)
+  real(wp), allocatable               :: diff_all(:,:), diff_all_transpose(:,:), 
+  real(wp), allocatable               :: dist_all(:), mat_dist_all(:,:), wei_v(:), 
+  integer , allocatable               :: Wnorm(:,:),  ind_v(:)
+  real(wp)                            :: cen(3)
 
-  integer :: np, ns, ne, n
-  integer :: ip, is, ie
+  integer                             :: np, ns, ne, n
+  integer                             :: ip, is, ie
 
   !> Number of surface points
   np = size(rr,2)
+
   !> Number of surface elems
   ne = size(ee,2)
+  
   !> Number of coupling nodes of the structure
   ns = size(this%nodes,2)
 
@@ -142,11 +145,11 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
   allocate(dist_all(ns)); dist_all = 0.0_wp
   allocate(mat_dist_all(ns,ns)); mat_dist_all = 0.0_wp
   allocate(Wnorm(3,3)); Wnorm = 0.0_wp
-  Wnorm(1,1) = 0.001_wp;
-  Wnorm(2,2) = 1.0_wp;
-  Wnorm(3,3) = 0.001_wp;
-
-
+  !> anisotropy matrix: section is rigid chordwise
+  Wnorm(1,1) = 0.001_wp
+  Wnorm(2,2) = 1.0_wp
+  Wnorm(3,3) = 0.001_wp
+  !> From beam ref. sys to Dust ref. sys
   Wnorm = matmul(transpose(coupling_node_rot),(matmul(Wnorm,coupling_node_rot)))
 
   do ip = 1, np
@@ -155,14 +158,13 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
     do is = 1, ns
       diff_all(:,is)  = rr(:,ip) - this%nodes(:,is)
     end do
-
+    !> interpolation matrix
     ! [ns x ns] =                       [ns x 3]        *     [3 x 3] *  [3 x ns]
-    mat_dist_all(:,:)   =    matmul(transpose(diff_all), matmul(Wnorm , diff_all)) ! interpolation matrix
+    mat_dist_all(:,:)   =    matmul(transpose(diff_all), matmul(Wnorm , diff_all)) 
     
     do is = 1, ns
       dist_all(is) = sqrt(mat_dist_all(is,is))
     end do
-
 
     call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
 
@@ -183,37 +185,25 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
   do ie = 1, ne
 
     !> Compute element center
-    ! *** to do *** elem center for 'll'
-    cen = 0.0_wp; n = 0
-    !do i_comp = 1, size(geo%components)
-    !  associate( comp => geo%components(i_comp))
-    !
-    !  if ( comp%comp_el_type(1:1) .eq. 'l' ) then
-    !    cen =  sum ( rr(:,1:2),2 ) / 2.0_wp !! only for l component
-     ! else
-        do ip = 1, 4
-          if ( ee(ip,ie) .ne. 0 ) then
-            n = n + 1
-            cen = cen + rr(:,ee(ip,ie))
-          end if
-        end do
-        cen = cen / dble(n)
-      !end if
-      !end associate
-    !end do
+    do ip = 1, 4
+      if ( ee(ip,ie) .ne. 0 ) then
+        n = n + 1
+        cen = cen + rr(:,ee(ip,ie))
+      end if
+    end do
+    cen = cen / dble(n)
 
-      !> Distance of the surface nodes from the structural nodes
-      do is = 1, ns
-        !dist_all(is) = norm2( cen - this%nodes(:,is) ) !OLD
-        diff_all(:,is)  = cen - this%nodes(:,is)
-      end do
-
+    !> Distance of the surface nodes from the structural nodes
+    do is = 1, ns
+      diff_all(:,is)  = cen - this%nodes(:,is)
+    end do
+    
+    !> interpolation matrix from aero center to beam nodes
     ! [ns x ns] =                       [ns x 3]        *     [3 x 3] *  [3 x ns]
-      mat_dist_all(:,:)   =    matmul(transpose(diff_all), matmul(Wnorm , diff_all)) ! interpolation matrix
+      mat_dist_all(:,:)   =    matmul(transpose(diff_all), matmul(Wnorm , diff_all)) 
       do is = 1, ns
         dist_all(is) = sqrt(mat_dist_all(is,is))
       end do
-
 
     call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
 
@@ -226,13 +216,10 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
 
   enddo
 
-
-
   !> Deallocate and cleaning
   if ( allocated(dist_all) )  deallocate(dist_all)
   if ( allocated(wei_v   ) )  deallocate(wei_v   )
   if ( allocated(ind_v   ) )  deallocate(ind_v   )
-
 
 end subroutine build_connectivity
 
@@ -241,24 +228,23 @@ end subroutine build_connectivity
 ! *** to do *** clean the implementation, moving sort_ routines
 ! into math module
 subroutine sort_vector_real( vec, nel, sor, ind )
-  real(wp), intent(inout) :: vec(:)
-  integer , intent(in)    :: nel
-  real(wp), allocatable, intent(out):: sor(:)
-  integer , allocatable, intent(out):: ind(:)
+  real(wp), intent(inout)               :: vec(:)
+  integer , intent(in)                  :: nel
+  real(wp), allocatable, intent(out)    :: sor(:)
+  integer , allocatable, intent(out)    :: ind(:)
 
-  real(wp):: maxv
-  integer :: i
+  real(wp)                              :: maxv
+  integer                               :: i
 
   allocate(sor(nel)); sor = 0.0_wp
   allocate(ind(nel)); ind = 0
 
-  maxv = maxval( vec )
+  maxv = maxval(vec)
   do i = 1, nel
-    sor(i) = minval( vec, 1 )
-    ind(i) = minloc( vec, 1 )
-    vec( ind(i) ) = maxv + 0.1_wp ! naif
+    sor(i) = minval(vec, 1)
+    ind(i) = minloc(vec, 1)
+    vec(ind(i)) = maxv + 0.1_wp 
   end do
-
 
 end subroutine sort_vector_real
 
