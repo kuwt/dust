@@ -620,7 +620,7 @@ subroutine calc_geo_data_vortlatt(this, vert)
   
   this%area = 0.5_wp * norm2(nor)
   ! avoid numerical singularities when compiled in debug mode
-  if (norm2(nor) .lt. 1e-16) then 
+  if (norm2(nor) .lt. 1e-16_wp) then 
     nor(3) = 1e-16_wp
   end if
 

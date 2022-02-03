@@ -1148,7 +1148,7 @@ subroutine tec_out_probes(out_filename, time, vars, var_names, zone_names)
     write(fu) int(-2,s_size)
 
     !Solution time, useless in this case
-    write(fu) real(0.0_wp,d_size)
+    write(fu) real(0.0,d_size)
 
     !"not used, set to -1"
     write(fu) int(-1,s_size)
@@ -1309,7 +1309,7 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size, &
   write(fu) int(-2,s_size)
 
   !Solution time, useless in this case
-  write(fu) real(0.0_wp,d_size)
+  write(fu) real(0.0,d_size)
 
   !"not used, set to -1"
   write(fu) int(-1,s_size)
@@ -1477,7 +1477,7 @@ subroutine tec_out_loads(out_filename, time, force, moment)
   write(fu) int(-2,s_size)
 
   !Solution time, useless in this case
-  write(fu) real(0.0_wp,d_size)
+  write(fu) real(0.0,d_size)
 
   !"not used, set to -1"
   write(fu) int(-1,s_size)

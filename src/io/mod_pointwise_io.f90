@@ -206,9 +206,6 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
  ee_size =  nelem_chord_tot *  nelem_span_tot
  rr_size = npoint_chord_tot * npoint_span_tot
 
-! ! check ---
-! write(*,*) ' ee_size , rr_size : ' , ee_size , rr_size
-
  ! === connectivity matrix, ee ===
  allocate( ee( 4 , ee_size ) ) ; ee = 0
  do i_ch = 1 , nelem_chord_tot
@@ -310,9 +307,6 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
     w1 = ( s_in(i2) - s_in(i ) ) / ( s_in(i2) - s_in(i1) )
     w2 = ( s_in(i ) - s_in(i1) ) / ( s_in(i2) - s_in(i1) )
 
-!   ! check ---
-!   write(*,*) ' i , i1 , i2 , w1 , w2 : ' , i , i1 , i2 , w1 , w2
-
     if ( allocated(xy1) ) deallocate(xy1)
     if ( allocated(xy2) ) deallocate(xy2)
 
@@ -357,18 +351,10 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
  allocate( rr( 3 , rr_size ) ) ; rr = 0.0_wp
  allocate( rr_s ( 2 , size(points(1)%xy,2) ) )
 
- !>
- ! write(*,*) ' shape(ref_line_interp_p) : ' ,  shape(ref_line_interp_p)
- ! write(*,*) ' shape(ref_line_interp_s) : ' ,  shape(ref_line_interp_s)
- ! write(*,*) ' shape(points           ) : ' ,  shape(points)
  do i = 1 , npoint_span_tot
 
 
-   ! write(*,*) i , ref_line_interp_p(i,1) , ref_line_interp_p(i,2)
-
-   ! write(*,*) ' shape( points( ...(1) )%xy ) : ' , shape(points( ref_line_interp_p(i,1) )%xy)
-   ! write(*,*) ' shape( points( ...(2) )%xy ) : ' , shape(points( ref_line_interp_p(i,2) )%xy)
-   rr_s = points( ref_line_interp_p(i,1) )%xy * &
+  rr_s = points( ref_line_interp_p(i,1) )%xy * &
                                        ( 1.0_wp - ref_line_interp_s(i) ) + &
           points( ref_line_interp_p(i,2) )%xy  *  ref_line_interp_s(i)
 
@@ -377,7 +363,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
 
    ! rotation
    theta = atan2( ref_line_normal(i,3) , ref_line_normal(i,2) )
-   ! write(*,*) ' theta : ' , theta
+
    rr(1,i1:i2) = rr_s(1,:)
    rr(2,i1:i2) =-rr_s(2,:) * sin(theta)
    rr(3,i1:i2) = rr_s(2,:) * cos(theta)
@@ -643,7 +629,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
 
    ! rotation
    theta = atan2( ref_line_normal(i,3) , ref_line_normal(i,2) )
-   ! write(*,*) ' theta : ' , theta
+
    rr(1,i1:i2) = rr_s(1,:)
    rr(2,i1:i2) =-rr_s(2,:) * sin(theta)
    rr(3,i1:i2) = rr_s(2,:) * cos(theta)
@@ -703,7 +689,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
  j = 1
  do i = 1 , nelem_span_tot ! loop over the elements in the spanwise direction
 
-   s_cen_e = 0.5 * ( ref_line_interp_s_all(i) + ref_line_interp_s_all(i+1) )
+   s_cen_e = 0.5_wp * ( ref_line_interp_s_all(i) + ref_line_interp_s_all(i+1) )
 
    ! scan airfoil_list_actual_s and update j, index of the lower bound for interpolation
    if  ( s_cen_e .gt. airfoil_list_actual_s(j+1) ) then
@@ -756,35 +742,6 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
  !  doesn't matter, does it?)
  call finalizeParameters(pmesh_prs)
 
-
-
-! ! check ---
-! write(*,*) ' shape(ref_line_interp_p) : ' , shape(ref_line_interp_p)
-! write(*,*) ' shape(ref_line_interp_p) : ' , shape(ref_line_interp_s)
-! do i = 1 , size(ref_line_interp_s)
-!   write(*,*) ref_line_interp_p(i,:) , ref_line_interp_s(i)
-! end do
-!
-! ! check ---
-! write(*,*) ' npoints_chord_tot : ' , npoints_chord_tot
-! write(*,*) ' nelem_span_tot    : ' , nelem_span_tot
-! write(*,*) ' chord_p(:) , theta_p(:) [deg] : '
-! do i = 1 , size(chord_p)
-!   write(*,*) chord_p(i) , theta_p(i) * 180.0_wp/pi
-! end do
-! write(*,*) ' normalised_coord_e(:) : '
-! do i = 1 , size(normalised_coord_e,2)
-!   write(*,*) normalised_coord_e(:,i)
-! end do
-! write(*,*) ' shape(ee) : ' , shape(ee)
-! write(*,*) ' shape(rr) : ' , shape(rr)
-! write(*,*) ' stop in mod_pointwise_io.f90: read_mesh_pointwise_ll. ' ; stop
-! ! check ---
-
-
-
-
-
 end subroutine read_mesh_pointwise_ll
 
 !----------------------------------------------------------------------
@@ -815,7 +772,6 @@ subroutine build_reference_line( npoint_span_tot   , points, lines     , &
 
  integer :: i , i1 , i2 , j , n
 
-!write(*,*) ' n. point in spanwise direction: ' , npoint_span_tot
  allocate(ref_line_points(  npoint_span_tot,3))
  allocate(ref_line_normal(  npoint_span_tot,3))
  allocate(ref_line_interp_p(npoint_span_tot,2))
@@ -1141,7 +1097,7 @@ subroutine check_point_line_inputs( points , lines )
          ( trim(lines(i+1)%l_type) .eq. 'Spline' ) ) then
       write(*,*) ' error in check_point_lines_input: two consecutive splines are not &
                   &allowed so far. '
-      write(*,*) ' In future release, this coul not be true anymore: '
+      write(*,*) ' In future release, this could not be true anymore: '
       write(*,*) ' two consecutive splines could be joined together if no'
       write(*,*) ' TangentVec is provided, or two consecutive spline with'
       write(*,*) ' TangentVec provided could be treated as well. So far, Stop.'
@@ -1231,8 +1187,6 @@ subroutine update_ref_line_normal( points , ref_line_normal   , &
      w2 = ( ref_line_interp_s_all(i)       - s_in( ref_line_interp_p(i,1) ) ) / &
           ( s_in( ref_line_interp_p(i,2) ) - s_in( ref_line_interp_p(i,1) ) )
 
-!    write(*,*) ' w1 , w2  : ' , w1 , w2
-
      ref_line_normal(i,:) = nor1 * w1 +  nor2 * w2
 
    else
@@ -1249,8 +1203,6 @@ subroutine update_ref_line_normal( points , ref_line_normal   , &
      w2 = 0.5_wp * ds * ( ds+1.0_wp)
      w0 = (1.0_wp - ds)*(1.0_wp + ds)
 
-!    write(*,*) ' w1 , w2 , w0 : ' , w1 , w2 , w0
-
      ref_line_normal(i,:) = nor1 * w1 +  nor2 * w2 + w0 * nor0
 
    end if
@@ -1259,12 +1211,6 @@ subroutine update_ref_line_normal( points , ref_line_normal   , &
    ref_line_normal(i,:) = ref_line_normal(i,:) / norm2(ref_line_normal(i,:))
 
  end do
-
-!! check
-!write(*,*) ' ref_line_interp_s(i) :' , size(ref_line_interp_s)
-!do i = 1 , size(ref_line_interp_s)
-!  write(*,*) ref_line_interp_s(i) , ref_line_normal(i,:)
-!end do
 
 end subroutine update_ref_line_normal
 
@@ -1547,42 +1493,5 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
 
 
 end subroutine set_parser_pointwise
-
-!----------------------------------------------------------------------
-! ! === checks ===
-! ! --- points, lines structures ---
-! write(*,*) ' nPoints , nLines : ' , size(points) , size(lines)
-! do i = 1 , size(points)
-!   write(*,*)      points(i) % id
-!   write(*,*)      points(i) % coord
-!   write(*,*) trim(points(i) % airfoil)
-!   write(*,*)      points(i) % chord
-!   write(*,*)      points(i) % theta
-! end do
-! do i = 1 , size(lines)
-!   write(*,*) trim(lines(i) % l_type)
-!   write(*,*)      lines(i) % end_points
-!   write(*,*)      lines(i) % nelems
-! end do
-
-!  !> Build reference line
-!  ! test ---
-!  allocate(spl%rr(4,3)) ; allocate(spl%d0(3)) ; allocate(spl%d1(3))
-!  spl%rr(1,:) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
-!  spl%rr(2,:) = (/ 1.0_wp , 1.0_wp , 0.0_wp /)
-!  spl%rr(3,:) = (/ 1.0_wp , 2.0_wp , 0.0_wp /)
-!  spl%rr(4,:) = (/ 0.0_wp , 3.0_wp , 0.0_wp /)
-!  spl%d0 = (/ 1.0_wp , 0.0_wp , 0.0_wp /)
-!  spl%d1 = (/-1.0_wp , 0.0_wp , 0.0_wp /)
-!  spl%e_bc(1) = 'derivative'
-!  spl%e_bc(2) = 'derivative'
-!
-!  call hermite_spline( spl , rr_spl )
-!
-! ! check ---
-! do i = 1 , size(rr_spl,1)
-!   write(*,*) rr_spl(i,:)
-! end do
-
 
 end module mod_pointwise_io

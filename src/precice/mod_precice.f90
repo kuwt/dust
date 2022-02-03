@@ -192,7 +192,7 @@ subroutine initialize_mesh( this, geo )
   class(t_precice), intent(inout) :: this
   type(t_geo)     , intent(in)    :: geo
 
-  integer :: i, i_comp, n_comp
+  integer :: i_comp, n_comp
   integer :: dnnodes, nnodes, ih, n_hinges
 
   !> TODO: add component field, that describe if the component
@@ -376,17 +376,16 @@ subroutine update_force( this, geo, elems )
   class(t_precice)  , intent(inout) :: this
   type(t_geo)       , intent(inout) :: geo
   type(t_pot_elem_p), intent(in)    :: elems(:)
-  real(wp) :: n_rot(3), chord(3), chord_rot(3), omega(3), pos(3), vel(3)
+  real(wp) :: n_rot(3), chord(3), chord_rot(3)
   real(wp) ::   ell(3),   off(3),   off_rot(3)
   real(wp) :: radius_1(3), radius_2(3)
   real(wp) :: theta
   real(wp) :: eps = 1.0e-9_wp
 
-  integer :: i, j, i_comp, iw, ip, ip_p, ih, ia, ib
+  integer :: i, j, i_comp, iw, ip, ih
 
   integer :: j_for, j_mom, j_rot, j_pos
 
-  real :: alpha
 
   do j = 1, size(this%fields)
     if ( trim(this%fields(j)%fname) .eq. 'Position') j_pos = j
@@ -742,7 +741,7 @@ subroutine update_elems( this, geo, elems, te )
   type(t_geo)       , intent(inout) :: geo
   type(t_pot_elem_p), intent(inout) :: elems(:)
   type(t_tedge), optional, intent(inout) :: te
-  integer :: count
+
   integer :: i,j, i_comp, ip, iw, ih, ib, ii, it, il
   real(wp) :: n_rot(3), chord(3), chord_rot(3), omega(3), pos(3), vel(3)
   real(wp) :: r_drot(3), n_drot(3)
@@ -763,7 +762,7 @@ subroutine update_elems( this, geo, elems, te )
     if ( trim(this%fields(j)%fname) .eq. 'AngularVelocity') j_ome = j
   end do
 
-  te%t_hinged = te%t
+  
   !> Update elems
   ! *** to do *** build and exploit the connectivity preCICE-dust
   do i_comp = 1, size(geo%components)
@@ -915,9 +914,6 @@ subroutine update_elems( this, geo, elems, te )
       !> rbf coupling ----------------------------------------------------------
       elseif ( trim(comp%coupling_type) .eq. 'rbf' ) then
 
-        ! debug ---
-        !write(*,*) ' comp n. ', comp%comp_id, ' rbf'
-
         !> Reset, before accumulation, only nodes belonging to the component
         do i = 1, size(comp%i_points)
           ip = comp%i_points(i)
@@ -991,7 +987,7 @@ subroutine update_elems( this, geo, elems, te )
 
 
                 n_rot = this%fields(j_rot)%fdata(:, &
-                       comp%i_points_precice( comp%hinge(ih)%hin%ind(j,i)  ) )
+                        comp%i_points_precice( comp%hinge(ih)%hin%ind(j,i)  ) )
 
                 comp%hinge(ih) % hin_rot(:,i) = comp%hinge(ih) % hin_rot(:,i) + &
                                                 comp%hinge(ih) % hin % wei(j,i) * n_rot
@@ -1040,9 +1036,9 @@ subroutine update_elems( this, geo, elems, te )
             do i = 1, size( comp%hinge(ih)%rot %node_id )
               ip = comp%i_points( comp%hinge(ih)%rot%node_id(i) )
               geo%points(:,ip)     = geo%points(:,ip) * &
-                                     ( 1.0_wp - comp%hinge(ih)%rot %span_wei(i) )
+                                    ( 1.0_wp - comp%hinge(ih)%rot %span_wei(i) )
               geo%points_vel(:,ip) = geo%points_vel(:,ip) * &
-                                     ( 1.0_wp - comp%hinge(ih)%rot %span_wei(i) )
+                                    ( 1.0_wp - comp%hinge(ih)%rot %span_wei(i) )
             end do
 
             !> From motion of hinge nodes to surface motion
@@ -1064,16 +1060,16 @@ subroutine update_elems( this, geo, elems, te )
               nx(2,:) = (/  n_rot(3),    0.0_wp, -n_rot(1) /)
               nx(3,:) = (/ -n_rot(2),  n_rot(1),    0.0_wp /)
               Rot = reshape( (/1.0_wp, 0.0_wp, 0.0_wp, &
-                               0.0_wp, 1.0_wp, 0.0_wp, &
-                               0.0_wp, 0.0_wp, 1.0_wp /), (/3,3/) ) &
+                              0.0_wp, 1.0_wp, 0.0_wp, &
+                              0.0_wp, 0.0_wp, 1.0_wp /), (/3,3/) ) &
                   - sin(theta) * nx + ( 1.0_wp - cos(theta) ) * matmul(nx, nx)
 
               !> Evaluate hinge deflection, theta, from the relative position of the rotating
               ! and non-rotating ref.frames
               call rotation_vector_combination( &
-                  this%fields(j_rot)%fdata(:, &
+                      this%fields(j_rot)%fdata(:, &
                       comp%hinge(ih)%i_points_precice( i ) ), &
-                 -comp%hinge(ih) % hin_rot(:,i), r_drot, theta, n_drot )
+                      -comp%hinge(ih) % hin_rot(:,i), r_drot, theta, n_drot )
 
 
               !> === Surface nodes ===
@@ -1090,7 +1086,7 @@ subroutine update_elems( this, geo, elems, te )
                 geo%points(:,ip) = geo%points(:,ip) + &
                      comp%hinge(ih)%rot%n2h(i)%s2h(ib) * &
                      comp%hinge(ih)%rot%n2h(i)%w2h(ib) * &
-                   ( comp%hinge(ih) % act % rr(:,i) + matmul( transpose(Rot), chord ) )
+                    ( comp%hinge(ih) % act % rr(:,i) + matmul( transpose(Rot), chord ) )
               end do
 
               !> 1.2. Chordwise blending region
@@ -1131,7 +1127,8 @@ subroutine update_elems( this, geo, elems, te )
 
             end do
             
-            if (present(te)) then  
+            if (present(te)) then
+              te%t_hinged = te%t  
               !> Update trailing edge direction
               do it = 1, size(te%t_hinged,2)
                 do i = 1, comp%hinge(ih)%n_nodes ! hinge nodes
@@ -1155,13 +1152,15 @@ subroutine update_elems( this, geo, elems, te )
 
                     ip = comp%hinge(ih)%rot%n2h(i)%p2h(ib)  ! Local numbering
                     
-                    il = comp%i_points(ip)  ! Local-to-global connectivity
+                    il = comp%i_points(ip)  ! Node of the hinge region
+
                     !th1 = theta !* comp%hinge(ih)%rot%n2h(i)%s2h(ib)
                     th1 = theta * comp%hinge(ih)%rot%n2h(i)%w2h(ib) 
                     Rot = sin(th1) * nx + ( 1.0_wp - cos(th1) ) * matmul( nx, nx )
                   
                     if (te%i(1,it) .eq. il) then ! hinge node is also trailing edge node
-                    
+                      WRITE(*,*) 'te%i(1,it)', te%i(1,it) !--> transfer to wake update 
+                      te%is_hinged(it) = te%i(1,it)
                       te%t_hinged(:,it) = te%t_hinged(:,it) + comp%hinge(ih)%rot%n2h(i)%s2h(ib) &
                                           !* comp%hinge(ih)%rot%n2h(i)%w2h(ib) &
                                         * matmul( Rot, te%t_hinged(:,it))   
@@ -1175,7 +1174,6 @@ subroutine update_elems( this, geo, elems, te )
                 end do
               end do
             end if
-
             !> 2. Update velocity with weighted rigid motion, after the new position
             ! of the nodes has been evaluated
             do i = 1, comp%hinge(ih)%n_nodes ! hinge nodes
@@ -1258,18 +1256,18 @@ end subroutine update_elems
 
 !----------------------------------------------------------------
 !> Update near field wake
-subroutine update_near_field_wake( this, geo, wake, te_t_hinged )
+subroutine update_near_field_wake( this, geo, wake, te )
   class(t_precice)  , intent(inout) :: this
   type(t_geo)       , intent(in)    :: geo
   type(t_wake)      , intent(inout) :: wake
+  type(t_tedge)     , intent(inout) :: te
 
-  real(wp), intent(in) :: te_t_hinged(:,:)
   real(wp) :: n_rot(3), dist(3), vel_te(3), wind(3)
   real(wp) :: theta
   real(wp) :: eps = 1.0e-9_wp
 
   integer :: icomp
-  integer :: ip, ir, i_point, p1, p2, j, j_rot, iw
+  integer :: ip, ir, i_point, p1, p2, j, j_rot, iw, i
 
   ! Find rotation and angular velocity field id
   j_rot = 0
@@ -1277,7 +1275,7 @@ subroutine update_near_field_wake( this, geo, wake, te_t_hinged )
     if ( trim(this%fields(j)%fname) .eq. 'Rotation' )  j_rot = j
   end do
 
-  wake%pan_gen_dir = te_t_hinged
+  
   
   !> First row of points of the panel wake
   wake%w_start_points = 0.5_wp * (geo%points(:,wake%pan_gen_points(1,:)) + &
@@ -1291,7 +1289,7 @@ subroutine update_near_field_wake( this, geo, wake, te_t_hinged )
     if ( geo%components( wake%pan_gen_icomp(ip) )%coupling ) then
 
       if ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) &
-           .eq. 'll' ) then
+            .eq. 'll' ) then
 
         !> LL coupling
         i_point = wake%pan_gen_points(1,ip)
@@ -1303,23 +1301,23 @@ subroutine update_near_field_wake( this, geo, wake, te_t_hinged )
 
         if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-             dist*wake%pan_gen_scaling(ip)* &
-             norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &
-             sim_param%ndt_update_wake
+                                      dist*wake%pan_gen_scaling(ip)* &
+                                      norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &
+                                      real(sim_param%ndt_update_wake,wp)
         else
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-             dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
-             sim_param%min_vel_at_te*sim_param%dt * &
-             sim_param%ndt_update_wake
+                                      dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
+                                      sim_param%min_vel_at_te*sim_param%dt * &
+                                      real(sim_param%ndt_update_wake,wp)
         end if
 
       elseif ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) &
-               .eq. 'rigid' ) then
+              .eq. 'rigid' ) then
 
         !> rigid coupling
         !> Rotation
         n_rot = this%fields(j_rot)%fdata(:, &
-                 geo%components( wake%pan_gen_icomp(ip) )%i_points_precice(1) )
+                geo%components( wake%pan_gen_icomp(ip) )%i_points_precice(1) )
         theta = norm2( n_rot )
         if ( theta .lt. eps ) then;  n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /);  theta = 0.0_wp
         else                      ;  n_rot = n_rot / theta
@@ -1337,12 +1335,12 @@ subroutine update_near_field_wake( this, geo, wake, te_t_hinged )
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
              dist*wake%pan_gen_scaling(ip)* &
              norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &
-             sim_param%ndt_update_wake
+             real(sim_param%ndt_update_wake,wp)
         else
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
              dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
              sim_param%min_vel_at_te*sim_param%dt * &
-             sim_param%ndt_update_wake
+             real(sim_param%ndt_update_wake,wp)
         end if
 
       elseif ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) &
@@ -1353,22 +1351,54 @@ subroutine update_near_field_wake( this, geo, wake, te_t_hinged )
         icomp = wake%pan_gen_icomp(ip)
         associate( comp => geo%components(icomp) )
 
-          iw = wake%pan_gen_points(1,ip) - minval(comp%i_points) + 1
+          iw = wake%pan_gen_points(1,ip) - minval(comp%i_points) + 1 ! trailing edge points ID
+          WRITE(*,*) 'iw', iw
+          
+          ! find if the trailing edge node belongs to a hinge
+          ! if so, it has already been rotated in update_geometry
+          ! and we can use t_hinged
+          if (any(te%is_hinged .eq. iw)) then
+            ! iw is the node index, but we need to find where that node is 
+            ! in the trailing edge array
+            ! (workaround for findloc)
+            do i=1, size(te%is_hinged)
+              if (te%is_hinged(i) .eq. iw) then
+                dist = te%t_hinged(:,i)
+              end if
+            end do
+          else
 
-          ! *** to do ***
-          ! So far, t_te inherits orientation ONLY from the closest coupling node,
-          ! without interpolation with rbf coefficients
-          n_rot = this%fields(j_rot)%fdata(:, &
+
+
+           ! *** to do ***
+           ! So far, t_te inherits orientation ONLY from the closest coupling node,
+           ! without interpolation with rbf coefficients
+           n_rot = this%fields(j_rot)%fdata(:, &
                    comp%i_points_precice( comp%rbf%nod%ind(1,iw) ) )
-          theta = norm2( n_rot )
-          if ( theta .lt. eps ) then;  n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /);  theta = 0.0_wp
-          else                      ;  n_rot = n_rot / theta
+           theta = norm2( n_rot )
+ 
+           if ( theta .lt. eps ) then
+             n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
+             theta = 0.0_wp
+           else
+             n_rot = n_rot / theta
+           end if
+ 
+ 
+           !do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
+! 
+           !  ip = comp%hinge(ih)%rot%n2h(i)%p2h(ib)  ! Local numbering
+           !  
+           !  ip = comp%i_points(ip)  ! Node of the hinge region
+           
+           !  if (te%i(1,it) .eq. ip) then ! hinge node is also trailing edge node         
+               !dist = wake%pan_gen_dir(:,ip)
+           !  else                          ! if not hinged region
+               dist =  cos(theta) * wake%pan_gen_dir(:,ip) + &
+                       sin(theta) * cross( n_rot, wake%pan_gen_dir(:,ip) ) + &
+                     ( 1.0_wp - cos(theta) ) * sum( wake%pan_gen_dir(:,ip)*n_rot ) * n_rot
           end if
 
-          !dist =  cos(theta) * wake%pan_gen_dir(:,ip) + &
-          !        sin(theta) * cross( n_rot, wake%pan_gen_dir(:,ip) ) + &
-          !      ( 1.0_wp - cos(theta) ) * sum( wake%pan_gen_dir(:,ip)*n_rot ) * n_rot
-          dist = wake%pan_gen_dir(:,ip)
           vel_te = geo%points_vel(:, wake%pan_gen_icomp(ip))
           wind = variable_wind(geo%points(:,wake%pan_gen_icomp),sim_param%time)
         
@@ -1377,14 +1407,14 @@ subroutine update_near_field_wake( this, geo, wake, te_t_hinged )
             wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                                         dist*wake%pan_gen_scaling(ip)* &
                                         norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &
-                                        sim_param%ndt_update_wake
+                                        real(sim_param%ndt_update_wake,wp)
           
           else
           
             wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                 dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
                 sim_param%min_vel_at_te*sim_param%dt * &
-                sim_param%ndt_update_wake
+                real(sim_param%ndt_update_wake,wp)
           
           end if
         

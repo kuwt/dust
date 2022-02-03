@@ -516,10 +516,8 @@ subroutine prepare_geometry_postpro(comps)
  class(c_pot_elem), pointer :: elem
  character(len=*), parameter :: this_sub_name = 'prepare_geometry_postpro'
 
- !debug
-!write(*,*) ' size(comps) : ' , size(comps)
+
  do i_comp = 1,size(comps)
-!  write(*,*) ' size(comps(',i_comp,')%el : ' , size(comps(i_comp)%el)
    do ie = 1,size(comps(i_comp)%el)
      elem => comps(i_comp)%el(ie)
 
@@ -804,10 +802,6 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
 
   end associate
  enddo
-
-!DEBUG
-!write(*,*) ' ***** '
-
 
 end subroutine update_points_postpro
 

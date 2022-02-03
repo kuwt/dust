@@ -279,9 +279,6 @@ subroutine save_status(geo, wake, it, time, run_id)
 
 #if USE_PRECICE
     if ( geo%components(icomp)%coupling ) then
-      !write(*,*) ' ************************************************* '
-      !write(*,*) ' * write position of coupled component: ', icomp
-      !write(*,*) ' ************************************************* '
       call new_hdf5_group(gloc2, 'Geometry', gloc3)
       call write_hdf5(geo%points(:,geo%components(icomp)%i_points), &
                       'rr',gloc3)
@@ -337,11 +334,7 @@ subroutine save_status(geo, wake, it, time, run_id)
   allocate(vort_v(3,wake%n_prt))
   allocate(turbvisc(wake%n_prt))
   allocate(vel_w(3,wake%n_prt,1))
-  !> debug ---
-  !write(*,*) ' ++++ debug in mod_dust_io.f90 ++++ '
-  !write(*,*) ' wake%n_prt: ', wake%n_prt
-  !write(*,*) ' ++++ debug in mod_dust_io.f90 ++++ '
-  !> debug ---
+
   do ip = 1, wake%n_prt
     points_w(:,ip,1) = wake%part_p(ip)%p%cen
     vel_w(:,ip,1) = wake%part_p(ip)%p%vel
@@ -512,151 +505,5 @@ subroutine load_time(filename, time)
 end subroutine load_time
 
 !----------------------------------------------------------------------
-
-! moved to geo/mod_references.f90
-
-! subroutine update_relative_initial_conditions (restart_file, ref_file , refs )
-!  character(len=max_char_len), intent(in) :: restart_file
-!  character(len=max_char_len), intent(in) :: ref_file
-!  type(t_ref), intent(inout) :: refs(0:)
-!
-!  type(t_parse) :: ref_prs
-!  type(t_parse), pointer :: sbprms , sbprms_pol , sbprms_rot
-!
-!  integer(h5loc) :: floc , refs_gloc , ref_loc !, gloc1, gloc2, gloc3
-!  character(len=max_char_len) :: ref_title
-!
-!  real(wp) :: relative_pos_0(3)
-!  real(wp) :: relative_rot_0
-!
-!  integer :: iref , nref , idref
-!  integer :: i , it , nref_ref_in
-!
-!  character(len=*), parameter :: this_sub_name = 'update_relative_initial_conditions'
-!
-!  !Define all the parameters to be read
-!  call ref_prs%CreateStringOption('Reference_Tag','Integer tag of reference frame',&
-!               multiple=.true.)
-!  call ref_prs%CreateLogicalOption('Moving','Is the reference moving', &
-!               multiple=.true.)
-!  call ref_prs%CreateLogicalOption('Multiple','Is the reference multiple', &
-!               multiple=.true.)
-!
-!  ! Motion sub-parser ---------------------------------------------
-!  call ref_prs%CreateSubOption('Motion','Definition of the motion of a frame',sbprms, &
-!               multiple=.true.)
-!  ! Pole motion sub-parser ----------------------------------------
-!  call sbprms%CreateSubOption('Pole','Definition of the motion of the pole', &
-!              sbprms_pol)
-!  call sbprms_pol%CreateStringOption('Input','Input: velocity or position')
-!  ! End Pole motion sub-parser ----------------------------------------
-!  ! Rotation motion sub-parser ------------------------------------
-!  call sbprms%CreateSubOption('Rotation','Definition of the rotation of &
-!                              &the frame', sbprms_rot)
-!  call sbprms_rot%CreateStringOption('Input','Input: velocity or position')
-!  ! End Rotation motion sub-parser ------------------------------------
-!  ! End Motion sub-parser ---------------------------------------------
-!  sbprms => null()
-!
-!  ! Multiple sub-parser -------------------------------------------
-!  call ref_prs%CreateSubOption('Multiplicity','Parameters for multiple frames',&
-!                sbprms, multiple=.true.)
-!  call sbprms%CreateStringOption('MultType','Kind of multiplicity')
-!  call sbprms%CreateIntOption('N_Frames', 'Number of reference frames')
-!  call sbprms%CreateIntOption('N_Blades', 'Number of reference repeated structures,&
-!               & blades or whatever')
-!  call sbprms%CreateIntOption('N_Dofs', 'Number of dofs for each blade')
-!  ! End Multiple sub-parser -------------------------------------------
-!
-!
-!  !read the file
-!  call ref_prs%read_options(trim(ref_file),printout_val=.false.)
-!
-!  nref_ref_in = countoption(ref_prs,'Reference_Tag')
-!
-!  ! open restart file to read the relative initial conditions
-!  call open_hdf5_file(trim(restart_file), floc)
-!  call open_hdf5_group(floc, 'References', refs_gloc)
-!
-!  iref = 0
-!  write(*,*) ' @@@@@@@@@@@@@@ '
-!  do i = 1 , nref_ref_in
-!
-!    iref = iref + 1
-!    write(*,*) ' iref : ' , iref
-!
-!    write(ref_title,'(A,I3.3)')'Ref',iref
-!    call open_hdf5_group(refs_gloc, trim(ref_title), ref_loc)
-!
-!    if ( refs(iref)%self_moving ) then
-!
-!
-!      call getsuboption(ref_prs,'Motion',sbprms)
-!
-!      ! === Pole ===
-!      call getsuboption(sbprms,'Pole',sbprms_pol)
-!
-!      select case( trim(getstr(sbprms_pol,'Input')) )
-!         case('velocity')
-!           ! add the i.c. from restart file
-!           write(*,*) ' pole velocity, iref : ' , iref
-!
-!           call read_hdf5(relative_pos_0,'RelativePolPos',ref_loc)
-!
-!           do it = 1 , size(refs(iref)%pol_pos,2)
-!             refs(iref)%pol_pos(:,it) = refs(iref)%pol_pos(:,it) + &
-!                                        relative_pos_0
-!           end do
-!
-!         case default
-!           ! do nothing
-!       end select
-!
-!       ! === Rotation ===
-!       call getsuboption(sbprms,'Rotation',sbprms_rot)
-!
-!       select case(trim(getstr(sbprms_rot,'Input')) )
-!         case('velocity')
-!           ! add the i.c. from restart file
-!           write(*,*) ' rot  velocity, iref : ' , iref
-!
-!           call read_hdf5(relative_rot_0,'RelativeRotPos',ref_loc)
-!
-!           do it = 1 , size(refs(iref)%rot_pos)
-!             refs(iref)%rot_pos(it) = refs(iref)%rot_pos(it) + &
-!                                      relative_rot_0
-!           end do
-!
-!         case default
-!           ! do nothing
-!       end select
-!
-!    end if
-!
-!    call close_hdf5_group(ref_loc)
-!
-! ! Multiplicity -----
-! !  if ( ) then ! loop over multiplicity
-! !
-! !    select case(trim(   mult_type))
-! !
-! !      case('simple rotor')
-! !
-! !      case('rotor')
-! !
-! !
-! !    end select
-! !
-! !  end if
-!
-!
-!  end do
-!
-!  call close_hdf5_group(refs_gloc)
-!  call close_hdf5_file(floc)
-!
-! end subroutine update_relative_initial_conditions
-!
-! !----------------------------------------------------------------------
 
 end module mod_dust_io

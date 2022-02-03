@@ -279,19 +279,6 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
   allocate(wei_v(this%n_wei))
   allocate(ind_v(this%n_wei))
 
-  ! ! debug ---
-    !write(*,*) ' ................................................ '
-    !write(*,*) ' Debug in hinge%build_connectivity(), loc_points: '
-    !write(*,*) ' ................................................ '
-    !do iw = 1, size(loc_points,2)
-    !  write(*,*) loc_points(:,iw)
-    !end do
-    !write(*,*) ' Debug in hinge%build_connectivity(), ref%rr: '
-    !do iw = 1, size(this%ref%rr,2)
-    ! write(*,*) this%ref%rr(:,iw)
-    !end do
-  ! ! debug ---
-
   !> N. of surface and hinge nodes
   nb = size(loc_points,2)
   nh = this%n_nodes
@@ -320,17 +307,6 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
 
   ! hinge width, measured in the hinge direction
   hinge_width = rrh(2,nh) - rrh(2,1)
-
-  !write(*,*) ' ................................................ '
-  !write(*,*) ' Debug in hinge%build_connectivity(), loc_points: '
-  !write(*,*) ' ................................................ '
-  !do iw = 1, nb
-  !    write(*,*) rrb(:,iw)
-  !end do
-  !write(*,*) ' Debug in hinge%build_connectivity(), ref%rr: '
-  !do iw = 1, nh
-  !  write(*,*) this%ref%rr(:,iw)
-  !end do
 
   !> Compute connectivity and weights
   ! Allocate auxiliary node_id(:), ind(:,:), wei(:,:) arrays
@@ -540,7 +516,7 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
       end if
     end do
 
-    loc_points(:,ib) = loc_points(:,ib) / n_nodes
+    loc_points(:,ib) = loc_points(:,ib) / real(n_nodes,wp)
 
   end do
 
@@ -746,7 +722,7 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
   n_t = size(rr_t,2)
   n_h = size(ind_h);  allocate(rr_h(3,n_h)) ;  rr_h = 0.0_wp
   n_b = n_t - n_h  ;  allocate(rr_b(3,n_b)) ;  rr_b = 0.0_wp
-  allocate(ind_b(n_b)) ;  ind_b = -333.0_wp
+  allocate(ind_b(n_b)) ;  ind_b = -333
   i_h = 0; i_b = 0
 
 
@@ -1061,8 +1037,8 @@ subroutine initialize_hinge_config( h_config, hinge )
 
   nv = cross( vv, hv )
   
-  if (norm2(nv) .le. 1e-16) then ! workaround for debug compiling 
-    nv(3) = 1e-16
+  if (norm2(nv) .le. 1e-16_wp) then ! workaround for debug compiling 
+    nv(3) = 1e-16_wp
   endif
 
   nv = nv / norm2(nv)
@@ -1152,6 +1128,9 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
           ( trim(hinges(i)%rotation_input) .ne. 'function:cos'   ) .and. &
           ( trim(hinges(i)%rotation_input) .ne. 'from_file'      ) .and. &
           ( trim(hinges(i)%rotation_input) .ne. 'coupling'       ) ) then
+            write(*,*) ' Error in t_hinge%build_hinge(): rotation_input = &
+            $ '//trim(hinges(i)%rotation_input)// &
+                    &'not known.'; stop
      else
        if ( ( trim(hinges(i)%rotation_input) .eq. 'function:const' ) .or. &
             ( trim(hinges(i)%rotation_input) .eq. 'function:sin'   ) .or. &
@@ -1198,12 +1177,6 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
 
        end if
      end if
-
-!    ! check ---
-!    write(*,*) ' Hinge id:', i
-!    write(*,*) ' _Tag        : ', trim(hinges(i)%tag)
-!    write(*,*) ' _Nodes_Input: ', trim(hinges(i)%nodes_input)
-!    ! check ---
 
   end do
 

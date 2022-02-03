@@ -95,7 +95,7 @@ function variable_wind(pos, time) result(wind)
         s = -sum((pos-(gust_origin+gust_front_speed*gust_front_direction*&
                                          (time-gust_time)))*gust_front_direction)
 
-        if (s .ge. 0.0 .and. s .lt. 2.0_wp*gust_gradient) then
+        if (s .ge. 0.0_wp .and. s .lt. 2.0_wp*gust_gradient) then
           wind = wind + gust_u_des/2*(1.0_wp-cos(pi*s/gust_gradient))
         end if
 

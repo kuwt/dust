@@ -523,14 +523,6 @@ call finalizeParameters(prms)
       call precice % initialize_mesh( geo )
       call precice % initialize_fields()
       call precicef_initialize(precice % dt_precice)
-
-!     !> check ---
-!     do i = 1, size(precice%fields)
-!       write(*,*) trim(precice%fields(i)%fname), precice%fields(i)%fid
-!     end do
-!     write(*,*) ' Using PreCICE: stop in dust.f90, after the initialization '
-!     write(*,*) ' of the fields and the mesh, used for coupling, l.490.'; stop
-
 #endif
 !> --- Initialize PreCICE mesh and fields: done -----------------
 
@@ -676,7 +668,6 @@ it = 0
 #endif
 
 if ( mod( it-1, sim_param%ndt_update_wake ) .eq. 0 ) then
-  !   write(*,*) ' =================== call update_wake ==================== '
   call prepare_wake(wake, elems_tot, octree)
 end if
 
@@ -703,61 +694,27 @@ end if
         call precicef_mark_action_fulfilled( precice%write_it_checkp )
       end if
 
-      ! check ---
       !> Read data from structural solver
       do i = 1, size(precice%fields)
         if ( trim(precice%fields(i)%fio) .eq. 'read' ) then
           if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
-            ! check ---
-            ! write(*,*) ' read scalar field: ', trim(precice%fields(i)%fname)
-            ! check ---
             call precicef_read_bsdata( precice%fields(i)%fid, &
                                        precice%mesh%nnodes  , &
                                        precice%mesh%node_ids, &
                                        precice%fields(i)%fdata(1,:) )
           elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
-            ! ! check ---
-            ! write(*,*) ' read vector field: ', trim(precice%fields(i)%fname)
-            ! write(*,*) '    mesh%nnodes  : ' , precice%mesh%nnodes
-            ! write(*,*) '    mesh%nodes_ids: ', precice%mesh%node_ids
-            ! ! check ---
+
             call precicef_read_bvdata( precice%fields(i)%fid, &
                                        precice%mesh%nnodes  , &
                                        precice%mesh%node_ids, &
                                        precice%fields(i)%fdata )
           endif
-          ! check ---
-          !write(*,*) ' precice%mesh%nnodes : ', precice%mesh%nnodes
-          !write(*,*) i, precice%fields(i)%fid, precice%fields(i)%fname
-          !do i_el = 1, size(precice%fields(i)%fdata,2)
-          !  write(*,*) precice%fields(i)%fdata(:,i_el)
-          !end do
-          !write(*,*)
-          ! check ---
+
         end if
       end do
 
-      ! write(*,*) ' write something, before stop in dust.f90, l.700 '
-      ! read(*,*)
-
-      ! ! check ---
-      ! stop
-      ! ! check ---
-
       !> Update dust geometry ( elems and first wake panels )
       call precice % update_elems( geo, elems_tot, te )
-
-      ! ! debug ---
-      ! write(*,*) ' debug in dust.f90, l.715. geo%points:'
-      ! do i_el = 1, size(geo%points,2)
-      !   write(*,*) i_el, ' :   ', geo%points(:,i_el)
-      ! end do
-      ! write(*,*) ' stop in dust.f90, l.719. '; stop
-      ! write(*,*) ' debug in dust.f90, l.715. elems_tot(1)%p%ver: '
-      ! do i_el = 1, size(elems_tot(1)%p%ver,2)
-      !   write(*,*) elems_tot(1)%p%i_ver(i_el), ': ', elems_tot(1)%p%ver(:,i_el)
-      ! end do
-      ! ! debug ---
 
       !> Update geo_data()
       do i_el = 1, size(elems_tot)
@@ -766,7 +723,7 @@ end if
       end do
 
       !> Update near-field wake
-      call precice % update_near_field_wake( geo, wake, te%t_hinged )
+      call precice % update_near_field_wake( geo, wake, te )
 
       !> Update dt
       ! *** to do *** : change the way of treating time integration.
@@ -921,7 +878,6 @@ end if
           ! ALTERNATIVE:
           !call el%compute_pres_vortlatt()
           !elems(i_el)%p%dforce = elems(i_el)%p%pres * elems(i_el)%p%area * elems(i_el)%p%nor
-          !write(*,*) 'F:  ', el%dforce
 
           !ifort bug workaround
           !elems(i_el)%p%pres = sum( elems(i_el)%p%dforce * elems(i_el)%p%nor )&
@@ -1018,7 +974,6 @@ end if
 
   t0 = dust_time()
   if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
-    !   write(*,*) ' =================== call update_wake ==================== '
     call update_wake(wake, elems_tot, octree)
   end if
   t1 = dust_time()
@@ -1043,7 +998,6 @@ end if
     !> Update geometry
     call update_geometry(geo, te, time, .false.)
     if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
-      !     write(*,*) ' =================== call complete_wake ==================== '
           call complete_wake(wake, geo, elems_tot, te)
     end if
   endif

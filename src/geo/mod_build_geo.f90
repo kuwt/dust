@@ -618,9 +618,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       elseif ( trim(coupling_type) .eq. 'rbf' ) then
 
         call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)
-        write(*,*) 'RR_pre' , rr
+        !write(*,*) 'RR_pre' , rr
         rr = matmul( transpose(coupling_node_rot), rr )
-        write(*,*) 'RR_post' , rr
+        !write(*,*) 'RR_post' , rr
 
       end if
 
@@ -918,15 +918,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                                                symmetry_point, symmetry_normal, rr_sym)
                   nelems_span_tot = 2*nelems_span
 
-                  !write(*,*); write(*,*) ' rr: '
-                  !do i = 1, size(rr,2)
-                  !  write(*,*) rr(:,i)
-                  !end do
-                  !write(*,*); write(*,*) ' rr_sym: '
-                  !do i = 1, size(rr_sym,2)
-                  !  write(*,*) rr_sym(:,i)
-                  !end do
-
               case default
                call error(this_sub_name, this_mod_name,&
                      'Symmetry routines implemented for MeshFileType = &
@@ -1010,8 +1001,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)
 
         if ( mesh_symmetry ) then
-          write(*,*) 'SHAPE_A' , shape(rr)
-          write(*,*) 'SHAPE_B' , shape(rr(1:size(rr,2)-size(rr_sym,2),: ))
+          !write(*,*) 'SHAPE_A' , shape(rr)
+          !write(*,*) 'SHAPE_B' , shape(rr(1:size(rr,2)-size(rr_sym,2),: ))
 
           rr(:,1:(size(rr,2)-size(rr_sym,2))) = matmul( transpose(coupling_node_rot), rr(:,1:size(rr,2)-size(rr_sym,2) ))
           rr(:,size(rr,2)-size(rr_sym,2)+1:size(rr,2)) = matmul( transpose(coupling_node_rot_mir), rr_sym )

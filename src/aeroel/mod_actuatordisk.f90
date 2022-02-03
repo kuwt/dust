@@ -241,7 +241,6 @@ subroutine compute_pres_actdisk (this, R_g)
 
 ! Add this simple routine in order to easily include AD elements in postpro
  this%pres   = this%traction  / this%area
-!write(*,*) ' debug. this%pres   : ' , this%pres
 
 ! call error(this_sub_name, this_mod_name, 'This was not supposed to &
 ! &happen, a team of professionals is underway to remove the evidence')

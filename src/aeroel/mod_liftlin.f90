@@ -798,14 +798,6 @@ subroutine solve_liftlin_piszkin( &
                   - sim_param%rho_inf * el%area * ( &
                   el%dGamma_dt  * el%nor + el%mag * el%dn_dt )
 
-      !write(*,*) 'debug mod_liftlin.f90 l.795'
-      !write(*,*) 'sim_param%time      ', sim_param%time
-      !write(*,*) 'sim_param%time_old  ', sim_param%time_old
-      !write(*,*) 'el%dGamma_dt        ', el%dGamma_dt
-      !write(*,*) 'el%nor              ', el%nor
-      !write(*,*) 'el%mag              ', el%mag
-      !write(*,*) 'el%dn_dt            ', el%dn_dt
-
       ! el%dforce = el%dforce &
       !             + sim_param%rho_inf * el%area * el%dGamma_dt &
       !             * e_l ! lift direction
@@ -844,13 +836,6 @@ subroutine solve_liftlin_piszkin( &
       ! el%dforce = el%dforce &
       !             + sim_param%rho_inf * el%area * el%dGamma_dt &
       !             * e_l ! lift direction
-      write(*,*) 'debug mod_liftlin.f90 l.795'
-      write(*,*) 'sim_param%time      ', sim_param%time
-      write(*,*) 'sim_param%time_old  ', sim_param%time_old
-      write(*,*) 'el%dGamma_dt        ', el%dGamma_dt
-      write(*,*) 'el%nor              ', el%nor
-      write(*,*) 'el%mag              ', el%mag
-      write(*,*) 'el%dn_dt            ', el%dn_dt
 
       !> Update aerodynamic coefficients and AOA, and pressure
       c_m(i_l,1) = sum( el % dforce * e_l ) / &
@@ -1139,16 +1124,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
                  ( a_v(i_l-1       ) .lt. al_stall )             .and. &
                  ( a_v(i_l+nn_stall) .lt. al_stall ) ) then ! correct
 
-! ! todo: assign a proper debug_level to this screen output
-! ! debug ----
-!               write(*,*) ' stall_regularisation '
-!               write(*,*) ' i_l , i_l+nn_stall-1 : ' , i_l , i_l+nn_stall-1
-!               write(*,*) (a_v(i_l:i_l+nn_stall-1) .ge. al_stall ) , '       ' , &
-!                          (a_v(i_l-1) .lt. al_stall ) , &
-!                          (a_v(i_l+nn_stall) .lt. al_stall)
-!               write(*,*) ' a_v(i_l-1,i_l+nn_stall): ' , a_v(i_l-1) , a_v(i_l+nn_stall)
-!               write(*,*) ' a_v(i_l:i_l+nn_stall-1)    : ' , a_v(i_l:i_l+nn_stall-1)
-! ! debug ----
               do i = 1 , nn_stall
                 a_v(     i_l+i-1) =  real(i,wp)/real(nn_stall+1,wp) &
                         * a_v(i_l+nn_stall) + (real(nn_stall+1-i,wp))/&
@@ -1158,12 +1133,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
                      dou_temp(i_l+nn_stall) + (real(nn_stall+1-i,wp))/&
                                   real(nn_stall+1,wp) * dou_temp(i_l-1)
               end do
-
-! ! todo: assign a proper debug_level to this screen output
-! ! debug ----
-
-!               write(*,*) ' a_v(i_l:i_l+nn_stall-1) new: ' , a_v(i_l:i_l+nn_stall-1)
-! ! debug ----
 
               i_do = 0 ;  ! update variable for the do while loops
 
@@ -1214,19 +1183,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   do i_l = 1,size(elems_ll)
     elems_ll(i_l)%p%dGamma_dt = ( elems_ll(i_l)%p%mag - elems_ll(i_l)%p%Gamma_old) / &
                                   sim_param%dt
-    !if (sim_param%time .lt. 1e-9_wp) then
-    !else
-      !elems_ll(i_l)%p%dGamma_dt = ( 3*elems_ll(i_l)%p%mag - 4*elems_ll(i_l)%p%Gamma_old + elems_ll(i_l)%p%Gamma_old_old) / &
-                                  !(2*sim_param%dt)
-    !endif
-                                  !if (i_l .eq. 10) then
-    !  write(*,*) 'sim_param%time', sim_param%time
-    !  write(*,*) 'sim_param%time_old', sim_param%time_old
-    !  write(*,*) 'elems_ll(i_l)%p%Gamma_old', elems_ll(i_l)%p%Gamma_old
-    !  write(*,*) 'elems_ll(i_l)%p%mag', elems_ll(i_l)%p%mag
-    !  write(*,*) 'elems_ll(i_l)%p%dGamma_dt', elems_ll(i_l)%p%dGamma_dt
-    !end if
-
   end do
 
   ! === Loads computation ===
@@ -1266,14 +1222,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       el%dforce = el%dforce &
                   - sim_param%rho_inf * el%area * ( &
                   el%dGamma_dt  * el%nor + el%mag * el%dn_dt )
-
-      !write(*,*) 'debug mod_liftlin.f90 l.1259'
-      !write(*,*) 'sim_param%time      ', sim_param%time
-      !write(*,*) 'sim_param%time_old  ', sim_param%time_old
-      !write(*,*) 'el%dGamma_dt        ', el%dGamma_dt
-      !write(*,*) 'el%nor              ', el%nor
-      !write(*,*) 'el%mag              ', el%mag
-      !write(*,*) 'el%dn_dt            ', el%dn_dt
 
       !el%dforce = el%dforce &
       !            + sim_param%rho_inf * el%area * el%dGamma_dt &
@@ -1431,14 +1379,6 @@ subroutine calc_geo_data_liftlin(this, vert)
   this%ver = vert
   nsides = this%n_ver
 
-! ! debug ---
-! write(*,*) ' debug in calc_geo_data_liftin(), id: ', this%id
-! do is = 1, nsides
-!   if ( allocated(this%i_ver) ) write(*,'(I5,A)',advance='no') this%i_ver(is), ': '
-!   write(*,*) vert(:,is), '          ', this%ver(:,is)
-! end do
-! ! debug ---
-
   ! center, for the lifting line is the mid-point
   this%cen =  sum ( this%ver(:,1:2),2 ) / 2.0_wp
 
@@ -1474,9 +1414,6 @@ subroutine calc_geo_data_liftlin(this, vert)
 
   ! unit vector
   do is = 1 , nSides
-    ! ! debug ---
-    ! write(*,*) is, this%edge_vec(:,is), this%edge_len(is)
-    ! ! debug ---
     this%edge_uni(:,is) = this%edge_vec(:,is) / this%edge_len(is)
   end do
 
@@ -1505,8 +1442,6 @@ subroutine calc_geo_data_liftlin(this, vert)
   !> modified ~3/4 control point
   !this%ctr_pt = this%cen + this%tang_cen * this%chord / 2.0_wp
   this%ctr_pt = this%cen + this%tang_cen * this%chord / 2.0_wp
-  !write(*,*) 'CENTRI' , this%cen
-  !write(*,*) 'CTR POINT' , this%ctr_pt
   ! this%ctr_pt = this%cen + this%tang_cen * this%chord / ( 2.0_wp * cos_lambda )
 
   !> 2 * pi * | x_CP - x{1/4*c} | * cos(lambda)

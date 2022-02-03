@@ -260,7 +260,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     allocate(  vel(size( vort,1)) ) ; vel = 0.0_wp
     allocate(   cp(size(press,1)) ) ;  cp = 0.0_wp
     ! pressure coefficient
-    cp = (press - P_inf)/(0.5*rho*norm2(u_inf)**2)
+    cp = (press - P_inf)/(0.5_wp*rho*norm2(u_inf)**2)
 
     i_var = 1
     if(out_vort) then

@@ -350,6 +350,7 @@ type t_tedge
  !> Unit vector at TE nodes
  real(wp), allocatable :: t(:,:)
  real(wp), allocatable :: t_hinged(:,:) ! considering hinge deflection
+ integer, allocatable :: is_hinged(:)
 
  !> Reference frame of the TE nodes
  integer , allocatable :: ref(:)
@@ -882,7 +883,7 @@ subroutine load_components(geo, in_file, out_file, te)
         call error (this_sub_name, this_mod_name, &
            ' Coupled = T and CouplingType = ll for component <'//trim(comp_name)// &
            '>, but it is not a LL element. So far, coupling is implemented &
-              for lifting line elements only. Stop'//nl)
+             &for lifting line elements only. Stop'//nl)
       end if
     end if
 #else
@@ -1507,6 +1508,7 @@ subroutine load_components(geo, in_file, out_file, te)
         allocate(te%o    (2,ne_te) ) ; te%o     =     o_te
         allocate(te%t    (3,nn_te) ) ; te%t     =     t_te
         allocate(te%t_hinged    (3,nn_te) ) ; te%t_hinged     =     0.0_wp
+        allocate(te%is_hinged    (nn_te) ) ; te%is_hinged     =     -1
         allocate(te%ref  (  nn_te) ) ; te%ref   = geo%components(i_comp)%ref_id
         allocate(te%icomp(  nn_te) ) ; te%icomp = i_comp
         allocate(te%scaling(  nn_te) )
@@ -1790,7 +1792,7 @@ subroutine calc_geo_data_pan(elem,vert)
 
   ! center
   elem%cen =  sum ( vert,2 ) / real(nsides,wp)
-  write(*,*) 'elem%cen da mod_geo: ', elem%cen
+  !write(*,*) 'elem%cen da mod_geo: ', elem%cen
 
 
   ! unit normal and area
@@ -1886,7 +1888,6 @@ subroutine calc_geo_data_ll(elem,vert)
 
   ! center, for the lifting line is the mid-point
   elem%cen =  sum ( vert(:,1:2),2 ) / 2.0_wp
-  write(*,*) 'elem%cen: ', elem%cen
   ! unit normal and area
   if ( nsides .eq. 4 ) then
     nor = cross( vert(:,3) - vert(:,1) , &

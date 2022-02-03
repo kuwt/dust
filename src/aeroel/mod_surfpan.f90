@@ -365,9 +365,6 @@ subroutine velocity_calc_sou_surfpan(this, vel, pos)
  vel(2) = this%tang(2,1)*phix + this%tang(2,2)*phiy + this%nor(2)* pdou
  vel(3) = this%tang(3,1)*phix + this%tang(3,2)*phiy + this%nor(3)* pdou
 
-!!!!! ! debug ---- check if the formulas were inverted
-!!!!! ! vel = - vel
-
 end subroutine velocity_calc_sou_surfpan
 
 !----------------------------------------------------------------------
@@ -562,12 +559,6 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
 
     linsys%b(ie) = linsys%b(ie) - a*wake_elems(j1)%p%mag
 
-!   ! debug ---
-!   if ( ie .eq. 42 ) then
-!     write(*,*) 'wake_elems(' , j1 , '): ' , a
-!   end if
-!   ! debug ---
-
   end do
 
 end subroutine add_wake_surfpan
@@ -683,14 +674,10 @@ subroutine compute_pot_surfpan(this, A, b, pos , i , j )
     dou = -2.0_wp*pi
   end if
 
-  ! TODO: check coefficients 1/4*pi, ...
   A = -dou
-
 
   call potential_calc_sou_surfpan(this, sou, dou, pos)
 
-! b = ... (sources from doublets)
-  !b =  sou * this%nor
   b =  sou
 
 end subroutine compute_pot_surfpan
@@ -903,7 +890,6 @@ subroutine compute_pres_surfpan(this, R_g)
                + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
                + sim_param%rho_inf * this%didou_dt
 
-    !write(*,*) 'this%surf_vel', this%surf_vel
   else
     force_pres = this%pres
   endif
@@ -1051,7 +1037,6 @@ subroutine create_chtls_stencil_surfpan( this , R_g )
   integer :: n_neigh
   integer :: i_n , i_nn
 
-  ! write(*,*) 'R_g_chtls_stencil_surfpan', R_g
   ! # of neighbouring elements
   n_neigh = 0
   do i_n = 1 , this%n_ver

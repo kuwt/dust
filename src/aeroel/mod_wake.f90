@@ -499,7 +499,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                   dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
                   sim_param%min_vel_at_te* &
-                  sim_param%dt*sim_param%ndt_update_wake
+                  sim_param%dt*real(sim_param%ndt_update_wake,wp)
     end if
 
   enddo
@@ -908,7 +908,7 @@ subroutine update_wake(wake, elems, octree)
       wake%pan_w_vel(   :,iw,ipan) = vel_p
       if ( ipan .ne. 3 ) then
         wake%pan_w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + &
-                                      vel_p*sim_param%dt*sim_param%ndt_update_wake
+                                      vel_p*sim_param%dt*real(sim_param%ndt_update_wake,wp)
       else
         wake%pan_w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + &
                                       vel_p*sim_param%dt
@@ -931,7 +931,7 @@ subroutine update_wake(wake, elems, octree)
       call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
 
       !update the position in time
-      points_end(:,iw) = pos_p + vel_p*sim_param%dt*sim_param%ndt_update_wake
+      points_end(:,iw) = pos_p + vel_p*sim_param%dt*real(sim_param%ndt_update_wake,wp)
     enddo
 !$omp end parallel do
   endif
@@ -983,7 +983,7 @@ subroutine update_wake(wake, elems, octree)
 
       !update the position in time
       points(:,ip,ir) = points(:,ip,ir) + &
-                        vel_p*sim_param%dt*sim_param%ndt_update_wake
+                        vel_p*sim_param%dt*real(sim_param%ndt_update_wake,wp)
     enddo !ir
   enddo !ip
 !$omp end parallel do
@@ -1008,7 +1008,7 @@ subroutine update_wake(wake, elems, octree)
 
       !update the position in time
       points_end_ring(:,ip) = pos_p + &
-                              vel_p*sim_param%dt*sim_param%ndt_update_wake
+                              vel_p*sim_param%dt*real(sim_param%ndt_update_wake,wp)
     enddo
   endif
 
@@ -1283,7 +1283,7 @@ subroutine complete_wake(wake, geo, elems, te)
 
     if(.not. wake%part_p(ip)%p%free) then
       pos_p = wake%part_p(ip)%p%cen + wake%part_p(ip)%p%vel* &
-              sim_param%dt*sim_param%ndt_update_wake
+              sim_param%dt*real(sim_param%ndt_update_wake,wp)
 
       if(all(pos_p .ge. wake%part_box_min) .and. &
           all(pos_p .le. wake%part_box_max)) then
@@ -1294,14 +1294,14 @@ subroutine complete_wake(wake, geo, elems, te)
           !add filtering
           if(sim_param%use_divfilt) then
             wake%part_p(ip)%p%stretch = wake%part_p(ip)%p%stretch - &
-              sim_param%filt_eta/sim_param%ndt_update_wake*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
+              sim_param%filt_eta/real(sim_param%ndt_update_wake,wp)*( wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag - &
               wake%part_p(ip)%p%rotu*wake%part_p(ip)%p%mag/norm2(wake%part_p(ip)%p%rotu))
           endif
 
           !Explicit Euler
           alpha_p = wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag + &
                           wake%part_p(ip)%p%stretch* &
-                          sim_param%dt*sim_param%ndt_update_wake
+                          sim_param%dt*real(sim_param%ndt_update_wake,wp)
           alpha_p_n = norm2(alpha_p)
 
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
@@ -1481,7 +1481,7 @@ subroutine complete_wake(wake, geo, elems, te)
             ! flow separation
             if ( el % al_free .gt. 0.0_wp ) then
               pos_p = el%cen + el%nor * el%h_bl + &
-                       el % surf_vel * sim_param%dt*sim_param%ndt_update_wake
+                       el % surf_vel * sim_param%dt*real(sim_param%ndt_update_wake,wp)
 
               if(all(pos_p .ge. wake%part_box_min) .and. &
                 all(pos_p .le. wake%part_box_max)) then
@@ -1830,7 +1830,7 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
         !Get the position of the particle with respect to the element
         dist1 = pos1-(elem%cen + blthick*elem%nor )
         elrad = maxval(elem%edge_len)*r2d2
-        check_radius = sim_param%dt*sim_param%ndt_update_wake* &
+        check_radius = sim_param%dt*real(sim_param%ndt_update_wake,wp)* &
                         sim_param%u_ref*rad_mult + elrad
         distn = norm2(dist1)
 
@@ -1858,7 +1858,7 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
               dist1_tan = norm2(dist1-(n*dist1_nor))
               !make sure not to go back in time
               dt_part = max(-dist1_nor/normvel,0.0_wp)
-              if(dt_part .le. sim_param%dt*sim_param%ndt_update_wake) then
+              if(dt_part .le. sim_param%dt*real(sim_param%ndt_update_wake,wp)) then
 
                 !Get the position at the time in which the particle hits the
                 !surface plane
@@ -1876,7 +1876,7 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
                                             !correct the normal velocity to avoid penetration
 !                     normvel_corr = -dist1_nor*(1-tol)/sim_param%dt
                       normvel_corr = -dist1_nor*(1.0_wp-0.0_wp)/ &
-                            (sim_param%dt*sim_param%ndt_update_wake)
+                            (sim_param%dt*real(sim_param%ndt_update_wake,wp))
 
                     ! should be
                     ! vel = relvel + (normvel_corr-normvel)*n + elem%ub
@@ -1909,7 +1909,7 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
             dt_part = max(-dist1_nor/normvel,0.0_wp)
             !if it is lower than the timestep (i.e. the particles hits the surface
             !within next step) start the correction
-            if(dt_part .le. sim_param%dt*sim_param%ndt_update_wake) then
+            if(dt_part .le. sim_param%dt*real(sim_param%ndt_update_wake,wp)) then
 
               !Get the position at the time in which the particle hits the
               !surface plane
@@ -1926,7 +1926,7 @@ subroutine avoid_collision(elems, wake, part, vel_in, vel_out)
                 !correct the normal velocity to avoid penetration
 !               normvel_corr = -dist1_nor*(1-tol)/sim_param%dt
                 normvel_corr = -dist1_nor*(1.0_wp-0.0_wp)/ &
-                               (sim_param%dt*sim_param%ndt_update_wake)
+                               (sim_param%dt*real(sim_param%ndt_update_wake,wp))
 
                 ! should be
                 ! vel = relvel + (normvel_corr-normvel)*n + elem%ub
@@ -2052,11 +2052,11 @@ subroutine avoid_collision_2(elems, wake, part, vel_in, vel_out)
 !             normvel_corr = -dist1_nor*(1-tol)/sim_param%dt
               if (dt_part .lt. sim_param%dt) then
                 normvel_corr = -dist1_nor/ &
-                                (sim_param%dt*sim_param%ndt_update_wake)
+                                (sim_param%dt*real(sim_param%ndt_update_wake,wp))
               else
                 dampf = (dist2_nor/blthick)
                 normvel_corr = normvel + (blthick-dist2_nor)/ &
-                              (sim_param%dt*sim_param%ndt_update_wake) * dampf
+                              (sim_param%dt*real(sim_param%ndt_update_wake,wp)) * dampf
               endif
 
               ! should be
