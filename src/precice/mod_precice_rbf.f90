@@ -119,8 +119,8 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
 
   integer ,             intent(in)    :: ee(:,:)
 
-  real(wp), allocatable               :: diff_all(:,:), diff_all_transpose(:,:), 
-  real(wp), allocatable               :: dist_all(:), mat_dist_all(:,:), wei_v(:), 
+  real(wp), allocatable               :: diff_all(:,:), diff_all_transpose(:,:) 
+  real(wp), allocatable               :: dist_all(:), mat_dist_all(:,:), wei_v(:) 
   integer , allocatable               :: Wnorm(:,:),  ind_v(:)
   real(wp)                            :: cen(3)
 
@@ -183,7 +183,7 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
   deallocate(dist_all); allocate(dist_all(ns)); dist_all = 0.0_wp
 
   do ie = 1, ne
-
+    cen = 0.0_wp; n = 0
     !> Compute element center
     do ip = 1, 4
       if ( ee(ip,ie) .ne. 0 ) then
