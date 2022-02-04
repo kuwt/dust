@@ -752,7 +752,7 @@ subroutine update_elems( this, geo, elems, te )
   real(wp) :: th1, yc, xq, yq, thp, xqp, yqp
 
   real(wp) :: Rot(3,3), nx(3,3)
-
+  
   ! Find rotation and angular velocity field id
   j_rot = 0; j_ome = 0
   do j = 1, size(this%fields)
@@ -762,7 +762,7 @@ subroutine update_elems( this, geo, elems, te )
     if ( trim(this%fields(j)%fname) .eq. 'AngularVelocity') j_ome = j
   end do
 
-  
+  if (present(te)) te%t_hinged = te%t
   !> Update elems
   ! *** to do *** build and exploit the connectivity preCICE-dust
   do i_comp = 1, size(geo%components)
@@ -1127,8 +1127,7 @@ subroutine update_elems( this, geo, elems, te )
 
             end do
             
-            if (present(te)) then
-              te%t_hinged = te%t  
+            if (present(te)) then 
               !> Update trailing edge direction
               do it = 1, size(te%t_hinged,2)
                 do i = 1, comp%hinge(ih)%n_nodes ! hinge nodes
@@ -1151,15 +1150,16 @@ subroutine update_elems( this, geo, elems, te )
                   do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
 
                     ip = comp%hinge(ih)%rot%n2h(i)%p2h(ib)  ! Local numbering
+
                     
-                    il = comp%i_points(ip)  ! Node of the hinge region
+                    il = comp%i_points(ip)  ! Node of the hinge region        
 
                     !th1 = theta !* comp%hinge(ih)%rot%n2h(i)%s2h(ib)
                     th1 = theta * comp%hinge(ih)%rot%n2h(i)%w2h(ib) 
                     Rot = sin(th1) * nx + ( 1.0_wp - cos(th1) ) * matmul( nx, nx )
                   
                     if (te%i(1,it) .eq. il) then ! hinge node is also trailing edge node
-                      WRITE(*,*) 'te%i(1,it)', te%i(1,it) !--> transfer to wake update 
+
                       te%is_hinged(it) = te%i(1,it)
                       te%t_hinged(:,it) = te%t_hinged(:,it) + comp%hinge(ih)%rot%n2h(i)%s2h(ib) &
                                           !* comp%hinge(ih)%rot%n2h(i)%w2h(ib) &
@@ -1248,7 +1248,6 @@ subroutine update_elems( this, geo, elems, te )
       end if
 
     end if ! if coupling
-
     end associate
   end do
 
@@ -1275,8 +1274,6 @@ subroutine update_near_field_wake( this, geo, wake, te )
     if ( trim(this%fields(j)%fname) .eq. 'Rotation' )  j_rot = j
   end do
 
-  
-  
   !> First row of points of the panel wake
   wake%w_start_points = 0.5_wp * (geo%points(:,wake%pan_gen_points(1,:)) + &
                                   geo%points(:,wake%pan_gen_points(2,:)))
@@ -1352,17 +1349,15 @@ subroutine update_near_field_wake( this, geo, wake, te )
         associate( comp => geo%components(icomp) )
 
           iw = wake%pan_gen_points(1,ip) - minval(comp%i_points) + 1 ! trailing edge points ID
-          WRITE(*,*) 'iw', iw
-          
           ! find if the trailing edge node belongs to a hinge
           ! if so, it has already been rotated in update_geometry
           ! and we can use t_hinged
-          if (any(te%is_hinged .eq. iw)) then
+          if (any(te%is_hinged .eq. wake%pan_gen_points(1,ip))) then
             ! iw is the node index, but we need to find where that node is 
             ! in the trailing edge array
             ! (workaround for findloc)
             do i=1, size(te%is_hinged)
-              if (te%is_hinged(i) .eq. iw) then
+              if (te%is_hinged(i) .eq. wake%pan_gen_points(1,ip)) then              
                 dist = te%t_hinged(:,i)
               end if
             end do
@@ -1383,17 +1378,7 @@ subroutine update_near_field_wake( this, geo, wake, te )
            else
              n_rot = n_rot / theta
            end if
- 
- 
-           !do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
-! 
-           !  ip = comp%hinge(ih)%rot%n2h(i)%p2h(ib)  ! Local numbering
-           !  
-           !  ip = comp%i_points(ip)  ! Node of the hinge region
-           
-           !  if (te%i(1,it) .eq. ip) then ! hinge node is also trailing edge node         
-               !dist = wake%pan_gen_dir(:,ip)
-           !  else                          ! if not hinged region
+
                dist =  cos(theta) * wake%pan_gen_dir(:,ip) + &
                        sin(theta) * cross( n_rot, wake%pan_gen_dir(:,ip) ) + &
                      ( 1.0_wp - cos(theta) ) * sum( wake%pan_gen_dir(:,ip)*n_rot ) * n_rot

@@ -756,7 +756,8 @@ subroutine load_components(geo, in_file, out_file, te)
  type(t_pot_elem_p) , allocatable :: e_te_tmp(:,:)
  integer, allocatable  :: i_te_tmp(:,:) , ii_te_tmp(:,:)
  integer , allocatable :: neigh_te_tmp(:,:) , o_te_tmp(:,:)
- real(wp), allocatable :: t_te_tmp(:,:)
+ real(wp), allocatable :: t_te_tmp(:,:), t_hinged_te_tmp(:,:)
+ integer , allocatable ::t_is_hinged_tmp(:)
  integer , allocatable :: ref_te_tmp(:)
  integer , allocatable :: icomp_te_tmp(:)
  real(wp), allocatable :: scale_te_tmp(:)
@@ -1502,12 +1503,11 @@ subroutine load_components(geo, in_file, out_file, te)
             te%e(2,i1)%p  => geo%components(i_comp)%el(e_te(2,i1))
         enddo
         allocate(te%i    (2,nn_te) ) ; te%i     =     i_te
-        !allocate(te%rr   (3,nn_te) ) ; te%rr    =    rr_te
         allocate(te%ii   (2,ne_te) ) ; te%ii    =    ii_te
         allocate(te%neigh(2,ne_te) ) ; te%neigh = neigh_te
         allocate(te%o    (2,ne_te) ) ; te%o     =     o_te
         allocate(te%t    (3,nn_te) ) ; te%t     =     t_te
-        allocate(te%t_hinged    (3,nn_te) ) ; te%t_hinged     =     0.0_wp
+        allocate(te%t_hinged    (3,nn_te) ) ; te%t_hinged     =     te%t
         allocate(te%is_hinged    (nn_te) ) ; te%is_hinged     =     -1
         allocate(te%ref  (  nn_te) ) ; te%ref   = geo%components(i_comp)%ref_id
         allocate(te%icomp(  nn_te) ) ; te%icomp = i_comp
@@ -1517,6 +1517,7 @@ subroutine load_components(geo, in_file, out_file, te)
       elseif (ne_te .gt. 0) then
         nn_te_prev = size(te%i,2)
         ne_te_prev = size(te%e,2)
+
         allocate(e_te_tmp(2,size(te%e,2)+ne_te))
         e_te_tmp(:,             1:size(te%e,2)    ) = te%e
         do i1 = 1,ne_te
@@ -1528,9 +1529,9 @@ subroutine load_components(geo, in_file, out_file, te)
             e_te_tmp(2,size(te%e,2)+i1)%p  => &
                                        geo%components(i_comp)%el(e_te(2,i1))
           endif
-
         enddo
         call move_alloc(e_te_tmp,te%e)
+
         allocate(i_te_tmp(2,size(te%i,2)+nn_te))
         i_te_tmp(:,             1:size(te%i,2)    ) = te%i
         i_te_tmp(:,size(te%i,2)+1:size(i_te_tmp,2)) = i_te + points_offset
@@ -1543,33 +1544,48 @@ subroutine load_components(geo, in_file, out_file, te)
         ii_te_tmp(:,              1:size(te%ii,2)    ) = te%ii
         ii_te_tmp(:,size(te%ii,2)+1:size(ii_te_tmp,2)) = ii_te + nn_te_prev
         call move_alloc(ii_te_tmp,te%ii)
+
         allocate(neigh_te_tmp(2,size(te%neigh,2)+ne_te))
         neigh_te_tmp(:,                 1:size(te%neigh,2)    ) = te%neigh
         where ( neigh_te .ne. 0 ) neigh_te = neigh_te + ne_te_prev
         neigh_te_tmp(:,size(te%neigh,2)+1:size(neigh_te_tmp,2)) = neigh_te
         call move_alloc(neigh_te_tmp,te%neigh)
+
         allocate( o_te_tmp(2,size(te%o ,2)+ne_te))
         o_te_tmp(:,              1:size(te%o ,2)    ) = te%o
         o_te_tmp(:,size(te%o ,2)+1:size( o_te_tmp,2)) =  o_te
         call move_alloc(o_te_tmp,te%o )
+
         allocate( t_te_tmp(3,size(te%t ,2)+nn_te))
         t_te_tmp(:,              1:size(te%t ,2)    ) = te%t
         t_te_tmp(:,size(te%t ,2)+1:size( t_te_tmp,2)) =  t_te
         call move_alloc(t_te_tmp,te%t )
+
+        allocate( t_hinged_te_tmp(3,size(te%t_hinged ,2)+nn_te))
+        t_hinged_te_tmp(:,              1:size(te%t_hinged ,2)    ) = te%t_hinged
+        t_hinged_te_tmp(:,size(te%t_hinged ,2)+1:size( t_hinged_te_tmp,2)) = t_te
+        call move_alloc(t_hinged_te_tmp,te%t_hinged )
+
+        allocate( t_is_hinged_tmp(size(te%is_hinged,1)+nn_te))
+        t_is_hinged_tmp(1:size(te%is_hinged ,1)) = te%is_hinged
+        t_is_hinged_tmp(size(te%is_hinged ,1)+1:size( t_is_hinged_tmp,1)) =  -1
+        call move_alloc(t_is_hinged_tmp,te%is_hinged )
+
         allocate(ref_te_tmp(size(te%ref   )+nn_te))
         ref_te_tmp(                 1:size(te%ref   )   ) =  te%ref
         ref_te_tmp(  size(te%ref  )+1:size(ref_te_tmp  )) = &
                                                   geo%components(i_comp)%ref_id
         call move_alloc(ref_te_tmp,te%ref)
+
         allocate(icomp_te_tmp(size(te%icomp)+nn_te))
         icomp_te_tmp(               1:size(te%icomp    )) = te%icomp
         icomp_te_tmp(size(te%icomp)+1:size(icomp_te_tmp)) = i_comp
         call move_alloc(icomp_te_tmp,te%icomp)
+
         allocate( scale_te_tmp(size(te%scaling)+nn_te))
         scale_te_tmp(1:size(te%scaling )    ) = te%scaling
         scale_te_tmp(size(te%scaling )+1:size( scale_te_tmp)) = &
                                        scale_te*sim_param%first_panel_scaling
-
         call move_alloc(scale_te_tmp,te%scaling )
 
       end if
@@ -2244,7 +2260,7 @@ subroutine update_geometry(geo, te, t, update_static)
   !> Hinges -----------------------------------------------------------
 
   !> Get trailing edge direction to be rotated for hinge deflection
-  te%t_hinged = te%t
+  !te%t_hinged = te%t
   
   do ih = 1, comp%n_hinges
 

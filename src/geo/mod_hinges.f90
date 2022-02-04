@@ -1129,7 +1129,7 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
           ( trim(hinges(i)%rotation_input) .ne. 'from_file'      ) .and. &
           ( trim(hinges(i)%rotation_input) .ne. 'coupling'       ) ) then
             write(*,*) ' Error in t_hinge%build_hinge(): rotation_input = &
-            $ '//trim(hinges(i)%rotation_input)// &
+           & $ '//trim(hinges(i)%rotation_input)// &
                     &'not known.'; stop
      else
        if ( ( trim(hinges(i)%rotation_input) .eq. 'function:const' ) .or. &
