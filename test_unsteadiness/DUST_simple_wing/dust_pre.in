@@ -1,8 +1,0 @@
-
-CompName = right_wing
-GeoFile = wing.in
-RefTag = Right
-
-
-FileName = geo_input.h5 
-

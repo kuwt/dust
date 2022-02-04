@@ -86,7 +86,7 @@ mbdyn_input.close()
 # ===========================================================================
 # launch coupled simulation
 
-dust = subprocess.run("cd ../dust && ./dust_pre && ./dust > " + dust_log + " &", shell=True)
+dust = subprocess.run("cd ../dust && dust_pre && dust > " + dust_log + ".log" + " &", shell=True)
 
 # set launch dust && MBDyn command
 str_mbdyn = 'mbdyn -f ' + mbdyn_file + ' -o ' + output_mbdyn + '/' + file_str + ' > ' + output_mbdyn + '/' + file_str + '.txt 2>&1 &'
