@@ -87,18 +87,18 @@ use mod_actuatordisk, only: &
   t_actdisk
 
 use mod_hdf5_io, only: &
-   h5loc, &
-   new_hdf5_file, &
-   open_hdf5_file, &
-   close_hdf5_file, &
-   new_hdf5_group, &
-   open_hdf5_group, &
-   close_hdf5_group, &
-   write_hdf5, &
-   write_hdf5_attr, &
-   read_hdf5, &
-   read_hdf5_al, &
-   check_dset_hdf5
+  h5loc, &
+  new_hdf5_file, &
+  open_hdf5_file, &
+  close_hdf5_file, &
+  new_hdf5_group, &
+  open_hdf5_group, &
+  close_hdf5_group, &
+  write_hdf5, &
+  write_hdf5_attr, &
+  read_hdf5, &
+  read_hdf5_al, &
+  check_dset_hdf5
 
 use mod_octree, only: &
   t_octree, sort_particles, calculate_multipole, apply_multipole, &
@@ -122,155 +122,156 @@ private
 !> Type containing wake panels information
 type :: t_wake
 
- !> Number of maximum streamwise panels
- integer :: nmax_pan
+  !> Number of maximum streamwise panels
+  integer :: nmax_pan
 
- !> Number of maximum "rows" of disks
- integer :: nmax_rin
+  !> Number of maximum "rows" of disks
+  integer :: nmax_rin
 
- !> Number of actual streamwise panels
- integer :: pan_wake_len
+  !> Number of actual streamwise panels
+  integer :: pan_wake_len
 
- !> Actual number of rings in the ring wake
- integer :: rin_wake_len
+  !> Actual number of rings in the ring wake
+  integer :: rin_wake_len
 
- !> Number of wake stripes ("spanwise" panels)
- integer :: n_pan_stripes
+  !> Number of wake stripes ("spanwise" panels)
+  integer :: n_pan_stripes
 
- !> Number of wake points in the "spanwise" direction
- integer :: n_pan_points
+  !> Number of wake points in the "spanwise" direction
+  integer :: n_pan_points
 
- !> Number of generating disks
- integer :: ndisks
+  !> Number of generating disks
+  integer :: ndisks
 
- !> Number of points for each "row"
- integer :: np_row
+  !> Number of points for each "row"
+  integer :: np_row
 
- !> Pointer and index of the 2 generating elements of the panel wake
- !! (2 x n_pan_stripes)
- type(t_pot_elem_p), allocatable :: pan_gen_elems(:,:)
- integer, allocatable :: pan_gen_elems_id(:,:)
+  !> Pointer and index of the 2 generating elements of the panel wake
+  !! (2 x n_pan_stripes)
+  type(t_pot_elem_p), allocatable :: pan_gen_elems(:,:)
+  integer, allocatable :: pan_gen_elems_id(:,:)
 
- !> Generating actuator disk elements
- type(t_pot_elem_p), allocatable :: rin_gen_elems(:)
+  !> Generating actuator disk elements
+  type(t_pot_elem_p), allocatable :: rin_gen_elems(:)
 
- !> Index of the 2 generating points of each wake point
- !! (2 x n_pan_points)
- integer, allocatable :: pan_gen_points(:,:)
+  !> Index of the 2 generating points of each wake point
+  !! (2 x n_pan_points)
+  integer, allocatable :: pan_gen_points(:,:)
 
- !> Direction of the wake at the trailing edge
- !! (3xn_pan_points)
- real(wp), allocatable :: pan_gen_dir(:,:)
+  !> Direction of the wake at the trailing edge
+  !! (3xn_pan_points)
+  real(wp), allocatable :: pan_gen_dir(:,:)
 
- !> Reference frame of the generating points (id)
- !! (n_pan_points)
- integer, allocatable :: pan_gen_ref(:)
+  !> Reference frame of the generating points (id)
+  !! (n_pan_points)
+  integer, allocatable :: pan_gen_ref(:)
 
- !> Component of the generating points
- integer, allocatable :: pan_gen_icomp(:)
+  !> Component of the generating points
+  integer, allocatable :: pan_gen_icomp(:)
 
- !> Individual scaling of the firs element of the wake
- real(wp), allocatable :: pan_gen_scaling(:)
+  !> Individual scaling of the firs element of the wake
+  real(wp), allocatable :: pan_gen_scaling(:)
 
- !> Panels neighbours in wake numbering
- integer, allocatable :: pan_neigh(:,:)
+  !> Panels neighbours in wake numbering
+  integer, allocatable :: pan_neigh(:,:)
 
- !> Relative orientation of neighbours
- integer, allocatable :: pan_neigh_o(:,:)
+  !> Relative orientation of neighbours
+  integer, allocatable :: pan_neigh_o(:,:)
 
- !> Index in the stripes of end elements in panel wake
- integer, allocatable :: pan_i_ends(:)
+  !> Index in the stripes of end elements in panel wake
+  integer, allocatable :: pan_i_ends(:)
 
- !> Index of the joined trailing edges
- integer, allocatable :: joined_tes(:,:,:)
+  !> Index of the joined trailing edges
+  integer, allocatable :: joined_tes(:,:,:)
 
- !> Wake starting points: calculated from the 2 (or 1) starting points of the
- !! geometry possibly moved
- real(wp), allocatable :: w_start_points(:,:)
+  !> Wake starting points: calculated from the 2 (or 1) starting points of the
+  !! geometry possibly moved
+  real(wp), allocatable :: w_start_points(:,:)
 
- !> Index of the 2 wake starting points for each wake stripe
- !! (2 x n_pan_stripes)
- integer, allocatable :: i_start_points(:,:)
+  !> Index of the 2 wake starting points for each wake stripe
+  !! (2 x n_pan_stripes)
+  integer, allocatable :: i_start_points(:,:)
 
- !> Points of the wake, in a structured way
- !! (3 x n_pan_points x npan+1)
- real(wp), allocatable :: pan_w_points(:,:,:)
- !> Velocities of the wake panels
- !! (3 x n_pan_points x npan+1) !!!! now used for rotational effects on pressure !!!!
- real(wp), allocatable :: pan_w_vel(:,:,:)
+  !> Points of the wake, in a structured way
+  !! (3 x n_pan_points x npan+1)
+  real(wp), allocatable :: pan_w_points(:,:,:)
 
- !> Relative velocity ( u_inf - ub ) of the nodes at the TE
- !! (3 x n_pan_points)
- !! used to determine the first prescribed panel of the wake
- real(wp), allocatable :: w_vel_te(:,:)
+  !> Velocities of the wake panels
+  !! (3 x n_pan_points x npan+1) !!!! now used for rotational effects on pressure !!!!
+  real(wp), allocatable :: pan_w_vel(:,:,:)
 
- !> Velocity at the nodes of the wake. For output only
- !! (3 x n_pan_points x npan+1)
- real(wp), allocatable :: w_vel(:,:,:)
+  !> Relative velocity ( u_inf - ub ) of the nodes at the TE
+  !! (3 x n_pan_points)
+  !! used to determine the first prescribed panel of the wake
+  real(wp), allocatable :: w_vel_te(:,:)
 
- !> elements of the panels
- type(t_vortlatt), allocatable :: wake_panels(:,:)
+  !> Velocity at the nodes of the wake. For output only
+  !! (3 x n_pan_points x npan+1)
+  real(wp), allocatable :: w_vel(:,:,:)
 
- !> Ring elements
- type(t_actdisk), allocatable :: wake_rings(:,:)
+  !> elements of the panels
+  type(t_vortlatt), allocatable :: wake_panels(:,:)
 
- !> end vortices
- type(t_vortline), allocatable :: end_vorts(:)
+  !> Ring elements
+  type(t_actdisk), allocatable :: wake_rings(:,:)
 
- !> doublets intensities
- real(wp), allocatable :: pan_idou(:,:)
+  !> end vortices
+  type(t_vortline), allocatable :: end_vorts(:)
 
- !> vortex intensities
- real(wp), allocatable :: rin_idou(:,:)
+  !> doublets intensities
+  real(wp), allocatable :: pan_idou(:,:)
 
- !> pointer to the wake elements to be passed to the linsys
- !! solver
- type(t_pot_elem_p), allocatable :: pan_p(:)
+  !> vortex intensities
+  real(wp), allocatable :: rin_idou(:,:)
 
- !> pointer to the wake elements to be passed to the linsys
- !! solver
- type(t_pot_elem_p), allocatable :: rin_p(:)
+  !> pointer to the wake elements to be passed to the linsys
+  !! solver
+  type(t_pot_elem_p), allocatable :: pan_p(:)
+
+  !> pointer to the wake elements to be passed to the linsys
+  !! solver
+  type(t_pot_elem_p), allocatable :: rin_p(:)
 
 
- !! Particles data
+  !! Particles data
 
- !> Maximum number of particles
- integer :: nmax_prt
+  !> Maximum number of particles
+  integer :: nmax_prt
 
- !> Actual number of particles
- integer :: n_prt
+  !> Actual number of particles
+  integer :: n_prt
 
- !> Wake particles
- type(t_vortpart), allocatable :: wake_parts(:)
+  !> Wake particles
+  type(t_vortpart), allocatable :: wake_parts(:)
 
- !> Magnitude of particles vorticity
- real(wp), allocatable :: prt_ivort(:)
+  !> Magnitude of particles vorticity
+  real(wp), allocatable :: prt_ivort(:)
 
- !> Wake particles pointer
- type(t_vortpart_p), allocatable :: part_p(:)
+  !> Wake particles pointer
+  type(t_vortpart_p), allocatable :: part_p(:)
 
- !> Bounding box
- real(wp) :: part_box_min(3), part_box_max(3)
+  !> Bounding box
+  real(wp) :: part_box_min(3), part_box_max(3)
 
- type(t_vort_elem_p), allocatable :: vort_p(:)
+  type(t_vort_elem_p), allocatable :: vort_p(:)
 
- !> Last vortex intensity from removed panels
- real(wp), allocatable :: last_pan_idou(:)
+  !> Last vortex intensity from removed panels
+  real(wp), allocatable :: last_pan_idou(:)
 
- !> Last vortex intensity from removed panels
- real(wp), allocatable :: end_pan_idou(:)
+  !> Last vortex intensity from removed panels
+  real(wp), allocatable :: end_pan_idou(:)
 
- !> Are the panels full? (and so need to produce particles...)
- logical :: full_panels=.false.
+  !> Are the panels full? (and so need to produce particles...)
+  logical :: full_panels=.false.
 
- !> Are the rings full? (and so need to produce particles...)
- logical :: full_rings=.false.
+  !> Are the rings full? (and so need to produce particles...)
+  logical :: full_rings=.false.
 
 end type
 
 !module variables to share among the different subroutines
- real(wp), allocatable :: points_end(:,:)
- real(wp), allocatable :: points_end_ring(:,:)
+  real(wp), allocatable :: points_end(:,:)
+  real(wp), allocatable :: points_end_ring(:,:)
 
 !> Class to change methods from different wake implementations
 type, abstract :: c_wake_mov
@@ -313,7 +314,7 @@ contains
 subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   type(t_wake), intent(out),target     :: wake
   type(t_geo), intent(in), target      :: geo
-  type(t_tedge), intent(in)            :: te
+  type(t_tedge), intent(inout)         :: te
   integer, intent(in)                  :: npan
   integer, intent(in)                  :: nrings
   integer, intent(in)                  :: nparts
@@ -333,6 +334,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   wake%nmax_pan = npan
   wake%n_pan_stripes = size(te%e,2)
   wake%n_pan_points  = size(te%i,2)
+
   allocate(wake%pan_gen_elems(2,wake%n_pan_stripes))
   allocate(wake%pan_gen_elems_id(2,wake%n_pan_stripes))
   allocate(wake%pan_gen_points(2,wake%n_pan_points))
@@ -437,7 +439,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   wake%pan_neigh_o = te%o
   nend = 0
 
-  do iw=1,wake%n_pan_stripes
+  do iw = 1,wake%n_pan_stripes
     wake%pan_gen_elems_id(1,iw) = wake%pan_gen_elems(1,iw)%p%id
     if(associated(wake%pan_gen_elems(2,iw)%p)) then
       wake%pan_gen_elems_id(2,iw) = wake%pan_gen_elems(2,iw)%p%id
@@ -473,7 +475,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   wake%pan_w_vel(   :,:,:) = 0.0_wp
 
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
-  do ip=1,wake%n_pan_points
+  do ip=1 , wake%n_pan_points
   !dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
     call calc_node_vel( wake%w_start_points(:,ip), &
             geo%refs(wake%pan_gen_ref(ip))%G_g, &
@@ -483,9 +485,21 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
     wind = variable_wind(wake%w_start_points(:,ip), sim_param%time)
 
     if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
+      !if (ip .eq. 16) then 
+      !  WRITE(*,*) 'ip                                    ', ip
+      !  WRITE(*,*) 'geo%refs(wake%pan_gen_ref(ip)%R_g(1,:)', geo%refs(wake%pan_gen_ref(ip))%R_g(1,:)
+      !  WRITE(*,*) 'geo%refs(wake%pan_gen_ref(ip)%R_g(2,:)', geo%refs(wake%pan_gen_ref(ip))%R_g(2,:)
+      !  WRITE(*,*) 'geo%refs(wake%pan_gen_ref(ip)%R_g(3,:)', geo%refs(wake%pan_gen_ref(ip))%R_g(3,:)
+      !  WRITE(*,*) 'wake%pan_gen_dir(:,ip)                ', wake%pan_gen_dir(:,ip)
+      !end if 
 
       dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
-
+      
+      !if (ip .eq. 16) then 
+      !  WRITE(*,*) 'dist                                  ', dist
+      !  WRITE(*,*)
+      !endif 
+      
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                   dist*wake%pan_gen_scaling(ip)* &
                   norm2(wind-vel_te)* &
@@ -557,12 +571,12 @@ end subroutine initialize_wake
 
 !> Destroy a wake panels type by simply passing it as intent(out)
 subroutine destroy_wake(wake)
- type(t_wake), intent(out) :: wake
+  type(t_wake), intent(out) :: wake
 
- !dummy to avoid compiler warnings
- wake%nmax_pan = -1
- if(allocated(points_end)) deallocate(points_end)
- if(allocated(points_end_ring)) deallocate(points_end_ring)
+  !dummy to avoid compiler warnings
+  wake%nmax_pan = -1
+  if(allocated(points_end)) deallocate(points_end)
+  if(allocated(points_end_ring)) deallocate(points_end_ring)
 
 end subroutine
 
@@ -1120,11 +1134,14 @@ subroutine update_wake(wake, elems, octree)
         pan_p_temp(wake%n_pan_stripes*(wake%pan_wake_len-1)+iw)%p &
                                         => wake%wake_panels(iw,wake%pan_wake_len)
       enddo
+
       if(allocated(wake%pan_p)) deallocate(wake%pan_p)
       allocate(wake%pan_p(size(pan_p_temp)))
+
       do ip = 1,size(wake%pan_p)
         wake%pan_p(ip) = pan_p_temp(ip)
       enddo
+
       deallocate(pan_p_temp)
 
   endif
@@ -1223,6 +1240,9 @@ subroutine complete_wake(wake, geo, elems, te)
 
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1,wake%n_pan_points
+    if (ip .eq. 16) then
+      WRITE(*,*) 'wake%pan_gen_dir(:,ip) update', wake%pan_gen_dir(:,ip)
+    endif
     dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
     call calc_node_vel( wake%w_start_points(:,ip), &
             geo%refs(wake%pan_gen_ref(ip))%G_g, &
