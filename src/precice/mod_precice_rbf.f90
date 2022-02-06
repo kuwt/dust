@@ -120,8 +120,8 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
   integer ,             intent(in)    :: ee(:,:)
 
   real(wp), allocatable               :: diff_all(:,:), diff_all_transpose(:,:) 
-  real(wp), allocatable               :: dist_all(:), mat_dist_all(:,:), wei_v(:) 
-  integer , allocatable               :: Wnorm(:,:),  ind_v(:)
+  real(wp), allocatable               :: dist_all(:), mat_dist_all(:,:), wei_v(:), Wnorm(:,:)
+  integer , allocatable               ::  ind_v(:)
   real(wp)                            :: cen(3)
 
   integer                             :: np, ns, ne, n
