@@ -104,7 +104,6 @@ subroutine read_mesh_basic(mesh_file,ee,rr)
   call new_file_unit(fid, fid_err)
   open(unit=fid, file=trim(adjustl(filen_ee)), action='read', iostat=io_error )
   do i1 = 1 , 1000000
-  ! write(*,*) i1
     read(fid,*,iostat=io_error) ! dummy
     if ( io_error  .lt. 0 ) then
       ee_size = i1-1

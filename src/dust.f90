@@ -497,11 +497,13 @@ sim_param%time_vec = (/ ( sim_param%t0 + &
 
 !------ Geometry creation ------
 call printout(nl//'====== Geometry Creation ======')
+
 t0 = dust_time()
 target_file = trim(sim_param%basename)//'_geo.h5'
+
 call create_geometry(sim_param%GeometryFile, sim_param%ReferenceFile, &
-                     input_file_name, geo, te, elems, elems_expl, elems_ad, &
-                     elems_ll, elems_tot, airfoil_data, target_file, run_id)
+                    input_file_name, geo, te, elems, elems_expl, elems_ad, &
+                    elems_ll, elems_tot, airfoil_data, target_file, run_id)
 
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
@@ -520,17 +522,11 @@ call finalizeParameters(prms)
 
 !> --- Initialize PreCICE mesh and fields -----------------------
 #if USE_PRECICE
-      call precice % initialize_mesh( geo )
-      call precice % initialize_fields()
-      call precicef_initialize(precice % dt_precice)
-
-!     !> check ---
-!     do i = 1, size(precice%fields)
-!       write(*,*) trim(precice%fields(i)%fname), precice%fields(i)%fid
-!     end do
-!     write(*,*) ' Using PreCICE: stop in dust.f90, after the initialization '
-!     write(*,*) ' of the fields and the mesh, used for coupling, l.490.'; stop
-
+  te%t_hinged = te%t
+  call precice % initialize_mesh( geo )
+  call precice % initialize_fields()
+  call precicef_initialize(precice % dt_precice)
+  call precice % update_elems(geo, elems_tot, te ) ! TEST
 #endif
 !> --- Initialize PreCICE mesh and fields: done -----------------
 
@@ -665,7 +661,6 @@ it = 0
     write(message,'(A,F9.3,A)') 'Elapsed wall time: ',t22-t00
     call printout(message)
   endif
-
 #if USE_PRECICE
       if ( precice_convergence ) then
 #endif
@@ -676,7 +671,6 @@ it = 0
 #endif
 
 if ( mod( it-1, sim_param%ndt_update_wake ) .eq. 0 ) then
-  !   write(*,*) ' =================== call update_wake ==================== '
   call prepare_wake(wake, elems_tot, octree)
 end if
 
@@ -703,61 +697,27 @@ end if
         call precicef_mark_action_fulfilled( precice%write_it_checkp )
       end if
 
-      ! check ---
       !> Read data from structural solver
       do i = 1, size(precice%fields)
         if ( trim(precice%fields(i)%fio) .eq. 'read' ) then
           if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
-            ! check ---
-            ! write(*,*) ' read scalar field: ', trim(precice%fields(i)%fname)
-            ! check ---
             call precicef_read_bsdata( precice%fields(i)%fid, &
                                        precice%mesh%nnodes  , &
                                        precice%mesh%node_ids, &
                                        precice%fields(i)%fdata(1,:) )
           elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
-            ! ! check ---
-            ! write(*,*) ' read vector field: ', trim(precice%fields(i)%fname)
-            ! write(*,*) '    mesh%nnodes  : ' , precice%mesh%nnodes
-            ! write(*,*) '    mesh%nodes_ids: ', precice%mesh%node_ids
-            ! ! check ---
+
             call precicef_read_bvdata( precice%fields(i)%fid, &
                                        precice%mesh%nnodes  , &
                                        precice%mesh%node_ids, &
                                        precice%fields(i)%fdata )
           endif
-          ! check ---
-          !write(*,*) ' precice%mesh%nnodes : ', precice%mesh%nnodes
-          !write(*,*) i, precice%fields(i)%fid, precice%fields(i)%fname
-          !do i_el = 1, size(precice%fields(i)%fdata,2)
-          !  write(*,*) precice%fields(i)%fdata(:,i_el)
-          !end do
-          !write(*,*)
-          ! check ---
+
         end if
       end do
 
-      ! write(*,*) ' write something, before stop in dust.f90, l.700 '
-      ! read(*,*)
-
-      ! ! check ---
-      ! stop
-      ! ! check ---
-
       !> Update dust geometry ( elems and first wake panels )
-      call precice % update_elems( geo, elems_tot )
-
-      ! ! debug ---
-      ! write(*,*) ' debug in dust.f90, l.715. geo%points:'
-      ! do i_el = 1, size(geo%points,2)
-      !   write(*,*) i_el, ' :   ', geo%points(:,i_el)
-      ! end do
-      ! write(*,*) ' stop in dust.f90, l.719. '; stop
-      ! write(*,*) ' debug in dust.f90, l.715. elems_tot(1)%p%ver: '
-      ! do i_el = 1, size(elems_tot(1)%p%ver,2)
-      !   write(*,*) elems_tot(1)%p%i_ver(i_el), ': ', elems_tot(1)%p%ver(:,i_el)
-      ! end do
-      ! ! debug ---
+      call precice % update_elems( geo, elems_tot, te )
 
       !> Update geo_data()
       do i_el = 1, size(elems_tot)
@@ -766,7 +726,7 @@ end if
       end do
 
       !> Update near-field wake
-      call precice % update_near_field_wake( geo, wake )
+      call precice % update_near_field_wake( geo, wake, te )
 
       !> Update dt
       ! *** to do *** : change the way of treating time integration.
@@ -881,10 +841,6 @@ end if
       ! select cases for intel, need to call these for all elements and for the
       ! vortex lattices it is going to be a dummy empty function call
 
-      !write(*,*) ' i_el : ', i_el
-      !write(*,*) ' elems(i_el)%p%comp_id): ', elems(i_el)%p%comp_id
-      !write(*,*) ' geo%components()%ref_id: ', &
-      !             geo%components(elems(i_el)%p%comp_id)%ref_id
       call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
                 geo%components(elems(i_el)%p%comp_id)%coupling_node_rot)
       call elems(i_el)%p%compute_dforce()
@@ -900,10 +856,6 @@ end if
       ! select cases for intel, need to call these for all elements and for the
       ! vortex lattices it is going to be a dummy empty function call
 
-      !write(*,*) ' i_el : ', i_el
-      !write(*,*) ' elems(i_el)%p%comp_id): ', elems(i_el)%p%comp_id
-      !write(*,*) ' geo%components()%ref_id: ', &
-      !             geo%components(elems(i_el)%p%comp_id)%ref_id
       call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
               geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g)
       call elems(i_el)%p%compute_dforce()
@@ -929,20 +881,11 @@ end if
           ! ALTERNATIVE:
           !call el%compute_pres_vortlatt()
           !elems(i_el)%p%dforce = elems(i_el)%p%pres * elems(i_el)%p%area * elems(i_el)%p%nor
-          !write(*,*) 'F:  ', el%dforce
 
           !ifort bug workaround
           !elems(i_el)%p%pres = sum( elems(i_el)%p%dforce * elems(i_el)%p%nor )&
           !                     / elems(i_el)%p%area
 
-              ! ! debug ---
-              ! write(*,'(I4,A,3F10.5,A,3F10.5,A,3F10.5,A,3F10.5,A,F10.5)') &
-              !                        i_el, '     ', el%vel_ctr_pt, &
-              !                              '     ', el%dforce, &
-              !                              '     ', el%nor,    &
-              !                              '     ', el%dn_dt,  &
-              !                              '     ', el%pres
-              ! ! debug ---
 
       end select
     end do
@@ -963,39 +906,11 @@ end if
 
 #if USE_PRECICE
 
-      !write(*,*) ' ------------------------------------------------------------------- '
-      !write(*,*) ' debug in dust.f90, l.890: i, pres, dforce '
       sum_force = 0.0_wp
       do i = 1, size(elems_tot)
         sum_force = sum_force + elems_tot(i)%p%dforce
-      !  write(*,*) i, ' : ', elems_tot(i)%p%pres, '      ', elems_tot(i)%p%dforce
       end do
-      !write(*,*) '                                                 ', sum_force
-      !write(*,*) ' ------------------------------------------------------------------- '
-      !write(*,*)
 
-!     write(*,*) ' debug in dust.f90, l.890 '
-!     do i = 1, 10
-!     ! !> check mag, pres
-!     ! write(*,*) i, ':  ', elems_ll(i)%p%mag , elems_ll(i+10)%p%mag , elems_ll(i+20)%p%mag, &
-!     !               '   ', elems_ll(i)%p%pres, elems_ll(i+10)%p%pres, elems_ll(i+20)%p%pres
-!     ! !> check nor, dforce ---> issues in the unsteady force contributions
-!     ! write(*,*) i   , ':  ', elems_ll(i   )%p%nor , elems_ll(i   )%p%dforce, &
-!     !                    sum( elems_ll(i   )%p%nor * elems_ll(i   )%p%dforce )
-!     ! write(*,*) i+10, ':  ', elems_ll(i+10)%p%nor , elems_ll(i+10)%p%dforce, &
-!     !                    sum( elems_ll(i+10)%p%nor * elems_ll(i+10)%p%dforce )
-!     ! write(*,*) i+20, ':  ', elems_ll(i+20)%p%nor , elems_ll(i+20)%p%dforce, &
-!     !                    sum( elems_ll(i+20)%p%nor * elems_ll(i+20)%p%dforce )
-!     ! write(*,*)
-!     ! write(*,*) i, ':  ', elems_ll(i   )%p%dGamma_dt , &
-!     !                      elems_ll(i+10)%p%dGamma_dt , &
-!     !                      elems_ll(i+20)%p%dGamma_dt
-!     ! !> check nor, dforce ---> issues in the unsteady force contributions
-!     ! write(*,*) i   , ':  ', elems_ll(i   )%p%dn_dt
-!     ! write(*,*) i+10, ':  ', elems_ll(i+10)%p%dn_dt
-!     ! write(*,*) i+20, ':  ', elems_ll(i+20)%p%dn_dt
-!     ! write(*,*)
-!     end do
 
       !> Update force and moments to be passed to the structural solver
       call precice % update_force( geo, elems_tot )
@@ -1022,14 +937,6 @@ end if
                                         precice%fields(i)%fdata )
           endif
 
-          ! check ---
-          !write(*,*) ' precice%mesh%nnodes : ', precice%mesh%nnodes
-          !write(*,*) i, precice%fields(i)%fid, precice%fields(i)%fname
-          !do i_el = 1, size(precice%fields(i)%fdata,2)
-          !  write(*,*) precice%fields(i)%fdata(:,i_el)
-          !end do
-          !write(*,*)
-          ! check ---
 
         end if
       end do
@@ -1070,7 +977,6 @@ end if
 
   t0 = dust_time()
   if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
-    !   write(*,*) ' =================== call update_wake ==================== '
     call update_wake(wake, elems_tot, octree)
   end if
   t1 = dust_time()
@@ -1093,10 +999,9 @@ end if
     !time = min(sim_param%tend, time+sim_param%dt)
     time = min(sim_param%tend, sim_param%time_vec(it+1))
     !> Update geometry
-    call update_geometry(geo, time, .false.)
+    call update_geometry(geo, te, time, .false.)
     if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
-      !     write(*,*) ' =================== call complete_wake ==================== '
-          call complete_wake(wake, geo, elems_tot)
+          call complete_wake(wake, geo, elems_tot, te)
     end if
   endif
 
@@ -1438,45 +1343,6 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
 
 end subroutine init_sim_param
 
-!----------------------------------------------------------------------
-
-!DISCONTINUED: consider removing
-!!subroutine copy_geo(sim_param, geo_file, run_id)
-!! type(t_sim_param), intent(inout) :: sim_param
-!! character(len=*), intent(inout)     :: geo_file
-!! integer, intent(in)              :: run_id(10)
-!!
-!! character(len=max_char_len) :: target_file
-!! integer :: estat, cstat
-!! integer(h5loc) :: floc
-!!
-!!  !target file name: same as run basename with appendix
-!!  target_file = trim(sim_param%basename)//'_geo.h5'
-!!
-!!  if (trim(geo_file) .ne. trim(target_file)) then
-!!  !Copy the geometry file
-!!  call execute_command_line('cp '//trim(geo_file)//' '//trim(target_file), &
-!!                                           exitstat=estat,cmdstat=cstat)
-!!  if((cstat .ne. 0) .or. (estat .ne. 0)) &
-!!    call error('dust','','System errors while trying to copy the geometry &
-!!    &to the output path')
-!!  endif
-!!
-!!
-!!  !Attach the run_id to the file as an attribute
-!!  call open_hdf5_file(trim(target_file), floc)
-!!  call write_hdf5_attr(run_id, 'run_id', floc)
-!!  call close_hdf5_file(floc)
-!!
-!!
-!!  !Overwrite the geo file name, so that the copy is going to be
-!!  !opened
-!!  geo_file = trim(target_file)
-!!
-!!end subroutine copy_geo
-
-!----------------------------------------------------------------------
-
 !> Perform preliminary procedures each timestep, mainly chech if it is time
 !! to perform output or not
 subroutine init_timestep(t)
@@ -1669,7 +1535,6 @@ end subroutine debug_printout_geometry_minimal
 ! ---------------------------------------------------------------------
 
 subroutine debug_ll_printout_geometry(elems, geo, basename, it)
- !type(t_expl_elem_p),   intent(in) :: elems(:)
  type(t_liftlin_p),   intent(in) :: elems(:)
  type(t_geo),      intent(in) :: geo
  character(len=*), intent(in) :: basename
@@ -1685,11 +1550,6 @@ subroutine debug_ll_printout_geometry(elems, geo, basename, it)
   allocate(el(4,size(elems))); el = 0
   allocate(conn(4,size(elems))); conn = -666;
 
-! only for surfpan !!!!!!
-! ! surf_vel and vel_phi
-! allocate( surf_vel(3,size(elems)), vel_phi(3,size(elems)) )
-! surf_vel = -666.6 ; vel_phi = -666.6
-
   do ie=1,size(elems)
     norm(:,ie) = elems(ie)%p%nor
     cent(:,ie) = elems(ie)%p%cen
@@ -1702,24 +1562,6 @@ subroutine debug_ll_printout_geometry(elems, geo, basename, it)
         conn(iv, ie) = 0
       endif
     enddo
-
-! only for surfpan !!!!!!
-!   ! surf_vel and vel_phi for surfpan only
-!   select type( el => elems(ie)%p )
-!    class is(t_surfpan)
-!     surf_vel(:,ie) = el%surf_vel   ! elems(ie)%p%surf_vel
-!
-!     vel_phi(:,ie) = 0.0_wp
-!     do i_e = 1 , el%n_ver    ! elems(ie)%p%n_ver
-!       if ( associated(el%neigh(i_e)%p) ) then !  .and. &
-!         vel_phi(:,ie) = vel_phi(:,ie) + &
-!           el%pot_vel_stencil(:,i_e) * (el%neigh(i_e)%p%mag - el%mag)
-!       end if
-!     end do
-!     vel_phi(:,ie)  = - vel_phi(:,ie)
-!
-!   end select
-
   enddo
 
   write(sit,'(I4.4)') it
@@ -1731,87 +1573,7 @@ subroutine debug_ll_printout_geometry(elems, geo, basename, it)
   call write_basic(conn,       trim(basename)//'_ll_mesh_conn_'   //trim(sit)//'.dat')
   deallocate(norm, cent, el, conn, velb)
 
-! only for surfpan !!!!!!
-! ! surf_vel and vel_phi
-! call write_basic(surf_vel,   trim(basename)//'_mesh_surfvel_'  //trim(sit)//'.dat')
-! call write_basic(vel_phi ,   trim(basename)//'_mesh_velphi_'   //trim(sit)//'.dat')
-! deallocate(surf_vel,vel_phi)
-
 end subroutine debug_ll_printout_geometry
-
-!------------------------------------------------------------------------------
-!----------------------------------------------------------------------
-!UNDER SCRUTINY: employs old stuff, to remove?
-!subroutine debug_printout_loads(elems, basename_debug, it)
-! type(t_elem_p),   intent(in) :: elems(:)
-! character(len=*), intent(in) :: basename_debug
-! integer,          intent(in) :: it
-!
-! real(wp), allocatable :: vel(:,:), cp(:,:), F_aero(:,:)
-! integer :: i_el
-!
-!  allocate( vel(3,size(elems)) )
-!  allocate(  cp(1,size(elems)) )
-!  allocate(F_aero(3,1))
-!  F_aero = 0.0_wp
-!  do i_el = 1 , size(elems)
-!    vel(:,i_el) = elems(i_el)%p%vel
-!    cp (1,i_el) = elems(i_el)%p%cp
-!    F_aero(:,1) = F_aero(:,1) - 0.5_wp * rho * norm2(uinf)**2.0_wp * cp(1,i_el) * &
-!                     elems(i_el)%p%area * elems(i_el)%p%nor
-!  end do
-!  write(frmt,'(I4.4)') it
-!  call write_basic(vel,trim(basename_debug)//'_velocity_'//trim(frmt)//'.dat')
-!  call write_basic(cp ,trim(basename_debug)//'_cp_'//trim(frmt)//'.dat')
-!  call write_basic(F_aero ,trim(basename_debug)//'_Faero_'//trim(frmt)//'.dat')
-!  deallocate(vel,cp,F_aero)
-!
-!end subroutine debug_printout_loads
-
-!----------------------------------------------------------------------
-
-!Consider discontinuing
-!DISCONTINUED
-!subroutine debug_printout_wake(wake_panels, basename, it)
-! type(t_wake), intent(in) :: wake_panels
-! character(len=*), intent(in) :: basename
-! integer,          intent(in) :: it
-!
-! real(wp), allocatable :: norm(:,:), cent(:,:), res(:,:)
-! integer, allocatable :: el(:,:)
-! character(len=max_char_len) :: sit
-! integer :: ie, of, p1, p2
-!
-!  allocate(norm(3,size(wake_panels%pan_p)), cent(3,size(wake_panels%pan_p)))
-!  allocate(el(4,size(wake_panels%pan_p))); el = 0
-!  allocate(res(1,size(wake_panels%pan_p)))
-!  do ie=1,size(wake_panels%pan_p)
-!    norm(:,ie) = wake_panels%pan_p(ie)%p%nor
-!    cent(:,ie) = wake_panels%pan_p(ie)%p%cen
-!    p1 = wake_panels%i_start_points(1,mod(ie-1,wake_panels%n_wake_stripes)+1)
-!    p2 = wake_panels%i_start_points(2,mod(ie-1,wake_panels%n_wake_stripes)+1)
-!    of = wake_panels%n_wake_points*((ie-1)/wake_panels%n_wake_stripes)
-!    el(1:4,ie) = (/of+p2, of+p1, of+p1+wake_panels%n_wake_points, &
-!                     of+p2+wake_panels%n_wake_points/)
-!    res(1,ie) = wake_panels%pan_p(ie)%p%mag
-!  enddo
-!  write(sit,'(I4.4)') it
-!  call write_basic( &
-!    reshape(wake_panels%w_points(:,:,1:wake_panels%wake_len+1),&
-!    (/3,(wake_panels%n_wake_points)*(wake_panels%wake_len+1)/)), &
-!    trim(basename)//'_wake_points_'//trim(sit)//'.dat')
-!  call write_basic( &
-!    reshape(wake_panels%w_vel(:,:,1:wake_panels%wake_len+1),&
-!    (/3,(wake_panels%n_wake_points)*(wake_panels%wake_len+1)/)), &
-!    trim(basename)//'_wake_vels_'//trim(sit)//'.dat')
-!  call write_basic(norm, trim(basename)//'_wake_norm_'//trim(sit)//'.dat')
-!  call write_basic(cent, trim(basename)//'_wake_cent_'//trim(sit)//'.dat')
-!  call write_basic(el,   trim(basename)//'_wake_elems_'//trim(sit)//'.dat')
-!  call write_basic(res,  trim(basename)//'_wake_result_'//trim(sit)//'.dat')
-!  deallocate(norm, cent, el, res)
-!end subroutine debug_printout_wake
-
-!------------------------------------------------------------------------------
 
 end program dust
 

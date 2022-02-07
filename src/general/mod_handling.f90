@@ -518,13 +518,10 @@ subroutine check_basename(basename,sub_name,mod_name)
 
   if( estat.ne.0 .or. cstat.ne.0) then
     !got a problem with the basename
-    if(present(mod_name)) then
-      call error(trim(sub_name),trim(mod_name),'Problems creating output&
-      & with basename: '//trim(basename)//' possibly invalid path.')
-    else
-      call error(trim(sub_name),'Problems creating output&
-      & with basename: '//trim(basename)//' possibly invalid path.')
-    endif
+    call put_msg(1, 'ERROR: problems creating output&
+      & with basename: '//trim(basename)//' , please check if folder exists &
+      and is writable. Stopping execution.' )
+    call exit(-1)
   else
     !the basename is good, remove the test file
     call execute_command_line('rm '//trim(basename)//'.try', &

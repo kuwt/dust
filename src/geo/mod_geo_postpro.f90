@@ -461,10 +461,10 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         call initialize_hinge_config( comps(i_comp)%hinge(ih)%act , &
                                       comps(i_comp)%hinge(ih) )
         ! Allocate and initialize hinge node coords in the actual configuration
-        allocate( comps(i_comp)%hinge(ih)%act%rr( &
-                3,comps(i_comp)%hinge(ih)%n_nodes ) )
-        comps(i_comp)%hinge(ih)%act%rr = &
-                                      comps(i_comp)%hinge(ih)%ref%rr
+        allocate( comps(i_comp)%hinge(ih)%act%rr( 3,comps(i_comp)%hinge(ih)%n_nodes ) )
+        
+        comps(i_comp)%hinge(ih)%act%rr = comps(i_comp)%hinge(ih)%ref%rr
+
 #if USE_PRECICE
         coupling_node_rot = comps(i_comp)%coupling_node_rot
 #else
@@ -516,10 +516,8 @@ subroutine prepare_geometry_postpro(comps)
  class(c_pot_elem), pointer :: elem
  character(len=*), parameter :: this_sub_name = 'prepare_geometry_postpro'
 
- !debug
-!write(*,*) ' size(comps) : ' , size(comps)
+
  do i_comp = 1,size(comps)
-!  write(*,*) ' size(comps(',i_comp,')%el : ' , size(comps(i_comp)%el)
    do ie = 1,size(comps(i_comp)%el)
      elem => comps(i_comp)%el(ie)
 
@@ -776,8 +774,8 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
     !> Allocating contiguous array
     allocate(rr_hinge_contig(3,size(comp%i_points)))
     rr_hinge_contig = points(:, comp%i_points)
-    call comp%hinge(ih)%hinge_deflection( &
-                         rr_hinge_contig, time_todo, postpro=.true. )
+    call comp%hinge(ih)%hinge_deflection( comp%i_points, &
+                        rr_hinge_contig, time_todo, postpro=.true. )
     points(:, comp%i_points) = rr_hinge_contig
 
     deallocate(rr_hinge_contig)
@@ -804,10 +802,6 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
 
   end associate
  enddo
-
-!DEBUG
-!write(*,*) ' ***** '
-
 
 end subroutine update_points_postpro
 

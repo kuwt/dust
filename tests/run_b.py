@@ -12,7 +12,7 @@ pars.add_argument("exe_path",help='path to the executables')
 pars.add_argument('-t','--tolerance', nargs='?', help='tolerance for the test',
                   required=False, default=1e-10, type=float)
 pars.add_argument('-r','--release', nargs='?', help='release to check with',
-                  required=False, default='0.5.14')
+                  required=False, default='0.6.0')
 
 args = pars.parse_args()
 exe_path = args.exe_path
@@ -22,8 +22,8 @@ solver = exe_path+'/dust'
 post   = exe_path+'/dust_post'
 tol = args.tolerance
 
-vers_dic ={'0.5.11':'0-5-11', '0.5.12':'0-5-12','0.5.13':'0-5-13',
-           '0.5.14':'0-5-14'}
+vers_dic ={'0.5.11':'0-5-11', '0.5.12':'0-5-12', '0.5.13':'0-5-13',
+           '0.5.14':'0-5-14', '0.6.0':'0-6-0'}
 try:
   vers = '_'+vers_dic[args.release]
 except:
@@ -58,8 +58,8 @@ for i, run in enumerate(runs):
   folder = './Output/'
   res = '_res_0011'
 
-  #ref_filename = folder+ref_name+vers+res+suffix
-  ref_filename = folder+ref_name+res+suffix
+  ref_filename = folder+ref_name+vers+res+suffix
+  #ref_filename = folder+ref_name+res+suffix
   check_filename = folder+check_name+res+suffix
   ref_file = h5py.File(ref_filename, 'r')
   check_file = h5py.File(check_filename, 'r')
@@ -70,7 +70,7 @@ for i, run in enumerate(runs):
     errors[i,j] = err
 
 
-#erease all the produced files
+#delete all the produced files
 files = os.listdir('Output/')
 for file in files:
   if file.startswith('test'):

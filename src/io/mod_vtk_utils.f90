@@ -355,7 +355,7 @@ subroutine vtk_print_piece_data(fu, out_vars, nquad, ntria, &
         enddo
       else
           do i=1,ne
-            write(fu) real(0.0_wp, vtk_fsize)
+            write(fu) real(0.0, vtk_fsize)
           enddo
       endif
     else

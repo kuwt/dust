@@ -410,7 +410,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                           getrealarray(geo_prs, 'CouplingNodeOrientationMirror', 9), &
                           (/3,3/) )
     end if
-    write(*,*) 'CouplingNodeOrientationMirror' , coupling_node_rot_mir
+
     if (  trim(coupling_type) .eq. 'rbf' ) then
       !> Open coupling_nodes_file and read nodes for FSI
       n_coupling_nodes = 0; io = 0
@@ -426,7 +426,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       open(unit=21, file=trim(coupling_node_file))
       write(*,*) ' n_coupling_nodes: ', n_coupling_nodes
       do i = 1, n_coupling_nodes
-        read(21,*) coupling_nodes(:,i) ; write(*,*) coupling_nodes(:,i)
+        read(21,*) coupling_nodes(:,i)
       end do
       close(21)
     end if
@@ -618,9 +618,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       elseif ( trim(coupling_type) .eq. 'rbf' ) then
 
         call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)
-        write(*,*) 'RR_pre' , rr
+        !write(*,*) 'RR_pre' , rr
         rr = matmul( transpose(coupling_node_rot), rr )
-        write(*,*) 'RR_post' , rr
+        !write(*,*) 'RR_post' , rr
 
       end if
 
@@ -918,15 +918,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                                                symmetry_point, symmetry_normal, rr_sym)
                   nelems_span_tot = 2*nelems_span
 
-                  !write(*,*); write(*,*) ' rr: '
-                  !do i = 1, size(rr,2)
-                  !  write(*,*) rr(:,i)
-                  !end do
-                  !write(*,*); write(*,*) ' rr_sym: '
-                  !do i = 1, size(rr_sym,2)
-                  !  write(*,*) rr_sym(:,i)
-                  !end do
-
               case default
                call error(this_sub_name, this_mod_name,&
                      'Symmetry routines implemented for MeshFileType = &
@@ -1010,23 +1001,14 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)
 
         if ( mesh_symmetry ) then
-          write(*,*) 'SHAPE_A' , shape(rr)
-          write(*,*) 'SHAPE_B' , shape(rr(1:size(rr,2)-size(rr_sym,2),: ))
+          !write(*,*) 'SHAPE_A' , shape(rr)
+          !write(*,*) 'SHAPE_B' , shape(rr(1:size(rr,2)-size(rr_sym,2),: ))
 
           rr(:,1:(size(rr,2)-size(rr_sym,2))) = matmul( transpose(coupling_node_rot), rr(:,1:size(rr,2)-size(rr_sym,2) ))
           rr(:,size(rr,2)-size(rr_sym,2)+1:size(rr,2)) = matmul( transpose(coupling_node_rot_mir), rr_sym )
         else
           rr = matmul( transpose(coupling_node_rot), rr )
         end if
-        write(*,*); write(*,*) ' rr: '
-        do i = 1, size(rr,2)
-          write(*,*) rr(:,i)
-        end do
-        !write(*,*); write(*,*) ' rr_sym: '
-        !do i = 1, size(rr_sym,2)
-        !  write(*,*) rr_sym(:,i)
-        !end do
-
       end if
 
     end if
@@ -1254,7 +1236,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     call write_hdf5(scale_te,'scale_te',te_loc)
     call close_hdf5_group(te_loc)
   endif
-
   !> Hinges ---
   call new_hdf5_group(comp_loc, 'Hinges', hinge_loc)
   call write_hdf5(n_hinges, 'n_hinges', hinge_loc)
@@ -2113,29 +2094,29 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
 
        ! Check normals ----
        ! 1.
-       if ( sum( nor(:,i_e) * nor(:,neigh_m(i_b,i_e)) ) .le. &
-                                                       inner_prod_thresh ) then
+        if ( sum( nor(:,i_e) * nor(:,neigh_m(i_b,i_e)) ) .le. &
+                                                      inner_prod_thresh ) then
 
-         ne_te = ne_te + 1
+          ne_te = ne_te + 1
 
-         ! 2. ... other criteria to find te elements -------
+          ! 2. ... other criteria to find te elements -------
 
-         ! surface elements at the trailing edge -----------
-         e_te_tmp(1,ne_te) = i_e
-         e_te_tmp(2,ne_te) = neigh_m(i_b,i_e)
+          ! surface elements at the trailing edge -----------
+          e_te_tmp(1,ne_te) = i_e
+          e_te_tmp(2,ne_te) = neigh_m(i_b,i_e)
 
-         ! nodes on the trailing edge ----
-         i_el_nodes_tmp(1,ne_te) = ee( i_b , i_e )
-         i_el_nodes_tmp(2,ne_te) = ee( mod(i_b,nSides) + 1 , i_e )
+          ! nodes on the trailing edge ----
+          i_el_nodes_tmp(1,ne_te) = ee( i_b , i_e )
+          i_el_nodes_tmp(2,ne_te) = ee( mod(i_b,nSides) + 1 , i_e )
 
-         ! Find the corresponding node on the other side
-         ! of the traling edge (for open te)
-         ind1 = 1 ; mi1 = norm2( rr(:,i_el_nodes_tmp(1,ne_te)) -  &
-                                                 rr(:,ee(1,neigh_m(i_b,i_e))) )
-         ind2 = 1 ; mi2 = norm2( rr(:,i_el_nodes_tmp(2,ne_te)) - &
-                                                 rr(:,ee(1,neigh_m(i_b,i_e))) )
+          ! Find the corresponding node on the other side
+          ! of the traling edge (for open te)
+          ind1 = 1 ; mi1 = norm2( rr(:,i_el_nodes_tmp(1,ne_te)) -  &
+                                                  rr(:,ee(1,neigh_m(i_b,i_e))) )
+          ind2 = 1 ; mi2 = norm2( rr(:,i_el_nodes_tmp(2,ne_te)) - &
+                                                  rr(:,ee(1,neigh_m(i_b,i_e))) )
 
-         nSides_b = count( ee(:,neigh_m(i_b,i_e)) .ne. 0 )
+          nSides_b = count( ee(:,neigh_m(i_b,i_e)) .ne. 0 )
 
          do i1 = 2 , nSides_b
            if (     norm2( rr(:,i_el_nodes_tmp(1,ne_te)) - &

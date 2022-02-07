@@ -48,7 +48,7 @@ type_span = uniform
 
 ! Second section
 chord = 1.5
-twist = 0
+twist = 10
 airfoil = NACA0012
 
 ! First region

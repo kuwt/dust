@@ -1,76 +1,40 @@
-MeshFileType = parametric
+MeshFileType = pointwise
 ElType = p
 
-!!> === Coupled with external structural solver (T/F) ===
-!Coupled      = T
-!CouplingType = rbf
-!CouplingNodeFile = coupling_nodes_right.in 
-!
-!CouplingNodeOrientation = (/0.5,   0.836516303737808,   0.224143868042013, -0.852868531952443,   0.430682165754551,   0.295174760618610, 0.150383733180435,  -0.338752631992439,   0.928779514800424/)
-!
-nelem_chord = 15
-type_chord = cosineLE   
-starting_point = (/0.222655776165707,0.595417457320121 ,0.181114485501542/)
-reference_chord_fraction = 0.25
-!
-!n_hinges = 1
-!Hinge = {
-!  Hinge_Tag = Aileron_right
-!  Hinge_Nodes_Input = parametric      ! or from_file
-!  Node1 = (/ 1.473342035233606, 1.434004005481840, 0.284465743940698  /)  ! In the local ref.frame
-!  Node2 = (/ 2.223342035233606  , 2.688778461088552  , 0.620681546003718/)
-!  N_Nodes = 2
-!
-!  
-!  Hinge_Ref_Dir = (/ 1.0, 0.0, 0.0 /)
-!  Hinge_Offset  = 0.05
-!  Hinge_Spanwise_Blending = 0.001
-!
-!  Hinge_Rotation_Input = coupling
-!  Hinge_Rotation_Coupling = {
-!  Coupling_Node_Subset = range
-!  Coupling_Node_First  = 5
-!  Coupling_Node_Last  =  6
-!  }
-!}
+mesh_symmetry = T
+symmetry_point = (/0.0 , 0.0 , 0.0/)
+symmetry_normal = (/0.0 , 1.0 , 0.0/)
 
-! First section
-chord = 2.0
-twist = 10
-airfoil = NACA0012
+mesh_mirror = F
+mirror_point = (/0.0 , 0.0 , 0.0/)
+mirror_normal = (/1.0 , 0.0 , 0.0/)
 
-! First region
-span = 3.404582542679879
-sweep = 30.0
-dihed = 15
-nelem_span = 20
-type_span = uniform
+nelem_chord = 10
+reference_chord_fraction = 0.0
+type_chord = cosineLE
 
-! Second section
-chord = 1.5
-twist = 0
-airfoil = NACA0012
+! === Points ===
+Point = {
+  Id = 1
+  Coordinates = (/ 0.0 , 0.0 , 0.0 /)
+  Airfoil = NACA0012
+  Chord = 1.0
+  Twist = 10.0
+  SectionNormal = yAxis
+}
 
-! First region
-span = 0.8
-sweep = 40.0
-dihed = 25
-nelem_span = 7
-type_span = uniform
+Point = {
+  Id = 2
+  Coordinates = (/ 0.5 , 3.0 , 0.5 /)
+  Airfoil = NACA0012
+  Chord = 1.0
+  Twist = 5.0
+  SectionNormal = referenceLine
+}
 
-! Second section
-chord = 1.0
-twist = 0
-airfoil = NACA0012
-
-! First region
-span = 0.1
-sweep = 70.0
-dihed = 80
-nelem_span = 7
-type_span = uniform
-
-! Second section
-chord = 0.5
-twist = 0
-airfoil = NACA0012
+! === Lines ===
+Line = {
+  Type = Straight
+  EndPoints = (/ 1 , 2 /)
+  Nelems = 20
+}

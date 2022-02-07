@@ -279,19 +279,6 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
   allocate(wei_v(this%n_wei))
   allocate(ind_v(this%n_wei))
 
-  ! ! debug ---
-    !write(*,*) ' ................................................ '
-    !write(*,*) ' Debug in hinge%build_connectivity(), loc_points: '
-    !write(*,*) ' ................................................ '
-    !do iw = 1, size(loc_points,2)
-    !  write(*,*) loc_points(:,iw)
-    !end do
-    !write(*,*) ' Debug in hinge%build_connectivity(), ref%rr: '
-    !do iw = 1, size(this%ref%rr,2)
-    ! write(*,*) this%ref%rr(:,iw)
-    !end do
-  ! ! debug ---
-
   !> N. of surface and hinge nodes
   nb = size(loc_points,2)
   nh = this%n_nodes
@@ -307,6 +294,7 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
   allocate( rrb_wei(3,nb) );
   !rotate the hinge nodes (from coupling_nodes file) to recover the value
   !of the component.in input
+  
   this%ref%rr(:,1) = matmul( (coupling_node_rot),this%ref%rr(:,1))
   this%ref%rr(:,2) = matmul( (coupling_node_rot),this%ref%rr(:,2))
   !rotate the dust mesh points in dust reference
@@ -320,17 +308,6 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
 
   ! hinge width, measured in the hinge direction
   hinge_width = rrh(2,nh) - rrh(2,1)
-
-  !write(*,*) ' ................................................ '
-  !write(*,*) ' Debug in hinge%build_connectivity(), loc_points: '
-  !write(*,*) ' ................................................ '
-  !do iw = 1, nb
-  !    write(*,*) rrb(:,iw)
-  !end do
-  !write(*,*) ' Debug in hinge%build_connectivity(), ref%rr: '
-  !do iw = 1, nh
-  !  write(*,*) this%ref%rr(:,iw)
-  !end do
 
   !> Compute connectivity and weights
   ! Allocate auxiliary node_id(:), ind(:,:), wei(:,:) arrays
@@ -357,7 +334,9 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
   ! rrb_wei are the rrb re-rotate in the same reference of rrh in order to evaluate the weight
   ! while rrb are used to evaluate the flap region in the wind axis
   do ib = 1, nb
-    rrb_wei(:,ib) = matmul( coupling_node_rot, (loc_points(:,ib) - matmul(transpose(coupling_node_rot) ,this%ref%rr(:,1)) ))
+    rrb_wei(:,ib) = matmul( coupling_node_rot, &
+                            (loc_points(:,ib) - &
+                    matmul(transpose(coupling_node_rot) ,this%ref%rr(:,1)) ))
   enddo
 
   ! Loop over all the surface points
@@ -540,10 +519,10 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
       end if
     end do
 
-    loc_points(:,ib) = loc_points(:,ib) / n_nodes
+    loc_points(:,ib) = loc_points(:,ib) / real(n_nodes,wp)
 
   end do
-
+  
   !> Coordinates in the hinge reference frame
   ! Rotation matrix, build with the local ortonormal ref.frame of
   ! the first hinge node
@@ -564,11 +543,6 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
     rrb(:,ib) =  matmul( (coupling_node_rot), loc_points(:,ib))
   end do
 
-  do ib = 1, nh
-    rrh(:,ib) =  this%ref%rr(:,ib) - this%ref%rr(:,1)
-    write(*,*) 'this%ref%rr(:,ib)', ib, this%ref%rr(:,ib)
-  end do
-  write(*,*) 'nh', nh
   ! hinge width, measured in the hinge direction (span)
   hinge_width = rrh(2,nh) - rrh(2,1)  !dh
 
@@ -754,6 +728,7 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
   allocate(ind_b(n_b)) ;  ind_b = -333
   i_h = 0; i_b = 0
 
+
   do i_t = 1, n_t
     if ( any( ind_h .eq. i_t ) ) then
       i_h = i_h + 1
@@ -771,6 +746,7 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
       ind_b(i_b) = i_b
     end if
   end do
+
 
   !> Allocate and fill hinge%hin object
   allocate(this%hin%node_id(       n_h)); this%hin%node_id = -333 ! useless
@@ -790,7 +766,6 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
 
     !> Weights in chordwise direction
     call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
-
     wei_v = 1.0_wp / max( wei_v, 1e-9_wp ) **this%w_order
     wei_v = wei_v / sum(wei_v)
 
@@ -802,17 +777,6 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
 
   !> Allocate t_hinge%hin_rot
   allocate( this%hin_rot(3,n_h) ); this%hin_rot = -333.3_wp
-
-  ! debug ---
-  !write(*,*) ' this%hin%ind, %i_points_precice, %wei: '
-  !do i_h = 1, n_h
-  !  write(*,*) i_h, this%hin%ind(:,i_h), &
-  !                  this%hin%wei(:,i_h)
-  !end do
-  !write(*,*)
-  ! write(*,*) ' stop in geo/mod_hinges/build_connectivity_hin() '; stop
-  ! debug ---
-
 
 end subroutine build_connectivity_hin
 
@@ -852,8 +816,8 @@ subroutine init_theta(this, t)
 
   if ( t .ne. 0.0_wp ) then
     write(*,*) ' Error in t_hinge % init_theta: t .ne. 0.0_wp. &
-               &This argument is meant for future restart capabilities. &
-               &So far, must be passed to the function equal to 0.0_wp. Stop'
+                &This argument is meant for future restart capabilities. &
+                &So far, must be passed to the function equal to 0.0_wp. Stop'
     stop
   end if
 
@@ -884,7 +848,6 @@ subroutine update_hinge_nodes( this, R, of )
   real(wp)      , intent(in)    :: of(:)
 
   if ( trim(this%input_type) .ne. 'coupling' ) then !> Prescribed motion
-
     !> Actual configuration: node position
     this % act % rr = matmul( R, this % ref % rr )
     this % act % rr(1,:) = this % act % rr(1,:) + of(1)
@@ -912,7 +875,9 @@ subroutine update_theta( this, t )
   real(wp)      , intent(in)    :: t
 
   !> Update theta_old
-  this % theta_old = this % theta
+  if (t .gt. 0) then 
+    this % theta_old = this % theta
+  end if
 
   if ( trim(this%input_type) .eq. 'function:const' ) then
     this%theta = this%f_ampl
@@ -935,19 +900,25 @@ end subroutine update_theta
 ! ---------------------------------------------------------------
 !> Update the coordinates rr of the points of the surface, after
 ! hinge deflection
-subroutine hinge_deflection( this, rr, t, postpro )
-  class(t_hinge), intent(inout) :: this
-  real(wp)      , intent(inout) :: rr(:,:)
-  real(wp)      , intent(in)    :: t
-  logical, optional, intent(in) :: postpro
-  logical            ::   local_postpro
-  logical, parameter :: default_postpro = .false.
+subroutine hinge_deflection(i_points, this,  rr, t, te_i, te_t, postpro )
+  class(t_hinge),     intent(inout)   :: this
+  real(wp), optional, intent(inout)   :: te_t(:,:)
+  integer,  optional, intent(in)      :: te_i(:,:)
+  real(wp),           intent(inout)   :: rr(:,:)
+  real(wp),           intent(in)      :: t
+  logical,  optional, intent(in)      :: postpro
+  integer,            intent(in)      :: i_points(:)
+  
+  logical                             :: local_postpro
+  logical, parameter                  :: default_postpro = .false.
+  real(wp), allocatable               :: rr_in(:,:)
+  real(wp)                            :: th, th1, thp, yc, xq, yq, xqp, yqp
+  real(wp)                            :: nx(3,3), Rot_I(3,3), eye(3,3) 
+  integer                             :: nrot, nble, ib, ih, ii, it
 
-  real(wp), allocatable :: rr_in(:,:)
-  real(wp) :: th, th1, thp, yc, xq, yq, xqp, yqp
-  real(wp) :: nx(3,3), Rot_I(3,3)
-  integer :: nrot, nble, ib, ih, ii
-
+  eye(1,:) = (/1., 0., 0./)
+  eye(2,:) = (/0., 1., 0./)
+  eye(3,:) = (/0., 0., 1./)
 
   if ( trim(this%input_type) .ne. 'coupling' ) then
     ! Old routine for hinges with prescribed motion
@@ -958,7 +929,8 @@ subroutine hinge_deflection( this, rr, t, postpro )
     else                        ;  local_postpro = default_postpro
     end if
 
-    allocate(rr_in(size(rr,1),size(rr,2))); rr_in = rr
+    allocate(rr_in(size(rr,1),size(rr,2)))
+    rr_in = rr
 
     !> n.nodes in the rigid-rotation and in the blending regions
     nrot = size(this%rot %node_id)
@@ -979,12 +951,15 @@ subroutine hinge_deflection( this, rr, t, postpro )
         do ib = 1, size(this%rot%n2h(ih)%p2h)
           ii = this%rot%n2h(ih)%p2h(ib)
           th1 = th * this%rot%n2h(ih)%s2h(ib)
-          Rot_I = sin(th1) * nx + ( 1.0_wp - cos(th1) ) * matmul( nx, nx )
+          
+          Rot_I = sin(th1) * nx + ( 1.0_wp - cos(th1) ) * matmul( nx, nx )       
           rr(:,ii) = rr(:,ii) + &
-                     this%rot%n2h(ih)%w2h(ib) * &
-                     matmul( Rot_I, rr_in(:,ii)-this%act%rr(:,ih) )
+                      this%rot%n2h(ih)%w2h(ib) * &
+                      matmul( Rot_I, rr_in(:,ii)-this%act%rr(:,ih) )
+
         end do
 
+        
         !> Blending region
         do ib = 1, size(this%blen%n2h(ih)%p2h)
 
@@ -1007,10 +982,43 @@ subroutine hinge_deflection( this, rr, t, postpro )
                    ( xqp * this%act%v(:,ih) + yqp * this%act%n(:,ih) )
 
         end do
-
+      
       end if
 
     end do
+
+    if (present(te_t)) then     
+      ! Rotate trailing edge direction in the rigid-rotation region
+      do it = 1, size(te_t,2)
+        
+        do ih = 1, this%n_nodes
+          th =   (this%theta(ih) - this%theta_old(ih)) * pi/180.0_wp  !
+          ! Rotation matrix
+            nx(1,:) = (/            0.0_wp, -this%act%h(3,ih),  this%act%h(2,ih) /)
+            nx(2,:) = (/  this%act%h(3,ih),            0.0_wp, -this%act%h(1,ih) /)
+            nx(3,:) = (/ -this%act%h(2,ih),  this%act%h(1,ih),            0.0_wp /)
+
+            do ib = 1, size(this%rot%n2h(ih)%p2h)
+
+
+              ii = this%rot%n2h(ih)%p2h(ib)
+              ii = i_points(ii)
+              th1 = th * this%rot%n2h(ih)%s2h(ib)
+              
+              Rot_I = eye + sin(th1) * nx + ( 1.0_wp - cos(th1) ) * matmul( nx, nx )
+              
+              if (te_i(1 , it) .eq. ii) then ! hinge node is also trailing edge node
+!
+                te_t(:,it) = te_t(:,it) + this%rot%n2h(ih)%s2h(ib) * matmul( Rot_I, te_t(:,it))
+              
+              end if
+            
+            end do
+            
+        end do
+      end do
+
+    end if  
 
     deallocate(rr_in)
 
@@ -1036,10 +1044,20 @@ subroutine initialize_hinge_config( h_config, hinge )
   !> rr0, rr1 (useless?)
   h_config%rr0 = hinge%ref%rr(:,1)
   h_config%rr1 = hinge%ref%rr(:,hinge%n_nodes)
-  hv = h_config%rr1 - h_config%rr0;  hv = hv / norm2(hv)
+
+  hv = h_config%rr1 - h_config%rr0
+  hv = hv / norm2(hv)
   vv = hinge%ref_dir / norm2(hinge%ref_dir)
-  nv = cross( vv, hv ); nv = nv / norm2(nv)
-  vv = cross( hv, nv ); vv = vv / norm2(vv)  ! useless normalization
+
+  nv = cross( vv, hv )
+  
+  if (norm2(nv) .le. 1e-16_wp) then ! workaround for debug compiling 
+    nv(3) = 1e-16_wp
+  endif
+
+  nv = nv / norm2(nv)
+  vv = cross( hv, nv )
+  vv = vv / norm2(vv)  ! useless normalization
 
   !> h, v, n
   allocate( h_config%h(3, hinge%n_nodes) )
@@ -1090,9 +1108,9 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
            &string, something probabily went wrong.'
        allocate( hinges(i)%rr( 3, hinges(i)%n_nodes ) )
        do j = 1, hinges(i)%n_nodes
-         hinges(i) % rr(:,j) = hinges(i) % node1 + &
-                             ( hinges(i) % node2 - hinges(i) % node1 ) * &
-                             dble(j-1)/dble(hinges(i)%n_nodes-1)
+          hinges(i) % rr(:,j) = hinges(i) % node1 + &
+                              ( hinges(i) % node2 - hinges(i) % node1 ) * &
+                               dble(j-1)/dble(hinges(i)%n_nodes-1)
        end do
 
      elseif ( trim(hinges(i) % nodes_input) .eq. 'from_file' ) then
@@ -1124,6 +1142,9 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
           ( trim(hinges(i)%rotation_input) .ne. 'function:cos'   ) .and. &
           ( trim(hinges(i)%rotation_input) .ne. 'from_file'      ) .and. &
           ( trim(hinges(i)%rotation_input) .ne. 'coupling'       ) ) then
+            write(*,*) ' Error in t_hinge%build_hinge(): rotation_input = &
+           & $ '//trim(hinges(i)%rotation_input)// &
+                    &'not known.'; stop
      else
        if ( ( trim(hinges(i)%rotation_input) .eq. 'function:const' ) .or. &
             ( trim(hinges(i)%rotation_input) .eq. 'function:sin'   ) .or. &
@@ -1171,12 +1192,6 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
        end if
      end if
 
-!    ! check ---
-!    write(*,*) ' Hinge id:', i
-!    write(*,*) ' _Tag        : ', trim(hinges(i)%tag)
-!    write(*,*) ' _Nodes_Input: ', trim(hinges(i)%nodes_input)
-!    ! check ---
-
   end do
 
 
@@ -1221,7 +1236,7 @@ end subroutine read_hinge_nodes
 ! ---------------------------------------------------------------
 !> Hinge input parser, called in mod_build_geo.f90 by dust_pre preprocessor
 subroutine hinge_input_parser( geo_prs, hinge_prs, &
-                               fun_prs, file_prs, coupling_prs )
+                              fun_prs, file_prs, coupling_prs )
   type(t_parse),          intent(inout) :: geo_prs
   type(t_parse), pointer, intent(inout) :: hinge_prs
   type(t_parse), pointer, intent(inout) :: fun_prs, file_prs, coupling_prs
@@ -1231,11 +1246,11 @@ subroutine hinge_input_parser( geo_prs, hinge_prs, &
               '0') ! default: no hinges -> n_hinges = 0
 
   call geo_prs%CreateSubOption('Hinge', 'Parser for hinge input', &
-               hinge_prs, multiple=.true. )
+                                hinge_prs, multiple=.true. )
 
   call hinge_prs%CreateStringOption('Hinge_Tag','Name of the hinge')
   call hinge_prs%CreateStringOption('Hinge_Nodes_Input', &
-         'Type of hinge nodes input: parametric or from_file.')
+                              'Type of hinge nodes input: parametric or from_file.')
   call hinge_prs%CreateIntOption('N_Nodes','N.hinge nodes')
   call hinge_prs%CreateRealArrayOption('Node1', &
       'First node of the hinge. Components in the local ref.frame of the component')
@@ -1254,7 +1269,7 @@ subroutine hinge_input_parser( geo_prs, hinge_prs, &
       'Input type of the rotation: function, from_file, coupling')
   !> Hinge_Rotation_Input = function:...
   call hinge_prs%CreateSubOption('Hinge_Rotation_Function', &
-               'Parser for hinge input w/ simple functions', fun_prs )
+                'Parser for hinge input w/ simple functions', fun_prs )
   call fun_prs%CreateRealOption('Amplitude', &
       'Amplitude of the rotation, for constant, function:const, :sin, &
       &:cos Rotation_Input')
@@ -1281,7 +1296,6 @@ subroutine hinge_input_parser( geo_prs, hinge_prs, &
       &is defined through "range" input: last id of the nodes')
   call coupling_prs%CreateStringOption('Coupling_Node_Filename', &
       'File collecting the IDs of the coupling nodes for hinge coupling')
-
 
   ! *** to do ***
   ! add all the fields required for all the input types
