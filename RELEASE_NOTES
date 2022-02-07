@@ -1,3 +1,8 @@
+0.6.1-b
+* Fix trailing edge orientation for hinged wake first panel
+* Fixed some bugs when compiling in debug mode
+* Improved examples
+
 0.6.0-b
 * Added the aeroelastic interface for communication with preCICE
 * Added hinged surfaces
