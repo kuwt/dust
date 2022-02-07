@@ -115,7 +115,8 @@ end subroutine initialize_doublet
 subroutine potential_calc_doublet(this, dou, pos)
  class(c_pot_elem), intent(in) :: this
  real(wp), intent(out) :: dou
- real(wp), contiguous, intent(in) :: pos(:)
+ !real(wp), contiguous, intent(in) :: pos(:)
+ real(wp), intent(in) :: pos(:)
 
  real(wp), dimension(3) :: e3
 

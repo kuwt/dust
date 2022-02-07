@@ -497,12 +497,14 @@ sim_param%time_vec = (/ ( sim_param%t0 + &
 
 !------ Geometry creation ------
 call printout(nl//'====== Geometry Creation ======')
+
 t0 = dust_time()
 target_file = trim(sim_param%basename)//'_geo.h5'
+
 call create_geometry(sim_param%GeometryFile, sim_param%ReferenceFile, &
-                     input_file_name, geo, te, elems, elems_expl, elems_ad, &
-                     elems_ll, elems_tot, airfoil_data, target_file, run_id)
-te%t_hinged = te%t
+                    input_file_name, geo, te, elems, elems_expl, elems_ad, &
+                    elems_ll, elems_tot, airfoil_data, target_file, run_id)
+
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Created geometry in: ' , t1 - t0,' s.'
@@ -520,10 +522,11 @@ call finalizeParameters(prms)
 
 !> --- Initialize PreCICE mesh and fields -----------------------
 #if USE_PRECICE
-      call precice % initialize_mesh( geo )
-      call precice % initialize_fields()
-      call precicef_initialize(precice % dt_precice)
-      call precice % update_elems(geo, elems_tot, te ) ! TEST
+  te%t_hinged = te%t
+  call precice % initialize_mesh( geo )
+  call precice % initialize_fields()
+  call precicef_initialize(precice % dt_precice)
+  call precice % update_elems(geo, elems_tot, te ) ! TEST
 #endif
 !> --- Initialize PreCICE mesh and fields: done -----------------
 

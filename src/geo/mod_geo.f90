@@ -245,6 +245,7 @@ type :: t_geo_component
  integer :: n_hinges
  type(t_hinge), allocatable :: hinge(:)
 
+
  !> Dimensions of parametric elements only
  integer :: parametric_nelems_span , parametric_nelems_chor
 
@@ -1531,7 +1532,7 @@ subroutine load_components(geo, in_file, out_file, te)
           endif
         enddo
         call move_alloc(e_te_tmp,te%e)
-
+        write(*,*) 'nn_te', nn_te
         allocate(i_te_tmp(2,size(te%i,2)+nn_te))
         i_te_tmp(:,             1:size(te%i,2)    ) = te%i
         i_te_tmp(:,size(te%i,2)+1:size(i_te_tmp,2)) = i_te + points_offset
@@ -1587,7 +1588,6 @@ subroutine load_components(geo, in_file, out_file, te)
         scale_te_tmp(size(te%scaling )+1:size( scale_te_tmp)) = &
                                        scale_te*sim_param%first_panel_scaling
         call move_alloc(scale_te_tmp,te%scaling )
-
       end if
 
 
@@ -1623,6 +1623,7 @@ subroutine load_components(geo, in_file, out_file, te)
     call close_hdf5_group(cloc)
 
   enddo !i_comp
+
   !update the total number of components
   !call write_hdf5(i_comp-1,'NComponents',gloc)
   call close_hdf5_group(gloc)
@@ -1730,51 +1731,50 @@ end subroutine import_aero_tab
 !> Prepare the geometry allocating all the relevant fields for each
 !! kind of element
 subroutine prepare_geometry(geo)
- type(t_geo), intent(inout), target :: geo
+  type(t_geo), intent(inout), target :: geo
 
- integer :: i_comp, ie
- integer :: nsides
- class(c_pot_elem), pointer :: elem
- character(len=*), parameter :: this_sub_name = 'prepare_geometry'
+  integer :: i_comp, ie
+  integer :: nsides
+  class(c_pot_elem), pointer :: elem
+  character(len=*), parameter :: this_sub_name = 'prepare_geometry'
 
+  do i_comp = 1,size(geo%components)
 
- do i_comp = 1,size(geo%components)
+    do ie = 1,size(geo%components(i_comp)%el)
+      elem => geo%components(i_comp)%el(ie)
 
-   do ie = 1,size(geo%components(i_comp)%el)
-     elem => geo%components(i_comp)%el(ie)
+      nsides = size(elem%i_ver)
 
-     nsides = size(elem%i_ver)
+      !Fields common to each element
+      allocate(elem%ver(3,nsides))
+      allocate(elem%edge_vec(3,nsides))
+      allocate(elem%edge_len(nsides))
+      allocate(elem%edge_uni(3,nsides))
 
-     !Fields common to each element
-     allocate(elem%ver(3,nsides))
-     allocate(elem%edge_vec(3,nsides))
-     allocate(elem%edge_len(nsides))
-     allocate(elem%edge_uni(3,nsides))
+      !type-specific fields
+      select type(elem)
+        !Surface panel
+        class is(t_surfpan)
+          allocate(elem%verp(3,nsides))
+          allocate(elem%cosTi(nsides))
+          allocate(elem%sinTi(nsides))
 
-     !type-specific fields
-     select type(elem)
-      !Surface panel
-      class is(t_surfpan)
-       allocate(elem%verp(3,nsides))
-       allocate(elem%cosTi(nsides))
-       allocate(elem%sinTi(nsides))
+        class is(t_liftlin)
 
-      class is(t_liftlin)
+          allocate(elem%tang_cen(3))
+          allocate(elem%bnorm_cen(3))  
 
-       allocate(elem%tang_cen(3))
-       allocate(elem%bnorm_cen(3))
+         elem%csi_cen = 0.5_wp * &
+                        sum(geo%components(i_comp)%normalised_coord_e(:,ie))
+          elem%i_airfoil =  geo%components(i_comp)%i_airfoil_e(:,ie)
+          elem%twist     =  geo%components(i_comp)%theta_e(ie)
+        class is(t_vortlatt)
 
-       elem%csi_cen = 0.5_wp * &
-                      sum(geo%components(i_comp)%normalised_coord_e(:,ie))
-       elem%i_airfoil =  geo%components(i_comp)%i_airfoil_e(:,ie)
-       elem%twist     =  geo%components(i_comp)%theta_e(ie)
-      class is(t_vortlatt)
+        class is(t_actdisk)
 
-      class is(t_actdisk)
-
-      class default
-       call error(this_sub_name, this_mod_name, 'Unknown element type')
-     end select
+        class default
+          call error(this_sub_name, this_mod_name, 'Unknown element type')
+      end select
 
      !> Position and velocity increment, due to hinge motion
      elem%dcen_h     = 0.0_wp
@@ -2197,83 +2197,79 @@ subroutine update_geometry(geo, te, t, update_static)
  !update all the references
  call update_all_references(geo%refs,t)
 
- do i_comp = 1,size(geo%components)
+do i_comp = 1,size(geo%components)
   associate(comp => geo%components(i_comp))
 
-  ! Update only rigid components, or update at first timestep
-  ! *** to do *** quite a dirty implementation
-  if ( ( .not. comp%coupling ) .or. update_static ) then
+    ! Update only rigid components, or update at first timestep
+    ! *** to do *** quite a dirty implementation
+    if ( ( .not. comp%coupling ) .or. update_static ) then
 
-    if (comp%moving .or. update_static) then
+      if (comp%moving .or. update_static) then
 
-      !> store %nor at previous time step, for moving, used few lines
-      ! below to evaluate unit normal time derivative dn_dt
-      if ( .not. update_static ) then
+        !> store %nor at previous time step, for moving, used few lines
+        ! below to evaluate unit normal time derivative dn_dt
+        if ( .not. update_static ) then
+          do ie = 1 , size(comp%el)
+            comp%el(ie)%nor_old = comp%el(ie)%nor
+          end do
+        end if
+
+        !> Move points of the component
+        geo%points(:,comp%i_points) = move_points(comp%loc_points, &
+                             geo%refs(comp%ref_id)%R_g, &
+                             geo%refs(comp%ref_id)%of_g)
+
+        !> Update geometrical data of the elements, after geometry motion
+        do ie = 1,size(comp%el)
+          call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
+        enddo
+
+        !> Unit normal vector time derivative, dn_dt
+        ! set %nor_old = %nor for static elements and first time step,
+        ! this if statement completes the if statement found few lines
+        ! above, avoiding initialization issues (dirty implementation?)
+        if ( update_static ) then
+          do ie = 1,size(comp%el)
+            comp%el(ie)%nor_old = comp%el(ie)%nor
+          end do
+        end if
+
         do ie = 1 , size(comp%el)
-          comp%el(ie)%nor_old = comp%el(ie)%nor
+          comp%el(ie)%dn_dt = (comp%el(ie)%nor - comp%el(ie)%nor_old)/sim_param % dt
         end do
+
+        !> Calculate the velocity of the centers to assing b.c.
+        do ie = 1,size(comp%el)
+          call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &
+                                        geo%refs(comp%ref_id)%f_g)
+        enddo
+
       end if
 
-      !> Move points of the component
-      geo%points(:,comp%i_points) = move_points(comp%loc_points, &
-                           geo%refs(comp%ref_id)%R_g, &
-                           geo%refs(comp%ref_id)%of_g)
+    elseif ( comp%coupling .or. update_static ) then
 
-      !> Update geometrical data of the elements, after geometry motion
       do ie = 1,size(comp%el)
-        call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
-      enddo
 
-      !> Unit normal vector time derivative, dn_dt
-      ! set %nor_old = %nor for static elements and first time step,
-      ! this if statement completes the if statement found few lines
-      ! above, avoiding initialization issues (dirty implementation?)
-      if ( update_static ) then
-        do ie = 1 , size(comp%el)
-          comp%el(ie)%nor_old = comp%el(ie)%nor
-        end do
-      end if
-
-      do ie = 1 , size(comp%el)
-        comp%el(ie)%dn_dt = ( comp%el(ie)%nor - comp%el(ie)%nor_old ) / &
-                                                                sim_param % dt
+        comp%el(ie)%dn_dt = (comp%el(ie)%nor - comp%el(ie)%nor_old)/sim_param % dt
       end do
-
-      !> Calculate the velocity of the centers to assing b.c.
-      do ie = 1,size(comp%el)
-        call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &
-                                       geo%refs(comp%ref_id)%f_g )
-      enddo
-
-    end if
-
-  elseif ( comp%coupling .or. update_static ) then
-
-    do ie = 1 , size(comp%el)
-
-      comp%el(ie)%dn_dt = ( comp%el(ie)%nor - comp%el(ie)%nor_old ) / &
-                                                              sim_param % dt
-    end do
 
   end if  ! if ( .not. comp%coupling )
 
   !> Hinges -----------------------------------------------------------
 
   !> Get trailing edge direction to be rotated for hinge deflection
-  !te%t_hinged = te%t
   
   do ih = 1, comp%n_hinges
-
     !> Update:
     ! - hinge node coordinates, act%rr
     ! - hinge node orientation (unit vectors h,v,n)
     ! - hinge rotation angle, theta
     ! for non-coupled components only (so far)
     if ( .not. comp%coupling ) then
-       
+
       !> hinge nodes, points and orientation
       call comp%hinge(ih)%update_hinge_nodes( geo%refs(comp%ref_id)%R_g, &
-                                              geo%refs(comp%ref_id)%f_g )
+                                              geo%refs(comp%ref_id)%of_g )
       !> hinge rotation, theta
       call comp%hinge(ih)%update_theta( t )
 
@@ -2281,10 +2277,9 @@ subroutine update_geometry(geo, te, t, update_static)
       allocate(rr_hinge_contig(3,size(comp%i_points)))
       rr_hinge_contig = geo%points(:, comp%i_points)
       
-      call comp%hinge(ih)%hinge_deflection( rr_hinge_contig, t, te%i, te%t_hinged )
+      call comp%hinge(ih)%hinge_deflection(comp%i_points, rr_hinge_contig,  t, te%i, te%t_hinged )
       geo%points(:, comp%i_points) = rr_hinge_contig
-
-      deallocate(rr_hinge_contig)
+            deallocate(rr_hinge_contig)
 
     else
 
@@ -2292,6 +2287,7 @@ subroutine update_geometry(geo, te, t, update_static)
 
     end if
 
+    
   end do
 
   ! *** to do ***

@@ -14,6 +14,7 @@ src/general/mod_version.f90
 *.mod
 *.frc
 *.ine
+*.vtr
 build/
 *.h5
 !test/

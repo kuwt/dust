@@ -2094,29 +2094,29 @@ subroutine find_te_general ( rr , ee , neigh_m , inner_prod_thresh , &
 
        ! Check normals ----
        ! 1.
-       if ( sum( nor(:,i_e) * nor(:,neigh_m(i_b,i_e)) ) .le. &
-                                                       inner_prod_thresh ) then
+        if ( sum( nor(:,i_e) * nor(:,neigh_m(i_b,i_e)) ) .le. &
+                                                      inner_prod_thresh ) then
 
-         ne_te = ne_te + 1
+          ne_te = ne_te + 1
 
-         ! 2. ... other criteria to find te elements -------
+          ! 2. ... other criteria to find te elements -------
 
-         ! surface elements at the trailing edge -----------
-         e_te_tmp(1,ne_te) = i_e
-         e_te_tmp(2,ne_te) = neigh_m(i_b,i_e)
+          ! surface elements at the trailing edge -----------
+          e_te_tmp(1,ne_te) = i_e
+          e_te_tmp(2,ne_te) = neigh_m(i_b,i_e)
 
-         ! nodes on the trailing edge ----
-         i_el_nodes_tmp(1,ne_te) = ee( i_b , i_e )
-         i_el_nodes_tmp(2,ne_te) = ee( mod(i_b,nSides) + 1 , i_e )
+          ! nodes on the trailing edge ----
+          i_el_nodes_tmp(1,ne_te) = ee( i_b , i_e )
+          i_el_nodes_tmp(2,ne_te) = ee( mod(i_b,nSides) + 1 , i_e )
 
-         ! Find the corresponding node on the other side
-         ! of the traling edge (for open te)
-         ind1 = 1 ; mi1 = norm2( rr(:,i_el_nodes_tmp(1,ne_te)) -  &
-                                                 rr(:,ee(1,neigh_m(i_b,i_e))) )
-         ind2 = 1 ; mi2 = norm2( rr(:,i_el_nodes_tmp(2,ne_te)) - &
-                                                 rr(:,ee(1,neigh_m(i_b,i_e))) )
+          ! Find the corresponding node on the other side
+          ! of the traling edge (for open te)
+          ind1 = 1 ; mi1 = norm2( rr(:,i_el_nodes_tmp(1,ne_te)) -  &
+                                                  rr(:,ee(1,neigh_m(i_b,i_e))) )
+          ind2 = 1 ; mi2 = norm2( rr(:,i_el_nodes_tmp(2,ne_te)) - &
+                                                  rr(:,ee(1,neigh_m(i_b,i_e))) )
 
-         nSides_b = count( ee(:,neigh_m(i_b,i_e)) .ne. 0 )
+          nSides_b = count( ee(:,neigh_m(i_b,i_e)) .ne. 0 )
 
          do i1 = 2 , nSides_b
            if (     norm2( rr(:,i_el_nodes_tmp(1,ne_te)) - &

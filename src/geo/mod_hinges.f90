@@ -294,6 +294,7 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
   allocate( rrb_wei(3,nb) );
   !rotate the hinge nodes (from coupling_nodes file) to recover the value
   !of the component.in input
+  
   this%ref%rr(:,1) = matmul( (coupling_node_rot),this%ref%rr(:,1))
   this%ref%rr(:,2) = matmul( (coupling_node_rot),this%ref%rr(:,2))
   !rotate the dust mesh points in dust reference
@@ -521,7 +522,7 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
     loc_points(:,ib) = loc_points(:,ib) / real(n_nodes,wp)
 
   end do
-
+  
   !> Coordinates in the hinge reference frame
   ! Rotation matrix, build with the local ortonormal ref.frame of
   ! the first hinge node
@@ -847,7 +848,6 @@ subroutine update_hinge_nodes( this, R, of )
   real(wp)      , intent(in)    :: of(:)
 
   if ( trim(this%input_type) .ne. 'coupling' ) then !> Prescribed motion
-
     !> Actual configuration: node position
     this % act % rr = matmul( R, this % ref % rr )
     this % act % rr(1,:) = this % act % rr(1,:) + of(1)
@@ -900,13 +900,15 @@ end subroutine update_theta
 ! ---------------------------------------------------------------
 !> Update the coordinates rr of the points of the surface, after
 ! hinge deflection
-subroutine hinge_deflection( this, rr, t, te_i, te_t, postpro )
+subroutine hinge_deflection(i_points, this,  rr, t, te_i, te_t, postpro )
   class(t_hinge),     intent(inout)   :: this
   real(wp), optional, intent(inout)   :: te_t(:,:)
   integer,  optional, intent(in)      :: te_i(:,:)
   real(wp),           intent(inout)   :: rr(:,:)
   real(wp),           intent(in)      :: t
   logical,  optional, intent(in)      :: postpro
+  integer,            intent(in)      :: i_points(:)
+  
   logical                             :: local_postpro
   logical, parameter                  :: default_postpro = .false.
   real(wp), allocatable               :: rr_in(:,:)
@@ -988,8 +990,9 @@ subroutine hinge_deflection( this, rr, t, te_i, te_t, postpro )
     if (present(te_t)) then     
       ! Rotate trailing edge direction in the rigid-rotation region
       do it = 1, size(te_t,2)
+        
         do ih = 1, this%n_nodes
-          th =   (this % theta(ih) - this % theta_old(ih)) * pi/180.0_wp  !
+          th =   (this%theta(ih) - this%theta_old(ih)) * pi/180.0_wp  !
           ! Rotation matrix
             nx(1,:) = (/            0.0_wp, -this%act%h(3,ih),  this%act%h(2,ih) /)
             nx(2,:) = (/  this%act%h(3,ih),            0.0_wp, -this%act%h(1,ih) /)
@@ -997,37 +1000,21 @@ subroutine hinge_deflection( this, rr, t, te_i, te_t, postpro )
 
             do ib = 1, size(this%rot%n2h(ih)%p2h)
 
+
               ii = this%rot%n2h(ih)%p2h(ib)
+              ii = i_points(ii)
               th1 = th * this%rot%n2h(ih)%s2h(ib)
               
               Rot_I = eye + sin(th1) * nx + ( 1.0_wp - cos(th1) ) * matmul( nx, nx )
               
               if (te_i(1 , it) .eq. ii) then ! hinge node is also trailing edge node
-                ! debug
-                !if (ii .eq. 36) then
-                !  WRITE(*,*) 'this % theta(ih)            ', this%theta(ih)
-                !  WRITE(*,*) 'this % theta_old(ih)        ', this%theta_old(ih)
-                !  WRITE(*,*) 'th1                         ', th1
-                !  WRITE(*,*) 'ii                          ', ii
-                !  WRITE(*,*) 'te_t(:,it)  pre             ', te_t(:,it)
-                !  WRITE(*,*) 'Rot_I(1,:)                  ', Rot_I(1,:)
-                !  WRITE(*,*) 'Rot_I(2,:)                  ', Rot_I(2,:)
-                !  WRITE(*,*) 'Rot_I(3,:)                  ', Rot_I(3,:)
-                !  WRITE(*,*) 'it                          ', it
-                !  WRITE(*,*) 'ih                          ', ih
-                !  WRITE(*,*) 'this%rot%n2h(ih)%w2h(ib)    ', this%rot%n2h(ih)%w2h(ib)
-                !  WRITE(*,*) 'this%rot%n2h(ih)%s2h(ib)    ', this%rot%n2h(ih)%s2h(ib)
-                !end if
-
+!
                 te_t(:,it) = te_t(:,it) + this%rot%n2h(ih)%s2h(ib) * matmul( Rot_I, te_t(:,it))
-                
-                !te_t(:,it) = te_t(:,it)/norm2(te_t(:,it))
-                !if (ii .eq. 36) then
-                !  WRITE(*,*) 'te_t(:,it)  post            ', te_t(:,it)
-                !  WRITE(*,*)
-                !end if
+              
               end if
+            
             end do
+            
         end do
       end do
 

@@ -461,10 +461,10 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         call initialize_hinge_config( comps(i_comp)%hinge(ih)%act , &
                                       comps(i_comp)%hinge(ih) )
         ! Allocate and initialize hinge node coords in the actual configuration
-        allocate( comps(i_comp)%hinge(ih)%act%rr( &
-                3,comps(i_comp)%hinge(ih)%n_nodes ) )
-        comps(i_comp)%hinge(ih)%act%rr = &
-                                      comps(i_comp)%hinge(ih)%ref%rr
+        allocate( comps(i_comp)%hinge(ih)%act%rr( 3,comps(i_comp)%hinge(ih)%n_nodes ) )
+        
+        comps(i_comp)%hinge(ih)%act%rr = comps(i_comp)%hinge(ih)%ref%rr
+
 #if USE_PRECICE
         coupling_node_rot = comps(i_comp)%coupling_node_rot
 #else
@@ -774,8 +774,8 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
     !> Allocating contiguous array
     allocate(rr_hinge_contig(3,size(comp%i_points)))
     rr_hinge_contig = points(:, comp%i_points)
-    call comp%hinge(ih)%hinge_deflection( &
-                         rr_hinge_contig, time_todo, postpro=.true. )
+    call comp%hinge(ih)%hinge_deflection( comp%i_points, &
+                        rr_hinge_contig, time_todo, postpro=.true. )
     points(:, comp%i_points) = rr_hinge_contig
 
     deallocate(rr_hinge_contig)

@@ -427,7 +427,6 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   !enddo
 
   ! FIX FOR TE WITH HINGES
-  
 
   wake%pan_gen_points = te%i
   wake%pan_gen_dir = te%t_hinged
@@ -485,20 +484,10 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
     wind = variable_wind(wake%w_start_points(:,ip), sim_param%time)
 
     if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
-      !if (ip .eq. 16) then 
-      !  WRITE(*,*) 'ip                                    ', ip
-      !  WRITE(*,*) 'geo%refs(wake%pan_gen_ref(ip)%R_g(1,:)', geo%refs(wake%pan_gen_ref(ip))%R_g(1,:)
-      !  WRITE(*,*) 'geo%refs(wake%pan_gen_ref(ip)%R_g(2,:)', geo%refs(wake%pan_gen_ref(ip))%R_g(2,:)
-      !  WRITE(*,*) 'geo%refs(wake%pan_gen_ref(ip)%R_g(3,:)', geo%refs(wake%pan_gen_ref(ip))%R_g(3,:)
-      !  WRITE(*,*) 'wake%pan_gen_dir(:,ip)                ', wake%pan_gen_dir(:,ip)
-      !end if 
-
+      
       dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
       
-      !if (ip .eq. 16) then 
-      !  WRITE(*,*) 'dist                                  ', dist
-      !  WRITE(*,*)
-      !endif 
+      
       
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                   dist*wake%pan_gen_scaling(ip)* &
@@ -1240,9 +1229,6 @@ subroutine complete_wake(wake, geo, elems, te)
 
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1,wake%n_pan_points
-    if (ip .eq. 16) then
-      WRITE(*,*) 'wake%pan_gen_dir(:,ip) update', wake%pan_gen_dir(:,ip)
-    endif
     dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
     call calc_node_vel( wake%w_start_points(:,ip), &
             geo%refs(wake%pan_gen_ref(ip))%G_g, &
