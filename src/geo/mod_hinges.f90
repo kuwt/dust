@@ -916,9 +916,9 @@ subroutine hinge_deflection(i_points, this,  rr, t, te_i, te_t, postpro )
   real(wp)                            :: nx(3,3), Rot_I(3,3), eye(3,3) 
   integer                             :: nrot, nble, ib, ih, ii, it
 
-  eye(1,:) = (/1., 0., 0./)
-  eye(2,:) = (/0., 1., 0./)
-  eye(3,:) = (/0., 0., 1./)
+  eye(1,:) = (/1.0_wp, 0.0_wp, 0.0_wp/)
+  eye(2,:) = (/0.0_wp, 1.0_wp, 0.0_wp/)
+  eye(3,:) = (/0.0_wp, 0.0_wp, 1.0_wp/)
 
   if ( trim(this%input_type) .ne. 'coupling' ) then
     ! Old routine for hinges with prescribed motion

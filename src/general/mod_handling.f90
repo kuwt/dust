@@ -518,9 +518,9 @@ subroutine check_basename(basename,sub_name,mod_name)
 
   if( estat.ne.0 .or. cstat.ne.0) then
     !got a problem with the basename
-    call put_msg(1, 'ERROR: problems creating output&
+    call put_msg(1, 'ERROR: problems creating output &
       & with basename: '//trim(basename)//' , please check if folder exists &
-      and is writable. Stopping execution.' )
+      & and is writable. Stopping execution.' )
     call exit(-1)
   else
     !the basename is good, remove the test file

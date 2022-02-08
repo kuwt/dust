@@ -1532,7 +1532,7 @@ subroutine load_components(geo, in_file, out_file, te)
           endif
         enddo
         call move_alloc(e_te_tmp,te%e)
-        write(*,*) 'nn_te', nn_te
+
         allocate(i_te_tmp(2,size(te%i,2)+nn_te))
         i_te_tmp(:,             1:size(te%i,2)    ) = te%i
         i_te_tmp(:,size(te%i,2)+1:size(i_te_tmp,2)) = i_te + points_offset
