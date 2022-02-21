@@ -152,84 +152,84 @@ private
 !! It also contains some temporary arrays employed during geometry generation
 type :: t_geo_component
 
- !> Element type
- character(len=max_char_len) :: comp_el_type
+  !> Element type
+  character(len=max_char_len) :: comp_el_type
 
- !> Name of the component
- character(len=max_char_len) :: comp_name
+  !> Name of the component
+  character(len=max_char_len) :: comp_name
 
- !> Type of input: basic, cgns, parametric
- character(len=max_char_len) :: comp_input
+  !> Type of input: basic, cgns, parametric
+  character(len=max_char_len) :: comp_input
 
- !> Coupling w/ external structural code: .true., .false.
- logical :: coupling
+  !> Coupling w/ external structural code: .true., .false.
+  logical :: coupling
 
- !> Coupling type: 'll', 'rigid', 'rbf'
- character(len=max_char_len) :: coupling_type
+  !> Coupling type: 'll', 'rigid', 'rbf'
+  character(len=max_char_len) :: coupling_type
 
- !> Coupling node: local coordinates (in the component local ref.frame)
+  !> Coupling node: local coordinates (in the component local ref.frame)
  ! of the coupling node (why initilized?)
- real(wp) :: coupling_node(3) = 0.0_wp
+  real(wp) :: coupling_node(3) = 0.0_wp
 
- !> Coupling node orientation: orientation of the coupling node, w.r.t.
- ! the local ref.rame of the geometrical component (why initialized?)
- real(wp) :: coupling_node_rot(3,3) = 0.0_wp
-
-#if USE_PRECICE
- type(t_precice_rbf) :: rbf
-#endif
-
- !> Id of the component (warning: not always defined)
- integer :: comp_id
-
- !> Number of elements of the component
- integer :: nelems
-
- !> Elements of the group
- !! The main memory allocation happens here, they will be pointed from
- !! somewhere else
- class(c_pot_elem), allocatable :: el(:)
-
- !> Global indexes of the points in the component
- integer, allocatable :: i_points(:)
+  !> Coupling node orientation: orientation of the coupling node, w.r.t.
+  ! the local ref.rame of the geometrical component (why initialized?)
+  real(wp) :: coupling_node_rot(3,3) = 0.0_wp
 
 #if USE_PRECICE
- !> Global PreCICE indices of the points for coupling
- integer, allocatable :: i_points_precice(:)
+  type(t_precice_rbf) :: rbf
 #endif
 
- !> Reference frame tag
- character(len=max_char_len) :: ref_tag
+  !> Id of the component (warning: not always defined)
+  integer :: comp_id
 
- ! Reference frame id
- integer :: ref_id
+  !> Number of elements of the component
+  integer :: nelems
 
- !> Points in local reference frame
- real(wp), allocatable :: loc_points(:,:)
+  !> Elements of the group
+  !! The main memory allocation happens here, they will be pointed from
+  !! somewhere else
+  class(c_pot_elem), allocatable :: el(:)
 
- !> Number of surface panels in the component
- integer :: nSurfPan
- !> Number of vortex rings in the component
- integer :: nVortRin
- !> Number of lifting line elements in the component
- integer :: nLiftLin
- !> Number of lifting line ele
- integer :: nActDisk
+  !> Global indexes of the points in the component
+  integer, allocatable :: i_points(:)
 
- !> Is the component moving?
- logical :: moving
+#if USE_PRECICE
+  !> Global PreCICE indices of the points for coupling
+  integer, allocatable :: i_points_precice(:)
+#endif
 
- !> Arrays for lifting line components
- character(len=max_char_len), allocatable :: airfoil_list(:)
- !> Number of ll elements in each region. Size(nelem_span_list) = nRegions
- integer, allocatable :: nelem_span_list(:)
- !> Normalised coordinate of sections in each wing region.
- !! Size(...) = nRegions+1
- real(wp),allocatable :: normalised_coord_e(:,:)
- !> twist angle for flat elements
- real(wp),allocatable :: theta_e(:)
- !> Id of the airfoil elements (index in airfoil_list char array)
- integer ,allocatable :: i_airfoil_e(:,:)
+  !> Reference frame tag
+  character(len=max_char_len) :: ref_tag
+
+  ! Reference frame id
+  integer :: ref_id
+
+  !> Points in local reference frame
+  real(wp), allocatable :: loc_points(:,:)
+
+  !> Number of surface panels in the component
+  integer :: nSurfPan
+  !> Number of vortex rings in the component
+  integer :: nVortRin
+  !> Number of lifting line elements in the component
+  integer :: nLiftLin
+  !> Number of lifting line ele
+  integer :: nActDisk
+
+  !> Is the component moving?
+  logical :: moving
+
+  !> Arrays for lifting line components
+  character(len=max_char_len), allocatable :: airfoil_list(:)
+  !> Number of ll elements in each region. Size(nelem_span_list) = nRegions
+  integer, allocatable :: nelem_span_list(:)
+  !> Normalised coordinate of sections in each wing region.
+  !! Size(...) = nRegions+1
+  real(wp),allocatable :: normalised_coord_e(:,:)
+  !> twist angle for flat elements
+  real(wp),allocatable :: theta_e(:)
+  !> Id of the airfoil elements (index in airfoil_list char array)
+  integer ,allocatable :: i_airfoil_e(:,:)
 
 #if USE_PRECICE
  !> Chord vector reference, required to assign the motion ot the
@@ -260,46 +260,46 @@ end type  t_geo_component
 !! frames and all the points of the mesh
 type :: t_geo
 
- !> Total number of implicit elements
- integer :: nelem_impl
+  !> Total number of implicit elements
+  integer :: nelem_impl
 
- !> Number of lifting line elements
- !integer :: nll
+  !> Number of lifting line elements
+  !integer :: nll
 
- !> Number of actuator disk elements
- !integer :: nad
+  !> Number of actuator disk elements
+  !integer :: nad
 
- !> Number of explicit elements
- integer :: nelem_expl
+  !> Number of explicit elements
+  integer :: nelem_expl
 
- !> Number of surface panel elements
- integer :: nSurfPan
- !> Number of vortex ring elements
- integer :: nVortLatt
- !> Number of lifting line elements
- integer :: nLiftLin
- !> Number of Actuator disk elements
- integer :: nActDisk
+  !> Number of surface panel elements
+  integer :: nSurfPan
+  !> Number of vortex ring elements
+  integer :: nVortLatt
+  !> Number of lifting line elements
+  integer :: nLiftLin
+  !> Number of Actuator disk elements
+  integer :: nActDisk
 
- ! Only for implicit elements (for slicing)
- !> Global id of surface panel elements
- integer, allocatable :: idSurfPan(:)
- !> Global id of vortex ring elements
- integer, allocatable :: idVortLatt(:)
+  ! Only for implicit elements (for slicing)
+  !> Global id of surface panel elements
+  integer, allocatable :: idSurfPan(:)
+  !> Global id of vortex ring elements
+  integer, allocatable :: idVortLatt(:)
 !!> Global id of lifting line elements
 !integer, allocatable :: idLiftLin(:)
 !!> Global id of actuator disk elements
 !integer, allocatable :: idActDisk(:)
  !> Surfpan id of global surface panel elements (G2L: global to local)
- integer, allocatable :: idSurfPanG2L(:)
+  integer, allocatable :: idSurfPanG2L(:)
 
- !> Number of statical implicit elements
- integer :: nstatic_impl
- !> Number of moving implicit elements
- integer :: nmoving_impl
+  !> Number of statical implicit elements
+  integer :: nstatic_impl
+  !> Number of moving implicit elements
+  integer :: nmoving_impl
 
- !> Number of statical surfpan elements (for slicing)
- integer :: nstatic_SurfPan
+  !> Number of statical surfpan elements (for slicing)
+  integer :: nstatic_SurfPan
 
  !> Number of static or moving lifting lines
  integer :: nstatic_expl, nmoving_expl
@@ -329,38 +329,38 @@ end type t_geo
 
 type t_tedge
 
- !> Global id of the elements at the TE
- !integer , allocatable :: e(:,:)
- type(t_pot_elem_p), allocatable :: e(:,:)
+  !> Global id of the elements at the TE
+  !integer , allocatable :: e(:,:)
+  type(t_pot_elem_p), allocatable :: e(:,:)
 
- !> Global id of the nodes on the TE
- integer , allocatable :: i(:,:)
+  !> Global id of the nodes on the TE
+  integer , allocatable :: i(:,:)
 
- !> Coordinates of the nodes of the TE
- !real(wp), allocatable :: rr(:,:)
+  !> Coordinates of the nodes of the TE
+  !real(wp), allocatable :: rr(:,:)
 
- !> TE id of the nodes of the TE elements
- integer , allocatable :: ii(:,:)
+  !> TE id of the nodes of the TE elements
+  integer , allocatable :: ii(:,:)
 
- !> TE id of neighboring TE elements
- integer , allocatable :: neigh(:,:)
+  !> TE id of neighboring TE elements
+  integer , allocatable :: neigh(:,:)
 
- !> Relative orientation of the neighboring TE elements
- integer , allocatable :: o(:,:)
+  !> Relative orientation of the neighboring TE elements
+  integer , allocatable :: o(:,:)
 
- !> Unit vector at TE nodes
- real(wp), allocatable :: t(:,:)
- real(wp), allocatable :: t_hinged(:,:) ! considering hinge deflection
- integer, allocatable :: is_hinged(:)
+  !> Unit vector at TE nodes
+  real(wp), allocatable :: t(:,:)
+  real(wp), allocatable :: t_hinged(:,:) ! considering hinge deflection
+  integer, allocatable :: is_hinged(:)
 
- !> Reference frame of the TE nodes
- integer , allocatable :: ref(:)
+  !> Reference frame of the TE nodes
+  integer , allocatable :: ref(:)
 
- !> Component of the TE
- integer , allocatable :: icomp(:)
+  !> Component of the TE
+  integer , allocatable :: icomp(:)
 
- !> Individual scaling for each component
- real(wp), allocatable :: scaling(:)
+  !> Individual scaling for each component
+  real(wp), allocatable :: scaling(:)
 
 
 end type t_tedge
@@ -478,45 +478,45 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   do i_comp = 1,size(geo%components)
 
     select case(trim(geo%components(i_comp)%comp_el_type))
-     case('p')
-      if(geo%components(i_comp)%moving) then
-        geo%nmoving_impl = geo%nmoving_impl + geo%components(i_comp)%nelems
-      else
-        geo%nstatic_impl = geo%nstatic_impl + geo%components(i_comp)%nelems
-        geo%nstatic_SurfPan = geo%nstatic_SurfPan + geo%components(i_comp)%nelems
-      endif
-      geo%nSurfPan = geo%nSurfPan + geo%components(i_comp)%nelems
-      geo%nelem_impl = geo%nelem_impl + geo%components(i_comp)%nelems
+      case('p')
+        if(geo%components(i_comp)%moving) then
+          geo%nmoving_impl = geo%nmoving_impl + geo%components(i_comp)%nelems
+        else
+          geo%nstatic_impl = geo%nstatic_impl + geo%components(i_comp)%nelems
+          geo%nstatic_SurfPan = geo%nstatic_SurfPan + geo%components(i_comp)%nelems
+        endif
+        geo%nSurfPan = geo%nSurfPan + geo%components(i_comp)%nelems
+        geo%nelem_impl = geo%nelem_impl + geo%components(i_comp)%nelems
 
-     case('v')
-      if(geo%components(i_comp)%moving) then
-        geo%nmoving_impl = geo%nmoving_impl + geo%components(i_comp)%nelems
-      else
-        geo%nstatic_impl = geo%nstatic_impl + geo%components(i_comp)%nelems
-      endif
-      geo%nVortLatt = geo%nVortLatt + geo%components(i_comp)%nelems
-      geo%nelem_impl = geo%nelem_impl + geo%components(i_comp)%nelems
+      case('v')
+        if(geo%components(i_comp)%moving) then
+          geo%nmoving_impl = geo%nmoving_impl + geo%components(i_comp)%nelems
+        else
+          geo%nstatic_impl = geo%nstatic_impl + geo%components(i_comp)%nelems
+        endif
+        geo%nVortLatt = geo%nVortLatt + geo%components(i_comp)%nelems
+        geo%nelem_impl = geo%nelem_impl + geo%components(i_comp)%nelems
 
-     case('l')
-      if(geo%components(i_comp)%moving) then
-        geo%nmoving_expl = geo%nmoving_expl + geo%components(i_comp)%nelems
-      else
-        geo%nstatic_expl = geo%nstatic_expl + geo%components(i_comp)%nelems
-      endif
-      geo%nLiftLin = geo%nLiftLin + geo%components(i_comp)%nelems
-      geo%nelem_expl = geo%nelem_expl + geo%components(i_comp)%nelems
+      case('l')
+        if(geo%components(i_comp)%moving) then
+          geo%nmoving_expl = geo%nmoving_expl + geo%components(i_comp)%nelems
+        else
+          geo%nstatic_expl = geo%nstatic_expl + geo%components(i_comp)%nelems
+        endif
+        geo%nLiftLin = geo%nLiftLin + geo%components(i_comp)%nelems
+        geo%nelem_expl = geo%nelem_expl + geo%components(i_comp)%nelems
 
-     case('a')
-      if(geo%components(i_comp)%moving) then
-        geo%nmoving_expl = geo%nmoving_expl + geo%components(i_comp)%nelems
-      else
-        geo%nstatic_expl = geo%nstatic_expl + geo%components(i_comp)%nelems
-      endif
-      geo%nActDisk = geo%nActDisk + geo%components(i_comp)%nelems
-      geo%nelem_expl = geo%nelem_expl + geo%components(i_comp)%nelems
+      case('a')
+        if(geo%components(i_comp)%moving) then
+          geo%nmoving_expl = geo%nmoving_expl + geo%components(i_comp)%nelems
+        else
+          geo%nstatic_expl = geo%nstatic_expl + geo%components(i_comp)%nelems
+        endif
+        geo%nActDisk = geo%nActDisk + geo%components(i_comp)%nelems
+        geo%nelem_expl = geo%nelem_expl + geo%components(i_comp)%nelems
 
-     case default
-      call error (this_sub_name, this_mod_name, 'Unknow type of element: '&
+      case default
+        call error (this_sub_name, this_mod_name, 'Unknow type of element: '&
                   //trim(geo%components(i_comp)%comp_el_type))
     end select
 
@@ -556,7 +556,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
 
   !Create the vector of pointers to all the elements
   allocate(elems_impl(geo%nelem_impl), elems_expl(geo%nelem_expl),  &
-           elems_tot(geo%nelem_impl+geo%nelem_expl))
+            elems_tot(geo%nelem_impl+geo%nelem_expl))
   allocate(elems_ad(geo%nactdisk), elems_ll(geo%nLiftLin))
   i_impl=0; i_expl=0; i_ad=0; i_ll=0; i_tot=0
   do i_comp = 1,size(geo%components)
@@ -694,82 +694,82 @@ end subroutine create_geometry
 !! The points and the elements are then genereated.
 !! Finally the trailing edge is created
 subroutine load_components(geo, in_file, out_file, te)
- type(t_geo), intent(inout),target :: geo
- character(len=*), intent(in) :: in_file
- character(len=*), intent(in) :: out_file
- type(t_tedge), intent(out) :: te
+  type(t_geo), intent(inout),target :: geo
+  character(len=*), intent(in) :: in_file
+  character(len=*), intent(in) :: out_file
+  type(t_tedge), intent(out) :: te
 
 
- integer :: i1, i2, i3
- integer, allocatable :: ee(:,:)
- real(wp), allocatable :: rr(:,:)
- character(len=max_char_len) :: comp_el_type, comp_name, comp_input
- integer :: points_offset, n_vert , elems_offset
- real(wp), allocatable :: points_tmp(:,:)
- character(len=max_char_len) :: ref_tag, ref_tag_m
- integer :: ref_id, iref
- character(len=max_char_len) :: msg, cname, cname_write
- integer(h5loc) :: floc, gloc, cloc , geo_loc , te_loc, cloc2
- integer(h5loc) :: floc_out, gloc_out
- integer :: n_comp, i_comp, n_comp_input, i_comp_input, n_comp_write
- integer :: n_mult, i_mult
- logical :: mult
+  integer :: i1, i2, i3
+  integer, allocatable :: ee(:,:)
+  real(wp), allocatable :: rr(:,:)
+  character(len=max_char_len) :: comp_el_type, comp_name, comp_input
+  integer :: points_offset, n_vert , elems_offset
+  real(wp), allocatable :: points_tmp(:,:)
+  character(len=max_char_len) :: ref_tag, ref_tag_m
+  integer :: ref_id, iref
+  character(len=max_char_len) :: msg, cname, cname_write
+  integer(h5loc) :: floc, gloc, cloc , geo_loc , te_loc, cloc2
+  integer(h5loc) :: floc_out, gloc_out
+  integer :: n_comp, i_comp, n_comp_input, i_comp_input, n_comp_write
+  integer :: n_mult, i_mult
+  logical :: mult
 
- ! Connectivity and te structures
- integer , allocatable :: neigh(:,:)
- ! Lifting Line elements
- real(wp), allocatable :: normalised_coord_e(:,:), theta_e(:)
- integer                 , allocatable :: i_airfoil_e(:,:)
- character(max_char_len) , allocatable :: airfoil_list(:)
- integer                 , allocatable :: nelem_span_list(:)
- !> Coupling
- character(len=max_char_len) :: comp_coupling_str
- character(len=max_char_len) :: comp_coupling_type
- real(wp) :: comp_coupling_node(3)       = 0.0_wp    ! <- Initialization(?)
- real(wp) :: comp_coupling_node_rot(3,3) = 0.0_wp    ! <- Initialization(?)
- logical :: comp_coupling
+  ! Connectivity and te structures
+  integer , allocatable :: neigh(:,:)
+  ! Lifting Line elements
+  real(wp), allocatable :: normalised_coord_e(:,:), theta_e(:)
+  integer                 , allocatable :: i_airfoil_e(:,:)
+  character(max_char_len) , allocatable :: airfoil_list(:)
+  integer                 , allocatable :: nelem_span_list(:)
+  !> Coupling
+  character(len=max_char_len) :: comp_coupling_str
+  character(len=max_char_len) :: comp_coupling_type
+  real(wp) :: comp_coupling_node(3)       = 0.0_wp    ! <- Initialization(?)
+  real(wp) :: comp_coupling_node_rot(3,3) = 0.0_wp    ! <- Initialization(?)
+  logical :: comp_coupling
 #if USE_PRECICE
- real(wp), allocatable :: c_ref_p(:,:)
- real(wp), allocatable :: c_ref_c(:,:)
- real(wp), allocatable :: xac_p(:)
- real(wp), allocatable :: comp_coupling_nodes(:,:)
- !real(wp) :: coupling_node_rot(3,3)
- integer :: points_offset_precice, np_precice, np_precice_tot
- integer :: comp_ind
- integer, allocatable :: hinge_ind(:)
- integer, allocatable :: ind_coupling(:)
- integer :: n_nodes_coupling_hinges, n_nodes_coupling_hinge_1
+  real(wp), allocatable :: c_ref_p(:,:)
+  real(wp), allocatable :: c_ref_c(:,:)
+  real(wp), allocatable :: xac_p(:)
+  real(wp), allocatable :: comp_coupling_nodes(:,:)
+  !real(wp) :: coupling_node_rot(3,3)
+  integer :: points_offset_precice, np_precice, np_precice_tot
+  integer :: comp_ind
+  integer, allocatable :: hinge_ind(:)
+  integer, allocatable :: ind_coupling(:)
+  integer :: n_nodes_coupling_hinges, n_nodes_coupling_hinge_1
 #endif
- real(wp) :: coupling_node_rot(3,3) = 0.0_wp
- !> Hinges
- integer :: n_hinges, ih
- character(len=2) :: hinge_id_str
- integer(h5loc) :: hloc, hiloc, hloc2
- ! Parametric elements
- integer :: par_nelems_span , par_nelems_chor
- ! trailing edge ------
- integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
- integer , allocatable :: neigh_te(:,:) , o_te(:,:)
- real(wp), allocatable :: t_te(:,:)
- real(wp) :: scale_te
- integer :: ne_te , nn_te
- ! tmp arrays --------
- type(t_pot_elem_p) , allocatable :: e_te_tmp(:,:)
- integer, allocatable  :: i_te_tmp(:,:) , ii_te_tmp(:,:)
- integer , allocatable :: neigh_te_tmp(:,:) , o_te_tmp(:,:)
- real(wp), allocatable :: t_te_tmp(:,:), t_hinged_te_tmp(:,:)
- integer , allocatable ::t_is_hinged_tmp(:)
- integer , allocatable :: ref_te_tmp(:)
- integer , allocatable :: icomp_te_tmp(:)
- real(wp), allocatable :: scale_te_tmp(:)
- ! # n. elements and nodes at TE ( of the prev. comps)
- integer :: ne_te_prev , nn_te_prev
- real(wp) :: trac, rad
- logical :: rewrite_geo
- logical :: is_hinge
- integer, allocatable :: ind_h(:)
+  real(wp) :: coupling_node_rot(3,3) = 0.0_wp
+  !> Hinges
+  integer :: n_hinges, ih
+  character(len=2) :: hinge_id_str
+  integer(h5loc) :: hloc, hiloc, hloc2
+  ! Parametric elements
+  integer :: par_nelems_span , par_nelems_chor
+  ! trailing edge ------
+  integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
+  integer , allocatable :: neigh_te(:,:) , o_te(:,:)
+  real(wp), allocatable :: t_te(:,:)
+  real(wp) :: scale_te
+  integer :: ne_te , nn_te
+  ! tmp arrays --------
+  type(t_pot_elem_p) , allocatable :: e_te_tmp(:,:)
+  integer, allocatable  :: i_te_tmp(:,:) , ii_te_tmp(:,:)
+  integer , allocatable :: neigh_te_tmp(:,:) , o_te_tmp(:,:)
+  real(wp), allocatable :: t_te_tmp(:,:), t_hinged_te_tmp(:,:)
+  integer , allocatable ::t_is_hinged_tmp(:)
+  integer , allocatable :: ref_te_tmp(:)
+  integer , allocatable :: icomp_te_tmp(:)
+  real(wp), allocatable :: scale_te_tmp(:)
+  ! # n. elements and nodes at TE ( of the prev. comps)
+  integer :: ne_te_prev , nn_te_prev
+  real(wp) :: trac, rad
+  logical :: rewrite_geo
+  logical :: is_hinge
+  integer, allocatable :: ind_h(:)
 
- character(len=*), parameter :: this_sub_name = 'load_components'
+  character(len=*), parameter :: this_sub_name = 'load_components'
 
   !Re-write the geometry only if it is not restarting from a previous run
   !with the same name
@@ -801,7 +801,7 @@ subroutine load_components(geo, in_file, out_file, te)
     !if not found the reference
     if (ref_id .lt. 0) then
       write(msg,'(A,I2,A,A,A)') 'For component ',i_comp, &
-                   ' a reference with tag ',trim(ref_tag),' was not found'
+                    ' a reference with tag ',trim(ref_tag),' was not found'
       call error(this_sub_name, this_mod_name, msg)
     endif
     mult = .false.
@@ -855,7 +855,7 @@ subroutine load_components(geo, in_file, out_file, te)
     !if not found the reference
     if (ref_id .lt. 0) then
       write(msg,'(A,I2,A,A,A)') 'For component ',i_comp, &
-                   ' a reference with tag ',trim(ref_tag),' was not found'
+                    ' a reference with tag ',trim(ref_tag),' was not found'
       call error(this_sub_name, this_mod_name, msg)
     endif
 
@@ -1118,7 +1118,7 @@ subroutine load_components(geo, in_file, out_file, te)
           ! connectivity between dust with PreCICE nodes
           allocate(geo%components(i_comp)%i_points_precice( np_precice ))
           geo%components(i_comp)%i_points_precice = &
-                           (/((i3),i3=points_offset_precice+1, &
+                          (/((i3),i3=points_offset_precice+1, &
                                       points_offset_precice+np_precice)/)
           points_offset_precice = points_offset_precice + np_precice
 
@@ -1491,7 +1491,7 @@ subroutine load_components(geo, in_file, out_file, te)
       if(allocated(i_te)) nn_te = size(i_te,2)
       if (sim_param%debug_level .ge. 3) then
         write(msg,'(A,I0,A,I0)') ' Trailing edge: elements: ', &
-                                                       ne_te, ' nodes ', nn_te
+                                                        ne_te, ' nodes ', nn_te
         call printout(msg)
       endif
       if (.not.allocated(te%e) ) then ! it should be enough
@@ -1650,78 +1650,78 @@ end subroutine load_components
 !----------------------------------------------------------------------
 
 subroutine import_aero_tab(geo,coeff)
- type(t_geo), intent(inout), target :: geo
- type(t_aero_tab) , allocatable , intent(inout) :: coeff(:)
+  type(t_geo), intent(inout), target :: geo
+  type(t_aero_tab) , allocatable , intent(inout) :: coeff(:)
 
- integer :: n_tmp , n_tmp2
- character(len=max_char_len) , allocatable :: list_tmp(:)
- character(len=max_char_len) , allocatable :: list_tmp_tmp(:)
- integer , allocatable :: i_airfoil_e_tmp (:,:)
+  integer :: n_tmp , n_tmp2
+  character(len=max_char_len) , allocatable :: list_tmp(:)
+  character(len=max_char_len) , allocatable :: list_tmp_tmp(:)
+  integer , allocatable :: i_airfoil_e_tmp (:,:)
 
- integer :: i_c, n_c, i_a, n_a, i_l
+  integer :: i_c, n_c, i_a, n_a, i_l
 
- n_tmp = 30
- allocate(list_tmp(n_tmp))
+  n_tmp = 30
+  allocate(list_tmp(n_tmp))  
 
- ! Count # of different airfoil
- n_c = size(geo%components)
- n_a = 0
- do i_c = 1 ,  n_c
+  ! Count # of different airfoil
+  n_c = size(geo%components)
+  n_a = 0
+  do i_c = 1 ,  n_c
 
-   if ( geo%components(i_c)%comp_el_type .eq. 'l' ) then
+    if ( geo%components(i_c)%comp_el_type .eq. 'l' ) then ! add condition for vl corrected !
 
-     allocate( i_airfoil_e_tmp( &
+      allocate( i_airfoil_e_tmp( &
           size(geo%components(i_c)%i_airfoil_e,1), &
           size(geo%components(i_c)%i_airfoil_e,2) ) )
-     i_airfoil_e_tmp = 0
+      i_airfoil_e_tmp = 0
 
-     do i_a = 1 , size(geo%components(i_c)%airfoil_list)
+      do i_a = 1 , size(geo%components(i_c)%airfoil_list)
 
-       if (all( geo%components(i_c)%airfoil_list(i_a) .ne. &
-                                                       list_tmp(1:n_a))) then
-         ! new airfoil ----
-         n_a = n_a + 1
+        if (all( geo%components(i_c)%airfoil_list(i_a) .ne. &
+                                                      list_tmp(1:n_a))) then
+          ! new airfoil ----
+          n_a = n_a + 1
 
-         where (geo%components(i_c)%i_airfoil_e .eq. i_a) i_airfoil_e_tmp = n_a
+          where (geo%components(i_c)%i_airfoil_e .eq. i_a) i_airfoil_e_tmp = n_a
 
-         ! if n_a > n_tmp --> movalloc
-         if ( n_a .gt. n_tmp ) then
-           n_tmp2 = n_tmp + n_tmp
-           allocate(list_tmp_tmp(n_tmp2))
-           list_tmp_tmp(1:n_tmp) = list_tmp
-           deallocate(list_tmp)
-           call move_alloc(list_tmp_tmp,list_tmp)
-           n_tmp = n_tmp2
-         end if
+          ! if n_a > n_tmp --> movalloc
+          if ( n_a .gt. n_tmp ) then
+            n_tmp2 = n_tmp + n_tmp
+            allocate(list_tmp_tmp(n_tmp2))
+            list_tmp_tmp(1:n_tmp) = list_tmp
+            deallocate(list_tmp)
+            call move_alloc(list_tmp_tmp,list_tmp)
+            n_tmp = n_tmp2
+          end if
 
-         list_tmp(n_a) = geo%components(i_c)%airfoil_list(i_a)
+          list_tmp(n_a) = geo%components(i_c)%airfoil_list(i_a)
 
-       else
-         ! airfoil already used: find the element and replace the global index
-         do i_l = 1 , n_a
-           if ( geo%components(i_c)%airfoil_list(i_a) .eq. list_tmp(i_l) ) exit
-         end do
+        else
+          ! airfoil already used: find the element and replace the global index
+          do i_l = 1 , n_a
+            if ( geo%components(i_c)%airfoil_list(i_a) .eq. list_tmp(i_l) ) exit
+          end do
 
-         where (geo%components(i_c)%i_airfoil_e .eq. i_a) i_airfoil_e_tmp = i_l
+          where (geo%components(i_c)%i_airfoil_e .eq. i_a) i_airfoil_e_tmp = i_l
 
-       end if
+        end if
 
 
-     end do
+      end do
 
-   geo%components(i_c)%i_airfoil_e = i_airfoil_e_tmp
+    geo%components(i_c)%i_airfoil_e = i_airfoil_e_tmp
 
-   deallocate(i_airfoil_e_tmp)
+    deallocate(i_airfoil_e_tmp)
 
-   end if
+    end if
 
- end do
+  end do
 
- ! Read tables and fill coeff structure
- allocate(coeff(n_a))
- do i_a = 1 , n_a
-   call read_c81_table( list_tmp(i_a) , coeff(i_a) )
- end do
+  ! Read tables and fill coeff structure
+  allocate(coeff(n_a))
+  do i_a = 1 , n_a
+    call read_c81_table( list_tmp(i_a) , coeff(i_a) )
+  end do
 
 
 end subroutine import_aero_tab

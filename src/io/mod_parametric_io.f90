@@ -77,58 +77,64 @@ contains
 !----------------------------------------------------------------------
 
 subroutine read_mesh_parametric(mesh_file,ee,rr, &
-                     npoints_chord_tot,nelem_span_tot)
+                    npoints_chord_tot,nelem_span_tot)
 
- character(len=*), intent(in) :: mesh_file
- integer  , allocatable, intent(out) :: ee(:,:)
- real(wp) , allocatable, intent(out) :: rr(:,:)
- integer  , intent(out), optional    :: npoints_chord_tot, nelem_span_tot
+  character(len=*), intent(in) :: mesh_file
+  integer  , allocatable, intent(out) :: ee(:,:)
+  real(wp) , allocatable, intent(out) :: rr(:,:)
+  integer  , intent(out), optional    :: npoints_chord_tot, nelem_span_tot
 
- type(t_parse) :: pmesh_prs
- integer :: ee_size , rr_size
+  type(t_parse) :: pmesh_prs
+  integer :: ee_size , rr_size
 
- logical :: twist_linear_interp
- integer :: nelem_chord, nelem_chord_tot ! , nelem_span_tot <--- moved as an output
- integer :: npoint_chord_tot, npoint_span_tot
- integer :: nRegions, nSections
- integer :: iRegion, iSection, iChord, iSpan, iElement, iPoint
- real(wp):: ref_chord_fraction
- real(wp), allocatable :: ref_point(:)
- ! data read from file
- ! sections ---
- real(wp)         , allocatable :: chord_list(:) , twist_list(:)
- character(len=max_char_len), allocatable :: airfoil_list(:)
- ! regions  ---
- integer , allocatable :: nelem_span_list(:)
- real(wp), allocatable :: span_list(:) , sweep_list(:) , dihed_list(:)
- character(len=max_char_len), allocatable :: type_span_list(:)
- integer :: n_type_span
- ! Sections 1. 2.
- real(wp), allocatable :: xySection1(:,:) , xySection2(:,:) , xyAirfoil2(:,:)
- real(wp), allocatable :: rrSection1(:,:) , rrSection2(:,:) , xyAirfoil1(:,:)
- real(wp) :: dx_ref , dy_ref , dz_ref
- integer :: ista , iend
+  logical :: twist_linear_interp, aero_table
+  integer :: nelem_chord, nelem_chord_tot ! , nelem_span_tot <--- moved as an output
+  integer :: npoint_chord_tot, npoint_span_tot
+  integer :: nRegions, nSections
+  integer :: iRegion, iSection, iChord, iSpan, iElement, iPoint
+  real(wp):: ref_chord_fraction
+  real(wp), allocatable :: ref_point(:)
+  ! data read from file
+  ! sections ---
+  real(wp)         , allocatable :: chord_list(:) , twist_list(:)
+  character(len=max_char_len), allocatable :: airfoil_list(:)
+  character(len=max_char_len), allocatable :: airfoil_table_list(:)
+  
+  ! regions  ---
+  integer , allocatable :: nelem_span_list(:)
+  real(wp), allocatable :: span_list(:) , sweep_list(:) , dihed_list(:)
+  character(len=max_char_len), allocatable :: type_span_list(:)
+  integer :: n_type_span
+  character :: ElType
+  ! Sections 1. 2.
+  real(wp), allocatable :: xySection1(:,:) , xySection2(:,:) , xyAirfoil2(:,:)
+  real(wp), allocatable :: rrSection1(:,:) , rrSection2(:,:) , xyAirfoil1(:,:)
+  real(wp) :: dx_ref , dy_ref , dz_ref
+  integer :: ista , iend
 
- ! Linear interpolation of the twist angle
- real(wp), allocatable :: rr_tw(:,:) , rr_tw_1(:,:) , rr_tw_2(:,:)
- real(wp) :: dx_ref_1, dy_ref_1, dz_ref_1
- real(wp) :: interp_weight
+  ! Linear interpolation of the twist angle
+  real(wp), allocatable :: rr_tw(:,:) , rr_tw_1(:,:) , rr_tw_2(:,:)
+  real(wp) :: dx_ref_1, dy_ref_1, dz_ref_1
+  real(wp) :: interp_weight
 
- character :: ElType
- real(wp), allocatable :: chord_fraction(:), span_fraction(:)
- character(len=max_char_len) :: type_chord
- integer :: i1
+  real(wp), allocatable :: chord_fraction(:), span_fraction(:)
+  character(len=max_char_len) :: type_chord
+  integer :: i1
 
- integer :: iSec
- real(wp) :: dy_actual_airfoils , dy_sections , csi , twist_rad
+  integer :: iSec
+  real(wp) :: dy_actual_airfoils , dy_sections , csi , twist_rad
 
- character(len=*), parameter :: this_sub_name = 'read_mesh_parametric'
+  character(len=*), parameter :: this_sub_name = 'read_mesh_parametric'
 
 
   !Prepare all the parameters to be read in the file
   ! Global parameters
   call pmesh_prs%CreateStringOption('ElType', &
-                'element type (temporary) p panel v vortex ring')
+                'element type (temporary) p panel v vortex ring');
+  call pmesh_prs%CreateLogicalOption('AirfoilTableCorrection', &
+                'include presence of aerodynamic .c81 for corrections', &
+                'F', &
+                multiple=.false.);
   call pmesh_prs%CreateIntOption('nelem_chord',&
                 'number of chord-wise elements', &
                 multiple=.false.);
@@ -137,17 +143,18 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                 'uniform', &
                 multiple=.false.);
   call pmesh_prs%CreateRealArrayOption('starting_point',&
-               'Starting point (inboard TE), (x, y, z)', &
-               '(/0.0, 0.0, 0.0/)',&
-               multiple=.false.);
+                'Starting point (inboard TE), (x, y, z)', &
+                '(/0.0, 0.0, 0.0/)',&
+                multiple=.false.);
   call pmesh_prs%CreateRealOption('reference_chord_fraction',&
-               'Reference chord fraction', &
-               '0.0',&
-               multiple=.false.);
+                'Reference chord fraction', &
+                '0.0',&
+                multiple=.false.);
   call pmesh_prs%CreateLogicalOption('twist_linear_interpolation',&
-               'Linear interpolation of the twist angle, for the whole component',&
-               'F',&
-               multiple=.false.);
+                'Linear interpolation of the twist angle, for the whole component',&
+                'F',&
+                multiple=.false.);
+  
   ! TODO: do we really need to allow the user to define the parameter above?
   ! the reference chord fraction is a number in the range [0,1] that defines
   ! - where the reference point is located in the root chord
@@ -164,8 +171,12 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   call pmesh_prs%CreateRealOption(     'twist', 'section twist angle', &
                 multiple=.true.);
   call pmesh_prs%CreateStringOption( 'airfoil', 'section airfoil', &
+                multiple=.true.);                
+  call pmesh_prs%CreateStringOption( 'airfoil_table', 'airfoil table path', &
                 multiple=.true.);
 
+  
+  
   ! Region parameters
   call pmesh_prs%CreateRealOption(    'span', 'region span',&
                 multiple=.true.);
@@ -177,8 +188,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                 multiple=.true.);
   call pmesh_prs%CreateStringOption('type_span', 'type of span-wise division: &
                 &uniform, cosine, cosineIB, cosineOB', multiple=.true.);
-
-
+  
   !read the parameters
   call pmesh_prs%read_options(mesh_file,printout_val=.true.)
 
@@ -191,7 +201,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   ! Check that nSections = nRegion + 1
   if ( nSections .ne. nRegions + 1 ) then
     call error(this_sub_name, this_mod_name, 'Unconsistent input: &
-         &nSections .ne. nRegions. Stop.')
+          &nSections .ne. nRegions. Stop.')
   end if
 
   ref_chord_fraction = getreal(pmesh_prs,'reference_chord_fraction')
@@ -202,19 +212,19 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   !Check the number of inputs
   if(countoption(pmesh_prs,'nelem_span') .ne. nRegions ) &
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-         &number of "nelem_span" different from number of regions.')
+        &number of "nelem_span" different from number of regions.')
   if(countoption(pmesh_prs,'dihed') .ne. nRegions ) &
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-         &number of "dihed" different from number of regions.')
+        &number of "dihed" different from number of regions.')
   if(countoption(pmesh_prs,'sweep') .ne. nRegions ) &
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-         &number of "sweep" different from number of regions.')
+        &number of "sweep" different from number of regions.')
   if(countoption(pmesh_prs,'twist') .ne. nSections ) &
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-         &number of "twist" different from number of sections.')
+        &number of "twist" different from number of sections.')
   if(countoption(pmesh_prs,'airfoil') .ne. nSections ) &
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-         &number of "airfoil" different from number of sections.')
+        &number of "airfoil" different from number of sections.')
 
   ! Get total number of elements and initialize arrays
   allocate(nelem_span_list(nRegions));   nelem_span_list = 0
@@ -254,10 +264,18 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   allocate(chord_list  (nSections))  ; chord_list = 0.0_wp
   allocate(twist_list  (nSections))  ; twist_list = 0.0_wp
   allocate(airfoil_list(nSections))
+  allocate(airfoil_table_list(nSections))
+  
   do iSection= 1,nSections
     chord_list(iSection)   = getreal(pmesh_prs,'chord')
     twist_list(iSection)   = getreal(pmesh_prs,'twist')
     airfoil_list(iSection) = getstr(pmesh_prs,'airfoil')
+
+    if ((ElType.eq.'p') .and. (.not. aero_table)) then
+    else
+      airfoil_table_list(iSection) = getstr(pmesh_prs,'airfoil_table')
+    endif   
+
   enddo
 
   if (ElType.eq.'p') then

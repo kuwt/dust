@@ -338,15 +338,15 @@ call prms%CreateRealOption( 'CutoffRad', &
 call prms%CreateStringOption('LLsolver','Solver for the LL elements', &
         'GammaMethod')
 call prms%CreateLogicalOption('LLReynoldsCorrections', &
-       'Use Reynolds corrections for the .c81 tables?', 'F')
+      'Use Reynolds corrections for the .c81 tables?', 'F')
 call prms%CreateRealOption('LLReynoldsCorrectionsNfact', &
-       'Exponent in (Re/Re_T)^n correction', '0.2')
+      'Exponent in (Re/Re_T)^n correction', '0.2')
 call prms%CreateIntOption('LLmaxIter', &
-       'Maximum number of iteration in LL algorithm', '100')
+      'Maximum number of iteration in LL algorithm', '100')
 call prms%CreateRealOption('LLtol', 'Tolerance for the relative error in &
-                           &fixed point iteration for LL','1.0e-6' )
+                          &fixed point iteration for LL','1.0e-6' )
 call prms%CreateRealOption('LLdamp', 'Damping param in fixed point iteration &
-                           &for LL used to avoid oscillations','25.0')
+                          &for LL used to avoid oscillations','25.0')
 call prms%CreateLogicalOption('LLstallRegularisation', &
        'Avoid "unphysical" separations in inner sections of LL?','T')
 call prms%CreateIntOption('LLstallRegularisationNelems', &
@@ -1121,6 +1121,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%a_inf  = getreal(prms,'a_inf')
   sim_param%mu_inf = getreal(prms,'mu_inf')
   sim_param%nu_inf = sim_param%mu_inf/sim_param%rho_inf
+
   !Wake parameters
   sim_param%n_wake_panels = getint(prms, 'n_wake_panels')
   if(sim_param%n_wake_panels .lt. 1) then
