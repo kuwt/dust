@@ -330,6 +330,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
 
   twist_list = twist_list * pi / 180
+<<<<<<< HEAD
   ista = 1 ; iend = npoint_chord_tot
   ich = 1
 
@@ -469,6 +470,237 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 !   chord_p(ich) = chord_p(ich) / 0.75_wp
 ! end do
 
+=======
+  ista       = 1
+  iend       = npoint_chord_tot
+  !ich        = 1
+
+  ! Loop over regions
+  do iRegion = 1, nRegions
+
+    ! check ----
+        write(*,*) ' Region ' , iRegion , ' / ' , nRegions
+    ! check ----
+    
+        if ( iRegion .gt. 1 ) then  ! first section = last section of the previous region
+          rrSection1 = rrSection2
+        else                        ! build points
+          write(*,*) ' nelem_chord_tot ' , nelem_chord_tot
+    
+          call define_section( chord_list(iRegion), &
+                              twist_list(iRegion), ElType, nelem_chord,              &
+                              chord_fraction, ref_chord_fraction,       &
+                              ref_point, xySection1 )
+  
+          write(*,*) size(rrSection1,1) , size(rrSection1,2)
+          write(*,*) size(xySection1,1) , size(xySection1,2)
+          rrSection1(1,:) = xySection1(1,:) + ref_point(1)
+          rrSection1(2,:) = 0.0_wp          + ref_point(2)     ! <--- read from region structure
+          rrSection1(3,:) = xySection1(2,:) + ref_point(3)
+    
+          ! Update rr
+          rr(:,ista:iend) = rrSection1
+    
+        end if
+    
+    
+        ! === new-2019-02-06 ===
+        ! now, it is possible to define the airfoils on some of the sections only.
+        !  When the shape of the airfoil is not defined on a section, it is interpolated
+        if ( trim(adjustl(airfoil_list(iRegion+1))) .ne. 'interp' ) then  ! read the field 'airfoil'
+    
+          call define_section( chord_list(iRegion+1), &
+                              twist_list(iRegion+1), ElType, nelem_chord,                    &
+                              chord_fraction, ref_chord_fraction,               &
+                              ref_point, xySection2 )
+    
+        else ! interpolation
+    
+          do iSec = iRegion + 1 , nRegions + 1
+            if ( airfoil_list(iSec) .ne. 'interp' ) then
+              dy_actual_airfoils = sum( abs(span_list(iRegion:iSec-1)) )
+            exit
+            end if
+          end do
+          dy_sections = abs(span_list(iRegion))
+          csi = dy_sections / dy_actual_airfoils ! adimensional "coord" for interpolation
+    
+          call define_section( 1.0_wp , &
+                              0.0_wp , ElType, nelem_chord,               &
+                              chord_fraction, 0.0_wp,                     &
+                              ref_point, xyAirfoil2 )
+    
+          ! Compute the coordinates xySection2(), after removing the offset
+          if ( .not. allocated(xySection2) ) &
+                      allocate(xySection2(size(xyAirfoil2,1),size(xyAirfoil2,2)))
+    
+    
+          if ( allocated(xyAirfoil1) ) deallocate(xyAirfoil1)
+          allocate(xyAirfoil1(size(xyAirfoil2,1),size(xyAirfoil2,2)))
+    
+          xyAirfoil1(1,:) = ( rrSection1(1,:) - dx_ref ) / chord_list(iRegion)
+          xyAirfoil1(2,:) = ( rrSection1(3,:) - dz_ref ) / chord_list(iRegion)
+    
+          xyAirfoil1(1,:) =   rrSection1(1,:) + ref_chord_fraction
+    
+          twist_rad = twist_list(iRegion) * 4.0_wp * atan(1.0_wp) / 180.0_wp
+          xyAirfoil1 = matmul( &
+               reshape( (/ cos(twist_rad), sin(twist_rad) , &
+                          -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
+                                                              xyAirfoil1 )
+    
+    !     xySection2(1,:) = ( (1-csi) * xyAirfoil1(1,:) + &
+    !                            csi  * xyAirfoil2(1,:) ) * chord_list(iRegion+1)
+    !     xySection2(2,:) = ( (1-csi) * xyAirfoil1(2,:) + &
+    !                            csi  * xyAirfoil2(2,:) ) * chord_list(iRegion+1)
+          xySection2 = ( (1-csi) * xyAirfoil1 + &
+                            csi  * xyAirfoil2 ) * chord_list(iRegion+1)
+          xySection2(1,:) = xySection2(1,:) - ref_chord_fraction
+    
+          twist_rad = twist_list(iRegion+1) * 4.0_wp * atan(1.0_wp) / 180.0_wp
+          xySection2 = matmul( &
+               reshape( (/ cos(twist_rad),-sin(twist_rad) , &
+                           sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
+                                                              xySection2 )
+    
+        end if
+        ! === new-2019-02-06 ===
+    
+    
+        if ( abs( sweep_list(iRegion) ) .gt. 60.0_wp ) then
+          write(*,*) ' WARNING. abs( sweep_list(iRegion) ) .gt. 60.0_wp. '
+        end if
+        if ( abs( dihed_list(iRegion) ) .gt. 60.0_wp ) then
+          write(*,*) ' WARNING. abs( sweep_list(iRegion) ) .gt. 60.0_wp. '
+        end if
+    
+        !> save before update
+        dx_ref_1 = dx_ref ;  dy_ref_1 = dy_ref ;  dz_ref_1 = dz_ref
+    
+        dx_ref = span_list(iRegion) * tan( sweep_list(iRegion)* pi / 180.0_wp ) + dx_ref
+        dy_ref = span_list(iRegion)                                             + dy_ref
+        dz_ref = span_list(iRegion) * tan( dihed_list(iRegion)* pi / 180.0_wp ) + dz_ref
+    
+        rrSection2(1,:) = xySection2(1,:) + dx_ref
+        rrSection2(2,:) = 0.0_wp          + dy_ref  ! <--- read from region structure
+        rrSection2(3,:) = xySection2(2,:) + dz_ref
+    
+        ! Interpolation of the nodes of the region i (between sections i and i+1)
+        do i1 = 1 , nelem_span_list(iRegion)
+    
+          ista = iend + 1
+          iend = iend + npoint_chord_tot
+    
+          if ( .not. twist_linear_interp ) then
+    
+            ! write(*,*) ; write(*,* )' *** twist_linear_interp = F *** ' ; write(*,*)
+    
+            if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then
+              ! uniform spacing in span
+              rr(:,ista:iend) = rrSection1 + real(i1,wp) / &
+                                real(nelem_span_list(iRegion),wp) * &
+                                ( rrSection2 - rrSection1 )
+            else if ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then
+              ! cosine  spacing in span
+              rr(:,ista:iend) = 0.5_wp * ( rrSection1 + rrSection2 ) - &
+                                0.5_wp * ( rrSection2 - rrSection1 ) * &
+                          cos( real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
+            else if ( trim(type_span_list(iRegion)) .eq. 'cosineOB' ) then
+              ! cosine  spacing in span: outboard refinement
+              rr(:,ista:iend) = rrSection1 + &
+                              ( rrSection2 - rrSection1 ) * &
+                  sin( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
+            else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then
+              ! cosine  spacing in span: inboard refinement
+              rr(:,ista:iend) = rrSection2 - &
+                              ( rrSection2 - rrSection1 ) * &
+                  cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
+            else
+              write(*,*) ' mesh_file   : ' , trim(mesh_file)
+              write(*,*) ' type_span_list(',iRegion,') : ' , trim(type_span_list(iRegion))
+              call error(this_sub_name, this_mod_name, 'Unconsistent input: &
+                    & type_span must be equal to uniform, cosine, cosineIB, cosineOB.')
+            end if
+    
+          else !-> linear interpolation of the twist angle
+    
+            ! write(*,*) ; write(*,* )' *** twist_linear_interp = T *** ' ; write(*,*)
+    
+            allocate(rr_tw(  2,npoint_chord_tot))
+            allocate(rr_tw_1(2,npoint_chord_tot))
+            allocate(rr_tw_2(2,npoint_chord_tot))
+    
+            ! === Transform sections back to local reference frames ===
+            ! Section 1
+            !> remove offset in x,z
+            rr_tw_1(1,:) = rrSection1(1,:) - dx_ref_1
+            rr_tw_1(2,:) = rrSection1(3,:) - dz_ref_1
+            !> rotate section back ( coord. in the local ref. frame )
+            twist_rad = twist_list(iRegion) * pi/180.0_wp
+            rr_tw_1 = matmul( &
+                 reshape( (/ cos(twist_rad), sin(twist_rad) , &
+                            -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
+                                                                   rr_tw_1 )
+            ! Section 2
+            !> remove offset in x,z
+            rr_tw_2(1,:) = rrSection2(1,:) - dx_ref
+            rr_tw_2(2,:) = rrSection2(3,:) - dz_ref
+            !> rotate section back ( coord. in the local ref. frame )
+            twist_rad = twist_list(iRegion+1) * pi/180.0_wp
+            rr_tw_2 = matmul( &
+                 reshape( (/ cos(twist_rad), sin(twist_rad) , &
+                            -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
+                                                                   rr_tw_2 )
+            ! === Interpolation weight ===
+            if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then
+              interp_weight = real(i1,wp) / real(nelem_span_list(iRegion),wp)
+            else if ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then
+              interp_weight = 0.5_wp * ( &
+                            1.0_wp - cos( real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) ) )
+            else if ( trim(type_span_list(iRegion)) .eq. 'cosineOB' ) then
+              interp_weight = sin( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
+            else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then
+              interp_weight = 1.0_wp - cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
+              ! interp_weight = cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
+            else
+              write(*,*) ' mesh_file   : ' , trim(mesh_file)
+              write(*,*) ' type_span_list(',iRegion,') : ' , trim(type_span_list(iRegion))
+              call error(this_sub_name, this_mod_name, 'Unconsistent input: &
+                    & type_span must be equal to uniform, cosine, cosineIB, cosineOB.')
+            end if
+    
+            ! === x,z coordinates ===
+            rr_tw = rr_tw_1 + ( rr_tw_2 - rr_tw_1 ) * interp_weight
+            !> rotation ( linear interpolation of the twist angle )
+            twist_rad = pi/180.0_wp * ( twist_list(iRegion) + &
+                ( twist_list(iRegion+1)-twist_list(iRegion) ) * interp_weight )
+            rr_tw = matmul( &
+                    reshape( (/ cos(twist_rad),-sin(twist_rad) , &
+                                sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
+                                                                        rr_tw )
+            rr(1,ista:iend) = rr_tw(1,:) + dx_ref_1 + &
+                                ( dx_ref - dx_ref_1 ) * interp_weight
+            rr(3,ista:iend) = rr_tw(2,:) + dz_ref_1 + &
+                                ( dz_ref - dz_ref_1 ) * interp_weight
+            ! === y coordinate ===
+            rr(2,ista:iend) = rrSection1(2,:) + &
+                            ( rrSection2(2,:) - rrSection1(2,:) ) * interp_weight
+    
+            deallocate(rr_tw, rr_tw_1, rr_tw_2)
+    
+    
+          end if
+    
+        end do
+    
+    
+      enddo
+    
+      ! lots of deallocation missing causing memory leakage =(
+      if ( allocated(xySection1) ) deallocate(xySection1)
+      if ( allocated(xySection2) ) deallocate(xySection2)
+      ! ...
+>>>>>>> wip in NL-UVLM
 
 ! === new-2019-02-06 ===
 ! Save the fields related to the definition of actual airfoils

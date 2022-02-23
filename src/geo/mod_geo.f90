@@ -185,6 +185,13 @@ type :: t_geo_component
   !> Number of elements of the component
   integer :: nelems
 
+  !> Number of elements in chord
+  integer :: n_c
+
+  !> Number of elements in span
+  integer :: n_s
+
+
   !> Elements of the group
   !! The main memory allocation happens here, they will be pointed from
   !! somewhere else
@@ -1769,7 +1776,10 @@ subroutine prepare_geometry(geo)
           elem%i_airfoil =  geo%components(i_comp)%i_airfoil_e(:,ie)
           elem%twist     =  geo%components(i_comp)%theta_e(ie)
         class is(t_vortlatt)
-
+          !elem%csi_cen = 0.5_wp * &
+          !                sum(geo%components(i_comp)%normalised_coord_e(:,ie))
+          !elem%i_airfoil =  geo%components(i_comp)%i_airfoil_e(:,ie)
+          
         class is(t_actdisk)
 
         class default
@@ -2085,12 +2095,12 @@ subroutine create_strip_connectivity(geo)
  integer :: i_c , i_s , n_s , n_c , i_c2
  character(len=*), parameter :: this_sub_name = 'create_strip_connectivity'
 
- do i_comp = 1 , size(geo%components)
+do i_comp = 1 , size(geo%components)
   associate(comp => geo%components(i_comp))
 
   ! connectivity built for lifting surface only
   if ( ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'v' .or. &
-         geo%components(i_comp)%comp_el_type(1:1) .eq. 'l' )  ) then
+          geo%components(i_comp)%comp_el_type(1:1) .eq. 'l' )  ) then
 
     n_el = size(comp%el)
 
@@ -2136,26 +2146,32 @@ subroutine create_strip_connectivity(geo)
     ! allocate and fill comp%strip_elem array
     if ( mod(n_el,n_s) .ne. 0 ) then
       call error(this_sub_name, this_mod_name, ' The number of elements of&
-         & a parametric element is not an exact multiple of the number of&
-         & spanwise stripes. There is something wrong in the geometry input&
-         & file')
+          & a parametric element is not an exact multiple of the number of&
+          & spanwise stripes. There is something wrong in the geometry input&
+          & file')
     end if
     n_c = n_el / n_s  ! integer division to find number of chord panels
+
+    !comp%n_c = n_c
+    !comp%n_s = n_s
 
     do i_s = 1 , n_s
       do i_c = 1 , n_c
         allocate( comp%el(i_c+(i_s-1)*n_c)%stripe_elem(i_c) )
         do i_c2 = 1 , i_c
-          comp%el(i_c+(i_s-1)*n_c)%stripe_elem(i_c2)%p => &
+          comp%el(i_c+(i_s - 1)*n_c)%stripe_elem(i_c2)%p => &
                                         comp%el(i_c2+(i_s-1)*n_c)
+          comp%el(i_c+(i_s - 1)*n_c)%n_c = n_c
+          comp%el(i_c+(i_s - 1)*n_c)%n_s = n_s
         end do
       end do
+      
     end do
 
   end if
 
   end associate
- end do
+end do
 
 
 end subroutine create_strip_connectivity

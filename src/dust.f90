@@ -149,9 +149,12 @@ use mod_octree, only: &
   initialize_octree, destroy_octree, sort_particles, t_octree, &
   apply_multipole_panels
 
+use mod_math, only: & 
+  cross, dot
+
 #if USE_PRECICE
-      use mod_precice, only: &
-          t_precice
+  use mod_precice, only: &
+    t_precice
 #endif
 
 use mod_wind, only: &
@@ -164,15 +167,12 @@ integer :: run_id(10)
 
 !Input
 !> Main parameters parser
-type(t_parse) :: prms
-character(len=*), parameter :: input_file_name_def = 'dust.in'
-character(len=max_char_len) :: input_file_name
-character(len=max_char_len) :: target_file
+type(t_parse)                    :: prms
+character(len=*), parameter      :: input_file_name_def = 'dust.in'
+character(len=max_char_len)      :: input_file_name
+character(len=max_char_len)      :: target_file
 character(len=extended_char_len) :: message
 
-!Simulation parameters
-!type(t_sim_param) :: sim_param
-! Asymptotic conditions
 
 !Time parameters
 real(wp) :: time
@@ -185,62 +185,58 @@ real(wp) :: dt_debug_out
 
 !Main variables
 !> All the implicit elements, sorted first static then moving
-type(t_impl_elem_p), allocatable :: elems(:)
+type(t_impl_elem_p), allocatable  :: elems(:)
 !> All the explicit elements
-type(t_expl_elem_p), allocatable :: elems_expl(:)
+type(t_expl_elem_p), allocatable  :: elems_expl(:)
 !> Only the lifting line elements
-!type(t_expl_elem_p), allocatable :: elems_ll(:)
-type(t_liftlin_p), allocatable :: elems_ll(:)
+type(t_liftlin_p), allocatable    :: elems_ll(:)
 !> Only the actuator disk elements
-type(t_expl_elem_p), allocatable :: elems_ad(:)
+type(t_expl_elem_p), allocatable  :: elems_ad(:)
 !> All the elements (panels+ll)
-type(t_pot_elem_p), allocatable :: elems_tot(:)
+type(t_pot_elem_p), allocatable   :: elems_tot(:)
 !> Geometry
-type(t_geo) :: geo
+type(t_geo)                       :: geo
 !> Trailing edge
-type(t_tedge) :: te
+type(t_tedge)                     :: te
 !> Airfoil table data
-type(t_aero_tab), allocatable :: airfoil_data(:)
+type(t_aero_tab), allocatable     :: airfoil_data(:)
 !> Linear system
-type(t_linsys) :: linsys
+type(t_linsys)                    :: linsys
 !> Wake
-type(t_wake) :: wake
+type(t_wake)                      :: wake
 
 !> Timing vars
-real(t_realtime) :: t1 , t0, t00, t11, t22
+real(t_realtime)                  :: t1 , t0, t00, t11, t22
 
 !I/O prefixes
-character(len=max_char_len) :: frmt
-character(len=max_char_len) :: basename_debug
+character(len=max_char_len)       :: frmt
+character(len=max_char_len)       :: basename_debug
 
-real(wp) , allocatable :: res_old(:)
-real(wp) , allocatable :: surf_vel_SurfPan_old(:,:)
-real(wp) , allocatable ::      nor_SurfPan_old(:,:)
+real(wp) , allocatable            :: res_old(:)
+real(wp) , allocatable            :: surf_vel_SurfPan_old(:,:)
+real(wp) , allocatable            ::      nor_SurfPan_old(:,:)
 
-real(wp) , allocatable :: al_kernel(:,:) , al_v(:)
-
-integer :: i_el , i, sel
+real(wp) , allocatable            :: al_kernel(:,:) , al_v(:)
+!> vl viscous correction
+real(wp), allocatable             :: cl_inv(:), cl_visc(:) 
+integer                           :: i_el , i, sel, i_chord, i_span
 
 !octree parameters
-type(t_octree) :: octree
+type(t_octree)                    :: octree
 
 #if USE_PRECICE
-    !> --- PreCICE data ---------------------------------------------
-    type(t_precice) :: precice
-    integer :: bool
-    logical :: precice_convergence
-    integer :: j
-    !> debug --------
-    real(wp) :: sum_force(3)
-    !> debug --------
-    !> --- PreCICE --------------------------------------------------
+  !> --- PreCICE data ---------------------------------------------
+  type(t_precice)               :: precice
+  integer                       :: bool
+  logical                       :: precice_convergence
+  integer                       :: j
+  real(wp)                      :: sum_force(3)
 #endif
 
 
 #if USE_PRECICE
-    !> --- Initialize PreCICE ---------------------------------------
-    call precice % initialize()
-    !> --- Initialize PreCICE: done ---------------------------------
+  !> --- Initialize PreCICE ---------------------------------------
+  call precice % initialize()
 #endif
 
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
@@ -276,25 +272,21 @@ call prms%CreateStringOption('ReferenceFile','Reference frames file','no_set')
 
 ! output:
 call prms%CreateStringOption('basename','oputput basename','./')
-call prms%CreateStringOption('basename_debug','oputput basename for debug', &
-                                                                         './')
+call prms%CreateStringOption('basename_debug','oputput basename for debug','./')
 call prms%CreateLogicalOption( 'output_start', "output values at starting &
                                                           & iteration", 'F')
 call prms%CreateLogicalOption( 'output_detailed_geo', "output at each &
                     &timestep the detailed geometry in the results file", 'F')
-call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output', &
-                                                                         '1')
+call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output', '1')
 
 ! restart
 call prms%CreateLogicalOption('restart_from_file','restarting from file?','F')
 call prms%CreateStringOption('restart_file','restart file name')
-call prms%CreateLogicalOption('reset_time','reset the time from previous &
-                               &execution?','F')
+call prms%CreateLogicalOption('reset_time','reset the time from previous execution?','F')
 
 ! parameters:
 ! --- reference conditions ---
-call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", &
-                                                       '(/1.0, 0.0, 0.0/)')
+call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", '(/1.0, 0.0, 0.0/)')
 call prms%CreateRealOption( 'u_ref', "reference velocity")             !
 call prms%CreateRealOption( 'P_inf', "free stream pressure", '101325')    !
 call prms%CreateRealOption( 'rho_inf', "free stream density", '1.225')   !
@@ -303,22 +295,18 @@ call prms%CreateRealOption( 'mu_inf', "Dynamic viscosity", '0.000018') ! kg/ms
 
 ! --- wake ---
 call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
-call prms%CreateIntOption('n_wake_particles', 'number of wake particles', &
-                                                                  '10000')
+call prms%CreateIntOption('n_wake_particles', 'number of wake particles', '10000')
 call prms%CreateRealArrayOption('particles_box_min', 'min coordinates of the &
-     &particles bounding box', '(/-10.0, -10.0, -10.0/)')
+                                &particles bounding box', '(/-10.0, -10.0, -10.0/)')
 call prms%CreateRealArrayOption('particles_box_max', 'max coordinates of the &
-     &particles bounding box', '(/10.0, 10.0, 10.0/)')
+                                &particles bounding box', '(/10.0, 10.0, 10.0/)')
 
-call prms%CreateRealOption( 'ImplicitPanelScale', &
-                    "Scaling of the first implicit wake panel", '0.3')
-call prms%CreateRealOption( 'ImplicitPanelMinVel', &
-                    "Minimum velocity at the trailing edge", '1.0e-8')
+call prms%CreateRealOption( 'ImplicitPanelScale', "Scaling of the first implicit wake panel", '0.3')
+call prms%CreateRealOption( 'ImplicitPanelMinVel', "Minimum velocity at the trailing edge", '1.0e-8')
 call prms%CreateLogicalOption('rigid_wake','rigid wake?','F')
 call prms%CreateRealArrayOption( 'rigid_wake_vel', "rigid wake velocity" )
 call prms%CreateLogicalOption('join_te','join trailing edge','F')
-call prms%CreateRealOption( 'join_te_factor', "join the trailing edges &
-                             &when closer than factor*te element size",'1.0' )
+call prms%CreateRealOption( 'join_te_factor', "join the trailing edges when closer than factor*te element size",'1.0' )
 
 ! --- regularisation ---
 call prms%CreateRealOption( 'FarFieldRatioDoublet', &
@@ -336,35 +324,35 @@ call prms%CreateRealOption( 'CutoffRad', &
 
 ! --- lifting line elements ---
 call prms%CreateStringOption('LLsolver','Solver for the LL elements', &
-        'GammaMethod')
+                          &'GammaMethod')
 call prms%CreateLogicalOption('LLReynoldsCorrections', &
-      'Use Reynolds corrections for the .c81 tables?', 'F')
+                          &'Use Reynolds corrections for the .c81 tables?', 'F')
 call prms%CreateRealOption('LLReynoldsCorrectionsNfact', &
-      'Exponent in (Re/Re_T)^n correction', '0.2')
+                          &'Exponent in (Re/Re_T)^n correction', '0.2')
 call prms%CreateIntOption('LLmaxIter', &
-      'Maximum number of iteration in LL algorithm', '100')
+                          &'Maximum number of iteration in LL algorithm', '100')
 call prms%CreateRealOption('LLtol', 'Tolerance for the relative error in &
                           &fixed point iteration for LL','1.0e-6' )
 call prms%CreateRealOption('LLdamp', 'Damping param in fixed point iteration &
                           &for LL used to avoid oscillations','25.0')
 call prms%CreateLogicalOption('LLstallRegularisation', &
-       'Avoid "unphysical" separations in inner sections of LL?','T')
+                          &'Avoid "unphysical" separations in inner sections of LL?','T')
 call prms%CreateIntOption('LLstallRegularisationNelems', &
-       'Number of "unphysical" separations to be removed', '1' )
+                          &'Number of "unphysical" separations to be removed', '1' )
 call prms%CreateIntOption('LLstallRegularisationNiters', &
-       'Number of timesteps between two regularisations', '1' )
+                          &'Number of timesteps between two regularisations', '1' )
 call prms%CreateRealOption('LLstallRegularisationAlphaStall', &
-       'Stall angle used as threshold for regularisation [deg]', '15.0' )
+                          &'Stall angle used as threshold for regularisation [deg]', '15.0' )
 call prms%CreateRealOption('LLartificialViscosity', &
-       'Constant artificial viscosity for regularisation', '0.0' )
+                          &'Constant artificial viscosity for regularisation', '0.0' )
 call prms%CreateLogicalOption('LLartificialViscosityAdaptive', &
-       'Adaptive artificial viscosity algorithm', 'F' )
+                          &'Adaptive artificial viscosity algorithm', 'F' )
 call prms%CreateRealOption('LLartificialViscosityAdaptive_Alpha', &
-       'Adaptive Artificial Viscosity algorithm, reference AOA [deg]')
+                          &'Adaptive Artificial Viscosity algorithm, reference AOA [deg]')
 call prms%CreateRealOption('LLartificialViscosityAdaptive_dAlpha', &
-       'Adaptive Artificial Viscosity algorithm, reference AOA [deg]')
+                          &'Adaptive Artificial Viscosity algorithm, reference AOA [deg]')
 call prms%CreateLogicalOption('LLloadsAVL', &
-       'Use AVL expression for inviscid load computation','T')
+                          &'Use AVL expression for inviscid load computation','T')
 
 !== Octree and multipole data ==
 call prms%CreateLogicalOption('FMM','Employ fast multipole method?','T')
@@ -374,30 +362,27 @@ call prms%CreateRealOption('BoxLength','length of the octree box')
 call prms%CreateIntArrayOption('NBox','number of boxes in each direction')
 call prms%CreateRealArrayOption( 'OctreeOrigin', "rigid wake velocity" )
 call prms%CreateIntOption('NOctreeLevels','number of octree levels')
-call prms%CreateIntOption('MinOctreePart','minimum number of octree &
-                                                             &particles')
+call prms%CreateIntOption('MinOctreePart','minimum number of octree particles')
 call prms%CreateIntOption('MultipoleDegree','multipole expansion degree')
 call prms%CreateLogicalOption('DynLayers','Use dynamic layers','F')
-call prms%CreateIntOption('NMaxOctreeLevels','maximum number &
-                                                          &of octree levels')
+call prms%CreateIntOption('NMaxOctreeLevels','maximum number of octree levels')
 call prms%CreateRealOption('LeavesTimeRatio','Ratio that triggers the &
                                           &increase of the number of levels')
 
 ! models options
 call prms%CreateLogicalOption('Vortstretch','Employ vortex stretching','T')
 call prms%CreateLogicalOption('VortstretchFromElems','Employ vortex stretching&
-                                     & from geometry elements','F')
+                              & from geometry elements','F')
 call prms%CreateLogicalOption('DivergenceFiltering','Employ divergence filtering','T')
 call prms%CreateRealOption('FilterTimescale','Filter timescale','40.0')
 call prms%CreateLogicalOption('Diffusion','Employ vorticity diffusion','T')
 call prms%CreateLogicalOption('TurbulentViscosity','Employ turbulent &
-                               &viscosity','F')
-call prms%CreateLogicalOption('PenetrationAvoidance','Employ penetration &
-                                                              & avoidance','F')
+                              &viscosity','F')
+call prms%CreateLogicalOption('PenetrationAvoidance','Employ penetration avoidance','F')
 call prms%CreateRealOption('PenetrationAvoidanceCheckRadius', &
-     'Check radius for penetration avoidance','5.0')
+      'Check radius for penetration avoidance','5.0')
 call prms%CreateRealOption('PenetrationAvoidanceElementRadius', &
-     'Element impact radius for penetration avoidance','1.5')
+      'Element impact radius for penetration avoidance','1.5')
 call prms%CreateLogicalOption('ViscosityEffects','Simulate viscosity &
                                                               & effects','F')
 call prms%CreateLogicalOption('ParticlesRedistribution','Employ particles &
@@ -405,11 +390,10 @@ call prms%CreateLogicalOption('ParticlesRedistribution','Employ particles &
 call prms%CreateIntOption('OctreeLevelSolid','Level at which the panels &
                           & are considered for particles redistribution')
 call prms%CreateRealOption('ParticlesRedistributionRatio','How many times &
-         &a particle need to be smaller than the average of the cell to be&
-         & eliminated','3.0')
+          &a particle need to be smaller than the average of the cell to be&
+          & eliminated','3.0')
 ! HCAS
-call prms%CreateLogicalOption('HCAS','Hover Convergence Augmentation System',&
-                               'F')
+call prms%CreateLogicalOption('HCAS','Hover Convergence Augmentation System', 'F')
 call prms%CreateRealOption('HCAS_time','HCAS deployment time')
 call prms%CreateRealArrayOption('HCAS_velocity','HCAS velocity')
 
@@ -424,6 +408,8 @@ call prms%CreateRealArrayOption('GustPerturbationDirection','Gust perturbation &
                               &direction vector','(/0.0, 0.0, 1.0/)')
 call prms%CreateRealOption('GustGradient','Gust gradient')
 call prms%CreateRealOption('GustStartTime','Gust starting time','0.0')
+
+
 
 ! get the parameters and print them out
 call printout(nl//'====== Input parameters: ======')
@@ -459,37 +445,33 @@ call initialize_surfpan()
 ! Check that tend .gt. tinit
 if ( sim_param%tend .le. sim_param%t0 ) then
     write(message,*) 'The end time of the simulation',sim_param%tend,'is&
-                     & lower or equal to the start time',sim_param%t0,'.&
-                     & Remembver that when restarting without resetting the&
-                     & time the start time is taken from the restart result!'
+                    & lower or equal to the start time',sim_param%t0,'.&
+                    & Remembver that when restarting without resetting the&
+                    & time the start time is taken from the restart result!'
     call error('dust','',message)
 end if
 
 
 !Printout the parameters
 if (sim_param%debug_level .ge. 3) then
-  write(message,*) 'Initial time tstart: ', sim_param%t0; call printout(message)
-  write(message,*) 'Final time tend:     ', sim_param%tend; call printout(message)
-  write(message,*) 'Time step dt:        ', sim_param%dt; call printout(message)
-  write(message,*) 'Output interval:     ', sim_param%dt_out; call printout(message)
-  write(message,*) 'Output first step:   ', output_start; call printout(message)
-  write(message,*) 'Debug level:', sim_param%debug_level; call printout(message)
-  write(message,*) 'Free stream velocity:', sim_param%u_inf; call printout(message)
-  write(message,*) 'Maximum wake panels:', sim_param%n_wake_panels; call printout(message)
-  write(message,*) 'Results basename: ', trim(sim_param%basename); call printout(message)
-  write(message,*) 'Debug basename: ', trim(basename_debug); call printout(message)
+  write(message,*) 'Initial time tstart: ', sim_param%t0;             call printout(message)
+  write(message,*) 'Final time tend:     ', sim_param%tend;           call printout(message)
+  write(message,*) 'Time step dt:        ', sim_param%dt;             call printout(message)
+  write(message,*) 'Output interval:     ', sim_param%dt_out;         call printout(message)
+  write(message,*) 'Output first step:   ', output_start;             call printout(message)
+  write(message,*) 'Debug level:         ', sim_param%debug_level;    call printout(message)
+  write(message,*) 'Free stream velocity:', sim_param%u_inf;          call printout(message)
+  write(message,*) 'Maximum wake panels: ', sim_param%n_wake_panels;  call printout(message)
+  write(message,*) 'Results basename:    ', trim(sim_param%basename); call printout(message)
+  write(message,*) 'Debug basename:      ', trim(basename_debug);     call printout(message)
 endif
 
 
 !---- Check that the basenames are valid ----
-  call check_basename(trim(sim_param%basename),'dust main')
-  if(sim_param%debug_level.ge.10) &
-    call check_basename(trim(basename_debug),'dust main')
+call check_basename(trim(sim_param%basename),'dust main')
+if(sim_param%debug_level.ge.10)  call check_basename(trim(basename_debug),'dust main')
 
 !---- Simulation parameters ----
-!!nstep = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1
-!!       !(+1 for the zero time step)
-!!sim_param%n_timesteps = nstep
 nstep = sim_param%n_timesteps
 allocate(sim_param%time_vec(sim_param%n_timesteps))
 sim_param%time_vec = (/ ( sim_param%t0 + &
@@ -512,9 +494,9 @@ if(sim_param%debug_level .ge. 1) then
 endif
 
 if(sim_param%debug_level .ge. 15) &
-      call debug_printout_geometry_minimal(elems, geo, basename_debug, 0)
+  call debug_printout_geometry_minimal(elems, geo, basename_debug, 0)
 if(sim_param%debug_level .ge. 15) &
-      call debug_ll_printout_geometry(elems_ll, geo, basename_debug, 0)
+  call debug_ll_printout_geometry(elems_ll, geo, basename_debug, 0)
 
 !TODO: check whether to move these calls before, and precisely what they do
 if(sim_param%debug_level .ge. 7) call ignoredParameters(prms)
@@ -523,15 +505,14 @@ call finalizeParameters(prms)
 !> --- Initialize PreCICE mesh and fields -----------------------
 #if USE_PRECICE
   te%t_hinged = te%t
-  call precice % initialize_mesh( geo )
-  call precice % initialize_fields()
-  call precicef_initialize(precice % dt_precice)
-  call precice % update_elems(geo, elems_tot, te ) ! TEST
+  call precice%initialize_mesh( geo )
+  call precice%initialize_fields()
+  call precicef_initialize(precice%dt_precice)
+  call precice%update_elems(geo, elems_tot, te ) ! TEST
 #endif
 !> --- Initialize PreCICE mesh and fields: done -----------------
 
 !------ Initialization ------
-
 if(sim_param%use_fmm) then
   call printout(nl//'====== Initializing Octree ======')
   t0 = dust_time()
@@ -553,9 +534,7 @@ call initialize_wake(wake, geo, te, sim_param%n_wake_panels, &
 
 call printout(nl//'====== Initializing Linear System ======')
 t0 = dust_time()
-call initialize_linsys(linsys, geo, elems, elems_expl, &
-                      wake ) ! sim_param%u_inf)
-!call initialize_pressure_sys(linsys, geo, elems)
+call initialize_linsys(linsys, geo, elems, elems_expl, wake ) 
 
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
@@ -563,17 +542,10 @@ if(sim_param%debug_level .ge. 1) then
   call printout(message)
 endif
 
-
-
-! Restart --------------
-!------ Reloading ------
+!>---------------- Restart --------------
 if (sim_param%restart_from_file) then
  call load_solution(sim_param%restart_file, geo%components, geo%refs)
  call load_wake(sim_param%restart_file, wake, elems_tot)
-
-! Moved to mod_geo.f90/create_geometry()
-!! Update the initial relative position of the ref.sys.
-!call update_relative_initial_conditions(restart_file, sim_param%ReferenceFile, geo%refs)
 
 else ! Set to zero the intensity of all the singularities
 
@@ -619,15 +591,16 @@ end if
       write(*,*) ' is coupling ongoing: ', precice % is_ongoing
       write(*,*) ' dt_precice         : ', precice % dt_precice
 #endif
-!> --- Initialize PreCICE mesh and fields: done -----------------
 
 
-!====== Time Cycle ======
+!======================= Time Cycle ==================================
 call printout(nl//'////////// Performing Computations //////////')
 time = sim_param%t0
 sim_param%time_old = sim_param%t0 + 1
-t_last_out = time; t_last_debug_out = time
-time_no_out = 0.0_wp; time_no_out_debug = 0.0_wp
+t_last_out = time; 
+t_last_debug_out = time
+time_no_out = 0.0_wp; 
+time_no_out_debug = 0.0_wp
 
 allocate(surf_vel_SurfPan_old(geo%nSurfpan,3)) ; surf_vel_SurfPan_old = 0.0_wp
 allocate(     nor_SurfPan_old(geo%nSurfpan,3)) ;      nor_SurfPan_old = 0.0_wp
@@ -674,14 +647,14 @@ if ( mod( it-1, sim_param%ndt_update_wake ) .eq. 0 ) then
   call prepare_wake(wake, elems_tot, octree)
 end if
 
-  call update_liftlin(elems_ll,linsys)
-  call update_actdisk(elems_ad,linsys)
+call update_liftlin(elems_ll,linsys)
+call update_actdisk(elems_ad,linsys)
 
-  !debug geometry printing
-  if((sim_param%debug_level .ge. 16).and.time_2_debug_out)&
-            call debug_printout_geometry(elems, geo, basename_debug, it)
-  if((sim_param%debug_level .ge. 16).and.time_2_debug_out)&
-            call debug_ll_printout_geometry(elems_ll, geo, basename_debug, it)
+!debug geometry printing
+if((sim_param%debug_level .ge. 16).and.time_2_debug_out)&
+          call debug_printout_geometry(elems, geo, basename_debug, it)
+if((sim_param%debug_level .ge. 16).and.time_2_debug_out)&
+          call debug_ll_printout_geometry(elems_ll, geo, basename_debug, it)
 
 #if USE_PRECICE
       !> -------------------------------------------------------------
@@ -728,27 +701,20 @@ end if
       !> Update near-field wake
       call precice % update_near_field_wake( geo, wake, te )
 
-      !> Update dt
-      ! *** to do *** : change the way of treating time integration.
-      ! So far, only explicit fixed-dt integration is available.
-      ! The law of motion of the rigid components is evaluated before
-      ! the time loop starts
-      ! dt = min ( dt_dust, dt_precice )
-
+      !> Update dt--> mbdyn should take care of the dt and send it to precice
 #else
 #endif
 
-      !Calculate the normal velocity derivative for the pressure equation
-      call press_normvel_der(geo, elems, surf_vel_SurfPan_old)
+!> Calculate the normal velocity derivative for the pressure equation
+call press_normvel_der(geo, elems, surf_vel_SurfPan_old)
 
-  !------ Assemble the system ------
-  !call prepare_wake(wake, geo, sim_param)
-  t0 = dust_time()
+!------ Assemble the system ------
+!call prepare_wake(wake, geo, sim_param)
+t0 = dust_time()
 
-  call assemble_linsys(linsys, geo, elems, elems_expl, wake)
-  call assemble_pressure_sys(linsys, geo, elems, wake)
-  t1 = dust_time()
+sel = size(elems)
 
+<<<<<<< HEAD
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,F9.3,A)') 'Assembled linear system in: ' , t1 - t0,' s.'
     call printout(message)
@@ -762,35 +728,52 @@ end if
                          trim(basename_debug)//'Apres_'//trim(frmt)//'.dat', &
                          trim(basename_debug)//'bpres_'//trim(frmt)//'.dat')
   endif
+=======
+call assemble_linsys(linsys, geo, elems, elems_expl, wake)
+call assemble_pressure_sys(linsys, geo, elems, wake)
+t1 = dust_time()
+>>>>>>> wip in NL-UVLM
 
-  !------ Solve the pressure system ------
-  if ( it .gt. 1 .and. geo%nSurfPan .gt. 0 ) then
-    call solve_pressure_sys(linsys)
-  end if
+if(sim_param%debug_level .ge. 1) then
+  write(message,'(A,F9.3,A)') 'Assembled linear system in: ' , t1 - t0,' s.'
+  call printout(message)
+endif
 
-  !------ Solve the system ------
-  t0 = dust_time()
-  if (linsys%rank .gt. 0) then
-    call solve_linsys(linsys)
-  endif
-  t1 = dust_time()
+!debug output of the system
+if ((sim_param%debug_level .ge. 50).and.time_2_debug_out) then
+  write(frmt,'(I4.4)') it
+  call dump_linsys(linsys, trim(basename_debug)//'A_'//trim(frmt)//'.dat', &
+                          trim(basename_debug)//'b_'//trim(frmt)//'.dat' )
+  call dump_linsys_pres(linsys, &
+                          trim(basename_debug)//'Apres_'//trim(frmt)//'.dat', &
+                          trim(basename_debug)//'bpres_'//trim(frmt)//'.dat')
+endif
 
-  sel = size(elems)
-  ! compute time derivative of the result ( = i_vortex = -i_doublet ) -------
+!------ Solve the pressure system ------
+if ( it .gt. 1 .and. geo%nSurfPan .gt. 0 ) then
+  call solve_pressure_sys(linsys)
+end if
+
+!------ Solve the system ------
+t0 = dust_time()
+if (linsys%rank .gt. 0) then
+  call solve_linsys(linsys)
+endif
+t1 = dust_time()
+
 !$omp parallel do private(i_el)
   do i_el = 1 , sel
     elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
   end do
 !$omp end parallel do
-  ! res_old = linsys%res  ! moved to l.940 approx, when the dt is finalized
 
-  if(sim_param%debug_level .ge. 1) then
-    write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
-    call printout(message)
-  endif
+if(sim_param%debug_level .ge. 1) then
+  write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
+  call printout(message)
+endif
 
-  !debug print of the results
-  if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
+!debug print of the results
+if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                       call debug_printout_result(linsys, basename_debug, it)
 
   !------ Update the explicit part ------  % v-----implicit elems: p,v
@@ -835,31 +818,21 @@ end if
 #if USE_PRECICE
   !$omp parallel do private(i_el)
     do i_el = 1 , sel
-
       ! ifort bugs workaround:
       ! apparently it is not possible to call polymorphic methods inside
       ! select cases for intel, need to call these for all elements and for the
       ! vortex lattices it is going to be a dummy empty function call
-
       call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
                 geo%components(elems(i_el)%p%comp_id)%coupling_node_rot)
       call elems(i_el)%p%compute_dforce()
-
     end do
   !$omp end parallel do
 #else
   !$omp parallel do private(i_el)
     do i_el = 1 , sel
-
-      ! ifort bugs workaround:
-      ! apparently it is not possible to call polymorphic methods inside
-      ! select cases for intel, need to call these for all elements and for the
-      ! vortex lattices it is going to be a dummy empty function call
-
       call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
               geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g)
       call elems(i_el)%p%compute_dforce()
-
     end do
   !$omp end parallel do
 #endif
@@ -868,28 +841,32 @@ end if
   ! since even if the following calls looks thread safe, they mess up with
   ! ifort and parallel runs, so the cycle is executed another time just for the
   ! vortex lattices
+  i_chord = 0
+  i_span = 1
+  allocate(cl_inv(10))
+  cl_inv = 0.0_wp
+
+  allocate(cl_visc(10)) ! hardcoded !!!!! FIXMEEE
+  cl_visc = 0.0_wp
+
   if ( geo%nVortLatt .gt. 0) then
     do i_el = 1 , sel
+
       select type( el => elems(i_el)%p )
+
         class is(t_vortlatt)
-          ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
+          
           call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/), wake%vort_p)
           ! compute dforce using AVL formula
           call el%compute_dforce_jukowski()
           ! update the pressure field, p = df.n / area
           el%pres = sum( el%dforce * el%nor ) / el%area
-          ! ALTERNATIVE:
-          !call el%compute_pres_vortlatt()
-          !elems(i_el)%p%dforce = elems(i_el)%p%pres * elems(i_el)%p%area * elems(i_el)%p%nor
-
-          !ifort bug workaround
-          !elems(i_el)%p%pres = sum( elems(i_el)%p%dforce * elems(i_el)%p%nor )&
-          !                     / elems(i_el)%p%area
-
-
       end select
     end do
   endif
+
+
+  deallocate(cl_inv, cl_visc)
 
   ! Explicit elements:
   ! - liftlin: _pres and _dforce computed in solve_liftin()
@@ -899,7 +876,7 @@ end if
   do i_el = 1 , size(elems_ad)
 !   call elems_ad(i_el)%p%compute_pres(sim_param)
     call elems_ad(i_el)%p%compute_pres( &     ! update surf_vel field too
-             geo%refs( geo%components(elems_ad(i_el)%p%comp_id)%ref_id )%R_g)
+            geo%refs( geo%components(elems_ad(i_el)%p%comp_id)%ref_id )%R_g)
     call elems_ad(i_el)%p%compute_dforce()
   end do
 !$omp end parallel do
@@ -990,7 +967,7 @@ end if
   do i_el = 1 , geo%nSurfPan
     select type ( el => elems(i_el)%p ) ; class is ( t_surfpan )
       surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) = el%ub   ! el%surf_vel
-           nor_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) = el%nor  ! el%surf_vel
+          nor_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) = el%nor   ! el%surf_vel
     end select
   end do
   ! Pressure integral equation ++++++++
@@ -1004,9 +981,15 @@ end if
           call complete_wake(wake, geo, elems_tot, te)
     end if
   endif
+<<<<<<< HEAD
 
       !> Save old solution (at the previous dt) of the linear system
       res_old = linsys%res
+=======
+  
+  !> Save old solution (at the previous dt) of the linear system
+  res_old = linsys%res
+>>>>>>> wip in NL-UVLM
 
       !> Update nor_old (moved from geo/mod_geo.f90/update_geometry(), l.2220 approx
     !$omp parallel do private(i_el)
@@ -1127,8 +1110,8 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   if(sim_param%n_wake_panels .lt. 1) then
     sim_param%n_wake_panels = 1
     call warning('dust','dust','imposed a number of wake panels rows &
-                 &LOWER THAN 1. At least one row of panels is mandatory, &
-                 &the simulation will proceed with "n_wake_panels = 1"')
+                &LOWER THAN 1. At least one row of panels is mandatory, &
+                &the simulation will proceed with "n_wake_panels = 1"')
   endif
   sim_param%n_wake_particles = getint(prms, 'n_wake_particles')
   sim_param%particles_box_min = getrealarray(prms, 'particles_box_min',3)
@@ -1140,7 +1123,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
       sim_param%rigid_wake_vel = getrealarray(prms, 'rigid_wake_vel',3)
     else if ( countoption(prms,'rigid_wake_vel') .le. 0 ) then
       call warning('dust','dust','no rigid_wake_vel parameter set, &
-           &with rigid_wake = T; rigid_wake_vel = u_inf')
+            &with rigid_wake = T; rigid_wake_vel = u_inf')
       sim_param%rigid_wake_vel = sim_param%u_inf
     end if
   end if
@@ -1199,17 +1182,17 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   if ( trim(sim_param%llSolver) .eq. 'GammaMethod' ) then
     if ( sim_param%llArtificialViscosity .gt. 0.0_wp ) then
       call warning('dust','init_sim_param','LLartificialViscoisty set as an input, &
-         & different from zero, but ll regularisation available only if&
-         & LLsolver = AlphaMethod. LLartificialViscosity = 0.0')
-         sim_param%llArtificialViscosity = 0.0_wp
-         sim_param%llArtificialViscosityAdaptive = .false.
-         sim_param%llArtificialViscosityAdaptive_Alpha  = 0.0_wp
-         sim_param%llArtificialViscosityAdaptive_dAlpha = 0.0_wp
+          & different from zero, but ll regularisation available only if&
+          & LLsolver = AlphaMethod. LLartificialViscosity = 0.0')
+        sim_param%llArtificialViscosity = 0.0_wp
+        sim_param%llArtificialViscosityAdaptive = .false.
+        sim_param%llArtificialViscosityAdaptive_Alpha  = 0.0_wp
+        sim_param%llArtificialViscosityAdaptive_dAlpha = 0.0_wp
     end if
     if ( sim_param%llArtificialViscosityAdaptive ) then
       call warning('dust','init_sim_param','LLartificialViscosityAdaptive set&
-         & as an input, but ll adaptive regularisation available only if&
-         & LLsolver = AlphaMethod')
+          & as an input, but ll adaptive regularisation available only if&
+          & LLsolver = AlphaMethod')
     end if
   end if
   !> The user is required to set _Alpha and _dAlpha for ll adaptive regularisation

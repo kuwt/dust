@@ -70,7 +70,7 @@ use mod_param, only: &
   wp, pi, max_char_len, prev_tri, next_tri, prev_qua, next_qua
 
 use mod_math, only: &
-  cross
+  cross, dot 
 
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
@@ -101,6 +101,7 @@ public :: t_vortlatt
 type, extends(c_impl_elem) :: t_vortlatt
 
   real(wp) :: vel_ctr_pt(3)
+  real(wp) :: alpha, alpha_body, alpha_ind, dx
 
   !TODO: consider applying the correct element pointer here
   contains
@@ -124,6 +125,7 @@ type, extends(c_impl_elem) :: t_vortlatt
   procedure, pass(this) :: get_vel_ctr_pt   => get_vel_ctr_pt_vortlatt
   procedure, pass(this) :: compute_dforce_jukowski => &
                           compute_dforce_jukowski_vortlatt
+  !procedure, pass(this) :: correction_c81 => correction_c81_vortlatt
 
 end type
 
@@ -159,7 +161,8 @@ subroutine build_row_vortlatt(this, elems, linsys, ie, ista, iend)
           linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-wind-elems(j1)%p%uvort))
     
     enddo
-
+    
+    
   ! ista and iend will be the end of the unknowns vector, containing
   ! the moving elements
   do j1 = ista , iend
@@ -448,7 +451,7 @@ end subroutine compute_grad_vortlatt
 !! see compute_dforce_vortlatt
 subroutine compute_pres_vortlatt(this) !, R_g)
   class(t_vortlatt), intent(inout) :: this
-  integer  :: i_stripe
+  integer  :: i_stripe, num_stripe
   real(wp) :: wind(3)
 
   this%pres = 0.0_wp
@@ -510,35 +513,81 @@ end subroutine compute_dforce_dummy
 ! the velocity
 !
 subroutine compute_dforce_jukowski_vortlatt(this)
- class(t_vortlatt), intent(inout) :: this
- real(wp) :: gam(3), wind(3)
 
- integer  :: i_stripe
- real(wp) :: mach
+  class(t_vortlatt), intent(inout) :: this
+  real(wp) :: gam(3), wind(3)
 
+  integer  :: i_stripe
+  real(wp) :: mach, reynolds
+
+  !write(*,*) 'this%stripe_elem', size(this%stripe_elem)
+  
+  
   ! Prandt -- Glauert correction for compressibility effect
   wind = variable_wind(this%cen, sim_param%time)
+  
   mach = abs(sum(this%vel_ctr_pt*this%tang(:,2)) / sim_param%a_inf)
+  
+  
+  
   ! === Steady contribution (KJ) ===
-  gam = cross ( this % vel_ctr_pt, this%edge_vec(:,1) )
+  gam = cross ( this%vel_ctr_pt, this%edge_vec(:,1) )
   i_stripe = size(this%stripe_elem)
+
   if ( i_stripe .gt. 1 ) then
 
     this%dforce = sim_param%rho_inf * gam &
                 * ( this%mag - this%stripe_elem(i_stripe-1)%p%mag )  / sqrt(1 - mach**2)
-
+    
   else
 
     this%dforce = sim_param%rho_inf * gam * this%mag  / sqrt(1 - mach**2)
-
+    this%alpha = -this%alpha
   end if
 
   ! === Unsteady contribution ===
   this%dforce = this%dforce &
               - sim_param%rho_inf * this%area * ( &
                 this%didou_dt * this%nor)
-
+  
 end subroutine compute_dforce_jukowski_vortlatt
+
+!subroutine correction_c81_vortlatt(this)
+
+!  class(t_vortlatt), intent(inout) :: this
+!  
+!  integer  :: i_stripe
+!  real(wp) :: mach, reynolds
+!
+!  this%dx = this%area/this%dy ! the sum for each stripe will be the chord.. 
+!  
+!  wind = variable_wind(this%cen, sim_param%time) 
+!  
+!  mach = abs(sum(this%vel_ctr_pt*this%tang(:,2)) / sim_param%a_inf)
+!  
+!  reynolds = sim_param%rho_inf * norm2(this%vel_ctr_pt) * &
+!                          this%chord / sim_param%mu_inf
+!  
+!  i_stripe = size(this%stripe_elem)
+!
+!  if ( i_stripe .gt. 1 ) then 
+!  else
+!    this%alpha = -this%alpha
+!  end if
+!  
+!  ! get correction from c81 table 
+!  call interp_aero_coeff ( airfoil_data,  this%csi_cen, this%i_airfoil , &
+!                        (/this%alpha, mach, reynolds/), aero_coeff )
+!  this%cl = aero_coeff(1)
+!  this%cd = aero_coeff(2)
+!
+!  this%dforce_c81(3) = 0.5_wp*sim_param%rho_inf* &
+!                        dot(this%vel_ctr_pt, this%vel_ctr_pt)*this%area *this%cl 
+!  this%dforce_c81(1) = 0.5_wp*sim_param%rho_inf* &
+!                        dot(this%vel_ctr_pt, this%vel_ctr_pt)*this%area *this%cd 
+!
+!end subroutine correction_c81_vortlatt
+
 
 !----------------------------------------------------------------------
 !> Compute an approximate value of the induced velocity at 1/4 of chord
@@ -557,7 +606,7 @@ subroutine get_vel_ctr_pt_vortlatt(this, elems, wake_elems, vort_elems)
   type(t_pot_elem_p),intent(in):: wake_elems(:)
   type(t_vort_elem_p), intent(in) :: vort_elems(:)
 
-  real(wp) :: v(3), x0(3), wind(3)
+  real(wp) :: v(3), x0(3), wind(3), up(3)
   integer :: j
 
   ! Initialisation to zero
@@ -582,7 +631,7 @@ subroutine get_vel_ctr_pt_vortlatt(this, elems, wake_elems, vort_elems)
     this%vel_ctr_pt = this%vel_ctr_pt + v
   enddo
 
-  ! induced velocity on leading edge side
+  !> induced velocity on leading edge side
   wind = variable_wind(this%cen, sim_param%time)
   this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp * pi) &
                 + wind - this%ub! + this%uvort

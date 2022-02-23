@@ -627,9 +627,9 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   point_list = point_list * chord
   ! 3. rotation    : twist
   point_list = matmul( reshape( (/ cos(twist_rad),-sin(twist_rad) , &
-                                   sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
-                                                                     point_list )
-
+                                  sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
+                                                                    point_list )
+  write(*,*) 'point_list', point_list
 
 end subroutine define_section
 

@@ -129,7 +129,7 @@ type, abstract, extends(c_elem) :: c_pot_elem
   integer, allocatable :: i_ver(:)
 
   !> Element area
-  real(wp)             :: area
+  real(wp) :: area
 
   !> Element normal vector
   real(wp) :: nor(3)
@@ -156,33 +156,37 @@ type, abstract, extends(c_elem) :: c_pot_elem
   real(wp) :: ub(3)
 
   !> Vorticity induced velocity at the centre
-  real(wp)          :: uvort(3)
+  real(wp) :: uvort(3)
 
   !> Is the element moving during simulation?
-  logical :: moving
+  logical  :: moving
 
   !> Element neighbours global index (in the elements vector)
   type(t_pot_elem_p), allocatable :: neigh(:)
 
   !> Average pressure on the element
-  real(wp)              :: pres
+  real(wp)  :: pres
 
   !> Elementary force acting on the element (components in the base ref.sys.)
-  real(wp)              :: dforce(3)
+  real(wp)  :: dforce(3)
 
   !> Elementary force acting on the element (components in the base ref.sys.)
-  real(wp)              :: dmom(3)
+  real(wp)  :: dmom(3)
 
   !TODO: these three are used only by vortlatt and liftlin
   ! consider moving them there, but then change the implementation of
   ! create_strip_connectivity
   !> Previous element in a stripe
-  type(t_pot_elem_p)        :: stripe_1
+  type(t_pot_elem_p)  :: stripe_1
   !> Panel width (= strip width)
-  real(wp)              :: dy
+  real(wp)  :: dy
+  !> Panel in chord
+  integer(wp)  :: n_c 
+  !> Panel in span
+  integer(wp)  :: n_s
   !> Element indices in the component%strip_elem array
   type(t_elem_p), allocatable :: stripe_elem(:)
-
+  
   !> Hinge motion
   ! Initialization to zero *** to do: restart??? ***
   !> Delta position, due to hinge motion of the element center
