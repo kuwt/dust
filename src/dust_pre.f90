@@ -61,7 +61,6 @@ use mod_geometry, only: &
 use mod_basic_io, only: &
   read_mesh_basic, write_basic
 
-!this is for the parsing
 use mod_parse, only: &
   t_parse, &
   getstr, getlogical, getreal, getint, &
@@ -76,39 +75,35 @@ initialize_hdf5, destroy_hdf5
 
 implicit none
 
-!Input
-character(len=*), parameter :: input_file_name_def = 'dust_pre.in'
-character(len=max_char_len) :: input_file_name
-character(len=max_char_len) :: output_file_name
-character(len=max_char_len) :: output_file_name_read
-logical :: cmd_set_filename
-character(len=max_char_len), allocatable :: comp_names(:)
-character(len=max_char_len), allocatable :: geo_files(:)
-character(len=max_char_len), allocatable :: ref_tags(:)
-!character(len=extended_char_len) :: message
+!> Input
+character(len=*), parameter               :: input_file_name_def = 'dust_pre.in'
+character(len=max_char_len)               :: input_file_name
+character(len=max_char_len)               :: output_file_name
+character(len=max_char_len)               :: output_file_name_read
+logical                                   :: cmd_set_filename
+character(len=max_char_len), allocatable  :: comp_names(:)
+character(len=max_char_len), allocatable  :: geo_files(:)
+character(len=max_char_len), allocatable  :: ref_tags(:)
 
-!Geometry parameters
-type(t_parse) :: prms
-type(t_link), pointer :: lnk
+!> Geometry parameters
+type(t_parse)                             :: prms
+type(t_link), pointer                     :: lnk
 
-!General parameters: tol_sew,inner_prod_thr
-real(wp) :: tol_sew
-real(wp) :: inner_prod_thr
-
-integer :: n_geo, n_tag, n_name, i
+!> General parameters
+real(wp)                                  :: tol_sew
+real(wp)                                  :: inner_prod_thr
+integer                                   :: n_geo, n_tag, n_name, i
 
 
 call printout(nl//'>>>>>> DUST PREPROCESSOR beginning >>>>>>'//nl)
 call initialize_hdf5()
 
-!------ Input reading ------
-
+!> Input reading 
 if(command_argument_count().gt.0) then
-  call get_command_argument(1,value=input_file_name)
+  call get_command_argument(1, value = input_file_name)
 else
   input_file_name = input_file_name_def
 endif
-
 
 if(command_argument_count().gt.1) then
   call get_command_argument(2,value=output_file_name)
@@ -117,27 +112,21 @@ else
   cmd_set_filename = .false.
 endif
 
-
-!call prms%CreateRealOption( 'tstart', "Starting time", '0.0')
-
 call prms%CreateStringOption('CompName','Component Name', multiple=.true.)
 call prms%CreateStringOption('GeoFile','Geometry definition files', multiple=.true.)
 call prms%CreateStringOption('RefTag','Reference Tag of the component', multiple=.true.)
-
 call prms%CreateRealOption('TolSewing','Global parameter for closing gaps','0.001')
 call prms%CreateRealOption('InnerProductTe','Global parameter for edge identification','-0.5')
-
 call prms%CreateStringOption('FileName','Preprocessor output file')
 
 call check_file_exists(input_file_name,'dust preprocessor')
 call prms%read_options(input_file_name, printout_val=.false.)
 
-n_name = countoption(prms,'CompName')
-n_geo  = countoption(prms,'GeoFile')
-n_tag  = countoption(prms,'RefTag')
-
-tol_sew = getreal(prms,'TolSewing')
-inner_prod_thr = getreal(prms,'InnerProductTe')
+n_name          = countoption(prms, 'CompName')
+n_geo           = countoption(prms, 'GeoFile')
+n_tag           = countoption(prms, 'RefTag')
+tol_sew         = getreal(prms, 'TolSewing')
+inner_prod_thr  = getreal(prms, 'InnerProductTe')
 
 if(n_geo .ne. n_name)  call error('dust_pre','','Different number of components &
   & and components names in input file "'//trim(input_file_name)//'"')
@@ -148,18 +137,17 @@ output_file_name_read = getstr(prms, 'FileName')
 
 allocate(comp_names(n_geo), geo_files(n_geo), ref_tags(n_geo))
 do i=1,n_geo
-  comp_names(i) = getstr(prms,'CompName')
-  geo_files(i) = getstr(prms,'GeoFile',olink=lnk)
-  call check_opt_consistency(lnk,prev=.true.,prev_opt='CompName')
-  call check_opt_consistency(lnk,next=.true.,next_opt='RefTag')
-  ref_tags(i)  = getstr(prms,'RefTag')
+  comp_names(i) = getstr(prms, 'CompName')
+  geo_files(i)  = getstr(prms, 'GeoFile', olink=lnk)
+  call check_opt_consistency(lnk, prev=.true., prev_opt='CompName')
+  call check_opt_consistency(lnk, next=.true., next_opt='RefTag')
+  ref_tags(i)   = getstr(prms, 'RefTag')
 enddo
 
 if (.not. cmd_set_filename) output_file_name = output_file_name_read
 
-call build_geometry(geo_files,ref_tags,comp_names,trim(output_file_name), &
-                 tol_sew , inner_prod_thr )
-
+call build_geometry(geo_files, ref_tags,comp_names, trim(output_file_name), &
+                    tol_sew, inner_prod_thr )
 
 deallocate(comp_names, geo_files, ref_tags)
 call destroy_hdf5()

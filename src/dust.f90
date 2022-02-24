@@ -1,5 +1,3 @@
-
-
 !./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
 !.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
 !..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
@@ -162,28 +160,27 @@ use mod_wind, only: &
 
 implicit none
 
-!run-id
-integer :: run_id(10)
+!> Run-id
+integer                           :: run_id(10)
 
-!Input
+!> Input
 !> Main parameters parser
-type(t_parse)                    :: prms
-character(len=*), parameter      :: input_file_name_def = 'dust.in'
-character(len=max_char_len)      :: input_file_name
-character(len=max_char_len)      :: target_file
-character(len=extended_char_len) :: message
+type(t_parse)                     :: prms
+character(len=*), parameter       :: input_file_name_def = 'dust.in'
+character(len=max_char_len)       :: input_file_name
+character(len=max_char_len)       :: target_file
+character(len=extended_char_len)  :: message
 
+!> Time parameters
+real(wp)                          :: time
+integer                           :: it, nstep, nout
+real(wp)                          :: t_last_out, t_last_debug_out
+real(wp)                          :: time_no_out, time_no_out_debug
+logical                           :: time_2_out, time_2_debug_out
+logical                           :: output_start
+real(wp)                          :: dt_debug_out
 
-!Time parameters
-real(wp) :: time
-integer  :: it, nstep, nout
-real(wp) :: t_last_out, t_last_debug_out
-real(wp) :: time_no_out, time_no_out_debug
-logical  :: time_2_out, time_2_debug_out
-logical  :: output_start
-real(wp) :: dt_debug_out
-
-!Main variables
+!> Main variables
 !> All the implicit elements, sorted first static then moving
 type(t_impl_elem_p), allocatable  :: elems(:)
 !> All the explicit elements
@@ -204,39 +201,37 @@ type(t_aero_tab), allocatable     :: airfoil_data(:)
 type(t_linsys)                    :: linsys
 !> Wake
 type(t_wake)                      :: wake
-
 !> Timing vars
 real(t_realtime)                  :: t1 , t0, t00, t11, t22
-
-!I/O prefixes
+!> I/O prefixes
 character(len=max_char_len)       :: frmt
 character(len=max_char_len)       :: basename_debug
 
-real(wp) , allocatable            :: res_old(:)
-real(wp) , allocatable            :: surf_vel_SurfPan_old(:,:)
-real(wp) , allocatable            ::      nor_SurfPan_old(:,:)
+real(wp), allocatable             :: res_old(:)
+real(wp), allocatable             :: surf_vel_SurfPan_old(:,:)
+real(wp), allocatable             ::      nor_SurfPan_old(:,:)
+real(wp) , allocatable            :: al_kernel(:,:), al_v(:)
 
-real(wp) , allocatable            :: al_kernel(:,:) , al_v(:)
 !> vl viscous correction
-real(wp), allocatable             :: cl_inv(:), cl_visc(:) 
-integer                           :: i_el , i, sel, i_chord, i_span
+real(wp), allocatable             :: cl_inv(:), cl_visc(:), alpha(:)
+integer                           :: i_el, i, ie_vl, sel, i_chord, i_span
 
-!octree parameters
+!> octree parameters
 type(t_octree)                    :: octree
 
 #if USE_PRECICE
-  !> --- PreCICE data ---------------------------------------------
-  type(t_precice)               :: precice
-  integer                       :: bool
-  logical                       :: precice_convergence
-  integer                       :: j
-  real(wp)                      :: sum_force(3)
+  !> PreCICE data 
+  type(t_precice)                 :: precice
+  integer                         :: bool
+  logical                         :: precice_convergence
+  integer                         :: j
+  real(wp)                        :: sum_force(3)
 #endif
 
 
 #if USE_PRECICE
-  !> --- Initialize PreCICE ---------------------------------------
-  call precice % initialize()
+  !> Initialize PreCICE 
+  call precice%initialize()
 #endif
 
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
@@ -245,84 +240,81 @@ t00 = dust_time()
 
 call get_run_id(run_id)
 
-!------ Modules initialization ------
+!> Modules initialization 
 call initialize_hdf5()
 
-!------ Input reading ------
-
+!> Input reading 
 if(command_argument_count().gt.0) then
-  call get_command_argument(1,value=input_file_name)
+  call get_command_argument(1, value = input_file_name)
 else
   input_file_name = input_file_name_def
 endif
 
-! define the parameters to be read
-! time:
-call prms%CreateRealOption( 'tstart', "Starting time")
-call prms%CreateRealOption( 'tend',   "Ending time")
-call prms%CreateRealOption( 'dt',     "time step")
-call prms%CreateIntOption ( 'timesteps', "number of timesteps")
-call prms%CreateRealOption( 'dt_out', "output time interval")
-call prms%CreateRealOption( 'dt_debug_out', "debug output time interval")
-call prms%CreateIntOption ( 'ndt_update_wake', 'n. dt between two wake updates', '1')
+!> Define the parameters to be read
+!> Time
+call prms%CreateRealOption('tstart', "Starting time")
+call prms%CreateRealOption('tend',   "Ending time")
+call prms%CreateRealOption('dt',     "time step")
+call prms%CreateIntOption ('timesteps', "number of timesteps")
+call prms%CreateRealOption('dt_out', "output time interval")
+call prms%CreateRealOption('dt_debug_out', "debug output time interval")
+call prms%CreateIntOption ('ndt_update_wake', 'n. dt between two wake updates', '1')
 
-! input:
+!> Input
 call prms%CreateStringOption('GeometryFile','Main geometry definition file')
 call prms%CreateStringOption('ReferenceFile','Reference frames file','no_set')
 
-! output:
+!> Output
 call prms%CreateStringOption('basename','oputput basename','./')
 call prms%CreateStringOption('basename_debug','oputput basename for debug','./')
-call prms%CreateLogicalOption( 'output_start', "output values at starting &
+call prms%CreateLogicalOption('output_start', "output values at starting &
                                                           & iteration", 'F')
-call prms%CreateLogicalOption( 'output_detailed_geo', "output at each &
+call prms%CreateLogicalOption('output_detailed_geo', "output at each &
                     &timestep the detailed geometry in the results file", 'F')
 call prms%CreateIntOption('debug_level', 'Level of debug verbosity/output', '1')
 
-! restart
+!> Restart
 call prms%CreateLogicalOption('restart_from_file','restarting from file?','F')
 call prms%CreateStringOption('restart_file','restart file name')
 call prms%CreateLogicalOption('reset_time','reset the time from previous execution?','F')
 
-! parameters:
-! --- reference conditions ---
-call prms%CreateRealArrayOption( 'u_inf', "free stream velocity", '(/1.0, 0.0, 0.0/)')
-call prms%CreateRealOption( 'u_ref', "reference velocity")             !
-call prms%CreateRealOption( 'P_inf', "free stream pressure", '101325')    !
-call prms%CreateRealOption( 'rho_inf', "free stream density", '1.225')   !
-call prms%CreateRealOption( 'a_inf', "Speed of sound", '340.0')        ! m/s   for dimensional sim
-call prms%CreateRealOption( 'mu_inf', "Dynamic viscosity", '0.000018') ! kg/ms
+!> Parameters: reference conditions 
+call prms%CreateRealArrayOption('u_inf', "free stream velocity", '(/1.0, 0.0, 0.0/)')
+call prms%CreateRealOption('u_ref', "reference velocity")             
+call prms%CreateRealOption('P_inf', "free stream pressure", '101325')    
+call prms%CreateRealOption('rho_inf', "free stream density", '1.225')   
+call prms%CreateRealOption('a_inf', "Speed of sound", '340.0')        ! m/s   for dimensional sim
+call prms%CreateRealOption('mu_inf', "Dynamic viscosity", '0.000018') ! kg/ms
 
-! --- wake ---
+!> Wake 
 call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
 call prms%CreateIntOption('n_wake_particles', 'number of wake particles', '10000')
 call prms%CreateRealArrayOption('particles_box_min', 'min coordinates of the &
                                 &particles bounding box', '(/-10.0, -10.0, -10.0/)')
 call prms%CreateRealArrayOption('particles_box_max', 'max coordinates of the &
                                 &particles bounding box', '(/10.0, 10.0, 10.0/)')
-
-call prms%CreateRealOption( 'ImplicitPanelScale', "Scaling of the first implicit wake panel", '0.3')
-call prms%CreateRealOption( 'ImplicitPanelMinVel', "Minimum velocity at the trailing edge", '1.0e-8')
+call prms%CreateRealOption('ImplicitPanelScale', "Scaling of the first implicit wake panel", '0.3')
+call prms%CreateRealOption('ImplicitPanelMinVel', "Minimum velocity at the trailing edge", '1.0e-8')
 call prms%CreateLogicalOption('rigid_wake','rigid wake?','F')
-call prms%CreateRealArrayOption( 'rigid_wake_vel', "rigid wake velocity" )
+call prms%CreateRealArrayOption('rigid_wake_vel', "rigid wake velocity" )
 call prms%CreateLogicalOption('join_te','join trailing edge','F')
-call prms%CreateRealOption( 'join_te_factor', "join the trailing edges when closer than factor*te element size",'1.0' )
+call prms%CreateRealOption('join_te_factor', "join the trailing edges when closer than factor*te element size",'1.0' )
 
-! --- regularisation ---
-call prms%CreateRealOption( 'FarFieldRatioDoublet', &
+!> Regularisation 
+call prms%CreateRealOption('FarFieldRatioDoublet', &
       "Multiplier for far field threshold computation on doublet", '10.0')
-call prms%CreateRealOption( 'FarFieldRatioSource', &
+call prms%CreateRealOption('FarFieldRatioSource', &
       "Multiplier for far field threshold computation on sources", '10.0')
-call prms%CreateRealOption( 'DoubletThreshold', &
+call prms%CreateRealOption('DoubletThreshold', &
       "Thresold for considering the point in plane in doublets", '1.0e-6')
-call prms%CreateRealOption( 'RankineRad', &
+call prms%CreateRealOption('RankineRad', &
       "Radius of Rankine correction for vortex induction near core", '0.1')
-call prms%CreateRealOption( 'VortexRad', &
+call prms%CreateRealOption('VortexRad', &
       "Radius of vortex core, for particles", '0.1')
-call prms%CreateRealOption( 'CutoffRad', &
+call prms%CreateRealOption('CutoffRad', &
       "Radius of complete cutoff  for vortex induction near core", '0.001')
 
-! --- lifting line elements ---
+!> Lifting line elements
 call prms%CreateStringOption('LLsolver','Solver for the LL elements', &
                           &'GammaMethod')
 call prms%CreateLogicalOption('LLReynoldsCorrections', &
@@ -354,7 +346,7 @@ call prms%CreateRealOption('LLartificialViscosityAdaptive_dAlpha', &
 call prms%CreateLogicalOption('LLloadsAVL', &
                           &'Use AVL expression for inviscid load computation','T')
 
-!== Octree and multipole data ==
+!> Octree and multipole data 
 call prms%CreateLogicalOption('FMM','Employ fast multipole method?','T')
 call prms%CreateLogicalOption('FMMPanels','Employ fast multipole method &
                               &also for panels?','F')
@@ -369,7 +361,7 @@ call prms%CreateIntOption('NMaxOctreeLevels','maximum number of octree levels')
 call prms%CreateRealOption('LeavesTimeRatio','Ratio that triggers the &
                                           &increase of the number of levels')
 
-! models options
+!> Models options
 call prms%CreateLogicalOption('Vortstretch','Employ vortex stretching','T')
 call prms%CreateLogicalOption('VortstretchFromElems','Employ vortex stretching&
                               & from geometry elements','F')
@@ -392,12 +384,13 @@ call prms%CreateIntOption('OctreeLevelSolid','Level at which the panels &
 call prms%CreateRealOption('ParticlesRedistributionRatio','How many times &
           &a particle need to be smaller than the average of the cell to be&
           & eliminated','3.0')
-! HCAS
+
+!> HCAS
 call prms%CreateLogicalOption('HCAS','Hover Convergence Augmentation System', 'F')
 call prms%CreateRealOption('HCAS_time','HCAS deployment time')
 call prms%CreateRealArrayOption('HCAS_velocity','HCAS velocity')
 
-! variable_wind
+!> Variable wind
 call prms%CreateLogicalOption('Gust','Gust perturbation','F')
 call prms%CreateStringOption('GustType','Gust model','AMC')
 call prms%CreateRealArrayOption('GustOrigin','Gust origin point')
@@ -409,24 +402,23 @@ call prms%CreateRealArrayOption('GustPerturbationDirection','Gust perturbation &
 call prms%CreateRealOption('GustGradient','Gust gradient')
 call prms%CreateRealOption('GustStartTime','Gust starting time','0.0')
 
-
-
-! get the parameters and print them out
+!> Get the parameters and print them out
 call printout(nl//'====== Input parameters: ======')
 call check_file_exists(input_file_name,'dust main')
 call prms%read_options(input_file_name, printout_val=.true.)
 
-! initialize all the parameters
-nout = 0 !reset the numbering for output files
+!> Initialize all the parameters
+nout = 0  !> Reset the numbering for output files
 output_start = getlogical(prms, 'output_start')
 call init_sim_param(sim_param, prms, nout, output_start)
 
-! remaining parameters
+!> Remaining parameters
 if(countoption(prms, 'dt_debug_out') .lt. 1) then
   dt_debug_out = sim_param%dt_out
 else
   dt_debug_out = getreal(prms, 'dt_debug_out')
 endif
+
 if(countoption(prms, 'basename_debug') .lt. 1) then
   basename_debug = sim_param%basename
 else
@@ -435,24 +427,23 @@ endif
 
 sim_param%basename_debug = basename_debug
 
-!-- Parameters Initializations --
+!> Parameters Initializations 
 call initialize_doublet()
 call initialize_vortline()
 call initialize_vortpart()
 call initialize_surfpan()
 
-
-! Check that tend .gt. tinit
+!> Check that tend .gt. tinit
 if ( sim_param%tend .le. sim_param%t0 ) then
-    write(message,*) 'The end time of the simulation',sim_param%tend,'is&
-                    & lower or equal to the start time',sim_param%t0,'.&
-                    & Remembver that when restarting without resetting the&
-                    & time the start time is taken from the restart result!'
-    call error('dust','',message)
+  write(message,*) 'The end time of the simulation',sim_param%tend,'is&
+                  & lower or equal to the start time',sim_param%t0,'.&
+                  & Remembver that when restarting without resetting the&
+                  & time the start time is taken from the restart result!'
+  call error('dust','',message)
 end if
 
 
-!Printout the parameters
+!> Printout the parameters
 if (sim_param%debug_level .ge. 3) then
   write(message,*) 'Initial time tstart: ', sim_param%t0;             call printout(message)
   write(message,*) 'Final time tend:     ', sim_param%tend;           call printout(message)
@@ -467,17 +458,17 @@ if (sim_param%debug_level .ge. 3) then
 endif
 
 
-!---- Check that the basenames are valid ----
+!> Check that the basenames are valid 
 call check_basename(trim(sim_param%basename),'dust main')
 if(sim_param%debug_level.ge.10)  call check_basename(trim(basename_debug),'dust main')
 
-!---- Simulation parameters ----
+!> Simulation parameters 
 nstep = sim_param%n_timesteps
 allocate(sim_param%time_vec(sim_param%n_timesteps))
 sim_param%time_vec = (/ ( sim_param%t0 + &
          real(i-1,wp)*sim_param%dt, i=1,sim_param%n_timesteps ) /)
 
-!------ Geometry creation ------
+!> Geometry creation 
 call printout(nl//'====== Geometry Creation ======')
 
 t0 = dust_time()
@@ -498,11 +489,11 @@ if(sim_param%debug_level .ge. 15) &
 if(sim_param%debug_level .ge. 15) &
   call debug_ll_printout_geometry(elems_ll, geo, basename_debug, 0)
 
-!TODO: check whether to move these calls before, and precisely what they do
+!> TODO: check whether to move these calls before, and precisely what they do
 if(sim_param%debug_level .ge. 7) call ignoredParameters(prms)
 call finalizeParameters(prms)
 
-!> --- Initialize PreCICE mesh and fields -----------------------
+!> Initialize PreCICE mesh and fields 
 #if USE_PRECICE
   te%t_hinged = te%t
   call precice%initialize_mesh( geo )
@@ -510,9 +501,8 @@ call finalizeParameters(prms)
   call precicef_initialize(precice%dt_precice)
   call precice%update_elems(geo, elems_tot, te ) ! TEST
 #endif
-!> --- Initialize PreCICE mesh and fields: done -----------------
 
-!------ Initialization ------
+!> Initialization 
 if(sim_param%use_fmm) then
   call printout(nl//'====== Initializing Octree ======')
   t0 = dust_time()
@@ -542,7 +532,7 @@ if(sim_param%debug_level .ge. 1) then
   call printout(message)
 endif
 
-!>---------------- Restart --------------
+!> Restart 
 if (sim_param%restart_from_file) then
  call load_solution(sim_param%restart_file, geo%components, geo%refs)
  call load_wake(sim_param%restart_file, wake, elems_tot)
@@ -571,35 +561,32 @@ if(sim_param%debug_level .ge. 1) then
   call printout(message)
 endif
 
-! === build kernel for regularisation (averaging) process for LL ===
-if ( ( size(elems_ll) .gt. 0 ) ) then
-  allocate(al_v(size(elems_ll))) ; al_v = 0.0_wp
-  call build_ll_kernel( elems_ll , al_v , al_kernel )
+!> Build kernel for regularisation (averaging) process for LL 
+if (( size(elems_ll) .gt. 0 )) then
+  allocate(al_v(size(elems_ll))) 
+  al_v = 0.0_wp  
+  call build_ll_kernel(elems_ll, al_v, al_kernel)
   deallocate(al_v)
 end if
 
-
-!> --- Initialize coupling --------------------------------------
+!> Initialize coupling 
 #if USE_PRECICE
-  call precicef_ongoing(precice%is_ongoing)
-  
+  call precicef_ongoing(precice%is_ongoing)  
   write(*,*) ' is coupling ongoing: ', precice%is_ongoing
   call precicef_ongoing(precice%is_ongoing)
-
   precice_convergence = .true.
-
   write(*,*) ' is coupling ongoing: ', precice%is_ongoing
   write(*,*) ' dt_precice         : ', precice%dt_precice
 #endif
 
 
-!======================= Time Cycle ==================================
+!=========================== Time Cycle ==============================
 call printout(nl//'////////// Performing Computations //////////')
 time = sim_param%t0
 sim_param%time_old = sim_param%t0 + 1
-t_last_out = time; 
+t_last_out = time
 t_last_debug_out = time
-time_no_out = 0.0_wp; 
+time_no_out = 0.0_wp
 time_no_out_debug = 0.0_wp
 
 allocate(surf_vel_SurfPan_old(geo%nSurfpan,3)) ; surf_vel_SurfPan_old = 0.0_wp
@@ -614,7 +601,7 @@ else
  res_old = 0.0_wp
 end if
 
-!> -----------------------------start time cycle -----------------------------
+!> Start time cycle 
 t11 = dust_time()
 it = 0
 #if USE_PRECICE
@@ -632,7 +619,7 @@ it = 1
                                         nstep, ' simulation time: ', time
       call printout(message)
       t22 = dust_time()
-      write(message,'(A,F9.3,A)') 'Elapsed wall time: ',t22-t00
+      write(message,'(A,F9.3,A)') 'Elapsed wall time: ', t22 - t00
       call printout(message)
     endif
 
@@ -654,7 +641,7 @@ it = 1
     call update_liftlin(elems_ll,linsys)
     call update_actdisk(elems_ad,linsys)
 
-    !>debug geometry printing
+    !> Debug geometry printing
     if((sim_param%debug_level .ge. 16).and.time_2_debug_out)&
               call debug_printout_geometry(elems, geo, basename_debug, it)
     if((sim_param%debug_level .ge. 16).and.time_2_debug_out)&
@@ -861,6 +848,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     end do
   !$omp end parallel do
 #endif
+<<<<<<< HEAD
 
   ! ifort bugs workaround:
   ! since even if the following calls looks thread safe, they mess up with
@@ -901,23 +889,85 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
 
           if (i_chord .lt. el%n_c + 1) then
             cl_inv(i_span) = cl_inv(i_span) +  &
+=======
+    
+    ! ifort bugs workaround:
+    ! since even if the following calls looks thread safe, they mess up with
+    ! ifort and parallel runs, so the cycle is executed another time just for the
+    ! vortex lattices
+    i_chord = 0
+    i_span = 1
+    ie_vl = 0 
+    
+    allocate(cl_inv(10))
+    cl_inv = 0.0_wp
+    
+    allocate(cl_visc(10)) ! hardcoded !!!!! FIXMEEE
+    cl_visc = 0.0_wp
+    
+    allocate(alpha(10)) ! hardcoded !!!!! FIXMEEE
+    alpha = 0.0_wp
+    
+    if ( geo%nVortLatt .gt. 0) then
+      do i_el = 1 , sel      
+        select type(el => elems(i_el)%p)        
+          class is(t_vortlatt)          
+          !do i_nlvl = 1, 100 ! loop for non linear vl 
+            call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/), wake%vort_p)
+            !> compute dforce using AVL formula
+            call el%compute_dforce_jukowski()
+            !> sum force over stripe 
+            if (i_chord .eq. el%n_c) then
+              i_span = i_span + 1
+              i_chord = 1
+              if (i_span .eq. el%n_s + 1) then
+                i_chord = 0
+                i_span = 0 
+              end if            
+            else
+              i_chord = i_chord + 1            
+              if (i_chord .eq. 2) then 
+                alpha(i_span) = el%alpha 
+              endif 
+            end if 
+            ie_vl = i_el
+            if (i_chord .lt. el%n_c + 1) then
+              cl_inv(i_span) = cl_inv(i_span) +  &
+>>>>>>> more cleanup
                             norm2(el%dforce)/(0.5_wp * sim_param%rho_inf*el%area*el%n_c*dot(el%vel_ctr_pt,el%vel_ctr_pt))
+            end if 
             
-          end if 
-          !write(*,*) 'i_chord i_span cl_inv alpha', i_chord, i_span, el%alpha, el%dforce, cl_inv
-          
+            !write(*,*) 'i_chord i_span alpha cl_inv ', i_chord, i_span, alpha, cl_inv
+          !end do 
           ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
+<<<<<<< HEAD
           
 >>>>>>> cleanup of dust.f90
+=======
+>>>>>>> more cleanup
           ! update the pressure field, p = df.n / area
-          el%pres = sum( el%dforce * el%nor ) / el%area
-      end select
-    end do
-  endif
+          
+          el%pres = sum(el%dforce * el%nor)/el%area
+        end select
+      end do
+    endif
+    
+    !write(*,*) 'alpha ', alpha
+    !write(*,*) 'cl_inv', cl_inv
+    !cl_visc = (/0.36967787339981062,
+    !            0.45366451570245264,    
+    !            0.48597341217522216,
+    !            0.50044162302290962,
+    !            0.50627160955933748,
+    !            0.50627160955933814,
+    !            0.50044162302290951,
+    !            0.48597341217522216,
+    !            0.45366451570245231,
+    !            0.36967787339981073/)
+    !d_alpha = 
 
-
-  deallocate(cl_inv, cl_visc)
-
+    deallocate(cl_inv, cl_visc, alpha)
+    
   ! Explicit elements:
   ! - liftlin: _pres and _dforce computed in solve_liftin()
   ! - actdisk: avg delta_pressure and force computed here,
@@ -1405,7 +1455,7 @@ end subroutine init_sim_param
 !> Perform preliminary procedures each timestep, mainly chech if it is time
 !! to perform output or not
 subroutine init_timestep(t)
- real(wp), intent(in) :: t
+  real(wp), intent(in) :: t
 
   sim_param%time = t
 

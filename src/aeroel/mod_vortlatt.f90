@@ -100,8 +100,8 @@ public :: t_vortlatt
 !! edges of the element.
 type, extends(c_impl_elem) :: t_vortlatt
 
-  real(wp) :: vel_ctr_pt(3)
-  real(wp) :: alpha, alpha_body, alpha_ind, dx
+  real(wp) :: vel_ctr_pt(3), alpha, alpha_ind, alpha_body, dx
+  
 
   !TODO: consider applying the correct element pointer here
   contains
@@ -128,6 +128,21 @@ type, extends(c_impl_elem) :: t_vortlatt
   !procedure, pass(this) :: correction_c81 => correction_c81_vortlatt
 
 end type
+!
+!type, extends(t_vortlatt) :: t_stripe_vortlatt
+!  !> AoA of the stripe
+!  real(wp) :: alpha  
+!  !> Aoa inducted 
+!  real(wp) :: alpha_ind
+!  !> AoA body 
+!  real(wp) :: alpha_body
+!  !> Inviscid cl
+!  real(wp) :: cl_inv
+!  !> Viscous cl 
+!  real(wp) :: cl_visc
+!  !> mean span of the panel 
+!  real(wp) :: dx
+!end type 
 
 character(len=*), parameter :: this_mod_name='mod_vortlatt'
 
@@ -152,6 +167,7 @@ subroutine build_row_vortlatt(this, elems, linsys, ie, ista, iend)
 
   !Not moving components, in the rhs contribution there is no body velocity
   !linsys%b(ie) = sum(linsys%b_static(:,ie) * (-uinf))
+  
   linsys%b(ie) = 0.0_wp
 
     do j1 = 1,ista-1
