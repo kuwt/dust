@@ -552,9 +552,9 @@ else ! Set to zero the intensity of all the singularities
   do i_el = 1 , size(elems)      ! implicit elements (vr, sp)
      elems(i_el)%p%mag = 0.0_wp
   end do
+  
   do i_el = 1 , size(elems_expl) ! explicit elements (ll, ad)
     elems_expl(i_el)%p%mag = 0.0_wp
-
   end do
   if (size(elems_ll) .gt. 0) then
     do i_el = 1, size(elems_ll)
@@ -581,15 +581,15 @@ end if
 
 !> --- Initialize coupling --------------------------------------
 #if USE_PRECICE
-      call precicef_ongoing(   precice % is_ongoing)
-      write(*,*) ' is coupling ongoing: ', precice % is_ongoing
-      !call precicef_initialize(precice % dt_precice)
-      call precicef_ongoing(   precice % is_ongoing)
+  call precicef_ongoing(precice%is_ongoing)
+  
+  write(*,*) ' is coupling ongoing: ', precice%is_ongoing
+  call precicef_ongoing(precice%is_ongoing)
 
-      precice_convergence = .true.
+  precice_convergence = .true.
 
-      write(*,*) ' is coupling ongoing: ', precice % is_ongoing
-      write(*,*) ' dt_precice         : ', precice % dt_precice
+  write(*,*) ' is coupling ongoing: ', precice%is_ongoing
+  write(*,*) ' dt_precice         : ', precice%dt_precice
 #endif
 
 
@@ -614,106 +614,111 @@ else
  res_old = 0.0_wp
 end if
 
-
+!> -----------------------------start time cycle -----------------------------
 t11 = dust_time()
 it = 0
 #if USE_PRECICE
-    it = 1
-    do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .eq. 1 ) ) ! start time cycle
+it = 1
+  do while ( ( it .lt. nstep ) .and. ( precice%is_ongoing .eq. 1 ) ) 
 #else
-    do while ( ( it .lt. nstep ) )
-      it = it + 1
-#endif
-  sim_param%time_old = sim_param%time
-
-  if(sim_param%debug_level .ge. 1) then
-    write(message,'(A,I5,A,I5,A,F9.4)') nl//'--> Step ',it,' of ', &
-                                      nstep, ' simulation time: ', time
-    call printout(message)
-    t22 = dust_time()
-    write(message,'(A,F9.3,A)') 'Elapsed wall time: ',t22-t00
-    call printout(message)
-  endif
-#if USE_PRECICE
-      if ( precice_convergence ) then
-#endif
-      call init_timestep(time)
-#if USE_PRECICE
-        precice_convergence = .false.
-      end if
+  do while ( ( it .lt. nstep ) )
+    it = it + 1
 #endif
 
-if ( mod( it-1, sim_param%ndt_update_wake ) .eq. 0 ) then
-  call prepare_wake(wake, elems_tot, octree)
-end if
+    sim_param%time_old = sim_param%time
 
-call update_liftlin(elems_ll,linsys)
-call update_actdisk(elems_ad,linsys)
-
-!debug geometry printing
-if((sim_param%debug_level .ge. 16).and.time_2_debug_out)&
-          call debug_printout_geometry(elems, geo, basename_debug, it)
-if((sim_param%debug_level .ge. 16).and.time_2_debug_out)&
-          call debug_ll_printout_geometry(elems_ll, geo, basename_debug, it)
+    if(sim_param%debug_level .ge. 1) then
+      write(message,'(A,I5,A,I5,A,F9.4)') nl//'--> Step ',it,' of ', &
+                                        nstep, ' simulation time: ', time
+      call printout(message)
+      t22 = dust_time()
+      write(message,'(A,F9.3,A)') 'Elapsed wall time: ',t22-t00
+      call printout(message)
+    endif
 
 #if USE_PRECICE
-      !> -------------------------------------------------------------
-      call precicef_action_required( precice%write_it_checkp , bool )
-      if ( bool .eq. 1 ) then ! Save old state
-        !> Save old state: forces and moments
-        do j = 1, size(precice%fields)
-          if ( trim(precice%fields(j)%fio) .eq. 'write' ) then
-            precice%fields(j)%cdata = precice%fields(j)%fdata
-          end if
-        end do
-        !> PreCICE action fulfilled
-        call precicef_mark_action_fulfilled( precice%write_it_checkp )
-      end if
+    if ( precice_convergence ) then
+#endif
 
-      !> Read data from structural solver
-      do i = 1, size(precice%fields)
-        if ( trim(precice%fields(i)%fio) .eq. 'read' ) then
-          if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
-            call precicef_read_bsdata( precice%fields(i)%fid, &
-                                       precice%mesh%nnodes  , &
-                                       precice%mesh%node_ids, &
-                                       precice%fields(i)%fdata(1,:) )
-          elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
+    call init_timestep(time)
 
-            call precicef_read_bvdata( precice%fields(i)%fid, &
-                                       precice%mesh%nnodes  , &
-                                       precice%mesh%node_ids, &
-                                       precice%fields(i)%fdata )
-          endif
+#if USE_PRECICE
+      precice_convergence = .false.
+    end if
+#endif
 
+    if ( mod( it-1, sim_param%ndt_update_wake ) .eq. 0 ) then
+      call prepare_wake(wake, elems_tot, octree)
+    end if
+
+    call update_liftlin(elems_ll,linsys)
+    call update_actdisk(elems_ad,linsys)
+
+    !>debug geometry printing
+    if((sim_param%debug_level .ge. 16).and.time_2_debug_out)&
+              call debug_printout_geometry(elems, geo, basename_debug, it)
+    if((sim_param%debug_level .ge. 16).and.time_2_debug_out)&
+              call debug_ll_printout_geometry(elems_ll, geo, basename_debug, it)
+
+#if USE_PRECICE
+
+    call precicef_action_required( precice%write_it_checkp , bool )
+    if ( bool .eq. 1 ) then ! Save old state
+      !> Save old state: forces and moments
+      do j = 1, size(precice%fields)
+        if ( trim(precice%fields(j)%fio) .eq. 'write' ) then
+          precice%fields(j)%cdata = precice%fields(j)%fdata
         end if
       end do
+      !> PreCICE action fulfilled
+      call precicef_mark_action_fulfilled( precice%write_it_checkp )
+    end if
 
-      !> Update dust geometry ( elems and first wake panels )
-      call precice % update_elems( geo, elems_tot, te )
+    !> Read data from structural solver
+    do i = 1, size(precice%fields)
+      if ( trim(precice%fields(i)%fio) .eq. 'read' ) then
+        if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
+          call precicef_read_bsdata( precice%fields(i)%fid, &
+                                    precice%mesh%nnodes  , &
+                                    precice%mesh%node_ids, &
+                                    precice%fields(i)%fdata(1,:) )
+        elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
+            call precicef_read_bvdata( precice%fields(i)%fid, &
+                                      precice%mesh%nnodes  , &
+                                      precice%mesh%node_ids, &
+                                      precice%fields(i)%fdata )
+        endif
+      end if
+    end do
 
-      !> Update geo_data()
-      do i_el = 1, size(elems_tot)
-        call elems_tot(i_el)%p%calc_geo_data( &
-                               geo%points(:,elems_tot(i_el)%p%i_ver) )
-      end do
+    !> Update dust geometry ( elems and first wake panels )
+    call precice % update_elems( geo, elems_tot, te )
 
-      !> Update near-field wake
-      call precice % update_near_field_wake( geo, wake, te )
+    !> Update geo_data()
+    do i_el = 1, size(elems_tot)
+      call elems_tot(i_el)%p%calc_geo_data( &
+                            geo%points(:,elems_tot(i_el)%p%i_ver) )
+    end do
 
-      !> Update dt--> mbdyn should take care of the dt and send it to precice
+    !> Update near-field wake
+    call precice % update_near_field_wake( geo, wake, te )
+
+    !> Update dt--> mbdyn should take care of the dt and send it to precice (TODO)
 #else
 #endif
 
-!> Calculate the normal velocity derivative for the pressure equation
-call press_normvel_der(geo, elems, surf_vel_SurfPan_old)
+    !> Calculate the normal velocity derivative for the pressure equation
+    call press_normvel_der(geo, elems, surf_vel_SurfPan_old)
 
-!------ Assemble the system ------
-!call prepare_wake(wake, geo, sim_param)
-t0 = dust_time()
+    !>-------------- Assemble the system ------
+    t0 = dust_time()
+    sel = size(elems) ! total number of elements
 
-sel = size(elems)
+    call assemble_linsys(linsys, geo, elems, elems_expl, wake)
+    call assemble_pressure_sys(linsys, geo, elems, wake)
+    t1 = dust_time()
 
+<<<<<<< HEAD
 <<<<<<< HEAD
   if(sim_param%debug_level .ge. 1) then
     write(message,'(A,F9.3,A)') 'Assembled linear system in: ' , t1 - t0,' s.'
@@ -733,40 +738,57 @@ call assemble_linsys(linsys, geo, elems, elems_expl, wake)
 call assemble_pressure_sys(linsys, geo, elems, wake)
 t1 = dust_time()
 >>>>>>> wip in NL-UVLM
+=======
+    if(sim_param%debug_level .ge. 1) then
+      write(message,'(A,F9.3,A)') 'Assembled linear system in: ' , t1 - t0,' s.'
+      call printout(message)
+    endif
+>>>>>>> cleanup of dust.f90
 
-if(sim_param%debug_level .ge. 1) then
-  write(message,'(A,F9.3,A)') 'Assembled linear system in: ' , t1 - t0,' s.'
-  call printout(message)
-endif
+    !debug output of the system
+    if ((sim_param%debug_level .ge. 50).and.time_2_debug_out) then
+      write(frmt,'(I4.4)') it
+      call dump_linsys(linsys, trim(basename_debug)//'A_'//trim(frmt)//'.dat', &
+                              trim(basename_debug)//'b_'//trim(frmt)//'.dat' )
+      call dump_linsys_pres(linsys, &
+                              trim(basename_debug)//'Apres_'//trim(frmt)//'.dat', &
+                              trim(basename_debug)//'bpres_'//trim(frmt)//'.dat')
+    endif
 
-!debug output of the system
-if ((sim_param%debug_level .ge. 50).and.time_2_debug_out) then
-  write(frmt,'(I4.4)') it
-  call dump_linsys(linsys, trim(basename_debug)//'A_'//trim(frmt)//'.dat', &
-                          trim(basename_debug)//'b_'//trim(frmt)//'.dat' )
-  call dump_linsys_pres(linsys, &
-                          trim(basename_debug)//'Apres_'//trim(frmt)//'.dat', &
-                          trim(basename_debug)//'bpres_'//trim(frmt)//'.dat')
-endif
+    !> Solve the pressure system 
+    if ( it .gt. 1 .and. geo%nSurfPan .gt. 0 ) then
+      call solve_pressure_sys(linsys)
+    end if
 
-!------ Solve the pressure system ------
-if ( it .gt. 1 .and. geo%nSurfPan .gt. 0 ) then
-  call solve_pressure_sys(linsys)
-end if
+    !> Solve the system 
+    t0 = dust_time()
+    if (linsys%rank .gt. 0) then
+      call solve_linsys(linsys)
+    endif
+    t1 = dust_time()
+    
+    !>  Update the explicit part (lifting lines) 
+    if ( size(elems_ll) .gt. 0 ) then
+      call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
+                (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it)
+    end if
 
-!------ Solve the system ------
-t0 = dust_time()
-if (linsys%rank .gt. 0) then
-  call solve_linsys(linsys)
-endif
-t1 = dust_time()
+    !> debug print of the results
+    if(sim_param%debug_level .ge. 1) then
+      write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
+      call printout(message)
+    endif
+    if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
+      call debug_printout_result(linsys, basename_debug, it)
 
+    !> compute dGamma_dt for unsteady contribution
 !$omp parallel do private(i_el)
-  do i_el = 1 , sel
-    elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
-  end do
+    do i_el = 1 , sel
+      elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
+    end do
 !$omp end parallel do
 
+<<<<<<< HEAD
 if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
   call printout(message)
@@ -809,6 +831,9 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
 !           M_array )
    end if
   end if
+=======
+    
+>>>>>>> cleanup of dust.f90
 
 !------ Compute loads -------
 ! Implicit elements: vortex rings and 3d-panels
@@ -859,6 +884,31 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/), wake%vort_p)
           ! compute dforce using AVL formula
           call el%compute_dforce_jukowski()
+<<<<<<< HEAD
+=======
+          !> sum force over stripe 
+          if (i_chord .eq. el%n_c) then
+            i_span = i_span + 1
+            i_chord = 1
+            if (i_span .eq. el%n_s + 1) then
+              i_chord = 0
+              i_span = 0 
+              
+            end if            
+          else
+            i_chord = i_chord + 1            
+          end if 
+
+          if (i_chord .lt. el%n_c + 1) then
+            cl_inv(i_span) = cl_inv(i_span) +  &
+                            norm2(el%dforce)/(0.5_wp * sim_param%rho_inf*el%area*el%n_c*dot(el%vel_ctr_pt,el%vel_ctr_pt))
+            
+          end if 
+          !write(*,*) 'i_chord i_span cl_inv alpha', i_chord, i_span, el%alpha, el%dforce, cl_inv
+          
+          ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
+          
+>>>>>>> cleanup of dust.f90
           ! update the pressure field, p = df.n / area
           el%pres = sum( el%dforce * el%nor ) / el%area
       end select
@@ -873,81 +923,75 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
   ! - actdisk: avg delta_pressure and force computed here,
   !            to include thier effects in postpro (e.g. integral loads)
 !$omp parallel do private(i_el)
-  do i_el = 1 , size(elems_ad)
-!   call elems_ad(i_el)%p%compute_pres(sim_param)
-    call elems_ad(i_el)%p%compute_pres( &     ! update surf_vel field too
+    do i_el = 1 , size(elems_ad)
+      call elems_ad(i_el)%p%compute_pres( &     ! update surf_vel field too
             geo%refs( geo%components(elems_ad(i_el)%p%comp_id)%ref_id )%R_g)
-    call elems_ad(i_el)%p%compute_dforce()
-  end do
+      call elems_ad(i_el)%p%compute_dforce()
+    end do
 !$omp end parallel do
 
 #if USE_PRECICE
+    sum_force = 0.0_wp
+    do i = 1, size(elems_tot)
+      sum_force = sum_force + elems_tot(i)%p%dforce
+    end do
 
-      sum_force = 0.0_wp
-      do i = 1, size(elems_tot)
-        sum_force = sum_force + elems_tot(i)%p%dforce
-      end do
+    !> Update force and moments to be passed to the structural solver
+    call precice%update_force(geo, elems_tot)
 
+    call precicef_ongoing(precice%is_ongoing)
+    if (precice%is_ongoing .eq. 1) then
+      call precicef_advance( precice%dt_precice )
+      write(*,*) ' ++++ dt_precice: ', precice%dt_precice
+    end if
 
-      !> Update force and moments to be passed to the structural solver
-      call precice % update_force( geo, elems_tot )
-
-      call precicef_ongoing( precice%is_ongoing )
-      if ( precice%is_ongoing .eq. 1 ) then
-        call precicef_advance( precice%dt_precice )
-        write(*,*) ' ++++ dt_precice: ', precice%dt_precice
+    !> Write force and moments to structural solver
+    do i = 1, size(precice%fields)
+      if (trim(precice%fields(i)%fio) .eq. 'write') then
+        if (trim(precice%fields(i)%ftype) .eq. 'scalar') then
+          call precicef_write_bsdata( precice%fields(i)%fid, &
+                                      precice%mesh%nnodes  , &
+                                      precice%mesh%node_ids, &
+                                      precice%fields(i)%fdata(1,:) )
+        elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
+          call precicef_write_bvdata( precice%fields(i)%fid, &
+                                      precice%mesh%nnodes  , &
+                                      precice%mesh%node_ids, &
+                                      precice%fields(i)%fdata )
+        endif
       end if
+    end do
 
-      !> Write force and moments to structural solver
-      do i = 1, size(precice%fields)
-        if ( trim(precice%fields(i)%fio) .eq. 'write' ) then
+    call precicef_action_required( precice%read_it_checkp, bool )
 
-          if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
-            call precicef_write_bsdata( precice%fields(i)%fid, &
-                                        precice%mesh%nnodes  , &
-                                        precice%mesh%node_ids, &
-                                        precice%fields(i)%fdata(1,:) )
-          elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
-            call precicef_write_bvdata( precice%fields(i)%fid, &
-                                        precice%mesh%nnodes  , &
-                                        precice%mesh%node_ids, &
-                                        precice%fields(i)%fdata )
-          endif
-
-
+    if ( bool .eq. 1 ) then ! timestep not converged
+      !> Reload checkpoint state
+      do j = 1, size(precice%fields)
+        if ( trim(precice%fields(j)%fio) .eq. 'write' ) then
+          precice%fields(j)%fdata = precice%fields(j)%cdata
         end if
       end do
-
-      call precicef_action_required( precice%read_it_checkp, bool )
-
-      if ( bool .eq. 1 ) then ! timestep not converged
-        !> Reload checkpoint state
-        do j = 1, size(precice%fields)
-          if ( trim(precice%fields(j)%fio) .eq. 'write' ) then
-            precice%fields(j)%fdata = precice%fields(j)%cdata
-          end if
-        end do
-        call precicef_mark_action_fulfilled( precice%read_it_checkp )
-      else ! timestep converged
-        precice_convergence = .true.
-        !> Finalize timestep
-        ! Do the same actions as a simulation w/o coupling
-        ! *** to do *** check if something special is needed
-
+      call precicef_mark_action_fulfilled( precice%read_it_checkp )
+    else ! timestep converged
+      precice_convergence = .true.
+      !> Finalize timestep
+      ! Do the same actions as a simulation w/o coupling
+      ! *** to do *** check if something special is needed
 #else
 #endif
 
-  !----- Print the results -----
-  if(time_2_out)  then
-    nout = nout+1
-    call save_status(geo, wake, nout, time, run_id)
-  endif
+    !> Print the results 
+    if(time_2_out)  then
+      nout = nout+1
+      call save_status(geo, wake, nout, time, run_id)
+    endif
 
-  !------ Viscous Effects and Flow Separations ------
-  ! some computation of surface quantities and vorticity to be released.
-  ! Free vortices will be introduced in prepare_wake(), some lines below
-  if(sim_param%use_ve) call viscosity_effects( geo , elems , te )
+    !> Viscous Effects and Flow Separations 
+    ! some computation of surface quantities and vorticity to be released.
+    ! Free vortices will be introduced in prepare_wake(), some lines below
+    if(sim_param%use_ve) call viscosity_effects( geo , elems , te )
 
+<<<<<<< HEAD
   !------ Treat the wake ------
   ! (this needs to be done after output, in practice the update is for the
   !  next iteration)
@@ -977,9 +1021,16 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     time = min(sim_param%tend, sim_param%time_vec(it+1))
     !> Update geometry
     call update_geometry(geo, te, time, .false.)
+=======
+    !> Treat the wake: this needs to be done after output, 
+    !                  in practice the update is for the next iteration)
+  
+    t0 = dust_time()
+>>>>>>> cleanup of dust.f90
     if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
-          call complete_wake(wake, geo, elems_tot, te)
+      call update_wake(wake, elems_tot, octree)
     end if
+<<<<<<< HEAD
   endif
 <<<<<<< HEAD
 
@@ -990,75 +1041,98 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
   !> Save old solution (at the previous dt) of the linear system
   res_old = linsys%res
 >>>>>>> wip in NL-UVLM
+=======
+    t1 = dust_time()
 
-      !> Update nor_old (moved from geo/mod_geo.f90/update_geometry(), l.2220 approx
-    !$omp parallel do private(i_el)
-      do i_el = 1 , size(elems_tot)
-        elems_tot(i_el)%p%nor_old = elems_tot(i_el)%p%nor
-      end do
-    !$omp end parallel do
+    !> debug message
+    if(sim_param%debug_level .ge. 1) then
+      write(message,'(A,F9.3,A)') 'Updated wake in: ' , t1 - t0,' s.'
+      call printout(message)
+    endif
+
+    !> Pressure integral equation 
+    !> save old velocity on the surfpan (before updating the geom, few lines below)
+    do i_el = 1 , geo%nSurfPan
+      select type ( el => elems(i_el)%p ) ; class is ( t_surfpan )
+        surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) = el%ub   ! el%surf_vel
+            nor_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) = el%nor   ! el%surf_vel
+      end select
+    end do
+
+    !> Pressure integral equation 
+    if(it .lt. nstep) then
+      time = min(sim_param%tend, sim_param%time_vec(it+1))
+      !> Update geometry
+      call update_geometry(geo, te, time, .false.)
+      if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
+            call complete_wake(wake, geo, elems_tot, te)
+      end if
+    endif
+  
+    !> Save old solution (at the previous dt) of the linear system
+    res_old = linsys%res
+>>>>>>> cleanup of dust.f90
+
+    !> Update nor_old (moved from geo/mod_geo.f90/update_geometry(), l.2220 approx
+!$omp parallel do private(i_el)
+    do i_el = 1 , size(elems_tot)
+      elems_tot(i_el)%p%nor_old = elems_tot(i_el)%p%nor
+    end do
+!$omp end parallel do
 
 
 #if USE_PRECICE
-      ! *** to do *** dirty implementation. it-update moved into #if USE_PRECICE
-      ! statement, to avoid double time counter update, when the code is not coupled
-      ! with external softwares through PRECICE.
-      ! #if .not. USE_PRECICE, it-update occurs at the beginning of the time loop,
-      ! approximately at l.615.
-      ! Is there a reasone why it-update should occur in two different places of the
-      ! time loop (at the begin w/o precice, at the end w/ precice)?
-      !> Update n. time step
-      it = it + 1
-      endif ! End of the if statement that check whether the timestep
-            ! has converged or not
+    ! *** to do *** dirty implementation. it-update moved into #if USE_PRECICE
+    ! statement, to avoid double time counter update, when the code is not coupled
+    ! with external softwares through PRECICE.
+    ! #if .not. USE_PRECICE, it-update occurs at the beginning of the time loop,
+    ! approximately at l.615.
+    ! Is there a reasone why it-update should occur in two different places of the
+    ! time loop (at the begin w/o precice, at the end w/ precice)?
+    !> Update n. time step
+    it = it + 1
+    endif ! End of the if statement that check whether the timestep
+          ! has converged or not
 #endif
 
-enddo
+  enddo !> while do 
 call printout(nl//'\\\\\\\\\\  Computations Finished \\\\\\\\\\')
+deallocate(res_old)
+!> End Time Cycle 
 
-
-deallocate( res_old )
-!===== End Time Cycle ======
-
-!> --- Finalize PreCICE -----------------------------------------
+!> Finalize PreCICE 
 #if USE_PRECICE
-      call precicef_finalize()
+  call precicef_finalize()
 #endif
-!> --- Finalize PreCICE: done -----------------------------------
 
-!------ Cleanup ------
-!call destroy_wake_panels(wake_panels)
+!> Cleanup 
 call destroy_wake(wake)
 call destroy_octree(octree)
 call destroy_linsys(linsys)
 call destroy_elements(geo)
 call destroy_geometry(geo, elems_tot)
-
 call destroy_hdf5()
 
 t22 = dust_time()
+!> Debug
 if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') 'Completed all computations in ',t22-t00,' s'
   call printout(message)
 endif
 call printout(nl//'<<<<<< DUST end <<<<<<'//nl)
 
-
-
-!----------------------------------------------------------------------
 contains
-!----------------------------------------------------------------------
 
+!> Functions (maybe put everything in a dedicated module) 
 subroutine get_run_id (run_id)
- integer, intent(out) :: run_id(10)
+  integer, intent(out) :: run_id(10)
+  real(wp)             :: randr
+  integer              :: maxi, randi
 
- real(wp) :: randr
- integer  :: maxi, randi
-
-  !First 8 values are the date and time
+  !> First 8 values are the date and time
   call date_and_time(VALUES=run_id(1:8))
 
-  !Last 3 values are 2 random integers
+  !> Last 3 values are 2 random integers
   maxi = huge(maxi)
   call random_number(randr)
   randi = int(randr*real(maxi,wp))
@@ -1067,30 +1141,31 @@ subroutine get_run_id (run_id)
   call random_number(randr)
   randi = int(randr*real(maxi,wp))
   run_id(10) = randi
-
 end subroutine
-
-!----------------------------------------------------------------------
 
 !> Initialize all the parameters reading them from the the input file
 subroutine init_sim_param(sim_param, prms, nout, output_start)
- class(t_sim_param) :: sim_param
- type(t_parse) :: prms
- integer, intent(inout) :: nout
- logical, intent(inout) :: output_start
-
-  !timing
-  sim_param%t0     = getreal(prms, 'tstart')
-  sim_param%tend   = getreal(prms, 'tend')
-  sim_param%dt_out = getreal(prms,'dt_out')
-  sim_param%debug_level = getint(prms, 'debug_level')
+  class(t_sim_param)      :: sim_param
+  type(t_parse)           :: prms
+  integer, intent(inout)  :: nout
+  logical, intent(inout)  :: output_start
+  
+  !> Timing
+  sim_param%t0                  = getreal(prms, 'tstart')
+  sim_param%tend                = getreal(prms, 'tend')
+  sim_param%dt_out              = getreal(prms,'dt_out')
+  sim_param%debug_level         = getint(prms, 'debug_level')
   sim_param%output_detailed_geo = getlogical(prms, 'output_detailed_geo')
-  sim_param%ndt_update_wake = getint(prms, 'ndt_update_wake')
-
-  !Reference values
-  sim_param%P_inf = getreal(prms,'P_inf')
-  sim_param%rho_inf  = getreal(prms,'rho_inf')
-  sim_param%u_inf = getrealarray(prms, 'u_inf', 3)
+  sim_param%ndt_update_wake     = getint(prms, 'ndt_update_wake')
+  
+  !> Reference environment values
+  sim_param%P_inf               = getreal(prms,'P_inf')
+  sim_param%rho_inf             = getreal(prms,'rho_inf')
+  sim_param%a_inf               = getreal(prms,'a_inf')
+  sim_param%mu_inf              = getreal(prms,'mu_inf')
+  sim_param%nu_inf              = sim_param%mu_inf/sim_param%rho_inf
+  sim_param%u_inf               = getrealarray(prms, 'u_inf', 3)
+  !> Check on reference velocity
   if ( countoption(prms,'u_ref') .gt. 0 ) then
     sim_param%u_ref = getreal(prms, 'u_ref')
   else
@@ -1101,58 +1176,62 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
       &Stopping now before producing invalid results')
     endif
   end if
-  sim_param%a_inf  = getreal(prms,'a_inf')
-  sim_param%mu_inf = getreal(prms,'mu_inf')
-  sim_param%nu_inf = sim_param%mu_inf/sim_param%rho_inf
-
-  !Wake parameters
-  sim_param%n_wake_panels = getint(prms, 'n_wake_panels')
+  
+  !> Wake parameters
+  sim_param%n_wake_panels         = getint(prms, 'n_wake_panels')
+  sim_param%n_wake_particles      = getint(prms, 'n_wake_particles')
+  sim_param%particles_box_min     = getrealarray(prms, 'particles_box_min',3)
+  sim_param%particles_box_max     = getrealarray(prms, 'particles_box_max',3)
+  sim_param%rigid_wake            = getlogical(prms, 'rigid_wake')
+  sim_param%rigid_wake_vel        = sim_param%u_inf   !> initialisation
+  !> Check on wake panels
   if(sim_param%n_wake_panels .lt. 1) then
     sim_param%n_wake_panels = 1
     call warning('dust','dust','imposed a number of wake panels rows &
                 &LOWER THAN 1. At least one row of panels is mandatory, &
                 &the simulation will proceed with "n_wake_panels = 1"')
   endif
-  sim_param%n_wake_particles = getint(prms, 'n_wake_particles')
-  sim_param%particles_box_min = getrealarray(prms, 'particles_box_min',3)
-  sim_param%particles_box_max = getrealarray(prms, 'particles_box_max',3)
-  sim_param%rigid_wake = getlogical(prms, 'rigid_wake')
-  sim_param%rigid_wake_vel = sim_param%u_inf   ! initialisation
   if ( sim_param%rigid_wake ) then
     if ( countoption(prms,'rigid_wake_vel') .eq. 1 ) then
-      sim_param%rigid_wake_vel = getrealarray(prms, 'rigid_wake_vel',3)
+      sim_param%rigid_wake_vel    = getrealarray(prms, 'rigid_wake_vel',3)
     else if ( countoption(prms,'rigid_wake_vel') .le. 0 ) then
       call warning('dust','dust','no rigid_wake_vel parameter set, &
             &with rigid_wake = T; rigid_wake_vel = u_inf')
-      sim_param%rigid_wake_vel = sim_param%u_inf
+      sim_param%rigid_wake_vel    = sim_param%u_inf
     end if
   end if
-  sim_param%join_te = getlogical(prms, 'join_te')
+
+  !> Trailing edge 
+  sim_param%join_te               = getlogical(prms, 'join_te')
   if (sim_param%join_te) sim_param%join_te_factor=getreal(prms,'join_te_factor')
-  !Names
-  sim_param%basename = getstr(prms,'basename')
-  sim_param%GeometryFile = getstr(prms,'GeometryFile')
-  sim_param%ReferenceFile = getstr(prms,'ReferenceFile')
-  !Method parameters
+
+  !> Names
+  sim_param%basename              = getstr(prms, 'basename')
+  sim_param%GeometryFile          = getstr(prms, 'GeometryFile')
+  sim_param%ReferenceFile         = getstr(prms, 'ReferenceFile')
+
+  !> Method parameters
   sim_param%FarFieldRatioDoublet  = getreal(prms, 'FarFieldRatioDoublet')
-  sim_param%FarFieldRatioSource  = getreal(prms, 'FarFieldRatioSource')
-  sim_param%DoubletThreshold   = getreal(prms, 'DoubletThreshold')
-  sim_param%RankineRad = getreal(prms, 'RankineRad')
-  sim_param%VortexRad = getreal(prms, 'VortexRad')
-  sim_param%CutoffRad  = getreal(prms, 'CutoffRad')
-  sim_param%first_panel_scaling = getreal(prms,'ImplicitPanelScale')
-  sim_param%min_vel_at_te  = getreal(prms,'ImplicitPanelMinVel')
-  sim_param%use_vs = getlogical(prms, 'Vortstretch')
-  sim_param%vs_elems = getlogical(prms, 'VortstretchFromElems')
-  sim_param%use_vd = getlogical(prms, 'Diffusion')
-  sim_param%use_tv = getlogical(prms, 'TurbulentViscosity')
-  sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
+  sim_param%FarFieldRatioSource   = getreal(prms, 'FarFieldRatioSource')
+  sim_param%DoubletThreshold      = getreal(prms, 'DoubletThreshold')
+  sim_param%RankineRad            = getreal(prms, 'RankineRad')
+  sim_param%VortexRad             = getreal(prms, 'VortexRad')
+  sim_param%CutoffRad             = getreal(prms, 'CutoffRad')
+  sim_param%first_panel_scaling   = getreal(prms, 'ImplicitPanelScale')
+  sim_param%min_vel_at_te         = getreal(prms, 'ImplicitPanelMinVel')
+  sim_param%use_vs                = getlogical(prms, 'Vortstretch')
+  sim_param%vs_elems              = getlogical(prms, 'VortstretchFromElems')
+  sim_param%use_vd                = getlogical(prms, 'Diffusion')
+  sim_param%use_tv                = getlogical(prms, 'TurbulentViscosity')
+  sim_param%use_ve                = getlogical(prms, 'ViscosityEffects')
+  sim_param%use_pa                = getlogical(prms, 'PenetrationAvoidance')
+  !> Check on penetration avoidance 
   if(sim_param%use_pa) then
     sim_param%pa_rad_mult = getreal(prms, 'PenetrationAvoidanceCheckRadius')
     sim_param%pa_elrad_mult = getreal(prms,'PenetrationAvoidanceElementRadius')
   endif
-  sim_param%use_ve = getlogical(prms, 'ViscosityEffects')
-  !Lifting line elements
+
+  !> Lifting line elements
   sim_param%llSolver                        = getstr(    prms, 'LLsolver')
   sim_param%llReynoldsCorrections           = getlogical(prms, 'LLreynoldsCorrections')
   sim_param%llReynoldsCorrectionsNfact      = getreal(   prms, 'LLreynoldsCorrectionsNfact')
@@ -1167,27 +1246,24 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%llArtificialViscosityAdaptive   = getlogical(prms, 'LLartificialViscosityAdaptive')
   sim_param%llLoadsAVL                      = getlogical(prms, 'LLloadsAVL')
   !> check LL inputs
-  if ( ( trim(sim_param%llSolver) .ne. 'GammaMethod' ) .and. &
-       ( trim(sim_param%llSolver) .ne. 'AlphaMethod' ) ) then
-
+  if ((trim(sim_param%llSolver) .ne. 'GammaMethod') .and. &
+      (trim(sim_param%llSolver) .ne. 'AlphaMethod')) then
     write(*,*) ' sim_param%llSolver : ' , trim(sim_param%llSolver)
-
     call warning('dust','init_sim_param',' Wrong string for LLsolver. &
-         &This parameter is set equal to "GammaMethod" (default) &
-         &in init_sim_param() routine.')
-
+                &This parameter is set equal to "GammaMethod" (default) &
+                &in init_sim_param() routine.')
     sim_param%llSolver = 'GammaMethod'
-
   end if
+
   if ( trim(sim_param%llSolver) .eq. 'GammaMethod' ) then
     if ( sim_param%llArtificialViscosity .gt. 0.0_wp ) then
       call warning('dust','init_sim_param','LLartificialViscoisty set as an input, &
           & different from zero, but ll regularisation available only if&
           & LLsolver = AlphaMethod. LLartificialViscosity = 0.0')
-        sim_param%llArtificialViscosity = 0.0_wp
-        sim_param%llArtificialViscosityAdaptive = .false.
-        sim_param%llArtificialViscosityAdaptive_Alpha  = 0.0_wp
-        sim_param%llArtificialViscosityAdaptive_dAlpha = 0.0_wp
+      sim_param%llArtificialViscosity = 0.0_wp
+      sim_param%llArtificialViscosityAdaptive = .false.
+      sim_param%llArtificialViscosityAdaptive_Alpha  = 0.0_wp
+      sim_param%llArtificialViscosityAdaptive_dAlpha = 0.0_wp
     end if
     if ( sim_param%llArtificialViscosityAdaptive ) then
       call warning('dust','init_sim_param','LLartificialViscosityAdaptive set&
@@ -1195,132 +1271,131 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
           & LLsolver = AlphaMethod')
     end if
   end if
+
   !> The user is required to set _Alpha and _dAlpha for ll adaptive regularisation
-  if ( trim(sim_param%llSolver) .eq. 'AlphaMethod' ) then
-    if ( sim_param%llArtificialViscosityAdaptive) then
-      if ( ( countoption(prms,'LLartificialViscosityAdaptive_Alpha')  .eq. 0 ) .or. &
-           ( countoption(prms,'LLartificialViscosityAdaptive_dAlpha') .eq. 0 ) ) then
-
+  if (trim(sim_param%llSolver) .eq. 'AlphaMethod') then
+    if (sim_param%llArtificialViscosityAdaptive) then
+      if ((countoption(prms,'LLartificialViscosityAdaptive_Alpha')  .eq. 0) .or. &
+          (countoption(prms,'LLartificialViscosityAdaptive_dAlpha') .eq. 0)) then
         call error('dust','init_sim_param','LLartificialViscosityAdaptive_Alpha or&
-           & LLartificialViscosity_dAlpha not set as an input, while LLartificialViscosityAdaptive&
-           & is set equal to T. Set these parameters [deg].')
-
+          & LLartificialViscosity_dAlpha not set as an input, while LLartificialViscosityAdaptive&
+          & is set equal to T. Set these parameters [deg].')
       else
-        sim_param%llArtificialViscosityAdaptive_Alpha = &
-                  getreal(prms,'LLartificialViscosityAdaptive_Alpha')
-        sim_param%llArtificialViscosityAdaptive_dAlpha= &
-                  getreal(prms,'LLartificialViscosityAdaptive_dAlpha')
+        sim_param%llArtificialViscosityAdaptive_Alpha = getreal(prms,'LLartificialViscosityAdaptive_Alpha')
+        sim_param%llArtificialViscosityAdaptive_dAlpha= getreal(prms,'LLartificialViscosityAdaptive_dAlpha')
       end if
     end if
   end if
   write(*,*) ' sim_param%llSolver : ' , trim(sim_param%llSolver)
 
-  !Octree and FMM parameters
-  sim_param%use_fmm = getlogical(prms, 'FMM')
-  if(sim_param%use_fmm) then
-    sim_param%use_fmm_pan = getlogical(prms, 'FMMPanels')
-    sim_param%BoxLength = getreal(prms, 'BoxLength')
-    sim_param%NBox = getintarray(prms, 'NBox',3)
-    sim_param%OctreeOrigin = getrealarray(prms, 'OctreeOrigin',3)
-    sim_param%NOctreeLevels = getint(prms, 'NOctreeLevels')
-    sim_param%MinOctreePart = getint(prms, 'MinOctreePart')
-    sim_param%MultipoleDegree = getint(prms,'MultipoleDegree')
+  !> Octree and FMM parameters
+  sim_param%use_fmm                       = getlogical(prms, 'FMM')
 
-    sim_param%use_dyn_layers = getlogical(prms,'DynLayers')
+  if(sim_param%use_fmm) then
+    sim_param%use_fmm_pan                 = getlogical(prms, 'FMMPanels')
+    sim_param%BoxLength                   = getreal(prms, 'BoxLength')
+    sim_param%NBox                        = getintarray(prms, 'NBox',3)
+    sim_param%OctreeOrigin                = getrealarray(prms, 'OctreeOrigin',3)
+    sim_param%NOctreeLevels               = getint(prms, 'NOctreeLevels')
+    sim_param%MinOctreePart               = getint(prms, 'MinOctreePart')
+    sim_param%MultipoleDegree             = getint(prms,'MultipoleDegree')
+    sim_param%use_dyn_layers              = getlogical(prms,'DynLayers')
+
     if(sim_param%use_dyn_layers) then
-      sim_param%NMaxOctreeLevels = getint(prms, 'NMaxOctreeLevels')
-      sim_param%LeavesTimeRatio = getreal(prms, 'LeavesTimeRatio')
+      sim_param%NMaxOctreeLevels          = getint(prms, 'NMaxOctreeLevels')
+      sim_param%LeavesTimeRatio           = getreal(prms, 'LeavesTimeRatio')
     else
-      sim_param%NMaxOctreeLevels = sim_param%NOctreeLevels
+      sim_param%NMaxOctreeLevels          = sim_param%NOctreeLevels
     endif
 
-    sim_param%use_pr = getlogical(prms, 'ParticlesRedistribution')
+    sim_param%use_pr                      = getlogical(prms, 'ParticlesRedistribution')
+
     if(sim_param%use_pr) then
-      sim_param%part_redist_ratio = getreal(prms,'ParticlesRedistributionRatio')
+      sim_param%part_redist_ratio         = getreal(prms,'ParticlesRedistributionRatio')
       if ( countoption(prms,'OctreeLevelSolid') .gt. 0 ) then
-        sim_param%lvl_solid = getint(prms, 'OctreeLevelSolid')
+        sim_param%lvl_solid               = getint(prms, 'OctreeLevelSolid')
       else
-        sim_param%lvl_solid = max(sim_param%NOctreeLevels-2,1)
+        sim_param%lvl_solid               = max(sim_param%NOctreeLevels-2,1)
       endif
     endif
   else
     sim_param%use_fmm_pan = .false.
   endif
 
-  !HCAS
-  sim_param%hcas = getlogical(prms,'HCAS')
+  !> HCAS
+  sim_param%hcas                          = getlogical(prms,'HCAS')
   if(sim_param%hcas) then
-    sim_param%hcas_time = getreal(prms,'HCAS_time')
-    sim_param%hcas_vel = getrealarray(prms,'HCAS_velocity',3)
+    sim_param%hcas_time                   = getreal(prms,'HCAS_time')
+    sim_param%hcas_vel                    = getrealarray(prms,'HCAS_velocity',3)
   endif
 
-  !variable_wind
-  sim_param%use_gust = getlogical(prms, 'Gust')
+  !> Variable_wind
+  sim_param%use_gust                      = getlogical(prms, 'Gust')
+
   if(sim_param%use_gust) then
-    sim_param%GustType = getstr(prms,'GustType')
-    sim_param%gust_origin = getrealarray(prms, 'GustOrigin',3)
+    sim_param%GustType                    = getstr(prms,'GustType')
+    sim_param%gust_origin                 = getrealarray(prms, 'GustOrigin',3)
+
     if(countoption(prms,'GustFrontDirection') .gt. 0) then
-      sim_param%gust_front_direction = getrealarray(prms, 'GustFrontDirection',3)
+      sim_param%gust_front_direction      = getrealarray(prms, 'GustFrontDirection',3)
     else
-      sim_param%gust_front_direction = sim_param%u_inf
+      sim_param%gust_front_direction      = sim_param%u_inf
     end if
+    
     if(countoption(prms,'GustFrontSpeed') .gt. 0) then
-      sim_param%gust_front_speed = getreal(prms, 'GustFrontSpeed')
+      sim_param%gust_front_speed          = getreal(prms, 'GustFrontSpeed')
     else
-      sim_param%gust_front_speed = norm2(sim_param%u_inf)
+      sim_param%gust_front_speed          = norm2(sim_param%u_inf)
     end if
-    sim_param%gust_u_des = getreal(prms,'GustUDes')
-    sim_param%gust_perturb_direction = getrealarray(prms,'GustPerturbationDirection',3)
-    sim_param%gust_time = getreal(prms,'GustStartTime')
-    sim_param%gust_gradient = getreal(prms,'GustGradient')
+    sim_param%gust_u_des                  = getreal(prms,'GustUDes')
+    sim_param%gust_perturb_direction      = getrealarray(prms,'GustPerturbationDirection',3)
+    sim_param%gust_time                   = getreal(prms,'GustStartTime')
+    sim_param%gust_gradient               = getreal(prms,'GustGradient')
   end if
 
-  !Manage restart
-  sim_param%restart_from_file = getlogical(prms,'restart_from_file')
+  !> Manage restart
+  sim_param%restart_from_file             = getlogical(prms,'restart_from_file')
   if (sim_param%restart_from_file) then
 
-    sim_param%reset_time = getlogical(prms,'reset_time')
-    sim_param%restart_file = getstr(prms,'restart_file')
-    !Removing leading "./" if present to avoid issues when restarting
+    sim_param%reset_time                  = getlogical(prms,'reset_time')
+    sim_param%restart_file                = getstr(prms,'restart_file')
+    
+    !> Removing leading "./" if present to avoid issues when restarting
     if(sim_param%basename(1:2) .eq. './') sim_param%basename = sim_param%basename(3:)
+    
     if(sim_param%restart_file(1:2) .eq. './') sim_param%restart_file = sim_param%restart_file(3:)
+    
     call printout('RESTART: restarting from file: '//trim(sim_param%restart_file))
-    sim_param%GeometryFile = sim_param%restart_file(1:len(trim(sim_param%restart_file))-11)&
-                                                             &//'geo.h5'
+    sim_param%GeometryFile = sim_param%restart_file(1:len(trim(sim_param%restart_file))-11) //'geo.h5'
 
     !restarting the same simulation, advance the numbers
     if(sim_param%restart_file(1:len(trim(sim_param%restart_file))-12).eq. &
-                                                 trim(sim_param%basename)) then
-    read(sim_param%restart_file(len(trim(sim_param%restart_file))-6:len(trim(sim_param%restart_file))-3),*) &
-                                                                           nout
+                                                trim(sim_param%basename)) then
+    read(sim_param%restart_file(len(trim(sim_param%restart_file))-6:len(trim(sim_param%restart_file))-3),*) nout
       call printout('Identified restart from the same simulation, keeping the&
-      & previous output numbering')
-      !avoid rewriting the same timestep
+                    & previous output numbering')
+      !> avoid rewriting the same timestep
       output_start = .false.
     endif
     if(.not. sim_param%reset_time) call load_time(sim_param%restart_file, sim_param%t0)
-
   endif
 
-
-  !Check the number of timesteps
+  !> Check the number of timesteps
   if(CountOption(prms,'dt') .gt. 0) then
     if( CountOption(prms,'timesteps') .gt. 0) then
-      !error
       call error('init_sim_param','dust','Both number of timesteps and dt are&
       & set, but only one of the two can be specified')
     else
-      !get dt and compute number of timesteps
+      !> get dt and compute number of timesteps
       sim_param%dt     = getreal(prms, 'dt')
-      sim_param%n_timesteps = ceiling((sim_param%tend-sim_param%t0)/&
-                                       sim_param%dt) + 1
-       !(+1 for the zero time step)
+      sim_param%n_timesteps = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1
+                              !(+1 for the zero time step)
     endif
   else
-    !get number of steps, compute dt
+    !> get number of steps, compute dt
     sim_param%n_timesteps = getint(prms, 'timesteps')
     sim_param%dt =  (sim_param%tend-sim_param%t0)/&
-                     real(sim_param%n_timesteps,wp)
+                      real(sim_param%n_timesteps,wp)
     sim_param%n_timesteps = sim_param%n_timesteps + 1
                             !add one for the first step
   endif
@@ -1374,18 +1449,14 @@ subroutine init_timestep(t)
 end subroutine init_timestep
 
 
-!------------------------------------------------------------------------------
-
 subroutine debug_printout_result(linsys, basename, it)
- type(t_linsys),   intent(in) :: linsys
- character(len=*), intent(in) :: basename
- integer,          intent(in) :: it
-
- real(wp), allocatable :: res(:,:)
- character(len=max_char_len) :: sit
+  type(t_linsys),   intent(in) :: linsys
+  character(len=*), intent(in) :: basename
+  integer,          intent(in) :: it
+  real(wp), allocatable        :: res(:,:)
+  character(len=max_char_len)  :: sit
 
   allocate(res(1,linsys%rank+linsys%n_expl))
-  !!res(1,:) = linsys%res
   res(1,:) = (/linsys%res,linsys%res_expl(:,1)/)
   write(sit,'(I4.4)') it
   call write_basic(res,trim(basename)//'_result_'//trim(sit)//'.dat')
@@ -1393,31 +1464,26 @@ subroutine debug_printout_result(linsys, basename, it)
 
 end subroutine debug_printout_result
 
-!------------------------------------------------------------------------------
-
 subroutine debug_printout_geometry(elems, geo, basename, it)
- type(t_impl_elem_p),   intent(in) :: elems(:)
- type(t_geo),      intent(in) :: geo
- character(len=*), intent(in) :: basename
- integer,          intent(in) :: it
-
- real(wp), allocatable :: norm(:,:), cent(:,:), velb(:,:)
- integer, allocatable  :: el(:,:), conn(:,:)
- character(len=max_char_len) :: sit
- integer :: ie, iv
-
- ! surf_vel and vel_phi
- real(wp), allocatable :: surf_vel(:,:), vel_phi(:,:)
- integer :: i_e
-
- ! chtls
- real(wp) :: f(5)
- integer :: n_neigh
+  type(t_impl_elem_p),   intent(in) :: elems(:)
+  type(t_geo),      intent(in)      :: geo
+  character(len=*), intent(in)      :: basename
+  integer,          intent(in)      :: it
+  real(wp), allocatable             :: norm(:,:), cent(:,:), velb(:,:)
+  integer, allocatable              :: el(:,:), conn(:,:)
+  character(len=max_char_len)       :: sit
+  integer                           :: ie, iv
+  !> surf_vel and vel_phi
+  real(wp), allocatable             :: surf_vel(:,:), vel_phi(:,:)
+  integer                           :: i_e
+  !> chtls
+  real(wp)                          :: f(5)
+  integer                           :: n_neigh
 
   allocate(norm(3,size(elems)), cent(3,size(elems)), velb(3,size(elems)))
   allocate(el(4,size(elems))); el = 0
   allocate(conn(4,size(elems))); conn = -666;
-  ! surf_vel and vel_phi
+  !> surf_vel and vel_phi
   allocate( surf_vel(3,size(elems)), vel_phi(3,size(elems)) )
   surf_vel = -666.6_wp ; vel_phi = -666.6_wp
 
@@ -1434,36 +1500,22 @@ subroutine debug_printout_geometry(elems, geo, basename, it)
       endif
     enddo
 
-    ! surf_vel and vel_phi for surfpan only
+    !> surf_vel and vel_phi for surfpan only
     select type( el => elems(ie)%p )
-     class is(t_surfpan)
-      surf_vel(:,ie) = el%surf_vel   ! elems(ie)%p%surf_vel
-
-!     ! 1. FVM approx --------
-!     vel_phi(:,ie) = 0.0_wp
-!     do i_e = 1 , el%n_ver    ! elems(ie)%p%n_ver
-!       if ( associated(el%neigh(i_e)%p) ) then !  .and. &
-!         vel_phi(:,ie) = vel_phi(:,ie) + &
-!           el%pot_vel_stencil(:,i_e) * (el%neigh(i_e)%p%mag - el%mag)
-!       end if
-!     end do
-!     vel_phi(:,ie)  = - vel_phi(:,ie)
-
-      ! 2. CHTLS method ------
-      vel_phi(:,ie) = 0.0_wp
-      f = 0.0_wp ; n_neigh = 0
-      do i_e = 1 , el%n_ver
-        if ( associated(el%neigh(i_e)%p) ) then
-          n_neigh = n_neigh + 1
-          f(n_neigh) = - ( el%neigh(i_e)%p%mag - el%mag )
-        end if
-      end do
-      f(n_neigh+1) = sum(el%nor * (-variable_wind(el%cen, sim_param%time) - el%uvort + el%ub) )
-      vel_phi(:,ie) = matmul( el%chtls_stencil , f(1:n_neigh+1) )
-
-
+      class is(t_surfpan)
+        surf_vel(:,ie) = el%surf_vel   ! elems(ie)%p%surf_vel
+        !>  2. CHTLS method ------
+        vel_phi(:,ie) = 0.0_wp
+        f = 0.0_wp ; n_neigh = 0
+        do i_e = 1 , el%n_ver
+          if ( associated(el%neigh(i_e)%p) ) then
+            n_neigh = n_neigh + 1
+            f(n_neigh) = - ( el%neigh(i_e)%p%mag - el%mag )
+          end if
+        end do
+        f(n_neigh+1) = sum(el%nor * (-variable_wind(el%cen, sim_param%time) - el%uvort + el%ub) )
+        vel_phi(:,ie) = matmul( el%chtls_stencil , f(1:n_neigh+1) )
     end select
-
   enddo
 
   write(sit,'(I4.4)') it
@@ -1485,24 +1537,25 @@ end subroutine debug_printout_geometry
 !------------------------------------------------------------------------------
 
 subroutine debug_printout_geometry_minimal(elems,geo,basename, it)
- type(t_impl_elem_p),   intent(in) :: elems(:)
- type(t_geo),      intent(in) :: geo
- character(len=*), intent(in) :: basename
- integer,          intent(in) :: it
-
- real(wp), allocatable :: norm(:,:), cent(:,:)
- integer, allocatable  :: el(:,:)
- character(len=max_char_len) :: sit
- integer :: ie
- integer(h5loc) :: h5fid
+  type(t_impl_elem_p),   intent(in) :: elems(:)
+  type(t_geo),      intent(in)      :: geo
+  character(len=*), intent(in)      :: basename
+  integer,          intent(in)      :: it
+  real(wp), allocatable             :: norm(:,:), cent(:,:)
+  integer, allocatable              :: el(:,:)
+  character(len=max_char_len)       :: sit
+  integer                           :: ie
+  integer(h5loc)                    :: h5fid
 
   allocate(norm(3,size(elems)), cent(3,size(elems)))
   allocate(el(4,size(elems))); el = 0
+
   do ie=1,size(elems)
     norm(:,ie) = elems(ie)%p%nor
     cent(:,ie) = elems(ie)%p%cen
     el(1:elems(ie)%p%n_ver,ie) = elems(ie)%p%i_ver
   enddo
+
   write(sit,'(I4.4)') it
   call write_basic(geo%points, trim(basename)//'_mesh_points_'//trim(sit)//'.dat')
   call write_basic(norm,       trim(basename)//'_mesh_norm_'  //trim(sit)//'.dat')
@@ -1514,26 +1567,25 @@ subroutine debug_printout_geometry_minimal(elems,geo,basename, it)
   call close_hdf5_file(h5fid)
 
   deallocate(norm, cent, el)
+
 end subroutine debug_printout_geometry_minimal
 
 ! ---------------------------------------------------------------------
 
 subroutine debug_ll_printout_geometry(elems, geo, basename, it)
- type(t_liftlin_p),   intent(in) :: elems(:)
- type(t_geo),      intent(in) :: geo
- character(len=*), intent(in) :: basename
- integer,          intent(in) :: it
-
- real(wp), allocatable :: norm(:,:), cent(:,:), velb(:,:)
- integer, allocatable  :: el(:,:), conn(:,:)
- character(len=max_char_len) :: sit
- integer :: ie, iv
-
-
+  type(t_liftlin_p),   intent(in)  :: elems(:)
+  type(t_geo),      intent(in)     :: geo
+  character(len=*), intent(in)     :: basename
+  integer,          intent(in)     :: it
+  real(wp), allocatable            :: norm(:,:), cent(:,:), velb(:,:)
+  integer, allocatable             :: el(:,:), conn(:,:)
+  character(len=max_char_len)      :: sit
+  integer                          :: ie, iv
+  
   allocate(norm(3,size(elems)), cent(3,size(elems)), velb(3,size(elems)))
   allocate(el(4,size(elems))); el = 0
   allocate(conn(4,size(elems))); conn = -666;
-
+  
   do ie=1,size(elems)
     norm(:,ie) = elems(ie)%p%nor
     cent(:,ie) = elems(ie)%p%cen
