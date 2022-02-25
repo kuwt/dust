@@ -85,20 +85,20 @@ use mod_hinges, only: &
   t_hinge, t_hinge_input, build_hinges, hinge_input_parser
 
 use mod_hdf5_io, only: &
-   h5loc, &
-   new_hdf5_file, &
-   open_hdf5_file, &
-   close_hdf5_file, &
-   new_hdf5_group, &
-   open_hdf5_group, &
-   close_hdf5_group, &
-   write_hdf5, &
-   read_hdf5, &
-   read_hdf5_al, &
-   check_dset_hdf5
+  h5loc, &
+  new_hdf5_file, &
+  open_hdf5_file, &
+  close_hdf5_file, &
+  new_hdf5_group, &
+  open_hdf5_group, &
+  close_hdf5_group, &
+  write_hdf5, &
+  read_hdf5, &
+  read_hdf5_al, &
+  check_dset_hdf5
 
 use mod_math, only: &
-   cross
+  cross
 
 !----------------------------------------------------------------------
 
@@ -124,14 +124,13 @@ contains
 !! Namely calls build_component() for each component
 subroutine build_geometry(geo_files, ref_tags, comp_names, output_file, &
                           global_tol_sew , global_inner_prod_te )
- character(len=*), intent(in) :: geo_files(:)
- character(len=*), intent(in) :: ref_tags(:)
- character(len=*), intent(in) :: comp_names(:)
- character(len=*), intent(in) :: output_file
- real(wp),intent(in) :: global_tol_sew , global_inner_prod_te
-
- integer :: n_geo, i_geo
- integer(h5loc) :: file_loc, group_loc
+  character(len=*), intent(in) :: geo_files(:)
+  character(len=*), intent(in) :: ref_tags(:)
+  character(len=*), intent(in) :: comp_names(:)
+  character(len=*), intent(in) :: output_file
+  real(wp),intent(in)          :: global_tol_sew , global_inner_prod_te
+  integer                      :: n_geo, i_geo
+  integer(h5loc)               :: file_loc, group_loc
 
   n_geo = size(geo_files)
 
@@ -140,8 +139,8 @@ subroutine build_geometry(geo_files, ref_tags, comp_names, output_file, &
   call write_hdf5(n_geo,'NComponents',group_loc)
   do i_geo = 1,n_geo
     call build_component(group_loc, trim(geo_files(i_geo)), &
-                         trim(ref_tags(i_geo)), trim(comp_names(i_geo)), i_geo , &
-                         global_tol_sew , global_inner_prod_te )
+                        trim(ref_tags(i_geo)), trim(comp_names(i_geo)), i_geo , &
+                        global_tol_sew , global_inner_prod_te )
   enddo
 
   call close_hdf5_group(group_loc)
@@ -157,114 +156,122 @@ end subroutine build_geometry
 !! component, then builds the component by either loading the mesh
 !! from the mesh file or generating a parametric component
 subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
-                           global_tol_sew , global_inner_prod_te)
- integer(h5loc), intent(in)   :: gloc
- character(len=*), intent(in) :: geo_file
- character(len=*), intent(in) :: ref_tag
- character(len=*), intent(in) :: comp_tag
- integer, intent(in)          :: comp_id
- real(wp),intent(in) :: global_tol_sew , global_inner_prod_te
-
- type(t_parse) :: geo_prs
- character(len=max_char_len) :: mesh_file
- integer, allocatable :: ee(:,:)
- real(wp), allocatable :: rr(:,:)
- real(wp), allocatable :: rr_sym(:,:)
- real(wp), allocatable :: theta_e(:), theta_p(:), chord_p(:)
- character(len=max_char_len) :: comp_el_type
- character :: ElType
- character(len=max_char_len) :: mesh_file_type
- !> Hinge ---
- integer :: n_hinges
- type(t_parse), pointer :: hinge_prs
- type(t_parse), pointer :: fun_prs, file_prs, coupling_prs
- type(t_hinge_input), allocatable :: hinges(:)
- character(len=max_char_len) :: hinge_str
- character(len=2) :: hinge_id
- integer(h5loc) :: hinge_loc, hinge_i_loc
- !> Coupling ---
- logical :: coupled_comp
- character(len=max_char_len) :: coupled_str  ! there is no hdf_write for logical
- character(len=max_char_len) :: coupling_type
- real(wp)                    :: coupling_node(3)
- real(wp)                    :: coupling_node_rot(3,3)
- real(wp)                    :: coupling_node_rot_mir(3,3)
+                            global_tol_sew , global_inner_prod_te)
+  
+  integer(h5loc), intent(in)   :: gloc
+  character(len=*), intent(in) :: geo_file
+  character(len=*), intent(in) :: ref_tag
+  character(len=*), intent(in) :: comp_tag
+  integer, intent(in)          :: comp_id
+  real(wp),intent(in)          :: global_tol_sew , global_inner_prod_te
+  type(t_parse)                :: geo_prs
+  character(len=max_char_len)  :: mesh_file
+  integer, allocatable         :: ee(:,:)
+  real(wp), allocatable        :: rr(:,:)
+  real(wp), allocatable        :: rr_sym(:,:)
+  real(wp), allocatable        :: theta_e(:), theta_p(:), chord_p(:)
+  character(len=max_char_len)  :: comp_el_type
+  character                    :: ElType
+  character(len=max_char_len)  :: mesh_file_type
+  
+  !> Hinge 
+  integer                      :: n_hinges
+  type(t_parse), pointer       :: hinge_prs
+  type(t_parse), pointer       :: fun_prs, file_prs, coupling_prs
+  type(t_hinge_input), allocatable :: hinges(:)
+  character(len=max_char_len)  :: hinge_str
+  character(len=2)             :: hinge_id
+  integer(h5loc)               :: hinge_loc, hinge_i_loc
+  
+  !> Coupling 
+  logical :: coupled_comp
+  character(len=max_char_len) :: coupled_str  ! there is no hdf_write for logical
+  character(len=max_char_len) :: coupling_type
+  real(wp)                    :: coupling_node(3)
+  real(wp)                    :: coupling_node_rot(3,3)
+  real(wp)                    :: coupling_node_rot_mir(3,3)
 #if USE_PRECICE
- character(len=max_char_len) :: coupling_node_file
- real(wp), allocatable       :: coupling_nodes(:,:)
- integer                   :: n_coupling_nodes, io
+  character(len=max_char_len) :: coupling_node_file
+  real(wp), allocatable       :: coupling_nodes(:,:)
+  integer                     :: n_coupling_nodes, io
 #endif
- !> Symmetry and mirror ---
- logical :: mesh_symmetry , mesh_mirror
- real(wp) :: symmetry_point(3), symmetry_normal(3)
- real(wp) ::   mirror_point(3),   mirror_normal(3)
- character(len=max_char_len) :: comp_name
- integer(h5loc) :: comp_loc , geo_loc , te_loc
 
- character(len=max_char_len), allocatable :: airfoil_list(:)
- integer , allocatable                    :: nelem_span_list(:)
- integer , allocatable                    :: i_airfoil_e(:,:)
- real(wp), allocatable                    :: normalised_coord_e(:,:)
- real(wp) :: trac, radius, length
+  !> Symmetry and mirror 
+  logical                     :: mesh_symmetry, mesh_mirror
+  real(wp)                    :: symmetry_point(3), symmetry_normal(3)
+  real(wp)                    :: mirror_point(3),   mirror_normal(3)
+  character(len=max_char_len) :: comp_name
+  integer(h5loc)              :: comp_loc, geo_loc, te_loc
 
- ! Section names for CGNS
- integer :: nSections, iSection
- character(len=max_char_len), allocatable :: sectionNamesCGNS(:)
- ! Offset and scaling factor for CGNS
- real(wp) :: offset(3)
- real(wp) :: scaling
+  !> Span 
+  character(len=max_char_len), allocatable :: airfoil_list(:)
+  integer , allocatable                    :: nelem_span_list(:)
+  integer , allocatable                    :: i_airfoil_e(:,:)
+  real(wp), allocatable                    :: normalised_coord_e(:,:)
+  real(wp)                                 :: trac, radius, length
 
- integer :: npoints_chord_tot, nelems_span, nelems_span_tot
- ! Connectivity and te structures
- integer , allocatable :: neigh(:,:)
+  !> Section names for CGNS
+  integer                                  :: nSections, iSection
+  character(len=max_char_len), allocatable :: sectionNamesCGNS(:)
+  
+  !> Offset and scaling factor for CGNS
+  real(wp)         :: offset(3)
+  real(wp)         :: scaling
+  integer          :: npoints_chord_tot, nelems_span, nelems_span_tot
+  
+  !> Connectivity and te structures
+  integer , allocatable                    :: neigh(:,:)
 
- ! Parameters for gap sewing and te identification
- real(wp) :: tol_sewing , inner_product_threshold
- integer :: i_count
- ! Projection of the unit tangent exiting from te
- logical  :: te_proj_logical
- character(len=max_char_len) :: te_proj_dir
- real(wp) , allocatable :: te_proj_vec(:)
- logical :: suppress_te
- real(wp) :: scale_te
+  !> Parameters for gap sewing and te identification
+  real(wp)         :: tol_sewing , inner_product_threshold
+  integer          :: i_count
+  
+  !> Projection of the unit tangent exiting from te
+  logical                     :: te_proj_logical
+  character(len=max_char_len) :: te_proj_dir
+  real(wp) , allocatable      :: te_proj_vec(:)
+  logical                     :: suppress_te
+  real(wp)                    :: scale_te
 
- ! trailing edge ------
- integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
- integer , allocatable :: neigh_te(:,:) , o_te(:,:)
- real(wp), allocatable :: rr_te(:,:) , t_te(:,:)
+  !> Trailing edge 
+  integer , allocatable       :: e_te(:,:), i_te(:,:), ii_te(:,:)
+  integer , allocatable       :: neigh_te(:,:), o_te(:,:)
+  real(wp), allocatable       :: rr_te(:,:), t_te(:,:)
 
- integer :: i
+  integer :: i
 
 #if USE_PRECICE
- real(wp), allocatable :: c_ref_p(:,:)
- real(wp), allocatable :: c_ref_c(:,:)
- integer :: n_non_zero, j
+  real(wp), allocatable :: c_ref_p(:,:)
+  real(wp), allocatable :: c_ref_c(:,:)
+  integer               :: n_non_zero, j
 #endif
- ! ll offset
- character(len=max_char_len) :: xac_offset_filen
- logical                     :: xac_offset_io
- real(wp), allocatable       :: xac_p(:)
+  !> ll offset
+  character(len=max_char_len) :: xac_offset_filen
+  logical                     :: xac_offset_io
+  real(wp), allocatable       :: xac_p(:)
 
- character(len=*), parameter :: this_sub_name = 'build_component'
+  character(len=*), parameter :: this_sub_name = 'build_component'
 
   !=====
   !===== Define the parameters ====
   !=====
-  !mesh file
+  !> Mesh file
   call geo_prs%CreateStringOption('MeshFile','Mesh file definition')
   call geo_prs%CreateStringOption('MeshFileType','Mesh file type')
-  !element types
+  
+  !> Element types
   call geo_prs%CreateStringOption('ElType', &
               'element type (temporary) p:panel, v:vortex ring, l:lifting line')
-  !coupled simulation component
+  
+  !> Coupled simulation component
   call geo_prs%CreateLogicalOption('Coupled', &
               'Component of a coupled simulation, w/ a structural solver?', 'F')
   call geo_prs%CreateStringOption('CouplingType', &
               'Type of the coupling: &
-             &ll   : ll/beam coupling, &
-             &rigid: rigid component/node, &
-             &rbf: rigid component/node, &
-             &none', 'none')
+              &ll   : ll/beam coupling, &
+              &rigid: rigid component/node, &
+              &rbf: rigid component/node, &
+              &none', 'none')
   call geo_prs%CreateRealArrayOption('CouplingNode', &
               'Node for rigid coupling in the reference configuration (x, y, z)', &
               '(/0.0, 0.0, 0.0/)')
@@ -282,77 +289,79 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
               &component) of the unit vectors of the coupling node ref.frame: &
               &A = (/ I_nod_1^loc, I_nod_2^loc, I_nod_3^loc /)', &
               '(/ 1.,0.,0., 0.,1.,0., 0.,0.,1. /)')
-  ! ll xac offset (meant for coupled simulations)
+  !> ll xac offset (meant for coupled simulations)
   call geo_prs%CreateLogicalOption('Offset_xac', 'Offset in the chordwise &
               &direction of the LL elem w.r.t. the structural nodes', 'F')
   call geo_prs%CreateStringOption('Offset_xac_file','Filename of the &
               &chordwise input')
   !hinges
   call hinge_input_parser( geo_prs, hinge_prs, fun_prs, file_prs, coupling_prs )
-  !symmtery
-  call geo_prs%CreateLogicalOption('mesh_symmetry',&
-               'Reflect and double the geometry?', 'F')
-  call geo_prs%CreateRealArrayOption('symmetry_point', &
-               'Center point of symmetry plane, (x, y, z)', &
-               '(/0.0, 0.0, 0.0/)')
-  call geo_prs%CreateRealArrayOption('symmetry_normal', &
-               'Normal of symmetry plane, (xn, yn, zn)', &
-               '(/0.0, 1.0, 0.0/)')
-  !mirroring
-  call geo_prs%CreateLogicalOption('mesh_mirror',&
-               'Reflect and discard the original geometry', 'F')
-  call geo_prs%CreateRealArrayOption('mirror_point', &
-               'Center point of mirror plane, (x, y, z)', &
-               '(/0.0, 0.0, 0.0/)')
-  call geo_prs%CreateRealArrayOption('mirror_normal', &
-               'Normal of mirror plane, (xn, yn, zn)', &
-               '(/1.0, 0.0, 0.0/)')
 
-  !Parameters for the actuator disks
+  !> Symmetry
+  call geo_prs%CreateLogicalOption('mesh_symmetry',&
+              'Reflect and double the geometry?', 'F')
+  call geo_prs%CreateRealArrayOption('symmetry_point', &
+              'Center point of symmetry plane, (x, y, z)', &
+              '(/0.0, 0.0, 0.0/)')
+  call geo_prs%CreateRealArrayOption('symmetry_normal', &
+              'Normal of symmetry plane, (xn, yn, zn)', &
+              '(/0.0, 1.0, 0.0/)')
+
+  !> Mirroring
+  call geo_prs%CreateLogicalOption('mesh_mirror',&
+              'Reflect and discard the original geometry', 'F')
+  call geo_prs%CreateRealArrayOption('mirror_point', &
+              'Center point of mirror plane, (x, y, z)', &
+              '(/0.0, 0.0, 0.0/)')
+  call geo_prs%CreateRealArrayOption('mirror_normal', &
+              'Normal of mirror plane, (xn, yn, zn)', &
+              '(/1.0, 0.0, 0.0/)')
+  
+  !> Parameters for the actuator disks
   call geo_prs%CreateRealOption('traction', &
-               'Traction of the rotor')
+              'Traction of the rotor')
   call geo_prs%CreateRealOption('Radius', &
                'Radius of the rotor')
 
-  ! Parameters for gap sewing and edge identification
+  !> Parameters for gap sewing and edge identification
   call geo_prs%CreateRealOption('TolSewing', &
-               'Dimension of the gaps that will be filled, to close TE', &
-               '0.001')  ! very rough default value
+              'Dimension of the gaps that will be filled, to close TE', &
+              '0.001')  ! very rough default value
   call geo_prs%CreateRealOption('InnerProductTe', &
                'Threshold of the inner product of adiacent elements &
                &across the TE','-0.5')  ! very rough default value
 
-  ! Parameters for te unit tangent vector generation
+  !> Parameters for te unit tangent vector generation
   call geo_prs%CreateLogicalOption('ProjTe','Remove some component &
-               &from te vectors.')
+              &from te vectors.')
   call geo_prs%CreateStringOption('ProjTeDir','Parallel or normal to &
-               &ProjTeVector direction.','parallel')
+              &ProjTeVector direction.','parallel')
   call geo_prs%CreateRealArrayOption('ProjTeVector','Vector used for &
-               &the te projection.')
+              &the te projection.')
   call geo_prs%CreateLogicalOption('SuppressTe','Suppress the trailing edge &
-                                    &from the component','F')
+              &from the component','F')
   call geo_prs%CreateRealOption('ScaleTe','Scale the t.e. individually in &
                &each component','1.0')
 
-  ! Section name from CGNS file
+  !> Section name from CGNS file
   call geo_prs%CreateStringOption('SectionName', &
                'Section name from CGNS file', multiple=.true.)
 
-  ! Scaling factor to scale CGNS files
+  !> Scaling factor to scale CGNS files
   call geo_prs%CreateRealArrayOption('Offset',&
-         'Offset the points coordinates (before scaling)','(/0.0, 0.0, 0.0/)')
+              'Offset the points coordinates (before scaling)','(/0.0, 0.0, 0.0/)')
   call geo_prs%CreateRealOption('ScalingFactor', &
                                 'Scaling of the points coordinates.', '1.0')
 
-  ! Body of revolution
+  !> Body of revolution
   call geo_prs%CreateRealOption('Rev_Length',&
-         'Length of the body of revolution measured from nose to nose')
+              'Length of the body of revolution measured from nose to nose')
   call geo_prs%CreateRealOption('Rev_Radius', &
-         'Radius of the body of revolution section.')
+              'Radius of the body of revolution section.')
   call geo_prs%CreateRealOption('Rev_Nose_Radius', &
-         'Radius of the body of revolution nose.')
+              'Radius of the body of revolution nose.')
   call geo_prs%CreateIntOption('Rev_Nelem_long', &
-         'Number of elements along the length of the body revolution.')
+              'Number of elements along the length of the body revolution.')
   call geo_prs%CreateIntOption('Rev_Nelem_rev', &
          'Number of elements around the body of revolution circumference.')
 
@@ -362,24 +371,28 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   call check_file_exists(geo_file,this_sub_name,this_mod_name)
   call geo_prs%read_options(geo_file,printout_val=.false.)
 
-  mesh_file_type = getstr(geo_prs,'MeshFileType')
-  !ref_tag        = getstr(geo_prs,'Reference_Tag')
-
+  mesh_file_type  = getstr(geo_prs,'MeshFileType')
+  
+  !> Symmetry
   mesh_symmetry   = getlogical(geo_prs, 'mesh_symmetry')
   symmetry_point  = getrealarray(geo_prs, 'symmetry_point',3)
   symmetry_normal = getrealarray(geo_prs, 'symmetry_normal',3)
-
+  
+  !> Mirror 
   mesh_mirror   = getlogical(geo_prs, 'mesh_mirror')
   mirror_point  = getrealarray(geo_prs, 'mirror_point',3)
   mirror_normal = getrealarray(geo_prs, 'mirror_normal',3)
+  
+  ! Trailing edge options 
+  suppress_te   = getlogical(geo_prs, 'SuppressTe')
+  scale_te      = getreal(geo_prs, 'ScaleTe')
 
-  suppress_te = getlogical(geo_prs, 'SuppressTe')
-  scale_te    = getreal(geo_prs, 'ScaleTe')
+  comp_el_type  = getstr(geo_prs,'ElType')
+  ElType        = comp_el_type(1:1)
 
-  comp_el_type = getstr(geo_prs,'ElType')
-  ElType = comp_el_type(1:1)
-  if ( ( trim(ElType) .ne. 'p' ) .and. ( trim(ElType) .ne. 'v') .and. &
-       ( trim(ElType) .ne. 'l' ) .and. ( trim(ElType) .ne. 'a') ) then
+  if ((trim(ElType) .ne. 'p') .and. ( trim(ElType) .ne. 'v') .and. &
+      (trim(ElType) .ne. 'l') .and. ( trim(ElType) .ne. 'a')) then
+
     call error (this_sub_name, this_mod_name, 'Wrong ElType ('// &
          trim(ElType)//') for component'//trim(comp_tag)// &
          ', defined in file: '//trim(geo_file)//'. ElType must be:'// &
@@ -397,15 +410,19 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   coupled_str = 'false'
 #if USE_PRECICE
   if ( coupled_comp ) then
-    coupled_str       = 'true'
-    coupling_type     = getstr(geo_prs, 'CouplingType')
-    coupling_node     = getrealarray(geo_prs, 'CouplingNode', 3)
+
+    coupled_str   = 'true'
+    coupling_type = getstr(geo_prs, 'CouplingType')
+    coupling_node = getrealarray(geo_prs, 'CouplingNode', 3)
+    
     if ( countoption(geo_prs, 'CouplingNodeFile') .ne. 0 ) &
         coupling_node_file = getstr(geo_prs, 'CouplingNodeFile')
+    
     coupling_node_rot = reshape( &
                         getrealarray(geo_prs, 'CouplingNodeOrientation', 9), &
                         (/3,3/) )
-    if ( mesh_symmetry .or. mesh_mirror ) then
+
+    if ( mesh_symmetry .or. mesh_mirror ) then ! Fixme (not working)
       coupling_node_rot_mir = reshape( &
                           getrealarray(geo_prs, 'CouplingNodeOrientationMirror', 9), &
                           (/3,3/) )
@@ -413,12 +430,17 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
     if (  trim(coupling_type) .eq. 'rbf' ) then
       !> Open coupling_nodes_file and read nodes for FSI
-      n_coupling_nodes = 0; io = 0
+      n_coupling_nodes = 0 
+      io = 0
+
       open(unit=21, file=trim(coupling_node_file))
-      do while ( io .eq. 0 ) ! *** to do *** check
-        read(21,*,iostat=io) ; n_coupling_nodes = n_coupling_nodes + 1
-      end do
-      n_coupling_nodes = n_coupling_nodes - 1
+
+        do while ( io .eq. 0 ) 
+          read(21,*,iostat=io) ; n_coupling_nodes = n_coupling_nodes + 1
+        end do
+        
+        n_coupling_nodes = n_coupling_nodes - 1
+
       close(21)
 
       allocate(coupling_nodes(3,n_coupling_nodes)); coupling_nodes = 0.0_wp
@@ -431,61 +453,62 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       close(21)
     end if
 
-    if ( ( trim(coupling_type) .ne. 'll'    ) .and. &
-         ( trim(coupling_type) .ne. 'rigid' ) .and. &
-         ( trim(coupling_type) .ne. 'rbf'   ) ) then
+    if ((trim(coupling_type) .ne. 'll'    ) .and. &
+        (trim(coupling_type) .ne. 'rigid' ) .and. &
+        (trim(coupling_type) .ne. 'rbf'   ) ) then
+      
       call error (this_sub_name, this_mod_name, &
-         ' Coupled = T for component'//trim(comp_tag)// &
-         ', but CouplingType is equal to: '//trim(coupling_type)// &
-         ', it is not assigned, or it is assigned &
-          &as ''none''. Assign a valid CouplingType:'//nl// &
-           '  ll   : ll/beam coupling'//nl// &
-           '  rigid: rigid component/node'//nl// &
-           '  rbf  : generic component/node'//nl//'Stop'//nl)
+        ' Coupled = T for component'//trim(comp_tag)// &
+        ', but CouplingType is equal to: '//trim(coupling_type)// &
+        ', it is not assigned, or it is assigned &
+        &as ''none''. Assign a valid CouplingType:'//nl// &
+        '  ll   : ll/beam coupling'//nl// &
+        '  rigid: rigid component/node'//nl// &
+        '  rbf  : generic component/node'//nl//'Stop'//nl)
     end if
   end if
 #else
   if ( coupled_comp ) then
       call error (this_sub_name, this_mod_name, &
-         ' Coupled = T for component'//trim(comp_tag)// &
-         ', but no coupled simulation is expected, since dust &
-           &has been compiled without #USE_PRECICE option. Stop'//nl)
+          ' Coupled = T for component'//trim(comp_tag)// &
+          ', but no coupled simulation is expected, since dust &
+          &has been compiled without #USE_PRECICE option. Stop'//nl)
   end if
 #endif
 
 
-  ! Parameters for gap sewing and edge identification
-  ! TolSewing
+  !> Parameters for gap sewing and edge identification
+  !> TolSewing
   i_count = countoption(geo_prs,'TolSewing')
+  
   if ( i_count .eq. 1 ) then
     tol_sewing = getreal(geo_prs,'TolSewing')
   else if ( i_count .eq. 0 ) then
-    ! Inherit tol_sewing from general parameter
+    !> Inherit tol_sewing from general parameter
     tol_sewing = global_tol_sew
   else
     tol_sewing = getreal(geo_prs,'TolSewing')
-
     call warning(this_sub_name, this_mod_name, 'More than one &
        &TolSewing parameter defined for component'//trim(comp_tag)// &
        ', defined in file: '//trim(geo_file)//'.')
   end if
 
-  ! InnerProductTe
+  !> InnerProductTe
   i_count = countoption(geo_prs,'InnerProductTe')
+
   if ( i_count .eq. 1 ) then
     inner_product_threshold = getreal(geo_prs,'InnerProductTe')
   else if ( i_count .eq. 0 ) then
-    ! Inherit inner_product_threshold from general parameter
+    !> Inherit inner_product_threshold from general parameter
     inner_product_threshold = global_inner_prod_te
   else
     inner_product_threshold = getreal(geo_prs,'InnerProductTe')
-
     call warning(this_sub_name, this_mod_name, 'More than one &
        &InnerProductTe parameter defined for component'//trim(comp_tag)// &
        ', defined in file: '//trim(geo_file)//'. First value used.')
   end if
 
-  ! te projection
+  !> Trailing edge projection
   i_count = countoption(geo_prs,'ProjTe')
   te_proj_logical = .false.
   if ( i_count .eq. 1 ) then
@@ -499,19 +522,19 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     elseif ( i_count .lt. 1 ) then
       te_proj_dir = 'parallel'
       call warning (this_sub_name, this_mod_name, 'ProjTe = T, but &
-         & no ProjTeVDir defined for component'//trim(comp_tag)// &
-         ', defined in file: '//trim(geo_file)//" Default: 'parallel'.")
+        & no ProjTeVDir defined for component'//trim(comp_tag)// &
+        ', defined in file: '//trim(geo_file)//" Default: 'parallel'.")
     else
       te_proj_dir = getstr(geo_prs, 'ProjTeDir')
       call warning(this_sub_name, this_mod_name, 'ProjTe = T, and &
-         & more than one ProjTeDir defined for component'//trim(comp_tag)// &
-         ', defined in file: '//trim(geo_file)//'. First value used.')
+        & more than one ProjTeDir defined for component'//trim(comp_tag)// &
+        ', defined in file: '//trim(geo_file)//'. First value used.')
     end if
     if ( ( trim(te_proj_dir) .ne. 'parallel' ) .and. &
-         ( trim(te_proj_dir) .ne. 'normal'   )         ) then
+        ( trim(te_proj_dir) .ne. 'normal'   )         ) then
       call error (this_sub_name, this_mod_name, "Wrong 'ProjTeDir' &
-         & input for component"//trim(comp_tag)// &
-         ', defined in file: '//trim(geo_file)//'.')
+        & input for component"//trim(comp_tag)// &
+        ', defined in file: '//trim(geo_file)//'.')
     end if
   end if
 
@@ -539,14 +562,12 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   call write_hdf5(comp_tag,'CompName',comp_loc)
   call write_hdf5(mesh_file_type,'CompInput',comp_loc)
   call write_hdf5(ref_tag,'RefTag',comp_loc)
-
   call write_hdf5(trim(comp_el_type),'ElType',comp_loc)
   call write_hdf5(trim(coupled_str),'Coupled',comp_loc)
   call write_hdf5(trim(coupling_type)    ,'CouplingType' ,comp_loc)
-  call write_hdf5(     coupling_node     ,'CouplingNode' ,comp_loc)  ! Useless for 'rbf', and maybe for 'll'
+  call write_hdf5(     coupling_node     ,'CouplingNode' ,comp_loc)  
   call write_hdf5(     coupling_node_rot ,'CouplingNodeOrientation',comp_loc)
   call write_hdf5(     coupling_node_rot_mir ,'CouplingNodeOrientationMirror',comp_loc)
-
   call new_hdf5_group(comp_loc, 'Geometry', geo_loc)
 
   !=====
@@ -558,7 +579,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     mesh_file = getstr(geo_prs,'MeshFile')
     call read_mesh_basic(trim(mesh_file),ee, rr)
 
-    ! scale
+    !> Scale
     offset   = getrealarray(geo_prs, 'Offset',3)
     scaling  = getreal(geo_prs, 'ScalingFactor')
 
@@ -580,6 +601,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call error(this_sub_name, this_mod_name, &
                     'It is not possible to couple with lifting lines method&
                     &generic cgns meshes')
+
       elseif ( trim(coupling_type) .eq. 'rigid' ) then
         !> Rigid coupling between a rigid component and a "structural" node,
         ! defined as an input, coupling_node. This node represents the
@@ -604,8 +626,10 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
               c_ref_c(:,i) = c_ref_c(:,i) + rr(:,ee(j,i))
             end if
           end do
+
           !> Offset
           c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero) - coupling_node
+          
           !> Orientation
           c_ref_c(:,i) = matmul( transpose(coupling_node_rot), &
                                  c_ref_c(:,i) )
@@ -618,12 +642,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       elseif ( trim(coupling_type) .eq. 'rbf' ) then
 
         call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)
-        !write(*,*) 'RR_pre' , rr
         rr = matmul( transpose(coupling_node_rot), rr )
-        !write(*,*) 'RR_post' , rr
-
       end if
-
     end if
 #endif
 
@@ -711,12 +731,16 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         ! and the structural solvers
 
         allocate(c_ref_p(3, size(rr,2))); c_ref_p = 0.0_wp
+
         do i =1, size(c_ref_p,2)
+
           !> Offset
           c_ref_p(:,i) = rr(:,i) - coupling_node
+
           !> Orientation
-          c_ref_p(:,i) = matmul( transpose(coupling_node_rot), &
-                                 c_ref_p(:,i) )
+          c_ref_p(:,i) = matmul(transpose(coupling_node_rot), &
+                                c_ref_p(:,i))
+
         end do
 
         allocate(c_ref_c(3, size(ee,2))); c_ref_c = 0.0_wp
@@ -730,6 +754,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
           end do
           !> Offset
           c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero) - coupling_node
+
           !> Orientation
           c_ref_c(:,i) = matmul( transpose(coupling_node_rot), &
                                  c_ref_c(:,i) )
@@ -740,14 +765,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call write_hdf5(c_ref_c,'c_ref_c',geo_loc)
 
       elseif ( trim(coupling_type) .eq. 'rbf' ) then
-
-        call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)
-        !write(*,*) 'RR_pre' , rr
+        call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)        
         rr = matmul( transpose(coupling_node_rot), rr )
-        !write(*,*) 'RR_post' , rr
-
       end if
-
     end if
 #endif
 
@@ -755,10 +775,10 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
       if ( countoption(geo_prs,'MeshFile') .lt. 1 ) then
 
-        ! size of the body of revolution
-        trac   = getreal(geo_prs, 'Rev_Nose_Radius');
-        length = getreal(geo_prs, 'Rev_Length') - 2.0_wp*trac;
-        radius = getreal(geo_prs, 'Rev_Radius');
+        !> Size of the body of revolution
+        trac        = getreal(geo_prs, 'Rev_Nose_Radius');
+        length      = getreal(geo_prs, 'Rev_Length') - 2.0_wp * trac;
+        radius      = getreal(geo_prs, 'Rev_Radius');
         nelems_span = getint (geo_prs, 'Rev_Nelem_long');
 
         if ( trac <= 0.0_wp ) then
@@ -781,7 +801,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
             'Input Rev_Nelem_long is lower than zero.')
         endif
 
-        ! Generate 2D mesh
+        !> Generate 2D mesh
         allocate ( rr_te(nelems_span+1,2)  )
         call cigar2D(length,radius,trac,nelems_span,rr_te(:,1),rr_te(:,2))
 
@@ -793,7 +813,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
       endif
 
-      ! discretization of the body of revolution
+      !> Discretization of the body of revolution
       nSections = getint (geo_prs, 'Rev_Nelem_rev');
 
       if ( nSections < 1 ) then
@@ -805,9 +825,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       allocate ( rr (3,nSections*(nelems_span-1)+2), &
                  ee (4,nSections*nelems_span) )
 
-      call meshbyrev ( rr_te(:,1),rr_te(:,2), nSections, rr, ee )
+      call meshbyrev (rr_te(:,1),rr_te(:,2), nSections, rr, ee)
 
-      deallocate ( rr_te )
+      deallocate (rr_te)
 
       ! scale
       offset   = getrealarray(geo_prs, 'Offset',3)
@@ -828,11 +848,11 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     mesh_file = geo_file
     if ( (ElType .eq. 'v') .or. (ElType .eq. 'p')  ) then
 
-      ! TODO : actually it is possible to define the parameters in the GeoFile
-      !directly, find a good way to do this
+      !> TODO : actually it is possible to define the parameters in the GeoFile
+      !> directly, find a good way to do this
       call read_mesh_parametric(trim(mesh_file), ee, rr, &
                                 npoints_chord_tot, nelems_span )
-      ! nelems_span_tot will be overwritten if symmetry is required (around l.220)
+      !> Nelems_span_tot will be overwritten if symmetry is required (around l.220)
       nelems_span_tot =   nelems_span
 
     elseif(ElType .eq. 'l') then ! LIFTING LINE element
@@ -840,8 +860,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call read_mesh_ll(trim(mesh_file),ee,rr, &
                         airfoil_list   , nelem_span_list   , &
                         i_airfoil_e    , normalised_coord_e, &
-                                npoints_chord_tot, nelems_span, &
-                                chord_p,theta_p,theta_e )
+                        npoints_chord_tot, nelems_span, &
+                        chord_p, theta_p, theta_e )
+      
       ! nelems_span_tot will be overwritten if symmetry is required (around l.220)
       nelems_span_tot =   nelems_span
 
@@ -875,6 +896,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call write_hdf5(theta_e,'theta_e',geo_loc)
       call write_hdf5(i_airfoil_e,'i_airfoil_e',geo_loc)
       call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
+
     elseif(ElType .eq. 'a') then ! ACTUATOR DISK
       call read_actuatordisk_parametric(trim(mesh_file),ee,rr)
       trac = getreal(geo_prs,'traction')
@@ -914,21 +936,19 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
               case('parametric','pointwise')
                 call symmetry_mesh_structured(ee, rr,  &
-                                               npoints_chord_tot , nelems_span , &
-                                               symmetry_point, symmetry_normal, rr_sym)
+                                              npoints_chord_tot , nelems_span , &
+                                              symmetry_point, symmetry_normal, rr_sym)
                   nelems_span_tot = 2*nelems_span
 
               case default
-               call error(this_sub_name, this_mod_name,&
-                     'Symmetry routines implemented for MeshFileType = &
-                     & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
-                     'MeshFileType = '//trim(mesh_file_type))
+                call error(this_sub_name, this_mod_name,&
+                          'Symmetry routines implemented for MeshFileType = &
+                          & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
+                          'MeshFileType = '//trim(mesh_file_type))
             end select
-
           end if
         end if
 
-      write(*,*) ' coupling_type: ', trim(coupling_type)
       if ( trim(coupling_type) .eq. 'll' ) then
         !> Compute the reference chord vector, for geometry transformation
         ! of the deformable component. Meant for blades, wings defined using
@@ -973,7 +993,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
           c_ref_p(:,i) = rr(:,i) - coupling_node
           !> Orientation
           c_ref_p(:,i) = matmul( transpose(coupling_node_rot), &
-                                 c_ref_p(:,i) )
+                                c_ref_p(:,i) )
         end do
 
         allocate(c_ref_c(3, size(ee,2))); c_ref_c = 0.0_wp
@@ -989,7 +1009,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
           c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero) - coupling_node
           !> Orientation
           c_ref_c(:,i) = matmul( transpose(coupling_node_rot), &
-                                 c_ref_c(:,i) )
+                                c_ref_c(:,i) )
         end do
 
         !> Write to hdf5 geo file
@@ -1001,9 +1021,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)
 
         if ( mesh_symmetry ) then
-          !write(*,*) 'SHAPE_A' , shape(rr)
-          !write(*,*) 'SHAPE_B' , shape(rr(1:size(rr,2)-size(rr_sym,2),: ))
-
           rr(:,1:(size(rr,2)-size(rr_sym,2))) = matmul( transpose(coupling_node_rot), rr(:,1:size(rr,2)-size(rr_sym,2) ))
           rr(:,size(rr,2)-size(rr_sym,2)+1:size(rr,2)) = matmul( transpose(coupling_node_rot_mir), rr_sym )
         else
@@ -1031,31 +1048,28 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                                   i_airfoil_e    , normalised_coord_e, &
                                   npoints_chord_tot, nelems_span, &
                                   chord_p,theta_p,theta_e )
-      ! nelems_span_tot will be overwritten if symmetry is required (around l.220)
+      !> Nelems_span_tot will be overwritten if symmetry is required (around l.220)
       nelems_span_tot =   nelems_span
 
-
-      ! correction of the following list, if symmetry is required ---------
+      !> Correction of the following list, if symmetry is required 
       if ( mesh_symmetry ) then
         call symmetry_update_ll_lists( nelem_span_list , &
               theta_e, theta_p , chord_p , i_airfoil_e , normalised_coord_e )
       end if
+
+      !> Correction of the following list, if mirror is required 
       if ( mesh_mirror ) then
         call mirror_update_ll_lists( nelem_span_list , &
               theta_e, theta_p , chord_p , i_airfoil_e , normalised_coord_e )
       end if
 
-      ! -------------------------------------------------------------------
-
-      call write_hdf5(airfoil_list   ,'airfoil_list'   ,geo_loc)
-      call write_hdf5(nelem_span_list,'nelem_span_list',geo_loc)
-      call write_hdf5(theta_p,'theta_p',geo_loc)
-      call write_hdf5(chord_p,'chord_p',geo_loc)
-      call write_hdf5(theta_e,'theta_e',geo_loc)
-      call write_hdf5(i_airfoil_e,'i_airfoil_e',geo_loc)
-      call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
-
-
+      call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)
+      call write_hdf5(nelem_span_list,    'nelem_span_list',    geo_loc)
+      call write_hdf5(theta_p,            'theta_p',            geo_loc)
+      call write_hdf5(chord_p,            'chord_p',            geo_loc)
+      call write_hdf5(theta_e,            'theta_e',            geo_loc)
+      call write_hdf5(i_airfoil_e,        'i_airfoil_e',        geo_loc)
+      call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)
     else
       call error(this_sub_name, this_mod_name, 'Requested an element of &
       &type '//trim(ElType)//' for the pointwise component '//trim(comp_tag)&
@@ -1063,15 +1077,15 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       &are aailable')
     end if
 
-   case default
-    call error(this_sub_name, this_mod_name, 'Unknown mesh file type')
-
+    case default
+      call error(this_sub_name, this_mod_name, 'Unknown mesh file type')
   end select
 
   !=====
   !===== Symmetry: double the mesh
   !=====
 #if USE_PRECICE
+  ! Todo add to make it working? 
 
 #else
   if ( mesh_symmetry ) then
@@ -1081,17 +1095,16 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
       case('parametric','pointwise')
         call symmetry_mesh_structured(ee, rr,  &
-                                       npoints_chord_tot , nelems_span , &
-                                       symmetry_point, symmetry_normal, rr_sym)
+                                        npoints_chord_tot , nelems_span , &
+                                        symmetry_point, symmetry_normal, rr_sym)
           nelems_span_tot = 2*nelems_span
 
       case default
-       call error(this_sub_name, this_mod_name,&
-             'Symmetry routines implemented for MeshFileType = &
-             & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
-             'MeshFileType = '//trim(mesh_file_type))
+        call error(this_sub_name, this_mod_name,&
+              'Symmetry routines implemented for MeshFileType = &
+              & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
+              'MeshFileType = '//trim(mesh_file_type))
     end select
-
   end if
 #endif
 
@@ -1126,12 +1139,11 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   !=====
   call write_hdf5(rr,'rr',geo_loc)
   call write_hdf5(ee,'ee',geo_loc)
-  if ( ( trim(mesh_file_type) .eq. 'parametric' ) .or. &
-       ( trim(mesh_file_type) .eq. 'pointwise'  ) ) then
+  if (( trim(mesh_file_type) .eq. 'parametric' ) .or. &
+      ( trim(mesh_file_type) .eq. 'pointwise'  ) ) then
     !write HDF5 fields
     call write_hdf5(  nelems_span_tot  ,'parametric_nelems_span',geo_loc)
     call write_hdf5(npoints_chord_tot-1,'parametric_nelems_chor',geo_loc)
-
   end if
 
 
@@ -1179,35 +1191,35 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                                                           !te as an output
 
     case( 'parametric' , 'pointwise' )
-     if ( ElType .eq. 'l' .or. ElType .eq. 'v' .or. ElType .eq. 'p' ) then
+      if ( ElType .eq. 'l' .or. ElType .eq. 'v' .or. ElType .eq. 'p' ) then
         call build_connectivity_parametric( ee ,     &
-                       npoints_chord_tot , nelems_span_tot , &
-                       neigh )
+                      npoints_chord_tot , nelems_span_tot , &
+                      neigh )
         if(.not. suppress_te) call build_te_parametric( ee , rr , ElType ,  &
-           npoints_chord_tot , nelems_span_tot , &
-           e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
-     elseif(ElType .eq. 'a') then
-       allocate(neigh(size(ee,1), size(ee,2)))
-       neigh = 0 !All actuator disk are isolated
-     endif
+          npoints_chord_tot , nelems_span_tot , &
+          e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
+      elseif(ElType .eq. 'a') then
+        allocate(neigh(size(ee,1), size(ee,2)))
+        neigh = 0 !All actuator disk are isolated
+      endif
 
 #if USE_PRECICE
-     if ( coupled_comp ) then
-       ! *** to do *** check if the rotation is required only for 'rigid' coupling
-       if ( ( trim(coupling_type) .eq. 'rigid' ) ) then
-         !> Rotate t_te, if needed
-         do i = 1, size(t_te,2)
-           t_te(:,i) = matmul( transpose(coupling_node_rot), &
-                                       t_te(:,i) )
-         end do
-       end if
-     end if
+      if ( coupled_comp ) then
+        ! *** to do *** check if the rotation is required only for 'rigid' coupling
+        if ( ( trim(coupling_type) .eq. 'rigid' ) ) then
+          !> Rotate t_te, if needed
+          do i = 1, size(t_te,2)
+            t_te(:,i) = matmul( transpose(coupling_node_rot), &
+                                        t_te(:,i) )
+          end do
+        end if
+      end if
 #endif
 
 
     case default
-       call error(this_sub_name, this_mod_name,&
-             'Unknown option for building connectivity.')
+      call error(this_sub_name, this_mod_name,&
+            'Unknown option for building connectivity.')
   end select
 
   !=====
@@ -1221,7 +1233,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   !=====
   if (ElType .ne. 'a') then
     if(suppress_te) then
-      !supppress the trailing edge for the current component
+      !> Supppress the trailing edge for the current component
       allocate(e_te(2,0), i_te(2,0), rr_te(3,0), ii_te(2,0), neigh_te(2,0))
       allocate(o_te(2,0), t_te(3,0))
     endif
@@ -1236,7 +1248,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     call write_hdf5(scale_te,'scale_te',te_loc)
     call close_hdf5_group(te_loc)
   endif
-  !> Hinges ---
+
+  !> Hinges 
   call new_hdf5_group(comp_loc, 'Hinges', hinge_loc)
   call write_hdf5(n_hinges, 'n_hinges', hinge_loc)
   do i = 1 , n_hinges
@@ -1274,21 +1287,20 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   call close_hdf5_group(comp_loc)
 
-  !cleanup
+  !> cleanup
   deallocate(ee,rr)
-  ! hinges cleanup
+  !> hinges cleanup
   do i = 1 , n_hinges
     deallocate( hinges(i)%rr )
   end do
+  
   if ( allocated(hinges) ) deallocate(hinges)
 
   !> Finalize parser
   call finalizeparameters(geo_prs)
 
-
 end subroutine build_component
 
-!----------------------------------------------------------------------
 
 !> Subroutine used to double the mesh by reflecting it along a simmetry
 !! plane
@@ -1297,30 +1309,29 @@ end subroutine build_component
 !! is doubled: all the points are reflected and new mirrored elements
 !! introduced. The elements and points arrays are doubled.
 subroutine symmetry_mesh(ee, rr, cent, norm)
- integer, allocatable, intent(inout) :: ee(:,:)
- real(wp), allocatable, intent(inout) :: rr(:,:)
- real(wp), intent(in) :: cent(3), norm(3)
+  integer, allocatable, intent(inout)   :: ee(:,:)
+  real(wp), allocatable, intent(inout)  :: rr(:,:)
+  real(wp), intent(in)                  :: cent(3), norm(3)
+  real(wp)                              :: n(3), d, l
+  integer, allocatable                  :: ee_temp(:,:)
+  real(wp), allocatable                 :: rr_temp(:,:)
+  integer                               :: ip, np, ne
+  integer                               :: ie, iv, nv
+  character(len=*), parameter           :: this_sub_name = 'symmetry_mesh'
+  
+  ne = size(ee,2)
+  np = size(rr,2)
 
- real(wp) :: n(3), d, l
- integer, allocatable :: ee_temp(:,:)
- real(wp), allocatable :: rr_temp(:,:)
- integer :: ip, np, ne
- integer :: ie, iv, nv
-
- character(len=*), parameter :: this_sub_name = 'symmetry_mesh'
-
-  ne = size(ee,2); np = size(rr,2)
-
-  ! enlarge size
+  !> Enlarge size
   allocate(ee_temp(size(ee,1),2*ne))
   allocate(rr_temp(size(rr,1),2*np))
 
-  !first part equal
+  !> First part equal
   ee_temp(:,1:ne) = ee
   rr_temp(:,1:np) = rr
 
-  !second part of the elements: index incremented, need to rearrange the
-  !connectivity to preserve the normal
+  !> Second part of the elements: index incremented, need to rearrange the
+  !  connectivity to preserve the normal
   ee_temp(:,ne+1:2*ne) = 0
   do ie = 1,ne
     nv = count(ee(:,ie).ne.0)
@@ -1330,23 +1341,22 @@ subroutine symmetry_mesh(ee, rr, cent, norm)
     enddo
   enddo
 
-  !calculate normal unit vector and distance from origin
+  !> Calculate normal unit vector and distance from origin
   n = norm/norm2(norm)
   l = sum(cent * n)
 
-  !now reflect the points
+  !> Now reflect the points
   do ip=1,np
     d = sum( rr(:,ip) * n) - l
     rr_temp(:,np+ip) = rr_temp(:,ip) - 2*d*n
   enddo
 
-  !move alloc back to the original vectors
+  !> Move alloc back to the original vectors
   call move_alloc(rr_temp, rr)
   call move_alloc(ee_temp, ee)
 
 end subroutine symmetry_mesh
 
-!----------------------------------------------------------------------
 
 !> Subroutine used to double the mesh by reflecting it along a simmetry
 !! plane for a parametric component.
@@ -1356,102 +1366,100 @@ end subroutine symmetry_mesh
 !! introduced. The elements and points arrays are doubled.
 subroutine symmetry_mesh_structured( ee, rr, &
               npoints_chord_tot , nelems_span , cent, norm, rr_sym)
- integer, allocatable, intent(inout) :: ee(:,:)
- real(wp), allocatable, intent(inout) :: rr(:,:)
- real(wp), allocatable, intent(out) :: rr_sym(:,:)
- real(wp), intent(in) :: cent(3), norm(3)
- integer , intent(in) :: npoints_chord_tot , nelems_span ! <- unused input
 
- integer :: nelems_chord
- real(wp) :: n(3), d, l
- integer , allocatable :: ee_temp(:,:) , ee_sort(:,:)
- real(wp), allocatable :: rr_temp(:,:)
- integer :: ip, np, ne
- integer :: ie, nv
- ! some checks  and warnings -----
- real(wp) :: mabs  , m
- real(wp) :: minmaxPn
- real(wp), parameter :: eps = 1e-2_wp ! TODO: move it as an input
- integer :: imabs, i1, nsew
-
- logical :: sew_first_sec = .false. , sew_last_sec = .false.
-
- character(len=*), parameter :: this_sub_name = 'symmetry_mesh_structured'
+  integer, allocatable, intent(inout)   :: ee(:,:)
+  real(wp), allocatable, intent(inout)  :: rr(:,:)
+  real(wp), allocatable, intent(out)    :: rr_sym(:,:)
+  real(wp), intent(in)                  :: cent(3), norm(3)
+  integer , intent(in)                  :: npoints_chord_tot , nelems_span ! <- unused input
+  integer                               :: nelems_chord
+  real(wp)                              :: n(3), d, l
+  integer , allocatable                 :: ee_temp(:,:) , ee_sort(:,:)
+  real(wp), allocatable                 :: rr_temp(:,:)
+  integer                               :: ip, np, ne
+  integer                               :: ie, nv
+  !> some checks  and warnings 
+  real(wp)                              :: mabs  , m
+  real(wp)                              :: minmaxPn
+  real(wp), parameter                   :: eps = 1e-2_wp ! TODO: move it as an input
+  integer                               :: imabs, i1, nsew
+  logical                               :: sew_first_sec = .false. , sew_last_sec = .false.
+  character(len=*), parameter           :: this_sub_name = 'symmetry_mesh_structured'
 
 
- ! some checks ---------------------------------
- mabs = 0.0_wp
- do i1  = 1 , size(rr,2)
-   if (      abs( sum((rr(:,i1)-cent)*norm) ) .gt. mabs ) then
-     mabs  = abs( sum((rr(:,i1)-cent)*norm) ) ; imabs = i1
-   end if
- end do
- m = sum( (rr(:,imabs) - cent) * norm )
- if ( m .gt. 0.0_wp ) then
-   minmaxPn = sum( (rr(:,1)-cent)*norm )
-   do i1  = 2 , size(rr,2)
-     if (     sum( (rr(:,i1)-cent)*norm ) .lt. minmaxPn ) then
-       minmaxPn = sum( (rr(:,i1)-cent)*norm )
-     end if
-   end do
-   if ( minmaxPn .gt. eps ) then
-     call error(this_sub_name, this_mod_name, 'Discontinuous component.')
-   else if ( minmaxPn .lt. -eps ) then
-     call error(this_sub_name, this_mod_name, 'Body compenetration.')
-   end if
- else if ( m .lt. 0.0_wp ) then
-   minmaxPn = sum( (rr(:,1)-cent)*norm )
-   do i1  = 2 , size(rr,2)
-     if (     sum( (rr(:,i1)-cent)*norm ) .gt. minmaxPn ) then
-       minmaxPn = sum( (rr(:,i1)-cent)*norm )
-     end if
-   end do
-   if ( minmaxPn .lt. -eps ) then
-     call error(this_sub_name, this_mod_name, 'Discontinuous component.')
-   else if ( minmaxPn .gt. eps ) then
-     call error(this_sub_name, this_mod_name, 'Body compenetration.')
-   end if
- end if
+  !> Some checks 
+  mabs = 0.0_wp
+  do i1  = 1 , size(rr,2)
+    if (      abs( sum((rr(:,i1)-cent)*norm) ) .gt. mabs ) then
+      mabs  = abs( sum((rr(:,i1)-cent)*norm) ) ; imabs = i1
+    end if
+  end do
+  m = sum( (rr(:,imabs) - cent) * norm )
+  if ( m .gt. 0.0_wp ) then
+    minmaxPn = sum( (rr(:,1)-cent)*norm )
+    do i1  = 2 , size(rr,2)
+      if (     sum( (rr(:,i1)-cent)*norm ) .lt. minmaxPn ) then
+        minmaxPn = sum( (rr(:,i1)-cent)*norm )
+      end if
+    end do
+    if ( minmaxPn .gt. eps ) then
+      call error(this_sub_name, this_mod_name, 'Discontinuous component.')
+    else if ( minmaxPn .lt. -eps ) then
+      call error(this_sub_name, this_mod_name, 'Body compenetration.')
+    end if
+  else if ( m .lt. 0.0_wp ) then
+    minmaxPn = sum( (rr(:,1)-cent)*norm )
+    do i1  = 2 , size(rr,2)
+      if (     sum( (rr(:,i1)-cent)*norm ) .gt. minmaxPn ) then
+        minmaxPn = sum( (rr(:,i1)-cent)*norm )
+      end if
+    end do
+    if ( minmaxPn .lt. -eps ) then
+      call error(this_sub_name, this_mod_name, 'Discontinuous component.')
+    else if ( minmaxPn .gt. eps ) then
+      call error(this_sub_name, this_mod_name, 'Body compenetration.')
+    end if
+  end if
 
- ! a whole section must be sewed ------
- nsew = 0
- do i1 = 1 , size(rr,2)
-   if ( abs(sum( (rr(:,i1)-cent)*norm )) .lt. eps ) then
-     nsew = nsew + 1
+  !> A whole section must be sewed -
+  nsew = 0
+  do i1 = 1 , size(rr,2)
+    if ( abs(sum( (rr(:,i1)-cent)*norm )) .lt. eps ) then
+      nsew = nsew + 1
 
-     if ( i1 .eq. 1          ) sew_first_sec = .true.
-     if ( i1 .eq. size(rr,2) ) sew_last_sec = .true.
+      if ( i1 .eq. 1          ) sew_first_sec = .true.
+      if ( i1 .eq. size(rr,2) ) sew_last_sec = .true.
 
-   end if
- end do
+    end if
+  end do
 
- ! === some checks ===
- !> no section to be sewed. (first, last) = (f , f)
- if ( ( .not. sew_first_sec ) .and. ( .not. sew_last_sec ) ) then
-   call error(this_sub_name, this_mod_name, 'No section to be sewed. Stop')
- end if
- !> So far, avoid (first, last) = (f,t)
- if ( ( .not. sew_first_sec ) .and. ( sew_last_sec ) ) then
-   call error(this_sub_name, this_mod_name, 'So far, the last section of a &
-    &"parametric" of "pointwise" component can be sewed only if the first &
-    &section is sewed. Stop.')
- end if
- !> (first, last) = (t , f) or (first, last) = (f , t)
- if ( ( ( nsew .ne. npoints_chord_tot ) .and. ( .not. sew_last_sec ) ) .or. &
-      ( ( nsew .ne. npoints_chord_tot ) .and. ( .not. sew_first_sec ) )  ) then
-   write(msg,'(A,I0,A,I0,A)') 'Wrong sewing of parametric component during &
-         &symmetry reflection. Only ',nsew,' out of ',npoints_chord_tot,&
-         'effectively sewed'
-   call error(this_sub_name, this_mod_name, msg)
- end if
- !> (first, last) = (t , t)
- if ( ( nsew .ne. 2*npoints_chord_tot ) .and.  &
-      ( ( sew_last_sec ) .and. ( sew_first_sec ) ) )  then
-   write(msg,'(A,I0,A,I0,A)') 'Wrong sewing of parametric component during &
-         &symmetry reflection. Only ',nsew,' out of ',npoints_chord_tot,&
-         'effectively sewed'
-   call error(this_sub_name, this_mod_name, msg)
- end if
+  ! === some checks ===
+  !> no section to be sewed. (first, last) = (f , f)
+  if ( ( .not. sew_first_sec ) .and. ( .not. sew_last_sec ) ) then
+    call error(this_sub_name, this_mod_name, 'No section to be sewed. Stop')
+  end if
+  !> So far, avoid (first, last) = (f,t)
+  if ( ( .not. sew_first_sec ) .and. ( sew_last_sec ) ) then
+    call error(this_sub_name, this_mod_name, 'So far, the last section of a &
+      &"parametric" of "pointwise" component can be sewed only if the first &
+      &section is sewed. Stop.')
+  end if
+  !> (first, last) = (t , f) or (first, last) = (f , t)
+  if ( ( ( nsew .ne. npoints_chord_tot ) .and. ( .not. sew_last_sec ) ) .or. &
+        ( ( nsew .ne. npoints_chord_tot ) .and. ( .not. sew_first_sec ) )  ) then
+    write(msg,'(A,I0,A,I0,A)') 'Wrong sewing of parametric component during &
+          &symmetry reflection. Only ',nsew,' out of ',npoints_chord_tot,&
+          'effectively sewed'
+    call error(this_sub_name, this_mod_name, msg)
+  end if
+  !> (first, last) = (t , t)
+  if ( ( nsew .ne. 2*npoints_chord_tot ) .and.  &
+        ( ( sew_last_sec ) .and. ( sew_first_sec ) ) )  then
+      write(msg,'(A,I0,A,I0,A)') 'Wrong sewing of parametric component during &
+          &symmetry reflection. Only ',nsew,' out of ',npoints_chord_tot,&
+          'effectively sewed'
+    call error(this_sub_name, this_mod_name, msg)
+  end if
 
 
   ne = size(ee,2); np = size(rr,2)
@@ -1515,11 +1523,11 @@ subroutine symmetry_mesh_structured( ee, rr, &
   allocate(ee_sort(size(ee_temp,1),size(ee_temp,2)) ) ; ee_sort = 0
   do i1 = 1 , nelems_span
     ee_sort(:,1+(i1-1)*nelems_chord:i1*nelems_chord) = &
-       ee_temp(:,2*ne-i1*nelems_chord+1:2*ne-(i1-1)*nelems_chord)
+    ee_temp(:,2*ne-i1*nelems_chord+1:2*ne-(i1-1)*nelems_chord)
   end do
   do i1 = 1 , nelems_span
     ee_sort(:,1+(i1-1)*nelems_chord+ne:i1*nelems_chord+ne) = &
-       ee_temp(:,1+(i1-1)*nelems_chord:i1*nelems_chord)
+    ee_temp(:,1+(i1-1)*nelems_chord:i1*nelems_chord)
   end do
   rr_sym = rr_temp(:, np+1: np + (np-2*npoints_chord_tot))
 
@@ -2507,7 +2515,7 @@ end subroutine symmetry_update_ll_lists
 
 !> Updates lifting lines fields in case of mirroring
 subroutine mirror_update_ll_lists ( nelem_span_list , &
-                 theta_e, theta_p, chord_p , i_airfoil_e , normalised_coord_e )
+          theta_e, theta_p, chord_p , i_airfoil_e , normalised_coord_e )
 
  integer , allocatable , intent(inout) :: nelem_span_list(:)
  integer , allocatable , intent(inout) :: i_airfoil_e(:,:)
