@@ -74,9 +74,6 @@ use mod_cgns_io, only: &
 use mod_parametric_io, only: &
   read_mesh_parametric
 
-!use mod_aero_elements, only: &
-!  c_elem, t_elem_p
-
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
@@ -100,8 +97,7 @@ use mod_math, only: &
   cross
 
 use mod_reference, only: &
-  t_ref, build_references, update_all_references, destroy_references   ! , &
-! update_relative_initial_conditions
+  t_ref, build_references, update_all_references, destroy_references  
 
 use mod_hinges, only: &
   t_hinge, initialize_hinge_config
@@ -237,24 +233,24 @@ type :: t_geo_component
   real(wp),allocatable :: theta_e(:)
   !> Id of the airfoil elements (index in airfoil_list char array)
   integer ,allocatable :: i_airfoil_e(:,:)
-
+  character(len=5) :: aero_correction
 #if USE_PRECICE
- !> Chord vector reference, required to assign the motion ot the
- ! TE of a deformable LL element, knowing the LE motion
- real(wp), allocatable :: c_ref_p(:,:)
- !> "Chord" vector reference, referred to the center of the elements
- real(wp), allocatable :: c_ref_c(:,:)
- !> x_ac offset for LL
- real(wp), allocatable :: xac(:)
+  !> Chord vector reference, required to assign the motion ot the
+  ! TE of a deformable LL element, knowing the LE motion
+  real(wp), allocatable :: c_ref_p(:,:)
+  !> "Chord" vector reference, referred to the center of the elements
+  real(wp), allocatable :: c_ref_c(:,:)
+  !> x_ac offset for LL
+  real(wp), allocatable :: xac(:)
 #endif
 
- !> Hinges
- integer :: n_hinges
- type(t_hinge), allocatable :: hinge(:)
+  !> Hinges
+  integer :: n_hinges
+  type(t_hinge), allocatable :: hinge(:)
 
 
- !> Dimensions of parametric elements only
- integer :: parametric_nelems_span , parametric_nelems_chor
+  !> Dimensions of parametric elements only
+  integer :: parametric_nelems_span , parametric_nelems_chor
 
 end type  t_geo_component
 
@@ -269,12 +265,6 @@ type :: t_geo
 
   !> Total number of implicit elements
   integer :: nelem_impl
-
-  !> Number of lifting line elements
-  !integer :: nll
-
-  !> Number of actuator disk elements
-  !integer :: nad
 
   !> Number of explicit elements
   integer :: nelem_expl
@@ -293,10 +283,6 @@ type :: t_geo
   integer, allocatable :: idSurfPan(:)
   !> Global id of vortex ring elements
   integer, allocatable :: idVortLatt(:)
-!!> Global id of lifting line elements
-!integer, allocatable :: idLiftLin(:)
-!!> Global id of actuator disk elements
-!integer, allocatable :: idActDisk(:)
  !> Surfpan id of global surface panel elements (G2L: global to local)
   integer, allocatable :: idSurfPanG2L(:)
 
@@ -308,23 +294,23 @@ type :: t_geo
   !> Number of statical surfpan elements (for slicing)
   integer :: nstatic_SurfPan
 
- !> Number of static or moving lifting lines
- integer :: nstatic_expl, nmoving_expl
+  !> Number of static or moving lifting lines
+  integer :: nstatic_expl, nmoving_expl
 
- !> All the components of the geometry
- type(t_geo_component), allocatable :: components(:)
+  !> All the components of the geometry
+  type(t_geo_component), allocatable :: components(:)
 
- !> Points (element vertexes)
- real(wp), allocatable :: points(:,:)
+  !> Points (element vertexes)
+  real(wp), allocatable :: points(:,:)
 
 #if USE_PRECICE
- !> Velocity of the points (element vertexes), to be used by
- ! coupled components
- real(wp), allocatable :: points_vel(:,:)
+  !> Velocity of the points (element vertexes), to be used by
+  ! coupled components
+  real(wp), allocatable :: points_vel(:,:)
 #endif
 
- !> All the reference frames of the geometry
- type(t_ref), allocatable :: refs(:)
+  !> All the reference frames of the geometry
+  type(t_ref), allocatable :: refs(:)
 
 end type t_geo
 
@@ -337,40 +323,36 @@ end type t_geo
 type t_tedge
 
   !> Global id of the elements at the TE
-  !integer , allocatable :: e(:,:)
   type(t_pot_elem_p), allocatable :: e(:,:)
 
   !> Global id of the nodes on the TE
-  integer , allocatable :: i(:,:)
-
-  !> Coordinates of the nodes of the TE
-  !real(wp), allocatable :: rr(:,:)
+  integer , allocatable           :: i(:,:)
 
   !> TE id of the nodes of the TE elements
-  integer , allocatable :: ii(:,:)
+  integer , allocatable           :: ii(:,:)
 
   !> TE id of neighboring TE elements
-  integer , allocatable :: neigh(:,:)
+  integer , allocatable           :: neigh(:,:)
 
   !> Relative orientation of the neighboring TE elements
-  integer , allocatable :: o(:,:)
+  integer , allocatable           :: o(:,:)
 
   !> Unit vector at TE nodes
-  real(wp), allocatable :: t(:,:)
-  real(wp), allocatable :: t_hinged(:,:) ! considering hinge deflection
-  integer, allocatable :: is_hinged(:)
+  real(wp), allocatable           :: t(:,:)
+  real(wp), allocatable           :: t_hinged(:,:) ! considering hinge deflection
+  integer, allocatable            :: is_hinged(:)
 
   !> Reference frame of the TE nodes
-  integer , allocatable :: ref(:)
+  integer , allocatable           :: ref(:)
 
   !> Component of the TE
-  integer , allocatable :: icomp(:)
+  integer , allocatable           :: icomp(:)
 
   !> Individual scaling for each component
-  real(wp), allocatable :: scaling(:)
-
+  real(wp), allocatable           :: scaling(:)
 
 end type t_tedge
+
 
 !----------------------------------------------------------------------
 
@@ -405,39 +387,34 @@ contains
 subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
                       te, elems_impl, elems_expl, elems_ad, elems_ll, &
                       elems_tot, airfoil_data, target_file, run_id)
- character(len=*), intent(in) :: geo_file_name
- character(len=*), intent(inout) :: ref_file_name
- character(len=*), intent(in) :: in_file_name
- type(t_geo), intent(out), target :: geo
- type(t_impl_elem_p), allocatable, intent(out) :: elems_impl(:)
- type(t_expl_elem_p), allocatable, intent(out) :: elems_expl(:)
- type(t_expl_elem_p), allocatable, intent(out) :: elems_ad(:)
- !type(t_expl_elem_p), allocatable, intent(out) :: elems_ll(:)
- type(t_liftlin_p), allocatable, intent(out) :: elems_ll(:)
- type(t_pot_elem_p),  allocatable, intent(out) :: elems_tot(:)
- type(t_tedge), intent(out) :: te
- type(t_aero_tab) , allocatable, intent(out) :: airfoil_data(:)
- character(len=*), intent(in) :: target_file
- integer, intent(in)              :: run_id(10)
+  character(len=*), intent(in)                       :: geo_file_name
+  character(len=*), intent(inout)                    :: ref_file_name
+  character(len=*), intent(in)                       :: in_file_name
+  type(t_geo), intent(out), target                   :: geo
+  type(t_impl_elem_p), allocatable, intent(out)      :: elems_impl(:)
+  type(t_expl_elem_p), allocatable, intent(out)      :: elems_expl(:)
+  type(t_expl_elem_p), allocatable, intent(out)      :: elems_ad(:)
+  type(t_liftlin_p), allocatable, intent(out)        :: elems_ll(:)
+  type(t_pot_elem_p),  allocatable, intent(out)      :: elems_tot(:)
+  type(t_tedge), intent(out)                         :: te
+  type(t_aero_tab) , allocatable, intent(out)        :: airfoil_data(:)
+  character(len=*), intent(in)                       :: target_file
+  integer, intent(in)                                :: run_id(10)
+  real(wp)                                           :: tstart
 
- real(wp)                     :: tstart
-
- integer :: i, j, is, im,  i_comp, i_ll, i_ad, i_tot, i_expl, i_impl
- type(t_impl_elem_p), allocatable :: temp_static_i(:), temp_moving_i(:)
- type(t_expl_elem_p), allocatable :: temp_static_e(:), temp_moving_e(:)
- integer(h5loc) :: floc
-
- integer :: iSurfPan, iVortLatt
-
- character(len=max_char_len) :: msg
- character(len=*), parameter :: this_sub_name='create_geometry'
+  integer :: i, j, is, im,  i_comp, i_ll, i_ad, i_tot, i_expl, i_impl
+  type(t_impl_elem_p), allocatable :: temp_static_i(:), temp_moving_i(:)
+  type(t_expl_elem_p), allocatable :: temp_static_e(:), temp_moving_e(:)
+  integer(h5loc)                                     :: floc
+  integer                                            :: iSurfPan, iVortLatt
+  character(len=max_char_len)                        :: msg
+  character(len=*), parameter                        :: this_sub_name='create_geometry'
 
   tstart = sim_param%t0
 
-  !build the reference frames
-  !read which is the reference frame file, if default the main input file is
-  !employed
-  !reference_file = getstr(prms, 'ReferenceFile')
+  !> Build the reference frames
+  ! read which is the reference frame file, if default the main input file is
+  ! employed
   if (trim(ref_file_name) .eq. 'no_set') then
     ref_file_name = trim(in_file_name)
   endif
@@ -445,28 +422,18 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   call build_references(geo%refs, trim(ref_file_name))
 
 ! -----------------------------------------------------------------------------------------
-! The following lines were needed when the motion was defined w.r.t. the initial
-! time of the simulation, tstart, and not w.r.t. 0, as they are defined now
-!
-! ! If rstart_from_file, set the right initial conditions!
-! ! -> Correction needed for motion defined through its velocity
-! if ( sim_param%restart_from_file .and. sim_param%reset_time ) then
-!   call update_relative_initial_conditions(sim_param%restart_file, sim_param%ReferenceFile, geo%refs)
-! end if
-! -----------------------------------------------------------------------------------------
-
-  !Create the output geometry file (if it is not restarting with the same name)
+  !> Create the output geometry file (if it is not restarting with the same name)
   if(trim(geo_file_name).ne.trim(target_file)) then
     call new_hdf5_file(trim(target_file), floc)
     call write_hdf5_attr(run_id, 'run_id', floc)
     call close_hdf5_file(floc)
   endif
 
-  !Load the components from the file created by the preprocessor
+  !> Load the components from the file created by the preprocessor
   call check_preproc(geo_file_name)
   call load_components(geo, trim(geo_file_name), trim(target_file), te)
 
-  call import_aero_tab(geo,airfoil_data)
+  call import_aero_tab(geo, airfoil_data)
 
   ! Initialisation
   geo%nelem_impl   = 0
@@ -647,7 +614,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
     end select
     select type( el => elems_impl(i)%p ); class is(t_vortlatt)
       iVortLatt= iVortLatt + 1
-      geo%idVortLatt(iVortLatt) = el%id
+      geo%idVortLatt(iVortLatt) = el%id ! get from here the vortex lattice id
     end select
   end do
 
@@ -724,6 +691,7 @@ subroutine load_components(geo, in_file, out_file, te)
 
   ! Connectivity and te structures
   integer , allocatable :: neigh(:,:)
+  character(len=5) :: aero_table
   ! Lifting Line elements
   real(wp), allocatable :: normalised_coord_e(:,:), theta_e(:)
   integer                 , allocatable :: i_airfoil_e(:,:)
@@ -996,10 +964,10 @@ subroutine load_components(geo, in_file, out_file, te)
       ! element-specific reads
       if ( comp_el_type(1:1) .eq. 'l' ) then
 
-        call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc)!(:)
-        call read_hdf5_al(nelem_span_list   ,'nelem_span_list'   ,geo_loc)!(:)
-        call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)!(:,:)
-        call read_hdf5_al(normalised_coord_e,'normalised_coord_e',geo_loc)!(:,:)
+        call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc)
+        call read_hdf5_al(nelem_span_list   ,'nelem_span_list'   ,geo_loc)
+        call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
+        call read_hdf5_al(normalised_coord_e,'normalised_coord_e',geo_loc)
         call read_hdf5_al(theta_e,           'theta_e'           ,geo_loc)
 
         allocate(geo%components(i_comp)%airfoil_list(size(airfoil_list)))
@@ -1018,6 +986,31 @@ subroutine load_components(geo, in_file, out_file, te)
 
         allocate(geo%components(i_comp)%theta_e(size(theta_e)))
         geo%components(i_comp)%theta_e = theta_e
+
+      elseif (comp_el_type(1:1) .eq. 'v') then
+        !> Additional fields for vl corrections 
+        call read_hdf5(aero_table,  'aero_table',  geo_loc)
+
+        if (trim(aero_table) .eq. 'true') then 
+          
+          call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc)
+          call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
+          call read_hdf5_al(normalised_coord_e,'normalised_coord_e',geo_loc)
+          
+          allocate(geo%components(i_comp)%airfoil_list(size(airfoil_list)))
+          geo%components(i_comp)%airfoil_list = airfoil_list
+          
+          allocate(geo%components(i_comp)%i_airfoil_e( &
+                size(i_airfoil_e,1),size(i_airfoil_e,2)) )
+          geo%components(i_comp)%i_airfoil_e = i_airfoil_e
+          
+          allocate(geo%components(i_comp)%normalised_coord_e( &
+                size(normalised_coord_e,1),size(normalised_coord_e,2)))
+          geo%components(i_comp)%normalised_coord_e = normalised_coord_e
+
+          geo%components(i_comp)%aero_correction = trim(aero_table)
+        
+        endif
 
       else if (comp_el_type(1:1) .eq. 'a') then
         call read_hdf5(trac,'Traction',cloc)
@@ -1673,9 +1666,11 @@ subroutine import_aero_tab(geo,coeff)
   ! Count # of different airfoil
   n_c = size(geo%components)
   n_a = 0
-  do i_c = 1 ,  n_c
+  do i_c = 1,n_c
 
-    if ( geo%components(i_c)%comp_el_type .eq. 'l' ) then ! add condition for vl corrected !
+    if ( geo%components(i_c)%comp_el_type .eq. 'l' .or. &
+        (geo%components(i_c)%comp_el_type .eq. 'v' .and. &
+        geo%components(i_c)%aero_correction .eq. 'true')) then 
 
       allocate( i_airfoil_e_tmp( &
           size(geo%components(i_c)%i_airfoil_e,1), &
