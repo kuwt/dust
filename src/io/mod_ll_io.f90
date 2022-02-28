@@ -751,10 +751,14 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
       normalised_coord_e(2,iSpan) = ( rr(2,(iSpan+1)*2) - rr(2,ista*2) ) / &
                                     ( rr(2,iend *2+1) - rr(2,ista*2) )
+      write(*,*) 'rr(2,(iSpan+1)*2)', rr(2,(iSpan+1)*2)
+      write(*,*) 'rr(2,ista*2)', rr(2,ista*2)
+      write(*,*) 'rr(2,iend*2+1)', rr(2,iend*2+1)
       if ( iSpan .ne. ista ) then ! else = 0.0_wp
         normalised_coord_e(1,iSpan) = normalised_coord_e(2,iSpan-1)
       end if
-
+      write(*,*) 'iSpan             ', iSpan
+      write(*,*) 'normalised_coord_e', normalised_coord_e
     end do
 
     ista = iend + 1

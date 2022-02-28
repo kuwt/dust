@@ -77,55 +77,67 @@ contains
 !----------------------------------------------------------------------
 
 subroutine read_mesh_parametric(mesh_file,ee,rr, &
-                    npoints_chord_tot,nelem_span_tot)
+                    npoints_chord_tot, nelem_span_tot, &
+                    airfoil_list_actual, i_airfoil_e, normalised_coord_e, & 
+                    aero_table)
 
-  character(len=*), intent(in) :: mesh_file
-  integer  , allocatable, intent(out) :: ee(:,:)
-  real(wp) , allocatable, intent(out) :: rr(:,:)
-  integer  , intent(out), optional    :: npoints_chord_tot, nelem_span_tot
+  character(len=*), intent(in)              :: mesh_file
+  integer  , allocatable, intent(out)       :: ee(:,:)
+  real(wp) , allocatable, intent(out)       :: rr(:,:)
+  integer  , intent(out), optional          :: npoints_chord_tot, nelem_span_tot 
 
-  type(t_parse) :: pmesh_prs
-  integer :: ee_size , rr_size
+  type(t_parse)                             :: pmesh_prs
+  integer                                   :: ee_size , rr_size
+  logical                                   :: twist_linear_interp
+  logical, intent(out), optional            :: aero_table
+  integer                                   :: nelem_chord, nelem_chord_tot ! , nelem_span_tot <--- moved as an output
+  integer                                   :: npoint_chord_tot, npoint_span_tot
+  integer                                   :: nRegions, nSections
+  integer                                   :: iRegion, iSection 
+  integer                                   :: iChord, iSpan 
+  integer                                   :: iElement, iPoint
+  real(wp)                                  :: ref_chord_fraction
+  real(wp), allocatable                     :: ref_point(:)
+  !> Data read from file
+  !> Sections 
+  real(wp), allocatable                     :: chord_list(:) 
+  real(wp), allocatable                     :: twist_list(:)
+  integer                                   :: iAirfoil
+  character(len=max_char_len), allocatable  :: airfoil_list(:)
+  character(len=max_char_len), allocatable  :: airfoil_table_list(:)
+  character(len=max_char_len), allocatable , intent(out), optional :: airfoil_list_actual(:)
+  integer,  allocatable, intent(out), optional :: i_airfoil_e(:,:)
+  real(wp), allocatable, intent(out), optional :: normalised_coord_e(:,:)
 
-  logical :: twist_linear_interp, aero_table
-  integer :: nelem_chord, nelem_chord_tot ! , nelem_span_tot <--- moved as an output
-  integer :: npoint_chord_tot, npoint_span_tot
-  integer :: nRegions, nSections
-  integer :: iRegion, iSection, iChord, iSpan, iElement, iPoint
-  real(wp):: ref_chord_fraction
-  real(wp), allocatable :: ref_point(:)
-  ! data read from file
-  ! sections ---
-  real(wp)         , allocatable :: chord_list(:) , twist_list(:)
-  character(len=max_char_len), allocatable :: airfoil_list(:)
-  character(len=max_char_len), allocatable :: airfoil_table_list(:)
-  
-  ! regions  ---
-  integer , allocatable :: nelem_span_list(:)
-  real(wp), allocatable :: span_list(:) , sweep_list(:) , dihed_list(:)
-  character(len=max_char_len), allocatable :: type_span_list(:)
-  integer :: n_type_span
-  character :: ElType
-  ! Sections 1. 2.
+  !> Regions  
+  integer , allocatable                     :: nelem_span_list(:)
+  real(wp), allocatable                     :: span_list(:) 
+  real(wp), allocatable                     :: sweep_list(:) 
+  real(wp), allocatable                     :: dihed_list(:)
+  character(len=max_char_len), allocatable  :: type_span_list(:)
+  integer                                   :: n_type_span
+  character                                 :: ElType
+  !> Sections 1. 2.
   real(wp), allocatable :: xySection1(:,:) , xySection2(:,:) , xyAirfoil2(:,:)
   real(wp), allocatable :: rrSection1(:,:) , rrSection2(:,:) , xyAirfoil1(:,:)
-  real(wp) :: dx_ref , dy_ref , dz_ref
-  integer :: ista , iend
+  real(wp)                                  :: dx_ref , dy_ref , dz_ref
+  integer                                   :: ista , iend, i
 
-  ! Linear interpolation of the twist angle
+  !> Linear interpolation of the twist angle
   real(wp), allocatable :: rr_tw(:,:) , rr_tw_1(:,:) , rr_tw_2(:,:)
-  real(wp) :: dx_ref_1, dy_ref_1, dz_ref_1
-  real(wp) :: interp_weight
-
-  real(wp), allocatable :: chord_fraction(:), span_fraction(:)
-  character(len=max_char_len) :: type_chord
-  integer :: i1
-
-  integer :: iSec
-  real(wp) :: dy_actual_airfoils , dy_sections , csi , twist_rad
-
-  character(len=*), parameter :: this_sub_name = 'read_mesh_parametric'
-
+  real(wp)                                  :: dx_ref_1, dy_ref_1, dz_ref_1
+  real(wp)                                  :: interp_weight
+  real(wp), allocatable                     :: chord_fraction(:)
+  real(wp), allocatable                     :: span_fraction(:)
+  character(len=max_char_len)               :: type_chord
+  integer                                   :: i1
+  integer                                   :: iSec
+  real(wp)                                  :: dy_actual_airfoils
+  real(wp)                                  :: dy_sections, csi
+  real(wp)                                  :: twist_rad
+  integer                                   :: i_aero1, i_aero2, nAirfoils
+  character(len=*), parameter               :: this_sub_name = 'read_mesh_parametric'
+  aero_table = .false.
 
   !Prepare all the parameters to be read in the file
   ! Global parameters
@@ -163,9 +175,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
 
   ! Section parameters
-! already there (few lines above) as a characteristic of the whole component !!!
-! call pmesh_prs%CreateRealOption('ref_point_chord', 'reference point of the section (as a fraction of the chord)',&
-!               multiple=.true.);
+  ! already there (few lines above) as a characteristic of the whole component !!!
+  ! call pmesh_prs%CreateRealOption('ref_point_chord', 'reference point of the section (as a fraction of the chord)',&
+  !               multiple=.true.);
   call pmesh_prs%CreateRealOption(     'chord', 'section chord', &
                 multiple=.true.);
   call pmesh_prs%CreateRealOption(     'twist', 'section twist angle', &
@@ -175,9 +187,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   call pmesh_prs%CreateStringOption( 'airfoil_table', 'airfoil table path', &
                 multiple=.true.);
 
-  
-  
-  ! Region parameters
+  !> Region parameters
   call pmesh_prs%CreateRealOption(    'span', 'region span',&
                 multiple=.true.);
   call pmesh_prs%CreateRealOption(   'sweep', 'region sweep angle [degrees]',&
@@ -189,15 +199,17 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   call pmesh_prs%CreateStringOption('type_span', 'type of span-wise division: &
                 &uniform, cosine, cosineIB, cosineOB', multiple=.true.);
   
-  !read the parameters
+  !> Read the parameters
   call pmesh_prs%read_options(mesh_file,printout_val=.true.)
-
+  
+  
+  
   nelem_chord = getint(pmesh_prs,'nelem_chord')
   ElType  = getstr(pmesh_prs,'ElType')
 
-  nSections = countoption(pmesh_prs,'chord')
-  nRegions  = countoption(pmesh_prs,'span')
-
+  nSections = countoption(pmesh_prs, 'chord')
+  nRegions  = countoption(pmesh_prs, 'span')
+  aero_table = getlogical(pmesh_prs, 'AirfoilTableCorrection')
   ! Check that nSections = nRegion + 1
   if ( nSections .ne. nRegions + 1 ) then
     call error(this_sub_name, this_mod_name, 'Unconsistent input: &
@@ -231,6 +243,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   allocate(      span_list(nRegions));         span_list = 0.0_wp
   allocate(     sweep_list(nRegions));        sweep_list = 0.0_wp
   allocate(     dihed_list(nRegions));        dihed_list = 0.0_wp
+
   nelem_span_tot = 0
   do iRegion = 1,nRegions
     nelem_span_list(iRegion) = getint(pmesh_prs,'nelem_span')
@@ -252,13 +265,13 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       type_span_list(iRegion) = getstr(pmesh_prs,'type_span')
     end do
   else
-   write(*,*) ' Mesh file   : ' , trim(mesh_file)
-   write(*,*) ' Number of span element distribution type definitions &
+  write(*,*) ' Mesh file   : ' , trim(mesh_file)
+  write(*,*) ' Number of span element distribution type definitions &
               &(type_span): ' , n_type_span
-   write(*,*) ' Number of regions : ' , nRegions
-   call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-         & the number of type of span element distribution defined is &
-         &different from the number of span regions')
+  write(*,*) ' Number of regions : ' , nRegions
+  call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+          & the number of type of span element distribution defined is &
+          &different from the number of span regions')
   end if
 
   allocate(chord_list  (nSections))  ; chord_list = 0.0_wp
@@ -271,8 +284,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     twist_list(iSection)   = getreal(pmesh_prs,'twist')
     airfoil_list(iSection) = getstr(pmesh_prs,'airfoil')
 
-    if ((ElType.eq.'p') .and. (.not. aero_table)) then
-    else
+    if (ElType .eq.'v' .and. aero_table) then
       airfoil_table_list(iSection) = getstr(pmesh_prs,'airfoil_table')
     endif   
 
@@ -304,7 +316,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   enddo
 
   allocate(rr(3,rr_size)) ; rr = 0.0_wp
-
+  
   ! get chordwise division
   allocate(chord_fraction(nelem_chord+1))
   type_chord = getstr(pmesh_prs,'type_chord')
@@ -362,9 +374,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     if ( trim(adjustl(airfoil_list(iRegion+1))) .ne. 'interp' ) then  ! read the field 'airfoil'
 
       call define_section( chord_list(iRegion+1), trim(adjustl(airfoil_list(iRegion+1))), &
-                           twist_list(iRegion+1), ElType, nelem_chord,                    &
-                           type_chord , chord_fraction, ref_chord_fraction,               &
-                           ref_point, xySection2 )
+                            twist_list(iRegion+1), ElType, nelem_chord,                    &
+                            type_chord , chord_fraction, ref_chord_fraction,               &
+                            ref_point, xySection2 )
 
     else ! interpolation
 
@@ -378,9 +390,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       csi = dy_sections / dy_actual_airfoils ! adimensional "coord" for interpolation
 
       call define_section( 1.0_wp , trim(adjustl(airfoil_list(iSec))), &
-                           0.0_wp , ElType, nelem_chord,               &
-                           type_chord , chord_fraction, 0.0_wp,        &
-                           ref_point, xyAirfoil2 )
+                            0.0_wp , ElType, nelem_chord,               &
+                            type_chord , chord_fraction, 0.0_wp,        &
+                            ref_point, xyAirfoil2 )
 
       ! Compute the coordinates xySection2(), after removing the offset
       if ( .not. allocated(xySection2) ) &
@@ -397,22 +409,18 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
       twist_rad = twist_list(iRegion) * 4.0_wp * atan(1.0_wp) / 180.0_wp
       xyAirfoil1 = matmul( &
-           reshape( (/ cos(twist_rad), sin(twist_rad) , &
-                      -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
-                                                          xyAirfoil1 )
+                  reshape( (/ cos(twist_rad), sin(twist_rad) , &
+                            -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
+                                                              xyAirfoil1 )
 
-!     xySection2(1,:) = ( (1-csi) * xyAirfoil1(1,:) + &
-!                            csi  * xyAirfoil2(1,:) ) * chord_list(iRegion+1)
-!     xySection2(2,:) = ( (1-csi) * xyAirfoil1(2,:) + &
-!                            csi  * xyAirfoil2(2,:) ) * chord_list(iRegion+1)
       xySection2 = ( (1-csi) * xyAirfoil1 + &
                         csi  * xyAirfoil2 ) * chord_list(iRegion+1)
       xySection2(1,:) = xySection2(1,:) - ref_chord_fraction
 
       twist_rad = twist_list(iRegion+1) * 4.0_wp * atan(1.0_wp) / 180.0_wp
       xySection2 = matmul( &
-           reshape( (/ cos(twist_rad),-sin(twist_rad) , &
-                       sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
+                  reshape( (/ cos(twist_rad),-sin(twist_rad) , &
+                              sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
                                                           xySection2 )
 
     end if
@@ -489,9 +497,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         !> rotate section back ( coord. in the local ref. frame )
         twist_rad = twist_list(iRegion) * pi/180.0_wp
         rr_tw_1 = matmul( &
-             reshape( (/ cos(twist_rad), sin(twist_rad) , &
-                        -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
-                                                               rr_tw_1 )
+                  reshape( (/ cos(twist_rad), sin(twist_rad) , &
+                              -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
+                                                                rr_tw_1 )
         ! Section 2
         !> remove offset in x,z
         rr_tw_2(1,:) = rrSection2(1,:) - dx_ref
@@ -499,9 +507,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         !> rotate section back ( coord. in the local ref. frame )
         twist_rad = twist_list(iRegion+1) * pi/180.0_wp
         rr_tw_2 = matmul( &
-             reshape( (/ cos(twist_rad), sin(twist_rad) , &
+                  reshape( (/ cos(twist_rad), sin(twist_rad) , &
                         -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
-                                                               rr_tw_2 )
+                                                                rr_tw_2 )
         ! === Interpolation weight ===
         if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then
           interp_weight = real(i1,wp) / real(nelem_span_list(iRegion),wp)
@@ -526,9 +534,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         twist_rad = pi/180.0_wp * ( twist_list(iRegion) + &
             ( twist_list(iRegion+1)-twist_list(iRegion) ) * interp_weight )
         rr_tw = matmul( &
-             reshape( (/ cos(twist_rad),-sin(twist_rad) , &
-                         sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
-                                                                 rr_tw )
+                reshape( (/ cos(twist_rad),-sin(twist_rad) , &
+                          sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
+                                                                  rr_tw )
         rr(1,ista:iend) = rr_tw(1,:) + dx_ref_1 + &
                             ( dx_ref - dx_ref_1 ) * interp_weight
         rr(3,ista:iend) = rr_tw(2,:) + dz_ref_1 + &
@@ -546,16 +554,84 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
 
   enddo
-
+  
   ! lots of deallocation missing causing memory leakage =(
   if ( allocated(xySection1) ) deallocate(xySection1)
   if ( allocated(xySection2) ) deallocate(xySection2)
-  ! ...
+
+  allocate(i_airfoil_e(2,nelem_span_tot))
+  i_airfoil_e = 0
+    
+  allocate(normalised_coord_e(2,nelem_span_tot))
+  normalised_coord_e = 0.0_wp
+
+  !> Interpolation of airfoil table for corrected vl only
+  if (ElType .eq.'v' .and. aero_table) then
+      !> Check airfoil_list()
+    if ( trim(airfoil_table_list(1)) .eq. 'interp' ) then
+      call error(this_sub_name, this_mod_name, 'The first "airfoil"&
+            & cannot be set as "interp".')
+    end if
+    if ( trim(airfoil_table_list(nSections)) .eq. 'interp' ) then
+      call error(this_sub_name, this_mod_name, 'The last "airfoil"&
+            & cannot be set as "interp".')
+    end if
+
+    nAirfoils = 0
+    do i = 1 , nSections
+      if ( trim(airfoil_table_list(i)) .ne. 'interp' ) nAirfoils = nAirfoils + 1
+    end do
+
+    allocate(airfoil_list_actual(nAirfoils))
+
+    iAirfoil = 0
+    
+    do i = 1 , nSections
+      if ( trim(airfoil_table_list(i)) .ne. 'interp' ) then
+        iAirfoil = iAirfoil + 1
+        airfoil_list_actual(iAirfoil) = trim(airfoil_table_list(i))
+        call check_file_exists(airfoil_list_actual(iAirfoil), this_sub_name, &
+              this_mod_name)
+      end if
+    end do
+
+    i_aero2 = 1 
+    ista = 1 
+    iAirfoil = 0
+    
+    do iAirfoil = 1, nAirfoils - 1
+
+      i_aero1 = i_aero2
+      do i = i_aero1 + 1, nSections
+        if (airfoil_table_list(i) .ne. 'interp') then
+          i_aero2 = i 
+          exit
+        end if
+      end do
+      
+      iend = sum(nelem_span_list(1:i_aero2-1))
+      
+      do iSpan = ista, iend
+        i_airfoil_e(1, iSpan) = iAirfoil
+        i_airfoil_e(2, iSpan) = iAirfoil + 1
+        
+        normalised_coord_e(2,iSpan) = (rr(2,(iSpan+1)*npoint_chord_tot) - rr(2,ista*2)) / &
+                                      (rr(2,(iend +1)*npoint_chord_tot) - rr(2,ista*2))
+        
+        if ( iSpan .ne. ista ) then ! else = 0.0_wp
+          normalised_coord_e(1,iSpan) = normalised_coord_e(2,iSpan-1)          
+        end if
+
+      end do
+
+      ista = iend + 1  
+
+    end do
+  endif
 
   ! optional output ----
   npoints_chord_tot = npoint_chord_tot
   ! optional output ----
-
 
 end subroutine read_mesh_parametric
 
@@ -629,8 +705,7 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   point_list = matmul( reshape( (/ cos(twist_rad),-sin(twist_rad) , &
                                   sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
                                                                     point_list )
-  write(*,*) 'point_list', point_list
-
+  
 end subroutine define_section
 
 !-------------------------------------------------------------------------------

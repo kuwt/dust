@@ -209,7 +209,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   integer , allocatable                    :: i_airfoil_e(:,:)
   real(wp), allocatable                    :: normalised_coord_e(:,:)
   real(wp)                                 :: trac, radius, length
-
+  logical                                  :: aero_table
   !> Section names for CGNS
   integer                                  :: nSections, iSection
   character(len=max_char_len), allocatable :: sectionNamesCGNS(:)
@@ -846,12 +846,30 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   case('parametric')
 
     mesh_file = geo_file
-    if ( (ElType .eq. 'v') .or. (ElType .eq. 'p')  ) then
+    if ((ElType .eq. 'v')) then
 
       !> TODO : actually it is possible to define the parameters in the GeoFile
       !> directly, find a good way to do this
       call read_mesh_parametric(trim(mesh_file), ee, rr, &
-                                npoints_chord_tot, nelems_span )
+                              npoints_chord_tot, nelems_span, &
+                              airfoil_list, i_airfoil_e, normalised_coord_e, &
+                              aero_table)  
+      !> Write additional fields for vl correction
+      if (aero_table) then 
+        call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)
+        call write_hdf5(i_airfoil_e,        'i_airfoil_e',        geo_loc)
+        call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)
+        call write_hdf5('true',             'aero_table',         geo_loc)
+      else
+        call write_hdf5('false',            'aero_table',         geo_loc)
+      endif
+
+      !> Nelems_span_tot will be overwritten if symmetry is required (around l.220)
+      nelems_span_tot =   nelems_span
+        
+    elseif (ElType .eq. 'p') then
+      call read_mesh_parametric(trim(mesh_file), ee, rr, &
+                                npoints_chord_tot, nelems_span)
       !> Nelems_span_tot will be overwritten if symmetry is required (around l.220)
       nelems_span_tot =   nelems_span
 
@@ -1168,8 +1186,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call warning(this_sub_name, this_mod_name, msg)
         !TODO: IMPORTANT: what should be the behaviour here?
         if(.not. suppress_te) call build_te_parametric( ee , rr , ElType ,  &
-           npoints_chord_tot , nelems_span_tot , &
-           e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
+            npoints_chord_tot , nelems_span_tot , &
+            e_te, i_te, rr_te, ii_te, neigh_te, o_te, t_te ) !te as an output
       else
         if(.not. suppress_te) call build_te_general ( ee , rr , ElType , &
                   tol_sewing , inner_product_threshold , &

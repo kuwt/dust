@@ -398,7 +398,7 @@ end subroutine CreateIntFromStringOption
 !!
 !! Only calls the general prms\%createoption routine.
 subroutine CreateLogicalOption(this, name, description, value, multiple)
- class(t_parse),intent(inout)      :: this          !< class(t_parse)
+ class(t_parse),intent(inout)         :: this        !< class(t_parse)
  character(len=*),intent(in)          :: name        !< option name
  character(len=*),intent(in)          :: description !< option description
  character(len=*),intent(in),optional :: value       !< option value
