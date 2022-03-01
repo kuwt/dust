@@ -71,7 +71,7 @@ use mod_geometry, only: &
 !  c_elem, t_elem_p !, t_vp
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
-  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p, t_stripe
 
 use mod_doublet, only: &
   initialize_doublet
@@ -80,7 +80,7 @@ use mod_surfpan, only: &
   t_surfpan , initialize_surfpan
 
 use mod_vortlatt, only: &
-  t_vortlatt
+  t_vortlatt,  get_vel_ac_stripe, calc_geo_data_stripe, correction_c81_vortlatt
 
 use mod_liftlin, only: &
  update_liftlin, t_liftlin_p, &
@@ -214,7 +214,7 @@ real(wp) , allocatable            :: al_kernel(:,:), al_v(:)
 
 !> vl viscous correction
 real(wp), allocatable             :: cl_inv(:), cl_visc(:), alpha(:)
-integer                           :: i_el, i, ie_vl, sel, i_chord, i_span
+integer                           :: i_el, i_c, i_s, i, ie_vl, sel, i_chord, i_span
 
 !> octree parameters
 type(t_octree)                    :: octree
@@ -705,32 +705,11 @@ it = 1
     call assemble_pressure_sys(linsys, geo, elems, wake)
     t1 = dust_time()
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-  if(sim_param%debug_level .ge. 1) then
-    write(message,'(A,F9.3,A)') 'Assembled linear system in: ' , t1 - t0,' s.'
-    call printout(message)
-  endif
-  !debug output of the system
-  if ((sim_param%debug_level .ge. 50).and.time_2_debug_out) then
-    write(frmt,'(I4.4)') it
-    call dump_linsys(linsys, trim(basename_debug)//'A_'//trim(frmt)//'.dat', &
-                             trim(basename_debug)//'b_'//trim(frmt)//'.dat' )
-    call dump_linsys_pres(linsys, &
-                         trim(basename_debug)//'Apres_'//trim(frmt)//'.dat', &
-                         trim(basename_debug)//'bpres_'//trim(frmt)//'.dat')
-  endif
-=======
-call assemble_linsys(linsys, geo, elems, elems_expl, wake)
-call assemble_pressure_sys(linsys, geo, elems, wake)
-t1 = dust_time()
->>>>>>> wip in NL-UVLM
-=======
     if(sim_param%debug_level .ge. 1) then
       write(message,'(A,F9.3,A)') 'Assembled linear system in: ' , t1 - t0,' s.'
       call printout(message)
     endif
->>>>>>> cleanup of dust.f90
+
 
     !debug output of the system
     if ((sim_param%debug_level .ge. 50).and.time_2_debug_out) then
@@ -775,7 +754,6 @@ t1 = dust_time()
     end do
 !$omp end parallel do
 
-<<<<<<< HEAD
 if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
   call printout(message)
@@ -818,9 +796,6 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
 !           M_array )
    end if
   end if
-=======
-    
->>>>>>> cleanup of dust.f90
 
 !------ Compute loads -------
 ! Implicit elements: vortex rings and 3d-panels
@@ -848,49 +823,9 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     end do
   !$omp end parallel do
 #endif
-<<<<<<< HEAD
 
-  ! ifort bugs workaround:
-  ! since even if the following calls looks thread safe, they mess up with
-  ! ifort and parallel runs, so the cycle is executed another time just for the
-  ! vortex lattices
-  i_chord = 0
-  i_span = 1
-  allocate(cl_inv(10))
-  cl_inv = 0.0_wp
 
-  allocate(cl_visc(10)) ! hardcoded !!!!! FIXMEEE
-  cl_visc = 0.0_wp
-
-  if ( geo%nVortLatt .gt. 0) then
-    do i_el = 1 , sel
-
-      select type( el => elems(i_el)%p )
-
-        class is(t_vortlatt)
-          
-          call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/), wake%vort_p)
-          ! compute dforce using AVL formula
-          call el%compute_dforce_jukowski()
-<<<<<<< HEAD
-=======
-          !> sum force over stripe 
-          if (i_chord .eq. el%n_c) then
-            i_span = i_span + 1
-            i_chord = 1
-            if (i_span .eq. el%n_s + 1) then
-              i_chord = 0
-              i_span = 0 
-              
-            end if            
-          else
-            i_chord = i_chord + 1            
-          end if 
-
-          if (i_chord .lt. el%n_c + 1) then
-            cl_inv(i_span) = cl_inv(i_span) +  &
-=======
-    
+ 
     ! ifort bugs workaround:
     ! since even if the following calls looks thread safe, they mess up with
     ! ifort and parallel runs, so the cycle is executed another time just for the
@@ -899,74 +834,49 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     i_span = 1
     ie_vl = 0 
     
-    allocate(cl_inv(10))
-    cl_inv = 0.0_wp
-    
-    allocate(cl_visc(10)) ! hardcoded !!!!! FIXMEEE
-    cl_visc = 0.0_wp
-    
-    allocate(alpha(10)) ! hardcoded !!!!! FIXMEEE
-    alpha = 0.0_wp
+    !allocate(cl_inv(10))
+    !cl_inv = 0.0_wp
+    !
+    !allocate(cl_visc(10)) ! hardcoded !!!!! FIXMEEE
+    !cl_visc = 0.0_wp
+    !
+    !allocate(alpha(10)) ! hardcoded !!!!! FIXMEEE
+    !alpha = 0.0_wp
     
     if ( geo%nVortLatt .gt. 0) then
       do i_el = 1 , sel      
         select type(el => elems(i_el)%p)        
           class is(t_vortlatt)          
-          !do i_nlvl = 1, 100 ! loop for non linear vl 
             call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/), wake%vort_p)
             !> compute dforce using AVL formula
             call el%compute_dforce_jukowski()
-            !> sum force over stripe 
-            if (i_chord .eq. el%n_c) then
-              i_span = i_span + 1
-              i_chord = 1
-              if (i_span .eq. el%n_s + 1) then
-                i_chord = 0
-                i_span = 0 
-              end if            
-            else
-              i_chord = i_chord + 1            
-              if (i_chord .eq. 2) then 
-                alpha(i_span) = el%alpha 
-              endif 
-            end if 
-            ie_vl = i_el
-            if (i_chord .lt. el%n_c + 1) then
-              cl_inv(i_span) = cl_inv(i_span) +  &
->>>>>>> more cleanup
-                            norm2(el%dforce)/(0.5_wp * sim_param%rho_inf*el%area*el%n_c*dot(el%vel_ctr_pt,el%vel_ctr_pt))
-            end if 
-            
-            !write(*,*) 'i_chord i_span alpha cl_inv ', i_chord, i_span, alpha, cl_inv
-          !end do 
-          ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
-<<<<<<< HEAD
-          
->>>>>>> cleanup of dust.f90
-=======
->>>>>>> more cleanup
           ! update the pressure field, p = df.n / area
           
-          el%pres = sum(el%dforce * el%nor)/el%area
+
+            ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
+            ! update the pressure field, p = df.n / area
+            el%pres = sum(el%dforce * el%nor)/el%area
+
         end select
       end do
     endif
     
-    !write(*,*) 'alpha ', alpha
-    !write(*,*) 'cl_inv', cl_inv
-    !cl_visc = (/0.36967787339981062,
-    !            0.45366451570245264,    
-    !            0.48597341217522216,
-    !            0.50044162302290962,
-    !            0.50627160955933748,
-    !            0.50627160955933814,
-    !            0.50044162302290951,
-    !            0.48597341217522216,
-    !            0.45366451570245231,
-    !            0.36967787339981073/)
-    !d_alpha = 
+    do i_c = 1, size(geo%components)
+      if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
+          trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
+            
+          do i_s = 1, size(geo%components(i_c)%stripe)
+            
+            call calc_geo_data_stripe(geo%components(i_c)%stripe(i_s))
+            call get_vel_ac_stripe(geo%components(i_c)%stripe(i_s), elems_tot, (/ wake%pan_p, wake%rin_p/), wake%vort_p)
+            call correction_c81_vortlatt(airfoil_data, geo%components(i_c)%stripe(i_s), linsys)
 
-    deallocate(cl_inv, cl_visc, alpha)
+
+          end do 
+      end if 
+    end do 
+  
+  !deallocate(cl_inv, cl_visc, alpha)
     
   ! Explicit elements:
   ! - liftlin: _pres and _dforce computed in solve_liftin()
@@ -1041,57 +951,14 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     ! Free vortices will be introduced in prepare_wake(), some lines below
     if(sim_param%use_ve) call viscosity_effects( geo , elems , te )
 
-<<<<<<< HEAD
-  !------ Treat the wake ------
-  ! (this needs to be done after output, in practice the update is for the
-  !  next iteration)
-
-  t0 = dust_time()
-  if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
-    call update_wake(wake, elems_tot, octree)
-  end if
-  t1 = dust_time()
-  if(sim_param%debug_level .ge. 1) then
-    write(message,'(A,F9.3,A)') 'Updated wake in: ' , t1 - t0,' s.'
-    call printout(message)
-  endif
-
-  ! Pressure integral equation  +++++++
-  ! save old velocity on the surfpan (before updating the geom, few lines below)
-  do i_el = 1 , geo%nSurfPan
-    select type ( el => elems(i_el)%p ) ; class is ( t_surfpan )
-      surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) = el%ub   ! el%surf_vel
-          nor_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) = el%nor   ! el%surf_vel
-    end select
-  end do
-  ! Pressure integral equation ++++++++
-
-  if(it .lt. nstep) then
-    !time = min(sim_param%tend, time+sim_param%dt)
-    time = min(sim_param%tend, sim_param%time_vec(it+1))
-    !> Update geometry
-    call update_geometry(geo, te, time, .false.)
-=======
     !> Treat the wake: this needs to be done after output, 
     !                  in practice the update is for the next iteration)
   
     t0 = dust_time()
->>>>>>> cleanup of dust.f90
     if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
       call update_wake(wake, elems_tot, octree)
     end if
-<<<<<<< HEAD
-  endif
-<<<<<<< HEAD
-
-      !> Save old solution (at the previous dt) of the linear system
-      res_old = linsys%res
-=======
   
-  !> Save old solution (at the previous dt) of the linear system
-  res_old = linsys%res
->>>>>>> wip in NL-UVLM
-=======
     t1 = dust_time()
 
     !> debug message
@@ -1121,7 +988,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
   
     !> Save old solution (at the previous dt) of the linear system
     res_old = linsys%res
->>>>>>> cleanup of dust.f90
+
 
     !> Update nor_old (moved from geo/mod_geo.f90/update_geometry(), l.2220 approx
 !$omp parallel do private(i_el)
@@ -1497,7 +1364,6 @@ subroutine init_timestep(t)
   time_no_out_debug = time_no_out_debug + sim_param%dt
 
 end subroutine init_timestep
-
 
 subroutine debug_printout_result(linsys, basename, it)
   type(t_linsys),   intent(in) :: linsys

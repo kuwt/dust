@@ -59,7 +59,7 @@ use mod_param, only: &
 implicit none
 
 public :: c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
-          t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
+          t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p, t_stripe
 
 private
 
@@ -227,17 +227,23 @@ type, abstract, extends(c_pot_elem) :: c_impl_elem
 
 end type c_impl_elem
 
-!type :: t_stripe
-!  !> Panel width (= strip width)
-!  real(wp) :: dy
-!  !> Panel in chord
-!  integer  :: n_c 
-!  !> Panel in span
-!  integer  :: n_s
-!  !
-!  !> airfoil c81
-!  !character(len=*) ::   
-!end type
+type :: t_stripe
+  
+  real(wp) :: csi_cen
+
+  integer  :: i_airfoil(2)  
+  !> Panel array
+  type(t_pot_elem_p), allocatable :: panels(:) 
+  !> Area of the stripe
+  real(wp) :: area 
+  !> Collocation point
+  real(wp) :: ac_stripe(3)  
+  real(wp) :: chord
+  real(wp) :: vel(3) 
+  real(wp) :: tang(3,2)
+  real(wp) :: nor(3)
+  real(wp) :: ub(3)
+end type
 
 !----------------------------------------------------------------------
 

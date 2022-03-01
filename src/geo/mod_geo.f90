@@ -76,7 +76,7 @@ use mod_parametric_io, only: &
 
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
-  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p, t_stripe
 
 use mod_surfpan, only: &
   t_surfpan
@@ -164,7 +164,7 @@ type :: t_geo_component
   character(len=max_char_len) :: coupling_type
 
   !> Coupling node: local coordinates (in the component local ref.frame)
- ! of the coupling node (why initilized?)
+  ! of the coupling node (why initilized?)
   real(wp) :: coupling_node(3) = 0.0_wp
 
   !> Coupling node orientation: orientation of the coupling node, w.r.t.
@@ -234,6 +234,9 @@ type :: t_geo_component
   !> Id of the airfoil elements (index in airfoil_list char array)
   integer ,allocatable :: i_airfoil_e(:,:)
   character(len=5) :: aero_correction
+
+  type(t_stripe), allocatable :: stripe(:)
+
 #if USE_PRECICE
   !> Chord vector reference, required to assign the motion ot the
   ! TE of a deformable LL element, knowing the LE motion
@@ -283,7 +286,7 @@ type :: t_geo
   integer, allocatable :: idSurfPan(:)
   !> Global id of vortex ring elements
   integer, allocatable :: idVortLatt(:)
- !> Surfpan id of global surface panel elements (G2L: global to local)
+  !> Surfpan id of global surface panel elements (G2L: global to local)
   integer, allocatable :: idSurfPanG2L(:)
 
   !> Number of statical implicit elements
@@ -1630,9 +1633,10 @@ subroutine import_aero_tab(geo,coeff)
   n_c = size(geo%components)
   n_a = 0
   do i_c = 1, n_c
-    if ( geo%components(i_c)%comp_el_type .eq. 'l' .or. &
-        (geo%components(i_c)%comp_el_type .eq. 'v' .and. &
-        geo%components(i_c)%aero_correction .eq. 'true')) then 
+
+    if ( trim(geo%components(i_c)%comp_el_type) .eq. 'l' .or. &
+        (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
+        trim(geo%components(i_c)%aero_correction) .eq. 'true')) then 
 
       allocate( i_airfoil_e_tmp( &
           size(geo%components(i_c)%i_airfoil_e,1), &
@@ -1970,7 +1974,7 @@ subroutine calc_geo_data_ad(elem,vert)
     elem%edge_len(is) = norm2(elem%edge_vec(:,is))
   end do
 
-  !> uUnit vector
+  !> Unit vector
   do is = 1 , nsides
     elem%edge_uni(:,is) = elem%edge_vec(:,is) / elem%edge_len(is)
   end do
@@ -2032,82 +2036,101 @@ subroutine create_strip_connectivity(geo)
   integer                              :: i_c , i_s , n_s , n_c , i_c2
   character(len=*), parameter          :: this_sub_name = 'create_strip_connectivity'
 
-do i_comp = 1 , size(geo%components)
-  associate(comp => geo%components(i_comp))
-
-  !> Connectivity built for lifting surface only
-  if ( ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'v' .or. &
-          geo%components(i_comp)%comp_el_type(1:1) .eq. 'l' )  ) then
-
-    n_el = size(comp%el)
-
-    !> Some checks added: the first element must be at the LE,
-    !  the last at the TE
-    if ( associated(comp%el(  1 )%neigh(1)%p)) then
-      call error(this_sub_name, this_mod_name, &
-                'First element must be at the LE')
-    end if
-    if ( associated(comp%el(n_el)%neigh(3)%p) ) then
-      call error(this_sub_name, this_mod_name, &
-                'Last element must be at the TE')
-    end if
-
-    !> Initialisation
-    io_tip = 1 ; io_te = 0 ; n_s = 0
-    do i_el = 1 , n_el
-      ie_ind = comp%el(i_el)%id
-      if ( .not. associated(comp%el(i_el)%neigh(1)%p) ) then
-        comp%el(i_el)%stripe_1%p => null()
-        n_s = n_s + 1
-      else
-        comp%el(i_el)%stripe_1%p => comp%el(i_el)%neigh(1)%p
-      end if
-
-      comp%el(i_el)%dy = sum( cross( comp%el(i_el)%edge_uni(:,2) ,    &
-                                    comp%el(i_el)%edge_vec(:,3)  ) * &
-                              comp%el(i_el)%nor )
-
-      h2 = sum( cross( comp%el(i_el)%edge_uni(:,2) ,                        &
-                      comp%el(i_el)%ver(:,1) - comp%el(i_el)%ver(:,3) ) * &
-                comp%el(i_el)%nor )
-
-      if ( abs( h2 - comp%el(i_el)%dy ) .gt. 1.0e-4_wp .and. &
-          sim_param%debug_level .ge. 7) then
-        call warning(this_sub_name, this_mod_name, 'non parallel stripe edges (rough check)')
-      end if
-
-    end do
-
-    !> Allocate and fill comp%strip_elem array
-    if ( mod(n_el,n_s) .ne. 0 ) then
-      call error(this_sub_name, this_mod_name, ' The number of elements of&
-          & a parametric element is not an exact multiple of the number of&
-          & spanwise stripes. There is something wrong in the geometry input&
-          & file')
-    end if
-    n_c = n_el / n_s  ! integer division to find number of chord panels
-
-    !comp%n_c = n_c
-    !comp%n_s = n_s
-
-    do i_s = 1 , n_s
-      do i_c = 1 , n_c
-        allocate( comp%el(i_c+(i_s-1)*n_c)%stripe_elem(i_c) )
-        do i_c2 = 1 , i_c
-          comp%el(i_c+(i_s - 1)*n_c)%stripe_elem(i_c2)%p => &
-                                        comp%el(i_c2+(i_s-1)*n_c)
-          comp%el(i_c+(i_s - 1)*n_c)%n_c = n_c
-          comp%el(i_c+(i_s - 1)*n_c)%n_s = n_s
-        end do
-      end do
+  do i_comp = 1 , size(geo%components)
+    associate(comp => geo%components(i_comp))
       
-    end do
+    !> Connectivity built for lifting surface only
+    if ( ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'v' .or. &
+            geo%components(i_comp)%comp_el_type(1:1) .eq. 'l' )  ) then
+      
+      
+      n_el = size(comp%el)
+            
+      !> Some checks added: the first element must be at the LE,
+      !  the last at the TE
+      if ( associated(comp%el(  1 )%neigh(1)%p)) then
+        call error(this_sub_name, this_mod_name, &
+                  'First element must be at the LE')
+      end if
+      if ( associated(comp%el(n_el)%neigh(3)%p) ) then
+        call error(this_sub_name, this_mod_name, &
+                  'Last element must be at the TE')
+      end if
+    
+      !> Initialisation
+      io_tip = 1 ; io_te = 0 ; n_s = 0
+      do i_el = 1 , n_el
+        ie_ind = comp%el(i_el)%id
+        if ( .not. associated(comp%el(i_el)%neigh(1)%p) ) then
+          comp%el(i_el)%stripe_1%p => null()
+          n_s = n_s + 1
+        else
+          comp%el(i_el)%stripe_1%p => comp%el(i_el)%neigh(1)%p
+        end if
+      
+        comp%el(i_el)%dy = sum( cross( comp%el(i_el)%edge_uni(:,2) ,    &
+                                      comp%el(i_el)%edge_vec(:,3)  ) * &
+                                comp%el(i_el)%nor )
+      
+        h2 = sum( cross( comp%el(i_el)%edge_uni(:,2) ,                        &
+                        comp%el(i_el)%ver(:,1) - comp%el(i_el)%ver(:,3) ) * &
+                  comp%el(i_el)%nor )
+      
+        if ( abs( h2 - comp%el(i_el)%dy ) .gt. 1.0e-4_wp .and. &
+            sim_param%debug_level .ge. 7) then
+          call warning(this_sub_name, this_mod_name, 'non parallel stripe edges (rough check)')
+        end if
+      
+      end do
+    
+      !> Allocate and fill comp%strip_elem array
+      if ( mod(n_el,n_s) .ne. 0 ) then
+        call error(this_sub_name, this_mod_name, ' The number of elements of&
+            & a parametric element is not an exact multiple of the number of&
+            & spanwise stripes. There is something wrong in the geometry input&
+            & file')
+      end if
+      n_c = n_el / n_s  ! integer division to find number of chord panels
+      
+      allocate(comp%stripe(n_s))
+      do i_s = 1, n_s
+        allocate(comp%stripe(i_s)%panels(n_c))
+        comp%stripe(i_s)%area = 0.0_wp
+        do i_c = 1, n_c
+          comp%stripe(i_s)%panels(i_c)%p => comp%el(i_c+(i_s-1)*n_c)
+          comp%stripe(i_s)%area = comp%stripe(i_s)%area + comp%el(i_c+(i_s-1)*n_c)%area
+        end do   
+          
+          comp%stripe(i_s)%csi_cen = 0.5_wp * sum(comp%normalised_coord_e(:,i_s))  
+          comp%stripe(i_s)%i_airfoil =  comp%i_airfoil_e(:,i_s)
 
-  end if
+          ! > get the aerodynamic center as the point at 0.25 c of the stripe 
+          ! mid point at leading edge - 0.25*( mid point at leading edge -   mid point at trailing edge)
+          comp%stripe(i_s)%ac_stripe = (comp%el(1+(i_s-1)*n_c)%ver(:,2) + comp%el(1+(i_s-1)*n_c)%ver(:,1))/2 - &
+                                        0.25_wp * ((comp%el(1+(i_s-1)*n_c)%ver(:,2) + comp%el(1+(i_s-1)*n_c)%ver(:,1))/2 - &
+                                                  (comp%el(n_c+(i_s-1)*n_c)%ver(:,3) + comp%el(n_c+(i_s-1)*n_c)%ver(:,4))/2)
+          comp%stripe(i_s)%chord = norm2((comp%el(1+(i_s-1)*n_c)%ver(:,2) + comp%el(1+(i_s-1)*n_c)%ver(:,1))/2 - &
+                                          (comp%el(n_c+(i_s-1)*n_c)%ver(:,3) + comp%el(n_c+(i_s-1)*n_c)%ver(:,4))/2)          
+      end do 
 
-  end associate
-end do
-
+      do i_s = 1 , n_s
+        do i_c = 1 , n_c
+          allocate( comp%el(i_c+(i_s-1)*n_c)%stripe_elem(i_c) )
+          do i_c2 = 1 , i_c
+            comp%el(i_c+(i_s - 1)*n_c)%stripe_elem(i_c2)%p => &
+                                          comp%el(i_c2+(i_s-1)*n_c)
+            comp%el(i_c+(i_s - 1)*n_c)%n_c = n_c
+            comp%el(i_c+(i_s - 1)*n_c)%n_s = n_s
+          end do
+        end do
+        
+      end do
+    
+    end if    
+    end associate
+  end do
+  
+  
 
 end subroutine create_strip_connectivity
 

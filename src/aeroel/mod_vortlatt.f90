@@ -74,7 +74,10 @@ use mod_math, only: &
 
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
-  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p, t_stripe
+
+use mod_c81, only: &
+  t_aero_tab, interp_aero_coeff
 
 use mod_vortpart, only: &
   t_vortpart_p
@@ -106,45 +109,29 @@ type, extends(c_impl_elem) :: t_vortlatt
   !TODO: consider applying the correct element pointer here
   contains
 
-  procedure, pass(this) :: build_row        => build_row_vortlatt
-  procedure, pass(this) :: build_row_static => build_row_static_vortlatt
-  procedure, pass(this) :: add_wake         => add_wake_vortlatt
-  procedure, pass(this) :: add_expl         => add_expl_vortlatt
-  procedure, pass(this) :: compute_pot      => compute_pot_vortlatt
-  procedure, pass(this) :: compute_vel      => compute_vel_vortlatt
-  procedure, pass(this) :: compute_grad     => compute_grad_vortlatt
-  procedure, pass(this) :: compute_psi      => compute_psi_vortlatt
-  !Dummy for intel workaround
-  procedure, pass(this) :: compute_pres     => compute_pres_dummy
-  procedure, pass(this) :: compute_pres_vortlatt     => compute_pres_vortlatt
-  procedure, pass(this) :: compute_dforce   => compute_dforce_dummy
-  procedure, pass(this) :: calc_geo_data    => calc_geo_data_vortlatt
-  procedure, pass(this) :: get_vort_vel     => get_vort_vel_vortlatt
-  procedure, pass(this) :: get_bernoulli_source => get_bernoulli_source_vortlatt
-
-  procedure, pass(this) :: get_vel_ctr_pt   => get_vel_ctr_pt_vortlatt
-  procedure, pass(this) :: compute_dforce_jukowski => &
-                          compute_dforce_jukowski_vortlatt
+  procedure, pass(this) :: build_row                => build_row_vortlatt
+  procedure, pass(this) :: build_row_static         => build_row_static_vortlatt
+  procedure, pass(this) :: add_wake                 => add_wake_vortlatt
+  procedure, pass(this) :: add_expl                 => add_expl_vortlatt
+  procedure, pass(this) :: compute_pot              => compute_pot_vortlatt
+  procedure, pass(this) :: compute_vel              => compute_vel_vortlatt
+  procedure, pass(this) :: compute_grad             => compute_grad_vortlatt
+  procedure, pass(this) :: compute_psi              => compute_psi_vortlatt
+  !> Dummy for intel workaround
+  procedure, pass(this) :: compute_pres             => compute_pres_dummy
+  procedure, pass(this) :: compute_pres_vortlatt    => compute_pres_vortlatt
+  procedure, pass(this) :: compute_dforce           => compute_dforce_dummy
+  procedure, pass(this) :: calc_geo_data            => calc_geo_data_vortlatt
+  procedure, pass(this) :: get_vort_vel             => get_vort_vel_vortlatt
+  procedure, pass(this) :: get_bernoulli_source     => get_bernoulli_source_vortlatt
+  procedure, pass(this) :: get_vel_ctr_pt           => get_vel_ctr_pt_vortlatt
+  procedure, pass(this) :: compute_dforce_jukowski  => compute_dforce_jukowski_vortlatt
   !procedure, pass(this) :: correction_c81 => correction_c81_vortlatt
 
 end type
-!
-!type, extends(t_vortlatt) :: t_stripe_vortlatt
-!  !> AoA of the stripe
-!  real(wp) :: alpha  
-!  !> Aoa inducted 
-!  real(wp) :: alpha_ind
-!  !> AoA body 
-!  real(wp) :: alpha_body
-!  !> Inviscid cl
-!  real(wp) :: cl_inv
-!  !> Viscous cl 
-!  real(wp) :: cl_visc
-!  !> mean span of the panel 
-!  real(wp) :: dx
-!end type 
 
 character(len=*), parameter :: this_mod_name='mod_vortlatt'
+public get_vel_ac_stripe, calc_geo_data_stripe, correction_c81_vortlatt
 
 !----------------------------------------------------------------------
 contains
@@ -568,42 +555,56 @@ subroutine compute_dforce_jukowski_vortlatt(this)
   
 end subroutine compute_dforce_jukowski_vortlatt
 
-!subroutine correction_c81_vortlatt(this)
 
-!  class(t_vortlatt), intent(inout) :: this
-!  
-!  integer  :: i_stripe
-!  real(wp) :: mach, reynolds
+subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys)
 !
-!  this%dx = this%area/this%dy ! the sum for each stripe will be the chord.. 
-!  
-!  wind = variable_wind(this%cen, sim_param%time) 
-!  
-!  mach = abs(sum(this%vel_ctr_pt*this%tang(:,2)) / sim_param%a_inf)
-!  
-!  reynolds = sim_param%rho_inf * norm2(this%vel_ctr_pt) * &
-!                          this%chord / sim_param%mu_inf
-!  
-!  i_stripe = size(this%stripe_elem)
-!
-!  if ( i_stripe .gt. 1 ) then 
-!  else
-!    this%alpha = -this%alpha
-!  end if
-!  
-!  ! get correction from c81 table 
-!  call interp_aero_coeff ( airfoil_data,  this%csi_cen, this%i_airfoil , &
-!                        (/this%alpha, mach, reynolds/), aero_coeff )
-!  this%cl = aero_coeff(1)
-!  this%cd = aero_coeff(2)
-!
-!  this%dforce_c81(3) = 0.5_wp*sim_param%rho_inf* &
-!                        dot(this%vel_ctr_pt, this%vel_ctr_pt)*this%area *this%cl 
-!  this%dforce_c81(1) = 0.5_wp*sim_param%rho_inf* &
-!                        dot(this%vel_ctr_pt, this%vel_ctr_pt)*this%area *this%cd 
-!
-!end subroutine correction_c81_vortlatt
+  type(t_aero_tab),  intent(in)    :: airfoil_data(:)
+  type(t_stripe),    intent(inout) :: stripe
+  type(t_linsys),    intent(inout) :: linsys
+  real(wp)                         :: mach, reynolds
+  real(wp)                         :: wind
+  real(wp)                         :: up(3)
+  real(wp)                         :: alpha_ind, alpha_body, alpha
+  real(wp),     allocatable        :: aero_coeff(:)
+  real(wp)                         :: force(3) 
+  integer                          :: i_c, n_pan
+  real(wp)                         :: cl_inv, cl_visc, cd_visc 
+  force = 0.0_wp
+  n_pan = size(stripe%panels)
+  mach = abs(dot(stripe%vel,stripe%tang(:,1)) / sim_param%a_inf)
 
+  reynolds = sim_param%rho_inf * norm2(stripe%vel) * &
+                          stripe%chord / sim_param%mu_inf
+
+  !> Calculation of the alpha for c81 correction
+  up = stripe%nor*dot(stripe%nor, stripe%vel) + & 
+        stripe%tang(:,1)*dot(stripe%tang(:,1), stripe%vel) 
+
+  
+  alpha_ind = -atan2(up(3), up(1)) *180/pi ! induced 
+                  
+  alpha_body = -atan2(stripe%tang(3,1), stripe%tang(1,1))*180/pi ! body
+  alpha = alpha_body - alpha_ind ! AoA 
+  
+  call interp_aero_coeff ( airfoil_data,  stripe%csi_cen, stripe%i_airfoil , &
+                        (/alpha, mach, reynolds/), aero_coeff )
+  do i_c = 1, n_pan
+    force = force + stripe%panels(i_c)%p%dforce 
+  end do
+
+  cl_inv = norm2(force)/(0.5_wp*sim_param%rho_inf*dot(stripe%vel,stripe%vel)*stripe%area)
+  cl_visc = aero_coeff(1)
+  cd_visc = aero_coeff(2)
+
+  write(*,*) 'stripe%vel   ', stripe%vel 
+  write(*,*) 'alpha_body   ', alpha_body
+  write(*,*) 'alpha_ind    ', alpha_ind
+  write(*,*) 'alpha        ', alpha
+  write(*,*) 'cl_visc      ', cl_visc
+  write(*,*) 'cl_inv       ', cl_inv
+  write(*,*) 'cd_visc      ', cd_visc
+  write(*,*) 'up           ', up         
+end subroutine correction_c81_vortlatt
 
 !----------------------------------------------------------------------
 !> Compute an approximate value of the induced velocity at 1/4 of chord
@@ -622,39 +623,92 @@ subroutine get_vel_ctr_pt_vortlatt(this, elems, wake_elems, vort_elems)
   type(t_pot_elem_p),intent(in):: wake_elems(:)
   type(t_vort_elem_p), intent(in) :: vort_elems(:)
 
-  real(wp) :: v(3), x0(3), wind(3), up(3)
+  real(wp) :: v(3), x0(3), wind(3), up(3),  vel_tmp(3)
   integer :: j
 
   ! Initialisation to zero
   this%vel_ctr_pt = 0.0_wp
-
+  vel_tmp = this%vel_ctr_pt 
   ! Control point at 1/4-fraction of the chord
   x0 = this%cen + (this%edge_vec(:,4)-this%edge_vec(:,2))/4.0_wp
-
+  
   !=== Compute the velocity from all the elements ===
   do j = 1,size(wake_elems)  ! wake panels
     call wake_elems(j)%p%compute_vel(x0,v)
     this%vel_ctr_pt = this%vel_ctr_pt + v
   enddo
+  write(*,*) 'this%vel_ctr_pt wake', this%vel_ctr_pt-vel_tmp
+  vel_tmp = this%vel_ctr_pt
 
   do j = 1,size(elems) ! body elements
     call elems(j)%p%compute_vel(x0,v)
     this%vel_ctr_pt = this%vel_ctr_pt + v
   enddo
+  write(*,*) 'this%vel_ctr_pt body', this%vel_ctr_pt-vel_tmp
+  vel_tmp = this%vel_ctr_pt
 
   do j = 1,size(vort_elems) ! wake vorticity elements 
     call vort_elems(j)%p%compute_vel(x0,v)
     this%vel_ctr_pt = this%vel_ctr_pt + v
   enddo
-
+  write(*,*) 'this%vel_ctr_pt vort', this%vel_ctr_pt-vel_tmp
+  write(*,*) 
+  vel_tmp = this%vel_ctr_pt 
+  
   !> induced velocity on leading edge side
   wind = variable_wind(this%cen, sim_param%time)
   this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp * pi) &
-                + wind - this%ub! + this%uvort
+                + wind - this%ub
 
+  
 end subroutine get_vel_ctr_pt_vortlatt
 
-!----------------------------------------------------------------------
+subroutine get_vel_ac_stripe(stripe, elems, wake_elems, vort_elems)
+  class(t_stripe), intent(inout) :: stripe
+  type(t_pot_elem_p),intent(in):: elems(:)
+  type(t_pot_elem_p),intent(in):: wake_elems(:)
+  type(t_vort_elem_p), intent(in) :: vort_elems(:)
+
+  real(wp) :: v(3), x0(3), wind(3), up(3), vel_tmp(3)
+  integer :: j
+
+  ! Initialisation to zero
+  stripe%vel = 0.0_wp
+
+  ! Control point at 1/4-fraction of the chord
+  x0 = stripe%ac_stripe
+  write(*,*) 'x0 stripe', x0
+  vel_tmp = stripe%vel 
+  !=== Compute the velocity from all the elements ===
+  do j = 1,size(wake_elems)  ! wake panels
+    call wake_elems(j)%p%compute_vel(x0,v)
+    stripe%vel = stripe%vel + v
+  enddo
+  write(*,*) 'stripe_vel wake', stripe%vel-vel_tmp
+  vel_tmp = stripe%vel
+
+  do j = 1,size(elems) ! body elements
+    call elems(j)%p%compute_vel(x0,v)
+    stripe%vel = stripe%vel + v
+  enddo
+  write(*,*) 'stripe_vel body', stripe%vel-vel_tmp
+  vel_tmp = stripe%vel
+  
+  do j = 1,size(vort_elems) ! wake vorticity elements 
+    call vort_elems(j)%p%compute_vel(x0,v)
+    stripe%vel = stripe%vel + v
+  enddo
+  
+  write(*,*) 'stripe_vel vort', stripe%vel-vel_tmp
+  vel_tmp = stripe%vel
+  
+  !> induced velocity on leading edge side
+  wind = variable_wind(stripe%ac_stripe, sim_param%time)
+  stripe%vel = stripe%vel/(4.0_wp * pi) &
+                + wind - stripe%ub
+
+end subroutine get_vel_ac_stripe
+!!!----------------------------------------------------------------------
 !> Calculate the geometrical quantities of a vortex lattice
 !!
 !! The subroutine calculates all the relevant geometrical quantities of a
@@ -729,6 +783,38 @@ subroutine calc_geo_data_vortlatt(this, vert)
   this%dmom   = 0.0_wp
 
 end subroutine calc_geo_data_vortlatt
+
+
+subroutine calc_geo_data_stripe(stripe)
+  type(t_stripe), intent(inout) :: stripe
+  integer                       :: n_pan
+  real(wp)                      :: nor(3), tang(3)
+
+  n_pan = size(stripe%panels)
+
+  nor = cross(stripe%panels(n_pan)%p%ver(:,3) - stripe%panels(1)%p%ver(:,1) , &
+              stripe%panels(n_pan)%p%ver(:,4) - stripe%panels(1)%p%ver(:,2) )
+
+  !> Avoid numerical singularities when compiled in debug mode
+  if (norm2(nor) .lt. 1e-16_wp) then 
+    nor(3) = 1e-16_wp
+  end if
+
+  stripe%nor = nor / norm2(nor)
+  
+  tang = (stripe%panels(n_pan)%p%ver(:,3) + stripe%panels(n_pan)%p%ver(:,4))/2 - &
+          (stripe%panels(1)%p%ver(:,1) + stripe%panels(1)%p%ver(:,2))/2
+  
+  stripe%tang(:,1) = tang / norm2(tang)
+  stripe%tang(:,2) = cross(stripe%nor, stripe%tang(:,1))
+  
+  !> velocity as linear interpolation 
+  stripe%ub = stripe%panels(n_pan)%p%ub*0.25_wp + stripe%panels(1)%p%ub*0.75_wp 
+  stripe%ac_stripe = (stripe%panels(1)%p%ver(:,2) + stripe%panels(1)%p%ver(:,1))/2 - &
+                    0.25_wp * ((stripe%panels(1)%p%ver(:,2) + stripe%panels(1)%p%ver(:,1))/2 - &
+                    (stripe%panels(n_pan)%p%ver(:,3) + stripe%panels(n_pan)%p%ver(:,4))/2)
+end subroutine calc_geo_data_stripe
+
 
 !----------------------------------------------------------------------
 
