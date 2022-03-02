@@ -855,12 +855,13 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         end select
       end do
     end if 
-    
+
+    tol = 1e-2_wp  
+    diff = 1.0_wp 
+    it_vl = 0
     !> Vl correction for viscous forces 
     if (sim_param%vl_correction) then
-      tol = 5e-3_wp  
-      diff = 1.0_wp 
-      it_vl = 0
+      
       do while (diff .gt. tol .and. it_vl .lt. nMaxiter)
 
         do i_c = 1, size(geo%components)
@@ -871,7 +872,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                 call get_vel_ac_stripe(geo%components(i_c)%stripe(i_s), & 
                                     elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
                 call correction_c81_vortlatt(airfoil_data, geo%components(i_c)%stripe(i_s), linsys, diff)
-              
+                
               end do
           end if 
         end do 
@@ -893,8 +894,9 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         end do
 
         it_vl = it_vl + 1
+        write(*,*) 'diff', diff
       end do
-
+        
       do i_c = 1, size(geo%components)
         if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
             trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
@@ -908,15 +910,14 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                       geo%components(i_c)%stripe(i_s)%tang(:,1) )
 
               do i_p = 1, size(geo%components(i_c)%stripe(i_s)%panels)
-                
                 geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce = &
                             geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce + &
-                            d_cd *geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area
-                            
+                            d_cd * geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area
               end do
             end do
         end if 
       end do 
+      write(*,*) 'it_vl', it_vl
     end if 
 
   ! Explicit elements:
