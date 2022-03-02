@@ -856,13 +856,13 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
       end do
     end if 
 
-    tol = 1e-2_wp  
+    tol = 1e-4_wp  
     diff = 1.0_wp 
     it_vl = 0
     !> Vl correction for viscous forces 
     if (sim_param%vl_correction) then
-      
-      do while (diff .gt. tol .and. it_vl .lt. nMaxiter)
+      if (it .gt. 10) then
+      do while (diff .gt. tol .and. it_vl .lt. 10)
 
         do i_c = 1, size(geo%components)
           if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
@@ -918,6 +918,8 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         end if 
       end do 
       write(*,*) 'it_vl', it_vl
+    else
+    endif
     end if 
 
   ! Explicit elements:

@@ -574,14 +574,17 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff)
   end do
 
   stripe%alpha_ind = atan2(dot(stripe%vel,stripe%nor) , &
-                          dot(stripe%vel,stripe%tang(:,2))) 
-  
+                          dot(stripe%vel,stripe%tang(:,1))) 
+  !write(*,*) 'alpha_ind       ', stripe%alpha_ind*180.0_wp/pi
+  !write(*,*) 'stripe%vel      ', stripe%vel
+  !write(*,*) 'stripe%tang(:,1)', stripe%tang(:,1)
+  !write(*,*) 'force           ', force
   !> Sectional lift coefficient 
   cl_inv = dot(force,stripe%nor)/(0.5_wp*sim_param%rho_inf*dot(stripe%vel,stripe%vel)*stripe%area)
   
   !> AoA of the stripe (from inviscid calculation) -> check for unsymmetric profiles 
   alpha = (cl_inv/(2.0_wp*pi))*180/pi ! deg to enter in c81 table 
-
+  !write(*,*) 'alpha', alpha
   call interp_aero_coeff ( airfoil_data,  stripe%csi_cen, stripe%i_airfoil , &
                         (/alpha, mach, reynolds/), aero_coeff )
   
@@ -589,29 +592,34 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff)
   cl_visc = aero_coeff(1)
   stripe%cd = aero_coeff(2)
 
-  !> update tolerance 
-  
+  !> Update tolerance   
   diff = abs(cl_visc - cl_inv)/max(cl_inv,1e-10)
+  
   !> d_alpha update 
   d_alpha = rel_fct*(cl_visc-cl_inv)/(2*pi)
-  
+  !write(*,*) 'd_alpha', d_alpha
+
   do i_c = 1, n_pan
     !> Update on the normal  
     !  nor = nor * cos(d_alpha) - tan * sin(d_alpha)
     nor = stripe%panels(i_c)%p%nor * cos(d_alpha) -  &
           stripe%panels(i_c)%p%tang(:,2) * sin(d_alpha)
-
     !> Get the induced velocity part 
-    v_ind = stripe%panels(i_c)%p%dummy_vel_ctr
     
+    v_ind = stripe%panels(i_c)%p%ub - wind + stripe%panels(i_c)%p%uvort &
+            + stripe%panels(i_c)%p%dummy_vel_ctr 
+
     !> Update the normal to rhs 
     correction = dot(nor, v_ind) * 4.0_wp * pi
-
+    !> Old contribution to rhs except wake 
     old_b_par = dot(stripe%panels(i_c)%p%nor, v_ind)*4.0_wp*pi
     !> Get panel id -> should be the global id (CHECK THIS)
     id_pan = stripe%panels(i_c)%p%id
     !> Update of the rhs 
-    linsys%b(id_pan) =  linsys%b(id_pan) - old_b_par + correction     
+    linsys%b(id_pan) = linsys%b(id_pan) - old_b_par + correction 
+    !write(*,*) 'linsys%b(id_pan)', linsys%b(id_pan)   
+    !write(*,*) 'old_b_par       ', old_b_par
+    !write(*,*) 'correction      ', correction 
   end do 
 
 
@@ -650,24 +658,25 @@ subroutine get_vel_ctr_pt_vortlatt(this, elems, wake_elems, vort_elems)
     call wake_elems(j)%p%compute_vel(x0, v)
     this%vel_ctr_pt = this%vel_ctr_pt + v
   enddo
-
-  do j = 1,size(elems) ! body elements
-    call elems(j)%p%compute_vel(x0, v)
-    this%vel_ctr_pt = this%vel_ctr_pt + v
-  enddo
   
   do j = 1,size(vort_elems) ! wake vorticity elements 
     call vort_elems(j)%p%compute_vel(x0, v)
     this%vel_ctr_pt = this%vel_ctr_pt + v
   enddo
+  this%dummy_vel_ctr = this%vel_ctr_pt / (4.0_wp * pi)
 
-  this%dummy_vel_ctr = this%vel_ctr_pt
+  do j = 1,size(elems) ! body elements
+    call elems(j)%p%compute_vel(x0, v)
+    this%vel_ctr_pt = this%vel_ctr_pt + v
+  enddo
   !> induced velocity on leading edge side
   wind = variable_wind(this%cen, sim_param%time)
+  
   this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp * pi) &
                     + wind - this%ub
   
-  
+
+  !write(*,*) 'this%dummy_vel_ctr', this%dummy_vel_ctr
 
 end subroutine get_vel_ctr_pt_vortlatt
 
