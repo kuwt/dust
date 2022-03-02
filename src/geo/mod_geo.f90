@@ -2237,13 +2237,13 @@ subroutine update_geometry(geo, te, t, update_static)
       ! - hinge rotation angle, theta
       ! for non-coupled components only (so far)
       if ( .not. comp%coupling ) then
-
+        
         !> hinge nodes, points and orientation
         call comp%hinge(ih)%update_hinge_nodes( geo%refs(comp%ref_id)%R_g, &
                                                 geo%refs(comp%ref_id)%of_g )
         !> hinge rotation, theta
         call comp%hinge(ih)%update_theta( t )
-
+        
         !> Allocating contiguous array to pass to %hinge_deflection procedure
         allocate(rr_hinge_contig(3,size(comp%i_points)))
         rr_hinge_contig = geo%points(:, comp%i_points)

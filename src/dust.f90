@@ -859,19 +859,16 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
 
         end select
       end do
-    endif
+    end if 
     
     do i_c = 1, size(geo%components)
       if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
           trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
-            
-          do i_s = 1, size(geo%components(i_c)%stripe)
-            
+          do i_s = 1, size(geo%components(i_c)%stripe)            
             call calc_geo_data_stripe(geo%components(i_c)%stripe(i_s))
-            call get_vel_ac_stripe(geo%components(i_c)%stripe(i_s), elems_tot, (/ wake%pan_p, wake%rin_p/), wake%vort_p)
+            call get_vel_ac_stripe(geo%components(i_c)%stripe(i_s), & 
+                                  elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
             call correction_c81_vortlatt(airfoil_data, geo%components(i_c)%stripe(i_s), linsys)
-
-
           end do 
       end if 
     end do 

@@ -126,7 +126,6 @@ type, extends(c_impl_elem) :: t_vortlatt
   procedure, pass(this) :: get_bernoulli_source     => get_bernoulli_source_vortlatt
   procedure, pass(this) :: get_vel_ctr_pt           => get_vel_ctr_pt_vortlatt
   procedure, pass(this) :: compute_dforce_jukowski  => compute_dforce_jukowski_vortlatt
-  !procedure, pass(this) :: correction_c81 => correction_c81_vortlatt
 
 end type
 
@@ -479,8 +478,6 @@ subroutine compute_pres_vortlatt(this) !, R_g)
 
 end subroutine compute_pres_vortlatt
 
-!----------------------------------------------------------------------
-
 !> Dummy version doing nothing
 subroutine compute_pres_dummy(this, R_g)
   class(t_vortlatt), intent(inout) :: this
@@ -488,32 +485,22 @@ subroutine compute_pres_dummy(this, R_g)
 
 end subroutine compute_pres_dummy
 
-!----------------------------------------------------------------------
 
-!>  Compute the elementary force on the on the actual element
+!> Compute the elementary force on the on the actual element
 subroutine compute_dforce_vortlatt(this)
 class(t_vortlatt), intent(inout) :: this
-!type(t_elem_p), intent(in) :: elems(:)
-
-! this%dforce = this%pres * this%area * this%nor
 
 end subroutine compute_dforce_vortlatt
-
-!----------------------------------------------------------------------
 
 !> Dummy version doing nothing
 subroutine compute_dforce_dummy(this)
 class(t_vortlatt), intent(inout) :: this
-!type(t_elem_p), intent(in) :: elems(:)
-
-! this%dforce = this%pres * this%area * this%nor
 
 end subroutine compute_dforce_dummy
 
-!----------------------------------------------------------------------
-!>Compute the elementary force on the on the actual element
-! using Kutta-Jukowski theorem as implemented in AVL:
-! the velocity
+!> Compute the elementary force on the on the actual element
+!  using Kutta-Jukowski theorem as implemented in AVL:
+!  the velocity
 !
 subroutine compute_dforce_jukowski_vortlatt(this)
 
@@ -523,29 +510,20 @@ subroutine compute_dforce_jukowski_vortlatt(this)
   integer  :: i_stripe
   real(wp) :: mach, reynolds
 
-  !write(*,*) 'this%stripe_elem', size(this%stripe_elem)
-  
-  
   ! Prandt -- Glauert correction for compressibility effect
   wind = variable_wind(this%cen, sim_param%time)
   
   mach = abs(sum(this%vel_ctr_pt*this%tang(:,2)) / sim_param%a_inf)
-  
-  
   
   ! === Steady contribution (KJ) ===
   gam = cross ( this%vel_ctr_pt, this%edge_vec(:,1) )
   i_stripe = size(this%stripe_elem)
 
   if ( i_stripe .gt. 1 ) then
-
     this%dforce = sim_param%rho_inf * gam &
                 * ( this%mag - this%stripe_elem(i_stripe-1)%p%mag )  / sqrt(1 - mach**2)
-    
   else
-
     this%dforce = sim_param%rho_inf * gam * this%mag  / sqrt(1 - mach**2)
-    this%alpha = -this%alpha
   end if
 
   ! === Unsteady contribution ===
@@ -557,7 +535,7 @@ end subroutine compute_dforce_jukowski_vortlatt
 
 
 subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys)
-!
+
   type(t_aero_tab),  intent(in)    :: airfoil_data(:)
   type(t_stripe),    intent(inout) :: stripe
   type(t_linsys),    intent(inout) :: linsys
@@ -577,14 +555,13 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys)
                           stripe%chord / sim_param%mu_inf
 
   !> Calculation of the alpha for c81 correction
-  up = stripe%nor*dot(stripe%nor, stripe%vel) + & 
-        stripe%tang(:,1)*dot(stripe%tang(:,1), stripe%vel) 
-
+  !up = stripe%nor*dot(stripe%nor, stripe%vel) + & 
+  !      stripe%tang(:,1)*dot(stripe%tang(:,1), stripe%vel) 
   
-  alpha_ind = -atan2(up(3), up(1)) *180/pi ! induced 
-                  
-  alpha_body = -atan2(stripe%tang(3,1), stripe%tang(1,1))*180/pi ! body
-  alpha = alpha_body - alpha_ind ! AoA 
+  alpha = atan2(dot(stripe%vel,stripe%nor), &
+                dot(stripe%vel,stripe%tang(:,1))) *180/pi ! induced 
+  !alpha_body = -atan2(stripe%tang(3,1), stripe%tang(1,1))*180/pi ! body
+  !alpha = alpha_body - alpha_ind ! AoA 
   
   call interp_aero_coeff ( airfoil_data,  stripe%csi_cen, stripe%i_airfoil , &
                         (/alpha, mach, reynolds/), aero_coeff )
@@ -596,14 +573,14 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys)
   cl_visc = aero_coeff(1)
   cd_visc = aero_coeff(2)
 
-  write(*,*) 'stripe%vel   ', stripe%vel 
-  write(*,*) 'alpha_body   ', alpha_body
-  write(*,*) 'alpha_ind    ', alpha_ind
+  !write(*,*) 'stripe%vel    ', stripe%vel 
+  !write(*,*) 'alpha_body   ', alpha_body
+  !write(*,*) 'alpha_ind    ', alpha_ind
   write(*,*) 'alpha        ', alpha
-  write(*,*) 'cl_visc      ', cl_visc
-  write(*,*) 'cl_inv       ', cl_inv
-  write(*,*) 'cd_visc      ', cd_visc
-  write(*,*) 'up           ', up         
+  !write(*,*) 'cl_visc      ', cl_visc
+  !write(*,*) 'cl_inv       ', cl_inv
+  !write(*,*) 'force      ', force
+
 end subroutine correction_c81_vortlatt
 
 !----------------------------------------------------------------------
@@ -613,63 +590,54 @@ end subroutine correction_c81_vortlatt
 ! - body panels
 ! - wake panels
 ! ------------------------------------------------------------------- !
-! This routine uses the value in the centre of the panels of:       !!!
-! - the free-stream and the body velocity                           !!!
-! - the rotational part of the velocity, collected in this%uvort    !!!
+! This routine uses the value in the centre of the panels of:         !
+! - the free-stream and the body velocity                             !
+! - the rotational part of the velocity, collected in this%uvort      !
 ! ------------------------------------------------------------------- !
 subroutine get_vel_ctr_pt_vortlatt(this, elems, wake_elems, vort_elems)
-  class(t_vortlatt), intent(inout) :: this
-  type(t_pot_elem_p),intent(in):: elems(:)
-  type(t_pot_elem_p),intent(in):: wake_elems(:)
-  type(t_vort_elem_p), intent(in) :: vort_elems(:)
+  class(t_vortlatt),    intent(inout)   :: this
+  type(t_pot_elem_p),   intent(in)      :: elems(:)
+  type(t_pot_elem_p),   intent(in)      :: wake_elems(:)
+  type(t_vort_elem_p),  intent(in)      :: vort_elems(:)
 
-  real(wp) :: v(3), x0(3), wind(3), up(3),  vel_tmp(3)
+  real(wp) :: v(3), x0(3), wind(3), up(3)
   integer :: j
 
   ! Initialisation to zero
   this%vel_ctr_pt = 0.0_wp
-  vel_tmp = this%vel_ctr_pt 
   ! Control point at 1/4-fraction of the chord
-  x0 = this%cen + (this%edge_vec(:,4)-this%edge_vec(:,2))/4.0_wp
+  x0 = this%cen + (this%edge_vec(:,4) - this%edge_vec(:,2))/4.0_wp
   
   !=== Compute the velocity from all the elements ===
   do j = 1,size(wake_elems)  ! wake panels
-    call wake_elems(j)%p%compute_vel(x0,v)
+    call wake_elems(j)%p%compute_vel(x0, v)
     this%vel_ctr_pt = this%vel_ctr_pt + v
   enddo
-  write(*,*) 'this%vel_ctr_pt wake', this%vel_ctr_pt-vel_tmp
-  vel_tmp = this%vel_ctr_pt
 
   do j = 1,size(elems) ! body elements
-    call elems(j)%p%compute_vel(x0,v)
+    call elems(j)%p%compute_vel(x0, v)
     this%vel_ctr_pt = this%vel_ctr_pt + v
   enddo
-  write(*,*) 'this%vel_ctr_pt body', this%vel_ctr_pt-vel_tmp
-  vel_tmp = this%vel_ctr_pt
-
+  
   do j = 1,size(vort_elems) ! wake vorticity elements 
-    call vort_elems(j)%p%compute_vel(x0,v)
+    call vort_elems(j)%p%compute_vel(x0, v)
     this%vel_ctr_pt = this%vel_ctr_pt + v
   enddo
-  write(*,*) 'this%vel_ctr_pt vort', this%vel_ctr_pt-vel_tmp
-  write(*,*) 
-  vel_tmp = this%vel_ctr_pt 
   
   !> induced velocity on leading edge side
   wind = variable_wind(this%cen, sim_param%time)
   this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp * pi) &
-                + wind - this%ub
+                    + wind - this%ub
 
-  
 end subroutine get_vel_ctr_pt_vortlatt
 
 subroutine get_vel_ac_stripe(stripe, elems, wake_elems, vort_elems)
-  class(t_stripe), intent(inout) :: stripe
-  type(t_pot_elem_p),intent(in):: elems(:)
-  type(t_pot_elem_p),intent(in):: wake_elems(:)
-  type(t_vort_elem_p), intent(in) :: vort_elems(:)
+  class(t_stripe),      intent(inout)    :: stripe
+  type(t_pot_elem_p),   intent(in)       :: elems(:)
+  type(t_pot_elem_p),   intent(in)       :: wake_elems(:)
+  type(t_vort_elem_p),  intent(in)       :: vort_elems(:)
 
-  real(wp) :: v(3), x0(3), wind(3), up(3), vel_tmp(3)
+  real(wp) :: v(3), x0(3), wind(3), up(3)
   integer :: j
 
   ! Initialisation to zero
@@ -677,30 +645,22 @@ subroutine get_vel_ac_stripe(stripe, elems, wake_elems, vort_elems)
 
   ! Control point at 1/4-fraction of the chord
   x0 = stripe%ac_stripe
-  write(*,*) 'x0 stripe', x0
-  vel_tmp = stripe%vel 
+
   !=== Compute the velocity from all the elements ===
   do j = 1,size(wake_elems)  ! wake panels
     call wake_elems(j)%p%compute_vel(x0,v)
     stripe%vel = stripe%vel + v
   enddo
-  write(*,*) 'stripe_vel wake', stripe%vel-vel_tmp
-  vel_tmp = stripe%vel
 
-  do j = 1,size(elems) ! body elements
+  do j = 1, size(elems) ! body elements
     call elems(j)%p%compute_vel(x0,v)
     stripe%vel = stripe%vel + v
   enddo
-  write(*,*) 'stripe_vel body', stripe%vel-vel_tmp
-  vel_tmp = stripe%vel
   
   do j = 1,size(vort_elems) ! wake vorticity elements 
     call vort_elems(j)%p%compute_vel(x0,v)
     stripe%vel = stripe%vel + v
   enddo
-  
-  write(*,*) 'stripe_vel vort', stripe%vel-vel_tmp
-  vel_tmp = stripe%vel
   
   !> induced velocity on leading edge side
   wind = variable_wind(stripe%ac_stripe, sim_param%time)
