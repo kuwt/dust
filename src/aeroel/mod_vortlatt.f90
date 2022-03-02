@@ -282,13 +282,13 @@ end subroutine add_expl_vortlatt
 !! the contribution of velocity due to the wake
 subroutine add_wake_vortlatt(this, wake_elems, impl_wake_ind, linsys, &
                           ie, ista, iend)
-  class(t_vortlatt), intent(inout) :: this
-  type(t_pot_elem_p), intent(in)       :: wake_elems(:)
-  integer, intent(in)             :: impl_wake_ind(:,:)
-  type(t_linsys), intent(inout)    :: linsys
-  integer, intent(in)              :: ie
-  integer, intent(in)             :: ista
-  integer, intent(in)             :: iend
+  class(t_vortlatt), intent(inout)  :: this
+  type(t_pot_elem_p), intent(in)    :: wake_elems(:)
+  integer, intent(in)               :: impl_wake_ind(:,:)
+  type(t_linsys), intent(inout)     :: linsys
+  integer, intent(in)               :: ie
+  integer, intent(in)               :: ista
+  integer, intent(in)               :: iend
 
   integer :: j1, ind1, ind2
   real(wp) :: a, b
@@ -534,52 +534,85 @@ subroutine compute_dforce_jukowski_vortlatt(this)
 end subroutine compute_dforce_jukowski_vortlatt
 
 
-subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys)
+subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff)
 
   type(t_aero_tab),  intent(in)    :: airfoil_data(:)
   type(t_stripe),    intent(inout) :: stripe
   type(t_linsys),    intent(inout) :: linsys
+  real(wp)                         :: diff
   real(wp)                         :: mach, reynolds
-  real(wp)                         :: wind
+  real(wp)                         :: wind(3)
   real(wp)                         :: up(3)
-  real(wp)                         :: alpha_ind, alpha_body, alpha
+  real(wp)                         :: alpha_ind, alpha_body, alpha, d_alpha
   real(wp),     allocatable        :: aero_coeff(:)
   real(wp)                         :: force(3) 
-  integer                          :: i_c, n_pan
-  real(wp)                         :: cl_inv, cl_visc, cd_visc 
+  integer                          :: i_c, n_pan, id_pan
+  real(wp)                         :: cl_inv, cl_visc, cd_visc
+  real(wp)                         :: rel_fct
+  real(wp)                         :: nor(3), correction, old_b_par
+  real(wp)                         :: v_ind(3)
+
   force = 0.0_wp
+  
+  !> Relaxation factor (hardcoded so far)
+  rel_fct = 1.0_wp
+  
+  !> Initalization of d_alpha 
+  d_alpha = 0.0_wp
+
   n_pan = size(stripe%panels)
+  
   mach = abs(dot(stripe%vel,stripe%tang(:,1)) / sim_param%a_inf)
+  wind = variable_wind(stripe%ac_stripe, sim_param%time)
 
   reynolds = sim_param%rho_inf * norm2(stripe%vel) * &
                           stripe%chord / sim_param%mu_inf
 
-  !> Calculation of the alpha for c81 correction
-  !up = stripe%nor*dot(stripe%nor, stripe%vel) + & 
-  !      stripe%tang(:,1)*dot(stripe%tang(:,1), stripe%vel) 
-  
-  alpha = atan2(dot(stripe%vel,stripe%nor), &
-                dot(stripe%vel,stripe%tang(:,1))) *180/pi ! induced 
-  !alpha_body = -atan2(stripe%tang(3,1), stripe%tang(1,1))*180/pi ! body
-  !alpha = alpha_body - alpha_ind ! AoA 
-  
-  call interp_aero_coeff ( airfoil_data,  stripe%csi_cen, stripe%i_airfoil , &
-                        (/alpha, mach, reynolds/), aero_coeff )
+  !> Force calculation on the stripe 
   do i_c = 1, n_pan
     force = force + stripe%panels(i_c)%p%dforce 
   end do
 
-  cl_inv = norm2(force)/(0.5_wp*sim_param%rho_inf*dot(stripe%vel,stripe%vel)*stripe%area)
-  cl_visc = aero_coeff(1)
-  cd_visc = aero_coeff(2)
+  stripe%alpha_ind = atan2(dot(stripe%vel,stripe%nor) , &
+                          dot(stripe%vel,stripe%tang(:,2))) 
+  
+  !> Sectional lift coefficient 
+  cl_inv = dot(force,stripe%nor)/(0.5_wp*sim_param%rho_inf*dot(stripe%vel,stripe%vel)*stripe%area)
+  
+  !> AoA of the stripe (from inviscid calculation) -> check for unsymmetric profiles 
+  alpha = (cl_inv/(2.0_wp*pi))*180/pi ! deg to enter in c81 table 
 
-  !write(*,*) 'stripe%vel    ', stripe%vel 
-  !write(*,*) 'alpha_body   ', alpha_body
-  !write(*,*) 'alpha_ind    ', alpha_ind
-  write(*,*) 'alpha        ', alpha
-  !write(*,*) 'cl_visc      ', cl_visc
-  !write(*,*) 'cl_inv       ', cl_inv
-  !write(*,*) 'force      ', force
+  call interp_aero_coeff ( airfoil_data,  stripe%csi_cen, stripe%i_airfoil , &
+                        (/alpha, mach, reynolds/), aero_coeff )
+  
+  !> Aerodynamic coefficients from c81 table  
+  cl_visc = aero_coeff(1)
+  stripe%cd = aero_coeff(2)
+
+  !> update tolerance 
+  
+  diff = abs(cl_visc - cl_inv)/max(cl_visc,1e-10)
+  !> d_alpha update 
+  d_alpha = rel_fct*(cl_visc-cl_inv)/(2*pi)
+  
+  do i_c = 1, n_pan
+    !> Update on the normal  
+    !  nor = nor * cos(d_alpha) - tan * sin(d_alpha)
+    nor = stripe%panels(i_c)%p%nor * cos(d_alpha) -  &
+          stripe%panels(i_c)%p%tang(:,2) * sin(d_alpha)
+    !> Get the induced velocity part (no wake)
+    v_ind = stripe%panels(i_c)%p%ub - wind - stripe%panels(i_c)%p%uvort - stripe%panels(i_c)%p%uvort
+    !> Update the normal to rhs 
+    correction = dot(nor, v_ind) * 4.0_wp * pi
+    !> Old contribution to rhs except wake 
+    old_b_par = dot(stripe%panels(i_c)%p%nor, v_ind)*4.0_wp*pi
+    !> Get panel id -> should be the global id (CHECK THIS)
+    id_pan = stripe%panels(i_c)%p%id
+    !> Update of the rhs 
+    linsys%b(id_pan) =  linsys%b(id_pan) - old_b_par + correction    
+  end do 
+
+
 
 end subroutine correction_c81_vortlatt
 

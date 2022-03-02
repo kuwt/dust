@@ -268,6 +268,9 @@ type t_sim_param
   real(wp) :: gust_gradient
   real(wp) :: gust_time
 
+  !> Vl correction 
+  logical :: vl_correction = .false. 
+
 contains
   procedure, pass(this) :: save_param => save_sim_param
   !procedure, pass(this) :: init_param => init_sim_param

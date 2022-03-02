@@ -1006,7 +1006,7 @@ subroutine load_components(geo, in_file, out_file, te)
           geo%components(i_comp)%normalised_coord_e = normalised_coord_e
 
           geo%components(i_comp)%aero_correction = trim(aero_table)
-        
+          sim_param%vl_correction = .true. 
         endif
 
       else if (comp_el_type(1:1) .eq. 'a') then
@@ -2101,16 +2101,19 @@ subroutine create_strip_connectivity(geo)
           comp%stripe(i_s)%area = comp%stripe(i_s)%area + comp%el(i_c+(i_s-1)*n_c)%area
         end do   
           
-          comp%stripe(i_s)%csi_cen = 0.5_wp * sum(comp%normalised_coord_e(:,i_s))  
-          comp%stripe(i_s)%i_airfoil =  comp%i_airfoil_e(:,i_s)
+          if (sim_param%vl_correction) then
+            comp%stripe(i_s)%csi_cen = 0.5_wp * sum(comp%normalised_coord_e(:,i_s))  
+            comp%stripe(i_s)%i_airfoil =  comp%i_airfoil_e(:,i_s)
 
-          ! > get the aerodynamic center as the point at 0.25 c of the stripe 
-          ! mid point at leading edge - 0.25*( mid point at leading edge -   mid point at trailing edge)
-          comp%stripe(i_s)%ac_stripe = (comp%el(1+(i_s-1)*n_c)%ver(:,2) + comp%el(1+(i_s-1)*n_c)%ver(:,1))/2 - &
+            ! > get the aerodynamic center as the point at 0.25 c of the stripe 
+            ! mid point at leading edge - 0.25*( mid point at leading edge -   mid point at trailing edge)
+            comp%stripe(i_s)%ac_stripe = (comp%el(1+(i_s-1)*n_c)%ver(:,2) + comp%el(1+(i_s-1)*n_c)%ver(:,1))/2 - &
                                         0.25_wp * ((comp%el(1+(i_s-1)*n_c)%ver(:,2) + comp%el(1+(i_s-1)*n_c)%ver(:,1))/2 - &
                                                   (comp%el(n_c+(i_s-1)*n_c)%ver(:,3) + comp%el(n_c+(i_s-1)*n_c)%ver(:,4))/2)
-          comp%stripe(i_s)%chord = norm2((comp%el(1+(i_s-1)*n_c)%ver(:,2) + comp%el(1+(i_s-1)*n_c)%ver(:,1))/2 - &
-                                          (comp%el(n_c+(i_s-1)*n_c)%ver(:,3) + comp%el(n_c+(i_s-1)*n_c)%ver(:,4))/2)          
+            comp%stripe(i_s)%chord = norm2((comp%el(1+(i_s-1)*n_c)%ver(:,2) + comp%el(1+(i_s-1)*n_c)%ver(:,1))/2 - &
+                                          (comp%el(n_c+(i_s-1)*n_c)%ver(:,3) + comp%el(n_c+(i_s-1)*n_c)%ver(:,4))/2)       
+          endif    
+          
       end do 
 
       do i_s = 1 , n_s

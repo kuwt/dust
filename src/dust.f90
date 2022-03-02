@@ -213,9 +213,11 @@ real(wp), allocatable             ::      nor_SurfPan_old(:,:)
 real(wp) , allocatable            :: al_kernel(:,:), al_v(:)
 
 !> vl viscous correction
-real(wp), allocatable             :: cl_inv(:), cl_visc(:), alpha(:)
-integer                           :: i_el, i_c, i_s, i, ie_vl, sel, i_chord, i_span
-
+integer                           :: i_el, i_c, i_s, i, ie_vl, sel, i_chord, i_span, i_p
+integer                           :: nMaxiter = 100
+integer                           :: it_vl
+real(wp)                          :: tol, diff 
+real(wp)                          :: d_cd(3)
 !> octree parameters
 type(t_octree)                    :: octree
 
@@ -226,6 +228,7 @@ type(t_octree)                    :: octree
   logical                         :: precice_convergence
   integer                         :: j
   real(wp)                        :: sum_force(3)
+
 #endif
 
 
@@ -834,14 +837,6 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     i_span = 1
     ie_vl = 0 
     
-    !allocate(cl_inv(10))
-    !cl_inv = 0.0_wp
-    !
-    !allocate(cl_visc(10)) ! hardcoded !!!!! FIXMEEE
-    !cl_visc = 0.0_wp
-    !
-    !allocate(alpha(10)) ! hardcoded !!!!! FIXMEEE
-    !alpha = 0.0_wp
     
     if ( geo%nVortLatt .gt. 0) then
       do i_el = 1 , sel      
@@ -861,20 +856,69 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
       end do
     end if 
     
-    do i_c = 1, size(geo%components)
-      if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
-          trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
-          do i_s = 1, size(geo%components(i_c)%stripe)            
-            call calc_geo_data_stripe(geo%components(i_c)%stripe(i_s))
-            call get_vel_ac_stripe(geo%components(i_c)%stripe(i_s), & 
-                                  elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
-            call correction_c81_vortlatt(airfoil_data, geo%components(i_c)%stripe(i_s), linsys)
-          end do 
-      end if 
-    end do 
-  
-  !deallocate(cl_inv, cl_visc, alpha)
-    
+    !> Vl correction for viscous forces 
+    if (sim_param%vl_correction) then
+      tol = 5e-3_wp  
+      diff = 1.0_wp 
+      it_vl = 0
+      do while (diff .gt. tol .and. it_vl .lt. nMaxiter)
+
+        do i_c = 1, size(geo%components)
+          if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
+              trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
+              do i_s = 1, size(geo%components(i_c)%stripe)            
+                call calc_geo_data_stripe(geo%components(i_c)%stripe(i_s))
+                call get_vel_ac_stripe(geo%components(i_c)%stripe(i_s), & 
+                                    elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
+                call correction_c81_vortlatt(airfoil_data, geo%components(i_c)%stripe(i_s), linsys, diff)
+              
+              end do
+          end if 
+        end do 
+
+        if (linsys%rank .gt. 0) then
+          call solve_linsys(linsys)
+        endif
+
+        do i_el = 1 , sel      
+          select type(el => elems(i_el)%p)        
+            class is(t_vortlatt)          
+              call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/), wake%vort_p)
+              !> compute dforce using AVL formula
+              call el%compute_dforce_jukowski()
+              ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
+              ! update the pressure field, p = df.n / area
+              el%pres = sum(el%dforce * el%nor)/el%area
+          end select
+        end do
+
+        it_vl = it_vl + 1
+      end do
+
+      do i_c = 1, size(geo%components)
+        if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
+            trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
+            do i_s = 1, size(geo%components(i_c)%stripe)  
+              d_cd = 0.5_wp * sim_param%rho_inf *  & 
+                      geo%components(i_c)%stripe(i_s)%vel**2.0_wp * & 
+                      geo%components(i_c)%stripe(i_s)%cd *  &
+                      (sin(geo%components(i_c)%stripe(i_s)%alpha_ind) * & 
+                      geo%components(i_c)%stripe(i_s)%nor +  &
+                      cos(geo%components(i_c)%stripe(i_s)%alpha_ind) * & 
+                      geo%components(i_c)%stripe(i_s)%tang(:,1) )
+
+              do i_p = 1, size(geo%components(i_c)%stripe(i_s)%panels)
+                
+                geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce = &
+                            geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce + &
+                            d_cd *geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area
+                            
+              end do
+            end do
+        end if 
+      end do 
+    end if 
+
   ! Explicit elements:
   ! - liftlin: _pres and _dforce computed in solve_liftin()
   ! - actdisk: avg delta_pressure and force computed here,

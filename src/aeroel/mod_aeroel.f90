@@ -243,6 +243,8 @@ type :: t_stripe
   real(wp) :: tang(3,2)
   real(wp) :: nor(3)
   real(wp) :: ub(3)
+  real(wp) :: cd
+  real(wp) :: alpha_ind
 end type
 
 !----------------------------------------------------------------------
