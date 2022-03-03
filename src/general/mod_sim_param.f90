@@ -198,6 +198,7 @@ type t_sim_param
   !> Use AVL expression for inviscid load computation ( ~ VL )
   logical  :: llLoadsAVL
 
+  
   !FMM parameters
   !> Employing the FMM method
   logical :: use_fmm
@@ -269,7 +270,12 @@ type t_sim_param
   real(wp) :: gust_time
 
   !> Vl correction 
-  logical :: vl_correction = .false. 
+  logical   :: vl_correction = .false. 
+  real(wp)  :: vl_tol
+  real(wp)  :: vl_relax
+  integer   :: vl_maxiter
+  integer   :: vl_startstep
+  
 
 contains
   procedure, pass(this) :: save_param => save_sim_param

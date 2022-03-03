@@ -551,14 +551,14 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl)
   real(wp)                         :: force(3) 
   integer                          :: i_c, n_pan, id_pan
   real(wp)                         :: cl_inv, cl_visc, cd_visc
-  real(wp)                         :: rel_fct
+  real(wp)                         :: rel_fct, rhs_diff
   real(wp)                         :: nor(3), rhs_visc, rhs_old 
   real(wp)                         :: v_ind(3)
   integer,        intent(in)       :: it_vl
   force = 0.0_wp
   
-  !> Relaxation factor (hardcoded so far)
-  rel_fct = 0.05_wp
+  !> Relaxation factor
+  rel_fct = sim_param%vl_relax
   
   !> Initalization of d_alpha 
   d_alpha = 0.0_wp
@@ -597,8 +597,8 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl)
   cl_visc = aero_coeff(1)
   stripe%cd = aero_coeff(2)
 
-  !> Update tolerance   
-  diff = (cl_visc - cl_inv)/max(cl_visc,1e-10)
+  !> Update term rhs   (absolute)
+  rhs_diff = (cl_visc - cl_inv)!/max(cl_visc,1e-10)
   
   !> d_alpha update 
   !d_alpha = rel_fct*(cl_visc-cl_inv)/(2*pi)
@@ -634,7 +634,7 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl)
     id_pan = stripe%panels(i_c)%p%id
     !> Update of the rhs 
     !write(*,*) 'linsys%b(id_pan)', linsys%b(id_pan)
-    linsys%b(id_pan) =  (1 + rel_fct*diff)*linsys%b(id_pan)
+    linsys%b(id_pan) =  (1 + rel_fct*rhs_diff)*linsys%b(id_pan)
 
     !> DEBUG
     !write(*,*) 'i_c             ', i_c
@@ -647,8 +647,8 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl)
     !write(*,*) 'rhs_vsc                       ', rhs_visc 
   end do 
 
-  !> Update tolerance   
-  diff = abs(cl_visc - cl_inv)/max(cl_visc,1e-10)
+  !> Update tolerance  
+  diff = abs(cl_visc - cl_inv)!/max(cl_visc,1e-10)
   
 
 end subroutine correction_c81_vortlatt

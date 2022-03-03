@@ -214,7 +214,6 @@ real(wp) , allocatable            :: al_kernel(:,:), al_v(:)
 
 !> vl viscous correction
 integer                           :: i_el, i_c, i_s, i, sel, i_p
-integer                           :: nMaxiter = 100
 integer                           :: it_vl
 real(wp)                          :: tol, diff, max_diff 
 real(wp)                          :: d_cd(3)
@@ -348,6 +347,16 @@ call prms%CreateRealOption('LLartificialViscosityAdaptive_dAlpha', &
                           &'Adaptive Artificial Viscosity algorithm, reference AOA [deg]')
 call prms%CreateLogicalOption('LLloadsAVL', &
                           &'Use AVL expression for inviscid load computation','T')
+
+!> Vl correction parameter 
+call prms%CreateRealOption('VLrelax', 'Relaxation factor for rhs update','0.05')
+call prms%CreateIntOption('VLmaxiter', &
+                          &'Maximum number of iteration in VL algorithm', '100')
+call prms%CreateRealOption('VLtol', 'Tolerance for the absolute error on lift coefficient in &
+                          &fixed point iteration for VL','1.0e-3' )
+call prms%CreateIntOption('VLstartstep', &
+                          &'Step in which the VL correction start', '1')
+
 
 !> Octree and multipole data 
 call prms%CreateLogicalOption('FMM','Employ fast multipole method?','T')
@@ -850,29 +859,33 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         end select
       end do
     end if 
-
+            
     !> Vl correction for viscous forces 
     if (sim_param%vl_correction) then
-      tol = 1e-4_wp  ! param ->
-      diff = 1.0_wp ! param ->
+      tol = sim_param%vl_tol
+      diff = 1.0_wp 
       it_vl = 0
       max_diff = tol + 1e-6_wp
       !> Select time step to start the vl correction 
       !> (avoid strange behaviour at the begining of simulation)
-      if (it .gt. 1) then 
-        do while (max_diff .gt. tol .and. it_vl .lt. nMaxiter)
+      if (it .gt. sim_param%vl_startstep) then 
+        do while (max_diff .gt. tol .and. it_vl .lt. sim_param%vl_maxiter)
           max_diff = 0.0_wp
           diff = 0.0_wp
           do i_c = 1, size(geo%components)
             if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
               trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
-              do i_s = 1, size(geo%components(i_c)%stripe)            
-                call calc_geo_data_stripe(geo%components(i_c)%stripe(i_s))
-                call get_vel_ac_stripe(geo%components(i_c)%stripe(i_s), & 
-                                    elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
-                call correction_c81_vortlatt(airfoil_data, geo%components(i_c)%stripe(i_s), linsys, diff, it_vl)
-                max_diff = max(diff, max_diff)
-              end do
+              !$omp parallel do private(i_s)
+                do i_s = 1, size(geo%components(i_c)%stripe)            
+                  call calc_geo_data_stripe(geo%components(i_c)%stripe(i_s))
+                  call get_vel_ac_stripe(geo%components(i_c)%stripe(i_s), & 
+                                      elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
+                  call correction_c81_vortlatt(airfoil_data, geo%components(i_c)%stripe(i_s), linsys, diff, it_vl)
+              !$omp atomic
+                  max_diff = max(diff, max_diff) 
+              !$omp end atomic
+                end do
+              !$omp end parallel do
             end if 
           end do 
 
@@ -889,10 +902,10 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                 el%pres = sum(el%dforce * el%nor)/el%area
             end select
           end do
-          write(*,*) 'max_diff', max_diff
+          
           it_vl = it_vl + 1
         end do !(while)
-        write(*,*) 'it_vl', it_vl
+        
         !> Viscous correction 
         do i_c = 1, size(geo%components)
           if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
@@ -1244,6 +1257,14 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     end if
   end if
   write(*,*) ' sim_param%llSolver : ' , trim(sim_param%llSolver)
+  !> VL correction 
+  !write(*,*) 'sim_param%vl_correction', sim_param%vl_correction
+  !if (sim_param%vl_correction) then
+  sim_param%vl_tol                           = getreal(   prms, 'VLtol'                )
+  sim_param%vl_relax                         = getreal(   prms, 'VLrelax'               )
+  sim_param%vl_maxiter                       = getint(    prms, 'VLmaxiter'            )
+  sim_param%vl_startstep                     = getint(    prms, 'VLstartstep'            )
+  !end if 
 
   !> Octree and FMM parameters
   sim_param%use_fmm                       = getlogical(prms, 'FMM')
