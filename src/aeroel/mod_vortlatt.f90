@@ -95,15 +95,15 @@ public :: t_vortlatt
 !----------------------------------------------------------------------
 
 !> Planar aerodynamic elements with a surface distribution of doublets
-!!
-!! Aerodynamic elements characterized by a uniform surface distribution
-!! of doublets, employed to model a planar surface.
-!! Thanks to the equivalence of a surface distribution of doublets and a
-!! closed vortex ring it can be also viewed as ring vortex laying on the
-!! edges of the element.
+! 
+!  Aerodynamic elements characterized by a uniform surface distribution
+!  of doublets, employed to model a planar surface.
+!  Thanks to the equivalence of a surface distribution of doublets and a
+!  closed vortex ring it can be also viewed as ring vortex laying on the
+!  edges of the element.
 type, extends(c_impl_elem) :: t_vortlatt
 
-  real(wp) :: vel_ctr_pt(3), alpha, alpha_ind, alpha_body, dx
+  real(wp) :: vel_ctr_pt(3)
   
 
   !TODO: consider applying the correct element pointer here
@@ -163,8 +163,7 @@ subroutine build_row_vortlatt(this, elems, linsys, ie, ista, iend)
           linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-wind-elems(j1)%p%uvort))
     
     enddo
-    
-    
+
   ! ista and iend will be the end of the unknowns vector, containing
   ! the moving elements
   do j1 = ista , iend
@@ -173,16 +172,16 @@ subroutine build_row_vortlatt(this, elems, linsys, ie, ista, iend)
                                   this%cen, this%nor, ie, j1 )
 
     if (ie .eq. j1) then
-
-      !diagonal, we are certainly employing vortrin, enforce the b.c. on ie
+      
+      !> Diagonal, we are certainly employing vortrin, enforce the b.c. on ie
       wind = variable_wind(elems(ie)%p%cen, sim_param%time)
       linsys%b(ie) = linsys%b(ie) + &
                 b1*sum(elems(ie)%p%nor*(elems(ie)%p%ub-wind-elems(j1)%p%uvort))
     
     else
 
-      ! off-diagonal: if it is a vortrin b1 is zero, if it is a surfpan
-      ! enforce the boundary condition on it (j1)
+      !> off-diagonal: if it is a vortrin b1 is zero, if it is a surfpan
+      !  enforce the boundary condition on it (j1)
       wind = variable_wind(elems(j1)%p%cen, sim_param%time)
       linsys%b(ie) = linsys%b(ie) + &
                 b1*sum(elems(j1)%p%nor*(elems(j1)%p%ub-wind-elems(j1)%p%uvort))
@@ -215,19 +214,18 @@ subroutine build_row_static_vortlatt(this, elems, expl_elems, linsys, &
   linsys%b(ie) = 0.0_wp
   linsys%b_static(:,ie) = 0.0_wp
 
-  !Cycle just all the static elements, ista and iend will be the beginning of
-  !the result vector. Then save the rhs in b_static
+  !> Cycle just all the static elements, ista and iend will be the beginning of
+  !  the result vector. Then save the rhs in b_static
   do j1 = ista , iend
 
     call elems(j1)%p%compute_psi( linsys%A(ie,j1), b1,  &
                                   this%cen, this%nor, ie, j1 )
 
-    !linsys%b_static(:,ie) = linsys%b_static(:,ie) + b1
     linsys%b_static(ie,j1) = b1
 
   end do
 
-  !Now build the static contribution from the lifting line elements
+  !> Now build the static contribution from the lifting line elements
   do j1 = 1,linsys%nstatic_expl
 
     call expl_elems(j1)%p%compute_psi( linsys%L_static(ie,j1), b1,  &
@@ -257,19 +255,18 @@ subroutine add_expl_vortlatt(this, expl_elems, linsys, &
   integer :: j1
   real(wp) :: a, b
 
-  !Static part: take what was already computed
+  !> Static part: take what was already computed
   do  j1 = 1, ista-1
     linsys%b(ie) = linsys%b(ie) - linsys%L_static(ie,j1)*expl_elems(j1)%p%mag
   enddo
 
-  ! Add the explicit vortex panel wake contribution to the rhs
+  !> Add the explicit vortex panel wake contribution to the rhs
   do j1 = ista, iend
 
     call expl_elems(j1)%p%compute_psi( a, b, this%cen, this%nor, 1, 2 )
 
 
     linsys%b(ie) = linsys%b(ie) - a*expl_elems(j1)%p%mag
-    !write(*,*) 'a*expl_elems(j1)%p%mag', a*expl_elems(j1)%p%mag
 
   end do
 
@@ -303,8 +300,7 @@ subroutine add_wake_vortlatt(this, wake_elems, impl_wake_ind, linsys, &
   !ones since are at the beginning of the list
   do j1 = 1 , n_impl
     ind1 = impl_wake_ind(1,j1); ind2 = impl_wake_ind(2,j1)
-  !   if ((ind1.ge.ista .and. ind1.le.iend) .and. &
-  !       (ind2.ge.ista .and. ind2.le.iend)) then
+
     if ((ind1.ge.ista .and. ind1.le.iend)) then
 
       call wake_elems(j1)%p%compute_psi( a, b, this%cen, this%nor, 1, 2 )
@@ -321,8 +317,7 @@ subroutine add_wake_vortlatt(this, wake_elems, impl_wake_ind, linsys, &
     call wake_elems(j1)%p%compute_psi( a, b, this%cen, this%nor, 1, 2 )
 
   linsys%b(ie) = linsys%b(ie) - a*wake_elems(j1)%p%mag
-  !write(*,*) 'a                     ', a
-  !write(*,*) 'a*wake_elems(j1)%p%mag', a*wake_elems(j1)%p%mag
+  
 end do
 
 end subroutine add_wake_vortlatt
@@ -455,7 +450,7 @@ end subroutine compute_grad_vortlatt
 !! see compute_dforce_vortlatt
 subroutine compute_pres_vortlatt(this) !, R_g)
   class(t_vortlatt), intent(inout) :: this
-  integer  :: i_stripe, num_stripe
+  integer  :: i_stripe
   real(wp) :: wind(3)
 
   this%pres = 0.0_wp
@@ -510,7 +505,7 @@ subroutine compute_dforce_jukowski_vortlatt(this)
   real(wp) :: gam(3), wind(3)
 
   integer  :: i_stripe
-  real(wp) :: mach, reynolds
+  real(wp) :: mach
 
   ! Prandt -- Glauert correction for compressibility effect
   wind = variable_wind(this%cen, sim_param%time)
@@ -544,18 +539,16 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl)
   real(wp)                         :: diff
   real(wp)                         :: mach, reynolds
   real(wp)                         :: wind(3)
-  real(wp)                         :: up(3)
-  real(wp)                         :: alpha_ind, d_alpha 
+  real(wp)                         :: d_alpha 
   real(wp)                         :: alpha
   real(wp),     allocatable        :: aero_coeff(:)
   real(wp)                         :: force(3) 
   integer                          :: i_c, n_pan, id_pan
-  real(wp)                         :: cl_inv, cl_visc, cd_visc
+  real(wp)                         :: cl_inv, cl_visc
   real(wp)                         :: rel_fct, rhs_diff
-  real(wp)                         :: nor(3), rhs_visc, rhs_old 
-  real(wp)                         :: v_ind(3)
+  !real(wp)                         :: nor(3)
   integer,        intent(in)       :: it_vl
-  force = 0.0_wp
+  
   
   !> Relaxation factor
   rel_fct = sim_param%vl_relax
@@ -572,10 +565,12 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl)
                           stripe%chord / sim_param%mu_inf
 
   !> Force calculation on the stripe 
+  force = 0.0_wp
   do i_c = 1, n_pan
     force = force + stripe%panels(i_c)%p%dforce 
   end do
-
+  
+  !> Induced alpha on stripe for drag calculation 
   stripe%alpha_ind = atan2(dot(stripe%vel,stripe%nor) , &
                           dot(stripe%vel,stripe%tang(:,1))) 
 
@@ -670,7 +665,7 @@ subroutine get_vel_ctr_pt_vortlatt(this, elems, wake_elems, vort_elems)
   type(t_pot_elem_p),   intent(in)      :: wake_elems(:)
   type(t_vort_elem_p),  intent(in)      :: vort_elems(:)
 
-  real(wp) :: v(3), x0(3), wind(3), up(3)
+  real(wp) :: v(3), x0(3), wind(3)
   integer :: j
 
   !> Initialisation to zero
@@ -709,7 +704,7 @@ subroutine get_vel_ac_stripe(stripe, elems, wake_elems, vort_elems)
   type(t_pot_elem_p),   intent(in)       :: wake_elems(:)
   type(t_vort_elem_p),  intent(in)       :: vort_elems(:)
 
-  real(wp) :: v(3), x0(3), wind(3), up(3)
+  real(wp) :: v(3), x0(3), wind(3)
   integer :: j
 
   ! Initialisation to zero
