@@ -350,6 +350,7 @@ end subroutine assemble_linsys
 subroutine solve_linsys(linsys)
   type(t_linsys), intent(inout) :: linsys
   integer                       :: INFO
+  !logical, optional, intent(in) :: vl_correction
   character(len=max_char_len)   :: msg
   character(len=*), parameter   :: this_sub_name = 'solve_linsys'
 
@@ -366,6 +367,7 @@ subroutine solve_linsys(linsys)
   call dlaswp(linsys%nmoving, &
               linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
               linsys%nstatic,1,linsys%nstatic,linsys%P(1:linsys%nstatic),1)
+  write(*,*) 'ciao' 
 #endif /*DUST_PRECISION*/
 
   !> Solve Lss Usd = Pss Asd to get Usd and put it in place of Asd
@@ -378,7 +380,7 @@ subroutine solve_linsys(linsys)
   call dtrsm('L','L','N','U',linsys%nstatic,linsys%nmoving,1.0d+0,   &
               linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic, &
               linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank),    &
-              linsys%nstatic)
+              linsys%nstatic)               
 #endif /*DUST_PRECISION*/
 
   !==>Solve the lower-diagoal block Lds
@@ -393,6 +395,7 @@ subroutine solve_linsys(linsys)
               linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic,  &
               linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic),    &
               linsys%nmoving)
+              write(*,*) 'ciao2' 
 #endif /*DUST_PRECISION*/
 
   !> Modify the dynamic square block
@@ -413,13 +416,13 @@ subroutine solve_linsys(linsys)
               linsys%nstatic,1.0d+0,&
               linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank),&
               linsys%nmoving)
+              write(*,*) 'ciao3' 
 #endif /*DUST_PRECISION*/
 
   endif
 
   ! If the system has a dynamic part, factorize such part
   if (linsys%nmoving .gt. 0) then
-
     !==>Factorize and put in place the square dynamic block
 #if (DUST_PRECISION==1)
     call sgetrf(linsys%nmoving,linsys%nmoving, &
@@ -429,7 +432,9 @@ subroutine solve_linsys(linsys)
     call dgetrf(linsys%nmoving,linsys%nmoving, &
                 linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank), &
                 linsys%nmoving,linsys%P(linsys%nstatic+1:linsys%rank),info)
+                write(*,*) 'ciao4' 
 #endif /*DUST_PRECISION*/
+
     if ( info .ne. 0 ) then
       write(msg,*) 'error while factorizing the dynamic  block of &
                     &the linear system, Lapack DGETRF error code ', info
@@ -450,6 +455,7 @@ subroutine solve_linsys(linsys)
                 linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic), &
                 linsys%nmoving,1,linsys%nmoving,&
                 linsys%P(linsys%nstatic+1:linsys%rank),1)
+                write(*,*) 'ciao5' 
 #endif /*DUST_PRECISION*/
   endif
 
@@ -459,12 +465,14 @@ subroutine solve_linsys(linsys)
 
   !==> Solve the factorized system
   linsys%res = linsys%b
+  write(*,*) 'linsys%rank', linsys%rank
 #if (DUST_PRECISION==1)
   call sgetrs('N',linsys%rank,1,linsys%A,linsys%rank,linsys%P,linsys%res, &
                 linsys%rank,info)
 #elif (DUST_PRECISION==2)
   call dgetrs('N',linsys%rank,1,linsys%A,linsys%rank,linsys%P,linsys%res, &
                 linsys%rank,info)
+                write(*,*) 'ciao6' 
 #endif /*DUST_PRECISION*/
   if ( info .ne. 0 ) then
     write(msg,*) 'error while solving the factorized system &

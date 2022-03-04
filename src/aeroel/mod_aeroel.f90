@@ -227,23 +227,23 @@ type, abstract, extends(c_pot_elem) :: c_impl_elem
 
 end type c_impl_elem
 
-type :: t_stripe
-  
+type :: t_stripe  
   real(wp) :: csi_cen
-
   integer  :: i_airfoil(2)  
   !> Panel array
   type(t_pot_elem_p), allocatable :: panels(:) 
   !> Area of the stripe
   real(wp) :: area 
   !> Collocation point
-  real(wp) :: ac_stripe(3)  
+  real(wp) :: ac_stripe(3)
+  
   real(wp) :: chord
   real(wp) :: vel(3) 
   real(wp) :: tang(3,2)
   real(wp) :: nor(3)
   real(wp) :: ub(3)
   real(wp) :: cd
+  real(wp) :: cl_visc
   real(wp) :: alpha_ind
   real(wp) :: alpha
 end type
