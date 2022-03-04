@@ -143,6 +143,9 @@ type :: t_linsys
   !> Global id of surface panel elements ( copy of the structure in geo )
   integer, allocatable :: idSurfPanG2L(:)
 
+  !> Skip dynamic update
+  logical :: skip
+
 end type t_linsys
 
 !----------------------------------------------------------------------

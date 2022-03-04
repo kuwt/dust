@@ -127,7 +127,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, wake )
   linsys%nstatic_expl = geo%nstatic_expl
   linsys%nmoving_expl = geo%nmoving_expl
   linsys%n_expl =  geo%nelem_expl
-
+  linsys%skip = .false.
   ntot = linsys%rank
 
   !> Allocate the vectors of the right size
@@ -354,6 +354,7 @@ subroutine solve_linsys(linsys)
   character(len=max_char_len)   :: msg
   character(len=*), parameter   :: this_sub_name = 'solve_linsys'
 
+  if (.not. linsys%skip) then
   !> Operations on the side band matrices: done only if the system is
   !> mixed static/dynamic and those matrices exists
   if (linsys%nstatic .gt. 0 .and. linsys%nmoving .gt.0) then
@@ -462,7 +463,7 @@ subroutine solve_linsys(linsys)
   !==> Fix the lower part of the permutation matrix to make it global
   linsys%P(linsys%nstatic+1:linsys%rank) = &
   linsys%P(linsys%nstatic+1:linsys%rank) + linsys%nstatic
-
+end if
   !==> Solve the factorized system
   linsys%res = linsys%b
   write(*,*) 'linsys%rank', linsys%rank

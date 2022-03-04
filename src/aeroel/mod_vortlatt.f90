@@ -580,7 +580,7 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   !write(*,*) 'cl_inv           ', cl_inv
   !> AoA of the stripe (from inviscid calculation) -> check for unsymmetric profiles 
   if (it_vl .eq. 0) then  
-    alpha = (cl_inv/(2.0_wp*pi))*180/pi ! deg to enter in c81 table
+    alpha = (cl_inv/(2.0_wp*pi*sqrt(1-mach**2)))*180/pi ! deg to enter in c81 table
     
     !write(*,*) 'alpha           ', alpha
     stripe%alpha = alpha  
@@ -644,17 +644,17 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
 
   if (i_s .eq. 1) then
     !write(*,*)
-    write(*,*) 'force             ', force
-    write(*,*) 'stripe%vel        ', stripe%vel
-    write(*,*) 'stripe%nor        ', stripe%nor
-    write(*,*) 'stripe%tang(:,1)  ', stripe%tang(:,1)
-    write(*,*) 'stripe%tang(:,2)  ', stripe%tang(:,2)
-    write(*,*) 'stripe%alpha_ind  ', stripe%alpha_ind
-    write(*,*) 'cl_inv            ', cl_inv
-    write(*,*) 'alpha             ', alpha
-    write(*,*) 'cl_visc           ', cl_visc
-    write(*,*) 'rhs_diff          ', rhs_diff
-    write(*,*) 'linsys%b(1)       ', linsys%b(1)
+    !write(*,*) 'force             ', force
+    !write(*,*) 'stripe%vel        ', stripe%vel
+    !write(*,*) 'stripe%nor        ', stripe%nor
+    !write(*,*) 'stripe%tang(:,1)  ', stripe%tang(:,1)
+    !write(*,*) 'stripe%tang(:,2)  ', stripe%tang(:,2)
+    !write(*,*) 'stripe%alpha_ind  ', stripe%alpha_ind
+    !write(*,*) 'cl_inv            ', cl_inv
+    !write(*,*) 'alpha             ', alpha
+    !write(*,*) 'cl_visc           ', cl_visc
+    !write(*,*) 'rhs_diff          ', rhs_diff
+    !write(*,*) 'linsys%b(1)       ', linsys%b(1)
   end if
   
   !> Update tolerance  
