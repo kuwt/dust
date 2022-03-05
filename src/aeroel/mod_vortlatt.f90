@@ -570,7 +570,7 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   do i_c = 1, n_pan
     force = force + stripe%panels(i_c)%p%dforce 
   end do
-  !write(*,*) 'force           ', force
+
   !> Induced alpha on stripe for drag calculation 
   stripe%alpha_ind = atan2(dot(stripe%vel,stripe%nor) , &
                           dot(stripe%vel,stripe%tang(:,1))) 
@@ -581,18 +581,15 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   !> AoA of the stripe (from inviscid calculation) -> check for unsymmetric profiles 
   if (it_vl .eq. 0) then  
     alpha = (cl_inv/(2.0_wp*pi*sqrt(1-mach**2)))*180/pi ! deg to enter in c81 table
-    
     !write(*,*) 'alpha           ', alpha
     stripe%alpha = alpha  
     !> interpolation of the aerodynamic coefficents 
     call interp_aero_coeff ( airfoil_data,  stripe%csi_cen, stripe%i_airfoil , &
                           (/alpha, mach, reynolds/), aero_coeff )
     !> Aerodynamic coefficients from c81 table  
-    
     stripe%cl_visc = aero_coeff(1)
     stripe%cd = aero_coeff(2)  
-    cl_visc = stripe%cl_visc
-    
+    cl_visc = stripe%cl_visc    
     deallocate(aero_coeff)
   else 
     alpha = stripe%alpha
@@ -603,8 +600,7 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   
   
   !> Update term rhs   (absolute)
-  rhs_diff = (cl_visc - cl_inv)!/max(cl_visc,1e-10)
-  
+  rhs_diff = (cl_visc - cl_inv)
   !> d_alpha update 
   !d_alpha = rel_fct*(cl_visc-cl_inv)/(2*pi)
   
@@ -630,7 +626,6 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
     !> Update of the rhs 
     !write(*,*) 'linsys%b(id_pan)', linsys%b(id_pan)
     linsys%b(id_pan) =  (1 + rel_fct*rhs_diff)*linsys%b(id_pan)
-    !write(*,*) 'linsys%b(id_pan)           ', linsys%b(id_pan)
     !> DEBUG
     !write(*,*) 'i_c             ', i_c
     !write(*,*) 'stripe%panels(i_c)%p%nor      ', stripe%panels(i_c)%p%nor
@@ -642,24 +637,8 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
     !write(*,*) 'rhs_vsc                       ', rhs_visc 
   end do 
 
-  if (i_s .eq. 1) then
-    !write(*,*)
-    !write(*,*) 'force             ', force
-    !write(*,*) 'stripe%vel        ', stripe%vel
-    !write(*,*) 'stripe%nor        ', stripe%nor
-    !write(*,*) 'stripe%tang(:,1)  ', stripe%tang(:,1)
-    !write(*,*) 'stripe%tang(:,2)  ', stripe%tang(:,2)
-    !write(*,*) 'stripe%alpha_ind  ', stripe%alpha_ind
-    !write(*,*) 'cl_inv            ', cl_inv
-    !write(*,*) 'alpha             ', alpha
-    !write(*,*) 'cl_visc           ', cl_visc
-    !write(*,*) 'rhs_diff          ', rhs_diff
-    !write(*,*) 'linsys%b(1)       ', linsys%b(1)
-  end if
-  
   !> Update tolerance  
-  diff = abs(cl_visc - cl_inv)!/max(cl_visc,1e-10)
-  
+  diff = abs(cl_visc - cl_inv)
 
 end subroutine correction_c81_vortlatt
 

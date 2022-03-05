@@ -121,13 +121,14 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, wake )
   Pinf   = sim_param%P_inf
   rhoinf = sim_param%rho_inf
 
-  linsys%rank = geo%nelem_impl
-  linsys%nstatic = geo%nstatic_impl; 
-  linsys%nmoving = geo%nmoving_impl
+  linsys%rank         = geo%nelem_impl
+  linsys%nstatic      = geo%nstatic_impl; 
+  linsys%nmoving      = geo%nmoving_impl
   linsys%nstatic_expl = geo%nstatic_expl
   linsys%nmoving_expl = geo%nmoving_expl
-  linsys%n_expl =  geo%nelem_expl
-  linsys%skip = .false.
+  linsys%n_expl       =  geo%nelem_expl
+  linsys%skip         = .false.
+  
   ntot = linsys%rank
 
   !> Allocate the vectors of the right size
@@ -396,7 +397,6 @@ subroutine solve_linsys(linsys)
               linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic,  &
               linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic),    &
               linsys%nmoving)
-              write(*,*) 'ciao2' 
 #endif /*DUST_PRECISION*/
 
   !> Modify the dynamic square block
@@ -417,7 +417,6 @@ subroutine solve_linsys(linsys)
               linsys%nstatic,1.0d+0,&
               linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank),&
               linsys%nmoving)
-              write(*,*) 'ciao3' 
 #endif /*DUST_PRECISION*/
 
   endif
@@ -433,7 +432,6 @@ subroutine solve_linsys(linsys)
     call dgetrf(linsys%nmoving,linsys%nmoving, &
                 linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank), &
                 linsys%nmoving,linsys%P(linsys%nstatic+1:linsys%rank),info)
-                write(*,*) 'ciao4' 
 #endif /*DUST_PRECISION*/
 
     if ( info .ne. 0 ) then
@@ -456,7 +454,6 @@ subroutine solve_linsys(linsys)
                 linsys%A(linsys%nstatic+1:linsys%rank,1:linsys%nstatic), &
                 linsys%nmoving,1,linsys%nmoving,&
                 linsys%P(linsys%nstatic+1:linsys%rank),1)
-                write(*,*) 'ciao5' 
 #endif /*DUST_PRECISION*/
   endif
 

@@ -868,7 +868,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
       max_diff = tol + 1e-6_wp
       linsys%skip = .true.
       !> Select time step to start the vl correction 
-      !> (avoid strange behaviour at the begining of simulation)
+      !  (avoid strange behaviour at the begining of simulation)
       if (it .gt. sim_param%vl_startstep) then 
         do while (max_diff .gt. tol .and. it_vl .lt. sim_param%vl_maxiter)
           max_diff = 0.0_wp
@@ -889,28 +889,20 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               !$omp end parallel do
             end if 
           end do 
-          write(*,*) 'max_diff           ', max_diff
-          !debug output of the system
-          if ((sim_param%debug_level .ge. 50).and.time_2_debug_out) then
-            !write(frmt,'(I4.4)') it
-            !write(frmt_vl,'(I4.4)') it_vl
+          !> debug output of the system
+          if ((sim_param%debug_level .ge. 50) .and. time_2_debug_out) then
+            write(frmt,'(I4.4)') it
+            write(frmt_vl,'(I4.4)') it_vl
             call dump_linsys(linsys, trim(basename_debug)//'A_'//trim(frmt)//'_it_'//trim(frmt_vl)//'.dat', &
                               trim(basename_debug)//'b_'//trim(frmt)//'_it_'//trim(frmt_vl)//'.dat' )
           endif
           !==> Solve the factorized system
-          !write(*,*) 'shape(linsys%A)           ', shape(linsys%A)
-          !write(*,*) 'shape(linsys%P)           ', shape(linsys%P)
           if (linsys%rank .gt. 0) then
             call solve_linsys(linsys)     
-            !call dgetrs('N',linsys%rank,1,linsys%A,linsys%rank,linsys%P,linsys%res, &
-            !    linsys%rank,info)       
           endif
           
           do i_el = 1 , sel      
             elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
-            if (i_el .eq. 1) then
-              !write(*,*) 'linsys%res(i_el)           ', linsys%res(i_el)
-            endif
             select type(el => elems(i_el)%p)        
               class is(t_vortlatt)   
                 !> compute dforce using AVL formula
@@ -919,12 +911,8 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
             end select
             
           end do
-          !write(*,*) 'res_old(1)           ', res_old(1) 
-          !write(*,*)          
           it_vl = it_vl + 1
         end do !(while)
-        !write(*,*) 'it_vl', it_vl
-
         !> Viscous correction 
         do i_c = 1, size(geo%components)
           if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
@@ -937,7 +925,6 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                       geo%components(i_c)%stripe(i_s)%nor +  &
                       cos(geo%components(i_c)%stripe(i_s)%alpha_ind) * & 
                       geo%components(i_c)%stripe(i_s)%tang(:,1) )
-
               do i_p = 1, size(geo%components(i_c)%stripe(i_s)%panels)
                 geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce = &
                             geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce + &
