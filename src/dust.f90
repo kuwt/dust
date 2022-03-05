@@ -349,7 +349,7 @@ call prms%CreateLogicalOption('LLloadsAVL', &
                           &'Use AVL expression for inviscid load computation','T')
 
 !> Vl correction parameter 
-call prms%CreateRealOption('VLrelax', 'Relaxation factor for rhs update','0.05')
+call prms%CreateRealOption('VLrelax', 'Relaxation factor for rhs update','1.0')
 call prms%CreateIntOption('VLmaxiter', &
                           &'Maximum number of iteration in VL algorithm', '100')
 call prms%CreateRealOption('VLtol', 'Tolerance for the absolute error on lift coefficient in &
@@ -889,6 +889,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               !$omp end parallel do
             end if 
           end do 
+          
           !> debug output of the system
           if ((sim_param%debug_level .ge. 50) .and. time_2_debug_out) then
             write(frmt,'(I4.4)') it
@@ -913,6 +914,13 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           end do
           it_vl = it_vl + 1
         end do !(while)
+        if(it_vl .eq. sim_param%vl_maxiter) then
+          call warning('dust','dust','max iteration reached for non linear vl:&
+                      increase VLmaxiter!') 
+          write(message,*) 'Last iteration error: ', max_diff
+          call printout(message)
+        endif
+        
         !> Viscous correction 
         do i_c = 1, size(geo%components)
           if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &

@@ -463,14 +463,12 @@ subroutine solve_linsys(linsys)
 end if
   !==> Solve the factorized system
   linsys%res = linsys%b
-  write(*,*) 'linsys%rank', linsys%rank
 #if (DUST_PRECISION==1)
   call sgetrs('N',linsys%rank,1,linsys%A,linsys%rank,linsys%P,linsys%res, &
                 linsys%rank,info)
 #elif (DUST_PRECISION==2)
   call dgetrs('N',linsys%rank,1,linsys%A,linsys%rank,linsys%P,linsys%res, &
                 linsys%rank,info)
-                write(*,*) 'ciao6' 
 #endif /*DUST_PRECISION*/
   if ( info .ne. 0 ) then
     write(msg,*) 'error while solving the factorized system &
