@@ -534,7 +534,6 @@ end subroutine compute_dforce_jukowski_vortlatt
 
 
 subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_s)
-
   type(t_aero_tab),  intent(in)    :: airfoil_data(:)
   type(t_stripe),    intent(inout) :: stripe
   type(t_linsys),    intent(inout) :: linsys
@@ -551,6 +550,11 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   integer                          :: id_a, i_a
   integer                          :: imach, nmach
   real(wp)                         :: machend, mach1, mach2
+  !> Dynamic stall
+  real(wp)                         :: thicc = 0.12 !> get as input? 
+                                      !(should be the last 2 digits of NACA profile)
+  real(wp)                         :: alpha_ref, K1, dAlpha_dt
+  real(wp)                         :: rad_break, rad_dyn, M1, M2, g1, g2, g2_max
 
   !> Relaxation factor
   rel_fct = sim_param%vl_relax
@@ -593,14 +597,14 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
       machend = airfoil_data(id_a)%aero_coeff(1)%coeff(1)%par2(nmach)
       
       !> Find closest mach number 
-      do while ( (  mach .ge. mach1 ) .and. ( imach .lt. nmach  ) )
+      do while ((mach .ge. mach1 ) .and. (imach .lt. nmach))
         imach = imach + 1
         mach1 = airfoil_data(id_a)%aero_coeff(1)%coeff(1)%par2(imach)
       end do
-      
       imach = imach - 1
       mach1 = airfoil_data(id_a)%aero_coeff(1)%coeff(1)%par2(imach)
       mach2 = airfoil_data(id_a)%aero_coeff(1)%coeff(1)%par2(imach+1)
+
       !> Linear interpolation of alpha0 
       al0(id_a) = airfoil_data(id_a)%aero_coeff(1)%alcl0(imach) + &
               (mach-mach1)/(mach2-mach1) * &
@@ -610,17 +614,43 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
     end do
     !> Take the average of al0
     alcl0 = sum(al0)/2 
-    write(*,*) 'alcl0', alcl0
+    !write(*,*) 'alcl0', alcl0
     deallocate(al0)
 
     !> AoA of the stripe 
     alpha = (cl_inv/(2.0_wp*pi*sqrt(1-mach**2))) * 180/pi + alcl0! deg to enter in c81 table
-    
-    stripe%alpha = alpha  
+
+    !> Dynamic stall
+    if(sim_param%vl_dynstall) then
+
+      dAlpha_dt = (alpha*pi/180.0_wp - stripe%alpha_old)/sim_param%dt 
+      rad_break = 0.06_wp + 1.5_wp*(0.6_wp - thicc/stripe%chord)
+      rad_dyn = sqrt(abs(stripe%chord * dAlpha_dt/(2.0_wp* norm2(stripe%vel))))
+
+      !> dynamic stall lift
+      M1 = 0.4_wp + 5.0_wp*(0.6_wp - thicc/stripe%chord)
+      M2 = 0.9_wp + 2.5_wp*(0.6_wp - thicc/stripe%chord)
+      g2_max = 1.4_wp - 6.0_wp*(0.6_wp - thicc/stripe%chord)
+      g2 = min(g2_max,max(0.0_wp, (mach-M2)/(M1-M2)))
+      g1 = g2/2.0_wp
+      K1 = 0.75_wp + sign(0.25_wp, dAlpha_dt)
+
+      if(rad_dyn .LE. rad_break) then
+        alpha_ref = alpha - K1*g1*rad_dyn*sign(1.0_wp,dAlpha_dt) * 180_wp/pi ! deg
+      else
+        alpha_ref = alpha - K1*(g1*rad_break + g2*(rad_dyn-rad_break))* & 
+                            sign(1.0_wp,dAlpha_dt) * 180_wp/pi               ! deg
+      end if
+
+    else
+      alpha_ref = alpha
+    end if ! dynstall
+
+    stripe%alpha = alpha_ref  
     
     !> Interpolation of the aerodynamic coefficents 
     call interp_aero_coeff ( airfoil_data,  stripe%csi_cen, stripe%i_airfoil , &
-                          (/alpha, mach, reynolds/), aero_coeff )
+                          (/alpha_ref, mach, reynolds/), aero_coeff )
     
     !> Aerodynamic coefficients from c81 table  
     stripe%cl_visc = aero_coeff(1)
@@ -630,7 +660,6 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
 
     deallocate(aero_coeff)
   else 
-    alpha = stripe%alpha
     cl_visc = stripe%cl_visc
   endif 
   

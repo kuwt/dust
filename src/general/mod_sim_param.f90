@@ -147,22 +147,22 @@ type t_sim_param
   real(wp) :: CutoffRad
   !> use the vortex stretching or not
   logical :: use_vs
-    !> use the vortex stretching from elements
-    logical :: vs_elems
-    !> use the divergence filtering
-    logical :: use_divfilt
-      !> time scale of the divergence filter
-      real(wp) :: filt_eta
+  !> use the vortex stretching from elements
+  logical :: vs_elems
+  !> use the divergence filtering
+  logical :: use_divfilt
+  !> time scale of the divergence filter
+  real(wp) :: filt_eta
   !> use the vorticity diffusion or not
   logical :: use_vd
   !> use turbulent viscosity or not
   logical :: use_tv
   !> use the penetration avoidance
   logical :: use_pa
-    !> check radius for penetration avoidance
-    real(wp) :: pa_rad_mult
-    !> element impact radius for penetration avoidance
-    real(wp) :: pa_elrad_mult
+  !> check radius for penetration avoidance
+  real(wp) :: pa_rad_mult
+  !> element impact radius for penetration avoidance
+  real(wp) :: pa_elrad_mult
   !> simulate viscosity effects or not
   logical :: use_ve
 
@@ -275,11 +275,10 @@ type t_sim_param
   real(wp)  :: vl_relax
   integer   :: vl_maxiter
   integer   :: vl_startstep
-  
+  logical   :: vl_dynstall = .false.
 
 contains
   procedure, pass(this) :: save_param => save_sim_param
-  !procedure, pass(this) :: init_param => init_sim_param
 end type t_sim_param
 
 type(t_sim_param) :: sim_param
@@ -287,264 +286,6 @@ type(t_sim_param) :: sim_param
 !----------------------------------------------------------------------
 contains
 !----------------------------------------------------------------------
-!> Initialize all the parameters reading them from the the input file
-!subroutine init_sim_param (this, prms, nout, output_start)
-!  class(t_sim_param)      :: this
-!  class(t_parse), intent(in):: prms
-!  integer, intent(inout)  :: nout
-!  logical, intent(inout)  :: output_start
-!  
-!  !> Timing
-!  this%t0                  = getreal(prms, 'tstart')
-!  this%tend                = getreal(prms, 'tend')
-!  this%dt_out              = getreal(prms,'dt_out')
-!  this%debug_level         = getint(prms, 'debug_level')
-!  this%output_detailed_geo = getlogical(prms, 'output_detailed_geo')
-!  this%ndt_update_wake     = getint(prms, 'ndt_update_wake')
-!  
-!  !> Reference environment values
-!  this%P_inf               = getreal(prms,'P_inf')
-!  this%rho_inf             = getreal(prms,'rho_inf')
-!  this%a_inf               = getreal(prms,'a_inf')
-!  this%mu_inf              = getreal(prms,'mu_inf')
-!  this%nu_inf              = this%mu_inf/this%rho_inf
-!  this%u_inf               = getrealarray(prms, 'u_inf', 3)
-!  !> Check on reference velocity
-!  if ( countoption(prms,'u_ref') .gt. 0 ) then
-!    this%u_ref = getreal(prms, 'u_ref')
-!  else
-!    this%u_ref = norm2(this%u_inf)
-!    if (this%u_ref .le. 0.0_wp) then
-!      call error('dust','dust','No reference velocity u_ref provided but &
-!      &zero free stream velocity. Provide a non-zero reference velocity. &
-!      &Stopping now before producing invalid results')
-!    endif
-!  end if
-!  
-!  !> Wake parameters
-!  this%n_wake_panels         = getint(prms, 'n_wake_panels')
-!  this%n_wake_particles      = getint(prms, 'n_wake_particles')
-!  this%particles_box_min     = getrealarray(prms, 'particles_box_min',3)
-!  this%particles_box_max     = getrealarray(prms, 'particles_box_max',3)
-!  this%rigid_wake            = getlogical(prms, 'rigid_wake')
-!  this%rigid_wake_vel        = this%u_inf   !> initialisation
-!  !> Check on wake panels
-!  if(this%n_wake_panels .lt. 1) then
-!    this%n_wake_panels = 1
-!    call warning('dust','dust','imposed a number of wake panels rows &
-!                &LOWER THAN 1. At least one row of panels is mandatory, &
-!                &the simulation will proceed with "n_wake_panels = 1"')
-!  endif
-!  if ( this%rigid_wake ) then
-!    if ( countoption(prms,'rigid_wake_vel') .eq. 1 ) then
-!      this%rigid_wake_vel    = getrealarray(prms, 'rigid_wake_vel',3)
-!    else if ( countoption(prms,'rigid_wake_vel') .le. 0 ) then
-!      call warning('dust','dust','no rigid_wake_vel parameter set, &
-!            &with rigid_wake = T; rigid_wake_vel = u_inf')
-!      this%rigid_wake_vel    = this%u_inf
-!    end if
-!  end if
-!
-!  !> Trailing edge 
-!  this%join_te               = getlogical(prms, 'join_te')
-!  if (this%join_te) this%join_te_factor=getreal(prms,'join_te_factor')
-!
-!  !> Names
-!  this%basename              = getstr(prms, 'basename')
-!  this%GeometryFile          = getstr(prms, 'GeometryFile')
-!  this%ReferenceFile         = getstr(prms, 'ReferenceFile')
-!
-!  !> Method parameters
-!  this%FarFieldRatioDoublet  = getreal(prms, 'FarFieldRatioDoublet')
-!  this%FarFieldRatioSource   = getreal(prms, 'FarFieldRatioSource')
-!  this%DoubletThreshold      = getreal(prms, 'DoubletThreshold')
-!  this%RankineRad            = getreal(prms, 'RankineRad')
-!  this%VortexRad             = getreal(prms, 'VortexRad')
-!  this%CutoffRad             = getreal(prms, 'CutoffRad')
-!  this%first_panel_scaling   = getreal(prms, 'ImplicitPanelScale')
-!  this%min_vel_at_te         = getreal(prms, 'ImplicitPanelMinVel')
-!  this%use_vs                = getlogical(prms, 'Vortstretch')
-!  this%vs_elems              = getlogical(prms, 'VortstretchFromElems')
-!  this%use_vd                = getlogical(prms, 'Diffusion')
-!  this%use_tv                = getlogical(prms, 'TurbulentViscosity')
-!  this%use_ve                = getlogical(prms, 'ViscosityEffects')
-!  this%use_pa                = getlogical(prms, 'PenetrationAvoidance')
-!  !> Check on penetration avoidance 
-!  if(this%use_pa) then
-!    this%pa_rad_mult = getreal(prms, 'PenetrationAvoidanceCheckRadius')
-!    this%pa_elrad_mult = getreal(prms,'PenetrationAvoidanceElementRadius')
-!  endif
-!
-!  !> Lifting line elements
-!  this%llSolver                        = getstr(    prms, 'LLsolver')
-!  this%llReynoldsCorrections           = getlogical(prms, 'LLreynoldsCorrections')
-!  this%llReynoldsCorrectionsNfact      = getreal(   prms, 'LLreynoldsCorrectionsNfact')
-!  this%llMaxIter                       = getint(    prms, 'LLmaxIter'            )
-!  this%llTol                           = getreal(   prms, 'LLtol'                )
-!  this%llDamp                          = getreal(   prms, 'LLdamp'               )
-!  this%llStallRegularisation           = getlogical(prms, 'LLstallRegularisation')
-!  this%llStallRegularisationNelems     = getint(    prms, 'LLstallRegularisationNelems')
-!  this%llStallRegularisationNiters     = getint(    prms, 'LLstallRegularisationNiters')
-!  this%llStallRegularisationAlphaStall = getreal(   prms, 'LLstallRegularisationAlphaStall')
-!  this%llArtificialViscosity           = getreal(   prms, 'LLartificialViscosity')
-!  this%llArtificialViscosityAdaptive   = getlogical(prms, 'LLartificialViscosityAdaptive')
-!  this%llLoadsAVL                      = getlogical(prms, 'LLloadsAVL')
-!  !> check LL inputs
-!  if ((trim(this%llSolver) .ne. 'GammaMethod') .and. &
-!      (trim(this%llSolver) .ne. 'AlphaMethod')) then
-!    write(*,*) ' this%llSolver : ' , trim(this%llSolver)
-!    call warning('dust','init_this',' Wrong string for LLsolver. &
-!                &This parameter is set equal to "GammaMethod" (default) &
-!                &in init_this() routine.')
-!    this%llSolver = 'GammaMethod'
-!  end if
-!
-!  if ( trim(this%llSolver) .eq. 'GammaMethod' ) then
-!    if ( this%llArtificialViscosity .gt. 0.0_wp ) then
-!      call warning('dust','init_this','LLartificialViscoisty set as an input, &
-!          & different from zero, but ll regularisation available only if&
-!          & LLsolver = AlphaMethod. LLartificialViscosity = 0.0')
-!      this%llArtificialViscosity = 0.0_wp
-!      this%llArtificialViscosityAdaptive = .false.
-!      this%llArtificialViscosityAdaptive_Alpha  = 0.0_wp
-!      this%llArtificialViscosityAdaptive_dAlpha = 0.0_wp
-!    end if
-!    if ( this%llArtificialViscosityAdaptive ) then
-!      call warning('dust','init_this','LLartificialViscosityAdaptive set&
-!          & as an input, but ll adaptive regularisation available only if&
-!          & LLsolver = AlphaMethod')
-!    end if
-!  end if
-!
-!  !> The user is required to set _Alpha and _dAlpha for ll adaptive regularisation
-!  if (trim(this%llSolver) .eq. 'AlphaMethod') then
-!    if (this%llArtificialViscosityAdaptive) then
-!      if ((countoption(prms,'LLartificialViscosityAdaptive_Alpha')  .eq. 0) .or. &
-!          (countoption(prms,'LLartificialViscosityAdaptive_dAlpha') .eq. 0)) then
-!        call error('dust','init_this','LLartificialViscosityAdaptive_Alpha or&
-!          & LLartificialViscosity_dAlpha not set as an input, while LLartificialViscosityAdaptive&
-!          & is set equal to T. Set these parameters [deg].')
-!      else
-!        this%llArtificialViscosityAdaptive_Alpha = getreal(prms,'LLartificialViscosityAdaptive_Alpha')
-!        this%llArtificialViscosityAdaptive_dAlpha= getreal(prms,'LLartificialViscosityAdaptive_dAlpha')
-!      end if
-!    end if
-!  end if
-!  write(*,*) ' this%llSolver : ' , trim(this%llSolver)
-!
-!  !> Octree and FMM parameters
-!  this%use_fmm                       = getlogical(prms, 'FMM')
-!
-!  if(this%use_fmm) then
-!    this%use_fmm_pan                 = getlogical(prms, 'FMMPanels')
-!    this%BoxLength                   = getreal(prms, 'BoxLength')
-!    this%NBox                        = getintarray(prms, 'NBox',3)
-!    this%OctreeOrigin                = getrealarray(prms, 'OctreeOrigin',3)
-!    this%NOctreeLevels               = getint(prms, 'NOctreeLevels')
-!    this%MinOctreePart               = getint(prms, 'MinOctreePart')
-!    this%MultipoleDegree             = getint(prms,'MultipoleDegree')
-!    this%use_dyn_layers              = getlogical(prms,'DynLayers')
-!
-!    if(this%use_dyn_layers) then
-!      this%NMaxOctreeLevels          = getint(prms, 'NMaxOctreeLevels')
-!      this%LeavesTimeRatio           = getreal(prms, 'LeavesTimeRatio')
-!    else
-!      this%NMaxOctreeLevels          = this%NOctreeLevels
-!    endif
-!
-!    this%use_pr                      = getlogical(prms, 'ParticlesRedistribution')
-!
-!    if(this%use_pr) then
-!      this%part_redist_ratio         = getreal(prms,'ParticlesRedistributionRatio')
-!      if ( countoption(prms,'OctreeLevelSolid') .gt. 0 ) then
-!        this%lvl_solid               = getint(prms, 'OctreeLevelSolid')
-!      else
-!        this%lvl_solid               = max(this%NOctreeLevels-2,1)
-!      endif
-!    endif
-!  else
-!    this%use_fmm_pan = .false.
-!  endif
-!
-!  !> HCAS
-!  this%hcas                          = getlogical(prms,'HCAS')
-!  if(this%hcas) then
-!    this%hcas_time                   = getreal(prms,'HCAS_time')
-!    this%hcas_vel                    = getrealarray(prms,'HCAS_velocity',3)
-!  endif
-!
-!  !> Variable_wind
-!  this%use_gust                      = getlogical(prms, 'Gust')
-!
-!  if(this%use_gust) then
-!    this%GustType                    = getstr(prms,'GustType')
-!    this%gust_origin                 = getrealarray(prms, 'GustOrigin',3)
-!
-!    if(countoption(prms,'GustFrontDirection') .gt. 0) then
-!      this%gust_front_direction      = getrealarray(prms, 'GustFrontDirection',3)
-!    else
-!      this%gust_front_direction      = this%u_inf
-!    end if
-!    
-!    if(countoption(prms,'GustFrontSpeed') .gt. 0) then
-!      this%gust_front_speed          = getreal(prms, 'GustFrontSpeed')
-!    else
-!      this%gust_front_speed          = norm2(this%u_inf)
-!    end if
-!    this%gust_u_des                  = getreal(prms,'GustUDes')
-!    this%gust_perturb_direction      = getrealarray(prms,'GustPerturbationDirection',3)
-!    this%gust_time                   = getreal(prms,'GustStartTime')
-!    this%gust_gradient               = getreal(prms,'GustGradient')
-!  end if
-!
-!  !> Manage restart
-!  this%restart_from_file             = getlogical(prms,'restart_from_file')
-!  if (this%restart_from_file) then
-!
-!    this%reset_time                  = getlogical(prms,'reset_time')
-!    this%restart_file                = getstr(prms,'restart_file')
-!    
-!    !> Removing leading "./" if present to avoid issues when restarting
-!    if(this%basename(1:2) .eq. './') this%basename = this%basename(3:)
-!    
-!    if(this%restart_file(1:2) .eq. './') this%restart_file = this%restart_file(3:)
-!    
-!    call printout('RESTART: restarting from file: '//trim(this%restart_file))
-!    this%GeometryFile = this%restart_file(1:len(trim(this%restart_file))-11) //'geo.h5'
-!
-!    !restarting the same simulation, advance the numbers
-!    if(this%restart_file(1:len(trim(this%restart_file))-12).eq. &
-!                                                trim(this%basename)) then
-!    read(this%restart_file(len(trim(this%restart_file))-6:len(trim(this%restart_file))-3),*) nout
-!      call printout('Identified restart from the same simulation, keeping the&
-!                    & previous output numbering')
-!      !> avoid rewriting the same timestep
-!      output_start = .false.
-!    endif
-!    if(.not. this%reset_time) call load_time(this%restart_file, this%t0)
-!  endif
-!
-!  !> Check the number of timesteps
-!  if(CountOption(prms,'dt') .gt. 0) then
-!    if( CountOption(prms,'timesteps') .gt. 0) then
-!      call error('init_this','dust','Both number of timesteps and dt are&
-!      & set, but only one of the two can be specified')
-!    else
-!      !> get dt and compute number of timesteps
-!      this%dt     = getreal(prms, 'dt')
-!      this%n_timesteps = ceiling((this%tend-this%t0)/this%dt) + 1
-!                              !(+1 for the zero time step)
-!    endif
-!  else
-!    !> get number of steps, compute dt
-!    this%n_timesteps = getint(prms, 'timesteps')
-!    this%dt =  (this%tend-this%t0)/&
-!                      real(this%n_timesteps,wp)
-!    this%n_timesteps = this%n_timesteps + 1
-!                            !add one for the first step
-!  endif
-!
-!end subroutine init_sim_param
 
 subroutine save_sim_param(this, loc)
   class(t_sim_param) :: this

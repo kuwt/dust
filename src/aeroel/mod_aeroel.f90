@@ -228,7 +228,9 @@ type, abstract, extends(c_pot_elem) :: c_impl_elem
 end type c_impl_elem
 
 type :: t_stripe  
+  !> Adim coodinates of the stripe center wrt span
   real(wp) :: csi_cen
+  !> Profile data [start-end]
   integer  :: i_airfoil(2)  
   !> Panel array
   type(t_pot_elem_p), allocatable :: panels(:) 
@@ -236,16 +238,26 @@ type :: t_stripe
   real(wp) :: area 
   !> Collocation point
   real(wp) :: ac_stripe(3)
-  
+  !> Chord 
   real(wp) :: chord
+  !> Velocity at quarter chord
   real(wp) :: vel(3) 
+  !> Local tangent in the center of the stripe
   real(wp) :: tang(3,2)
+  !> Normal in the center of the stripe
   real(wp) :: nor(3)
+  !> Body component of the velocity 
   real(wp) :: ub(3)
+  !> Drag coefficient 
   real(wp) :: cd
+  !> Lift coefficient (from c81)
   real(wp) :: cl_visc
+  !> Induced AoA 
   real(wp) :: alpha_ind
+  !> AoA to input c81
   real(wp) :: alpha
+  !> AoA at previous time step (only for dynstall)
+  real(wp) :: alpha_old = 0.0_wp 
 end type
 
 !----------------------------------------------------------------------

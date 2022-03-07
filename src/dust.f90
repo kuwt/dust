@@ -212,11 +212,12 @@ real(wp), allocatable             :: surf_vel_SurfPan_old(:,:)
 real(wp), allocatable             ::      nor_SurfPan_old(:,:)
 real(wp) , allocatable            :: al_kernel(:,:), al_v(:)
 
-!> vl viscous correction
+!> VL viscous correction
 integer                           :: i_el, i_c, i_s, i, sel, i_p
 integer                           :: it_vl
 real(wp)                          :: tol, diff, max_diff 
 real(wp)                          :: d_cd(3)
+
 !> octree parameters
 type(t_octree)                    :: octree
 
@@ -348,7 +349,7 @@ call prms%CreateRealOption('LLartificialViscosityAdaptive_dAlpha', &
 call prms%CreateLogicalOption('LLloadsAVL', &
                           &'Use AVL expression for inviscid load computation','T')
 
-!> Vl correction parameter 
+!> VL correction parameter 
 call prms%CreateRealOption('VLrelax', 'Relaxation factor for rhs update','1.0')
 call prms%CreateIntOption('VLmaxiter', &
                           &'Maximum number of iteration in VL algorithm', '100')
@@ -356,7 +357,7 @@ call prms%CreateRealOption('VLtol', 'Tolerance for the absolute error on lift co
                           &fixed point iteration for VL','1.0e-3' )
 call prms%CreateIntOption('VLstartstep', &
                           &'Step in which the VL correction start', '1')
-
+call prms%CreateLogicalOption('VLdynstall', 'Dynamic stall on corrected VL', 'F')
 
 !> Octree and multipole data 
 call prms%CreateLogicalOption('FMM','Employ fast multipole method?','T')
@@ -876,17 +877,17 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           do i_c = 1, size(geo%components)
             if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
               trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
-              !!$omp parallel do private(i_s)
+              !$omp parallel do private(i_s)
                 do i_s = 1, size(geo%components(i_c)%stripe)            
                   call calc_geo_data_stripe(geo%components(i_c)%stripe(i_s))
                   call get_vel_ac_stripe(geo%components(i_c)%stripe(i_s), & 
                                       elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
                   call correction_c81_vortlatt(airfoil_data, geo%components(i_c)%stripe(i_s), linsys, diff, it_vl, i_s)
-              !!$omp atomic
+              !$omp atomic
                   max_diff = max(diff, max_diff) 
-              !!$omp end atomic
+              !$omp end atomic
                 end do
-              !!$omp end parallel do
+              !$omp end parallel do
             end if 
           end do 
           write(*,*) 'max_diff           ', max_diff
@@ -894,8 +895,9 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           if ((sim_param%debug_level .ge. 50) .and. time_2_debug_out) then
             write(frmt,'(I4.4)') it
             write(frmt_vl,'(I4.4)') it_vl
-            call dump_linsys(linsys, trim(basename_debug)//'A_'//trim(frmt)//'_it_'//trim(frmt_vl)//'.dat', &
-                              trim(basename_debug)//'b_'//trim(frmt)//'_it_'//trim(frmt_vl)//'.dat' )
+            call dump_linsys(linsys,  &
+                            trim(basename_debug)//'A_'//trim(frmt)//'_it_'//trim(frmt_vl)//'.dat', &
+                            trim(basename_debug)//'b_'//trim(frmt)//'_it_'//trim(frmt_vl)//'.dat' )
           endif
 
           !> Solve the factorized system
@@ -910,10 +912,11 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                 !> compute dforce using AVL formula
                 call el%compute_dforce_jukowski()
                 el%pres = sum(el%dforce * el%nor)/el%area
-            end select
-            
+            end select            
           end do
+
           it_vl = it_vl + 1
+
         end do !(while)
 
         if(it_vl .eq. sim_param%vl_maxiter) then
@@ -1057,8 +1060,6 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     endif
   
     !> Save old solution (at the previous dt) of the linear system
-    
-    
     res_old = linsys%res
 
 
@@ -1069,6 +1070,18 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     end do
 !$omp end parallel do
 
+    !> Save alpha_old for dynamic stall 
+    do i_c = 1, size(geo%components)
+      if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
+          trim(geo%components(i_c)%aero_correction) .eq. 'true' .and. &
+          sim_param%vl_dynstall) then 
+!$omp parallel do private(i_s)
+          do i_s = 1, size(geo%components(i_c)%stripe)
+            geo%components(i_c)%stripe(i_s)%alpha_old = geo%components(i_c)%stripe(i_s)%alpha 
+          end do 
+!$omp end parallel do  
+      end if
+    end do 
 
 #if USE_PRECICE
     ! *** to do *** dirty implementation. it-update moved into #if USE_PRECICE
@@ -1277,14 +1290,13 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   end if
   write(*,*) ' sim_param%llSolver : ' , trim(sim_param%llSolver)
   !> VL correction 
-  !write(*,*) 'sim_param%vl_correction', sim_param%vl_correction
-  !if (sim_param%vl_correction) then
-  sim_param%vl_tol                           = getreal(   prms, 'VLtol'                )
-  sim_param%vl_relax                         = getreal(   prms, 'VLrelax'               )
-  sim_param%vl_maxiter                       = getint(    prms, 'VLmaxiter'            )
-  sim_param%vl_startstep                     = getint(    prms, 'VLstartstep'            )
-  !end if 
-
+  sim_param%vl_tol                        = getreal(prms, 'VLtol')
+  sim_param%vl_relax                      = getreal(prms, 'VLrelax')
+  sim_param%vl_maxiter                    = getint(prms, 'VLmaxiter')
+  sim_param%vl_startstep                  = getint(prms, 'VLstartstep')
+  !>  VL Dynamic stall
+  sim_param%vl_dynstall                   = getlogical(prms, 'VLdynstall')  
+  
   !> Octree and FMM parameters
   sim_param%use_fmm                       = getlogical(prms, 'FMM')
 
