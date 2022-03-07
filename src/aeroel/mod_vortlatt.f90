@@ -540,15 +540,14 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   type(t_linsys),    intent(inout) :: linsys
   real(wp)                         :: diff
   real(wp)                         :: mach, reynolds
-  real(wp)                         :: wind(3)
+  real(wp)                         :: wind(3), up(3), unorm
   real(wp)                         :: d_alpha 
-  real(wp)                         :: alpha
+  real(wp)                         :: alpha, alpha_2d
   real(wp),     allocatable        :: aero_coeff(:)
-  real(wp)                         :: force(3) 
+  real(wp)                         :: force(3), mag 
   integer                          :: i_c, n_pan, id_pan
   real(wp)                         :: cl_inv, cl_visc
   real(wp)                         :: rel_fct, rhs_diff
-  !real(wp)                         :: nor(3)
   integer,        intent(in)       :: it_vl, i_s
   
   
@@ -575,13 +574,22 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   stripe%alpha_ind = atan2(dot(stripe%vel,stripe%nor) , &
                           dot(stripe%vel,stripe%tang(:,1))) 
   
+  !> Angle of incidence (full velocity)
+  alpha = atan2(dot(up, stripe%nor), dot(up,stripe%tang(:,1)))
+  
   !> Sectional lift coefficient 
   cl_inv = dot(force,stripe%nor)/(0.5_wp*sim_param%rho_inf*dot(stripe%vel,stripe%vel)*stripe%area)
-  !write(*,*) 'cl_inv           ', cl_inv
+
   !> AoA of the stripe (from inviscid calculation) -> check for unsymmetric profiles 
   if (it_vl .eq. 0) then  
-    alpha = (cl_inv/(2.0_wp*pi*sqrt(1-mach**2)))*180/pi ! deg to enter in c81 table
-    !write(*,*) 'alpha           ', alpha
+
+
+    write(*,*) 'airfoil_data(1)%aero_coeff(1)%alcl0           ', airfoil_data(1)%aero_coeff(1)%alcl0
+    write(*,*) 'airfoil_data(1)%aero_coeff(1)%coeff%par1            ', airfoil_data(1)%aero_coeff(1)%coeff(1)%par1
+    write(*,*) 'airfoil_data(1)%aero_coeff(1)%coeff%par2            ', airfoil_data(1)%aero_coeff(1)%coeff(1)%par2
+    
+    alpha = (cl_inv/(2.0_wp*pi*sqrt(1-mach**2))) * 180/pi! deg to enter in c81 table
+    
     stripe%alpha = alpha  
     !> interpolation of the aerodynamic coefficents 
     call interp_aero_coeff ( airfoil_data,  stripe%csi_cen, stripe%i_airfoil , &
@@ -589,52 +597,28 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
     !> Aerodynamic coefficients from c81 table  
     stripe%cl_visc = aero_coeff(1)
     stripe%cd = aero_coeff(2)  
+    write(*,*)  'aero_coeff',  aero_coeff
     cl_visc = stripe%cl_visc    
+
     deallocate(aero_coeff)
   else 
     alpha = stripe%alpha
     cl_visc = stripe%cl_visc
   endif 
-  !write(*,*) 'alpha           ', alpha
-  !write(*,*) 'cl_visc           ', cl_visc
-  
   
   !> Update term rhs   (absolute)
   rhs_diff = (cl_visc - cl_inv)
-  !> d_alpha update 
-  !d_alpha = rel_fct*(cl_visc-cl_inv)/(2*pi)
   
   !> DEBUG 
   
 
   do i_c = 1, n_pan
-    !> Update on the normal  
-    !  nor = nor * cos(d_alpha) - tan * sin(d_alpha)
-    !nor = stripe%panels(i_c)%p%nor * cos(d_alpha) -  &
-    !      stripe%panels(i_c)%p%tang(:,2) * sin(d_alpha)
-    !!write(*,*) 'nor   ', nor
-    !!> Get the induced velocity part 
-    !
-    !v_ind = stripe%panels(i_c)%p%ub - wind - stripe%panels(i_c)%p%uvort!&
-    !
-    !!> Update the normal to rhs 
-    !rhs_visc = dot(nor, v_ind) * 4.0_wp * pi
-    !!> Old contribution to rhs except wake 
-    !rhs_old = dot(stripe%panels(i_c)%p%nor, v_ind)*4.0_wp*pi
-    !> Get panel id -> should be the global id (CHECK THIS)
+    
     id_pan = stripe%panels(i_c)%p%id
     !> Update of the rhs 
     !write(*,*) 'linsys%b(id_pan)', linsys%b(id_pan)
     linsys%b(id_pan) =  (1 + rel_fct*rhs_diff)*linsys%b(id_pan)
-    !> DEBUG
-    !write(*,*) 'i_c             ', i_c
-    !write(*,*) 'stripe%panels(i_c)%p%nor      ', stripe%panels(i_c)%p%nor
-    !write(*,*) 'nor                           ', nor
-    !write(*,*) 'stripe%panels(i_c)%p%tang(:,2)', stripe%panels(i_c)%p%tang(:,2)
-    !write(*,*) 'd_alpha                       ', d_alpha
-    !write(*,*) 'v_ind                         ', v_ind
-    !write(*,*) 'old_b_par                     ', old_b_par
-    !write(*,*) 'rhs_vsc                       ', rhs_visc 
+    
   end do 
 
   !> Update tolerance  

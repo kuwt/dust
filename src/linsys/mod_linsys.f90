@@ -369,7 +369,6 @@ subroutine solve_linsys(linsys)
   call dlaswp(linsys%nmoving, &
               linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
               linsys%nstatic,1,linsys%nstatic,linsys%P(1:linsys%nstatic),1)
-  write(*,*) 'ciao' 
 #endif /*DUST_PRECISION*/
 
   !> Solve Lss Usd = Pss Asd to get Usd and put it in place of Asd

@@ -80,27 +80,27 @@ end type t_aero_2d_par
 
 type t_aero_2d_tab
 
- !> value of the third parameter, Re
- real(wp) :: Re
+  !> value of the third parameter, Re
+  real(wp)                          :: Re
+  
+  type(t_aero_2d_par) , allocatable :: coeff(:)
+  real(wp) , allocatable            :: dclda(:,:)
 
- type(t_aero_2d_par) , allocatable :: coeff(:)
- real(wp) , allocatable :: dclda(:,:)
+  real(wp) , allocatable            :: clmax(:) , alcl0(:) , cdmin (:)
+  real(wp) , allocatable            :: clstall_neg(:) , clstall_pos(:)
+  real(wp) , allocatable            :: alstall_neg(:) , alstall_pos(:)
 
- real(wp) , allocatable :: clmax(:) , alcl0(:) , cdmin (:)
- real(wp) , allocatable :: clstall_neg(:) , clstall_pos(:)
- real(wp) , allocatable :: alstall_neg(:) , alstall_pos(:)
-
-!!> cl(a,M,Re) 3d-data (extrapolation on Re or no dependence from Re)
-!real(wp) , allocatable :: cl(:,:)
-!type(t_aero_par) :: cl_par
-!
-!!> cd(a,M,Re) 3d-data
-!real(wp) , allocatable :: cd(:,:)
-!type(t_aero_par) :: cd_par
-!
-!!> cm(a,M,Re) 3d-data
-!real(wp) , allocatable :: cm(:,:)
-!type(t_aero_par) :: cm_par
+  !!> cl(a,M,Re) 3d-data (extrapolation on Re or no dependence from Re)
+  !real(wp) , allocatable :: cl(:,:)
+  !type(t_aero_par) :: cl_par
+  !
+  !!> cd(a,M,Re) 3d-data
+  !real(wp) , allocatable :: cd(:,:)
+  !type(t_aero_par) :: cd_par
+  !
+  !!> cm(a,M,Re) 3d-data
+  !real(wp) , allocatable :: cm(:,:)
+  !type(t_aero_par) :: cm_par
 
 end type t_aero_2d_tab
 
@@ -229,7 +229,7 @@ subroutine read_c81_table ( filen , coeff )
         ( coeff%aero_coeff(iRe)%coeff(1)%par1(i1+1) - coeff%aero_coeff(iRe)%coeff(1)%par1(i1-1) )
     end do
 
-    if ( sim_param%llReynoldsCorrections ) then
+    if ( sim_param%llReynoldsCorrections .or. sim_param%vl_correction) then
       ! === Parameters for corrections for Reynolds number effects ===
       ! Find clmax, alcl0, cdmin for each (Re,M)
       allocate(coeff%aero_coeff(iRe)%clmax(cl2)) ; coeff%aero_coeff(iRe)%clmax = -333.0_wp
@@ -267,7 +267,7 @@ subroutine read_c81_table ( filen , coeff )
           end if
         end do ! alpha
         coeff%aero_coeff(iRe)%alcl0(iMa) = alcl0
-
+       
         ! --- cdmin --- cd = coeff(2)
         coeff%aero_coeff(iRe)%cdmin(iMa) = minval( coeff%aero_coeff(iRe)%coeff(2)%cf(:,iMa) )
 
@@ -300,7 +300,8 @@ subroutine read_c81_table ( filen , coeff )
         coeff%aero_coeff(iRe)%clstall_neg(iMa) = coeff%aero_coeff(iRe)%coeff(1)%cf(istallm,iMa)
 
       end do ! Mach number
-    endif
+
+    end if 
       ! === Parameters for corrections for Reynolds number effects ===
 
   end do ! Reynolds number
@@ -540,6 +541,7 @@ subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
         ! --- cl ---
         aero_par_re    = aero_par(1:2)
         aero_par_re(1) = ( aero_par(1) - al01 ) / k_fact + al01    ! correct alpha
+        
         call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(irey)%coeff , &
                                                         aero_par_re , coeff1 , &
                                                                      dcl_da1 )

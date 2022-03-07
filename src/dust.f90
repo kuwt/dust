@@ -876,20 +876,20 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           do i_c = 1, size(geo%components)
             if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
               trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
-              !$omp parallel do private(i_s)
+              !!$omp parallel do private(i_s)
                 do i_s = 1, size(geo%components(i_c)%stripe)            
                   call calc_geo_data_stripe(geo%components(i_c)%stripe(i_s))
                   call get_vel_ac_stripe(geo%components(i_c)%stripe(i_s), & 
                                       elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
                   call correction_c81_vortlatt(airfoil_data, geo%components(i_c)%stripe(i_s), linsys, diff, it_vl, i_s)
-              !$omp atomic
+              !!$omp atomic
                   max_diff = max(diff, max_diff) 
-              !$omp end atomic
+              !!$omp end atomic
                 end do
-              !$omp end parallel do
+              !!$omp end parallel do
             end if 
           end do 
-          
+          write(*,*) 'max_diff           ', max_diff
           !> debug output of the system
           if ((sim_param%debug_level .ge. 50) .and. time_2_debug_out) then
             write(frmt,'(I4.4)') it
@@ -897,7 +897,8 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
             call dump_linsys(linsys, trim(basename_debug)//'A_'//trim(frmt)//'_it_'//trim(frmt_vl)//'.dat', &
                               trim(basename_debug)//'b_'//trim(frmt)//'_it_'//trim(frmt_vl)//'.dat' )
           endif
-          !==> Solve the factorized system
+
+          !> Solve the factorized system
           if (linsys%rank .gt. 0) then
             call solve_linsys(linsys)     
           endif
@@ -914,6 +915,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           end do
           it_vl = it_vl + 1
         end do !(while)
+
         if(it_vl .eq. sim_param%vl_maxiter) then
           call warning('dust','dust','max iteration reached for non linear vl:&
                       increase VLmaxiter!') 
@@ -921,7 +923,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           call printout(message)
         endif
         
-        !> Viscous correction 
+        !> Viscous drag correction 
         do i_c = 1, size(geo%components)
           if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
             trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
