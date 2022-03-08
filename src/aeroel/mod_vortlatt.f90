@@ -522,7 +522,7 @@ subroutine compute_dforce_jukowski_vortlatt(this)
   else
     this%dforce = sim_param%rho_inf * gam * this%mag  / sqrt(1 - mach**2)
   end if
-
+  
   ! === Unsteady contribution ===
   this%dforce = this%dforce &
               - sim_param%rho_inf * this%area * ( &
@@ -539,10 +539,11 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   type(t_linsys),    intent(inout) :: linsys
   real(wp)                         :: diff
   real(wp)                         :: mach, reynolds
-  real(wp)                         :: alpha, alcl0
+  real(wp)                         :: alpha, alpha_2d, alcl0
   real(wp),    allocatable         :: al0(:)
   real(wp),    allocatable         :: aero_coeff(:)
-  real(wp)                         :: force(3)
+  real(wp)                         :: up(3), unorm
+  real(wp)                         :: force(3), mag
   integer                          :: i_c, n_pan, id_pan
   real(wp)                         :: cl_inv, cl_visc
   real(wp)                         :: rel_fct, rhs_diff
@@ -578,7 +579,7 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   !> Induced alpha on stripe for drag calculation 
   stripe%alpha_ind = atan2(dot(stripe%vel,stripe%nor) , &
                           dot(stripe%vel,stripe%tang(:,1))) 
-  
+
   !> Sectional lift coefficient 
   cl_inv = dot(force,stripe%nor)/(0.5_wp*sim_param%rho_inf*dot(stripe%vel,stripe%vel)*stripe%area)
 
@@ -607,7 +608,7 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
 
       !> Linear interpolation of alpha0 
       al0(id_a) = airfoil_data(id_a)%aero_coeff(1)%alcl0(imach) + &
-              (mach-mach1)/(mach2-mach1) * &
+              (mach - mach1)/(mach2 - mach1) * &
               ( airfoil_data(id_a)%aero_coeff(1)%alcl0(imach+1) - &
               airfoil_data(id_a)%aero_coeff(1)%alcl0(imach  ) )
     
@@ -617,8 +618,35 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
     !write(*,*) 'alcl0', alcl0
     deallocate(al0)
 
-    !> AoA of the stripe 
-    alpha = (cl_inv/(2.0_wp*pi*sqrt(1-mach**2))) * 180/pi + alcl0! deg to enter in c81 table
+    !> AoA of the stripe         
+    !> "2D correction" of the induced angle
+    up = 0.0_wp 
+    unorm = 0.0_wp
+    up =  stripe%nor*sum(stripe%nor*stripe%vel) + stripe%tang(:,1)*sum(stripe%tang(:,1)*stripe%vel)
+    unorm = norm2(up)      ! velocity w/o induced velocity
+
+    ! Angle of incidence (full velocity)
+    !alpha = atan2(sum(up*stripe%nor), sum(up*stripe%tang(:,1)))
+    !alpha = alpha * 180.0_wp/pi  ! .c81 tables defined with angles in [deg]
+
+    mag = 0.0_wp
+    do i_c = 1, n_pan
+      if ( i_c .gt. 1 ) then
+        mag = mag + ( stripe%panels(i_c)%p%mag - stripe%panels(i_c - 1)%p%mag ) 
+      else
+        mag = mag + stripe%panels(i_c)%p%mag
+      end if
+      !write(*,*) 'i_c           ', i_c
+      !write(*,*) 'stripe%panels(i_c)%p%mag      ', stripe%panels(i_c)%p%mag
+    end do
+
+    alpha = - mag / ( pi * stripe%chord * unorm ) * 180.0_wp/pi
+    !alpha = (cl_inv/(2.0_wp*pi*sqrt(1-mach**2))) * 180/pi + alcl0! deg to enter in c81 table
+
+    !if (i_s .eq. 20) then
+    !  write(*,*) 'alpha          ',  alpha 
+    !  write(*,*) 'alpha_2d       ', alpha_2d
+    !endif
 
     !> Dynamic stall
     if(sim_param%vl_dynstall) then
@@ -655,7 +683,6 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
     !> Aerodynamic coefficients from c81 table  
     stripe%cl_visc = aero_coeff(1)
     stripe%cd = aero_coeff(2)  
-    write(*,*)  'aero_coeff',  aero_coeff
     cl_visc = stripe%cl_visc    
 
     deallocate(aero_coeff)

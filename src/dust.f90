@@ -882,7 +882,8 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                   call calc_geo_data_stripe(geo%components(i_c)%stripe(i_s))
                   call get_vel_ac_stripe(geo%components(i_c)%stripe(i_s), & 
                                       elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
-                  call correction_c81_vortlatt(airfoil_data, geo%components(i_c)%stripe(i_s), linsys, diff, it_vl, i_s)
+                  call correction_c81_vortlatt(airfoil_data, geo%components(i_c)%stripe(i_s), & 
+                                              linsys, diff, it_vl, i_s)
               !$omp atomic
                   max_diff = max(diff, max_diff) 
               !$omp end atomic
@@ -890,7 +891,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               !$omp end parallel do
             end if 
           end do 
-          write(*,*) 'max_diff           ', max_diff
+          !write(*,*) 'max_diff           ', max_diff
           !> debug output of the system
           if ((sim_param%debug_level .ge. 50) .and. time_2_debug_out) then
             write(frmt,'(I4.4)') it
