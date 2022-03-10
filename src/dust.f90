@@ -739,26 +739,14 @@ it = 1
       call solve_pressure_sys(linsys)
     end if
 
-    !> Solve the system 
+    !------ Solve the system ------
     t0 = dust_time()
     if (linsys%rank .gt. 0) then
       call solve_linsys(linsys)
     endif
     t1 = dust_time()
-    
-    !>  Update the explicit part (lifting lines) 
-    if ( size(elems_ll) .gt. 0 ) then
-      call solve_liftlin(elems_ll, elems_tot, elems , elems_ad , &
-                (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it)
-    end if
 
-    !> debug print of the results
-    if(sim_param%debug_level .ge. 1) then
-      write(message,'(A,F9.3,A)')  'Solved linear system in: ' , t1 - t0,' s.'
-      call printout(message)
-    endif
-    if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
-      call debug_printout_result(linsys, basename_debug, it)
+    sel = size(elems)
 
     !> compute dGamma_dt for unsteady contribution
 !$omp parallel do private(i_el)
@@ -851,8 +839,6 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
             !> compute dforce using AVL formula
             call el%compute_dforce_jukowski()
           ! update the pressure field, p = df.n / area
-          
-
             ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
             ! update the pressure field, p = df.n / area
             el%pres = sum(el%dforce * el%nor)/el%area
