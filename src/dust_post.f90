@@ -277,7 +277,7 @@ sim_param%CutoffRad  = getreal(prms, 'CutoffRad')
 call initialize_doublet();
 call initialize_surfpan()
 call initialize_vortline()
-call initialize_vortpart()
+!call initialize_vortpart()
 
 n_analyses = countoption(prms,'Analysis')
 
