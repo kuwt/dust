@@ -540,7 +540,7 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   real(wp)                         :: diff
   real(wp)                         :: mach, reynolds
   real(wp)                         :: alpha, alpha_2d, alcl0
-  real(wp),    allocatable         :: al0(:)
+  real(wp)                         :: al0
   real(wp),    allocatable         :: aero_coeff(:)
   real(wp)                         :: up(3), unorm
   real(wp)                         :: force(3), mag
@@ -587,7 +587,6 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   if (it_vl .eq. 0) then  
 
     !> Interpolation of alcl0
-    allocate(al0(2))
     al0 = 0.0_wp
 
     do i_a = 1, 2
@@ -607,17 +606,16 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
       mach2 = airfoil_data(id_a)%aero_coeff(1)%coeff(1)%par2(imach+1)
 
       !> Linear interpolation of alpha0 
-      al0(id_a) = airfoil_data(id_a)%aero_coeff(1)%alcl0(imach) + &
+      al0 = al0 + airfoil_data(id_a)%aero_coeff(1)%alcl0(imach) + &
               (mach - mach1)/(mach2 - mach1) * &
               ( airfoil_data(id_a)%aero_coeff(1)%alcl0(imach+1) - &
               airfoil_data(id_a)%aero_coeff(1)%alcl0(imach  ) )
     
     end do
     !> Take the average of al0
-    alcl0 = sum(al0)/2 
+    alcl0 = al0/2 
     !write(*,*) 'alcl0', alcl0
-    deallocate(al0)
-
+    
     !> AoA of the stripe         
     !> "2D correction" of the induced angle
     up = 0.0_wp 
