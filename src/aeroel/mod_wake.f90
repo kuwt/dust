@@ -52,6 +52,9 @@ module mod_wake
 use mod_param, only: &
   wp, nl, pi, max_char_len
 
+use mod_math, only: &
+  cross
+
 use mod_sim_param, only: &
   sim_param
 
@@ -1212,7 +1215,8 @@ subroutine complete_wake(wake, geo, elems, te)
   real(wp)                              :: dir(3), partvec(3), ave, alpha_p(3), alpha_p_n
   integer                               :: k, n_part
   real(wp)                              :: vel_in(3), vel_out(3), wind(3)
-
+  real(wp)                              :: area
+  
   ! flow separation variables
   integer                                :: i_comp , i_elem , n_elem
 
@@ -1373,7 +1377,9 @@ subroutine complete_wake(wake, geo, elems, te)
       pos_p = (points_end(:,p1)+points_end(:,p2)+ &
               wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
               wake%pan_w_points(:,p2,wake%nmax_pan+1) )/4.0_wp
-
+      ! A = 1/2 [()        
+      area = norm2(cross(points_end(:,p1)- wake%pan_w_points(:,p2,wake%nmax_pan+1),&
+                   points_end(:,p2)-wake%pan_w_points(:,p2,wake%nmax_pan+1)))
       !Add the particle (if it is in the box)
       if(all(pos_p .ge. wake%part_box_min) .and. &
           all(pos_p .le. wake%part_box_max)) then
@@ -1392,7 +1398,10 @@ subroutine complete_wake(wake, geo, elems, te)
             endif
 
             wake%wake_parts(ip)%cen = pos_p
-
+			!wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
+			wake%wake_parts(ip)%r_Vortex = 1.5_wp*sqrt(2.0_wp*area) ! k*radius of the circumscribed circle 
+			!write(*,*) wake%wake_parts(ip)%r_Vortex
+            wake%wake_parts(ip)%r_cutoff  = sim_param%CutoffRad
             wake%wake_parts(ip)%vel = 0.5_wp * &
                               ( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
                                 wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
