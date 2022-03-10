@@ -56,7 +56,7 @@ use mod_handling, only: &
 
 implicit none
 
-public :: cross , linear_interp , compute_qr, rotation_vector_combination
+public :: dot, cross , linear_interp , compute_qr, rotation_vector_combination
 
 private
 
@@ -68,6 +68,15 @@ end interface linear_interp
 character(len=*), parameter :: this_mod_name='mod_math'
 
 contains
+
+pure function dot(a, b)
+  real(wp)                           :: dot
+  real(wp), dimension(:), intent(in) :: a, b
+
+  dot = sum(a * b)
+
+end function dot
+
 
 ! ----------------------------------------------------------------------
 
