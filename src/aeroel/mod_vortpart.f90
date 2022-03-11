@@ -188,19 +188,19 @@ end subroutine compute_grad_vortpart
 !! WARNING: the calculated term, to be consistent with the formulation of
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
-subroutine compute_stretch_vortpart (this, pos, alpha, stretch)
+subroutine compute_stretch_vortpart (this, pos, alpha, r_Vortex_p, stretch)
  class(t_vortpart), intent(in) :: this
  real(wp), intent(in) :: pos(:)
  real(wp), intent(in) :: alpha(3)
  real(wp), intent(out) :: stretch(3)
-
+ real(wp), intent(in)          :: r_Vortex_p ! vortex rad of the particle p (induced on)
  real(wp) :: dist(3), distn, vecprod(3), c, d !, Sr, dSr
-
+ real(wp) :: r_ave
   !TODO: add far field approximations
 
   dist = pos-this%cen
   distn = norm2(dist)
-
+  r_ave = (this%r_Vortex + r_Vortex_p)*0.5_wp
 !!  !distn = sqrt(sum(dist**2)+r_Vortex**2) !rosenhead
 !!  !Rankine
 !!  distn = norm2(dist)
@@ -236,7 +236,7 @@ subroutine compute_stretch_vortpart (this, pos, alpha, stretch)
 
   !transpose, generic
   vecprod = cross(alpha, this%dir*this%mag)
-  call kernel_coeffs(this%r_Vortex, distn, c, d)
+  call kernel_coeffs(r_ave, distn, c, d)
   stretch = -( c * vecprod + d * dist * sum(dist*vecprod) )
 
 end subroutine compute_stretch_vortpart
@@ -248,19 +248,19 @@ end subroutine compute_stretch_vortpart
 !! WARNING: the calculated term, to be consistent with the formulation of
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
-subroutine compute_rotu_vortpart (this, pos, alpha, rotu)
+subroutine compute_rotu_vortpart (this, pos, alpha, r_Vortex_p, rotu)
  class(t_vortpart), intent(in) :: this
  real(wp), intent(in) :: pos(:)
  real(wp), intent(in) :: alpha(3)
  real(wp), intent(out) :: rotu(3)
-
+ real(wp), intent(in)          :: r_Vortex_p ! vortex rad of the particle p (induced on)
  real(wp) :: dist(3), distn, c, d
-
+ real(wp) :: r_ave
   !TODO: add far field approximations
 
   dist = pos-this%cen
   distn = norm2(dist)
-
+  r_ave = (this%r_Vortex + r_Vortex_p)*0.5_wp
   !rosenhead
   !distn = sqrt(sum(dist**2)+r_Vortex**2)
 
@@ -268,7 +268,7 @@ subroutine compute_rotu_vortpart (this, pos, alpha, rotu)
   !     +3.0_wp/(distn)**5 * cross(dist, cross(dist, this%dir*this%mag))
 
   !generic
-  call kernel_coeffs(this%r_Vortex, distn, c, d)
+  call kernel_coeffs(r_ave, distn, c, d)
   rotu = -2.0_wp * c * this%dir*this%mag + d * cross(dist, cross(dist, this%dir*this%mag))
 
 
@@ -281,7 +281,7 @@ subroutine kernel_coeffs(r_vort, rr, c, d)
  real(wp), intent(in) :: r_vort, rr
  real(wp), intent(out) :: c,d
 
- real(wp) :: distn,r
+ real(wp) :: distn, r
 
   r = rr
 
@@ -321,11 +321,11 @@ end subroutine
 !> Compute the vorticity diffusion induced by a vortex particle
 !! in a prescribed position with a prescribed vorticity (i.e. another particle)
 !!
-subroutine compute_diffusion_vortpart (this, pos, alpha, diff)!r_Vortex_p, diff)
+subroutine compute_diffusion_vortpart (this, pos, alpha, r_Vortex_p, diff)
   class(t_vortpart), intent(in) :: this ! particle q (inducing)
   real(wp), intent(in)          :: pos(:)
   real(wp), intent(in)          :: alpha(3)
-  !real(wp), intent(in)          :: r_Vortex_p ! vortex rad of the particle p (induced on)
+  real(wp), intent(in)          :: r_Vortex_p ! vortex rad of the particle p (induced on)
   real(wp), intent(out)         :: diff(3)
   real(wp)                      :: dist(3), distn
   real(wp)                      :: volp, volq
@@ -333,7 +333,7 @@ subroutine compute_diffusion_vortpart (this, pos, alpha, diff)!r_Vortex_p, diff)
   dist = pos-this%cen
   distn = norm2(dist)
 
-  volp = 4.0_wp/3.0_wp*pi*this%r_Vortex**3
+  volp = 4.0_wp/3.0_wp*pi*r_Vortex_p**3
   volq = 4.0_wp/3.0_wp*pi*this%r_Vortex**3
   diff = 1.0_wp/(this%r_Vortex**2)*(volp*this%dir*this%mag - volq*alpha) &
                                             *etaeps(distn,this%r_Vortex)

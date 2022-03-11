@@ -1056,13 +1056,13 @@ subroutine update_wake(wake, elems, octree)
         do iq = 1, wake%n_prt
           if (ip.ne.iq) then
             call wake%part_p(iq)%p%compute_stretch(wake%part_p(ip)%p%cen, &
-                  wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, str)
+                  wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, wake%part_p(ip)%p%r_Vortex, str)
             ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
             stretch = stretch + str/(4.0_wp*pi)
 
             if(sim_param%use_divfilt) then
               call wake%part_p(iq)%p%compute_rotu(wake%part_p(ip)%p%cen, &
-                    wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, ru)
+                    wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, wake%part_p(ip)%p%r_Vortex, ru)
               rotu = rotu + ru/(4.0_wp*pi)
 
             endif
@@ -1086,8 +1086,7 @@ subroutine update_wake(wake, elems, octree)
           if (ip.ne.iq) then
             call wake%part_p(iq)%p%compute_diffusion(wake%part_p(ip)%p%cen, &
                   wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, &
-                  df)
-                  !wake%part_p(ip)%p%r_Vortex, df)
+                  wake%part_p(ip)%p%r_Vortex, df)
             diff = diff + df*sim_param%nu_inf
           endif
 
