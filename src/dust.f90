@@ -331,7 +331,9 @@ call prms%CreateRealOption( 'RankineRad', &
       "Radius of Rankine correction for vortex induction near core", '0.1')
 call prms%CreateRealOption( 'VortexRad', &
       "Radius of vortex core, for particles", '0.1')
-call prms%CreateRealOption( 'CutoffRad', &
+call prms%CreateRealOption('KVortexRad', &
+      "Radius coefficient of vortex core, for particles", '-1.0') ! default is OFF
+call prms%CreateRealOption('CutoffRad', &
       "Radius of complete cutoff  for vortex induction near core", '0.001')
 
 ! --- lifting line elements ---
@@ -1151,18 +1153,21 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%ReferenceFile = getstr(prms,'ReferenceFile')
   !Method parameters
   sim_param%FarFieldRatioDoublet  = getreal(prms, 'FarFieldRatioDoublet')
-  sim_param%FarFieldRatioSource  = getreal(prms, 'FarFieldRatioSource')
-  sim_param%DoubletThreshold   = getreal(prms, 'DoubletThreshold')
-  sim_param%RankineRad = getreal(prms, 'RankineRad')
-  sim_param%VortexRad = getreal(prms, 'VortexRad')
-  sim_param%CutoffRad  = getreal(prms, 'CutoffRad')
-  sim_param%first_panel_scaling = getreal(prms,'ImplicitPanelScale')
-  sim_param%min_vel_at_te  = getreal(prms,'ImplicitPanelMinVel')
-  sim_param%use_vs = getlogical(prms, 'Vortstretch')
-  sim_param%vs_elems = getlogical(prms, 'VortstretchFromElems')
-  sim_param%use_vd = getlogical(prms, 'Diffusion')
-  sim_param%use_tv = getlogical(prms, 'TurbulentViscosity')
-  sim_param%use_pa = getlogical(prms, 'PenetrationAvoidance')
+  sim_param%FarFieldRatioSource   = getreal(prms, 'FarFieldRatioSource')
+  sim_param%DoubletThreshold      = getreal(prms, 'DoubletThreshold')
+  sim_param%RankineRad            = getreal(prms, 'RankineRad')
+  sim_param%VortexRad             = getreal(prms, 'VortexRad')
+  sim_param%KVortexRad             = getreal(prms, 'KVortexRad')
+  sim_param%CutoffRad             = getreal(prms, 'CutoffRad')
+  sim_param%first_panel_scaling   = getreal(prms, 'ImplicitPanelScale')
+  sim_param%min_vel_at_te         = getreal(prms, 'ImplicitPanelMinVel')
+  sim_param%use_vs                = getlogical(prms, 'Vortstretch')
+  sim_param%vs_elems              = getlogical(prms, 'VortstretchFromElems')
+  sim_param%use_vd                = getlogical(prms, 'Diffusion')
+  sim_param%use_tv                = getlogical(prms, 'TurbulentViscosity')
+  sim_param%use_ve                = getlogical(prms, 'ViscosityEffects')
+  sim_param%use_pa                = getlogical(prms, 'PenetrationAvoidance')
+  !> Check on penetration avoidance 
   if(sim_param%use_pa) then
     sim_param%pa_rad_mult = getreal(prms, 'PenetrationAvoidanceCheckRadius')
     sim_param%pa_elrad_mult = getreal(prms,'PenetrationAvoidanceElementRadius')
