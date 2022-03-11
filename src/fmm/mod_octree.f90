@@ -124,7 +124,7 @@ type :: t_cell
   !> Number of particles contained in each cell
   integer :: npart
 
-  !> Poiners to all the particles contained in the cell
+  !> Pointers to all the particles contained in the cell
   type(t_vortpart_p), allocatable :: cell_parts(:)
 
   !> Number of panels (centres) contained in the cell
@@ -1270,7 +1270,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
             endif
             if(sim_param%use_vd) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
-                 %compute_diffusion(pos, alpha, str)
+                 %compute_diffusion(pos, alpha,str)! octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ip)%p%r_Vortex ,str)
               stretch = stretch +str*(sim_param%nu_inf+turbvisc)
             endif
           enddo
@@ -1301,7 +1301,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
          endif
          if(sim_param%use_vd) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
-              %compute_diffusion(pos, alpha, str)
+              %compute_diffusion(pos, alpha, str)!octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ip)%p%r_Vortex, str)
            stretch = stretch +str*(sim_param%nu_inf+turbvisc)
          endif
        enddo
@@ -1330,7 +1330,8 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
 
           if(sim_param%use_vd) then
             call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_diffusion(pos, &
-                                                          alpha, str)
+                                                  alpha, str)
+                     !alpha, octree%leaves(lv)%p%cell_parts(ipp)%p%r_Vortex, str)
             stretch = stretch + str*(sim_param%nu_inf+turbvisc)
           endif
 

@@ -248,6 +248,8 @@ type :: t_stripe
   real(wp) :: nor(3)
   !> Body component of the velocity 
   real(wp) :: ub(3)
+  !> Norm of stripe velocity
+  real(wp) :: unorm  
   !> Drag coefficient 
   real(wp) :: cd
   !> Lift coefficient (from c81)
@@ -258,6 +260,7 @@ type :: t_stripe
   real(wp) :: alpha
   !> AoA at previous time step (only for dynstall)
   real(wp) :: alpha_old = 0.0_wp 
+  
 end type
 
 !----------------------------------------------------------------------

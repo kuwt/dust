@@ -622,7 +622,7 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
     unorm = 0.0_wp
     up =  stripe%nor*sum(stripe%nor*stripe%vel) + stripe%tang(:,1)*sum(stripe%tang(:,1)*stripe%vel)
     unorm = norm2(up)      ! velocity w/o induced velocity
-
+    stripe%unorm = unorm
     ! Angle of incidence (full velocity)
     !alpha = atan2(sum(up*stripe%nor), sum(up*stripe%tang(:,1)))
     !alpha = alpha * 180.0_wp/pi  ! .c81 tables defined with angles in [deg]
@@ -638,7 +638,7 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
       !write(*,*) 'stripe%panels(i_c)%p%mag      ', stripe%panels(i_c)%p%mag
     end do
 
-    alpha = - mag / ( pi * stripe%chord * unorm ) * 180.0_wp/pi
+    alpha = - mag / ( pi * stripe%chord * unorm ) * 180.0_wp/pi + alcl0
     !alpha = (cl_inv/(2.0_wp*pi*sqrt(1-mach**2))) * 180/pi + alcl0! deg to enter in c81 table
 
     !if (i_s .eq. 20) then

@@ -1085,7 +1085,9 @@ subroutine update_wake(wake, elems, octree)
 
           if (ip.ne.iq) then
             call wake%part_p(iq)%p%compute_diffusion(wake%part_p(ip)%p%cen, &
-                  wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, df)
+                  wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, &
+                  df)
+                  !wake%part_p(ip)%p%r_Vortex, df)
             diff = diff + df*sim_param%nu_inf
           endif
 
@@ -1377,9 +1379,9 @@ subroutine complete_wake(wake, geo, elems, te)
       pos_p = (points_end(:,p1)+points_end(:,p2)+ &
               wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
               wake%pan_w_points(:,p2,wake%nmax_pan+1) )/4.0_wp
-      ! A = 1/2 [()        
+      ! panel area     
       area = norm2(cross(points_end(:,p1)- wake%pan_w_points(:,p2,wake%nmax_pan+1),&
-                   points_end(:,p2)-wake%pan_w_points(:,p2,wake%nmax_pan+1)))
+                    points_end(:,p2)-wake%pan_w_points(:,p2,wake%nmax_pan+1)))
       !Add the particle (if it is in the box)
       if(all(pos_p .ge. wake%part_box_min) .and. &
           all(pos_p .le. wake%part_box_max)) then
@@ -1399,7 +1401,7 @@ subroutine complete_wake(wake, geo, elems, te)
 
             wake%wake_parts(ip)%cen = pos_p
 			!wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
-			wake%wake_parts(ip)%r_Vortex = 1.5_wp*sqrt(2.0_wp*area) ! k*radius of the circumscribed circle 
+			wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad*sqrt(2.0_wp*area) ! k*radius of the circumscribed circle 
 			!write(*,*) wake%wake_parts(ip)%r_Vortex
             wake%wake_parts(ip)%r_cutoff  = sim_param%CutoffRad
             wake%wake_parts(ip)%vel = 0.5_wp * &

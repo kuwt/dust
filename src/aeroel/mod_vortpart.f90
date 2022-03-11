@@ -321,15 +321,15 @@ end subroutine
 !> Compute the vorticity diffusion induced by a vortex particle
 !! in a prescribed position with a prescribed vorticity (i.e. another particle)
 !!
-subroutine compute_diffusion_vortpart (this, pos, alpha, diff)
- class(t_vortpart), intent(in) :: this
- real(wp), intent(in) :: pos(:)
- real(wp), intent(in) :: alpha(3)
- real(wp), intent(out) :: diff(3)
-
- real(wp) :: dist(3), distn
- real(wp) :: volp, volq
-
+subroutine compute_diffusion_vortpart (this, pos, alpha, diff)!r_Vortex_p, diff)
+  class(t_vortpart), intent(in) :: this ! particle q (inducing)
+  real(wp), intent(in)          :: pos(:)
+  real(wp), intent(in)          :: alpha(3)
+  !real(wp), intent(in)          :: r_Vortex_p ! vortex rad of the particle p (induced on)
+  real(wp), intent(out)         :: diff(3)
+  real(wp)                      :: dist(3), distn
+  real(wp)                      :: volp, volq
+  
   dist = pos-this%cen
   distn = norm2(dist)
 

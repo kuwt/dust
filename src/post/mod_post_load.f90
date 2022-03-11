@@ -556,6 +556,7 @@ subroutine load_wake_post(floc, wake, wake_p)
  integer,  allocatable :: wconn_rin(:)
  real(wp), allocatable :: wvort_rin(:,:)
  real(wp), allocatable :: vppoints(:,:), vpvort(:,:)
+ real(wp), allocatable :: v_rad(:)
  integer :: n_wake_stripes , npan, ndisks, nrows
  integer :: nsides
  integer :: p1 , p2
@@ -653,6 +654,7 @@ subroutine load_wake_post(floc, wake, wake_p)
   call open_hdf5_group(floc, 'ParticleWake', gloc)
   call read_hdf5_al(vppoints,'WakePoints',gloc)
   call read_hdf5_al(vpvort,'WakeVort',gloc)
+  call read_hdf5_al(v_rad,'v_rad',gloc)
   call close_hdf5_group(gloc)
 
   wake%n_prt = size(vpvort,2)
@@ -681,6 +683,7 @@ subroutine load_wake_post(floc, wake, wake_p)
     wake%wake_parts(ip)%cen = vppoints(:,ip)
     wake%wake_parts(ip)%mag => wake%prt_ivort(ip)
     wake%wake_parts(ip)%mag = norm2(vpvort(:,ip))
+    wake%wake_parts(ip)%r_Vortex = v_rad(ip)
     if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
       wake%wake_parts(ip)%dir = vpvort(:,ip)/wake%wake_parts(ip)%mag
     else
@@ -691,7 +694,7 @@ subroutine load_wake_post(floc, wake, wake_p)
     wake%vort_p(ip)%p => wake%wake_parts(ip)
   enddo
 
-  deallocate(vppoints, vpvort)
+  deallocate(vppoints, vpvort, v_rad)
 
   !Stitch everything together
   if(wake%n_prt .gt. 0) then

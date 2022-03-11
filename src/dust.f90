@@ -919,12 +919,13 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
             trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
             do i_s = 1, size(geo%components(i_c)%stripe)  
               d_cd = 0.5_wp * sim_param%rho_inf *  & 
-                      geo%components(i_c)%stripe(i_s)%vel**2.0_wp * & 
+                      geo%components(i_c)%stripe(i_s)%unorm**2.0_wp * & 
                       geo%components(i_c)%stripe(i_s)%cd *  &
-                      (sin(geo%components(i_c)%stripe(i_s)%alpha_ind) * & 
+                      (sin(geo%components(i_c)%stripe(i_s)%alpha) * & 
                       geo%components(i_c)%stripe(i_s)%nor +  &
-                      cos(geo%components(i_c)%stripe(i_s)%alpha_ind) * & 
+                      cos(geo%components(i_c)%stripe(i_s)%alpha) * & 
                       geo%components(i_c)%stripe(i_s)%tang(:,1) )
+
               do i_p = 1, size(geo%components(i_c)%stripe(i_s)%panels)
                 geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce = &
                             geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce + &

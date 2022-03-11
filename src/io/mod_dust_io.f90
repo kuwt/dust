@@ -142,7 +142,7 @@ subroutine save_status(geo, wake, it, time, run_id)
  integer :: ie, ne
  real(wp), allocatable :: vort(:), cp(:) , pres(:)
  real(wp), allocatable :: dforce(:,:), dmom(:,:), surf_vel(:,:)
- real(wp), allocatable :: turbvisc(:)
+ real(wp), allocatable :: turbvisc(:), v_rad(:)
  real(wp), allocatable :: points_w(:,:,:), cent(:,:,:) , vel_w(:,:,:)
  real(wp), allocatable :: vort_v(:,:)
  integer, allocatable :: conn_pe(:)
@@ -334,21 +334,25 @@ subroutine save_status(geo, wake, it, time, run_id)
   allocate(vort_v(3,wake%n_prt))
   allocate(turbvisc(wake%n_prt))
   allocate(vel_w(3,wake%n_prt,1))
+  allocate(v_rad(wake%n_prt))
 
   do ip = 1, wake%n_prt
     points_w(:,ip,1) = wake%part_p(ip)%p%cen
     vel_w(:,ip,1) = wake%part_p(ip)%p%vel
     vort_v(:,ip) = wake%part_p(ip)%p%dir * wake%part_p(ip)%p%mag
     turbvisc(ip) = wake%part_p(ip)%p%turbvisc
+    v_rad(ip) = wake%part_p(ip)%p%r_Vortex
   enddo
   call write_hdf5(points_w(:,:,1),'WakePoints',gloc1)
   call write_hdf5(   vel_w(:,:,1),'WakeVels'  ,gloc1)
   call write_hdf5( turbvisc,'turbvisc'  ,gloc1)
 
   call write_hdf5(vort_v,'WakeVort',gloc1)
+  call write_hdf5( v_rad,'v_rad'  ,gloc1)
+
   call write_hdf5(wake%last_pan_idou,'LastPanIdou',gloc1)
   call close_hdf5_group(gloc1)
-  deallocate(points_w, vort_v, vel_w, turbvisc)
+  deallocate(points_w, vort_v, vel_w, turbvisc, v_rad)
 
   ! 3) %%%% References
   ! save the whole list of references
