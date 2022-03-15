@@ -2101,7 +2101,8 @@ subroutine create_strip_connectivity(geo)
           comp%stripe(i_s)%area = comp%stripe(i_s)%area + comp%el(i_c+(i_s-1)*n_c)%area
         end do   
           
-          if (sim_param%vl_correction) then
+          if (trim(comp%comp_el_type) .eq. 'v' .and. &
+              trim(comp%aero_correction) .eq. 'true') then
             comp%stripe(i_s)%csi_cen = 0.5_wp * sum(comp%normalised_coord_e(:,i_s))  
             comp%stripe(i_s)%i_airfoil =  comp%i_airfoil_e(:,i_s)
 

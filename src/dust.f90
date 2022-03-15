@@ -214,10 +214,10 @@ real(wp) , allocatable            :: al_kernel(:,:), al_v(:)
 
 !> VL viscous correction
 integer                           :: i_el, i_c, i_s, i, sel, i_p
-integer                           :: it_vl
+integer                           :: it_vl, id_pan
 real(wp)                          :: tol, diff, max_diff 
 real(wp)                          :: d_cd(3)
-
+real(wp) ,allocatable             :: res_relax_old(:)
 !> octree parameters
 type(t_octree)                    :: octree
 
@@ -854,12 +854,17 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
       it_vl = 0
       max_diff = tol + 1e-6_wp
       linsys%skip = .true.
+      
+      
       !> Select time step to start the vl correction 
       !  (avoid strange behaviour at the begining of simulation)
       if (it .gt. sim_param%vl_startstep) then 
+        allocate(res_relax_old(size(elems)))
         do while (max_diff .gt. tol .and. it_vl .lt. sim_param%vl_maxiter)
+          
           max_diff = 0.0_wp
           diff = 0.0_wp
+          
           do i_c = 1, size(geo%components)
             if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
               trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
@@ -877,8 +882,9 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               !$omp end parallel do
             end if 
           end do 
-          !write(*,*) 'max_diff           ', max_diff
-          !> debug output of the system
+          
+
+          !> Debug output of the system
           if ((sim_param%debug_level .ge. 50) .and. time_2_debug_out) then
             write(frmt,'(I4.4)') it
             write(frmt_vl,'(I4.4)') it_vl
@@ -891,7 +897,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           if (linsys%rank .gt. 0) then
             call solve_linsys(linsys)     
           endif
-          
+
           do i_el = 1 , sel      
             elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
             select type(el => elems(i_el)%p)        
@@ -905,6 +911,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           it_vl = it_vl + 1
 
         end do !(while)
+        deallocate(res_relax_old)
 
         if(it_vl .eq. sim_param%vl_maxiter) then
           call warning('dust','dust','max iteration reached for non linear vl:&
@@ -917,15 +924,15 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         do i_c = 1, size(geo%components)
           if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
             trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
-            do i_s = 1, size(geo%components(i_c)%stripe)  
+            do i_s = 1, size(geo%components(i_c)%stripe) 
               d_cd = 0.5_wp * sim_param%rho_inf *  & 
                       geo%components(i_c)%stripe(i_s)%unorm**2.0_wp * & 
                       geo%components(i_c)%stripe(i_s)%cd *  &
-                      (sin(geo%components(i_c)%stripe(i_s)%alpha) * & 
+                      (sin(geo%components(i_c)%stripe(i_s)%alpha/180.0_wp*pi) * & 
                       geo%components(i_c)%stripe(i_s)%nor +  &
-                      cos(geo%components(i_c)%stripe(i_s)%alpha) * & 
+                      cos(geo%components(i_c)%stripe(i_s)%alpha/180.0_wp*pi) * & 
                       geo%components(i_c)%stripe(i_s)%tang(:,1) )
-
+              
               do i_p = 1, size(geo%components(i_c)%stripe(i_s)%panels)
                 geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce = &
                             geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce + &

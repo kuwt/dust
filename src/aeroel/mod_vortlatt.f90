@@ -558,7 +558,7 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   real(wp)                         :: rad_break, rad_dyn, M1, M2, g1, g2, g2_max
 
   !> Relaxation factor
-  rel_fct = sim_param%vl_relax
+  !rel_fct = sim_param%vl_relax
   
   !> Total panel on stripe 
   n_pan = size(stripe%panels)
@@ -570,6 +570,13 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   reynolds = sim_param%rho_inf * norm2(stripe%vel) * &
                           stripe%chord / sim_param%mu_inf
 
+  !> AoA of the stripe         
+  !> "2D correction" of the induced angle
+  up = 0.0_wp 
+  unorm = 0.0_wp
+  up =  stripe%nor*sum(stripe%nor*stripe%vel) + stripe%tang(:,1)*sum(stripe%tang(:,1)*stripe%vel)
+  unorm = norm2(up)      ! velocity w/o induced velocity
+  stripe%unorm = unorm
   !> Force calculation on the stripe 
   force = 0.0_wp
   do i_c = 1, n_pan
@@ -581,7 +588,7 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
                           dot(stripe%vel,stripe%tang(:,1))) 
 
   !> Sectional lift coefficient 
-  cl_inv = dot(force,stripe%nor)/(0.5_wp*sim_param%rho_inf*dot(stripe%vel,stripe%vel)*stripe%area)
+  cl_inv = dot(force,stripe%nor)/(0.5_wp*sim_param%rho_inf*(unorm**2)*stripe%area)
 
   !> AoA of the stripe (from inviscid calculation)
   if (it_vl .eq. 0) then  
@@ -614,19 +621,6 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
     end do
     !> Take the average of al0
     alcl0 = al0/2 
-    !write(*,*) 'alcl0', alcl0
-    
-    !> AoA of the stripe         
-    !> "2D correction" of the induced angle
-    up = 0.0_wp 
-    unorm = 0.0_wp
-    up =  stripe%nor*sum(stripe%nor*stripe%vel) + stripe%tang(:,1)*sum(stripe%tang(:,1)*stripe%vel)
-    unorm = norm2(up)      ! velocity w/o induced velocity
-    stripe%unorm = unorm
-    ! Angle of incidence (full velocity)
-    !alpha = atan2(sum(up*stripe%nor), sum(up*stripe%tang(:,1)))
-    !alpha = alpha * 180.0_wp/pi  ! .c81 tables defined with angles in [deg]
-
     mag = 0.0_wp
     do i_c = 1, n_pan
       if ( i_c .gt. 1 ) then
@@ -634,14 +628,16 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
       else
         mag = mag + stripe%panels(i_c)%p%mag
       end if
-      !write(*,*) 'i_c           ', i_c
-      !write(*,*) 'stripe%panels(i_c)%p%mag      ', stripe%panels(i_c)%p%mag
+      !if (i_s .eq. 3) then
+      !  write(*,*) 'i_c           ', i_c
+      !  write(*,*) 'stripe%panels(i_c)%p%mag      ', stripe%panels(i_c)%p%mag
+      !end if   
     end do
 
     alpha = - mag / ( pi * stripe%chord * unorm ) * 180.0_wp/pi + alcl0
     !alpha = (cl_inv/(2.0_wp*pi*sqrt(1-mach**2))) * 180/pi + alcl0! deg to enter in c81 table
 
-    !if (i_s .eq. 20) then
+    !if (i_s .eq. 3) then
     !  write(*,*) 'alpha          ',  alpha 
     !  write(*,*) 'alpha_2d       ', alpha_2d
     !endif
@@ -676,21 +672,30 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
     
     !> Interpolation of the aerodynamic coefficents 
     call interp_aero_coeff ( airfoil_data,  stripe%csi_cen, stripe%i_airfoil , &
-                          (/alpha_ref, mach, reynolds/), aero_coeff )
-    
+                        (/alpha_ref, mach, reynolds/), aero_coeff )
+  
     !> Aerodynamic coefficients from c81 table  
     stripe%cl_visc = aero_coeff(1)
     stripe%cd = aero_coeff(2)  
     cl_visc = stripe%cl_visc    
-
     deallocate(aero_coeff)
+    !write(*,*) 'alpha_ref ', i_s, alpha_ref
+    !
+    !if (i_s .eq. 10) then 
+    !  write(*,*) 'time      ', sim_param%time
+    !  write(*,*) 'alpha     ', alpha_ref
+    !  write(*,*) 'cl_visc   ', cl_visc
+    !  write(*,*) 'cl_inv    ', cl_inv
+    !end if 
+    
+  !
   else 
     cl_visc = stripe%cl_visc
   endif 
   
   !> Update term rhs (absolute)
   rhs_diff = (cl_visc - cl_inv)
-
+  rhs_diff = 0.05_wp*atan(rhs_diff)*2.0_wp/pi ! 0.05 hardcoded so far 
   !> Update tolerance  
   diff = abs(cl_visc - cl_inv)
   
@@ -698,7 +703,8 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
     !> Take the id of the panel in the linsys 
     id_pan = stripe%panels(i_c)%p%id
     !> Update of the rhs 
-    linsys%b(id_pan) =  (1 + rel_fct*rhs_diff)*linsys%b(id_pan)
+    linsys%b(id_pan) =  (1 + rhs_diff)*linsys%b(id_pan) ! 0.05 hardcoded so far 
+    
   end do 
 
 end subroutine correction_c81_vortlatt
