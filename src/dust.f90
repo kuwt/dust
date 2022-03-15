@@ -314,6 +314,8 @@ call prms%CreateRealOption('RankineRad', &
       "Radius of Rankine correction for vortex induction near core", '0.1')
 call prms%CreateRealOption('VortexRad', &
       "Radius of vortex core, for particles", '0.1')
+call prms%CreateRealOption('KVortexRad', &
+      "Radius coefficient of vortex core, for particles", '-1.0') ! default is OFF
 call prms%CreateRealOption('CutoffRad', &
       "Radius of complete cutoff  for vortex induction near core", '0.001')
 
@@ -1213,6 +1215,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%DoubletThreshold      = getreal(prms, 'DoubletThreshold')
   sim_param%RankineRad            = getreal(prms, 'RankineRad')
   sim_param%VortexRad             = getreal(prms, 'VortexRad')
+  sim_param%KVortexRad             = getreal(prms, 'KVortexRad')
   sim_param%CutoffRad             = getreal(prms, 'CutoffRad')
   sim_param%first_panel_scaling   = getreal(prms, 'ImplicitPanelScale')
   sim_param%min_vel_at_te         = getreal(prms, 'ImplicitPanelMinVel')
