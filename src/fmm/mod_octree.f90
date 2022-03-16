@@ -1026,10 +1026,10 @@ subroutine calculate_multipole(part,octree)
 !$omp parallel do private(lv) schedule(guided)
   do lv = 1, octree%nleaves
     call octree%leaves(lv)%p%mp%leaf_M(&
-               octree%leaves(lv)%p%cen, &
-               octree%leaves(lv)%p%cell_parts, &
-               octree%leaves(lv)%p%npart, &
-               octree%pexp  )
+              octree%leaves(lv)%p%cen, &
+              octree%leaves(lv)%p%cell_parts, &
+              octree%leaves(lv)%p%npart, &
+              octree%pexp  )
   enddo
 !$omp end parallel do
   !PROFILE
@@ -1252,11 +1252,11 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
           do ipp = 1,octree%leaves(lv)%p%neighbours(i,j,k)%p%npart
 
             call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
-                 %compute_vel(pos, v)
+                  %compute_vel(pos, v)
             vel = vel +v/(4.0_wp*pi)
             if(sim_param%use_vs) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
-                 %compute_stretch(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, str)
+                  %compute_stretch(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, str)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
               stretch = stretch + str/(4.0_wp*pi)
 !             !removed the parallel component
@@ -1264,13 +1264,13 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
 ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
               if(sim_param%use_divfilt) then
                 call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
-                   %compute_rotu(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex,  ru)
+                    %compute_rotu(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex,  ru)
                 rotu = rotu + ru/(4.0_wp*pi)
               endif
             endif
             if(sim_param%use_vd) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
-                 %compute_diffusion(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex ,str)
+                  %compute_diffusion(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex ,str)
               stretch = stretch +str*(sim_param%nu_inf+turbvisc)
             endif
           enddo

@@ -833,17 +833,23 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     ! ifort and parallel runs, so the cycle is executed another time just for the
     ! vortex lattices
     if ( geo%nVortLatt .gt. 0) then
+      !$omp parallel do private(i_el)
+        do i_el = 1 , sel      
+          select type(el => elems(i_el)%p)        
+            class is(t_vortlatt)          
+              call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/), wake%vort_p)
+              !> compute dforce using AVL formula
+          end select
+        end do 
+      !$omp parallel do private(i_el)
       do i_el = 1 , sel      
         select type(el => elems(i_el)%p)        
           class is(t_vortlatt)          
-            call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/), wake%vort_p)
-            !> compute dforce using AVL formula
             call el%compute_dforce_jukowski()
           ! update the pressure field, p = df.n / area
             ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
             ! update the pressure field, p = df.n / area
             el%pres = sum(el%dforce * el%nor)/el%area
-
         end select
       end do
     end if 

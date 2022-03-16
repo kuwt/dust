@@ -558,7 +558,7 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   real(wp)                         :: rad_break, rad_dyn, M1, M2, g1, g2, g2_max
 
   !> Relaxation factor
-  !rel_fct = sim_param%vl_relax
+  rel_fct = sim_param%vl_relax
   
   !> Total panel on stripe 
   n_pan = size(stripe%panels)
@@ -634,8 +634,8 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
       !end if   
     end do
 
-    alpha = - mag / ( pi * stripe%chord * unorm ) * 180.0_wp/pi + alcl0
-    !alpha = (cl_inv/(2.0_wp*pi*sqrt(1-0*mach**2))) * 180/pi + alcl0! deg to enter in c81 table
+    !alpha = - mag / ( pi * stripe%chord * unorm ) * 180.0_wp/pi + alcl0
+    alpha = (cl_inv/(2.0_wp*pi*sqrt(1-mach**2))) * 180/pi + alcl0! deg to enter in c81 table
 
     !if (i_s .eq. 3) then
     !  write(*,*) 'alpha          ',  alpha 
@@ -695,7 +695,7 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   
   !> Update term rhs (absolute)
   rhs_diff = (cl_visc - cl_inv)
-  rhs_diff = sqrt(abs(rhs_diff))*atan(rhs_diff)/(4.0_wp*pi) ! 0.05 hardcoded so far 
+  !rhs_diff = sqrt(abs(rhs_diff))*atan(rhs_diff)/(4.0_wp*pi) ! 0.05 hardcoded so far 
   !> Update tolerance  
   diff = abs(cl_visc - cl_inv)
   
@@ -703,7 +703,7 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
     !> Take the id of the panel in the linsys 
     id_pan = stripe%panels(i_c)%p%id
     !> Update of the rhs 
-    linsys%b(id_pan) =  (1 + rhs_diff)*linsys%b(id_pan) ! 0.05 hardcoded so far 
+    linsys%b(id_pan) =  (1 + rel_fct*rhs_diff)*linsys%b(id_pan) ! 0.05 hardcoded so far 
     
   end do 
 
