@@ -828,7 +828,6 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
 #endif
 
 
- 
     ! ifort bugs workaround:
     ! since even if the following calls looks thread safe, they mess up with
     ! ifort and parallel runs, so the cycle is executed another time just for the
