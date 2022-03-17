@@ -260,6 +260,8 @@ type :: t_stripe
   real(wp) :: alpha
   !> AoA at previous time step (only for dynstall)
   real(wp) :: alpha_old = 0.0_wp 
+  !> Stripe 'curvature'
+  real(wp) :: curv
   
 end type
 

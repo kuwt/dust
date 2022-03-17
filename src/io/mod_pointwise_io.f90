@@ -135,7 +135,7 @@ contains
 subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
                               npoints_chord_tot , nelem_span_tot, &
                               airfoil_list_actual, i_airfoil_e, normalised_coord_e, & 
-                              aero_table_out)
+                              aero_table_out, curv_ac)
 
 
   character(len=*), intent(in)          :: mesh_file
@@ -154,7 +154,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   real(wp)                              :: ref_chord_fraction
 
   real(wp), allocatable                 :: chord_fraction(:)
-
+  real(wp), intent(out), optional       :: curv_ac 
   !> Point and line structures
   type(t_point) , allocatable           :: points(:)
   type(t_line ) , allocatable           :: lines(:)
@@ -279,7 +279,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   call define_section( points(1)%chord , trim(adjustl(points(1)%airfoil)) , &
                       points(1)%theta , ElType , nelem_chord             , &
                       type_chord , chord_fraction , ref_chord_fraction   , &
-                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(1)%xy )
+                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(1)%xy, curv_ac)
 
   if ( points(1)%flip_sec ) call flip_section( ElType , points(1)%xy )
 
@@ -288,7 +288,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
                       points(i)%theta , ElType , nelem_chord             , &
                       type_chord , chord_fraction , ref_chord_fraction   , &
-                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy )
+                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy, curv_ac)
 
   if ( points(i)%flip_sec ) call flip_section( ElType , points(i)%xy ) 
 
@@ -299,7 +299,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
       call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
                           points(i)%theta , ElType , nelem_chord             , &
                           type_chord , chord_fraction , ref_chord_fraction   , &
-                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy   )
+                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy, curv_ac )
 
       if ( points(i)%flip_sec ) call flip_section( ElType , points(i)%xy   )
 
@@ -326,11 +326,11 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
     call define_section( 1.0_wp , trim(adjustl(points(i1)%airfoil)) , &
                           0.0_wp , ElType , nelem_chord              , &
                           type_chord , chord_fraction , 0.0_wp       , &
-                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy1 )
+                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy1, curv_ac )
     call define_section( 1.0_wp , trim(adjustl(points(i2)%airfoil)) , &
                           0.0_wp , ElType , nelem_chord              , &
                           type_chord , chord_fraction , 0.0_wp       , &
-                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy2 )
+                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy2, curv_ac )
 
     if ( points(i1)%flip_sec ) call flip_section( ElType , xy1 )
     if ( points(i2)%flip_sec ) call flip_section( ElType , xy2 )

@@ -628,45 +628,14 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
       else
         mag = mag + stripe%panels(i_c)%p%mag
       end if
-      !if (i_s .eq. 3) then
-      !  write(*,*) 'i_c           ', i_c
-      !  write(*,*) 'stripe%panels(i_c)%p%mag      ', stripe%panels(i_c)%p%mag
-      !end if   
     end do
 
-    !alpha = - mag / ( pi * stripe%chord * unorm ) * 180.0_wp/pi + alcl0
-    alpha = (cl_inv/(2.0_wp*pi*sqrt(1-mach**2))) * 180/pi + alcl0! deg to enter in c81 table
+    alpha = - mag / ( pi * stripe%chord * unorm ) * 180.0_wp/pi + alcl0
+    !alpha = (cl_inv/(2.0_wp*pi*sqrt(1-mach**2))) * 180/pi + alcl0! deg to enter in c81 table
 
-    !if (i_s .eq. 3) then
-    !  write(*,*) 'alpha          ',  alpha 
-    !  write(*,*) 'alpha_2d       ', alpha_2d
-    !endif
 
-    !> Dynamic stall
-    if(sim_param%vl_dynstall) then
-
-      dAlpha_dt = (alpha*pi/180.0_wp - stripe%alpha_old)/sim_param%dt 
-      rad_break = 0.06_wp + 1.5_wp*(0.6_wp - thicc/stripe%chord)
-      rad_dyn = sqrt(abs(stripe%chord * dAlpha_dt/(2.0_wp* norm2(stripe%vel))))
-
-      !> dynamic stall lift
-      M1 = 0.4_wp + 5.0_wp*(0.6_wp - thicc/stripe%chord)
-      M2 = 0.9_wp + 2.5_wp*(0.6_wp - thicc/stripe%chord)
-      g2_max = 1.4_wp - 6.0_wp*(0.6_wp - thicc/stripe%chord)
-      g2 = min(g2_max,max(0.0_wp, (mach-M2)/(M1-M2)))
-      g1 = g2/2.0_wp
-      K1 = 0.75_wp + sign(0.25_wp, dAlpha_dt)
-
-      if(rad_dyn .LE. rad_break) then
-        alpha_ref = alpha - K1*g1*rad_dyn*sign(1.0_wp,dAlpha_dt) * 180_wp/pi ! deg
-      else
-        alpha_ref = alpha - K1*(g1*rad_break + g2*(rad_dyn-rad_break))* & 
-                            sign(1.0_wp,dAlpha_dt) * 180_wp/pi               ! deg
-      end if
-
-    else
       alpha_ref = alpha
-    end if ! dynstall
+
 
     stripe%alpha = alpha_ref  
     
@@ -678,21 +647,13 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
     stripe%cl_visc = aero_coeff(1)
     stripe%cd = aero_coeff(2)  
     cl_visc = stripe%cl_visc    
-    deallocate(aero_coeff)
-    !write(*,*) 'alpha_ref ', i_s, alpha_ref
-    !
-    !if (i_s .eq. 10) then 
-    !  write(*,*) 'time      ', sim_param%time
-    !  write(*,*) 'alpha     ', alpha_ref
-    !  write(*,*) 'cl_visc   ', cl_visc
-    !  write(*,*) 'cl_inv    ', cl_inv
-    !end if 
-    
-  !
+    deallocate(aero_coeff)    
   else 
     cl_visc = stripe%cl_visc
   endif 
-  
+!
+ 
+  ! 
   !> Update term rhs (absolute)
   rhs_diff = (cl_visc - cl_inv)
   !rhs_diff = sqrt(abs(rhs_diff))*atan(rhs_diff)/(4.0_wp*pi) ! 0.05 hardcoded so far 
@@ -706,6 +667,21 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
     linsys%b(id_pan) =  (1 + rel_fct*rhs_diff)*linsys%b(id_pan) ! 0.05 hardcoded so far 
     
   end do 
+  
+  if (i_s .eq. 10) then 
+    write(*,*) 'time      ', sim_param%time
+    write(*,*) 'alpha     ', stripe%alpha
+    write(*,*) 'cl_visc   ', cl_visc
+    write(*,*) 'cl_inv    ', cl_inv
+    force = 0.0_wp
+    do i_c = 1, n_pan
+    force = force + stripe%panels(i_c)%p%dforce 
+    end do
+    write(*,*) 'force   ', force
+    write(*,*) 'unorm   ', unorm
+    write(*,*) 'stripevel   ', stripe%vel
+    write(*,*) 'dot ', dot(force,stripe%nor)
+  end if
 
 end subroutine correction_c81_vortlatt
 
@@ -756,7 +732,8 @@ subroutine get_vel_ctr_pt_vortlatt(this, elems, wake_elems, vort_elems)
   
   this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp * pi) &
                     + wind - this%ub
-
+  write(*,*) 'x0             ', x0
+  write(*,*) 'this%vel_ctr_pt', this%vel_ctr_pt
 end subroutine get_vel_ctr_pt_vortlatt
 
 subroutine get_vel_ac_stripe(stripe, elems, wake_elems, vort_elems)
