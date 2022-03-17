@@ -61,8 +61,8 @@ public :: dot, cross , linear_interp , compute_qr, rotation_vector_combination
 private
 
 interface linear_interp
-  module procedure linear_interp_vector, &
-                   linear_interp_array
+  module procedure  linear_interp_vector, &
+                    linear_interp_array
 end interface linear_interp
 
 character(len=*), parameter :: this_mod_name='mod_math'
@@ -92,13 +92,12 @@ end function cross
 
 ! ----------------------------------------------------------------------
 
-subroutine linear_interp_vector( val_vec , t_vec , t , val )
-  real(wp) , intent(in) :: val_vec(:)
-  real(wp) , intent(in) :: t_vec(:)
-  real(wp) , intent(in) :: t
-  real(wp) , intent(out) :: val
-
-  integer :: it , nt
+subroutine linear_interp_vector(val_vec , t_vec , t , val)
+  real(wp), intent(in)        :: val_vec(:)
+  real(wp), intent(in)        :: t_vec(:)
+  real(wp), intent(in)        :: t
+  real(wp), intent(out)       :: val
+  integer                     :: it , nt
   character(len=*), parameter :: this_sub_name='linear_interp_vector'
 
   nt = size(t_vec)
@@ -123,7 +122,7 @@ subroutine linear_interp_vector( val_vec , t_vec , t , val )
     if ( ( t .ge. t_vec( it ) ) .and. ( t .le. t_vec( it+1 ) ) ) then
 
       val = val_vec(it) + (t-t_vec(it))/(t_vec(it+1)-t_vec(it)) * &
-                                   ( val_vec(it+1)-val_vec(it) )
+                                  ( val_vec(it+1)-val_vec(it) )
 
     end if
 
@@ -144,7 +143,6 @@ subroutine linear_interp_array( val_arr , t_vec , t , val )
 
   nt = size(t_vec)
   allocate(val(size(val_arr,1)))
-
 
   ! Check dimensions -----
   if ( size(val_arr,2) .ne. nt ) then
@@ -167,7 +165,7 @@ subroutine linear_interp_array( val_arr , t_vec , t , val )
     if ( ( t .ge. t_vec( it ) ) .and. ( t .le. t_vec( it+1 ) ) ) then
 
       val = val_arr(:,it) + (t-t_vec(it))/(t_vec(it+1)-t_vec(it)) * &
-                                   ( val_arr(:,it+1)-val_arr(:,it) )
+                                  ( val_arr(:,it+1)-val_arr(:,it) )
 
     end if
 
@@ -196,12 +194,12 @@ subroutine compute_qr ( A , Q , R )
   ! input check and warnings
   if ( allocated(Q) ) then
     call warning(this_sub_name, this_mod_name, ' Q was already allocated.&
-                                           & Deallocated and re-allocated')
+                                          & Deallocated and re-allocated')
     deallocate(Q)
   end if
   if ( allocated(R) ) then
     call warning(this_sub_name, this_mod_name, ' R was already allocated.&
-                                           & Deallocated and re-allocated')
+                                          & Deallocated and re-allocated')
     deallocate(R)
   end if
 

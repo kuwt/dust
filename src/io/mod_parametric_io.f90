@@ -59,13 +59,14 @@ use mod_handling, only: &
 use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption
 
+use mod_math, only: & 
+  linear_interp
 !----------------------------------------------------------------------
 
 implicit none
 
 public :: read_mesh_parametric, read_actuatordisk_parametric , &
           define_section , define_division
-
 private
 
 character(len=*), parameter :: this_mod_name = 'mod_parametric_io'
@@ -90,7 +91,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   integer                                   :: ee_size , rr_size
   logical                                   :: twist_linear_interp
   logical, intent(out), optional            :: aero_table
-  real(wp),intent(out), optional            :: curv_ac 
+  real(wp), allocatable, intent(out), optional :: curv_ac(:)
+  real(wp)                                  :: curv_ac_section
   integer                                   :: nelem_chord, nelem_chord_tot ! , nelem_span_tot <--- moved as an output
   integer                                   :: npoint_chord_tot, npoint_span_tot
   integer                                   :: nRegions, nSections
@@ -177,7 +179,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
   ! Section parameters
   ! already there (few lines above) as a characteristic of the whole component !!!
-  ! call pmesh_prs%CreateRealOption('ref_point_chord', 'reference point of the section (as a fraction of the chord)',&
+  ! call pmesh_prs%CreateRealOption('ref_point_chord', 'reference point of the section 
+  !                (as a fraction of the chord)',&
   !               multiple=.true.);
   call pmesh_prs%CreateRealOption(     'chord', 'section chord', &
                 multiple=.true.);
@@ -202,8 +205,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   
   !> Read the parameters
   call pmesh_prs%read_options(mesh_file,printout_val=.true.)
-  
-  
   
   nelem_chord = getint(pmesh_prs,'nelem_chord')
   ElType  = getstr(pmesh_prs,'ElType')
@@ -279,8 +280,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   allocate(twist_list  (nSections))  ; twist_list = 0.0_wp
   allocate(airfoil_list(nSections))
   allocate(airfoil_table_list(nSections))
-  
-  do iSection= 1,nSections
+  allocate(curv_ac(nSections))       ; curv_ac = 0.0_wp
+
+  do iSection= 1, nSections
     chord_list(iSection)   = getreal(pmesh_prs,'chord')
     twist_list(iSection)   = getreal(pmesh_prs,'twist')
     airfoil_list(iSection) = getstr(pmesh_prs,'airfoil')
@@ -349,15 +351,16 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
   ista = 1 ; iend = npoint_chord_tot
   ! Loop over regions
-  do iRegion = 1,nRegions
+  do iRegion = 1, nRegions
 
     if ( iRegion .gt. 1 ) then  ! first section = last section of the previous region
       rrSection1 = rrSection2
+      curv_ac(2*iRegion) = curv_ac(2*iRegion)
     else                        ! build points
       call define_section(chord_list(iRegion), trim(adjustl(airfoil_list(iRegion))), &
                           twist_list(iRegion), ElType, nelem_chord,              &
                           type_chord , chord_fraction, ref_chord_fraction,       &
-                          ref_point, xySection1, curv_ac)
+                          ref_point, xySection1, curv_ac_section)
 
       rrSection1(1,:) = xySection1(1,:) + ref_point(1)
       rrSection1(2,:) = 0.0_wp          + ref_point(2)     ! <--- read from region structure
@@ -365,7 +368,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       
       ! Update rr
       rr(:,ista:iend) = rrSection1
-
+      curv_ac(2*iRegion-1) = curv_ac_section  
     end if
 
 
@@ -377,8 +380,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       call define_section( chord_list(iRegion+1), trim(adjustl(airfoil_list(iRegion+1))), &
                             twist_list(iRegion+1), ElType, nelem_chord,                    &
                             type_chord , chord_fraction, ref_chord_fraction,               &
-                            ref_point, xySection2, curv_ac)
-
+                            ref_point, xySection2, curv_ac_section)
+      curv_ac(iRegion + 1) = curv_ac_section
     else ! interpolation
 
       do iSec = iRegion + 1 , nRegions+1
@@ -393,7 +396,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       call define_section( 1.0_wp , trim(adjustl(airfoil_list(iSec))), &
                             0.0_wp , ElType, nelem_chord,               &
                             type_chord , chord_fraction, 0.0_wp,        &
-                            ref_point, xyAirfoil2, curv_ac)
+                            ref_point, xyAirfoil2, curv_ac_section)
 
       ! Compute the coordinates xySection2(), after removing the offset
       if ( .not. allocated(xySection2) ) &
@@ -401,6 +404,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
 
       if ( allocated(xyAirfoil1) ) deallocate(xyAirfoil1)
+
       allocate(xyAirfoil1(size(xyAirfoil2,1),size(xyAirfoil2,2)))
 
       xyAirfoil1(1,:) = ( rrSection1(1,:) - dx_ref ) / chord_list(iRegion)
@@ -521,7 +525,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
           interp_weight = sin( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
         else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then
           interp_weight = 1.0_wp - cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
-          ! interp_weight = cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
         else
           write(*,*) ' Mesh file   : ' , trim(mesh_file)
           write(*,*) ' type_span   : ' , trim(type_span_list(iRegion))
@@ -547,7 +550,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                         ( rrSection2(2,:) - rrSection1(2,:) ) * interp_weight
 
         deallocate(rr_tw, rr_tw_1, rr_tw_2)
-
 
       end if
 
@@ -619,7 +621,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         normalised_coord_e(2,iSpan) = (rr(2,(iSpan+1)*npoint_chord_tot) - rr(2,ista*2)) / &
                                       (rr(2,(iend +1)*npoint_chord_tot) - rr(2,ista*2))
         
-        if ( iSpan .ne. ista ) then ! else = 0.0_wp
+        if ( iSpan .ne. ista ) then 
           normalised_coord_e(1,iSpan) = normalised_coord_e(2,iSpan-1)          
         end if
 
@@ -665,7 +667,7 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   if ( airfoil(len_trim(airfoil)-3 : len_trim(airfoil)) .eq. '.dat' ) then
 
     call check_file_exists(airfoil, this_sub_name, this_mod_name)
-    call read_airfoil ( airfoil , trim(type_chord) , ElType , nelem_chord , point_list )
+    call read_airfoil ( airfoil , trim(type_chord) , ElType , nelem_chord , point_list, curv_ac )
 
   else if ( airfoil(1:4) .eq. 'NACA' ) then
     if ( len_trim(airfoil) .eq. 8 ) then      ! NACA 4-digit -------
@@ -874,7 +876,8 @@ subroutine naca5digits(airfoil_name, nelem_chord,&
     endif
 
     ! Thickness
-    thickness = 5.0_wp*s*(0.2969_wp*sqrt(xa) - 0.1260_wp*xa - 0.3516_wp*(xa**2) + 0.2843_wp*(xa**3) - 0.1015_wp*(xa**4))
+    thickness = 5.0_wp*s*(0.2969_wp*sqrt(xa) - 0.1260_wp*xa - &
+                0.3516_wp*(xa**2) + 0.2843_wp*(xa**3) - 0.1015_wp*(xa**4))
 
     points_mean_line(1,iPoint) = xa
     points_mean_line(2,iPoint) = ml
@@ -904,7 +907,7 @@ endsubroutine naca5digits
 
 !-------------------------------------------------------------------------------
 
-subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr )
+subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr, curv_ac)
 
   character(len=*), intent(in)                :: filen
   character(len=*), intent(in)                :: discr
@@ -917,6 +920,8 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr )
   real(wp) , allocatable                      :: csi_half(:) , csi(:)
   real(wp) , allocatable                      :: st_geo(:) , s_geo(:)
   real(wp)                                    :: ds_geo
+  real(wp) , intent(out)                      :: curv_ac
+  real(wp)                                    :: csi_ac 
   integer :: fid, ierr
   integer :: i1 , i2
 
@@ -963,8 +968,6 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr )
     csi = -csi_half(nelems_chord+1:1:-1) + 1.0_wp
   end if
 
-  !csi_ac = 0.25_wp
-  
   allocate(st_geo(np_geo),s_geo(np_geo))
   st_geo = 0.0_wp ; s_geo = 0.0_wp
 
@@ -986,6 +989,13 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr )
       end if
     end do
   end do
+  !> get position of aerodynamic center 
+  csi_ac = 0.25_wp
+  if ( ElType .eq. 'v' ) then
+    call linear_interp(rr_geo(:,2) , rr_geo(:,1) , csi_ac , curv_ac)
+  else 
+    curv_ac = 0.0_wp
+  endif 
 
 end subroutine read_airfoil
 
@@ -1017,7 +1027,6 @@ subroutine define_division(type_mesh, nelem, division)
     enddo
   case ("cosineTE", "cosineOB")
     do iPoint = 1,nelem+1
-!     division(iPoint) = - cos(pi/2.0_wp*((iPoint-1)*step+1.0_wp))
       division(iPoint) = sin(pi/2.0_wp*((real(iPoint-1,wp))*step))
     enddo
   case default

@@ -57,14 +57,14 @@ implicit none
 !----------------------------------------------------------------------
 
 public :: wp, &
-          max_char_len , &
-          extended_char_len, &
-          nl, &
-          pi , &
-          eps, &
-          prev_tri , next_tri , &
-          prev_qua , next_qua, &
-          ascii_real
+         max_char_len , &
+         extended_char_len, &
+         nl, &
+         pi , &
+         eps, &
+         prev_tri , next_tri , &
+         prev_qua , next_qua, &
+         ascii_real
 
 private
 
