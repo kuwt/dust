@@ -621,20 +621,17 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
     end do
     !> Take the average of al0
     alcl0 = al0/2 
-    mag = 0.0_wp
-    do i_c = 1, n_pan
-      if ( i_c .gt. 1 ) then
-        mag = mag + ( stripe%panels(i_c)%p%mag - stripe%panels(i_c - 1)%p%mag ) 
-      else
-        mag = mag + stripe%panels(i_c)%p%mag
-      end if
-    end do
+!    mag = 0.0_wp
+!    do i_c = 1, n_pan
+!      if ( i_c .gt. 1 ) then
+!        mag = mag + ( stripe%panels(i_c)%p%mag - stripe%panels(i_c - 1)%p%mag ) 
+!      else
+!        mag = mag + stripe%panels(i_c)%p%mag
+!      end if
+!    end do
 
-    alpha = - mag / ( pi * stripe%chord * unorm ) * 180.0_wp/pi + alcl0
-    !alpha = (cl_inv/(2.0_wp*pi*sqrt(1-mach**2))) * 180/pi + alcl0! deg to enter in c81 table
-
-
-      alpha_ref = alpha
+    alpha = (cl_inv*sqrt(1-mach**2)/(2.0_wp*pi)) * 180/pi + alcl0! deg to enter in c81 table
+    alpha_ref = alpha
 
 
     stripe%alpha = alpha_ref  
@@ -651,8 +648,7 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   else 
     cl_visc = stripe%cl_visc
   endif 
-!
- 
+
   ! 
   !> Update term rhs (absolute)
   rhs_diff = (cl_visc - cl_inv)
@@ -668,21 +664,6 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
     
   end do 
   
-  if (i_s .eq. 10) then 
-    write(*,*) 'time      ', sim_param%time
-    write(*,*) 'alpha     ', stripe%alpha
-    write(*,*) 'cl_visc   ', cl_visc
-    write(*,*) 'cl_inv    ', cl_inv
-    force = 0.0_wp
-    do i_c = 1, n_pan
-    force = force + stripe%panels(i_c)%p%dforce 
-    end do
-    write(*,*) 'force   ', force
-    write(*,*) 'unorm   ', unorm
-    write(*,*) 'stripevel   ', stripe%vel
-    write(*,*) 'dot ', dot(force,stripe%nor)
-  end if
-
 end subroutine correction_c81_vortlatt
 
 !----------------------------------------------------------------------
@@ -732,8 +713,7 @@ subroutine get_vel_ctr_pt_vortlatt(this, elems, wake_elems, vort_elems)
   
   this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp * pi) &
                     + wind - this%ub
-  write(*,*) 'x0             ', x0
-  write(*,*) 'this%vel_ctr_pt', this%vel_ctr_pt
+  
 end subroutine get_vel_ctr_pt_vortlatt
 
 subroutine get_vel_ac_stripe(stripe, elems, wake_elems, vort_elems)
@@ -749,7 +729,7 @@ subroutine get_vel_ac_stripe(stripe, elems, wake_elems, vort_elems)
   stripe%vel = 0.0_wp
 
   ! Control point at 1/4-fraction of the chord
-  x0 = stripe%ac_stripe
+  x0 = stripe%ac_stripe + stripe%nor*stripe%curv_ac
 
   !=== Compute the velocity from all the elements ===
   do j = 1,size(wake_elems)  ! wake panels

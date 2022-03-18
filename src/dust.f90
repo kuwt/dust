@@ -833,7 +833,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     ! ifort and parallel runs, so the cycle is executed another time just for the
     ! vortex lattices
     if ( geo%nVortLatt .gt. 0) then
-      !!$omp parallel do private(i_el)
+      !$omp parallel do private(i_el)
         do i_el = 1 , sel      
           select type(el => elems(i_el)%p)        
             class is(t_vortlatt)          
@@ -841,7 +841,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               !> compute dforce using AVL formula
           end select
         end do 
-      !!$omp parallel do private(i_el)
+      !$omp parallel do private(i_el)
       do i_el = 1 , sel      
         select type(el => elems(i_el)%p)        
           class is(t_vortlatt)          
@@ -861,8 +861,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
       it_vl = 0
       max_diff = tol + 1e-6_wp
       linsys%skip = .true.
-      
-      
+
       !> Select time step to start the vl correction 
       !  (avoid strange behaviour at the begining of simulation)
       if (it .gt. sim_param%vl_startstep) then 
@@ -875,19 +874,18 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           do i_c = 1, size(geo%components)
             if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
               trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
-              !!$omp parallel do private(i_s, diff)
+              !$omp parallel do private(i_s, diff)
                 do i_s = 1, size(geo%components(i_c)%stripe)
-                  write(*,*) 'vel_stripe', geo%components(i_c)%stripe(i_s)%vel
                   call calc_geo_data_stripe(geo%components(i_c)%stripe(i_s))
                   call get_vel_ac_stripe(geo%components(i_c)%stripe(i_s), & 
                                       elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
                   call correction_c81_vortlatt(airfoil_data, geo%components(i_c)%stripe(i_s), & 
                                               linsys, diff, it_vl, i_s)
-              !!$omp atomic
+              !$omp atomic
                   max_diff = max(diff, max_diff) 
-              !!$omp end atomic
+              !$omp end atomic
                 end do
-              !!$omp end parallel do
+              !$omp end parallel do
             end if 
           end do 
           
@@ -913,35 +911,14 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                 !> compute dforce using AVL formula
                 call el%compute_dforce_jukowski()
                 el%pres = sum(el%dforce * el%nor)/el%area
-                !if (i_el .eq. 11) then
-                !  write(*,*) 'dforce   ', el%dforce
-                !end if
+                
             end select            
           end do
 
           it_vl = it_vl + 1
-          write(*,*) 'max_diff', max_diff
+
         end do !(while)
         deallocate(res_relax_old)
-
-        diff = 0.0
-
-        write(*,*) 'force3   ', elems(1)%p%dforce(3)
-        do it_vl=1,10
-          diff = diff + geo%components(1)%stripe(10)%panels(it_vl)%p%dforce(3)
-        end do
-        write(*,*) 'stripeforce', diff
-        write(*,*) 'stripecl', diff/(0.5*1.225*68*68*12/20)
-
-        !if(it .eq. 100) then
-        !do i_el =1,sel
-        !   diff = diff + elems(i_el)%p%dforce(3)
-        !  
-        !   write(*,*) 'force3   ', elems(i_el)%p%dforce(3)
-        !   
-        !  end do 
-        !    write(*,*) 'cl    ', diff/(0.5*1.225*68*68*12)
-        !end if
 
         if(it_vl .eq. sim_param%vl_maxiter) then
           call warning('dust','dust','max iteration reached for non linear vl:&

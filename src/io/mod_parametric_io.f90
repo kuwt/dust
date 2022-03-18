@@ -91,7 +91,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   integer                                   :: ee_size , rr_size
   logical                                   :: twist_linear_interp
   logical, intent(out), optional            :: aero_table
-  real(wp), allocatable, intent(out), optional :: curv_ac(:)
+  real(wp), allocatable, intent(out), optional :: curv_ac(:,:)
+  real(wp)                                  :: curv_ac_section1, curv_ac_section2 
   real(wp)                                  :: curv_ac_section
   integer                                   :: nelem_chord, nelem_chord_tot ! , nelem_span_tot <--- moved as an output
   integer                                   :: npoint_chord_tot, npoint_span_tot
@@ -280,8 +281,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   allocate(twist_list  (nSections))  ; twist_list = 0.0_wp
   allocate(airfoil_list(nSections))
   allocate(airfoil_table_list(nSections))
-  allocate(curv_ac(nSections))       ; curv_ac = 0.0_wp
-
+  allocate(curv_ac(2,nelem_span_tot)) ; curv_ac = 0.0_wp
+  
   do iSection= 1, nSections
     chord_list(iSection)   = getreal(pmesh_prs,'chord')
     twist_list(iSection)   = getreal(pmesh_prs,'twist')
@@ -347,15 +348,15 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     call error(this_sub_name, this_mod_name, 'The last "airfoil"&
           & cannot be set as "interp".')
   end if
-  ! === new-2019-02-06 ===
-
+  
   ista = 1 ; iend = npoint_chord_tot
+  
   ! Loop over regions
   do iRegion = 1, nRegions
 
     if ( iRegion .gt. 1 ) then  ! first section = last section of the previous region
       rrSection1 = rrSection2
-      curv_ac(2*iRegion) = curv_ac(2*iRegion)
+      curv_ac_section1 = curv_ac_section2
     else                        ! build points
       call define_section(chord_list(iRegion), trim(adjustl(airfoil_list(iRegion))), &
                           twist_list(iRegion), ElType, nelem_chord,              &
@@ -368,7 +369,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       
       ! Update rr
       rr(:,ista:iend) = rrSection1
-      curv_ac(2*iRegion-1) = curv_ac_section  
+      curv_ac_section1 = curv_ac_section  
     end if
 
 
@@ -381,7 +382,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                             twist_list(iRegion+1), ElType, nelem_chord,                    &
                             type_chord , chord_fraction, ref_chord_fraction,               &
                             ref_point, xySection2, curv_ac_section)
-      curv_ac(iRegion + 1) = curv_ac_section
+      curv_ac_section2 = curv_ac_section
     else ! interpolation
 
       do iSec = iRegion + 1 , nRegions+1
@@ -397,7 +398,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                             0.0_wp , ElType, nelem_chord,               &
                             type_chord , chord_fraction, 0.0_wp,        &
                             ref_point, xyAirfoil2, curv_ac_section)
-
+      curv_ac_section2 = curv_ac_section
       ! Compute the coordinates xySection2(), after removing the offset
       if ( .not. allocated(xySection2) ) &
                   allocate(xySection2(size(xyAirfoil2,1),size(xyAirfoil2,2)))
@@ -430,8 +431,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
     end if
     ! === new-2019-02-06 ===
-
-
     if ( abs( sweep_list(iRegion) ) .gt. 60.0_wp ) then
       call warning(this_sub_name, this_mod_name, 'Requested a sweep angle of &
         &more than 60 degrees. Are you sure of this input?')
@@ -466,6 +465,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
           rr(:,ista:iend) = rrSection1 + real(i1,wp) / &
                             real(nelem_span_list(iRegion),wp) * &
                             ( rrSection2 - rrSection1 )
+          
         else if ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then
           ! cosine  spacing in span
           rr(:,ista:iend) = 0.5_wp * ( rrSection1 + rrSection2 ) - &
@@ -558,7 +558,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
   enddo
   
-  ! lots of deallocation missing causing memory leakage =(
+  ! lots of deallocation missing causing memory leakage 
   if ( allocated(xySection1) ) deallocate(xySection1)
   if ( allocated(xySection2) ) deallocate(xySection2)
 
@@ -620,7 +620,12 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         
         normalised_coord_e(2,iSpan) = (rr(2,(iSpan+1)*npoint_chord_tot) - rr(2,ista*2)) / &
                                       (rr(2,(iend +1)*npoint_chord_tot) - rr(2,ista*2))
-        
+        curv_ac(1,iSpan) = curv_ac_section1 + real(i1,wp) / &
+                              real(nelem_span_list(iRegion),wp) * &
+                              (curv_ac_section2 - curv_ac_section1)  
+        curv_ac(2,iSpan) = curv_ac_section2 + real(i1,wp) / &
+                              real(nelem_span_list(iRegion),wp) * &
+                              (curv_ac_section2 - curv_ac_section1)  
         if ( iSpan .ne. ista ) then 
           normalised_coord_e(1,iSpan) = normalised_coord_e(2,iSpan-1)          
         end if
@@ -744,7 +749,7 @@ subroutine naca4digits(airfoil_name, nelem_chord,&
 
   if ( allocated(points_mean_line) )  deallocate(points_mean_line)
   allocate(points_mean_line(2,nelem_chord+1)) ; points_mean_line = 0.0_wp
-  write(*,*) 'chord_fraction', chord_fraction
+  
   do iPoint = 1,nelem_chord+1
 
     xa = chord_fraction(iPoint)

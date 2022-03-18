@@ -234,7 +234,7 @@ type :: t_geo_component
   !> Id of the airfoil elements (index in airfoil_list char array)
   integer ,allocatable :: i_airfoil_e(:,:)
   character(len=5) :: aero_correction
-
+  real(wp), allocatable :: curv_ac(:,:)
   type(t_stripe), allocatable :: stripe(:)
 
 #if USE_PRECICE
@@ -692,6 +692,7 @@ subroutine load_components(geo, in_file, out_file, te)
   integer , allocatable                 :: neigh(:,:)
   !> Aerotable correction for vl 
   character(len=5)                      :: aero_table
+  real(wp), allocatable                 :: curv_ac(:,:)
   !> Lifting Line elements
   real(wp), allocatable                 :: normalised_coord_e(:,:), theta_e(:)
   integer                 , allocatable :: i_airfoil_e(:,:)
@@ -993,7 +994,8 @@ subroutine load_components(geo, in_file, out_file, te)
           call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc)
           call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
           call read_hdf5_al(normalised_coord_e,'normalised_coord_e',geo_loc)
-          
+          call read_hdf5_al(curv_ac           ,'curv_ac'           ,geo_loc)
+
           allocate(geo%components(i_comp)%airfoil_list(size(airfoil_list)))
           geo%components(i_comp)%airfoil_list = airfoil_list
           
@@ -1004,7 +1006,11 @@ subroutine load_components(geo, in_file, out_file, te)
           allocate(geo%components(i_comp)%normalised_coord_e( &
                 size(normalised_coord_e,1),size(normalised_coord_e,2)))
           geo%components(i_comp)%normalised_coord_e = normalised_coord_e
-
+          
+          allocate(geo%components(i_comp)%curv_ac( &
+                    size(curv_ac,1),size(curv_ac,2)))
+          geo%components(i_comp)%curv_ac = curv_ac
+          
           geo%components(i_comp)%aero_correction = trim(aero_table)
           sim_param%vl_correction = .true. 
         endif
@@ -1737,15 +1743,6 @@ subroutine prepare_geometry(geo)
           elem%twist     =  geo%components(i_comp)%theta_e(ie)
         class is(t_vortlatt)
 
-          !if (trim(geo%components(i_comp)%aero_correction) .eq. 'true') then
-          !  !write(*,*) 'ie', ie
-          !  !elem%csi_cen = 0.5_wp * &
-          !  !            sum(geo%components(i_comp)%normalised_coord_e(:,ie))
-          !  !elem%i_airfoil =  geo%components(i_comp)%i_airfoil_e(:,ie)
-          !  !write(*,*) 'elem%csi_cen', elem%csi_cen
-          !  !write(*,*) 'elem%i_airfoil', elem%i_airfoil
-          !
-          !endif
           
         class is(t_actdisk)
 
@@ -2114,7 +2111,8 @@ subroutine create_strip_connectivity(geo)
                                                   (comp%el(n_c+(i_s-1)*n_c)%ver(:,3) + comp%el(n_c+(i_s-1)*n_c)%ver(:,4))/2)
             
             comp%stripe(i_s)%chord = norm2((comp%el(1+(i_s-1)*n_c)%ver(:,2) + comp%el(1+(i_s-1)*n_c)%ver(:,1))/2 - &
-                                          (comp%el(n_c+(i_s-1)*n_c)%ver(:,3) + comp%el(n_c+(i_s-1)*n_c)%ver(:,4))/2)       
+                                          (comp%el(n_c+(i_s-1)*n_c)%ver(:,3) + comp%el(n_c+(i_s-1)*n_c)%ver(:,4))/2)     
+            comp%stripe(i_s)%curv_ac = sum(comp%curv_ac(:,i_s))/2 
           endif    
           
       end do 

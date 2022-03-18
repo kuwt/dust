@@ -173,7 +173,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   character(len=max_char_len)  :: comp_el_type
   character                    :: ElType
   character(len=max_char_len)  :: mesh_file_type
-  real(wp), allocatable        :: curv_ac(:)
+  real(wp), allocatable        :: curv_ac(:,:)
   !> Hinge 
   integer                      :: n_hinges
   type(t_parse), pointer       :: hinge_prs
