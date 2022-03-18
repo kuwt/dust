@@ -70,7 +70,7 @@ use mod_param, only: &
   wp, pi, max_char_len, prev_tri, next_tri, prev_qua, next_qua
 
 use mod_math, only: &
-  cross, dot 
+  cross, dot, linear_interp 
 
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
@@ -540,7 +540,7 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   real(wp)                         :: diff
   real(wp)                         :: mach, reynolds
   real(wp)                         :: alpha, alpha_2d, alcl0
-  real(wp)                         :: al0
+  real(wp),    allocatable         :: al0(:)
   real(wp),    allocatable         :: aero_coeff(:)
   real(wp)                         :: up(3), unorm
   real(wp)                         :: force(3), mag
@@ -551,6 +551,8 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   integer                          :: id_a, i_a
   integer                          :: imach, nmach
   real(wp)                         :: machend, mach1, mach2
+  integer                          :: irey, nRe, i_Re
+  real(wp)                         :: reyn1, reyn2, al0_Re
   !> Dynamic stall
   real(wp)                         :: thicc = 0.12 !> get as input? 
                                       !(should be the last 2 digits of NACA profile)
@@ -586,7 +588,7 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   !> Induced alpha on stripe for drag calculation 
   stripe%alpha_ind = atan2(dot(stripe%vel,stripe%nor) , &
                           dot(stripe%vel,stripe%tang(:,1))) 
-
+  
   !> Sectional lift coefficient 
   cl_inv = dot(force,stripe%nor)/(0.5_wp*sim_param%rho_inf*(unorm**2)*stripe%area)
 
@@ -594,43 +596,60 @@ subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_
   if (it_vl .eq. 0) then  
 
     !> Interpolation of alcl0
-    al0 = 0.0_wp
+    al0_Re = 0.0_wp
 
     do i_a = 1, 2
       id_a = stripe%i_airfoil(i_a)
-      imach = 1 
-      nmach = size(airfoil_data(id_a)%aero_coeff(1)%coeff(1)%par2)
-      mach1   = airfoil_data(id_a)%aero_coeff(1)%coeff(1)%par2(imach)
-      machend = airfoil_data(id_a)%aero_coeff(1)%coeff(1)%par2(nmach)
+      nRe = size(airfoil_data(id_a)%aero_coeff)
+
+      allocate(al0(nRe)); al0  = 0.0_wp
+      do i_Re = 1, nRe 
+        imach = 1 
+        nmach = size(airfoil_data(id_a)%aero_coeff(i_Re)%coeff(1)%par2)
+        mach1   = airfoil_data(id_a)%aero_coeff(i_Re)%coeff(1)%par2(imach)
+        machend = airfoil_data(id_a)%aero_coeff(i_Re)%coeff(1)%par2(nmach)
+
+        !> Find closest mach number 
+        do while ((mach .ge. mach1 ) .and. (imach .lt. nmach))
+          imach = imach + 1
+          mach1 = airfoil_data(id_a)%aero_coeff(i_Re)%coeff(1)%par2(imach)
+        end do
+        imach = imach - 1
+        mach1 = airfoil_data(id_a)%aero_coeff(i_Re)%coeff(1)%par2(imach)
+        mach2 = airfoil_data(id_a)%aero_coeff(i_Re)%coeff(1)%par2(imach+1)
+
+        !> Linear interpolation of alpha0 for all reynolds 
+        al0(i_Re) = airfoil_data(id_a)%aero_coeff(i_Re)%alcl0(imach) + &
+                (mach - mach1)/(mach2 - mach1) * &
+                ( airfoil_data(id_a)%aero_coeff(i_Re)%alcl0(imach+1) - &
+                airfoil_data(id_a)%aero_coeff(i_Re)%alcl0(imach  ) )
+      end do 
       
-      !> Find closest mach number 
-      do while ((mach .ge. mach1 ) .and. (imach .lt. nmach))
-        imach = imach + 1
-        mach1 = airfoil_data(id_a)%aero_coeff(1)%coeff(1)%par2(imach)
-      end do
-      imach = imach - 1
-      mach1 = airfoil_data(id_a)%aero_coeff(1)%coeff(1)%par2(imach)
-      mach2 = airfoil_data(id_a)%aero_coeff(1)%coeff(1)%par2(imach+1)
-
-      !> Linear interpolation of alpha0 
-      al0 = al0 + airfoil_data(id_a)%aero_coeff(1)%alcl0(imach) + &
-              (mach - mach1)/(mach2 - mach1) * &
-              ( airfoil_data(id_a)%aero_coeff(1)%alcl0(imach+1) - &
-              airfoil_data(id_a)%aero_coeff(1)%alcl0(imach  ) )
-    
+      if (nRe .gt. 1) then 
+        irey  = 1
+        reyn1 = airfoil_data(id_a)%aero_coeff(irey)%Re
+        do while ( ( reynolds .ge. reyn1 ) .and. ( irey .lt. nRe ) )
+          irey = irey + 1
+          reyn1 = airfoil_data(id_a)%aero_coeff(irey)%Re
+        end do
+        irey = irey - 1
+        reyn1 = airfoil_data(id_a)%aero_coeff(irey)%Re
+        reyn2 = airfoil_data(id_a)%aero_coeff(irey+1)%Re
+        !> Linear interpolation of alpha0 for all reynolds 
+        al0_Re = al0_Re + al0(irey) + (reynolds - reyn1)/(reyn2 - reyn1)* &
+                                      (al0(irey + 1)- al0(irey))
+      else 
+        al0_Re = al0_Re + al0(nRe)
+      end if 
+      deallocate(al0)
     end do
+    
     !> Take the average of al0
-    alcl0 = al0/2 
-!    mag = 0.0_wp
-!    do i_c = 1, n_pan
-!      if ( i_c .gt. 1 ) then
-!        mag = mag + ( stripe%panels(i_c)%p%mag - stripe%panels(i_c - 1)%p%mag ) 
-!      else
-!        mag = mag + stripe%panels(i_c)%p%mag
-!      end if
-!    end do
+    alcl0 = al0_Re/2 
 
+    
     alpha = (cl_inv*sqrt(1-mach**2)/(2.0_wp*pi)) * 180/pi + alcl0! deg to enter in c81 table
+
     alpha_ref = alpha
 
 
@@ -749,6 +768,7 @@ subroutine get_vel_ac_stripe(stripe, elems, wake_elems, vort_elems)
   
   !> induced velocity on leading edge side
   wind = variable_wind(stripe%ac_stripe, sim_param%time)
+  
   stripe%vel = stripe%vel/(4.0_wp * pi) &
                 + wind - stripe%ub
 

@@ -846,10 +846,12 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         select type(el => elems(i_el)%p)        
           class is(t_vortlatt)          
             call el%compute_dforce_jukowski()
+
           ! update the pressure field, p = df.n / area
             ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
             ! update the pressure field, p = df.n / area
             el%pres = sum(el%dforce * el%nor)/el%area
+
         end select
       end do
     end if 

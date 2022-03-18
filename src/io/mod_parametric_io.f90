@@ -620,12 +620,13 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         
         normalised_coord_e(2,iSpan) = (rr(2,(iSpan+1)*npoint_chord_tot) - rr(2,ista*2)) / &
                                       (rr(2,(iend +1)*npoint_chord_tot) - rr(2,ista*2))
-        curv_ac(1,iSpan) = curv_ac_section1 + real(i1,wp) / &
-                              real(nelem_span_list(iRegion),wp) * &
+        curv_ac(1,iSpan) = curv_ac_section1 + iSpan / &
+                              iend * &
                               (curv_ac_section2 - curv_ac_section1)  
-        curv_ac(2,iSpan) = curv_ac_section2 + real(i1,wp) / &
-                              real(nelem_span_list(iRegion),wp) * &
+        curv_ac(2,iSpan) = curv_ac_section2 + iSpan / &
+                              iend * &
                               (curv_ac_section2 - curv_ac_section1)  
+        
         if ( iSpan .ne. ista ) then 
           normalised_coord_e(1,iSpan) = normalised_coord_e(2,iSpan-1)          
         end if
@@ -997,8 +998,8 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr, curv_ac)
   !> get position of aerodynamic center 
   csi_ac = 0.25_wp
   if ( ElType .eq. 'v' ) then
-    call linear_interp(rr_geo(:,2) , rr_geo(:,1) , csi_ac , curv_ac)
-  else 
+    call linear_interp(rr_geo(2,:) , rr_geo(1,:) , csi_ac , curv_ac)
+  else  
     curv_ac = 0.0_wp
   endif 
 
