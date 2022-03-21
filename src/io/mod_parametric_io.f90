@@ -92,7 +92,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   logical                                   :: twist_linear_interp
   logical, intent(out), optional            :: aero_table
   real(wp), allocatable, intent(out), optional :: curv_ac(:,:)
-  real(wp)                                  :: curv_ac_section1, curv_ac_section2 
+  real(wp), allocatable                     :: curv_ac_section1(:), curv_ac_section2(:) 
   real(wp)                                  :: curv_ac_section
   integer                                   :: nelem_chord, nelem_chord_tot ! , nelem_span_tot <--- moved as an output
   integer                                   :: npoint_chord_tot, npoint_span_tot
@@ -282,6 +282,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   allocate(airfoil_list(nSections))
   allocate(airfoil_table_list(nSections))
   allocate(curv_ac(2,nelem_span_tot)) ; curv_ac = 0.0_wp
+  allocate(curv_ac_section1(nRegions)); curv_ac_section1 = 0.0_wp
+  allocate(curv_ac_section2(nRegions)); curv_ac_section2 = 0.0_wp
   
   do iSection= 1, nSections
     chord_list(iSection)   = getreal(pmesh_prs,'chord')
@@ -349,15 +351,17 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
           & cannot be set as "interp".')
   end if
   
-  ista = 1 ; iend = npoint_chord_tot
+  ista = 1
+  iend = npoint_chord_tot
   
   ! Loop over regions
   do iRegion = 1, nRegions
 
     if ( iRegion .gt. 1 ) then  ! first section = last section of the previous region
       rrSection1 = rrSection2
-      curv_ac_section1 = curv_ac_section2
-    else                        ! build points
+      curv_ac_section1(iRegion) = curv_ac_section2(iRegion-1)      
+
+    else   ! first section                      ! build points
       call define_section(chord_list(iRegion), trim(adjustl(airfoil_list(iRegion))), &
                           twist_list(iRegion), ElType, nelem_chord,              &
                           type_chord , chord_fraction, ref_chord_fraction,       &
@@ -369,20 +373,22 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       
       ! Update rr
       rr(:,ista:iend) = rrSection1
-      curv_ac_section1 = curv_ac_section  
+      curv_ac_section1(iRegion) = curv_ac_section
+
     end if
 
 
     ! === new-2019-02-06 ===
     ! now, it is possible to define the airfoils on some of the sections only.
     !  When the shape of the airfoil is not defined on a section, it is interpolated
-    if ( trim(adjustl(airfoil_list(iRegion+1))) .ne. 'interp' ) then  ! read the field 'airfoil'
+    if ( trim(adjustl(airfoil_list(iRegion + 1))) .ne. 'interp' ) then  ! read the field 'airfoil'
 
       call define_section( chord_list(iRegion+1), trim(adjustl(airfoil_list(iRegion+1))), &
                             twist_list(iRegion+1), ElType, nelem_chord,                    &
                             type_chord , chord_fraction, ref_chord_fraction,               &
                             ref_point, xySection2, curv_ac_section)
-      curv_ac_section2 = curv_ac_section
+      curv_ac_section2(iRegion) = curv_ac_section ! second section 
+
     else ! interpolation
 
       do iSec = iRegion + 1 , nRegions+1
@@ -398,11 +404,10 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                             0.0_wp , ElType, nelem_chord,               &
                             type_chord , chord_fraction, 0.0_wp,        &
                             ref_point, xyAirfoil2, curv_ac_section)
-      curv_ac_section2 = curv_ac_section
+
       ! Compute the coordinates xySection2(), after removing the offset
       if ( .not. allocated(xySection2) ) &
                   allocate(xySection2(size(xyAirfoil2,1),size(xyAirfoil2,2)))
-
 
       if ( allocated(xyAirfoil1) ) deallocate(xyAirfoil1)
 
@@ -430,6 +435,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                                                           xySection2 )
 
     end if
+
     ! === new-2019-02-06 ===
     if ( abs( sweep_list(iRegion) ) .gt. 60.0_wp ) then
       call warning(this_sub_name, this_mod_name, 'Requested a sweep angle of &
@@ -553,10 +559,10 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
       end if
 
-    end do
+    end do ! iReagion 
 
 
-  enddo
+  enddo ! iReagion 
   
   ! lots of deallocation missing causing memory leakage 
   if ( allocated(xySection1) ) deallocate(xySection1)
@@ -620,13 +626,19 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         
         normalised_coord_e(2,iSpan) = (rr(2,(iSpan+1)*npoint_chord_tot) - rr(2,ista*2)) / &
                                       (rr(2,(iend +1)*npoint_chord_tot) - rr(2,ista*2))
-        curv_ac(1,iSpan) = curv_ac_section1 + iSpan / &
-                              iend * &
-                              (curv_ac_section2 - curv_ac_section1)  
-        curv_ac(2,iSpan) = curv_ac_section2 + iSpan / &
-                              iend * &
-                              (curv_ac_section2 - curv_ac_section1)  
+        !> curvature interpolation 
+        !> inboard
+        if (iSpan .eq. ista) then 
+          curv_ac(1,iSpan) = curv_ac_section1(iAirfoil) 
+        else          
+          curv_ac(1,iSpan) = curv_ac(2,iSpan - 1)
+        endif 
+        !> outboard
+        curv_ac(2,iSpan) = curv_ac_section1(iAirfoil)*(1.0_wp - normalised_coord_e(2,iSpan)) + &
+                              curv_ac_section2(iAirfoil)*normalised_coord_e(2,iSpan)
+
         
+
         if ( iSpan .ne. ista ) then 
           normalised_coord_e(1,iSpan) = normalised_coord_e(2,iSpan-1)          
         end if
@@ -785,7 +797,7 @@ subroutine naca4digits(airfoil_name, nelem_chord,&
 
   enddo
 
-  xac = 0.25_wp !> ac point 
+  xac = 0.75_wp !> ac point 
   curv_ac = 0.0_wp
   if (p>0) then
     if (xac <= p) then
@@ -896,7 +908,7 @@ subroutine naca5digits(airfoil_name, nelem_chord,&
 
   enddo
 
-  xac = 0.25_wp
+  xac = 0.75_wp
   if (xa <= r) then
     curv_ac = mult*k1/6.0_wp*(xac**3 -3.0_wp*r*xac**2+r**2*(3.0_wp-r)*xac)
   else
@@ -996,13 +1008,13 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr, curv_ac)
     end do
   end do
   !> get position of aerodynamic center 
-  csi_ac = 0.25_wp
+  csi_ac = 0.75_wp
   if ( ElType .eq. 'v' ) then
     call linear_interp(rr_geo(2,:) , rr_geo(1,:) , csi_ac , curv_ac)
   else  
     curv_ac = 0.0_wp
   endif 
-
+  
 end subroutine read_airfoil
 
 !-------------------------------------------------------------------------------

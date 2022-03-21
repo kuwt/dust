@@ -2103,16 +2103,17 @@ subroutine create_strip_connectivity(geo)
             comp%stripe(i_s)%csi_cen = 0.5_wp * sum(comp%normalised_coord_e(:,i_s))  
             comp%stripe(i_s)%i_airfoil =  comp%i_airfoil_e(:,i_s)
 
-            ! > get the aerodynamic center as the point at 0.25 c of the chord (!)
-            ! mid point at leading edge - 0.25*( mid point at leading edge -   mid point at trailing edge)
+            ! > get the aerodynamic center as the point at 0.75 c of the chord (!)
+            ! mid point at leading edge - 0.75*( mid point at leading edge -   mid point at trailing edge)
             ! It is updated at every timestep to account for curvature
             comp%stripe(i_s)%ac_stripe = (comp%el(1+(i_s-1)*n_c)%ver(:,2) + comp%el(1+(i_s-1)*n_c)%ver(:,1))/2 - &
-                                        0.25_wp * ((comp%el(1+(i_s-1)*n_c)%ver(:,2) + comp%el(1+(i_s-1)*n_c)%ver(:,1))/2 - &
+                                        0.75_wp * ((comp%el(1+(i_s-1)*n_c)%ver(:,2) + comp%el(1+(i_s-1)*n_c)%ver(:,1))/2 - &
                                                   (comp%el(n_c+(i_s-1)*n_c)%ver(:,3) + comp%el(n_c+(i_s-1)*n_c)%ver(:,4))/2)
             
             comp%stripe(i_s)%chord = norm2((comp%el(1+(i_s-1)*n_c)%ver(:,2) + comp%el(1+(i_s-1)*n_c)%ver(:,1))/2 - &
                                           (comp%el(n_c+(i_s-1)*n_c)%ver(:,3) + comp%el(n_c+(i_s-1)*n_c)%ver(:,4))/2)     
             comp%stripe(i_s)%curv_ac = sum(comp%curv_ac(:,i_s))/2 
+
           endif    
           
       end do 

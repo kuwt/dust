@@ -937,14 +937,17 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               d_cd = 0.5_wp * sim_param%rho_inf *  & 
                       geo%components(i_c)%stripe(i_s)%unorm**2.0_wp * & 
                       geo%components(i_c)%stripe(i_s)%cd *  &
-                      (sin(geo%components(i_c)%stripe(i_s)%alpha/180.0_wp*pi) * & 
+                      sin(geo%components(i_c)%stripe(i_s)%alpha/180.0_wp*pi) * & 
                       geo%components(i_c)%stripe(i_s)%nor +  &
-                      cos(geo%components(i_c)%stripe(i_s)%alpha/180.0_wp*pi) * & 
+                      (cos(geo%components(i_c)%stripe(i_s)%alpha/180.0_wp*pi) * & 
                       geo%components(i_c)%stripe(i_s)%tang(:,1) )
               
               do i_p = 1, size(geo%components(i_c)%stripe(i_s)%panels)
                 geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce = &
-                            geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce + &
+                            geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce -        & 
+                            dot(geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce,     &
+                                geo%components(i_c)%stripe(i_s)%tang(:,2))* & 
+                                geo%components(i_c)%stripe(i_s)%tang(:,2) + &
                             d_cd * geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area
               end do
             end do

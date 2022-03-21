@@ -876,7 +876,7 @@ subroutine calc_geo_data_stripe(stripe)
   !> velocity as linear interpolation 
   stripe%ub = stripe%panels(n_pan)%p%ub*0.25_wp + stripe%panels(1)%p%ub*0.75_wp 
   stripe%ac_stripe = (stripe%panels(1)%p%ver(:,2) + stripe%panels(1)%p%ver(:,1))/2 - &
-                    0.25_wp * ((stripe%panels(1)%p%ver(:,2) + stripe%panels(1)%p%ver(:,1))/2 - &
+                    0.75_wp * ((stripe%panels(1)%p%ver(:,2) + stripe%panels(1)%p%ver(:,1))/2 - &
                     (stripe%panels(n_pan)%p%ver(:,3) + stripe%panels(n_pan)%p%ver(:,4))/2)
 end subroutine calc_geo_data_stripe
 
