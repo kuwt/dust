@@ -797,7 +797,7 @@ subroutine naca4digits(airfoil_name, nelem_chord,&
 
   enddo
 
-  xac = 0.75_wp !> ac point 
+  xac = 0.5_wp !> control point 
   curv_ac = 0.0_wp
   if (p>0) then
     if (xac <= p) then
@@ -811,7 +811,6 @@ subroutine naca4digits(airfoil_name, nelem_chord,&
   allocate(points(2,2*nelem_chord+1))
   points(:,            1:  nelem_chord  ) = points_lower(:,nelem_chord+1:2:-1)
   points(:,nelem_chord+1:2*nelem_chord+1) = points_upper
-
 
 endsubroutine naca4digits
 
@@ -908,7 +907,7 @@ subroutine naca5digits(airfoil_name, nelem_chord,&
 
   enddo
 
-  xac = 0.75_wp
+  xac = 0.5_wp ! control point for vl corrected
   if (xa <= r) then
     curv_ac = mult*k1/6.0_wp*(xac**3 -3.0_wp*r*xac**2+r**2*(3.0_wp-r)*xac)
   else
@@ -1008,7 +1007,7 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr, curv_ac)
     end do
   end do
   !> get position of aerodynamic center 
-  csi_ac = 0.75_wp
+  csi_ac = 0.5_wp ! control point for vl corrected
   if ( ElType .eq. 'v' ) then
     call linear_interp(rr_geo(2,:) , rr_geo(1,:) , csi_ac , curv_ac)
   else  

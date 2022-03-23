@@ -67,11 +67,9 @@ use mod_geometry, only: &
   create_geometry, update_geometry, &
   t_tedge,  destroy_geometry, destroy_elements
 
-!use mod_aero_elements, only: &
-!  c_elem, t_elem_p !, t_vp
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
-  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p, t_stripe
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
 use mod_doublet, only: &
   initialize_doublet
@@ -80,24 +78,24 @@ use mod_surfpan, only: &
   t_surfpan , initialize_surfpan
 
 use mod_vortlatt, only: &
-  t_vortlatt,  get_vel_ac_stripe, calc_geo_data_stripe, correction_c81_vortlatt
+  t_vortlatt 
+
+use mod_stripe, only: &
+  t_stripe
 
 use mod_liftlin, only: &
- update_liftlin, t_liftlin_p, &
- build_ll_kernel, &
- solve_liftlin, solve_liftlin_piszkin
-!solve_liftlin_optim , &
-!solve_liftlin_newton, &
-!solve_liftlin_optim_regul
+  update_liftlin, t_liftlin_p, &
+  build_ll_kernel, &
+  solve_liftlin, solve_liftlin_piszkin
 
 use mod_actuatordisk, only: &
- update_actdisk
+  update_actdisk
 
 use mod_vortline, only: &
- initialize_vortline
+  initialize_vortline
 
 use mod_vortpart, only: &
- initialize_vortpart
+  initialize_vortpart
 
 use mod_c81, only: &
   t_aero_tab
@@ -213,11 +211,10 @@ real(wp), allocatable             ::      nor_SurfPan_old(:,:)
 real(wp) , allocatable            :: al_kernel(:,:), al_v(:)
 
 !> VL viscous correction
-integer                           :: i_el, i_c, i_s, i, sel, i_p
+integer                           :: i_el, i_c, i_s, i, sel, i_p, j
 integer                           :: it_vl, id_pan
 real(wp)                          :: tol, diff, max_diff 
-real(wp)                          :: d_cd(3)
-real(wp) ,allocatable             :: res_relax_old(:)
+real(wp)                          :: d_cd(3), vel(3), v(3)
 !> octree parameters
 type(t_octree)                    :: octree
 
@@ -481,7 +478,7 @@ if(sim_param%debug_level.ge.10)  call check_basename(trim(basename_debug),'dust 
 nstep = sim_param%n_timesteps
 allocate(sim_param%time_vec(sim_param%n_timesteps))
 sim_param%time_vec = (/ ( sim_param%t0 + &
-         real(i-1,wp)*sim_param%dt, i=1,sim_param%n_timesteps ) /)
+          real(i-1,wp)*sim_param%dt, i=1,sim_param%n_timesteps ) /)
 
 !> Geometry creation 
 call printout(nl//'====== Geometry Creation ======')
@@ -549,13 +546,13 @@ endif
 
 !> Restart 
 if (sim_param%restart_from_file) then
- call load_solution(sim_param%restart_file, geo%components, geo%refs)
- call load_wake(sim_param%restart_file, wake, elems_tot)
+  call load_solution(sim_param%restart_file, geo%components, geo%refs)
+  call load_wake(sim_param%restart_file, wake, elems_tot)
 
 else ! Set to zero the intensity of all the singularities
 
   do i_el = 1 , size(elems)      ! implicit elements (vr, sp)
-     elems(i_el)%p%mag = 0.0_wp
+      elems(i_el)%p%mag = 0.0_wp
   end do
   
   do i_el = 1 , size(elems_expl) ! explicit elements (ll, ad)
@@ -572,7 +569,7 @@ endif
 t22 = dust_time()
 if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') nl//'------ Completed all preliminary operations &
-                             &in: ' , t22 - t00,' s.'
+                              &in: ' , t22 - t00,' s.'
   call printout(message)
 endif
 
@@ -613,7 +610,7 @@ if ( sim_param % restart_from_file ) then
     res_old(i_el) = elems(i_el)%p%mag
   end do
 else
- res_old = 0.0_wp
+  res_old = 0.0_wp
 end if
 
 !> Start time cycle 
@@ -787,17 +784,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     call error('dust','dust',' Wrong string for LLsolver. &
           &This parameter should have been set equal to "GammaMethod" (default) &
           &in init_sim_param() routine. Something went wrong. Stop')
-
-!   call solve_liftlin_optim(elems_ll, elems_tot, elems , elems_ad , &
-!           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it, &
-!           M_array )
-!   call solve_liftlin_optim_regul(elems_ll, elems_tot, elems , elems_ad , &
-!           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it, &
-!           M_array )
-!   call solve_liftlin_newton(elems_ll, elems_tot, elems , elems_ad , &
-!           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it, &
-!           M_array )
-   end if
+    end if
   end if
 
 !------ Compute loads -------
@@ -867,7 +854,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
       !> Select time step to start the vl correction 
       !  (avoid strange behaviour at the begining of simulation)
       if (it .gt. sim_param%vl_startstep) then 
-        allocate(res_relax_old(size(elems)))
+
         do while (max_diff .gt. tol .and. it_vl .lt. sim_param%vl_maxiter)
           
           max_diff = 0.0_wp
@@ -876,21 +863,47 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           do i_c = 1, size(geo%components)
             if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
               trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
-              !$omp parallel do private(i_s, diff)
-                do i_s = 1, size(geo%components(i_c)%stripe)
-                  call calc_geo_data_stripe(geo%components(i_c)%stripe(i_s))
-                  call get_vel_ac_stripe(geo%components(i_c)%stripe(i_s), & 
-                                      elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
-                  call correction_c81_vortlatt(airfoil_data, geo%components(i_c)%stripe(i_s), & 
-                                              linsys, diff, it_vl, i_s)
-              !$omp atomic
-                  max_diff = max(diff, max_diff) 
-              !$omp end atomic
-                end do
-              !$omp end parallel do
+                
+              !> calculate geo data and initial correction 
+              if (it_vl .eq. 0) then 
+                !!$omp parallel do private(i_s, diff)
+                  do i_s = 1, size(geo%components(i_c)%stripe)
+                    call geo%components(i_c)%stripe(i_s)%calc_geo_data(geo%components(i_c)%stripe(i_s)%ver)
+                    call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt(elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
+                    
+                    vel = 0.0_wp
+                    do j = 1, size(geo%components(i_c)%stripe)
+                      call geo%components(i_c)%stripe(j)%compute_vel(geo%components(i_c)%stripe(i_s)%cen, v)
+                      vel = vel + v
+                    end do 
+                    geo%components(i_c)%stripe(i_s)%vel = vel 
+
+                    call geo%components(i_c)%stripe(i_s)%correction_c81_vortlatt(airfoil_data, linsys, diff, it_vl, i_s)
+                !!$omp atomic
+                    max_diff = max(diff, max_diff) 
+                !!$omp end atomic
+                  end do
+                !!$omp end parallel do
+              else 
+                !!$omp parallel do private(i_s, diff)
+                  do i_s = 1, size(geo%components(i_c)%stripe)
+                    vel = 0.0_wp
+                    do j = 1, size(geo%components(i_c)%stripe)
+                      call geo%components(i_c)%stripe(j)%compute_vel(geo%components(i_c)%stripe(i_s)%cen, v)
+                      vel = vel + v
+                    end do 
+                    geo%components(i_c)%stripe(i_s)%vel = vel 
+
+                    call geo%components(i_c)%stripe(i_s)%correction_c81_vortlatt(airfoil_data, linsys, diff, it_vl, i_s)
+                !!$omp atomic
+                    max_diff = max(diff, max_diff) 
+                !!$omp end atomic
+                  end do
+                !!$omp end parallel do
+              end if 
             end if 
           end do 
-          
+          write(*,*) 'max_diff', max_diff
 
           !> Debug output of the system
           if ((sim_param%debug_level .ge. 50) .and. time_2_debug_out) then
@@ -920,7 +933,6 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           it_vl = it_vl + 1
 
         end do !(while)
-        deallocate(res_relax_old)
 
         if(it_vl .eq. sim_param%vl_maxiter) then
           call warning('dust','dust','max iteration reached for non linear vl:&
@@ -937,17 +949,14 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               d_cd = 0.5_wp * sim_param%rho_inf *  & 
                       geo%components(i_c)%stripe(i_s)%unorm**2.0_wp * & 
                       geo%components(i_c)%stripe(i_s)%cd *  &
-                      sin(geo%components(i_c)%stripe(i_s)%alpha/180.0_wp*pi) * & 
+                      sin(geo%components(i_c)%stripe(i_s)%alpha_ind) * & 
                       geo%components(i_c)%stripe(i_s)%nor +  &
-                      (cos(geo%components(i_c)%stripe(i_s)%alpha/180.0_wp*pi) * & 
-                      geo%components(i_c)%stripe(i_s)%tang(:,1) )
+                      (cos(geo%components(i_c)%stripe(i_s)%alpha_ind) * & 
+                      geo%components(i_c)%stripe(i_s)%tang_cen )
               
               do i_p = 1, size(geo%components(i_c)%stripe(i_s)%panels)
                 geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce = &
-                            geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce -        & 
-                            dot(geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce,     &
-                                geo%components(i_c)%stripe(i_s)%tang(:,2))* & 
-                                geo%components(i_c)%stripe(i_s)%tang(:,2) + &
+                            geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce +&
                             d_cd * geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area
               end do
             end do

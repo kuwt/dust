@@ -76,13 +76,16 @@ use mod_parametric_io, only: &
 
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
-  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p, t_stripe
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
 use mod_surfpan, only: &
   t_surfpan
 
 use mod_vortlatt, only: &
   t_vortlatt
+
+use mod_stripe, only: &
+  t_stripe 
 
 use mod_liftlin, only: &
   t_liftlin, t_liftlin_p
@@ -1905,13 +1908,13 @@ subroutine calc_geo_data_ll(elem,vert)
 
   ! ll-specific fields
   select type(elem)
-  type is(t_liftlin)
-  elem%tang_cen = elem%edge_uni(:,2) - elem%edge_uni(:,4)
-  elem%tang_cen = elem%tang_cen / norm2(elem%tang_cen)
+    type is(t_liftlin)
+    elem%tang_cen = elem%edge_uni(:,2) - elem%edge_uni(:,4)
+    elem%tang_cen = elem%tang_cen / norm2(elem%tang_cen)
 
-  elem%bnorm_cen = cross(elem%tang_cen, elem%nor)
-  elem%bnorm_cen = elem%bnorm_cen / norm2(elem%bnorm_cen)
-  elem%chord = sum(elem%edge_len((/2,4/)))*0.5_wp
+    elem%bnorm_cen = cross(elem%tang_cen, elem%nor)
+    elem%bnorm_cen = elem%bnorm_cen / norm2(elem%bnorm_cen)
+    elem%chord = sum(elem%edge_len((/2,4/)))*0.5_wp
   end select
 
   !> Initialise %dforce
@@ -2030,7 +2033,8 @@ subroutine create_strip_connectivity(geo)
   integer                              :: io_te , io_tip
   integer                              :: n_el , ie_ind
   integer                              :: i_comp , i_el
-  integer                              :: i_c , i_s , n_s , n_c , i_c2
+  integer                              :: i_c , i_s , n_s , n_c , i_c2, n_pan, i
+  real(wp)                             :: nor(3), tanl(3)
   character(len=*), parameter          :: this_sub_name = 'create_strip_connectivity'
 
   do i_comp = 1 , size(geo%components)
@@ -2093,6 +2097,16 @@ subroutine create_strip_connectivity(geo)
       do i_s = 1, n_s
         allocate(comp%stripe(i_s)%panels(n_c))
         comp%stripe(i_s)%area = 0.0_wp
+        allocate(comp%stripe(i_s)%ver(3,4))
+        comp%stripe(i_s)%ver = 0.0_wp 
+        allocate(comp%stripe(i_s)%edge_vec(3,4))
+        comp%stripe(i_s)%edge_vec = 0.0_wp
+        allocate(comp%stripe(i_s)%edge_len(4))
+        comp%stripe(i_s)%edge_len = 0.0_wp
+        allocate(comp%stripe(i_s)%edge_uni(3,4))
+        comp%stripe(i_s)%edge_uni = 0.0_wp
+        
+        
         do i_c = 1, n_c
           comp%stripe(i_s)%panels(i_c)%p => comp%el(i_c+(i_s-1)*n_c)
           comp%stripe(i_s)%area = comp%stripe(i_s)%area + comp%el(i_c+(i_s-1)*n_c)%area
@@ -2100,20 +2114,64 @@ subroutine create_strip_connectivity(geo)
           
           if (trim(comp%comp_el_type) .eq. 'v' .and. &
               trim(comp%aero_correction) .eq. 'true') then
+
+            comp%stripe(i_s)%n_ver = 4 ! hardcoded, but stripe should be always a quadrilateral element
             comp%stripe(i_s)%csi_cen = 0.5_wp * sum(comp%normalised_coord_e(:,i_s))  
             comp%stripe(i_s)%i_airfoil =  comp%i_airfoil_e(:,i_s)
-
-            ! > get the aerodynamic center as the point at 0.75 c of the chord (!)
-            ! mid point at leading edge - 0.75*( mid point at leading edge -   mid point at trailing edge)
-            ! It is updated at every timestep to account for curvature
-            comp%stripe(i_s)%ac_stripe = (comp%el(1+(i_s-1)*n_c)%ver(:,2) + comp%el(1+(i_s-1)*n_c)%ver(:,1))/2 - &
-                                        0.75_wp * ((comp%el(1+(i_s-1)*n_c)%ver(:,2) + comp%el(1+(i_s-1)*n_c)%ver(:,1))/2 - &
-                                                  (comp%el(n_c+(i_s-1)*n_c)%ver(:,3) + comp%el(n_c+(i_s-1)*n_c)%ver(:,4))/2)
             
-            comp%stripe(i_s)%chord = norm2((comp%el(1+(i_s-1)*n_c)%ver(:,2) + comp%el(1+(i_s-1)*n_c)%ver(:,1))/2 - &
-                                          (comp%el(n_c+(i_s-1)*n_c)%ver(:,3) + comp%el(n_c+(i_s-1)*n_c)%ver(:,4))/2)     
-            comp%stripe(i_s)%curv_ac = sum(comp%curv_ac(:,i_s))/2 
+            !> stripe verteces 
+            comp%stripe(i_s)%ver(:,1) = comp%el(1+(i_s-1)*n_c)%ver(:,1) 
+            comp%stripe(i_s)%ver(:,2) = comp%el(1+(i_s-1)*n_c)%ver(:,2)
+            comp%stripe(i_s)%ver(:,3) = comp%el(n_c+(i_s-1)*n_c)%ver(:,3)
+            comp%stripe(i_s)%ver(:,4) = comp%el(n_c+(i_s-1)*n_c)%ver(:,4) 
 
+            ! > get the control point as the point at 0.5 c of the chord (!)
+            ! It is updated at every timestep to account for curvature
+            comp%stripe(i_s)%cen = sum(comp%stripe(i_s)%ver(:,1:2))/2.0_wp
+
+            nor = cross(comp%stripe(i_s)%ver(:,3) - comp%stripe(i_s)%ver(:,1),&
+                        comp%stripe(i_s)%ver(:,4) - comp%stripe(i_s)%ver(:,2))
+            
+            comp%stripe(i_s)%nor = nor/norm2(nor) 
+            
+            tanl = 0.5_wp * ( comp%stripe(i_s)%ver(:,4) + comp%stripe(i_s)%ver(:,4) ) - &
+                            comp%stripe(i_s)%cen
+            
+            comp%stripe(i_s)%tang(:,1) = tanl / norm2(tanl)
+            comp%stripe(i_s)%tang(:,2) = cross(comp%stripe(i_s)%nor, comp%stripe(i_s)%tang(:,1))
+            
+             
+            
+            !> Vector connecting two consecutive vertices:
+            do i = 1, 4
+              comp%stripe(i_s)%edge_vec(:,i) = comp%stripe(i_s)%ver(:,next_qua(i)) - comp%stripe(i_s)%ver(:,i)
+            end do
+
+            !> Edge: edge_len(:)
+            do i = 1, 4
+              comp%stripe(i_s)%edge_len(i) = norm2(comp%stripe(i_s)%edge_vec(:,i))
+            end do
+          
+            !> Unit vector
+            do i = 1,4
+              comp%stripe(i_s)%edge_uni(:,i) = comp%stripe(i_s)%edge_vec(:,i) / comp%stripe(i_s)%edge_len(i)
+            end do
+            
+            comp%stripe(i_s)%tang_cen = comp%stripe(i_s)%edge_uni(:,2) - comp%stripe(i_s)%edge_uni(:,4)
+            comp%stripe(i_s)%tang_cen = comp%stripe(i_s)%tang_cen / norm2(comp%stripe(i_s)%tang_cen)
+  
+            comp%stripe(i_s)%bnorm_cen = cross(comp%stripe(i_s)%tang_cen, comp%stripe(i_s)%nor)
+            comp%stripe(i_s)%bnorm_cen = comp%stripe(i_s)%bnorm_cen / norm2(comp%stripe(i_s)%bnorm_cen)
+            comp%stripe(i_s)%chord = sum(comp%stripe(i_s)%edge_len((/2,4/)))*0.5_wp
+            
+            n_pan = size(comp%stripe(i_s)%panels)
+            comp%stripe(i_s)%area = 0.0_wp 
+            do i = 1, n_pan
+              comp%stripe(i_s)%area = comp%stripe(i_s)%area + comp%stripe(i_s)%panels(i)%p%area 
+            end do
+            
+            comp%stripe(i_s)%curv_ac = sum(comp%curv_ac(:,i_s))/2 
+            
           endif    
           
       end do 
@@ -2147,9 +2205,9 @@ function move_points(pp, R, of)  result(rot_pp)
   real(wp)                :: rot_pp(size(pp,1),size(pp,2))
 
   rot_pp = matmul(R,pp)
-  rot_pp(1,:) =rot_pp(1,:) + of(1)
-  rot_pp(2,:) =rot_pp(2,:) + of(2)
-  rot_pp(3,:) =rot_pp(3,:) + of(3)
+  rot_pp(1,:) = rot_pp(1,:) + of(1)
+  rot_pp(2,:) = rot_pp(2,:) + of(2)
+  rot_pp(3,:) = rot_pp(3,:) + of(3)
 
 end function move_points
 
@@ -2293,12 +2351,13 @@ subroutine update_geometry(geo, te, t, update_static)
         !> Update on-body velocity
         comp%el(ie)%ub = comp%el(ie)%ub + comp%el(ie)%dvel_h
 
-          !> Update time derivative of the unit normal vector
-          comp%el(ie)%dn_dt = comp%el(ie)%dn_dt + &
+        !> Update time derivative of the unit normal vector
+        comp%el(ie)%dn_dt = comp%el(ie)%dn_dt + &
                             ( comp%el(ie)%nor - comp%el(ie)%nor_old ) / &
-                                                                    sim_param % dt
-        end do
-      end if
+                                                                sim_param % dt
+      end do
+
+    end if
 
     end associate
   enddo

@@ -74,7 +74,7 @@ use mod_math, only: &
 
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
-  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p, t_stripe
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
 use mod_c81, only: &
   t_aero_tab, interp_aero_coeff
@@ -130,8 +130,7 @@ type, extends(c_impl_elem) :: t_vortlatt
 end type
 
 character(len=*), parameter :: this_mod_name='mod_vortlatt'
-public get_vel_ac_stripe, calc_geo_data_stripe, correction_c81_vortlatt
-
+public 
 !----------------------------------------------------------------------
 contains
 !----------------------------------------------------------------------
@@ -439,6 +438,7 @@ grad = grad_dou*this%mag
 
 end subroutine compute_grad_vortlatt
 
+
 !----------------------------------------------------------------------
 
 !> Compute an approximate value of the mean DELTA pressure on the actual
@@ -448,7 +448,7 @@ end subroutine compute_grad_vortlatt
 !!  s.t. vec{dforce} = pres * vec{n}  ( since vec{n} = vec{n_upper} )
 !!
 !! see compute_dforce_vortlatt
-subroutine compute_pres_vortlatt(this) !, R_g)
+subroutine compute_pres_vortlatt(this) 
   class(t_vortlatt), intent(inout) :: this
   integer  :: i_stripe
   real(wp) :: wind(3)
@@ -533,157 +533,7 @@ subroutine compute_dforce_jukowski_vortlatt(this)
 end subroutine compute_dforce_jukowski_vortlatt
 
 
-subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_s)
-  type(t_aero_tab),  intent(in)    :: airfoil_data(:)
-  type(t_stripe),    intent(inout) :: stripe
-  type(t_linsys),    intent(inout) :: linsys
-  real(wp)                         :: diff
-  real(wp)                         :: mach, reynolds
-  real(wp)                         :: alpha, alpha_2d, alcl0
-  real(wp),    allocatable         :: al0(:)
-  real(wp),    allocatable         :: aero_coeff(:)
-  real(wp)                         :: up(3), unorm
-  real(wp)                         :: force(3), mag
-  integer                          :: i_c, n_pan, id_pan
-  real(wp)                         :: cl_inv, cl_visc
-  real(wp)                         :: rel_fct, rhs_diff
-  integer,           intent(in)    :: it_vl, i_s
-  integer                          :: id_a, i_a
-  integer                          :: imach, nmach
-  real(wp)                         :: machend, mach1, mach2
-  integer                          :: irey, nRe, i_Re
-  real(wp)                         :: reyn1, reyn2, al0_Re
-  !> Dynamic stall
-  real(wp)                         :: thicc = 0.12 !> get as input? 
-                                      !(should be the last 2 digits of NACA profile)
-  real(wp)                         :: alpha_ref, K1, dAlpha_dt
-  real(wp)                         :: rad_break, rad_dyn, M1, M2, g1, g2, g2_max
 
-  !> Relaxation factor
-  rel_fct = sim_param%vl_relax
-  
-  !> Total panel on stripe 
-  n_pan = size(stripe%panels)
-  
-  !> Local Mach number 
-  mach = abs(dot(stripe%vel, stripe%tang(:,1)) / sim_param%a_inf)
-  
-  !> Local reynolds number 
-  reynolds = sim_param%rho_inf * norm2(stripe%vel) * &
-                          stripe%chord / sim_param%mu_inf
-
-  !> AoA of the stripe         
-  !> "2D correction" of the induced angle
-  up = 0.0_wp 
-  unorm = 0.0_wp
-  up =  stripe%nor*sum(stripe%nor*stripe%vel) + stripe%tang(:,1)*sum(stripe%tang(:,1)*stripe%vel)
-  unorm = norm2(up)      ! velocity w/o induced velocity
-  stripe%unorm = unorm
-  !> Force calculation on the stripe 
-  force = 0.0_wp
-  do i_c = 1, n_pan
-    force = force + stripe%panels(i_c)%p%dforce 
-  end do
-
-  !> Induced alpha on stripe for drag calculation 
-  stripe%alpha_ind = atan2(dot(stripe%vel,stripe%nor) , &
-                          dot(stripe%vel,stripe%tang(:,1))) 
-  
-  !> Sectional lift coefficient 
-  cl_inv = dot(force,stripe%nor)/(0.5_wp*sim_param%rho_inf*(unorm**2)*stripe%area)
-
-  !> AoA of the stripe (from inviscid calculation)
-  if (it_vl .eq. 0) then  
-
-    !> Interpolation of alcl0
-    al0_Re = 0.0_wp
-
-    do i_a = 1, 2
-      id_a = stripe%i_airfoil(i_a)
-      nRe = size(airfoil_data(id_a)%aero_coeff)
-
-      allocate(al0(nRe)); al0  = 0.0_wp
-      do i_Re = 1, nRe 
-        imach = 1 
-        nmach = size(airfoil_data(id_a)%aero_coeff(i_Re)%coeff(1)%par2)
-        mach1   = airfoil_data(id_a)%aero_coeff(i_Re)%coeff(1)%par2(imach)
-        machend = airfoil_data(id_a)%aero_coeff(i_Re)%coeff(1)%par2(nmach)
-
-        !> Find closest mach number 
-        do while ((mach .ge. mach1 ) .and. (imach .lt. nmach))
-          imach = imach + 1
-          mach1 = airfoil_data(id_a)%aero_coeff(i_Re)%coeff(1)%par2(imach)
-        end do
-        imach = imach - 1
-        mach1 = airfoil_data(id_a)%aero_coeff(i_Re)%coeff(1)%par2(imach)
-        mach2 = airfoil_data(id_a)%aero_coeff(i_Re)%coeff(1)%par2(imach+1)
-
-        !> Linear interpolation of alpha0 for all reynolds 
-        al0(i_Re) = airfoil_data(id_a)%aero_coeff(i_Re)%alcl0(imach) + &
-                (mach - mach1)/(mach2 - mach1) * &
-                ( airfoil_data(id_a)%aero_coeff(i_Re)%alcl0(imach+1) - &
-                airfoil_data(id_a)%aero_coeff(i_Re)%alcl0(imach  ) )
-      end do 
-      
-      if (nRe .gt. 1) then 
-        irey  = 1
-        reyn1 = airfoil_data(id_a)%aero_coeff(irey)%Re
-        do while ( ( reynolds .ge. reyn1 ) .and. ( irey .lt. nRe ) )
-          irey = irey + 1
-          reyn1 = airfoil_data(id_a)%aero_coeff(irey)%Re
-        end do
-        irey = irey - 1
-        reyn1 = airfoil_data(id_a)%aero_coeff(irey)%Re
-        reyn2 = airfoil_data(id_a)%aero_coeff(irey+1)%Re
-        !> Linear interpolation of alpha0 for all reynolds 
-        al0_Re = al0_Re + al0(irey) + (reynolds - reyn1)/(reyn2 - reyn1)* &
-                                      (al0(irey + 1)- al0(irey))
-      else 
-        al0_Re = al0_Re + al0(nRe)
-      end if 
-      deallocate(al0)
-    end do
-    
-    !> Take the average of al0
-    alcl0 = al0_Re/2 
-
-    
-    alpha = (cl_inv*sqrt(1-mach**2)/(2.0_wp*pi)) * 180/pi + alcl0! deg to enter in c81 table
-
-    alpha_ref = alpha
-
-
-    stripe%alpha = alpha_ref  
-    
-    !> Interpolation of the aerodynamic coefficents 
-    call interp_aero_coeff ( airfoil_data,  stripe%csi_cen, stripe%i_airfoil , &
-                        (/alpha_ref, mach, reynolds/), aero_coeff )
-  
-    !> Aerodynamic coefficients from c81 table  
-    stripe%cl_visc = aero_coeff(1)
-    stripe%cd = aero_coeff(2)  
-    cl_visc = stripe%cl_visc    
-    deallocate(aero_coeff)    
-  else 
-    cl_visc = stripe%cl_visc
-  endif 
-
-  ! 
-  !> Update term rhs (absolute)
-  rhs_diff = (cl_visc - cl_inv)
-  !rhs_diff = sqrt(abs(rhs_diff))*atan(rhs_diff)/(4.0_wp*pi) ! 0.05 hardcoded so far 
-  !> Update tolerance  
-  diff = abs(cl_visc - cl_inv)
-  
-  do i_c = 1, n_pan
-    !> Take the id of the panel in the linsys 
-    id_pan = stripe%panels(i_c)%p%id
-    !> Update of the rhs 
-    linsys%b(id_pan) =  (1 + rel_fct*rhs_diff)*linsys%b(id_pan) ! 0.05 hardcoded so far 
-    
-  end do 
-  
-end subroutine correction_c81_vortlatt
 
 !----------------------------------------------------------------------
 !> Compute an approximate value of the induced velocity at 1/4 of chord
@@ -710,7 +560,7 @@ subroutine get_vel_ctr_pt_vortlatt(this, elems, wake_elems, vort_elems)
 
   !> Control point at 1/4-fraction of the chord
   x0 = this%cen + (this%edge_vec(:,4) - this%edge_vec(:,2))/4.0_wp
-  
+
   !=== Compute the velocity from all the elements ===
   do j = 1,size(wake_elems)  ! wake panels
     call wake_elems(j)%p%compute_vel(x0, v)
@@ -726,53 +576,13 @@ subroutine get_vel_ctr_pt_vortlatt(this, elems, wake_elems, vort_elems)
     call elems(j)%p%compute_vel(x0, v)
     this%vel_ctr_pt = this%vel_ctr_pt + v
   enddo
-  
-  !> induced velocity on leading edge side
+
   wind = variable_wind(this%cen, sim_param%time)
-  
   this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp * pi) &
                     + wind - this%ub
   
 end subroutine get_vel_ctr_pt_vortlatt
 
-subroutine get_vel_ac_stripe(stripe, elems, wake_elems, vort_elems)
-  class(t_stripe),      intent(inout)    :: stripe
-  type(t_pot_elem_p),   intent(in)       :: elems(:)
-  type(t_pot_elem_p),   intent(in)       :: wake_elems(:)
-  type(t_vort_elem_p),  intent(in)       :: vort_elems(:)
-
-  real(wp) :: v(3), x0(3), wind(3)
-  integer :: j
-
-  ! Initialisation to zero
-  stripe%vel = 0.0_wp
-
-  ! Control point at 1/4-fraction of the chord
-  x0 = stripe%ac_stripe + stripe%nor*stripe%curv_ac
-
-  !=== Compute the velocity from all the elements ===
-  do j = 1,size(wake_elems)  ! wake panels
-    call wake_elems(j)%p%compute_vel(x0,v)
-    stripe%vel = stripe%vel + v
-  enddo
-
-  do j = 1, size(elems) ! body elements
-    call elems(j)%p%compute_vel(x0,v)
-    stripe%vel = stripe%vel + v
-  enddo
-  
-  do j = 1,size(vort_elems) ! wake vorticity elements 
-    call vort_elems(j)%p%compute_vel(x0,v)
-    stripe%vel = stripe%vel + v
-  enddo
-  
-  !> induced velocity on leading edge side
-  wind = variable_wind(stripe%ac_stripe, sim_param%time)
-  
-  stripe%vel = stripe%vel/(4.0_wp * pi) &
-                + wind - stripe%ub
-
-end subroutine get_vel_ac_stripe
 !!!----------------------------------------------------------------------
 !> Calculate the geometrical quantities of a vortex lattice
 !!
@@ -807,7 +617,6 @@ subroutine calc_geo_data_vortlatt(this, vert)
   if (norm2(nor) .lt. 1e-16_wp) then 
     nor(3) = 1e-16_wp
   end if
-
 
   this%nor = nor / norm2(nor)
   
@@ -849,36 +658,8 @@ subroutine calc_geo_data_vortlatt(this, vert)
 
 end subroutine calc_geo_data_vortlatt
 
+!> Calc geo data of the stripe: equivalent to calc_geo_data_liftlin 
 
-subroutine calc_geo_data_stripe(stripe)
-  type(t_stripe), intent(inout) :: stripe
-  integer                       :: n_pan
-  real(wp)                      :: nor(3), tang(3)
-
-  n_pan = size(stripe%panels)
-
-  nor = cross(stripe%panels(n_pan)%p%ver(:,3) - stripe%panels(1)%p%ver(:,1) , &
-              stripe%panels(n_pan)%p%ver(:,4) - stripe%panels(1)%p%ver(:,2) )
-
-  !> Avoid numerical singularities when compiled in debug mode
-  if (norm2(nor) .lt. 1e-16_wp) then 
-    nor(3) = 1e-16_wp
-  end if
-
-  stripe%nor = nor / norm2(nor)
-  
-  tang = (stripe%panels(n_pan)%p%ver(:,3) + stripe%panels(n_pan)%p%ver(:,4))/2 - &
-          (stripe%panels(1)%p%ver(:,1) + stripe%panels(1)%p%ver(:,2))/2
-  
-  stripe%tang(:,1) = tang / norm2(tang)
-  stripe%tang(:,2) = cross(stripe%nor, stripe%tang(:,1))
-  
-  !> velocity as linear interpolation 
-  stripe%ub = stripe%panels(n_pan)%p%ub*0.25_wp + stripe%panels(1)%p%ub*0.75_wp 
-  stripe%ac_stripe = (stripe%panels(1)%p%ver(:,2) + stripe%panels(1)%p%ver(:,1))/2 - &
-                    0.75_wp * ((stripe%panels(1)%p%ver(:,2) + stripe%panels(1)%p%ver(:,1))/2 - &
-                    (stripe%panels(n_pan)%p%ver(:,3) + stripe%panels(n_pan)%p%ver(:,4))/2)
-end subroutine calc_geo_data_stripe
 
 
 !----------------------------------------------------------------------
