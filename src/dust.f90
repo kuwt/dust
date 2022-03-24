@@ -211,7 +211,7 @@ real(wp), allocatable             ::      nor_SurfPan_old(:,:)
 real(wp) , allocatable            :: al_kernel(:,:), al_v(:)
 
 !> VL viscous correction
-integer                           :: i_el, i_c, i_s, i, sel, i_p, j
+integer                           :: i_el, i_c, i_s, i, sel, i_p, jj
 integer                           :: it_vl, id_pan
 real(wp)                          :: tol, diff, max_diff 
 real(wp)                          :: d_cd(3), vel(3), v(3)
@@ -820,7 +820,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     ! ifort and parallel runs, so the cycle is executed another time just for the
     ! vortex lattices
     if ( geo%nVortLatt .gt. 0) then
-      !$omp parallel do private(i_el)
+      !!$omp parallel do private(i_el)
         do i_el = 1 , sel      
           select type(el => elems(i_el)%p)        
             class is(t_vortlatt)          
@@ -828,7 +828,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               !> compute dforce using AVL formula
           end select
         end do 
-      !$omp parallel do private(i_el)
+      !!$omp parallel do private(i_el)
       do i_el = 1 , sel      
         select type(el => elems(i_el)%p)        
           class is(t_vortlatt)          
@@ -869,15 +869,21 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                 !!$omp parallel do private(i_s, diff)
                   do i_s = 1, size(geo%components(i_c)%stripe)
                     call geo%components(i_c)%stripe(i_s)%calc_geo_data(geo%components(i_c)%stripe(i_s)%ver)
-                    call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt(elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
-                    
-                    vel = 0.0_wp
-                    do j = 1, size(geo%components(i_c)%stripe)
-                      call geo%components(i_c)%stripe(j)%compute_vel(geo%components(i_c)%stripe(i_s)%cen, v)
-                      vel = vel + v
-                    end do 
-                    geo%components(i_c)%stripe(i_s)%vel = vel 
+                  end do 
 
+                  do  i_s = 1, size(geo%components(i_c)%stripe)
+                    call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt(elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
+                  end do 
+
+                  do i_s = 1, size(geo%components(i_c)%stripe)
+                    vel = 0.0_wp
+                    do jj = 1, size(geo%components(i_c)%stripe)
+                      call geo%components(i_c)%stripe(jj)%compute_vel(geo%components(i_c)%stripe(i_s)%cen, v)
+                      vel = vel + v                      
+                    end do 
+                    
+                    geo%components(i_c)%stripe(i_s)%vel = vel
+                    
                     call geo%components(i_c)%stripe(i_s)%correction_c81_vortlatt(airfoil_data, linsys, diff, it_vl, i_s)
                 !!$omp atomic
                     max_diff = max(diff, max_diff) 
@@ -888,12 +894,11 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                 !!$omp parallel do private(i_s, diff)
                   do i_s = 1, size(geo%components(i_c)%stripe)
                     vel = 0.0_wp
-                    do j = 1, size(geo%components(i_c)%stripe)
-                      call geo%components(i_c)%stripe(j)%compute_vel(geo%components(i_c)%stripe(i_s)%cen, v)
+                    do jj = 1, size(geo%components(i_c)%stripe)
+                      call geo%components(i_c)%stripe(jj)%compute_vel(geo%components(i_c)%stripe(i_s)%cen, v)
                       vel = vel + v
                     end do 
                     geo%components(i_c)%stripe(i_s)%vel = vel 
-
                     call geo%components(i_c)%stripe(i_s)%correction_c81_vortlatt(airfoil_data, linsys, diff, it_vl, i_s)
                 !!$omp atomic
                     max_diff = max(diff, max_diff) 
@@ -903,7 +908,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               end if 
             end if 
           end do 
-          write(*,*) 'max_diff', max_diff
+          !write(*,*) 'max_diff', max_diff
 
           !> Debug output of the system
           if ((sim_param%debug_level .ge. 50) .and. time_2_debug_out) then
@@ -942,26 +947,26 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         endif
         
         !> Viscous drag correction 
-        do i_c = 1, size(geo%components)
-          if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
-            trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
-            do i_s = 1, size(geo%components(i_c)%stripe) 
-              d_cd = 0.5_wp * sim_param%rho_inf *  & 
-                      geo%components(i_c)%stripe(i_s)%unorm**2.0_wp * & 
-                      geo%components(i_c)%stripe(i_s)%cd *  &
-                      sin(geo%components(i_c)%stripe(i_s)%alpha_ind) * & 
-                      geo%components(i_c)%stripe(i_s)%nor +  &
-                      (cos(geo%components(i_c)%stripe(i_s)%alpha_ind) * & 
-                      geo%components(i_c)%stripe(i_s)%tang_cen )
-              
-              do i_p = 1, size(geo%components(i_c)%stripe(i_s)%panels)
-                geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce = &
-                            geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce +&
-                            d_cd * geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area
-              end do
-            end do
-          end if 
-        end do 
+        !do i_c = 1, size(geo%components)
+        !  if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
+        !    trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
+        !    do i_s = 1, size(geo%components(i_c)%stripe) 
+        !      d_cd = 0.5_wp * sim_param%rho_inf *  & 
+        !              geo%components(i_c)%stripe(i_s)%unorm**2.0_wp * & 
+        !              geo%components(i_c)%stripe(i_s)%cd *  &
+        !              sin(geo%components(i_c)%stripe(i_s)%alpha_ind) * & 
+        !              geo%components(i_c)%stripe(i_s)%nor +  &
+        !              (cos(geo%components(i_c)%stripe(i_s)%alpha_ind) * & 
+        !              geo%components(i_c)%stripe(i_s)%tang_cen )
+        !      
+        !      do i_p = 1, size(geo%components(i_c)%stripe(i_s)%panels)
+        !        geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce = &
+        !                    geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce +&
+        !                    d_cd * geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area
+        !      end do
+        !    end do
+        !  end if 
+        !end do 
         
       endif
       linsys%skip = .false.

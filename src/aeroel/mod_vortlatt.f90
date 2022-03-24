@@ -520,7 +520,7 @@ subroutine compute_dforce_jukowski_vortlatt(this)
     this%dforce = sim_param%rho_inf * gam &
                 * ( this%mag - this%stripe_elem(i_stripe-1)%p%mag )  / sqrt(1 - mach**2)
   else
-    this%dforce = sim_param%rho_inf * gam * this%mag  / sqrt(1 - mach**2)
+    this%dforce = sim_param%rho_inf * gam * this%mag / sqrt(1 - mach**2)
   end if
   
   ! === Unsteady contribution ===

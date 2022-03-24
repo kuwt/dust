@@ -74,9 +74,6 @@ use mod_math, only: &
 use mod_c81, only: &
   t_aero_tab, interp_aero_coeff
 
-!use mod_aero_elements, only: &
-!  c_elem, t_elem_p
-
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
@@ -133,7 +130,6 @@ contains
   procedure, pass(this) :: compute_pres     => compute_pres_liftlin
   procedure, pass(this) :: compute_dforce   => compute_dforce_liftlin
   procedure, pass(this) :: calc_geo_data    => calc_geo_data_liftlin
-  ! procedure, pass(this) :: get_vort_vel     => get_vort_vel_liftlin
 
   !> new routines for load computations
   procedure, pass(this) :: get_vel_ctr_pt   => get_vel_ctr_pt_liftlin
@@ -227,6 +223,11 @@ subroutine compute_vel_liftlin (this, pos, vel)
 
   ! doublet ---
   call velocity_calc_doublet(this, vdou, pos)
+  !write(*,*) 'vdou      ', vdou
+  !write(*,*) 'pos       ', pos 
+  !write(*,*) 'this%mag  ', this%mag
+  write(*,*) 'this%tang(:,1)', this%tang(:,1)
+  write(*,*) 'this%tang(:,2)', this%tang(:,2)
   vel = vdou*this%mag
 
 
@@ -878,56 +879,56 @@ end subroutine solve_liftlin_piszkin
 !! system. It is fully explicit, but by being nonlinear requires an
 !! iterative solution.
 subroutine solve_liftlin(elems_ll, elems_tot, &
-                         elems_impl, elems_ad, &
-                         elems_wake, elems_vort, &
-                         airfoil_data, it)
- !type(t_expl_elem_p), intent(inout) :: elems_ll(:)
- type(t_liftlin_p), intent(inout) :: elems_ll(:)
- type(t_pot_elem_p),  intent(in)    :: elems_tot(:)
- type(t_impl_elem_p), intent(in)    :: elems_impl(:)
- type(t_expl_elem_p), intent(in)    :: elems_ad(:)
- type(t_pot_elem_p),  intent(in)    :: elems_wake(:)
- type(t_vort_elem_p), intent(in)    :: elems_vort(:)
- type(t_aero_tab),    intent(in)    :: airfoil_data(:)
- real(wp) :: wind(3)
- integer  :: i_l, j, ic
- real(wp) :: vel(3), v(3), up(3)
- real(wp), allocatable :: vel_w(:,:) , vel_w_vort(:,:)
- real(wp) :: unorm, alpha, alpha_2d
- real(wp) :: cl
- real(wp), allocatable :: aero_coeff(:)
- real(wp), allocatable :: dou_temp(:)
- real(wp), allocatable :: alpha_temp(:)
+                          elems_impl, elems_ad, &
+                          elems_wake, elems_vort, &
+                          airfoil_data, it)
+  !type(t_expl_elem_p), intent(inout) :: elems_ll(:)
+  type(t_liftlin_p), intent(inout) :: elems_ll(:)
+  type(t_pot_elem_p),  intent(in)    :: elems_tot(:)
+  type(t_impl_elem_p), intent(in)    :: elems_impl(:)
+  type(t_expl_elem_p), intent(in)    :: elems_ad(:)
+  type(t_pot_elem_p),  intent(in)    :: elems_wake(:)
+  type(t_vort_elem_p), intent(in)    :: elems_vort(:)
+  type(t_aero_tab),    intent(in)    :: airfoil_data(:)
+  real(wp) :: wind(3)
+  integer  :: i_l, j, ic
+  real(wp) :: vel(3), v(3), up(3)
+  real(wp), allocatable :: vel_w(:,:) , vel_w_vort(:,:)
+  real(wp) :: unorm, alpha, alpha_2d
+  real(wp) :: cl
+  real(wp), allocatable :: aero_coeff(:)
+  real(wp), allocatable :: dou_temp(:)
+  real(wp), allocatable :: alpha_temp(:)
 
- ! mach and reynolds number for each el
- real(wp) :: mach , reynolds
- ! arrays used for force projection
- real(wp) , allocatable :: a_v(:)   ! size(elems_ll)
- real(wp) , allocatable :: c_m(:,:) ! size(elems_ll) , 3
- real(wp) , allocatable :: u_v(:)   ! size(elems_ll)
+  ! mach and reynolds number for each el
+  real(wp) :: mach , reynolds
+  ! arrays used for force projection
+  real(wp) , allocatable :: a_v(:)   ! size(elems_ll)
+  real(wp) , allocatable :: c_m(:,:) ! size(elems_ll) , 3
+  real(wp) , allocatable :: u_v(:)   ! size(elems_ll)
 
- !> sim_param
- ! fixed point algorithm for ll
- real(wp) :: fp_tol , fp_damp , diff, diff_alpha
- integer  :: fp_maxIter
- ! stall regularisation: params read as inputs
- logical  :: stall_regularisation
- real(wp):: al_stall
- integer :: i_do , i , nn_stall , n_stall
- integer :: n_iter_reg
- ! load computation
- logical :: load_avl
- real(wp) :: e_l(3) , e_d(3)
+  !> sim_param
+  ! fixed point algorithm for ll
+  real(wp) :: fp_tol , fp_damp , diff, diff_alpha
+  integer  :: fp_maxIter
+  ! stall regularisation: params read as inputs
+  logical  :: stall_regularisation
+  real(wp):: al_stall
+  integer :: i_do , i , nn_stall , n_stall
+  integer :: n_iter_reg
+  ! load computation
+  logical :: load_avl
+  real(wp) :: e_l(3) , e_d(3)
 
- real(wp) :: max_mag_ll
+  real(wp) :: max_mag_ll
 
- type(t_liftlin), pointer :: el
+  type(t_liftlin), pointer :: el
 
- integer, intent(in) :: it
+  integer, intent(in) :: it
 
- real(wp) , allocatable :: diff_v(:)
- character(len=max_char_len) :: msg
- character(len=*), parameter :: this_sub_name = 'solve_liftlin'
+  real(wp) , allocatable :: diff_v(:)
+  character(len=max_char_len) :: msg
+  character(len=*), parameter :: this_sub_name = 'solve_liftlin'
 
   allocate( diff_v(sim_param%llMaxIter+1) ) ; diff_v = 0.0_wp
 
@@ -943,12 +944,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   ! param for load computation
   load_avl   = sim_param%llLoadsAVL
 
-
-  !> allocate and fill Gamma_old array of the ll intensity at previous dt
-  !allocate(Gamma_old(size(elems_ll)))
-  !do i_l = 1 , size(elems_ll)
-  !  Gamma_old(i_l) = elems_ll(i_l)%p%mag
-  !end do
 
   !> allocate temporary arrays
   allocate(dou_temp(size(elems_ll))) ; dou_temp = 0.0_wp
@@ -1012,18 +1007,15 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   ! IS THIS LOOP USED? (u_v) seems to be overwritten few lines down)
 !$omp parallel do private(i_l, el, wind) schedule(dynamic,4)
   do i_l=1,size(elems_ll)
-   !select type(el => elems_ll(i_l)%p)
-   !type is(t_liftlin)
-     el => elems_ll(i_l)%p
-     wind = variable_wind(el%cen,sim_param%time)
-     u_v(i_l) = norm2((wind-el%ub) - &
-          el%bnorm_cen*sum(el%bnorm_cen*(wind-el%ub)))
-     el%vel_2d_isolated = norm2((wind-el%ub) - &
+      el => elems_ll(i_l)%p
+      wind = variable_wind(el%cen,sim_param%time)
+      u_v(i_l) = norm2((wind-el%ub) - &
+            el%bnorm_cen*sum(el%bnorm_cen*(wind-el%ub)))
+      el%vel_2d_isolated = norm2((wind-el%ub) - &
                           el%bnorm_cen*sum(el%bnorm_cen*(wind-el%ub)))
-     el%vel_outplane_isolated = sum(el%bnorm_cen*(wind-el%ub))
-     el%alpha_isolated = atan2(sum((wind-el%ub)*el%nor), &
+      el%vel_outplane_isolated = sum(el%bnorm_cen*(wind-el%ub))
+      el%alpha_isolated = atan2(sum((wind-el%ub)*el%nor), &
                                 sum((wind-el%ub)*el%tang_cen))*180.0_wp/pi
-   !end select
   end do
 !$omp end parallel do
 
@@ -1046,24 +1038,24 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       !select type(el => elems_ll(i_l)%p) ; type is(t_liftlin)
       el => elems_ll(i_l)%p
 
-        ! overall relative velocity computed in the centre of the ll elem
-        wind = variable_wind(el%cen,sim_param%time)
+      ! overall relative velocity computed in the centre of the ll elem
+      wind = variable_wind(el%cen,sim_param%time)
 
-        !if (ic .eq. 1) then 
-        !  write(*,*) 'i_l             ', i_l
-        !  write(*,*) 'el%cen          ', el%cen
-        !  write(*,*) 'el%ub           ', el%ub 
-        !  write(*,*) 'vel_w(:,i_l)    ', vel_w(:,i_l)
-        !  write(*,*) 'vel/(4.0_wp*pi) ', vel/(4.0_wp*pi)
-        !  write(*,*) 'el%nor          ', el%nor
-        !  write(*,*) 'el%tang_cen     ', el%tang_cen
-        !  write(*,*) 'el%mag          ', el%mag 
-        !endif 
+      !if (ic .eq. 1) then 
+      !  write(*,*) 'i_l             ', i_l
+      !  write(*,*) 'el%cen          ', el%cen
+      !  write(*,*) 'el%ub           ', el%ub 
+      !  write(*,*) 'vel_w(:,i_l)    ', vel_w(:,i_l)
+      !  write(*,*) 'vel/(4.0_wp*pi) ', vel/(4.0_wp*pi)
+      !  write(*,*) 'el%nor          ', el%nor
+      !  write(*,*) 'el%tang_cen     ', el%tang_cen
+      !  write(*,*) 'el%mag          ', el%mag 
+      !endif 
 
         vel = vel/(4.0_wp*pi) + wind - el%ub + vel_w(:,i_l)
-        if (ic .eq. 1) then
-          write(*,*) 'vel             ', vel
-        end if 
+        !if (ic .eq. 1) then
+        !  write(*,*) 'vel             ', vel
+        !end if 
         ! "effective" velocity = proj. of vel in the n-t plane
         up =  el%nor*sum(el%nor*vel) + el%tang_cen*sum(el%tang_cen*vel)
         u_v(i_l) = norm2(up)

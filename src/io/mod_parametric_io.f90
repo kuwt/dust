@@ -80,7 +80,7 @@ contains
 subroutine read_mesh_parametric(mesh_file,ee,rr, &
                     npoints_chord_tot, nelem_span_tot, &
                     airfoil_list_actual, i_airfoil_e, normalised_coord_e, & 
-                    aero_table, curv_ac)
+                    aero_table_out, curv_ac)
 
   character(len=*), intent(in)              :: mesh_file
   integer  , allocatable, intent(out)       :: ee(:,:)
@@ -90,11 +90,12 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   type(t_parse)                             :: pmesh_prs
   integer                                   :: ee_size , rr_size
   logical                                   :: twist_linear_interp
-  logical, intent(out), optional            :: aero_table
+  logical, intent(out), optional            :: aero_table_out
+  logical                                   :: aero_table
   real(wp), allocatable, intent(out), optional :: curv_ac(:,:)
   real(wp), allocatable                     :: curv_ac_section1(:), curv_ac_section2(:) 
   real(wp)                                  :: curv_ac_section
-  integer                                   :: nelem_chord, nelem_chord_tot ! , nelem_span_tot <--- moved as an output
+  integer                                   :: nelem_chord, nelem_chord_tot 
   integer                                   :: npoint_chord_tot, npoint_span_tot
   integer                                   :: nRegions, nSections
   integer                                   :: iRegion, iSection 
@@ -652,6 +653,10 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
   ! optional output ----
   npoints_chord_tot = npoint_chord_tot
+
+  if (present(aero_table_out)) then
+    aero_table_out = aero_table
+  end if
   ! optional output ----
 
 end subroutine read_mesh_parametric
@@ -797,7 +802,7 @@ subroutine naca4digits(airfoil_name, nelem_chord,&
 
   enddo
 
-  xac = 0.5_wp !> control point 
+  xac = 0.75_wp !> control point 
   curv_ac = 0.0_wp
   if (p>0) then
     if (xac <= p) then
@@ -907,7 +912,7 @@ subroutine naca5digits(airfoil_name, nelem_chord,&
 
   enddo
 
-  xac = 0.5_wp ! control point for vl corrected
+  xac = 0.75_wp ! control point for vl corrected
   if (xa <= r) then
     curv_ac = mult*k1/6.0_wp*(xac**3 -3.0_wp*r*xac**2+r**2*(3.0_wp-r)*xac)
   else
@@ -1007,7 +1012,7 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr, curv_ac)
     end do
   end do
   !> get position of aerodynamic center 
-  csi_ac = 0.5_wp ! control point for vl corrected
+  csi_ac = 0.75_wp ! control point for vl corrected
   if ( ElType .eq. 'v' ) then
     call linear_interp(rr_geo(2,:) , rr_geo(1,:) , csi_ac , curv_ac)
   else  
