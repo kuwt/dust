@@ -924,21 +924,21 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
             call solve_linsys(linsys)     
           endif
 
-          do i_el = 1 , sel      
-            elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
-            select type(el => elems(i_el)%p)        
-              class is(t_vortlatt)   
-                !> compute dforce using AVL formula
-                call el%compute_dforce_jukowski()
-                el%pres = sum(el%dforce * el%nor)/el%area
-                
-            end select            
-          end do
-
           it_vl = it_vl + 1
 
         end do !(while)
 
+        do i_el = 1 , sel      
+          elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
+          select type(el => elems(i_el)%p)        
+            class is(t_vortlatt)   
+              !> compute dforce using AVL formula
+              call el%compute_dforce_jukowski()
+              el%pres = sum(el%dforce * el%nor)/el%area
+              
+          end select            
+        end do
+        
         if(it_vl .eq. sim_param%vl_maxiter) then
           call warning('dust','dust','max iteration reached for non linear vl:&
                       increase VLmaxiter!') 
@@ -947,26 +947,26 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         endif
         
         !> Viscous drag correction 
-        !do i_c = 1, size(geo%components)
-        !  if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
-        !    trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
-        !    do i_s = 1, size(geo%components(i_c)%stripe) 
-        !      d_cd = 0.5_wp * sim_param%rho_inf *  & 
-        !              geo%components(i_c)%stripe(i_s)%unorm**2.0_wp * & 
-        !              geo%components(i_c)%stripe(i_s)%cd *  &
-        !              sin(geo%components(i_c)%stripe(i_s)%alpha_ind) * & 
-        !              geo%components(i_c)%stripe(i_s)%nor +  &
-        !              (cos(geo%components(i_c)%stripe(i_s)%alpha_ind) * & 
-        !              geo%components(i_c)%stripe(i_s)%tang_cen )
-        !      
-        !      do i_p = 1, size(geo%components(i_c)%stripe(i_s)%panels)
-        !        geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce = &
-        !                    geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce +&
-        !                    d_cd * geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area
-        !      end do
-        !    end do
-        !  end if 
-        !end do 
+        do i_c = 1, size(geo%components)
+          if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
+            trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
+            do i_s = 1, size(geo%components(i_c)%stripe) 
+              d_cd = 0.5_wp * sim_param%rho_inf *  & 
+                      geo%components(i_c)%stripe(i_s)%unorm**2.0_wp * & 
+                      geo%components(i_c)%stripe(i_s)%cd *  &
+                      sin(geo%components(i_c)%stripe(i_s)%alpha_ind) * & 
+                      geo%components(i_c)%stripe(i_s)%nor +  &
+                      (cos(geo%components(i_c)%stripe(i_s)%alpha_ind) * & 
+                      geo%components(i_c)%stripe(i_s)%tang_cen )
+              
+              do i_p = 1, size(geo%components(i_c)%stripe(i_s)%panels)
+                geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce = &
+                            geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce +&
+                            d_cd * geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area
+              end do
+            end do
+          end if 
+        end do 
         
       endif
       linsys%skip = .false.

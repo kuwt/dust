@@ -237,7 +237,7 @@ module mod_stripe
     !> "2D correction" of the induced angle
     alpha_2d = mag_inv / ( pi * this%chord * unorm ) 
     alpha = (alpha - alpha_2d) * 180.0_wp/pi  
-    
+    !if (it_vl .eq. 0) then 
     !> Interpolation of the aerodynamic coefficents 
     call interp_aero_coeff ( airfoil_data,  this%csi_cen, this%i_airfoil , &
                         (/alpha, mach, reynolds/), aero_coeff )
@@ -246,24 +246,29 @@ module mod_stripe
     this%cl_visc = aero_coeff(1)
     this%cd = aero_coeff(2)  
     cl_visc = this%cl_visc    
+    cl_inv = -2.0_wp * mag_inv / (unorm*this%chord)
+    this%alpha = alpha
 
-    mag_visc = -0.5_wp * unorm * cl_visc * this%chord 
+      deallocate(aero_coeff)   
+    !else 
+    !  cl_visc = this%cl_visc 
+    !  cl_inv = -2.0_wp * mag_inv / (unorm*this%chord)
+    !endif 
+    !mag_visc = -0.5_wp * unorm * cl_visc * this%chord 
     
     !write(*,*) 'alpha_2d', alpha_2d * 180.0_wp/pi 
     !!write(*,*) 'it_vl   ', it_vl
     !write(*,*) 'alpha   ', alpha
-    !write(*,*) 'mag_visc', mag_visc
-    !write(*,*) 'mag_inv ', mag_inv
-
-    this%alpha = alpha
-
-    deallocate(aero_coeff)    
+    !write(*,*) 'cl_visc', cl_visc
+    !write(*,*) 'cl_inv ', cl_inv
+!
+     
 
     !> Update term rhs (absolute)
-    rhs_diff = (mag_inv - mag_visc)
+    rhs_diff = (cl_visc - cl_inv)
 
     !> Update tolerance  
-    diff = abs(mag_inv - mag_visc)
+    diff = abs(cl_visc - cl_inv)
     
     do i_c = 1, n_pan
       !> Take the id of the panel in the linsys 
