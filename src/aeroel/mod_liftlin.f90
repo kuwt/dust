@@ -226,8 +226,8 @@ subroutine compute_vel_liftlin (this, pos, vel)
   !write(*,*) 'vdou      ', vdou
   !write(*,*) 'pos       ', pos 
   !write(*,*) 'this%mag  ', this%mag
-  write(*,*) 'this%tang(:,1)', this%tang(:,1)
-  write(*,*) 'this%tang(:,2)', this%tang(:,2)
+  !write(*,*) 'this%tang(:,1)', this%tang(:,1)
+  !write(*,*) 'this%tang(:,2)', this%tang(:,2)
   vel = vdou*this%mag
 
 
@@ -1023,8 +1023,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     diff = 0.0_wp             ! max diff ("norm \infty")
     diff_alpha = 0.0_wp
     max_mag_ll = 0.0_wp
-!!$omp parallel do private(i_l, el, j, v, vel, up, unorm, alpha, alpha_2d, mach, &
-!!$omp& reynolds, aero_coeff, cl, wind) schedule(dynamic,4)
+!$omp parallel do private(i_l, el, j, v, vel, up, unorm, alpha, alpha_2d, mach, &
+!$omp& reynolds, aero_coeff, cl, wind) schedule(dynamic,4)
     do i_l = 1,size(elems_ll)
 
       ! compute velocity
@@ -1087,9 +1087,9 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       ! Compute the "equivalent" intensity of the vortex line
       dou_temp(i_l) = - 0.5_wp * unorm * cl * el%chord
       alpha_temp(i_l) = alpha
-!!$omp atomic
+!$omp atomic
       diff = max(diff,abs(elems_ll(i_l)%p%mag-dou_temp(i_l)))
-!!$omp end atomic
+!$omp end atomic
 
         c_m(i_l,:) = aero_coeff
         a_v(i_l)   = alpha * pi/180.0_wp ! [rad]
@@ -1098,7 +1098,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       !end select
 
     enddo  ! i_l
-!!$omp end parallel do
+!$omp end parallel do
     ! === Stall regularisation ===
     ! avoid "unphysical" stall on an elem between 2 elems without stall. Check
     ! ll section of nn_stall elems, with nn_stall \in (1,llRegularisationNelems)

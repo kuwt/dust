@@ -820,7 +820,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     ! ifort and parallel runs, so the cycle is executed another time just for the
     ! vortex lattices
     if ( geo%nVortLatt .gt. 0) then
-      !!$omp parallel do private(i_el)
+      !$omp parallel do private(i_el)
         do i_el = 1 , sel      
           select type(el => elems(i_el)%p)        
             class is(t_vortlatt)          
@@ -828,12 +828,11 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               !> compute dforce using AVL formula
           end select
         end do 
-      !!$omp parallel do private(i_el)
+      !$omp parallel do private(i_el)
       do i_el = 1 , sel      
         select type(el => elems(i_el)%p)        
           class is(t_vortlatt)          
             call el%compute_dforce_jukowski()
-
           ! update the pressure field, p = df.n / area
             ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
             ! update the pressure field, p = df.n / area
@@ -928,14 +927,23 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
 
         end do !(while)
 
+        
+        do i_c = 1, size(geo%components)
+          if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
+            trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
+              do i_s = 1, size(geo%components(i_c)%stripe)
+                call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt_final(elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
+              enddo 
+            end if 
+          end do 
+        
         do i_el = 1 , sel      
           elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
           select type(el => elems(i_el)%p)        
             class is(t_vortlatt)   
               !> compute dforce using AVL formula
               call el%compute_dforce_jukowski()
-              el%pres = sum(el%dforce * el%nor)/el%area
-              
+              el%pres = sum(el%dforce * el%nor)/el%area              
           end select            
         end do
         
@@ -954,9 +962,9 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               d_cd = 0.5_wp * sim_param%rho_inf *  & 
                       geo%components(i_c)%stripe(i_s)%unorm**2.0_wp * & 
                       geo%components(i_c)%stripe(i_s)%cd *  &
-                      sin(geo%components(i_c)%stripe(i_s)%alpha_ind) * & 
+                      sin(geo%components(i_c)%stripe(i_s)%al_ctr_pt) * & 
                       geo%components(i_c)%stripe(i_s)%nor +  &
-                      (cos(geo%components(i_c)%stripe(i_s)%alpha_ind) * & 
+                      (cos(geo%components(i_c)%stripe(i_s)%al_ctr_pt) * & 
                       geo%components(i_c)%stripe(i_s)%tang_cen )
               
               do i_p = 1, size(geo%components(i_c)%stripe(i_s)%panels)
