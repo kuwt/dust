@@ -1172,7 +1172,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     sim_param%pa_rad_mult = getreal(prms, 'PenetrationAvoidanceCheckRadius')
     sim_param%pa_elrad_mult = getreal(prms,'PenetrationAvoidanceElementRadius')
   endif
-  sim_param%use_ve = getlogical(prms, 'ViscosityEffects')
+
   !Lifting line elements
   sim_param%llSolver                        = getstr(    prms, 'LLsolver')
   sim_param%llReynoldsCorrections           = getlogical(prms, 'LLreynoldsCorrections')
