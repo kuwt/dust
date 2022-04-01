@@ -59,9 +59,6 @@ use mod_sim_param, only: &
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime, check_preproc
 
-!use mod_aero_elements, only: &
-!  c_elem, t_elem_p
-
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
@@ -79,18 +76,18 @@ use mod_reference, only: &
   t_ref
 
 use mod_hdf5_io, only: &
-   h5loc, &
-   new_hdf5_file, &
-   open_hdf5_file, &
-   close_hdf5_file, &
-   new_hdf5_group, &
-   open_hdf5_group, &
-   close_hdf5_group, &
-   write_hdf5, &
-   write_hdf5_attr, &
-   read_hdf5, &
-   read_hdf5_al, &
-   check_dset_hdf5
+  h5loc, &
+  new_hdf5_file, &
+  open_hdf5_file, &
+  close_hdf5_file, &
+  new_hdf5_group, &
+  open_hdf5_group, &
+  close_hdf5_group, &
+  write_hdf5, &
+  write_hdf5_attr, &
+  read_hdf5, &
+  read_hdf5_al, &
+  check_dset_hdf5
 
 use mod_geometry, only: &
   t_geo, t_geo_component
@@ -128,36 +125,40 @@ contains
 
 !----------------------------------------------------------------------
 subroutine save_status(geo, wake, it, time, run_id)
- type(t_geo), intent(in)         :: geo
- type(t_wake), intent(in) :: wake
- integer, intent(in)             :: it
- real(wp), intent(in)            :: time
- integer, intent(in)             :: run_id(10)
+  type(t_geo), intent(in)         :: geo
+  type(t_wake), intent(in) :: wake
+  integer, intent(in)             :: it
+  real(wp), intent(in)            :: time
+  integer, intent(in)             :: run_id(10)
 
- integer(h5loc) :: floc, gloc1, gloc2, gloc3, gloc4, ploc
- character(len=max_char_len) :: comp_name, sit
- integer :: icomp, ncomp
- integer :: iref, nref
- character(len=max_char_len) :: ref_name
- integer :: ie, ne
- real(wp), allocatable :: vort(:), cp(:) , pres(:)
- real(wp), allocatable :: dforce(:,:), dmom(:,:), surf_vel(:,:)
- real(wp), allocatable :: turbvisc(:), v_rad(:)
- real(wp), allocatable :: points_w(:,:,:), cent(:,:,:) , vel_w(:,:,:)
- real(wp), allocatable :: vort_v(:,:)
- integer, allocatable :: conn_pe(:)
- !LL data
- real(wp), allocatable :: alpha(:), vel_2d(:), vel_outplane(:)
- real(wp), allocatable :: alpha_isolated(:), vel_2d_isolated(:)
- real(wp), allocatable :: vel_outplane_isolated(:), aero_coeff(:,:)
- integer :: ir, id, ip, np, ih
- ! Hinges
- character(len=2) :: hinge_id_str
+  integer(h5loc) :: floc, gloc1, gloc2, gloc3, gloc4, ploc
+  character(len=max_char_len) :: comp_name, sit
+  integer :: icomp, ncomp
+  integer :: iref, nref
+  character(len=max_char_len) :: ref_name
+  integer :: ie, ne
+  real(wp), allocatable :: vort(:), cp(:) , pres(:)
+  real(wp), allocatable :: dforce(:,:), dmom(:,:), surf_vel(:,:)
+  real(wp), allocatable :: turbvisc(:), v_rad(:)
+  real(wp), allocatable :: points_w(:,:,:), cent(:,:,:) , vel_w(:,:,:)
+  real(wp), allocatable :: vort_v(:,:)
+  integer, allocatable :: conn_pe(:)
+  !LL data
+  real(wp), allocatable :: alpha(:), vel_2d(:), vel_outplane(:)
+  real(wp), allocatable :: alpha_isolated(:), vel_2d_isolated(:)
+  real(wp), allocatable :: vel_outplane_isolated(:), aero_coeff(:,:)
+  !VL corrected data
+  real(wp), allocatable :: alpha_vl(:), vel_2d_vl(:), vel_outplane_vl(:)
+  real(wp), allocatable :: alpha_isolated_vl(:), vel_2d_isolated_vl(:)
+  real(wp), allocatable :: vel_outplane_isolated_vl(:), aero_coeff_vl(:,:)
+  integer :: ir, id, ip, np, ih
+  ! Hinges
+  character(len=2) :: hinge_id_str
 
   !create the output file
   write(sit,'(I4.4)') it
   call new_hdf5_file(trim(sim_param%basename)//'_res_'//trim(sit)//'.h5', &
-                     floc)
+                      floc)
   !call write_hdf5_attr(run_id, 'run_id', floc)
   call write_hdf5_attr(git_sha1, 'git_sha1', floc)
   call write_hdf5_attr(version, 'version', floc)
@@ -192,11 +193,11 @@ subroutine save_status(geo, wake, it, time, run_id)
     ne = size(geo%components(icomp)%el)
     allocate(vort(ne), cp(ne) , pres(ne) , dforce(3,ne), dmom(3,ne) )
     do ie = 1,ne
-     vort(ie) = geo%components(icomp)%el(ie)%mag
-     !cp(ie) = geo%components(icomp)%el(ie)%cp
-     pres(ie) = geo%components(icomp)%el(ie)%pres
-     dforce(:,ie) = geo%components(icomp)%el(ie)%dforce
-     dmom(:,ie) = geo%components(icomp)%el(ie)%dmom
+      vort(ie) = geo%components(icomp)%el(ie)%mag
+      !cp(ie) = geo%components(icomp)%el(ie)%cp
+      pres(ie) = geo%components(icomp)%el(ie)%pres
+      dforce(:,ie) = geo%components(icomp)%el(ie)%dforce
+      dmom(:,ie) = geo%components(icomp)%el(ie)%dmom
     enddo
     call write_hdf5(vort,'Vort',gloc3)
     !call write_hdf5(cp,'Cp',gloc3)
@@ -221,20 +222,18 @@ subroutine save_status(geo, wake, it, time, run_id)
     if ( trim( geo%components(icomp)%comp_el_type ) .eq. 'l' ) then
       allocate(alpha(ne), vel_2d(ne), vel_outplane(ne))
       allocate(alpha_isolated(ne), vel_2d_isolated(ne), &
-               vel_outplane_isolated(ne))
+                vel_outplane_isolated(ne))
       allocate(aero_coeff(3,ne))
+      
       do ie = 1,ne
         select type( el => geo%components(icomp)%el(ie) ) ; type is (t_liftlin)
           alpha(ie) = el%alpha
           vel_2d(ie) = el%vel_2d
           vel_outplane(ie) = el%vel_outplane
-
           alpha_isolated(ie) = el%alpha_isolated
           vel_2d_isolated(ie) = el%vel_2d_isolated
           vel_outplane_isolated(ie) = el%vel_outplane_isolated
-
           aero_coeff(:,ie) = el%aero_coeff
-
         end select
       end do
       call write_hdf5(alpha,'alpha',gloc3)
@@ -247,7 +246,37 @@ subroutine save_status(geo, wake, it, time, run_id)
       deallocate(alpha, vel_2d, vel_outplane)
       deallocate(alpha_isolated, vel_2d_isolated, vel_outplane_isolated)
       deallocate(aero_coeff)
-    endif
+
+    elseif (trim(geo%components(icomp)%comp_el_type) .eq. 'v' .and. &
+      trim(geo%components(icomp)%aero_correction) .eq. 'true') then 
+      
+      ne = size(geo%components(icomp)%stripe)
+      allocate(alpha_vl(ne), vel_2d_vl(ne), vel_outplane_vl(ne))
+      allocate(alpha_isolated_vl(ne), vel_2d_isolated_vl(ne), &
+                vel_outplane_isolated_vl(ne))
+      allocate(aero_coeff_vl(3,ne))
+
+      do ie = 1, ne
+        alpha_vl(ie) = geo%components(icomp)%stripe(ie)%alpha
+        vel_2d_vl(ie) = geo%components(icomp)%stripe(ie)%vel_2d
+        vel_outplane_vl(ie) = geo%components(icomp)%stripe(ie)%vel_outplane
+        alpha_isolated_vl(ie) = geo%components(icomp)%stripe(ie)%alpha_isolated
+        vel_2d_isolated_vl(ie) = geo%components(icomp)%stripe(ie)%vel_2d_isolated
+        vel_outplane_isolated_vl(ie) = geo%components(icomp)%stripe(ie)%vel_outplane_isolated
+        aero_coeff_vl(:,ie) = geo%components(icomp)%stripe(ie)%aero_coeff
+      end do
+      call write_hdf5(alpha_vl,'alpha_vl',gloc3)
+      call write_hdf5(vel_2d_vl,'vel_2d_vl',gloc3)
+      call write_hdf5(vel_outplane_vl,'vel_outplane_vl',gloc3)
+      call write_hdf5(alpha_isolated_vl,'alpha_isolated_vl',gloc3)
+      call write_hdf5(vel_2d_isolated_vl,'vel_2d_isolated_vl',gloc3)
+      call write_hdf5(vel_outplane_isolated_vl,'vel_outplane_isolated_vl',gloc3)
+      call write_hdf5(transpose(aero_coeff_vl),'aero_coeff_vl',gloc3)
+      deallocate(alpha_vl, vel_2d_vl, vel_outplane_vl)
+      deallocate(alpha_isolated_vl, vel_2d_isolated_vl, vel_outplane_isolated_vl)
+      deallocate(aero_coeff_vl)
+
+    endif 
 
     call close_hdf5_group(gloc3)
 
@@ -388,18 +417,17 @@ end subroutine save_status
 !! Loads just the bodies solution, which is stored into the components,
 !! the loading of the wakes is left to other subroutines
 subroutine load_solution(filename,comps,refs)
- character(len=max_char_len), intent(in) :: filename
- type(t_geo_component), intent(inout) :: comps(:)
- type(t_ref), intent(in) :: refs(0:)
+  character(len=max_char_len), intent(in) :: filename
+  type(t_geo_component), intent(inout) :: comps(:)
+  type(t_ref), intent(in) :: refs(0:)
 
- integer(h5loc) :: floc, gloc1, gloc2, gloc3
- integer :: ncomp, icomp, icomp2
- integer :: ne, ie
- character(len=max_char_len) :: comp_name_read, comp_id
- real(wp), allocatable :: idou(:), pres(:), dF(:,:)
+  integer(h5loc) :: floc, gloc1, gloc2, gloc3
+  integer :: ncomp, icomp, icomp2
+  integer :: ne, ie
+  character(len=max_char_len) :: comp_name_read, comp_id
+  real(wp), allocatable :: idou(:), pres(:), dF(:,:)
 
-
- character(len=*), parameter :: this_sub_name = 'load_solution'
+  character(len=*), parameter :: this_sub_name = 'load_solution'
 
   call open_hdf5_file(filename, floc)
 
@@ -460,15 +488,15 @@ end subroutine load_solution
 !! This is done comparing offsets and rotations between the actual references
 !! and the one saved
 subroutine check_ref(gloc, floc, ref)
- integer(h5loc), intent(in) :: gloc
- integer(h5loc), intent(in) :: floc
- type(t_ref), intent(in)    :: ref
+  integer(h5loc), intent(in) :: gloc
+  integer(h5loc), intent(in) :: floc
+  type(t_ref), intent(in)    :: ref
 
- integer :: iref
- integer(h5loc) :: refs_gloc, ref_loc
- character(len=max_char_len) :: ref_title
- real(wp) :: R(3,3), of(3)
- character(len=*), parameter :: this_sub_name='check_ref'
+  integer :: iref
+  integer(h5loc) :: refs_gloc, ref_loc
+  character(len=max_char_len) :: ref_title
+  real(wp) :: R(3,3), of(3)
+  character(len=*), parameter :: this_sub_name='check_ref'
 
   call read_hdf5(iref, 'RefId', gloc)
   call open_hdf5_group(floc, 'References', refs_gloc)
@@ -496,10 +524,10 @@ end subroutine check_ref
 
 !> Load the time value from a result file
 subroutine load_time(filename, time)
- character(len=*), intent(in) :: filename
- real(wp), intent(out) :: time
+  character(len=*), intent(in) :: filename
+  real(wp), intent(out) :: time
 
- integer(h5loc) :: floc
+  integer(h5loc) :: floc
 
   call open_hdf5_file(filename, floc)
 

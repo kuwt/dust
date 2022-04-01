@@ -867,7 +867,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               if (it_vl .eq. 0) then 
                 !!$omp parallel do private(i_s, diff)
                   do i_s = 1, size(geo%components(i_c)%stripe)
-                    call geo%components(i_c)%stripe(i_s)%calc_geo_data(geo%components(i_c)%stripe(i_s)%ver)
+                    call geo%components(i_c)%stripe(i_s)%calc_geo_data(geo%components(i_c)%stripe(i_s)%ver) 
                   end do 
 
                   do  i_s = 1, size(geo%components(i_c)%stripe)
@@ -882,7 +882,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                     end do 
                     
                     geo%components(i_c)%stripe(i_s)%vel = vel
-                    
+                    !call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt_final(elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
                     call geo%components(i_c)%stripe(i_s)%correction_c81_vortlatt(airfoil_data, linsys, diff, it_vl, i_s)
                 !!$omp atomic
                     max_diff = max(diff, max_diff) 
@@ -898,6 +898,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                       vel = vel + v
                     end do 
                     geo%components(i_c)%stripe(i_s)%vel = vel 
+                    !call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt_final(elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
                     call geo%components(i_c)%stripe(i_s)%correction_c81_vortlatt(airfoil_data, linsys, diff, it_vl, i_s)
                 !!$omp atomic
                     max_diff = max(diff, max_diff) 
@@ -960,7 +961,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
             trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
             do i_s = 1, size(geo%components(i_c)%stripe) 
               d_cd = 0.5_wp * sim_param%rho_inf *  & 
-                      geo%components(i_c)%stripe(i_s)%unorm**2.0_wp * & 
+                      geo%components(i_c)%stripe(i_s)%vel_2d**2.0_wp * & 
                       geo%components(i_c)%stripe(i_s)%cd *  &
                       sin(geo%components(i_c)%stripe(i_s)%al_ctr_pt) * & 
                       geo%components(i_c)%stripe(i_s)%nor +  &
@@ -971,6 +972,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                 geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce = &
                             geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce +&
                             d_cd * geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area
+              
               end do
             end do
           end if 

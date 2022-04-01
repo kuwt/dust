@@ -109,7 +109,7 @@ module mod_stripe
     !> Local tangent in the center of the stripe in spanwise 
     real(wp) :: bnorm_cen(3)
     !> Norm of stripe velocity
-    real(wp) :: unorm  
+    real(wp) :: vel_2d
     !> Drag coefficient 
     real(wp) :: cd
     !> Lift coefficient (from c81)
@@ -119,13 +119,15 @@ module mod_stripe
     !> AoA to input c81
     real(wp) :: alpha
     !> AoA at previous time step (only for dynstall)
-    real(wp) :: alpha_old = 0.0_wp 
+    real(wp) :: alpha_old 
     !> Isolated alpha 
     real(wp) :: alpha_isolated 
     real(wp) :: vel_2d_isolated
     real(wp) :: vel_outplane
     real(wp) :: vel_outplane_isolated
     real(wp) :: al_ctr_pt
+    real(wp) :: aero_coeff(3) 
+
     !> Stripe 'curvature'
     real(wp) :: curv_ac 
     !> Sweep angle 
@@ -165,6 +167,7 @@ module mod_stripe
     class(t_stripe),   intent(inout) :: this
     type(t_aero_tab),  intent(in)    :: airfoil_data(:)
     type(t_linsys),    intent(inout) :: linsys
+    integer,           intent(in)    :: it_vl, i_s !> debug only
 
     real(wp)                         :: diff
     real(wp)                         :: mach, reynolds, wind(3)
@@ -172,16 +175,16 @@ module mod_stripe
     real(wp),    allocatable         :: al0(:)
     real(wp),    allocatable         :: aero_coeff(:)
     real(wp)                         :: up(3), unorm
-    real(wp)                         :: force(3), mag_inv, mag_visc 
+    real(wp)                         :: dforce(3), mag_inv, mag_visc 
     integer                          :: i_c, n_pan, id_pan
     real(wp)                         :: cl_inv, cl_visc
-    real(wp)                         :: rel_fct, rhs_diff
-    integer,           intent(in)    :: it_vl, i_s
+    real(wp)                         :: rel_fct, rhs_diff    
     integer                          :: id_a, i_a
     integer                          :: imach, nmach
     real(wp)                         :: machend, mach1, mach2
     integer                          :: irey, nRe, i_Re
     real(wp)                         :: reyn1, reyn2, al0_Re
+    real(wp)                         :: e_l(3), e_d(3), c_m(3)
     !> Dynamic stall
     real(wp)                         :: thicc = 0.12 !> get as input? 
                                         !(should be the last 2 digits of NACA profile)
@@ -207,11 +210,11 @@ module mod_stripe
     this%vel = this%vel + wind - this%ub + this%vel_w
 
     this%vel_outplane = dot(this%bnorm_cen,this%vel)
-
+    
     ! "effective" velocity = proj. of vel in the n-t plane
     up =  this%nor*dot(this%nor,this%vel) + this%tang_cen*dot(this%tang_cen,this%vel)
     unorm = norm2(up)      ! velocity w/o induced velocity
-    this%unorm = unorm
+    this%vel_2d = unorm
 
     mag_inv = 0.0_wp
     do i_c = 1, n_pan
@@ -230,88 +233,26 @@ module mod_stripe
     
     ! Angle of incidence (full velocity) 
     alpha = atan2(dot(up, this%nor), dot(up,this%tang_cen)) 
-    
-    !> Interpolation of alcl0
-    al0_Re = 0.0_wp
-  
-    do i_a = 1, 2
-      id_a = this%i_airfoil(i_a)
-      nRe = size(airfoil_data(id_a)%aero_coeff)
-
-      allocate(al0(nRe)); al0  = 0.0_wp
-      do i_Re = 1, nRe 
-        imach = 1 
-        nmach = size(airfoil_data(id_a)%aero_coeff(i_Re)%coeff(1)%par2)
-        mach1   = airfoil_data(id_a)%aero_coeff(i_Re)%coeff(1)%par2(imach)
-        machend = airfoil_data(id_a)%aero_coeff(i_Re)%coeff(1)%par2(nmach)
-
-        !> Find closest mach number 
-        do while ((mach .ge. mach1 ) .and. (imach .lt. nmach))
-          imach = imach + 1
-          mach1 = airfoil_data(id_a)%aero_coeff(i_Re)%coeff(1)%par2(imach)
-        end do
-        imach = imach - 1
-        mach1 = airfoil_data(id_a)%aero_coeff(i_Re)%coeff(1)%par2(imach)
-        mach2 = airfoil_data(id_a)%aero_coeff(i_Re)%coeff(1)%par2(imach+1)
-
-        !> Linear interpolation of alpha0 for all reynolds 
-        al0(i_Re) = airfoil_data(id_a)%aero_coeff(i_Re)%alcl0(imach) + &
-                (mach - mach1)/(mach2 - mach1) * &
-                ( airfoil_data(id_a)%aero_coeff(i_Re)%alcl0(imach+1) - &
-                airfoil_data(id_a)%aero_coeff(i_Re)%alcl0(imach  ) )
-      end do 
-      
-      if (nRe .gt. 1) then 
-        irey  = 1
-        reyn1 = airfoil_data(id_a)%aero_coeff(irey)%Re
-        do while ( ( reynolds .ge. reyn1 ) .and. ( irey .lt. nRe ) )
-          irey = irey + 1
-          reyn1 = airfoil_data(id_a)%aero_coeff(irey)%Re
-        end do
-        irey = irey - 1
-        reyn1 = airfoil_data(id_a)%aero_coeff(irey)%Re
-        reyn2 = airfoil_data(id_a)%aero_coeff(irey+1)%Re
-        !> Linear interpolation of alpha0 for all reynolds 
-        al0_Re = al0_Re + al0(irey) + (reynolds - reyn1)/(reyn2 - reyn1)* &
-                                      (al0(irey + 1)- al0(irey))
-      else 
-        al0_Re = al0_Re + al0(nRe)
-      end if 
-      deallocate(al0)
-    end do
-    
-    !> Take the average of al0
-
-    alcl0 = al0_Re/2  
-
 
     !> "2D correction" of the induced angle
     alpha_2d = mag_inv / ( pi * this%chord * unorm ) 
+
     alpha = (alpha - alpha_2d) * 180.0_wp/pi  
-    this%alpha = (alpha)*pi/180.0_wp
-    !if (it_vl .eq. 0) then 
+
     !> Interpolation of the aerodynamic coefficents 
     call interp_aero_coeff ( airfoil_data,  this%csi_cen, this%i_airfoil , &
                         (/alpha, mach, reynolds/), aero_coeff )
   
     !> Aerodynamic coefficients from c81 table  
+    c_m = aero_coeff
     this%cl_visc = aero_coeff(1)
     this%cd = aero_coeff(2)  
+    
     cl_visc = this%cl_visc    
     cl_inv = -2.0_wp * mag_inv / (unorm*this%chord)    
 
-    deallocate(aero_coeff)   
-    !else 
-    !  cl_visc = this%cl_visc 
-    !  cl_inv = -2.0_wp * mag_inv / (unorm*this%chord)
-    !endif 
-    !mag_visc = -0.5_wp * unorm * cl_visc * this%chord 
-    
-    !write(*,*) 'alpha_2d', alpha_2d * 180.0_wp/pi 
-    !!write(*,*) 'it_vl   ', it_vl
-    !write(*,*) 'alpha   ', alpha
-    !write(*,*) 'cl_visc', cl_visc
-    !write(*,*) 'cl_inv ', cl_inv
+    !deallocate(aero_coeff)   
+
     !> Update term rhs (absolute)
     rhs_diff = (cl_visc - cl_inv)
 
@@ -324,7 +265,30 @@ module mod_stripe
       !> Update of the rhs 
       linsys%b(id_pan) =  (1 + rel_fct*rhs_diff)*linsys%b(id_pan)       
     end do 
+
+    ! === Update AOAs and aerodynamic coefficients ===
+    !> unit vector in the direction of the relative velocity (_d for drag)
+    !  and in the direction of the lift (_l for lift)
+    e_l = this%nor * cos(this%al_ctr_pt) - this%tang_cen*sin(this%al_ctr_pt )
+    e_d = this%nor * sin(this%al_ctr_pt) + this%tang_cen*cos(this%al_ctr_pt )
+    e_l = e_l/norm2(e_l)
+    e_d = e_d/norm2(e_d)
     
+    !> Force calculation on the stripe 
+    dforce = 0.0_wp
+    do i_c = 1, n_pan
+      dforce = dforce + this%panels(i_c)%p%dforce
+    end do
+    
+    !> Update aerodynamic coefficients and AOA
+    c_m(1) = sum(dforce* e_l) / &
+                (0.5_wp*sim_param%rho_inf*unorm ** 2.0_wp * this%area )
+    c_m(2) = sum(dforce*e_d)/&
+                (0.5_wp*sim_param%rho_inf*unorm ** 2.0_wp * this%area )
+    
+    this%alpha = this%al_ctr_pt * 180_wp/pi
+    this%aero_coeff = c_m(:) 
+
   end subroutine correction_c81_vortlatt
 
   !----------------------------------------------------------------------
@@ -372,18 +336,16 @@ module mod_stripe
   
     !> induced velocity on stripe center 
     this%vel_w = this%vel_w/(4.0_wp * pi)
-    !write(*,*) 'this%vel_w            ',this%vel_w 
-    !write(*,*) 
   
   end subroutine get_vel_ctr_pt_stripe
 
   subroutine compute_vel_stripe(this, pos, vel) 
     class(t_stripe),    intent(in)    :: this
-    integer                           :: i_c, n_pan
     real(wp),  intent(in)             :: pos(:)
     real(wp), intent(out)             :: vel(3) 
     real(wp)                          :: vdou(3), mag
 
+    integer                           :: i_c, n_pan
     !> Total panel on stripe 
     n_pan = size(this%panels)
 
@@ -416,7 +378,7 @@ module mod_stripe
     ! Initialisation to zero
     vel_ctr_pt = 0.0_wp
   
-    ! Control point at 1/4-fraction of the chord
+    ! Control point at leading edge 
     x0 = this%cen  - this%tang_cen * this%chord / 2.0_wp
   
     !=== Compute the velocity from all the elements ===
@@ -440,9 +402,9 @@ module mod_stripe
     wind = variable_wind(x0, sim_param%time)
 
     vel_ctr_pt = vel_ctr_pt/(4.0_wp*pi) + wind -  this%ub
-  
-    this%al_ctr_pt = atan2(sum(vel_ctr_pt * this%nor    ) , &
-                           sum(vel_ctr_pt * this%tang_cen) )
+
+    this%al_ctr_pt = atan2(sum(vel_ctr_pt*this%nor    ) , &
+                          sum(vel_ctr_pt*this%tang_cen) )
   
   end subroutine get_vel_ctr_pt_final_stripe
 
@@ -461,10 +423,11 @@ module mod_stripe
     
   end subroutine compute_grad_stripe
 
-  subroutine calc_geo_data_stripe(this, vert)
 
+  subroutine calc_geo_data_stripe(this, vert)
     class(t_stripe), intent(inout) :: this
     real(wp), intent(in)           :: vert(:,:)
+
     integer                        :: n_pan, is
     real(wp)                       :: nor(3), tanl(3), cen(3)
     real(wp)                       :: cos_lambda 

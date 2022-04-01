@@ -85,7 +85,7 @@ use mod_aeroel, only: &
 
 implicit none
 
-public :: load_refs , load_res ,  load_ll, &
+public :: load_refs , load_res ,  load_ll, load_vl,&
           load_wake_post, load_wake_viz , &
           load_wake_pan , load_wake_ring , &
           check_if_components_exist
@@ -335,6 +335,68 @@ subroutine load_ll(floc, comps, ll_data)
   call close_hdf5_group(gloc1)
 
 end subroutine load_ll
+
+
+subroutine load_vl(floc, comps, vl_data)
+  integer(h5loc), intent(in)           :: floc
+  type(t_geo_component), intent(inout) :: comps(:)
+  real(wp), intent(out)                :: vl_data(:,:)
+
+  integer                              :: ncomps, icomp
+  integer                              :: nelems, offset, nelems_comp
+  integer(h5loc)                       :: gloc1, gloc2, gloc3
+  character(len=max_char_len)          :: cname
+  real(wp), allocatable                :: vl_data_read(:,:)
+  integer                              :: ncomps_sol
+
+  character(len=*), parameter :: this_sub_name = 'load_vl'
+
+  ncomps = size(comps)
+  nelems = 0
+  do icomp = 1, ncomps
+    if (trim(comps(icomp)%comp_el_type) .eq. 'v' .and. &
+            trim(comps(icomp)%aero_correction) .eq. 'true') then 
+      nelems = nelems + comps(icomp)%nelems
+    else
+      call internal_error(this_sub_name, this_mod_name,'Loading lifting &
+      &lines from a non lifting line component')
+    endif 
+  enddo
+
+    call open_hdf5_group(floc,'Components',gloc1)
+    call read_hdf5(ncomps_sol,'NComponents',gloc1)
+    if(ncomps_sol .lt. ncomps) call error(this_sub_name, this_mod_name, &
+    'Different number of components between solution and geometry')
+
+  offset = 0
+  do icomp = 1, ncomps
+
+    nelems_comp = comps(icomp)%nelems
+    allocate(vl_data_read(nelems_comp,9))
+    write(cname,'(A,I3.3)') 'Comp',comps(icomp)%comp_id
+    call open_hdf5_group(gloc1,trim(cname),gloc2)
+    call open_hdf5_group(gloc2,'Solution',gloc3)
+    call read_hdf5(vl_data_read(:,1:3),'aero_coeff_vl',gloc3)
+    call read_hdf5(vl_data_read(:,4),'alpha_vl',gloc3)
+    call read_hdf5(vl_data_read(:,5),'alpha_isolated_vl',gloc3)
+    call read_hdf5(vl_data_read(:,6),'vel_2d_vl',gloc3)
+    call read_hdf5(vl_data_read(:,7),'vel_2d_isolated_vl',gloc3)
+    call read_hdf5(vl_data_read(:,8),'vel_outplane_vl',gloc3)
+    call read_hdf5(vl_data_read(:,9),'vel_outplane_isolated_vl',gloc3)
+ 
+    call close_hdf5_group(gloc3)
+    call close_hdf5_group(gloc2)
+ 
+    vl_data(offset+1:offset+nelems_comp,:) = vl_data_read
+    offset = offset + nelems_comp
+ 
+    deallocate(vl_data_read)
+ 
+  enddo
+ 
+  call close_hdf5_group(gloc1)
+ 
+ end subroutine load_vl
 
 !----------------------------------------------------------------------
 
