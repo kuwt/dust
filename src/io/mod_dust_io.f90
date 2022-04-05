@@ -154,7 +154,7 @@ subroutine save_status(geo, wake, it, time, run_id)
   integer :: ir, id, ip, np, ih
   ! Hinges
   character(len=2) :: hinge_id_str
-
+  character(len=5) :: aero_table 
   !create the output file
   write(sit,'(I4.4)') it
   call new_hdf5_file(trim(sim_param%basename)//'_res_'//trim(sit)//'.h5', &
@@ -255,7 +255,7 @@ subroutine save_status(geo, wake, it, time, run_id)
       allocate(alpha_isolated_vl(ne), vel_2d_isolated_vl(ne), &
                 vel_outplane_isolated_vl(ne))
       allocate(aero_coeff_vl(3,ne))
-
+      aero_table = geo%components(icomp)%aero_correction
       do ie = 1, ne
         alpha_vl(ie) = geo%components(icomp)%stripe(ie)%alpha
         vel_2d_vl(ie) = geo%components(icomp)%stripe(ie)%vel_2d
@@ -272,6 +272,7 @@ subroutine save_status(geo, wake, it, time, run_id)
       call write_hdf5(vel_2d_isolated_vl,'vel_2d_isolated_vl',gloc3)
       call write_hdf5(vel_outplane_isolated_vl,'vel_outplane_isolated_vl',gloc3)
       call write_hdf5(transpose(aero_coeff_vl),'aero_coeff_vl',gloc3)
+      call write_hdf5(aero_table, 'aero_table', gloc3)
       deallocate(alpha_vl, vel_2d_vl, vel_outplane_vl)
       deallocate(alpha_isolated_vl, vel_2d_isolated_vl, vel_outplane_isolated_vl)
       deallocate(aero_coeff_vl)

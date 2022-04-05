@@ -237,7 +237,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
   do i_comp = 1 , n_comp_tot
     write(cname,'(A,I3.3)') 'Comp',i_comp
     call open_hdf5_group(gloc,trim(cname),cloc)
-    call read_hdf5(all_components_names(i_comp),'CompName',cloc)
+    call read_hdf5(all_components_names(i_comp),'CompName',cloc)    
     call close_hdf5_group(cloc)
   end do
   call close_hdf5_group(gloc)
@@ -296,8 +296,9 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
 
   !> decide on printing corrected vortex lattice data
   print_vl = getlogical(sbprms,'VortexLatticeData')
-  if (trim(comps(1)%comp_el_type) .ne. 'v' .and.  &
-    trim(comps(1)%aero_correction) .eq. 'true')  then
+  
+  if (trim(comps(1)%comp_el_type) .eq. 'v' .and.  &
+    trim(comps(1)%aero_correction) .ne. 'true')  then
     print_vl = .false.
     call warning(this_sub_name, this_mod_name, 'Cannot output corrected &
           &vortex lattice data for a non vortex lattice component, output of vortex &

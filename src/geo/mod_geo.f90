@@ -1318,6 +1318,12 @@ subroutine load_components(geo, in_file, out_file, te)
           call write_hdf5(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
           call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
           call write_hdf5(theta_e           ,'theta_e'           ,geo_loc)
+        elseif (comp_el_type(1:1) .eq. 'v' ) then
+          !call write_hdf5(airfoil_list      ,'airfoil_list'      ,geo_loc)
+          !call write_hdf5(nelem_span_list   ,'nelem_span_list'   ,geo_loc)
+          !call write_hdf5(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
+          !call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
+          call write_hdf5(trim(aero_table)  ,'aero_table'        ,geo_loc)          
 
         else if (comp_el_type(1:1) .eq. 'a') then
           call write_hdf5(trac,'Traction',cloc2)
@@ -2139,8 +2145,6 @@ subroutine create_strip_connectivity(geo)
             
             comp%stripe(i_s)%tang(:,1) = tanl / norm2(tanl)
             comp%stripe(i_s)%tang(:,2) = cross(comp%stripe(i_s)%nor, comp%stripe(i_s)%tang(:,1))
-            
-             
             
             !> Vector connecting two consecutive vertices:
             do i = 1, 4

@@ -144,57 +144,64 @@ contains
 !----------------------------------------------------------------------
 
 subroutine load_components_postpro(comps, points, nelem, floc, &
-             components_names, all_comp)
- type(t_geo_component), allocatable, intent(inout) :: comps(:)
- real(wp), allocatable, intent(out) :: points(:,:)
- integer, intent(out)               :: nelem
- !integer, allocatable, intent(out)  :: ep_conn(:,:)
- !character(len=*), intent(in) :: in_file
- integer(h5loc), intent(in) :: floc
- character(len=*), allocatable, intent(inout) :: components_names(:)
- logical, intent(in) :: all_comp
+                                    components_names, all_comp)
+  type(t_geo_component), allocatable, intent(inout) :: comps(:)
+  real(wp), allocatable, intent(out)                :: points(:,:)
+  integer, intent(out)                              :: nelem
+  integer(h5loc), intent(in)                        :: floc
+  character(len=*), allocatable, intent(inout)      :: components_names(:)
+  logical, intent(in)                               :: all_comp
 
- type(t_geo_component), allocatable :: comp_temp(:)
- integer :: i1 , i2, i3
- integer, allocatable :: ee(:,:)
- real(wp), allocatable :: rr(:,:)
- character(len=max_char_len) :: comp_el_type, comp_name, comp_name_stripped
- character(len=max_char_len) :: comp_input
- integer :: points_offset, n_vert! , elems_offset
- real(wp), allocatable :: points_tmp(:,:)
- character(len=max_char_len) :: ref_tag
- integer :: ref_id
- character(len=max_char_len) :: cname !, msg
- integer(h5loc) :: gloc, cloc , geo_loc
- integer :: n_comp, i_comp, n_comp_tot, i_comp_tot , i_comp_tmp
- integer :: parametric_nelems_span , parametric_nelems_chor
- real(wp) :: coupling_node_rot(3,3) = 0.0_wp
- !> Hinges
- integer(h5loc) :: hiloc, hloc
- integer :: ih, n_hinges
- real(wp):: rotation_amplitude
- character(len=2) :: hinge_id_str
+  type(t_geo_component), allocatable                :: comp_temp(:)
+  integer                                           :: i1 , i2, i3
+  integer, allocatable                              :: ee(:,:)
+  real(wp), allocatable                             :: rr(:,:)
+  character(len=max_char_len)                       :: comp_el_type, comp_name
+  character(len=max_char_len)                       :: comp_input, comp_name_stripped
+  integer                                           :: points_offset, n_vert
+  real(wp), allocatable                             :: points_tmp(:,:)
+  character(len=max_char_len)                       :: ref_tag
+  integer                                           :: ref_id
+  character(len=max_char_len)                       :: cname 
+  integer(h5loc)                                    :: gloc, cloc, geo_loc
+  integer                                           :: n_comp, i_comp, n_comp_tot 
+  integer                                           :: i_comp_tot, i_comp_tmp
+  integer                                           :: parametric_nelems_span , parametric_nelems_chor
+  real(wp)                                          :: coupling_node_rot(3,3) = 0.0_wp
+  
+  !> Hinges
+  integer(h5loc)                                    :: hiloc, hloc
+  integer                                           :: ih, n_hinges
+  real(wp)                                          :: rotation_amplitude
+  character(len=2)                                  :: hinge_id_str
 
- ! Some structure to handle multiple components
- character(len=max_char_len), allocatable :: components(:) , components_tmp(:)
- character(len=max_char_len) :: component_stripped
+  !> vl corrected 
+  character(len=5)                                  :: aero_table
 
- character(len=max_char_len) :: comp_coupling_str
+  !> Some structure to handle multiple components
+  character(len=max_char_len), allocatable          :: components(:) , components_tmp(:)
+  character(len=max_char_len)                       :: component_stripped
 
- character(len=*), parameter :: this_sub_name = 'load_components_postpro'
+  character(len=max_char_len)                       :: comp_coupling_str
+
+  character(len=*), parameter                       :: this_sub_name = 'load_components_postpro'
 
   ! Read all the components
-  call open_hdf5_group(floc,'Components',gloc)
+  call open_hdf5_group(floc,'Components', gloc)
   call read_hdf5(n_comp_tot,'NComponents',gloc)
 
   allocate(components(n_comp_tot))
   do i_comp_tot = 1 , n_comp_tot
     write(cname,'(A,I3.3)') 'Comp',i_comp_tot
-    call open_hdf5_group(gloc,trim(cname),cloc)
+    call open_hdf5_group(gloc, trim(cname),cloc)
     call read_hdf5(components(i_comp_tot),'CompName',cloc)
     call read_hdf5(comp_input,'CompInput',cloc)
     call close_hdf5_group(cloc)
   end do
+  
+  
+  
+  
 
 
 ! RE-BUILD components_names() to host multiple components ++++++++++++++++++
@@ -255,13 +262,13 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
   ! to avoid Components that do not exist as an input in dust_post.in
   if ( .not. allocated(components_names) ) then
     call error(this_sub_name, this_mod_name, &
-                 'components_names .not. allocated. Something strange &
-                 &and unexpected happened. It could be a bug')
+                  'components_names .not. allocated. Something strange &
+                  &and unexpected happened. It could be a bug')
   end if
   if ( size(components_names) .le. 0 ) then
     call error(this_sub_name, this_mod_name, &
-                 'No component found corresponding to the requested one(s) &
-                 &for this analysis')
+                  'No component found corresponding to the requested one(s) &
+                  &for this analysis')
   end if
 
 !  allocate(comps(n_comp))
@@ -314,7 +321,6 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       call read_hdf5_al(ee   ,'ee'   ,geo_loc)
       call read_hdf5_al(rr   ,'rr'   ,geo_loc)
 
-
       if ( trim(comps(i_comp)%comp_input) .eq. 'parametric' ) then
         call read_hdf5( parametric_nelems_span ,'parametric_nelems_span',geo_loc)
         call read_hdf5( parametric_nelems_chor ,'parametric_nelems_chor',geo_loc)
@@ -322,10 +328,12 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         comps(i_comp)%parametric_nelems_chor = parametric_nelems_chor
       end if
 
-
-      !!call read_hdf5_al(neigh,'neigh',geo_loc)
-      !! !element-specific reads
-      !!if ( comp_el_type(1:1) .eq. 'l' ) then
+      if ( trim(comps(i_comp_tot)%comp_el_type) .eq. 'v' ) then
+        call read_hdf5(aero_table,  'aero_table', geo_loc)
+        comps(i_comp_tot)%aero_correction = trim(aero_table)
+      end if 
+  
+      !
       !!  call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc) ! (:)
       !!  call read_hdf5_al(nelem_span_list   ,'nelem_span_list'   ,geo_loc) ! (:)
       !!  call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc) ! (:,:)
@@ -363,9 +371,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       points_tmp(:,points_offset+1:points_offset+size(rr,2)) = rr
       call move_alloc(points_tmp, points)
       allocate(comps(i_comp)%i_points(size(rr,2)))
-      comps(i_comp)%i_points = &
-                         (/((i3),i3=points_offset+1,points_offset+size(rr,2))/)
-
+      comps(i_comp)%i_points = (/((i3),i3=points_offset+1,points_offset+size(rr,2))/)
 
       ! --- treat the elements ---
 
@@ -373,26 +379,23 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       comps(i_comp)%nelems = size(ee,2)
       nelem = nelem + comps(i_comp)%nelems
       select case(trim(comps(i_comp)%comp_el_type))
-       case('p')
-        allocate(t_surfpan::comps(i_comp)%el(size(ee,2)))
-       case('v')
-        allocate(t_vortlatt::comps(i_comp)%el(size(ee,2)))
-       case('l')
-        allocate(t_liftlin::comps(i_comp)%el(size(ee,2)))
-       case('a')
-        allocate(t_actdisk::comps(i_comp)%el(size(ee,2)))
-       case default
-        call error(this_sub_name, this_mod_name, &
-                 'Unknown type of element: '//comps(i_comp)%comp_el_type)
+        case('p')
+          allocate(t_surfpan::comps(i_comp)%el(size(ee,2)))
+        case('v')
+          allocate(t_vortlatt::comps(i_comp)%el(size(ee,2)))
+        case('l')
+          allocate(t_liftlin::comps(i_comp)%el(size(ee,2)))
+        case('a')
+          allocate(t_actdisk::comps(i_comp)%el(size(ee,2)))
+        case default
+          call error(this_sub_name, this_mod_name, &
+                  'Unknown type of element: '//comps(i_comp)%comp_el_type)
       end select
 
-      !fill (some) of the elements fields
+      !> fill (some) of the elements fields
       do i2=1,size(ee,2)
 
-        !Component id
-        !comps(i_comp)%el(i2)%comp_id = i_comp
-
-        !vertices
+        !> vertices
         n_vert = count(ee(:,i2).ne.0)
         allocate(comps(i_comp)%el(i2)%i_ver(n_vert))
         !allocate(geo%components(i_comp)%el(i2)%neigh(n_vert))
