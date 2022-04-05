@@ -789,20 +789,20 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
   call close_hdf5_group(cloc)
   call close_hdf5_group(gloc)
   call close_hdf5_file(floc)
-  !> Hinges ----------------------------------------------------------------
+    !> Hinges ----------------------------------------------------------------
 
-  do ie = 1,size(comp%el)
-    call calc_geo_data_postpro(comp%el(ie),points(:,comp%el(ie)%i_ver))
+    do ie = 1,size(comp%el)
+      call calc_geo_data_postpro(comp%el(ie),points(:,comp%el(ie)%i_ver))
 
-    if ( present(refs_G) .and. present(refs_f) ) then
-      !Calculate the velocity of the centers to impose the boundary condition
-      call calc_geo_vel(comp%el(ie), refs_G(:,:,comp%ref_id) , &
-                                       refs_f(:,comp%ref_id) )
-    end if
+      if ( present(refs_G) .and. present(refs_f) ) then
+        !Calculate the velocity of the centers to impose the boundary condition
+        call calc_geo_vel(comp%el(ie), refs_G(:,:,comp%ref_id) , &
+                                        refs_f(:,comp%ref_id) )
+      end if
+    enddo
+
+    end associate
   enddo
-
-  end associate
- enddo
 
 end subroutine update_points_postpro
 
@@ -825,59 +825,57 @@ subroutine expand_actdisk_postpro(comps, points, points_exp, elems)
   do i_comp = 1,size(comps)
     associate(cmp=>comps(i_comp))
     select type(el => cmp%el)
-     type is(t_actdisk)
-      !make space also for the centers
-      allocate(pt_tmp(3,size(points_exp,2) + &
-               size(cmp%loc_points,2) + cmp%nelems))
-      pt_tmp(:,1:size(points_exp,2)) = points_exp
-      start_pts = size(points_exp,2)
-      start_cen = size(points_exp,2) + size(cmp%i_points)
-      pt_tmp(:,start_pts+1 : start_cen) = points(:,cmp%i_points)
-      do ie = 1,cmp%nelems
-        pt_tmp(:,start_cen+ie) = el(ie)%cen
-      enddo
-      call move_alloc(pt_tmp, points_exp)
-      extra_offset = extra_offset + cmp%nelems
-
-      allocate(ee_tmp(4,size(elems,2)+size(cmp%i_points)))
-      ee_tmp(:,1:size(elems,2)) = elems
-      ee_tmp(:,size(elems,2)+1:size(ee_tmp,2)) = 0
-
-      ipt = 1
-      do ie = 1,cmp%nelems
-        ipt1 = ipt
-        do iv = 1,el(ie)%n_ver-1
-          ee_tmp(1,size(elems,2)+ipt) = start_pts+ipt
-          ee_tmp(2,size(elems,2)+ipt) = start_pts+ipt+1
-          ee_tmp(3,size(elems,2)+ipt) = start_cen+ie
-          ipt = ipt+1
+      type is(t_actdisk)
+        !make space also for the centers
+        allocate(pt_tmp(3,size(points_exp,2) + &
+                 size(cmp%loc_points,2) + cmp%nelems))
+        pt_tmp(:,1:size(points_exp,2)) = points_exp
+        start_pts = size(points_exp,2)
+        start_cen = size(points_exp,2) + size(cmp%i_points)
+        pt_tmp(:,start_pts+1 : start_cen) = points(:,cmp%i_points)
+        do ie = 1,cmp%nelems
+          pt_tmp(:,start_cen+ie) = el(ie)%cen
         enddo
-        !last element
-          ee_tmp(1,size(elems,2)+ipt) = start_pts+ipt
-          ee_tmp(2,size(elems,2)+ipt) = start_pts+ipt1
-          ee_tmp(3,size(elems,2)+ipt) = start_cen+ie
-          ipt = ipt+1
-      enddo
-      call move_alloc(ee_tmp, elems)
+        call move_alloc(pt_tmp, points_exp)
+        extra_offset = extra_offset + cmp%nelems
 
-     class default
-      allocate(pt_tmp(3,size(points_exp,2)+size(cmp%loc_points,2)))
-      pt_tmp(:,1:size(points_exp,2)) = points_exp
-      pt_tmp(:,size(points_exp,2)+1:size(pt_tmp,2)) = points(:,cmp%i_points)
-      call move_alloc(pt_tmp, points_exp)
+        allocate(ee_tmp(4,size(elems,2)+size(cmp%i_points)))
+        ee_tmp(:,1:size(elems,2)) = elems
+        ee_tmp(:,size(elems,2)+1:size(ee_tmp,2)) = 0
 
-      allocate(ee_tmp(4,size(elems,2)+cmp%nelems))
-      ee_tmp(:,1:size(elems,2)) = elems
-      ee_tmp(:,size(elems,2)+1:size(ee_tmp,2)) = 0
-      do ie = 1,cmp%nelems
-        ee_tmp(1:el(ie)%n_ver,size(elems,2)+ie) =  &
-                                                el(ie)%i_ver+extra_offset
-      enddo
-      call move_alloc(ee_tmp, elems)
+        ipt = 1
+        do ie = 1,cmp%nelems
+          ipt1 = ipt
+          do iv = 1,el(ie)%n_ver-1
+            ee_tmp(1,size(elems,2)+ipt) = start_pts+ipt
+            ee_tmp(2,size(elems,2)+ipt) = start_pts+ipt+1
+            ee_tmp(3,size(elems,2)+ipt) = start_cen+ie
+            ipt = ipt+1
+          enddo
+          !last element
+            ee_tmp(1,size(elems,2)+ipt) = start_pts+ipt
+            ee_tmp(2,size(elems,2)+ipt) = start_pts+ipt1
+            ee_tmp(3,size(elems,2)+ipt) = start_cen+ie
+            ipt = ipt+1
+        enddo
+        call move_alloc(ee_tmp, elems)
 
+      class default
+        allocate(pt_tmp(3,size(points_exp,2)+size(cmp%loc_points,2)))
+        pt_tmp(:,1:size(points_exp,2)) = points_exp
+        pt_tmp(:,size(points_exp,2)+1:size(pt_tmp,2)) = points(:,cmp%i_points)
+        call move_alloc(pt_tmp, points_exp)
 
+        allocate(ee_tmp(4,size(elems,2)+cmp%nelems))
+        ee_tmp(:,1:size(elems,2)) = elems
+        ee_tmp(:,size(elems,2)+1:size(ee_tmp,2)) = 0
+        do ie = 1,cmp%nelems
+          ee_tmp(1:el(ie)%n_ver,size(elems,2)+ie) =  &
+                                                  el(ie)%i_ver+extra_offset
+        enddo
+        call move_alloc(ee_tmp, elems)
 
-    end select
+      end select
     end associate
   enddo
 end subroutine

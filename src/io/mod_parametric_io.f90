@@ -282,7 +282,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   allocate(twist_list  (nSections))  ; twist_list = 0.0_wp
   allocate(airfoil_list(nSections))
   allocate(airfoil_table_list(nSections))
-  allocate(curv_ac(2,nelem_span_tot)) ; curv_ac = 0.0_wp
   allocate(curv_ac_section1(nRegions)); curv_ac_section1 = 0.0_wp
   allocate(curv_ac_section2(nRegions)); curv_ac_section2 = 0.0_wp
   
@@ -568,15 +567,16 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   ! lots of deallocation missing causing memory leakage 
   if ( allocated(xySection1) ) deallocate(xySection1)
   if ( allocated(xySection2) ) deallocate(xySection2)
-
-  allocate(i_airfoil_e(2,nelem_span_tot))
-  i_airfoil_e = 0
-    
-  allocate(normalised_coord_e(2,nelem_span_tot))
-  normalised_coord_e = 0.0_wp
+  
 
   !> Interpolation of airfoil table for corrected vl only
   if (ElType .eq.'v' .and. aero_table) then
+    allocate(i_airfoil_e(2,nelem_span_tot))
+    i_airfoil_e = 0
+    
+    allocate(normalised_coord_e(2,nelem_span_tot))
+    normalised_coord_e = 0.0_wp
+  
       !> Check airfoil_list()
     if ( trim(airfoil_table_list(1)) .eq. 'interp' ) then
       call error(this_sub_name, this_mod_name, 'The first "airfoil"&
