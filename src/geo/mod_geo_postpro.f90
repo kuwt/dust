@@ -312,8 +312,13 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       call read_hdf5(comp_coupling_str,'Coupled',cloc)
       if ( trim(comp_coupling_str) .eq. 'true' ) then
         comps(i_comp)%coupling = .true.
+        call read_hdf5(coupling_node_rot,'CouplingNodeOrientation',cloc)
+        comps(i_comp)%coupling_node_rot = coupling_node_rot
       else
         comps(i_comp)%coupling = .false.
+        comps(i_comp)%coupling_node_rot(1,:) = (/ 1._wp, 0._wp, 0._wp/)
+        comps(i_comp)%coupling_node_rot(2,:) = (/ 0._wp, 1._wp, 0._wp/)
+        comps(i_comp)%coupling_node_rot(3,:) = (/ 0._wp, 0._wp, 1._wp/)
       end if
 
       ! Geometry --------------------------
@@ -363,7 +368,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       !store the read points into the local points
       allocate(comps(i_comp)%loc_points(3,size(rr,2)))
       comps(i_comp)%loc_points = rr
-
+      
       !Now for the moments the points are stored here without moving them,
       !will be moved later, consider not storing them here at all
       allocate(points_tmp(3,size(rr,2)+points_offset))
@@ -398,23 +403,9 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         !> vertices
         n_vert = count(ee(:,i2).ne.0)
         allocate(comps(i_comp)%el(i2)%i_ver(n_vert))
-        !allocate(geo%components(i_comp)%el(i2)%neigh(n_vert))
         comps(i_comp)%el(i2)%n_ver = n_vert
         comps(i_comp)%el(i2)%i_ver(1:n_vert) = &
                                               ee(1:n_vert,i2) + points_offset
-        !do i3=1,n_vert
-        !  if ( neigh(i3,i2) .ne. 0 ) then
-        !    geo%components(i_comp)%el(i2)%neigh(i3)%p => &
-        !                            geo%components(i_comp)%el(neigh(i3,i2))
-        !  else
-        !    ! do nothing, keep the neighbour pointer not associated
-        !    geo%components(i_comp)%el(i2)%neigh(i3)%p => null()
-        !  end if
-        !end do
-
-        !motion
-        !geo%components(i_comp)%el(i2)%moving = geo%components(i_comp)%moving
-
       enddo
 
       ! Update elems_offset for the next component
@@ -465,14 +456,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         allocate( comps(i_comp)%hinge(ih)%act%rr( 3,comps(i_comp)%hinge(ih)%n_nodes ) )
         
         comps(i_comp)%hinge(ih)%act%rr = comps(i_comp)%hinge(ih)%ref%rr
-
-#if USE_PRECICE
-        coupling_node_rot = comps(i_comp)%coupling_node_rot
-#else
-        coupling_node_rot(1,:) = (/ 1._wp, 0._wp, 0._wp/)
-        coupling_node_rot(2,:) = (/ 0._wp, 1._wp, 0._wp/)
-        coupling_node_rot(3,:) = (/ 0._wp, 0._wp, 1._wp/)
-#endif
+ 
         call comps(i_comp)%hinge(ih)%build_connectivity( rr, coupling_node_rot)
 
       end do

@@ -319,7 +319,9 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
     nelem_chor = comps(id_comp)%parametric_nelems_chor
     n_sect = nelem_span
 
-
+    do i1 = 1, size(comps(id_comp)%loc_points, 2) 
+      comps(id_comp)%loc_points(:, i1) = matmul(comps(id_comp)%coupling_node_rot,comps(id_comp)%loc_points(:,i1))
+    end do
     ! ######################################################################
     ! Find the coordinates of the reference points in the local reference frame
 
@@ -330,6 +332,8 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
     !TODO: find y-coord is general enough for all the 'parametric' components
     allocate(y_cen(n_sect),y_span(n_sect))
     ie = 0
+    
+    ie = 0
     do is = 1 , n_sect
       ie = ie + 1
       y_cen(is) = &
@@ -338,7 +342,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
       y_span(is) = &
       abs ( comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver(1) )&
       - comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver(2) ) )
-
+      
       do ic = 2 , nelem_chor ! check
         ie = ie + 1
         if (abs( y_cen(is) - &
