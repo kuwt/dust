@@ -338,22 +338,6 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         comps(i_comp_tot)%aero_correction = trim(aero_table)
       end if 
   
-      !
-      !!  call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc) ! (:)
-      !!  call read_hdf5_al(nelem_span_list   ,'nelem_span_list'   ,geo_loc) ! (:)
-      !!  call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc) ! (:,:)
-      !!  call read_hdf5_al(normalised_coord_e,'normalised_coord_e',geo_loc) ! (:,:)
-      !!  allocate(geo%components(i_comp)%airfoil_list(size(airfoil_list)))
-      !!  geo%components(i_comp)%airfoil_list = airfoil_list
-      !!  allocate(geo%components(i_comp)%nelem_span_list(size(nelem_span_list)))
-      !!  geo%components(i_comp)%nelem_span_list = nelem_span_list
-      !!  allocate(geo%components(i_comp)%i_airfoil_e( &
-      !!        size(i_airfoil_e,1),size(i_airfoil_e,2)) )
-      !!  geo%components(i_comp)%i_airfoil_e = i_airfoil_e
-      !!  allocate(geo%components(i_comp)%normalised_coord_e( &
-      !!        size(normalised_coord_e,1),size(normalised_coord_e,2)))
-      !!  geo%components(i_comp)%normalised_coord_e = normalised_coord_e
-      !!end if
       call close_hdf5_group(geo_loc)
 
       ! ======= CREATING ELEMENTS ======

@@ -806,76 +806,76 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
                end if
              end do
 
-             ! Compute the area of the subelem with the minimum n.of points -
-             !  (since it could be only TRI or QUAD) and compute the area of
-             !  the othe elem as a difference.
-             if ( sec1_nVer .le. sec2_nVer ) then
-               if ( sec1_nVer .gt. 2 ) then
-                  call error(this_sub_name, this_mod_name, 'Generic sectional &
-                  & loads error')
-               end if
+              ! Compute the area of the subelem with the minimum n.of points -
+              !  (since it could be only TRI or QUAD) and compute the area of
+              !  the othe elem as a difference.
+              if ( sec1_nVer .le. sec2_nVer ) then
+                if ( sec1_nVer .gt. 2 ) then
+                    call error(this_sub_name, this_mod_name, 'Generic sectional &
+                    & loads error')
+                end if
 
-               interSectAreas(1) = 0.5_wp * norm2( &
+                interSectAreas(1) = 0.5_wp * norm2( &
                     cross( interSectPoints(:,2) - comps(id_comp)%loc_points(:, &
-                             comps(id_comp)%el(ie)%i_ver( nNodeInt(1,1) ) ) , &
-                           interSectPoints(:,1) - comps(id_comp)%loc_points(:, &
-                             comps(id_comp)%el(ie)%i_ver( nNodeInt(1,2) ) ) ) ) ! nNodes(2,iSec1) ) )
-               interSectAreas(2) = comps(id_comp)%el(ie)%area - interSectAreas(1)
+                            comps(id_comp)%el(ie)%i_ver( nNodeInt(1,1) ) ) , &
+                            interSectPoints(:,1) - comps(id_comp)%loc_points(:, &
+                            comps(id_comp)%el(ie)%i_ver( nNodeInt(1,2) ) ) ) ) ! nNodes(2,iSec1) ) )
+                interSectAreas(2) = comps(id_comp)%el(ie)%area - interSectAreas(1)
 
-               if ( sec1_nVer .eq. 1 ) then
-                 interSectCen(:,1) = ( interSectPoints(:,1) + interSectPoints(:,2) + &
-                      comps(id_comp)%loc_points(:, &
+                if ( sec1_nVer .eq. 1 ) then
+                  interSectCen(:,1) = ( interSectPoints(:,1) + interSectPoints(:,2) + &
+                        comps(id_comp)%loc_points(:, &
                             comps(id_comp)%el(ie)%i_ver(nNodeInt(1,1)) ) ) / 3.0_wp
-               elseif ( sec1_nVer .eq. 2 ) then
-                 interSectCen(:,1) = ( interSectPoints(:,1) + interSectPoints(:,2) + &
-                      comps(id_comp)%loc_points(:, &
+                elseif ( sec1_nVer .eq. 2 ) then
+                  interSectCen(:,1) = ( interSectPoints(:,1) + interSectPoints(:,2) + &
+                        comps(id_comp)%loc_points(:, &
                             comps(id_comp)%el(ie)%i_ver(nNodeInt(1,1)) ) + &
-                      comps(id_comp)%loc_points(:, &
+                        comps(id_comp)%loc_points(:, &
                             comps(id_comp)%el(ie)%i_ver(nNodeInt(1,2)) ) ) / 4.0_wp
-               else
-               end if
-               interSectCen(:,2) = ( comps(id_comp)%el(ie)%area * comps(id_comp)%el(ie)%cen - &
+                else
+                end if
+                interSectCen(:,2) = ( comps(id_comp)%el(ie)%area * comps(id_comp)%el(ie)%cen - &
                        interSectAreas(1) * interSectCen(:,1) ) / interSectAreas(2)
 
-             else
-               if ( sec2_nVer .gt. 2 ) then
-                  call error(this_sub_name, this_mod_name, 'Generic sectional &
-                  & loads error')
-               end if
+              else
+                if ( sec2_nVer .gt. 2 ) then
+                    call error(this_sub_name, this_mod_name, 'Generic sectional &
+                    & loads error')
+                end if
 
-               interSectAreas(2) = 0.5_wp * norm2( &
-                    cross( interSectPoints(:,2) - comps(id_comp)%loc_points(:, &
-                             comps(id_comp)%el(ie)%i_ver( nNodeInt(2,1) ) ) , &
-                           interSectPoints(:,1) - comps(id_comp)%loc_points(:, &
-                             comps(id_comp)%el(ie)%i_ver( nNodeInt(2,2) ) ) ) ) ! nNodes(2,iSec1) ) )
-               interSectAreas(1) = comps(id_comp)%el(ie)%area - interSectAreas(2)
+              interSectAreas(2) = 0.5_wp * norm2( &
+                      cross( interSectPoints(:,2) - comps(id_comp)%loc_points(:, &
+                            comps(id_comp)%el(ie)%i_ver( nNodeInt(2,1) ) ) , &
+                          interSectPoints(:,1) - comps(id_comp)%loc_points(:, &
+                            comps(id_comp)%el(ie)%i_ver( nNodeInt(2,2) ) ) ) ) ! nNodes(2,iSec1) ) )
+              interSectAreas(1) = comps(id_comp)%el(ie)%area - interSectAreas(2)
 
-               if ( sec2_nVer .eq. 1 ) then
-                 interSectCen(:,2) = ( interSectPoints(:,1) + interSectPoints(:,2) + &
-                      comps(id_comp)%loc_points(:, &
-                            comps(id_comp)%el(ie)%i_ver(nNodeInt(2,1)) ) ) / 3.0_wp
-               elseif ( sec2_nVer .eq. 2 ) then
-                 interSectCen(:,2) = ( interSectPoints(:,1) + interSectPoints(:,2) + &
-                      comps(id_comp)%loc_points(:, &
-                            comps(id_comp)%el(ie)%i_ver(nNodeInt(2,1)) ) + &
-                      comps(id_comp)%loc_points(:, &
-                            comps(id_comp)%el(ie)%i_ver(nNodeInt(2,2)) ) ) / 4.0_wp
-               else
-               end if
-               interSectCen(:,1) = ( comps(id_comp)%el(ie)%area * comps(id_comp)%el(ie)%cen - &
-                       interSectAreas(2) * interSectCen(:,2) ) / interSectAreas(1)
+              if ( sec2_nVer .eq. 1 ) then
+                interSectCen(:,2) = ( interSectPoints(:,1) + interSectPoints(:,2) + &
+                     comps(id_comp)%loc_points(:, &
+                           comps(id_comp)%el(ie)%i_ver(nNodeInt(2,1)) ) ) / 3.0_wp
+              elseif ( sec2_nVer .eq. 2 ) then
+                interSectCen(:,2) = ( interSectPoints(:,1) + interSectPoints(:,2) + &
+                     comps(id_comp)%loc_points(:, &
+                           comps(id_comp)%el(ie)%i_ver(nNodeInt(2,1)) ) + &
+                     comps(id_comp)%loc_points(:, &
+                           comps(id_comp)%el(ie)%i_ver(nNodeInt(2,2)) ) ) / 4.0_wp
+              else
+              end if
+              interSectCen(:,1) = ( comps(id_comp)%el(ie)%area * comps(id_comp)%el(ie)%cen - &
+                      interSectAreas(2) * interSectCen(:,2) ) / interSectAreas(1)
 
-             end if
+            end if
 
-             ! Update structures
-             box_secloads(isec1)%nelems = box_secloads(isec1)%nelems + 1
-             box_secloads(isec1)%elems(box_secloads(isec1)%nelems) = ie
-             box_secloads(isec1)%fracs(box_secloads(isec1)%nelems) = interSectAreas(1) / comps(id_comp)%el(ie)%area
-             box_secloads(isec1)%cen(:,box_secloads(isec1)%nelems) = interSectCen(:,1)
-             box_secloads(isec2)%nelems = box_secloads(isec2)%nelems + 1
-             box_secloads(isec2)%elems(box_secloads(isec2)%nelems) = ie
-             box_secloads(isec2)%fracs(box_secloads(isec2)%nelems) = interSectAreas(2) / comps(id_comp)%el(ie)%area
-             box_secloads(isec2)%cen(:,box_secloads(isec2)%nelems) = interSectCen(:,2)
+            ! Update structures
+            box_secloads(isec1)%nelems = box_secloads(isec1)%nelems + 1
+            box_secloads(isec1)%elems(box_secloads(isec1)%nelems) = ie
+            box_secloads(isec1)%fracs(box_secloads(isec1)%nelems) = interSectAreas(1) / comps(id_comp)%el(ie)%area
+            box_secloads(isec1)%cen(:,box_secloads(isec1)%nelems) = interSectCen(:,1)
+            box_secloads(isec2)%nelems = box_secloads(isec2)%nelems + 1
+            box_secloads(isec2)%elems(box_secloads(isec2)%nelems) = ie
+            box_secloads(isec2)%fracs(box_secloads(isec2)%nelems) = interSectAreas(2) / comps(id_comp)%el(ie)%area
+            box_secloads(isec2)%cen(:,box_secloads(isec2)%nelems) = interSectCen(:,2)
 
 
            end if

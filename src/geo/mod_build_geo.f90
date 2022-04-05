@@ -857,6 +857,16 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
       !> Write additional fields for vl correction
       if (aero_table) then 
+
+        if ( mesh_symmetry ) then
+          call symmetry_update_vl_lists( nelem_span_list , &
+                chord_p , i_airfoil_e , normalised_coord_e )
+        end if
+        if ( mesh_mirror ) then
+          call mirror_update_vl_lists( nelem_span_list , &
+                chord_p , i_airfoil_e , normalised_coord_e )
+        end if
+  
         call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)
         call write_hdf5(i_airfoil_e,        'i_airfoil_e',        geo_loc)
         call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)
@@ -2516,6 +2526,130 @@ subroutine mirror_update_ll_lists ( nelem_span_list , &
 end subroutine mirror_update_ll_lists
 
 !----------------------------------------------------------------------
+!> Updates lifting lines fields in case of symmetry
+subroutine symmetry_update_vl_lists ( nelem_span_list , &
+                      chord_p , i_airfoil_e , normalised_coord_e )
+
+  integer , allocatable , intent(inout) :: nelem_span_list(:)
+  integer , allocatable , intent(inout) :: i_airfoil_e(:,:)
+  real(wp), allocatable , intent(inout) :: normalised_coord_e(:,:)
+  real(wp), allocatable , intent(inout) :: chord_p(:)
+
+  integer , allocatable :: nelem_span_list_tmp(:)
+  integer , allocatable :: i_airfoil_e_tmp(:,:)
+  real(wp), allocatable :: normalised_coord_e_tmp(:,:)
+  real(wp), allocatable :: chord_p_tmp(:)
+
+  integer :: nelem_span_section
+  integer :: nelems
+  integer :: npts   ! nelem + 1
+
+  integer :: i , siz
+
+  ! Update dimensions ----------
+  nelems = size(i_airfoil_e,2) * 2
+  npts  = nelems + 1
+  nelem_span_section = size(nelem_span_list) * 2
+
+  !> Fill temporary arrays
+  allocate(nelem_span_list_tmp( nelem_span_section ))
+  siz = size(nelem_span_list)
+  do i = 1 , siz
+    nelem_span_list_tmp( siz+i   ) = nelem_span_list(i)
+    nelem_span_list_tmp( siz-i+1 ) = nelem_span_list(i)
+  end do
+
+  allocate(i_airfoil_e_tmp( 2, nelems ))
+  siz = size(i_airfoil_e,2)
+  do i = 1 , siz
+    i_airfoil_e_tmp( 1:2 , siz+i   ) = i_airfoil_e( 1:2    , i )
+    i_airfoil_e_tmp( 1:2 , siz-i+1 ) = i_airfoil_e( 2:1:-1 , i )
+  end do
+
+  allocate(normalised_coord_e_tmp( 2, nelems ))
+  siz = size(normalised_coord_e,2)
+  do i = 1 , siz
+    normalised_coord_e_tmp( 1:2 , siz+i   ) = normalised_coord_e( 1:2    , i )
+    normalised_coord_e_tmp( 1:2 , siz-i+1 ) = 1.0_wp - normalised_coord_e( 2:1:-1 , i )
+  end do
+
+  allocate(chord_p_tmp( npts ))
+  siz = size(chord_p)
+  chord_p_tmp( siz ) = chord_p(1)
+  do i = 2 , siz
+    chord_p_tmp( siz+i-1 ) = chord_p( i )
+    chord_p_tmp( siz-i+1 ) = chord_p( i )
+  end do
+
+  ! Move_alloc to the original arrays -------------------------
+  call move_alloc(    nelem_span_list_tmp ,     nelem_span_list )
+  call move_alloc(        i_airfoil_e_tmp ,         i_airfoil_e )
+  call move_alloc( normalised_coord_e_tmp ,  normalised_coord_e )
+  call move_alloc(            chord_p_tmp ,             chord_p )
+
+end subroutine symmetry_update_vl_lists
+
+!----------------------------------------------------------------------
+
+!> Updates lifting lines fields in case of mirroring
+subroutine mirror_update_vl_lists ( nelem_span_list , &
+  chord_p , i_airfoil_e , normalised_coord_e )
+
+  integer , allocatable , intent(inout) :: nelem_span_list(:)
+  integer , allocatable , intent(inout) :: i_airfoil_e(:,:)
+  real(wp), allocatable , intent(inout) :: normalised_coord_e(:,:)
+  real(wp), allocatable , intent(inout) :: chord_p(:)
+
+  integer , allocatable :: nelem_span_list_tmp(:)
+  integer , allocatable :: i_airfoil_e_tmp(:,:)
+  real(wp), allocatable :: normalised_coord_e_tmp(:,:)
+  real(wp), allocatable :: chord_p_tmp(:)
+
+  integer :: nelem_span_section
+  integer :: nelem
+  integer :: npts   ! nelem + 1
+
+  integer :: i , siz
+
+  ! Update dimensions ----------
+  nelem = sum(nelem_span_list)
+  npts  = nelem + 1
+  nelem_span_section = size(nelem_span_list)
+
+
+  !> Fill temporary arrays
+  allocate(nelem_span_list_tmp( nelem_span_section ))
+  siz = size(nelem_span_list)
+  do i = 1 , siz
+    nelem_span_list_tmp( siz-i+1 ) = nelem_span_list(i)
+  end do
+
+  allocate(i_airfoil_e_tmp( 2, size(i_airfoil_e,2) ))
+  siz = size(i_airfoil_e,2)
+  do i = 1 , siz
+    i_airfoil_e_tmp( 1:2 , siz-i+1 ) = i_airfoil_e( 2:1:-1 , i )
+  end do
+
+  allocate(normalised_coord_e_tmp( 2, size(normalised_coord_e,2) ))
+  do i = 1 , siz
+    normalised_coord_e_tmp( 1:2 , siz-i+1 ) = 1.0_wp - normalised_coord_e( 2:1:-1 , i )
+  end do
+
+  allocate(chord_p_tmp( npts ))
+  siz = size(chord_p)
+  chord_p_tmp( siz ) = chord_p(1)
+  do i = 2 , siz
+    chord_p_tmp( siz-i+1 ) = chord_p( i )
+  end do
+
+  ! Move_alloc to the original arrays -------------------------
+  call move_alloc(    nelem_span_list_tmp ,     nelem_span_list )
+  call move_alloc(        i_airfoil_e_tmp ,         i_airfoil_e )
+  call move_alloc( normalised_coord_e_tmp ,  normalised_coord_e )
+  call move_alloc(            chord_p_tmp ,             chord_p )
+
+end subroutine mirror_update_vl_lists
+
 
 !> [X,Y] = cigar2D(L,R,RN,N)
 !!
