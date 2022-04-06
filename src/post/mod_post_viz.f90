@@ -130,13 +130,13 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
  type(t_geo_component), allocatable :: comps(:)
  character(len=max_char_len) :: filename
  integer(h5loc) :: floc , ploc
- logical :: out_vort, out_vort_vec, out_vel, out_cp, out_press , out_wake, out_surfvel
+ logical :: out_vort, out_vort_vec, out_vel, out_cp, out_press , out_wake, out_surfvel, out_vrad
  logical :: out_turbvisc
  logical :: separate_wake
  integer :: n_var , i_var
  character(len=max_char_len), allocatable :: var_names(:)
  real(wp), allocatable :: points(:,:), points_exp(:,:) , wpoints(:,:)
- real(wp), allocatable :: vppoints(:,:), vpvort(:), vpvort_v(:,:), vpturbvisc(:)
+ real(wp), allocatable :: vppoints(:,:), vpvort(:), vpvort_v(:,:), vpturbvisc(:), v_rad(:)
  integer , allocatable :: elems(:,:) , welems(:,:)
  integer :: nelem , nelem_w, nelem_vp
 
@@ -178,6 +178,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   out_press= isInList('pressure' ,var_names)
   out_cp   = isInList('cp'       ,var_names)
   out_turbvisc = isInList('turbulent_viscosity',var_names)
+  out_vrad = isInList('vortex_rad',var_names)
   nprint = 0; nprint_w = 0
   if(out_vort)  nprint = nprint+1
   if(out_vort_vec)  nprint = nprint+1
@@ -186,6 +187,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   if(out_vel)   nprint = nprint+1  !<--- *** TODO ***
   if(out_press) nprint = nprint+1  !<--- *** TODO ***
   if(out_turbvisc) nprint = nprint+1
+  if(out_vrad) nprint = nprint+1
   allocate(out_vars(nprint))
   if(average) allocate(ave_out_vars(nprint))
   !for the wake
@@ -305,9 +307,9 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
 
         if(out_turbvisc) then
           call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort, &
-                           vpvort_v, vpturbvisc)
+                           vpvort_v, v_rad, vpturbvisc)
         else
-          call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort, vpvort_v)
+          call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort, vpvort_v, v_rad)
         endif
         nelem_w = size(welems,2)
         nelem_vp = size(vppoints,2)
@@ -366,7 +368,16 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                  'Vorticity',.true.)
           i_var = i_var +1
         endif
-
+        if(out_vrad) then
+          call add_output_var(out_vars_vp(i_var), v_rad, &
+                 'VortexRad',.false.)
+          call add_output_var(out_vars_w(i_var), v_rad, &
+                 'VortexRad',.true.)
+          call add_output_var(out_vars(i_var), v_rad, &
+                 'VortexRad',.true.)
+          i_var = i_var +1
+        endif
+        
         !Output the results (with wake)
         select case (trim(out_frmt))
          case ('tecplot')
