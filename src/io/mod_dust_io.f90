@@ -376,6 +376,7 @@ subroutine save_status(geo, wake, it, time, run_id)
   call write_hdf5(points_w(:,:,1),'WakePoints',gloc1)
   call write_hdf5(   vel_w(:,:,1),'WakeVels'  ,gloc1)
   call write_hdf5( turbvisc,'turbvisc'  ,gloc1)
+  call write_hdf5( v_rad,'VortexRad'  ,gloc1)
 
   call write_hdf5(vort_v,'WakeVort',gloc1)
   call write_hdf5( v_rad,'v_rad'  ,gloc1)

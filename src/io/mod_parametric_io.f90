@@ -929,66 +929,93 @@ endsubroutine naca5digits
 
 !-------------------------------------------------------------------------------
 
-subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr, curv_ac)
+subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr )
 
-  character(len=*), intent(in)                :: filen
-  character(len=*), intent(in)                :: discr
-  character(len=*), intent(in)                :: ElType
-  integer         , intent(in)                :: nelems_chord
-  real(wp)        , allocatable , intent(out) :: rr(:,:)
-  integer                                     :: nelems_chord_tot
-  real(wp) , allocatable                      :: rr_geo(:,:)
-  integer                                     :: np_geo
-  real(wp) , allocatable                      :: csi_half(:) , csi(:)
-  real(wp) , allocatable                      :: st_geo(:) , s_geo(:)
-  real(wp)                                    :: ds_geo
-  real(wp) , intent(out)                      :: curv_ac
-  real(wp)                                    :: csi_ac 
-  integer :: fid, ierr
-  integer :: i1 , i2
+ character(len=*), intent(in) :: filen
+ character(len=*), intent(in) :: discr
+ character(len=*), intent(in) :: ElType
+ integer         , intent(in) :: nelems_chord
+ real(wp)        , allocatable , intent(out):: rr(:,:)
 
-  ! Read coordinates
-  call new_file_unit(fid, ierr)
-  open(unit=fid,file=trim(adjustl(filen)) )
-  read(fid,*) np_geo
-  allocate(rr_geo(2,np_geo))
-  do i1 = 1 , np_geo
-    read(fid,*) rr_geo(:,i1)
-  end do
-  close(fid)
+ integer :: nelems_chord_tot
+ real(wp) , allocatable :: rr_geo(:,:)
+ integer :: np_geo
+ real(wp) , allocatable :: csi_half(:) , csi(:)
+ real(wp) , allocatable :: st_geo(:) , s_geo(:)
+ real(wp) :: ds_geo
 
-  allocate(csi_half(nelems_chord+1))
-  select case (trim(discr))
-    case('uniform')
-      do i1 = 1 , nelems_chord+1
-        csi_half(i1) = real(i1-1,wp)/real(nelems_chord,wp)
-      end do
-    case('cosine')
-      do i1 = 1 , nelems_chord+1
-        csi_half(i1) = (1.0_wp - cos(pi*real(i1-1,wp)/real(nelems_chord,wp)))/ 2.0_wp
-      end do
-    case('cosineLE' , 'cosineIB')
-      do i1 = 1 , nelems_chord+1
-        csi_half(i1) = sin(pi/2.0_wp*real(i1-1,wp)/real(nelems_chord,wp))
-      end do
-    case('cosineTE' , 'cosineOB')
-      do i1 = 1 , nelems_chord+1
-        csi_half(i1) = (1.0_wp - cos(pi/2.0_wp*real(i1-1,wp) &
-                                    /real(nelems_chord,wp)))
-      end do
-    case default
-  end select
+ integer :: fid, ierr
+ integer :: i1 , i2
 
-  if ( ElType .eq. 'p' ) then
-    nelems_chord_tot = 2*nelems_chord+1
-    allocate(csi(nelems_chord_tot))
-    csi(             1  :nelems_chord+1) = 0.5_wp * csi_half
-    csi(nelems_chord+2:2*nelems_chord+1) =-0.5_wp * csi_half(nelems_chord:1:-1) + 1.0_wp
-  elseif ( ElType .eq. 'v' ) then
-    nelems_chord_tot = nelems_chord+1
-    allocate(csi(nelems_chord_tot))
-    csi = -csi_half(nelems_chord+1:1:-1) + 1.0_wp
-  end if
+ ! Read coordinates
+ call new_file_unit(fid, ierr)
+ open(unit=fid,file=trim(adjustl(filen)) )
+ read(fid,*) np_geo
+ allocate(rr_geo(2,np_geo))
+ do i1 = 1 , np_geo
+  read(fid,*) rr_geo(:,i1)
+ end do
+ close(fid)
+
+ allocate(csi_half(nelems_chord+1))
+ select case (trim(discr))
+ case('uniform')
+   do i1 = 1 , nelems_chord+1
+     csi_half(i1) = real(i1-1,wp)/real(nelems_chord,wp)
+   end do
+ case('cosine')
+   do i1 = 1 , nelems_chord+1
+     csi_half(i1) = (1.0_wp - cos(pi*real(i1-1,wp)/real(nelems_chord,wp)) )&
+                                                                    / 2.0_wp
+   end do
+ case('cosineLE' , 'cosineIB')
+   do i1 = 1 , nelems_chord+1
+     csi_half(i1) = sin(pi/2.0_wp*real(i1-1,wp)/real(nelems_chord,wp))
+   end do
+ case('cosineTE' , 'cosineOB')
+   do i1 = 1 , nelems_chord+1
+     csi_half(i1) = (1.0_wp - cos(pi/2.0_wp*real(i1-1,wp) &
+                                  /real(nelems_chord,wp)) )
+   end do
+ case default
+ end select
+
+ if ( ElType .eq. 'p' ) then
+   nelems_chord_tot = 2*nelems_chord+1
+   allocate(csi(nelems_chord_tot))
+   csi(             1  :nelems_chord+1) = 0.5_wp * csi_half
+   csi(nelems_chord+2:2*nelems_chord+1) =-0.5_wp * csi_half(nelems_chord:1:-1) + 1.0_wp
+ elseif ( ElType .eq. 'v' ) then
+   nelems_chord_tot = nelems_chord+1
+   allocate(csi(nelems_chord_tot))
+   csi = -csi_half(nelems_chord+1:1:-1) + 1.0_wp
+ end if
+
+ allocate(st_geo(np_geo),s_geo(np_geo))
+ st_geo = 0.0_wp ; s_geo = 0.0_wp
+ ! st_geo(1) = s_geo(1) = 0.0_wp
+
+ do i1 = 2 , np_geo
+  st_geo(i1) = st_geo(i1-1) + abs(rr_geo(1,i1)-rr_geo(1,i1-1))
+ end do
+ s_geo = st_geo / st_geo(np_geo)
+
+
+ allocate(rr(2,nelems_chord_tot)) ; rr = 0.0_wp
+ rr(:,1) = rr_geo(:,1)
+ rr(:,nelems_chord_tot) = rr_geo(:,np_geo)
+ do i1 = 2 , nelems_chord_tot - 1
+   do i2 = 2 , np_geo
+
+     if ( csi(i1) .lt. s_geo(i2) ) then
+       ds_geo = s_geo(i2)-s_geo(i2-1)
+       rr(:,i1) = (csi(i1)-s_geo(i2-1))/ds_geo * rr_geo(:,i2) + &
+                  (s_geo(i2)-csi(i1)  )/ds_geo * rr_geo(:,i2-1)
+       exit
+     end if
+
+   end do
+ end do
 
   allocate(st_geo(np_geo),s_geo(np_geo))
   st_geo = 0.0_wp ; s_geo = 0.0_wp

@@ -236,7 +236,7 @@ subroutine compute_stretch_vortpart (this, pos, alpha, r_Vortex_p, stretch)
 
   !transpose, generic
   vecprod = cross(alpha, this%dir*this%mag)
-  call kernel_coeffs(r_ave, distn, c, d)
+  call kernel_coeffs(this%r_Vortex, distn, c, d)
   stretch = -( c * vecprod + d * dist * sum(dist*vecprod) )
 
 end subroutine compute_stretch_vortpart
@@ -268,7 +268,7 @@ subroutine compute_rotu_vortpart (this, pos, alpha, r_Vortex_p, rotu)
   !     +3.0_wp/(distn)**5 * cross(dist, cross(dist, this%dir*this%mag))
 
   !generic
-  call kernel_coeffs(r_ave, distn, c, d)
+  call kernel_coeffs(this%r_Vortex, distn, c, d)
   rotu = -2.0_wp * c * this%dir*this%mag + d * cross(dist, cross(dist, this%dir*this%mag))
 
 
@@ -333,7 +333,7 @@ subroutine compute_diffusion_vortpart (this, pos, alpha, r_Vortex_p, diff)
   dist = pos-this%cen
   distn = norm2(dist)
 
-  volp = 4.0_wp/3.0_wp*pi*r_Vortex_p**3
+  volp = 4.0_wp/3.0_wp*pi*this%r_Vortex**3
   volq = 4.0_wp/3.0_wp*pi*this%r_Vortex**3
   diff = 1.0_wp/(this%r_Vortex**2)*(volp*this%dir*this%mag - volq*alpha) &
                                             *etaeps(distn,this%r_Vortex)

@@ -397,28 +397,29 @@ end subroutine load_vl
 !----------------------------------------------------------------------
 
 subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
-                          vpvort_v, vpturbvisc)
-  integer(h5loc), intent(in) :: floc
-  real(wp), allocatable, intent(out) :: wpoints(:,:)
-  integer, allocatable, intent(out)  :: welems(:,:)
-  real(wp), allocatable, intent(out) :: wvort(:)
-  real(wp), allocatable, intent(out) :: vppoints(:,:)
-  real(wp), allocatable, intent(out) :: vpvort(:)
-  real(wp), allocatable, intent(out) :: vpvort_v(:,:)
-  real(wp), allocatable, intent(out), optional :: vpturbvisc(:)
+                         vpvort_v, v_rad, vpturbvisc)
+ integer(h5loc), intent(in) :: floc
+ real(wp), allocatable, intent(out) :: wpoints(:,:)
+ integer, allocatable, intent(out)  :: welems(:,:)
+ real(wp), allocatable, intent(out) :: wvort(:)
+ real(wp), allocatable, intent(out) :: vppoints(:,:)
+ real(wp), allocatable, intent(out) :: vpvort(:)
+ real(wp), allocatable, intent(out) :: vpvort_v(:,:)
+ real(wp), allocatable, intent(out) :: v_rad(:)
+ real(wp), allocatable, intent(out), optional :: vpturbvisc(:)
 
-  integer(h5loc) :: gloc
-  logical :: got_dset
-  real(wp), allocatable :: wpoints_read(:,:,:)
-  real(wp), allocatable :: wpoints_pan(:,:), wpoints_rin(:,:)
-  integer, allocatable  :: wstart(:,:), wconn(:)
-  real(wp), allocatable :: wcen(:,:,:)
-  real(wp), allocatable :: wvort_read(:,:)
-  real(wp), allocatable :: wvort_pan(:), wvort_rin(:)
-  integer, allocatable  :: welems_pan(:,:), welems_rin(:,:)
-  integer :: nstripes, npoints_row, nrows, ndisks, nelem_w
-  integer :: iew, ir, is, ip
-  integer :: first_elem, act_disk, next_elem
+ integer(h5loc) :: gloc
+ logical :: got_dset
+ real(wp), allocatable :: wpoints_read(:,:,:)
+ real(wp), allocatable :: wpoints_pan(:,:), wpoints_rin(:,:)
+ integer, allocatable  :: wstart(:,:), wconn(:)
+ real(wp), allocatable :: wcen(:,:,:)
+ real(wp), allocatable :: wvort_read(:,:)
+ real(wp), allocatable :: wvort_pan(:), wvort_rin(:)
+ integer, allocatable  :: welems_pan(:,:), welems_rin(:,:)
+ integer :: nstripes, npoints_row, nrows, ndisks, nelem_w
+ integer :: iew, ir, is, ip
+ integer :: first_elem, act_disk, next_elem
 
 
   !get the panel wake
@@ -544,6 +545,7 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
     call open_hdf5_group(floc,'ParticleWake',gloc)
     call read_hdf5_al(vppoints,'WakePoints',gloc)
     call read_hdf5_al(wvort_read,'WakeVort',gloc)
+    call read_hdf5_al(v_rad,'VortexRad',gloc)
     if(present(vpturbvisc)) call read_hdf5_al(vpturbvisc,'turbvisc',gloc)
     allocate(vpvort(size(wvort_read,2)))
     do ip = 1,size(vpvort)
