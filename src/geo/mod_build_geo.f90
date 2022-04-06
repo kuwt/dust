@@ -853,7 +853,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call read_mesh_parametric(trim(mesh_file), ee, rr, &
                               npoints_chord_tot, nelems_span, &
                               airfoil_list, i_airfoil_e, normalised_coord_e, &
-                              aero_table, curv_ac)  
+                              aero_table)!, curv_ac)  
 
       !> Write additional fields for vl correction
       if (aero_table) then 
@@ -870,7 +870,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)
         call write_hdf5(i_airfoil_e,        'i_airfoil_e',        geo_loc)
         call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)
-        call write_hdf5(curv_ac,            'curv_ac',            geo_loc)
+        !call write_hdf5(curv_ac,            'curv_ac',            geo_loc)
         call write_hdf5('true',             'aero_table',         geo_loc)        
       else
         call write_hdf5('false',            'aero_table',         geo_loc)
@@ -1076,7 +1076,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)
         call write_hdf5(i_airfoil_e,        'i_airfoil_e',        geo_loc)
         call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)        
-        call write_hdf5(curv_ac,            'curv_ac',            geo_loc)
+        !call write_hdf5(curv_ac,            'curv_ac',            geo_loc)
         call write_hdf5('true',             'aero_table',         geo_loc)
       else
         call write_hdf5('false',            'aero_table',         geo_loc)

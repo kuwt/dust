@@ -1209,7 +1209,7 @@ subroutine update_elems( this, geo, elems, te )
             end do
 
           else
-            write(*,*) ' comp%hinge(ih)%input_type must be equale to <coupling>. Stop '; stop
+            write(*,*) ' comp%hinge(ih)%input_type must be equal to <coupling>. Stop '; stop
           end if
         end do
 
@@ -1227,8 +1227,8 @@ subroutine update_elems( this, geo, elems, te )
           ! accumulation
           do j = 1, comp%el(i)%n_ver
             comp%el(i)%ub = comp%el(i)%ub + &
-               1.0_wp / dble(comp%el(i)%n_ver) * &
-               geo%points_vel(:, comp%el(i)%i_ver(j) )
+                1.0_wp / dble(comp%el(i)%n_ver) * &
+                geo%points_vel(:, comp%el(i)%i_ver(j) )
           end do
           !> Velocity of the control point for LL components
           !> (exploit implicit connectivity of LL components)

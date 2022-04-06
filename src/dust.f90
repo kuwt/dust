@@ -189,6 +189,9 @@ type(t_liftlin_p), allocatable    :: elems_ll(:)
 type(t_expl_elem_p), allocatable  :: elems_ad(:)
 !> All the elements (panels+ll)
 type(t_pot_elem_p), allocatable   :: elems_tot(:)
+!> All the non corrected elements (panels+ll-vl_nl)
+type(t_pot_elem_p), allocatable   :: elems_non_corr(:)
+
 !> Geometry
 type(t_geo)                       :: geo
 !> Trailing edge
@@ -488,7 +491,7 @@ target_file = trim(sim_param%basename)//'_geo.h5'
 
 call create_geometry(sim_param%GeometryFile, sim_param%ReferenceFile, &
                     input_file_name, geo, te, elems, elems_expl, elems_ad, &
-                    elems_ll, elems_tot, airfoil_data, target_file, run_id)
+                    elems_ll, elems_non_corr, elems_tot, airfoil_data, target_file, run_id)
 
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
@@ -871,7 +874,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                   end do 
 
                   do  i_s = 1, size(geo%components(i_c)%stripe)
-                    call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt(elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
+                    call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt(elems_non_corr, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
                   end do 
 
                   do i_s = 1, size(geo%components(i_c)%stripe)
@@ -1085,7 +1088,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     if(it .lt. nstep) then
       time = min(sim_param%tend, sim_param%time_vec(it+1))
       !> Update geometry
-      call update_geometry(geo, te, time, .false.)
+      call update_geometry(geo, te, time, .false., .true.)
       if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
             call complete_wake(wake, geo, elems_tot, te)
       end if

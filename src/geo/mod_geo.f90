@@ -391,7 +391,7 @@ contains
 !!    moving elements after, and in the total elements surface panels
 !!    and vortex rings before, then lifting lines and finally actuator disks
 subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
-                      te, elems_impl, elems_expl, elems_ad, elems_ll, &
+                      te, elems_impl, elems_expl, elems_ad, elems_ll, elems_non_corr, &
                       elems_tot, airfoil_data, target_file, run_id)
   character(len=*), intent(in)                       :: geo_file_name
   character(len=*), intent(inout)                    :: ref_file_name
@@ -402,13 +402,16 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   type(t_expl_elem_p), allocatable, intent(out)      :: elems_ad(:)
   type(t_liftlin_p), allocatable, intent(out)        :: elems_ll(:)
   type(t_pot_elem_p),  allocatable, intent(out)      :: elems_tot(:)
+  type(t_pot_elem_p),  allocatable, intent(out)      :: elems_non_corr(:)
+  
   type(t_tedge), intent(out)                         :: te
   type(t_aero_tab) , allocatable, intent(out)        :: airfoil_data(:)
   character(len=*), intent(in)                       :: target_file
   integer, intent(in)                                :: run_id(10)
   real(wp)                                           :: tstart
 
-  integer :: i, j, is, im,  i_comp, i_ll, i_ad, i_tot, i_expl, i_impl
+  integer :: i, j, is, im,  i_comp, i_ll, i_ad
+  integer :: i_non_corr, i_corr, i_tot, i_expl, i_impl
   type(t_impl_elem_p), allocatable :: temp_static_i(:), temp_moving_i(:)
   type(t_expl_elem_p), allocatable :: temp_static_e(:), temp_moving_e(:)
   integer(h5loc)                                     :: floc
@@ -506,7 +509,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   !  already update the geometry for the first time to get the right
   !  starting geometrical condition
   call prepare_geometry(geo)
-  call update_geometry(geo, te, tstart, update_static=.true.)
+  call update_geometry(geo, te, tstart, update_static=.true., time_cycle = .false. )
 
   if(sim_param%debug_level .ge. 3) then
     call printout(nl//' Geometry details:' )
@@ -538,7 +541,20 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   allocate(elems_impl(geo%nelem_impl), elems_expl(geo%nelem_expl),  &
             elems_tot(geo%nelem_impl+geo%nelem_expl))
   allocate(elems_ad(geo%nactdisk), elems_ll(geo%nLiftLin))
-  i_impl=0; i_expl=0; i_ad=0; i_ll=0; i_tot=0
+  i_impl=0; i_expl=0; i_ad=0; i_ll=0; i_non_corr = 0; i_corr = 0;  i_tot=0
+
+  !> First count the corrected elements 
+  do i_comp = 1,size(geo%components)
+    if (trim(geo%components(i_comp)%comp_el_type) .eq. 'v' .and. & 
+      trim(geo%components(i_comp)%aero_correction) .eq. 'true') then
+      do j = 1,size(geo%components(i_comp)%el)
+        i_corr = i_corr + 1
+      end do 
+    end if 
+  end do 
+  
+  allocate(elems_non_corr(geo%nelem_impl+geo%nelem_expl - i_corr))
+
   do i_comp = 1,size(geo%components)
 
     if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p' .or. &
@@ -553,12 +569,27 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
         end select
       enddo
 
+    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'v' .and. &
+            trim(geo%components(i_comp)%aero_correction) .eq. 'false') then
+      do j = 1,size(geo%components(i_comp)%el)
+        i_non_corr = i_non_corr + 1 
+        elems_non_corr(i_non_corr)%p => geo%components(i_comp)%el(j)
+      end do 
+    
+    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'p') then 
+      do j = 1,size(geo%components(i_comp)%el)
+        i_non_corr = i_non_corr + 1 
+        elems_non_corr(i_non_corr)%p => geo%components(i_comp)%el(j)
+      end do
+
     elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'l') then
 
       do j = 1,size(geo%components(i_comp)%el)
-        i_ll = i_ll+1
-        i_expl = i_expl+1
-        i_tot = i_tot+1
+        i_ll = i_ll + 1
+        i_expl = i_expl + 1
+        i_non_corr = i_non_corr + 1
+        i_tot = i_tot + 1
+        elems_non_corr(i_non_corr)%p => geo%components(i_comp)%el(j)
         elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
         select type(el => geo%components(i_comp)%el(j)); class is(t_liftlin)
           elems_ll(i_ll)%p => el
@@ -569,9 +600,11 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
     elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'a') then
 
       do j = 1,size(geo%components(i_comp)%el)
-        i_ad = i_ad+1
-        i_expl = i_expl+1
-        i_tot = i_tot+1
+        i_ad = i_ad + 1
+        i_expl = i_expl + 1
+        i_non_corr = i_non_corr + 1
+        i_tot = i_tot + 1
+        elems_non_corr(i_non_corr)%p => geo%components(i_comp)%el(j)
         elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
         select type(el => geo%components(i_comp)%el(j)); class is(c_expl_elem)
           elems_ad(i_ad)%p => el
@@ -997,7 +1030,7 @@ subroutine load_components(geo, in_file, out_file, te)
           call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc)
           call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
           call read_hdf5_al(normalised_coord_e,'normalised_coord_e',geo_loc)
-          call read_hdf5_al(curv_ac           ,'curv_ac'           ,geo_loc)
+          !call read_hdf5_al(curv_ac           ,'curv_ac'           ,geo_loc)
 
           allocate(geo%components(i_comp)%airfoil_list(size(airfoil_list)))
           geo%components(i_comp)%airfoil_list = airfoil_list
@@ -1010,9 +1043,9 @@ subroutine load_components(geo, in_file, out_file, te)
                 size(normalised_coord_e,1),size(normalised_coord_e,2)))
           geo%components(i_comp)%normalised_coord_e = normalised_coord_e
           
-          allocate(geo%components(i_comp)%curv_ac( &
-                    size(curv_ac,1),size(curv_ac,2)))
-          geo%components(i_comp)%curv_ac = curv_ac
+          !allocate(geo%components(i_comp)%curv_ac( &
+          !          size(curv_ac,1),size(curv_ac,2)))
+          !geo%components(i_comp)%curv_ac = curv_ac
           
           geo%components(i_comp)%aero_correction = trim(aero_table)
           sim_param%vl_correction = .true. 
@@ -2175,7 +2208,9 @@ subroutine create_strip_connectivity(geo)
             end do
             
             comp%stripe(i_s)%curv_ac = sum(comp%curv_ac(:,i_s))/2 
-            
+            !> Update velocity 
+            call calc_node_vel(comp%stripe(i_s)%cen, geo%refs(comp%ref_id)%G_g, &
+                                geo%refs(comp%ref_id)%f_g, comp%stripe(i_s)%ub)
           endif    
           
       end do 
@@ -2224,11 +2259,12 @@ end function move_points
 !! updated.
 !!
 !! Also the velocity of the centerpoint of the elements is calculated
-subroutine update_geometry(geo, te, t, update_static)
+subroutine update_geometry(geo, te, t, update_static, time_cycle)
   type(t_geo), intent(inout) :: geo
   type(t_tedge), intent(inout) ::te
   real(wp), intent(in) :: t
   logical, intent(in) :: update_static
+  logical, intent(in) :: time_cycle
 
   real(wp), allocatable :: rr_hinge_contig(:,:)
   integer :: i_comp, ie, ih
@@ -2282,14 +2318,25 @@ subroutine update_geometry(geo, te, t, update_static)
             call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &
                                           geo%refs(comp%ref_id)%f_g)
           enddo
+          !> Update stripe velocity 
+          if (time_cycle .and. & 
+              trim(comp%comp_el_type) .eq. 'v' .and. &
+              trim(comp%aero_correction) .eq. 'true') then
+              write(*,*) 'comp%stripe', size(comp%stripe)
 
+            do ie = 1, size(comp%stripe)
+              
+              call calc_node_vel(comp%stripe(ie)%cen, geo%refs(comp%ref_id)%G_g, &
+                                geo%refs(comp%ref_id)%f_g, comp%stripe(ie)%ub)
+            end do  
+          endif 
         end if
 
       elseif ( comp%coupling .or. update_static ) then
 
         do ie = 1,size(comp%el)
 
-          comp%el(ie)%dn_dt = (comp%el(ie)%nor - comp%el(ie)%nor_old)/sim_param % dt
+          comp%el(ie)%dn_dt = (comp%el(ie)%nor - comp%el(ie)%nor_old)/sim_param%dt
         end do
 
       end if  ! if ( .not. comp%coupling )

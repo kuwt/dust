@@ -284,7 +284,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   allocate(airfoil_table_list(nSections))
   allocate(curv_ac_section1(nRegions)); curv_ac_section1 = 0.0_wp
   allocate(curv_ac_section2(nRegions)); curv_ac_section2 = 0.0_wp
-  
+!  allocate(curv_ac(2,nSections)); curv_ac = 0.0_wp
+
   do iSection= 1, nSections
     chord_list(iSection)   = getreal(pmesh_prs,'chord')
     twist_list(iSection)   = getreal(pmesh_prs,'twist')
@@ -629,14 +630,14 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                                       (rr(2,(iend +1)*npoint_chord_tot) - rr(2,ista*2))
         !> curvature interpolation 
         !> inboard
-        if (iSpan .eq. ista) then 
-          curv_ac(1,iSpan) = curv_ac_section1(iAirfoil) 
-        else          
-          curv_ac(1,iSpan) = curv_ac(2,iSpan - 1)
-        endif 
+        !if (iSpan .eq. ista) then 
+        !  curv_ac(1,iSpan) = curv_ac_section1(iAirfoil) 
+        !else          
+        !  curv_ac(1,iSpan) = curv_ac(2,iSpan - 1)
+        !endif 
         !> outboard
-        curv_ac(2,iSpan) = curv_ac_section1(iAirfoil)*(1.0_wp - normalised_coord_e(2,iSpan)) + &
-                              curv_ac_section2(iAirfoil)*normalised_coord_e(2,iSpan)
+        !curv_ac(2,iSpan) = curv_ac_section1(iAirfoil)*(1.0_wp - normalised_coord_e(2,iSpan)) + &
+        !                      curv_ac_section2(iAirfoil)*normalised_coord_e(2,iSpan)
 
         
 

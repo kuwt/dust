@@ -323,11 +323,10 @@ module mod_stripe
       this%vel_w = this%vel_w + v
     enddo
 
-    !TODO! should be all elements that do not have correction!!  
-    !do j = 1, size(elems) ! body elements 
-    !  call elems(j)%p%compute_vel(x0,v)
-    !  this%vel_w = this%vel_w + v
-    !enddo
+    do j = 1, size(elems) ! body elements that do not have correction 
+      call elems(j)%p%compute_vel(x0,v)
+      this%vel_w = this%vel_w + v
+    enddo
 
     do j = 1,size(vort_elems) ! wake vorticity elements 
       call vort_elems(j)%p%compute_vel(x0,v)
@@ -493,16 +492,13 @@ module mod_stripe
     !> 2 * pi * | x_CP - x{1/4*c} | * cos(lambda)
     this%d_2pi_coslambda = norm2( this%cen - this%ctr_pt ) * &
                             2.0_wp*pi*cos_lambda
-    !> consider also the curvature of the panel 
+    
     this%cen    = this%ctr_pt! + this%curv_ac*this%nor
 
     ! overwrite nor
     this%nor = cross( this%bnorm_cen , this%tang_cen )
     this%nor = this%nor / norm2(this%nor) 
   
-    !> velocity as linear interpolation fixme!!  
-    this%ub = this%panels(n_pan)%p%ub*0.75_wp + this%panels(1)%p%ub*0.25_wp 
-    
   end subroutine calc_geo_data_stripe
 
 
