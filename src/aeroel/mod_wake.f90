@@ -1399,14 +1399,12 @@ subroutine complete_wake(wake, geo, elems, te)
             endif
 
             wake%wake_parts(ip)%cen = pos_p
-			!wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
-            if (sim_param%KVortexRad .ge. 1e-10) then ! Variable vortex rad
+			    if (sim_param%KVortexRad .ge. 1e-10) then ! Variable vortex rad
 			  wake%wake_parts(ip)%r_Vortex = sim_param%KVortexRad*sqrt(2.0_wp*area) ! k*radius of the circumscribed circle
             else ! revert to sim_param vortex rad
               wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
             end if
-			!write(*,*) wake%wake_parts(ip)%r_Vortex
-            wake%wake_parts(ip)%r_cutoff  = sim_param%CutoffRad
+			      wake%wake_parts(ip)%r_cutoff  = sim_param%CutoffRad
             wake%wake_parts(ip)%vel = 0.5_wp * &
                               ( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
                                 wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
