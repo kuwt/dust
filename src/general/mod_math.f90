@@ -56,7 +56,7 @@ use mod_handling, only: &
 
 implicit none
 
-public :: dot, cross , linear_interp , compute_qr, rotation_vector_combination
+public :: dot, cross , linear_interp , compute_qr, rotation_vector_combination, sort_vector_real
 
 private
 
@@ -311,7 +311,30 @@ subroutine rotation_vector_combination( r1, r2, r, th, n )
 
 end subroutine rotation_vector_combination
 
+
 ! ----------------------------------------------------------------------
 
+subroutine sort_vector_real( vec, nel, sor, ind )
+  real(wp), intent(inout)               :: vec(:)
+  integer , intent(in)                  :: nel
+  real(wp), allocatable, intent(out)    :: sor(:)
+  integer , allocatable, intent(out)    :: ind(:)
+
+  real(wp)                              :: maxv
+  integer                               :: i
+
+  allocate(sor(nel)); sor = 0.0_wp
+  allocate(ind(nel)); ind = 0
+
+  maxv = maxval(vec)
+  do i = 1, nel
+    sor(i) = minval(vec, 1)
+    ind(i) = minloc(vec, 1)
+    vec(ind(i)) = maxv + 0.1_wp 
+  end do
+
+end subroutine sort_vector_real
+
+! ----------------------------------------------------------------------
 
 end module mod_math

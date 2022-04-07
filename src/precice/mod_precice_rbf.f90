@@ -50,7 +50,10 @@
 module mod_precice_rbf
 
 use mod_param, only: &
-    wp
+  wp
+
+use mod_math, only: &
+  sort_vector_real
 
 implicit none
 
@@ -61,12 +64,10 @@ public :: t_precice_rbf
 !> Connectivity, indices and weights of the structural nodes driving
 ! the surface points
 type :: t_rbf_conn
-
-!> Indices (surface to structure)
-integer,  allocatable :: ind(:,:)
-!> Weights (surface to structure)
-real(wp), allocatable :: wei(:,:)
-
+  !> Indices (surface to structure)
+  integer,  allocatable :: ind(:,:)
+  !> Weights (surface to structure)
+  real(wp), allocatable :: wei(:,:)
 end type t_rbf_conn
 
 !> RBF coupling structures
@@ -90,13 +91,9 @@ type :: t_precice_rbf
   !> --- Parameters of rbf interpolation ---
   !> Number of points for transferring the motion from the structure to the
   ! surface, through a weighted average
-  ! *** to do *** hardcoded, so far. Read as an input, with a default value,
-  ! equal to 2 (or 1?)
   integer :: n_wei = 2
 
   !> Order of the norm used for computing distance-based weights
-  ! *** to do *** hardcoded, so far. Read as an input, with a default value,
-  ! equal to 1 (or 2?)
   real(wp) :: w_order = 1.0_wp
 
   contains
@@ -116,14 +113,12 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
   class(t_precice_rbf), intent(inout) :: this
   real(wp),             intent(in)    :: rr(:,:)
   real(wp),             intent(in)    :: coupling_node_rot(3,3)
-
   integer ,             intent(in)    :: ee(:,:)
 
   real(wp), allocatable               :: diff_all(:,:), diff_all_transpose(:,:) 
   real(wp), allocatable               :: dist_all(:), mat_dist_all(:,:), wei_v(:), Wnorm(:,:)
-  integer , allocatable               ::  ind_v(:)
+  integer , allocatable               :: ind_v(:)
   real(wp)                            :: cen(3)
-
   integer                             :: np, ns, ne, n
   integer                             :: ip, is, ie
 
@@ -145,10 +140,12 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
   allocate(dist_all(ns)); dist_all = 0.0_wp
   allocate(mat_dist_all(ns,ns)); mat_dist_all = 0.0_wp
   allocate(Wnorm(3,3)); Wnorm = 0.0_wp
+
   !> anisotropy matrix: section is rigid chordwise
   Wnorm(1,1) = 0.001_wp
   Wnorm(2,2) = 1.0_wp
   Wnorm(3,3) = 0.001_wp
+
   !> From beam ref. sys to Dust ref. sys
   Wnorm = matmul(transpose(coupling_node_rot),(matmul(Wnorm,coupling_node_rot)))
 
@@ -179,7 +176,6 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
   !> === Surface centers ===
   allocate(this%cen%ind(this%n_wei, ne)); this%cen%ind = 0
   allocate(this%cen%wei(this%n_wei, ne)); this%cen%wei = 0.0_wp
-
   deallocate(dist_all); allocate(dist_all(ns)); dist_all = 0.0_wp
 
   do ie = 1, ne
@@ -224,28 +220,5 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
 end subroutine build_connectivity
 
 ! ---------------------------------------------------------------
-!> Naif sort, copied from mod_hinges
-! *** to do *** clean the implementation, moving sort_ routines
-! into math module
-subroutine sort_vector_real( vec, nel, sor, ind )
-  real(wp), intent(inout)               :: vec(:)
-  integer , intent(in)                  :: nel
-  real(wp), allocatable, intent(out)    :: sor(:)
-  integer , allocatable, intent(out)    :: ind(:)
-
-  real(wp)                              :: maxv
-  integer                               :: i
-
-  allocate(sor(nel)); sor = 0.0_wp
-  allocate(ind(nel)); ind = 0
-
-  maxv = maxval(vec)
-  do i = 1, nel
-    sor(i) = minval(vec, 1)
-    ind(i) = minloc(vec, 1)
-    vec(ind(i)) = maxv + 0.1_wp 
-  end do
-
-end subroutine sort_vector_real
 
 end module mod_precice_rbf

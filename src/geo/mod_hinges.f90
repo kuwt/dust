@@ -52,7 +52,7 @@ use mod_param, only: &
   wp, max_char_len, pi
 
 use mod_math, only: &
-  cross
+  cross, sort_vector_real
 
 use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, getsuboption, &
@@ -779,32 +779,6 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
   allocate( this%hin_rot(3,n_h) ); this%hin_rot = -333.3_wp
 
 end subroutine build_connectivity_hin
-
-! ---------------------------------------------------------------
-!> Naif sort
-subroutine sort_vector_real( vec, nel, sor, ind )
-  real(wp), intent(inout) :: vec(:)
-  integer , intent(in) :: nel
-  real(wp), allocatable, intent(inout):: sor(:)
-  integer , allocatable, intent(inout):: ind(:)
-
-  real(wp):: maxv
-  integer :: i
-
-  !allocate(sor(nel));
-  sor = 0.0_wp
-  !allocate(ind(nel));
-  ind = 0
-
-  maxv = maxval( vec )
-  do i = 1, nel
-    sor(i) = minval( vec, 1 )
-    ind(i) = minloc( vec, 1 )
-    vec( ind(i) ) = maxv + 0.1_wp ! naif
-  end do
-
-
-end subroutine sort_vector_real
 
 ! ---------------------------------------------------------------
 !> Compute actual configuration of the hinge nodes
