@@ -191,7 +191,7 @@ type, abstract, extends(c_elem) :: c_pot_elem
   !> Delta velocity, due to hinge motion of the element center, evaluated
   ! with finite difference method: dvel_h = ( dcen_h - dcen_h_old ) / dt
   real(wp) :: dvel_h(3) ! = 0.0_wp
-  
+  real(wp) :: loc_ctr_pt(3)
   contains
 
   procedure(i_compute_pot)   , deferred, pass(this) :: compute_pot

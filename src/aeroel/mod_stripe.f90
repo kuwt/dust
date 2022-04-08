@@ -127,7 +127,6 @@ module mod_stripe
     real(wp) :: vel_outplane_isolated
     real(wp) :: al_ctr_pt
     real(wp) :: aero_coeff(3) 
-
     !> Stripe 'curvature'
     real(wp) :: curv_ac 
     !> Sweep angle 

@@ -202,6 +202,9 @@ type :: t_geo_component
 #if USE_PRECICE
   !> Global PreCICE indices of the points for coupling
   integer, allocatable :: i_points_precice(:)
+
+
+
 #endif
 
   !> Reference frame tag
@@ -211,8 +214,10 @@ type :: t_geo_component
   integer :: ref_id
 
   !> Points in local reference frame
-  real(wp), allocatable :: loc_points(:,:)
-
+  real(wp), allocatable :: loc_points(:,:) 
+  real(wp), allocatable :: loc_cen(:,:) 
+  real(wp), allocatable :: loc_ctr_pt(:,:) 
+  
   !> Number of surface panels in the component
   integer :: nSurfPan
   !> Number of vortex rings in the component
@@ -409,6 +414,8 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   character(len=*), intent(in)                       :: target_file
   integer, intent(in)                                :: run_id(10)
   real(wp)                                           :: tstart
+  real(wp), allocatable                              :: cen(:,:)
+  real(wp), allocatable                              :: ctr_pt(:,:)
 
   integer :: i, j, is, im,  i_comp, i_ll, i_ad
   integer :: i_non_corr, i_corr, i_tot, i_expl, i_impl
@@ -692,6 +699,85 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
                 geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
     end select
   end do
+
+  !> Update connectivity matrix for cen and ac_stripe for  
+#if USE_PRECICE
+
+  do i_comp = 1, size(geo%components)
+    if (geo%components(i_comp)%coupling) then 
+      !> build connectivity for the panel center 
+      allocate(cen(3, size(geo%components(i_comp)%el))); cen = 0.0_wp 
+
+      do i = 1, size(geo%components(i_comp)%el) 
+        cen(:,i) = geo%components(i_comp)%el(i)%cen
+      end do 
+
+      call geo%components(i_comp)%rbf%build_connectivity(cen, geo%components(i_comp)%coupling_node_rot)
+      !> transfer index and weight matrix 
+      geo%components(i_comp)%rbf%cen%ind = geo%components(i_comp)%rbf%point%ind
+      geo%components(i_comp)%rbf%cen%wei = geo%components(i_comp)%rbf%point%wei
+      
+      !> store the read points into the local cen  
+      allocate(geo%components(i_comp)%loc_cen(3,size(cen,2)))
+      geo%components(i_comp)%loc_cen = cen 
+
+      !> cleanup 
+      deallocate(geo%components(i_comp)%rbf%point%ind, geo%components(i_comp)%rbf%point%wei)
+      deallocate(cen)
+
+      !> build connectivity for the stripe (vl_corrected) for velocity evaluation 
+      if (trim(geo%components(i_comp)%comp_el_type) .eq. 'v' .and. &
+          trim(geo%components(i_comp)%aero_correction) .eq. 'true') then 
+
+        allocate(ctr_pt(3, size(geo%components(i_comp)%stripe))); ctr_pt = 0.0_wp 
+          
+        do i = 1, size(geo%components(i_comp)%stripe) 
+          
+          ctr_pt(:,i) = geo%components(i_comp)%stripe(i)%ctr_pt
+          !> store the read points into the local control point          
+          geo%components(i_comp)%stripe(i)%loc_ctr_pt = ctr_pt(:,i)
+
+        end do       
+
+        call geo%components(i_comp)%rbf%build_connectivity(ctr_pt, geo%components(i_comp)%coupling_node_rot)
+        !> transfer index and weight matrix 
+        geo%components(i_comp)%rbf%ctr_pt%ind = geo%components(i_comp)%rbf%point%ind
+        geo%components(i_comp)%rbf%ctr_pt%wei = geo%components(i_comp)%rbf%point%wei 
+        
+        
+        !> cleanup 
+        deallocate(geo%components(i_comp)%rbf%point%ind, geo%components(i_comp)%rbf%point%wei)
+        deallocate(ctr_pt) 
+      
+      !> build connectivity for lifting line control points for velocity evaluation 
+      elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'l') then 
+
+          allocate(ctr_pt(3, size(geo%components(i_comp)%el))); ctr_pt = 0.0_wp 
+
+          do i = 1, size(geo%components(i_comp)%el)
+            select type(el => geo%components(i_comp)%el(i))
+              type is(t_liftlin) 
+              ctr_pt(:,i) = el%cen + el%tang_cen * el%chord / 2.0_wp ! control point of lifting line 
+              !> store the read points into the local control point  
+              el%loc_ctr_pt = ctr_pt(:,i)
+            end select    
+          end do       
+
+          call geo%components(i_comp)%rbf%build_connectivity(ctr_pt, geo%components(i_comp)%coupling_node_rot)
+          !> transfer index and weight matrix 
+          geo%components(i_comp)%rbf%ctr_pt%ind = geo%components(i_comp)%rbf%point%ind
+          geo%components(i_comp)%rbf%ctr_pt%wei = geo%components(i_comp)%rbf%point%wei
+    
+          
+
+          !> cleanup 
+          deallocate(geo%components(i_comp)%rbf%point%ind, geo%components(i_comp)%rbf%point%wei)
+          deallocate(ctr_pt)
+      endif 
+
+    endif 
+  end do 
+#endif 
 
 end subroutine create_geometry
 
@@ -1217,11 +1303,12 @@ subroutine load_components(geo, in_file, out_file, te)
           !             - here only allocated and itialized to a meaningless value,
           !             - to be updated at each timestep, with data read from precice,
           !               in t_precice%update_elems
-          allocate( geo%components(i_comp)%rbf%nodes(3, np_precice) , &
-                    geo%components(i_comp)%rbf%rrb  (3, np_precice) , &
+
+          allocate( geo%components(i_comp)%rbf%rrb  (3, np_precice) , &
                     geo%components(i_comp)%rbf%rrb_rot  (3, np_precice))
           geo%components(i_comp)%rbf%nodes = comp_coupling_nodes(:,ind_coupling)
           geo%components(i_comp)%rbf%rrb   = -333.3_wp
+          
 
 
         allocate(ind_h(n_nodes_coupling_hinges))
@@ -1250,8 +1337,14 @@ subroutine load_components(geo, in_file, out_file, te)
                   comp_coupling_nodes, ind_h) 
             end if
           end do
+          
+          !> build connectivity for the rr nodes 
+          call geo%components(i_comp)%rbf%build_connectivity(rr, coupling_node_rot)        
 
-          call geo%components(i_comp)%rbf%build_connectivity( rr, ee, coupling_node_rot)
+          !> transfer index and weight matrix 
+          geo%components(i_comp)%rbf%nod%ind = geo%components(i_comp)%rbf%point%ind
+          geo%components(i_comp)%rbf%nod%wei = geo%components(i_comp)%rbf%point%wei         
+          deallocate(geo%components(i_comp)%rbf%point%ind, geo%components(i_comp)%rbf%point%wei)
 
           !> Update offset of precice/dust coupling nodes
           points_offset_precice = points_offset_precice + np_precice_tot
@@ -1352,10 +1445,6 @@ subroutine load_components(geo, in_file, out_file, te)
           call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
           call write_hdf5(theta_e           ,'theta_e'           ,geo_loc)
         elseif (comp_el_type(1:1) .eq. 'v' ) then
-          !call write_hdf5(airfoil_list      ,'airfoil_list'      ,geo_loc)
-          !call write_hdf5(nelem_span_list   ,'nelem_span_list'   ,geo_loc)
-          !call write_hdf5(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
-          !call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
           call write_hdf5(trim(aero_table)  ,'aero_table'        ,geo_loc)          
 
         else if (comp_el_type(1:1) .eq. 'a') then
@@ -2206,8 +2295,11 @@ subroutine create_strip_connectivity(geo)
             do i = 1, n_pan
               comp%stripe(i_s)%area = comp%stripe(i_s)%area + comp%stripe(i_s)%panels(i)%p%area 
             end do
+
+            comp%stripe(i_s)%ctr_pt = comp%stripe(i_s)%cen +  & 
+                                      comp%stripe(i_s)%tang_cen * comp%stripe(i_s)%chord / 2.0_wp
             
-            comp%stripe(i_s)%curv_ac = sum(comp%curv_ac(:,i_s))/2 
+            !comp%stripe(i_s)%curv_ac = sum(comp%curv_ac(:,i_s))/2 
             !> Update velocity 
             call calc_node_vel(comp%stripe(i_s)%cen, geo%refs(comp%ref_id)%G_g, &
                                 geo%refs(comp%ref_id)%f_g, comp%stripe(i_s)%ub)

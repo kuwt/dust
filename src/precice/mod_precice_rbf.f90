@@ -84,9 +84,12 @@ type :: t_precice_rbf
 
   !> Grid nodes connectivity
   type(t_rbf_conn) :: nod
-
   !> Elem centers connectivity
   type(t_rbf_conn) :: cen
+  !> Ac stripe connectivity (for vl corrected) 
+  type(t_rbf_conn) :: ctr_pt 
+  !> Generic point 
+  type(t_rbf_conn) :: point
 
   !> --- Parameters of rbf interpolation ---
   !> Number of points for transferring the motion from the structure to the
@@ -109,12 +112,11 @@ contains
 !----------------------------------------------------------------
 !> Read local coordinates of surface nodes, rr, and build data for
 ! structure to surface interpolation of the motion
-subroutine build_connectivity(this, rr, ee, coupling_node_rot)
+subroutine build_connectivity(this, aero_coord, coupling_node_rot)
   class(t_precice_rbf), intent(inout) :: this
-  real(wp),             intent(in)    :: rr(:,:)
+  real(wp),             intent(in)    :: aero_coord(:,:)
   real(wp),             intent(in)    :: coupling_node_rot(3,3)
-  integer ,             intent(in)    :: ee(:,:)
-
+  
   real(wp), allocatable               :: diff_all(:,:), diff_all_transpose(:,:) 
   real(wp), allocatable               :: dist_all(:), mat_dist_all(:,:), wei_v(:), Wnorm(:,:)
   integer , allocatable               :: ind_v(:)
@@ -123,17 +125,14 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
   integer                             :: ip, is, ie
 
   !> Number of surface points
-  np = size(rr,2)
+  np = size(aero_coord,2)
 
-  !> Number of surface elems
-  ne = size(ee,2)
-  
   !> Number of coupling nodes of the structure
   ns = size(this%nodes,2)
 
   !> === Surface nodes ===
-  allocate(this%nod%ind(this%n_wei, np)); this%nod%ind = 0
-  allocate(this%nod%wei(this%n_wei, np)); this%nod%wei = 0.0_wp
+  allocate(this%point%ind(this%n_wei, np)); this%point%ind = 0
+  allocate(this%point%wei(this%n_wei, np)); this%point%wei = 0.0_wp
 
   allocate(diff_all(3,ns)); diff_all = 0.0_wp
   allocate(diff_all_transpose(ns,3)); diff_all_transpose = 0.0_wp
@@ -153,7 +152,7 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
 
     !> Distance of the surface nodes from the structural nodes
     do is = 1, ns
-      diff_all(:,is)  = rr(:,ip) - this%nodes(:,is)
+      diff_all(:,is)  = aero_coord(:,ip) - this%nodes(:,is)
     end do
     !> interpolation matrix
     ! [ns x ns] =                       [ns x 3]        *     [3 x 3] *  [3 x ns]
@@ -168,57 +167,17 @@ subroutine build_connectivity(this, rr, ee, coupling_node_rot)
     wei_v = 1.0_wp / max( wei_v, 1e-9_wp )**this%w_order
     wei_v = wei_v / sum(wei_v)
 
-    this%nod%wei(:,ip) = wei_v
-    this%nod%ind(:,ip) = ind_v
-
-  enddo
-
-  !> === Surface centers ===
-  allocate(this%cen%ind(this%n_wei, ne)); this%cen%ind = 0
-  allocate(this%cen%wei(this%n_wei, ne)); this%cen%wei = 0.0_wp
-  deallocate(dist_all); allocate(dist_all(ns)); dist_all = 0.0_wp
-
-  do ie = 1, ne
-    cen = 0.0_wp; n = 0
-    !> Compute element center
-    do ip = 1, 4
-      if ( ee(ip,ie) .ne. 0 ) then
-        n = n + 1
-        cen = cen + rr(:,ee(ip,ie))
-      end if
-    end do
-    cen = cen / dble(n)
-
-    !> Distance of the surface nodes from the structural nodes
-    do is = 1, ns
-      diff_all(:,is)  = cen - this%nodes(:,is)
-    end do
-    
-    !> interpolation matrix from aero center to beam nodes
-    ! [ns x ns] =                       [ns x 3]        *     [3 x 3] *  [3 x ns]
-      mat_dist_all(:,:)   =    matmul(transpose(diff_all), matmul(Wnorm , diff_all)) 
-      do is = 1, ns
-        dist_all(is) = sqrt(mat_dist_all(is,is))
-      end do
-
-    call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
-
-    !> Weight, inverse of the norm, avoid singularities
-    wei_v = 1.0_wp / max( wei_v, 1e-9_wp ) **this%w_order
-    wei_v = wei_v / sum(wei_v)
-
-    this%cen%wei(:,ie) = wei_v
-    this%cen%ind(:,ie) = ind_v
+    this%point%wei(:,ip) = wei_v
+    this%point%ind(:,ip) = ind_v
 
   enddo
 
   !> Deallocate and cleaning
   if ( allocated(dist_all) )  deallocate(dist_all)
   if ( allocated(wei_v   ) )  deallocate(wei_v   )
-  if ( allocated(ind_v   ) )  deallocate(ind_v   )
+  if ( allocated(ind_v   ) )  deallocate(ind_v   ) 
 
 end subroutine build_connectivity
 
-! ---------------------------------------------------------------
 
 end module mod_precice_rbf

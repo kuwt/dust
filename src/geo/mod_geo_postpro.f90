@@ -584,7 +584,7 @@ subroutine calc_geo_data_postpro(elem,vert)
     elem%tang(:,1) = tanl / norm2(tanl)
     elem%tang(:,2) = cross( elem%nor, elem%tang(:,1)  )
 
-   class is(t_actdisk)
+    class is(t_actdisk)
 
     elem%area = 0.0_wp; elem%nor = 0.0_wp
     do is = 1, nsides

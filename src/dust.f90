@@ -445,7 +445,6 @@ sim_param%basename_debug = basename_debug
 !> Parameters Initializations 
 call initialize_doublet()
 call initialize_vortline()
-!call initialize_vortpart()
 call initialize_surfpan()
 
 !> Check that tend .gt. tinit
