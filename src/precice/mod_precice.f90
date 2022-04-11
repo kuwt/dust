@@ -47,39 +47,32 @@
 
 module mod_precice
 
-! *** to do ***
-!> update position of the TE, using the rotation of the LE
-!> update velocity field, exploiting connectivity
-!> update velocity field, including the contribution of the angular vel
-!> update force    field, exploiting connectivity
-! *** to do ***
-
 use mod_param, only: &
-    wp, pi
+  wp, pi
 
 use mod_sim_param, only: &
-    sim_param
+  sim_param
 
 use mod_handling, only: &
-    error
+  error
 
 use mod_math, only: &
-    cross, rotation_vector_combination
+  cross, rotation_vector_combination
 
 use mod_geometry, only: &
-    t_geo, t_geo_component, t_tedge
+  t_geo, t_geo_component, t_tedge
 
 use mod_aeroel, only: &
-    t_pot_elem_p
+  t_pot_elem_p
 
 use mod_wake, only: &
-    t_wake
+  t_wake
 
 use mod_liftlin, only: &
-    t_liftlin, t_liftlin_p
+  t_liftlin, t_liftlin_p
 
 use mod_hinges, only: &
-    t_hinge
+  t_hinge
 
 use mod_wind, only: &
   variable_wind
@@ -158,22 +151,22 @@ subroutine initialize(this)
   write(*,*) ' Using PreCICE '
 
   ! *** to do *** read %config_file_name as an input
-  !> Default input for dust in a preCICE coupled simulation
-  this % config_file_name = './../precice-config.xml'
-  this % solver_name = 'dust'
-  this %   mesh_name = 'dust_mesh'
-  this % comm_rank = 0
-  this % comm_size = 1
+  !> Default input for dust in a preCICE coupled simulation TODO: read as input? 
+  this%config_file_name = './../precice-config.xml'
+  this%solver_name = 'dust'
+  this%  mesh_name = 'dust_mesh'
+  this%comm_rank = 0
+  this%comm_size = 1
 
   !> Initialize PreCICE participant and mesh
-  call precicef_create( this % solver_name, &
-                        this % config_file_name, &
-                        this % comm_rank, &
-                        this % comm_size )
+  call precicef_create( this%solver_name, &
+                        this%config_file_name, &
+                        this%comm_rank, &
+                        this%comm_size )
 
-  this % mesh % mesh_name = this % mesh_name
-  call precicef_get_dims( this % mesh % ndim )
-  call precicef_get_mesh_id( this % mesh % mesh_name, this % mesh % mesh_id )
+  this%mesh%mesh_name = this%mesh_name
+  call precicef_get_dims( this%mesh%ndim )
+  call precicef_get_mesh_id( this%mesh%mesh_name, this%mesh%mesh_id )
 
   !> Initialize some preCICE variables
   this % write_initial_data(1:precice_mcl)='                                                  '
@@ -234,15 +227,15 @@ subroutine initialize_mesh( this, geo )
         n_hinges = size(geo%components(i_comp)%hinge)
         do ih = 1, n_hinges
           if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. &
-               'coupling' ) then
+                'coupling' ) then
             dnnodes = size(geo%components(i_comp)%hinge(ih)%i_points_precice)
             nnodes = nnodes + dnnodes
           end if
         end do
       else
         write(*,*) ' Error in initialize mesh. CouplingType= '// &
-                   trim(coupling_type)//', while only ll, rigid'&
-                   ' CouplingType are implemented. Stop'; stop
+                    trim(coupling_type)//', while only ll, rigid'&
+                    ' CouplingType are implemented. Stop'; stop
       end if
     end if
   end do
@@ -286,7 +279,7 @@ subroutine initialize_mesh( this, geo )
         n_hinges = size(geo%components(i_comp)%hinge)
         do ih = 1, n_hinges
           if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. &
-               'coupling' ) then
+                'coupling' ) then
             dnnodes = size(geo%components(i_comp)%hinge(ih)%i_points_precice)
             this%mesh%nodes(:,geo%components(i_comp)%hinge(ih)%i_points_precice) = &
               geo%components(i_comp)%hinge(ih)%nodes
@@ -297,7 +290,7 @@ subroutine initialize_mesh( this, geo )
     end if
   end do
 
- 
+
   !> Initialize mesh ============================================
   !> Nodes
   call precicef_set_vertices( this%mesh%mesh_id, nnodes,  &
@@ -350,8 +343,8 @@ subroutine initialize_fields( this )
         allocate( this%fields(nf)%fdata(1, this%mesh%nnodes) )
         this%fields(nf)%fdata = 0.0_wp
       else if ( trim(this%fields(nf)%ftype) .eq. 'vector' ) then
-        allocate( this%fields(nf)%fdata( this%mesh%ndim, &
-                                         this%mesh%nnodes) )
+        allocate( this%fields(nf)%fdata(this%mesh%ndim, &
+                                        this%mesh%nnodes))
         this%fields(nf)%fdata = 0.0_wp
       end if
     end if
@@ -473,7 +466,7 @@ subroutine update_force( this, geo, elems )
         do i = 1, size(comp%el)
 
           this%fields(j_for)%fdata(:,ip) = this%fields(j_for)%fdata(:,ip) + &
-                                           comp%el(i)%dforce
+                                            comp%el(i)%dforce
         end do
 
 
@@ -493,8 +486,8 @@ subroutine update_force( this, geo, elems )
           do i = 1, size(comp%el)
 
             !> vector between the center of the elements and the coupling node
-            chord = 0.5_wp * ( comp%c_ref_p(:,2*(i-1)+1) + &
-                               comp%c_ref_p(:,2* i   +1) )
+            chord = 0.5_wp * (comp%c_ref_p(:,2*(i-1)+1) + &
+                              comp%c_ref_p(:,2* i   +1) )
             chord_rot =  cos(theta) * chord + &
                          sin(theta) * cross( n_rot, chord ) + &
                        ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
@@ -523,12 +516,6 @@ subroutine update_force( this, geo, elems )
 
         end if
 
-! #####################################################################################################
-! #####################################################################################################
-! ###########                                 RBF COUPLING                             ################
-! #####################################################################################################
-! #####################################################################################################
-
       !> rbf coupling ----------------------------------------------------------
       elseif ( trim(comp%coupling_type) .eq. 'rbf' ) then
 
@@ -548,9 +535,6 @@ subroutine update_force( this, geo, elems )
           end if
         end do
 
-        !write(*,*) 'Position from precice' , this%fields(1)%fdata
-
-
         !> === Aerodynamic mesh to structural nodes ===
         !  w/o considering hinge rotations
         do i = 1, size(comp%el)
@@ -563,7 +547,6 @@ subroutine update_force( this, geo, elems )
                     comp%rbf%cen%wei(iw,i) * comp%el(i)%dforce
 
             !> Moments
-
             ! ================================================================================
             !!! IF to activate only for ll element with RBF coupling!!!!
             if ( comp%comp_el_type(1:1) .eq. 'l' ) then
@@ -595,7 +578,6 @@ subroutine update_force( this, geo, elems )
         ! -------------------------------------------------------------------------------
         !>  === Add hinge motion: END ===
         ! -------------------------------------------------------------------------------
-
       end if
     end if
 
@@ -803,23 +785,23 @@ subroutine update_elems( this, geo, elems, te )
 
           !> Position of the LE
           geo%points(:, comp%i_points( 2*i-1 ) ) = &
-             this%fields(j_pos)%fdata(:, comp%i_points_precice( i ) ) &
-           - chord_rot * comp%xac(i)/norm2(chord_rot)
+              this%fields(j_pos)%fdata(:, comp%i_points_precice( i ) ) &
+              - chord_rot * comp%xac(i)/norm2(chord_rot)
 
           !> Position of the TE
           geo%points(:, comp%i_points( 2*i ) ) = &
-             geo%points(:, comp%i_points( 2*i-1 ) ) + &
-             chord_rot
+              geo%points(:, comp%i_points( 2*i-1 ) ) + &
+              chord_rot
 
           !> Velocity of the LE
           geo%points_vel(:, comp%i_points( 2*i-1 ) ) = &
-             this%fields(j_vel)%fdata(:, comp%i_points_precice( i ) ) - &
-             cross( omega, chord_rot ) * comp%xac(i)/norm2(chord_rot)
+              this%fields(j_vel)%fdata(:, comp%i_points_precice( i ) ) - &
+              cross( omega, chord_rot ) * comp%xac(i)/norm2(chord_rot)
 
           !> Velocity of the TE
           geo%points_vel(:, comp%i_points( 2*i ) ) = &
-             this%fields(j_vel)%fdata(:, comp%i_points_precice( i ) ) + &
-             cross( omega, chord_rot ) * ( 1.0_wp - comp%xac(i)/norm2(chord_rot) )
+              this%fields(j_vel)%fdata(:, comp%i_points_precice( i ) ) + &
+              cross( omega, chord_rot ) * ( 1.0_wp - comp%xac(i)/norm2(chord_rot) )
 
           !> Velocity of the control point on the LL ( accumulation ), vel_ctr_pt
           ! and velocity of the center of the QUAD el, ub
@@ -829,18 +811,14 @@ subroutine update_elems( this, geo, elems, te )
           ! connectivity may be required
           if ( i .lt. size(comp%i_points_precice) ) then
             select type( el => comp%el(i) ); type is(t_liftlin)
-             ! el%vel_ctr_pt = el%vel_ctr_pt + &
-             !                0.5_wp * geo%points_vel(:, comp%i_points( 2*i-1 ) )
-             el%ub = el%ub + &
+              el%ub = el%ub + &
                     0.25_wp * ( geo%points_vel(:, comp%i_points( 2*i-1 ) ) + &
                                 geo%points_vel(:, comp%i_points( 2*i   ) ) )
             end select
           end if
           if ( i .gt. 1 ) then
             select type( el => comp%el(i-1) ); type is(t_liftlin)
-             ! el%vel_ctr_pt = el%vel_ctr_pt + &
-             !                0.5_wp * geo%points_vel(:, comp%i_points( 2*i-1 ) )
-             el%ub = el%ub + &
+              el%ub = el%ub + &
                     0.25_wp * ( geo%points_vel(:, comp%i_points( 2*i-1 ) ) + &
                                 geo%points_vel(:, comp%i_points( 2*i   ) ) )
             end select
@@ -900,20 +878,20 @@ subroutine update_elems( this, geo, elems, te )
           do j = 1, comp%el(i)%n_ver
             comp%el(i)%ub = comp%el(i)%ub + &
                1.0_wp / dble(comp%el(i)%n_ver) * &
-               geo%points_vel(:, comp%el(i)%i_ver(j) )
+                geo%points_vel(:, comp%el(i)%i_ver(j) )
           end do
           !> Velocity of the control point for LL components
           !> (exploit implicit connectivity of LL components)
           select type( el => comp%el(i) ); type is(t_liftlin)
             el%vel_ctr_pt = 0.5_wp * ( &
-                 geo%points_vel(:, comp%i_points( 2*i-1 ) ) &
-               + geo%points_vel(:, comp%i_points( 2*i+1 ) ) )
+                  geo%points_vel(:, comp%i_points( 2*i-1 ) ) &
+                + geo%points_vel(:, comp%i_points( 2*i+1 ) ) )
           end select
         end do
 
       !> rbf coupling ----------------------------------------------------------
       elseif ( trim(comp%coupling_type) .eq. 'rbf' ) then
-
+        !> Nodes (rr)
         !> Reset, before accumulation, only nodes belonging to the component
         do i = 1, size(comp%i_points)
           ip = comp%i_points(i)
@@ -922,22 +900,75 @@ subroutine update_elems( this, geo, elems, te )
         end do
 
         !> Update surface quantities, as the weighted averages of the structure
-        ! quantities, w/o considering rotations of the hinges
+        !  quantities, w/o considering rotations of the hinges
         do i = 1, size(comp%i_points)
 
           ip = comp%i_points(i)
-
+          
           do iw = 1, size(comp%rbf%nod%ind,1)
 
             ! === Coupling Node ===
-            !> Position
+            !> Position of MBDyn nodes  
             pos   = this%fields(j_pos)%fdata(:, comp%i_points_precice(comp%rbf%nod%ind(iw,i)))
+            !write(*,*) 'pos', pos
             comp%rbf%rrb(:,comp%rbf%nod%ind(iw,i)) = pos
             !> Velocity
             vel   = this%fields(j_vel)%fdata(:, comp%i_points_precice(comp%rbf%nod%ind(iw,i)))
             !> Rotation
             n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(comp%rbf%nod%ind(iw,i)))
             comp%rbf%rrb_rot(:,comp%rbf%nod%ind(iw,i)) = n_rot
+            
+            theta = norm2( n_rot )
+            if ( theta .lt. eps ) then
+              n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
+              theta = 0.0_wp
+            else
+              n_rot = n_rot / theta
+            end if
+
+            !> Angular velocity of the structural point
+            omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(comp%rbf%nod%ind(iw,i)))
+
+            ! === Grid nodes of the components ===
+            !> Reference difference
+            chord = comp%loc_points(:,i) - comp%rbf%nodes(:,comp%rbf%nod%ind(iw,i))
+            
+            !> Rotated position difference
+            chord_rot =  cos(theta) * chord + &
+                         sin(theta) * cross( n_rot, chord ) + &
+                       ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
+            
+            !> Position
+            geo%points(:, ip) = geo%points(:, ip) + &
+                                comp%rbf%nod%wei(iw,i) * ( pos + chord_rot )
+            !> Velocity
+            geo%points_vel(:, ip) = geo%points_vel(:, ip) + &
+                                    comp%rbf%nod%wei(iw,i) * ( vel + cross( omega, chord_rot ) )
+          end do
+
+        end do
+
+
+        !> Center of panel 
+        !> Reset, before accumulation, only nodes belonging to the component
+        do i = 1, size(comp%el)
+          comp%el(i)%cen = 0.0_wp
+          comp%el(i)%ub = 0.0_wp
+        end do
+
+        !> Update surface quantities, as the weighted averages of the structure
+        !  quantities, w/o considering rotations of the hinges
+        do i = 1, size(comp%el) 
+
+          do iw = 1, size(comp%rbf%cen%ind,1)
+
+            ! === Coupling Node ===
+            !> Position
+            pos   = this%fields(j_pos)%fdata(:, comp%i_points_precice(comp%rbf%cen%ind(iw,i)))
+            !> Velocity
+            vel   = this%fields(j_vel)%fdata(:, comp%i_points_precice(comp%rbf%cen%ind(iw,i)))
+            !> Rotation
+            n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(comp%rbf%cen%ind(iw,i)))
             theta = norm2( n_rot )
             if ( theta .lt. eps ) then
               n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
@@ -946,30 +977,128 @@ subroutine update_elems( this, geo, elems, te )
               n_rot = n_rot / theta
             end if
             !> Angular velocity of the structural point
-            omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(comp%rbf%nod%ind(iw,i)))
-
-            ! === Grid nodes of the components ===
+            omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(comp%rbf%cen%ind(iw,i)))
             !> Reference difference
-            chord = comp%loc_points(:,i) - comp%rbf%nodes(:,comp%rbf%nod%ind(iw,i))
+            chord = comp%loc_cen(:,i) - comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i))
             !> Rotated position difference
-            chord_rot =  cos(theta) * chord + &
-                         sin(theta) * cross( n_rot, chord ) + &
-                       ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
+            chord_rot = cos(theta) * chord + &
+                        sin(theta) * cross(n_rot, chord ) + &
+                        (1.0_wp - cos(theta)) * sum(chord*n_rot ) * n_rot
 
             !> Position
-            geo%points(:, ip) = geo%points(:, ip) + &
-                                comp%rbf%nod%wei(iw,i) * ( pos + chord_rot )
+            comp%el(i)%cen = comp%el(i)%cen + &
+                                comp%rbf%cen%wei(iw,i) * (pos + chord_rot)
+            
             !> Velocity
-            geo%points_vel(:, ip) = geo%points_vel(:, ip) + &
-                                comp%rbf%nod%wei(iw,i) * ( vel + cross( omega, chord_rot ) )
+            comp%el(i)%ub = comp%el(i)%ub + &
+                                comp%rbf%cen%wei(iw,i) * (vel + cross(omega, chord_rot))
           end do
 
         end do
 
-        !> *** to do *** move to a function: update_elems_coupled_hinges(), here in mod_precice
-        !> *** to do *** blending regions
-        ! -------------------------------------------------------------------------------
-        !>  === Add hinge motion: START ===
+        !> stripe ub 
+        !> Reset, before accumulation, only nodes belonging to the component
+        if (trim(comp%comp_el_type) .eq. 'v' .and. trim(comp%aero_correction) .eq. 'true') then 
+          
+          do i = 1, size(comp%stripe)
+            comp%stripe(i)%ctr_pt = 0.0_wp
+            comp%stripe(i)%ub  = 0.0_wp
+          end do
+          !> Update surface quantities, as the weighted averages of the structure
+          !  quantities, w/o considering rotations of the hinges
+          do i = 1, size(comp%stripe)
+            do iw = 1, size(comp%rbf%ctr_pt%ind,1)
+              ! === Coupling Node ===
+              !> Position
+              pos   = this%fields(j_pos)%fdata(:, comp%i_points_precice(comp%rbf%ctr_pt%ind(iw,i)))
+              !> Velocity
+              vel   = this%fields(j_vel)%fdata(:, comp%i_points_precice(comp%rbf%ctr_pt%ind(iw,i)))
+              !> Rotation
+              n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(comp%rbf%ctr_pt%ind(iw,i)))
+              theta = norm2( n_rot )
+            
+              if ( theta .lt. eps ) then
+                n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
+                theta = 0.0_wp
+              else
+                n_rot = n_rot / theta
+              end if
+
+              !> Angular velocity of the structural point
+              omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(comp%rbf%ctr_pt%ind(iw,i)))
+              ! === Grid nodes of the components ===
+              !> Reference difference
+              chord = comp%stripe(i)%loc_ctr_pt - comp%rbf%nodes(:,comp%rbf%ctr_pt%ind(iw,i))
+              
+              !> Rotated position difference
+              chord_rot =  cos(theta) * chord + &
+                           sin(theta) * cross( n_rot, chord ) + &
+                         ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
+  
+              !> Position
+              comp%stripe(i)%ctr_pt = comp%stripe(i)%ctr_pt + &
+                                  comp%rbf%ctr_pt%wei(iw,i) * (pos + chord_rot)
+              !> Velocity
+              comp%stripe(i)%ub = comp%stripe(i)%ub + comp%rbf%ctr_pt%wei(iw,i) * (vel + cross(omega, chord_rot))
+            end do
+          end do
+
+        elseif (trim(comp%comp_el_type) .eq. 'l') then
+
+          do i = 1, size(comp%el)
+            select type(el => comp%el(i))
+              type is(t_liftlin) 
+              el%ctr_pt = 0.0_wp
+              el%vel_ctr_pt  = 0.0_wp
+            end select
+          end do
+          !> Update surface quantities, as the weighted averages of the structure
+          !  quantities, w/o considering rotations of the hinges
+          do i = 1, size(comp%el)
+            do iw = 1, size(comp%rbf%ctr_pt%ind,1)
+              select type(el => comp%el(i))
+                type is(t_liftlin) 
+                ! === Coupling Node ===
+                !> Position
+                pos   = this%fields(j_pos)%fdata(:, comp%i_points_precice(comp%rbf%ctr_pt%ind(iw,i)))
+                !> Velocity
+                vel   = this%fields(j_vel)%fdata(:, comp%i_points_precice(comp%rbf%ctr_pt%ind(iw,i)))
+                !> Rotation
+                n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(comp%rbf%ctr_pt%ind(iw,i)))
+                theta = norm2( n_rot )
+              
+                if ( theta .lt. eps ) then
+                  n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
+                  theta = 0.0_wp
+                else
+                  n_rot = n_rot / theta
+                end if
+                !> Angular velocity of the structural point
+                omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(comp%rbf%ctr_pt%ind(iw,i)))
+                ! === Grid nodes of the components ===
+                !> Reference difference
+                chord = el%loc_ctr_pt - comp%rbf%nodes(:,comp%rbf%ctr_pt%ind(iw,i))
+
+                !> Rotated position difference
+                chord_rot =  cos(theta) * chord + &
+                             sin(theta) * cross( n_rot, chord ) + &
+                           ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
+              
+                !> Position
+                el%ctr_pt = el%ctr_pt + comp%rbf%ctr_pt%wei(iw,i) * (pos + chord_rot)
+                !> Velocity
+                el%vel_ctr_pt = el%vel_ctr_pt + comp%rbf%ctr_pt%wei(iw,i) * (vel + cross(omega, chord_rot))
+
+              end select
+            end do
+          end do
+
+        endif 
+!!
+        !!> *** to do *** move to a function: update_elems_coupled_hinges(), here in mod_precice
+        !!> *** to do *** blending regions
+        !! -------------------------------------------------------------------------------
+        !!>  === Add hinge motion: START ===
         ! -------------------------------------------------------------------------------
     
         do ih = 1, comp%n_hinges
@@ -1002,6 +1131,7 @@ subroutine update_elems( this, geo, elems, te )
                 Rot_mat(1,:) = ( 1.0_wp - cos(theta) ) * n_rot(1) * n_rot / theta**2.0_wp
                 Rot_mat(2,:) = ( 1.0_wp - cos(theta) ) * n_rot(2) * n_rot / theta**2.0_wp
                 Rot_mat(3,:) = ( 1.0_wp - cos(theta) ) * n_rot(3) * n_rot / theta**2.0_wp
+
                 Rot_mat(1,:) = Rot_mat(1,:) + &
                   (/ cos(theta)*theta   ,-sin(theta)*n_rot(3), sin(theta)*n_rot(2) /)/theta
                 Rot_mat(2,:) = Rot_mat(2,:) + &
@@ -1050,15 +1180,17 @@ subroutine update_elems( this, geo, elems, te )
               !> Rotation vector and rotation matrix
               n_rot = this%fields(j_rot)%fdata(:,comp%hinge(ih)%i_points_precice(i))
               theta = norm2(n_rot)
-              !write(*,*) 'n_rot', n_rot
+
               if ( theta .lt. eps ) then
                 n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /); theta = 0.0_wp
               else
                 n_rot = n_rot / theta
               end if
+
               nx(1,:) = (/    0.0_wp, -n_rot(3),  n_rot(2) /)
               nx(2,:) = (/  n_rot(3),    0.0_wp, -n_rot(1) /)
               nx(3,:) = (/ -n_rot(2),  n_rot(1),    0.0_wp /)
+
               Rot = reshape( (/1.0_wp, 0.0_wp, 0.0_wp, &
                               0.0_wp, 1.0_wp, 0.0_wp, &
                               0.0_wp, 0.0_wp, 1.0_wp /), (/3,3/) ) &
@@ -1107,9 +1239,9 @@ subroutine update_elems( this, geo, elems, te )
                                            comp%hinge(ih)%offset * sin(th1)
                   !> Some auxiliary quantities
                   xq = sum( ( geo%points(:,ip) - comp%hinge(ih)%act%rr(:,i) ) * &
-                                                 comp%hinge(ih)%act%v( :,i) )
+                                                comp%hinge(ih)%act%v( :,i) )
                   yq = sum( ( geo%points(:,ip) - comp%hinge(ih)%act%rr(:,i) ) * &
-                                                 comp%hinge(ih)%act%n( :,i) )
+                                                comp%hinge(ih)%act%n( :,i) )
                   thp = 0.5_wp * ( xq + comp%hinge(ih)%offset ) / comp%hinge(ih)%offset * th1
                   xqp = yc*sin(thp)   - comp%hinge(ih)%offset - yq*sin(thp) - xq
                   yqp = yc*(1.0_wp-cos(thp))                  + yq*cos(thp) - yq
@@ -1136,7 +1268,7 @@ subroutine update_elems( this, geo, elems, te )
                   !> Rotation vector and rotation matrix
                   n_rot = this%fields(j_rot)%fdata(:,comp%hinge(ih)%i_points_precice(i))
                   theta = norm2(n_rot)
-                  !write(*,*) 'n_rot', n_rot
+
                   if ( theta .lt. eps ) then
                   n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /); theta = 0.0_wp
                   else
@@ -1154,7 +1286,6 @@ subroutine update_elems( this, geo, elems, te )
                     
                     il = comp%i_points(ip)  ! Node of the hinge region        
 
-                    !th1 = theta !* comp%hinge(ih)%rot%n2h(i)%s2h(ib)
                     th1 = theta * comp%hinge(ih)%rot%n2h(i)%w2h(ib) 
                     Rot = sin(th1) * nx + ( 1.0_wp - cos(th1) ) * matmul( nx, nx )
                   
@@ -1162,7 +1293,6 @@ subroutine update_elems( this, geo, elems, te )
 
                       te%is_hinged(it) = te%i(1,it)
                       te%t_hinged(:,it) = te%t_hinged(:,it) + comp%hinge(ih)%rot%n2h(i)%s2h(ib) &
-                                          !* comp%hinge(ih)%rot%n2h(i)%w2h(ib) &
                                         * matmul( Rot, te%t_hinged(:,it))   
                     
                       te%t_hinged(:,it) = te%t_hinged(:,it)/norm2(te%t_hinged(:,it))
@@ -1174,6 +1304,7 @@ subroutine update_elems( this, geo, elems, te )
                 end do
               end do
             end if
+
             !> 2. Update velocity with weighted rigid motion, after the new position
             ! of the nodes has been evaluated
             do i = 1, comp%hinge(ih)%n_nodes ! hinge nodes
@@ -1194,22 +1325,22 @@ subroutine update_elems( this, geo, elems, te )
                 geo%points_vel(:,il) = geo%points_vel(:,il) + &
                      comp%hinge(ih)%rot%n2h(i)%s2h(ib) * &
                      comp%hinge(ih)%rot%n2h(i)%w2h(ib) * &
-                   ( vel + cross( omega, &
-                                  geo%points(:,il) - comp%hinge(ih) % act % rr(:,i) ) )
+                    ( vel + cross( omega, &
+                          geo%points(:,il) - comp%hinge(ih)%act%rr(:,i) ) )
 
               end do
 
-              !> 2.2. Chordwise blending region
-              do ib = 1, size(comp%hinge(ih)%blen%n2h(i)%p2h)
-
-                ! *** to do ***
-
-              end do
+              !!> 2.2. Chordwise blending region
+              !do ib = 1, size(comp%hinge(ih)%blen%n2h(i)%p2h)
+              !
+              !  ! *** to do ***
+              !
+              !end do
 
             end do
 
           else
-            write(*,*) ' comp%hinge(ih)%input_type must be equale to <coupling>. Stop '; stop
+            write(*,*) ' comp%hinge(ih)%input_type must be equal to <coupling>. Stop '; stop
           end if
         end do
 
@@ -1220,24 +1351,26 @@ subroutine update_elems( this, geo, elems, te )
         !> === Control nodes of the elements ===
         ! *** to do *** avoid computing element quantities as the
         ! average value of node quantities
-        do i = 1, size(comp%el)
-          comp%el(i)%ub = 0.0_wp
-          !> Compute the velocity of the element centre as the
-          ! average value of the velocity of its nodes, by
-          ! accumulation
-          do j = 1, comp%el(i)%n_ver
-            comp%el(i)%ub = comp%el(i)%ub + &
-               1.0_wp / dble(comp%el(i)%n_ver) * &
-               geo%points_vel(:, comp%el(i)%i_ver(j) )
-          end do
-          !> Velocity of the control point for LL components
-          !> (exploit implicit connectivity of LL components)
-          select type( el => comp%el(i) ); type is(t_liftlin)
-            el%vel_ctr_pt = 0.5_wp * ( &
-                 geo%points_vel(:, comp%i_points( 2*i-1 ) ) &
-               + geo%points_vel(:, comp%i_points( 2*i+1 ) ) )
-          end select
-        end do
+        !do i = 1, size(comp%el)
+        !  comp%el(i)%ub = 0.0_wp
+        !  !> Compute the velocity of the element centre as the
+        !  ! average value of the velocity of its nodes, by
+        !  ! accumulation
+        !  
+        !  do j = 1, comp%el(i)%n_ver
+        !    comp%el(i)%ub = comp%el(i)%ub + &
+        !        1.0_wp / dble(comp%el(i)%n_ver) * &
+        !        geo%points_vel(:, comp%el(i)%i_ver(j) )
+        !  end do
+
+        !  !> Velocity of the control point for LL components
+        !  !> (exploit implicit connectivity of LL components)
+        !  select type( el => comp%el(i) ); type is(t_liftlin)
+        !    el%vel_ctr_pt = 0.5_wp * ( &
+        !                    geo%points_vel(:, comp%i_points( 2*i-1 )) &
+        !                    + geo%points_vel(:, comp%i_points( 2*i+1 )))
+        !  end select
+        !end do
 
       else !
         call error('update_elems','mod_precice', &

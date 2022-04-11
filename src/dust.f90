@@ -67,11 +67,9 @@ use mod_geometry, only: &
   create_geometry, update_geometry, &
   t_tedge,  destroy_geometry, destroy_elements
 
-!use mod_aero_elements, only: &
-!  c_elem, t_elem_p !, t_vp
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
-  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p, t_stripe
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
 use mod_doublet, only: &
   initialize_doublet
@@ -80,24 +78,24 @@ use mod_surfpan, only: &
   t_surfpan , initialize_surfpan
 
 use mod_vortlatt, only: &
-  t_vortlatt,  get_vel_ac_stripe, calc_geo_data_stripe, correction_c81_vortlatt
+  t_vortlatt 
+
+use mod_stripe, only: &
+  t_stripe
 
 use mod_liftlin, only: &
- update_liftlin, t_liftlin_p, &
- build_ll_kernel, &
- solve_liftlin, solve_liftlin_piszkin
-!solve_liftlin_optim , &
-!solve_liftlin_newton, &
-!solve_liftlin_optim_regul
+  update_liftlin, t_liftlin_p, &
+  build_ll_kernel, &
+  solve_liftlin, solve_liftlin_piszkin
 
 use mod_actuatordisk, only: &
- update_actdisk
+  update_actdisk
 
 use mod_vortline, only: &
- initialize_vortline
+  initialize_vortline
 
 use mod_vortpart, only: &
- initialize_vortpart
+  initialize_vortpart
 
 use mod_c81, only: &
   t_aero_tab
@@ -191,6 +189,9 @@ type(t_liftlin_p), allocatable    :: elems_ll(:)
 type(t_expl_elem_p), allocatable  :: elems_ad(:)
 !> All the elements (panels+ll)
 type(t_pot_elem_p), allocatable   :: elems_tot(:)
+!> All the non corrected elements (panels+ll-vl_nl)
+type(t_pot_elem_p), allocatable   :: elems_non_corr(:)
+
 !> Geometry
 type(t_geo)                       :: geo
 !> Trailing edge
@@ -213,11 +214,10 @@ real(wp), allocatable             ::      nor_SurfPan_old(:,:)
 real(wp) , allocatable            :: al_kernel(:,:), al_v(:)
 
 !> VL viscous correction
-integer                           :: i_el, i_c, i_s, i, sel, i_p
-integer                           :: it_vl
+integer                           :: i_el, i_c, i_s, i, sel, i_p, jj
+integer                           :: it_vl, id_pan
 real(wp)                          :: tol, diff, max_diff 
-real(wp)                          :: d_cd(3)
-
+real(wp)                          :: d_cd(3), vel(3), v(3)
 !> octree parameters
 type(t_octree)                    :: octree
 
@@ -445,7 +445,6 @@ sim_param%basename_debug = basename_debug
 !> Parameters Initializations 
 call initialize_doublet()
 call initialize_vortline()
-!call initialize_vortpart()
 call initialize_surfpan()
 
 !> Check that tend .gt. tinit
@@ -481,7 +480,7 @@ if(sim_param%debug_level.ge.10)  call check_basename(trim(basename_debug),'dust 
 nstep = sim_param%n_timesteps
 allocate(sim_param%time_vec(sim_param%n_timesteps))
 sim_param%time_vec = (/ ( sim_param%t0 + &
-         real(i-1,wp)*sim_param%dt, i=1,sim_param%n_timesteps ) /)
+          real(i-1,wp)*sim_param%dt, i=1,sim_param%n_timesteps ) /)
 
 !> Geometry creation 
 call printout(nl//'====== Geometry Creation ======')
@@ -491,7 +490,7 @@ target_file = trim(sim_param%basename)//'_geo.h5'
 
 call create_geometry(sim_param%GeometryFile, sim_param%ReferenceFile, &
                     input_file_name, geo, te, elems, elems_expl, elems_ad, &
-                    elems_ll, elems_tot, airfoil_data, target_file, run_id)
+                    elems_ll, elems_non_corr, elems_tot, airfoil_data, target_file, run_id)
 
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
@@ -549,13 +548,13 @@ endif
 
 !> Restart 
 if (sim_param%restart_from_file) then
- call load_solution(sim_param%restart_file, geo%components, geo%refs)
- call load_wake(sim_param%restart_file, wake, elems_tot)
+  call load_solution(sim_param%restart_file, geo%components, geo%refs)
+  call load_wake(sim_param%restart_file, wake, elems_tot)
 
 else ! Set to zero the intensity of all the singularities
 
   do i_el = 1 , size(elems)      ! implicit elements (vr, sp)
-     elems(i_el)%p%mag = 0.0_wp
+      elems(i_el)%p%mag = 0.0_wp
   end do
   
   do i_el = 1 , size(elems_expl) ! explicit elements (ll, ad)
@@ -572,7 +571,7 @@ endif
 t22 = dust_time()
 if(sim_param%debug_level .ge. 1) then
   write(message,'(A,F9.3,A)') nl//'------ Completed all preliminary operations &
-                             &in: ' , t22 - t00,' s.'
+                              &in: ' , t22 - t00,' s.'
   call printout(message)
 endif
 
@@ -613,7 +612,7 @@ if ( sim_param % restart_from_file ) then
     res_old(i_el) = elems(i_el)%p%mag
   end do
 else
- res_old = 0.0_wp
+  res_old = 0.0_wp
 end if
 
 !> Start time cycle 
@@ -787,17 +786,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     call error('dust','dust',' Wrong string for LLsolver. &
           &This parameter should have been set equal to "GammaMethod" (default) &
           &in init_sim_param() routine. Something went wrong. Stop')
-
-!   call solve_liftlin_optim(elems_ll, elems_tot, elems , elems_ad , &
-!           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it, &
-!           M_array )
-!   call solve_liftlin_optim_regul(elems_ll, elems_tot, elems , elems_ad , &
-!           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it, &
-!           M_array )
-!   call solve_liftlin_newton(elems_ll, elems_tot, elems , elems_ad , &
-!           (/ wake%pan_p, wake%rin_p/), wake%vort_p, airfoil_data, it, &
-!           M_array )
-   end if
+    end if
   end if
 
 !------ Compute loads -------
@@ -828,17 +817,23 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
 #endif
 
 
- 
     ! ifort bugs workaround:
     ! since even if the following calls looks thread safe, they mess up with
     ! ifort and parallel runs, so the cycle is executed another time just for the
     ! vortex lattices
     if ( geo%nVortLatt .gt. 0) then
+      !$omp parallel do private(i_el)
+        do i_el = 1 , sel      
+          select type(el => elems(i_el)%p)        
+            class is(t_vortlatt)          
+              call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/), wake%vort_p)
+              !> compute dforce using AVL formula
+          end select
+        end do 
+      !$omp parallel do private(i_el)
       do i_el = 1 , sel      
         select type(el => elems(i_el)%p)        
           class is(t_vortlatt)          
-            call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/), wake%vort_p)
-            !> compute dforce using AVL formula
             call el%compute_dforce_jukowski()
           ! update the pressure field, p = df.n / area
             ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
@@ -856,31 +851,68 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
       it_vl = 0
       max_diff = tol + 1e-6_wp
       linsys%skip = .true.
+
       !> Select time step to start the vl correction 
       !  (avoid strange behaviour at the begining of simulation)
       if (it .gt. sim_param%vl_startstep) then 
+
         do while (max_diff .gt. tol .and. it_vl .lt. sim_param%vl_maxiter)
+          
           max_diff = 0.0_wp
           diff = 0.0_wp
+          
           do i_c = 1, size(geo%components)
             if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
               trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
-              !$omp parallel do private(i_s)
-                do i_s = 1, size(geo%components(i_c)%stripe)            
-                  call calc_geo_data_stripe(geo%components(i_c)%stripe(i_s))
-                  call get_vel_ac_stripe(geo%components(i_c)%stripe(i_s), & 
-                                      elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
-                  call correction_c81_vortlatt(airfoil_data, geo%components(i_c)%stripe(i_s), & 
-                                              linsys, diff, it_vl, i_s)
-              !$omp atomic
-                  max_diff = max(diff, max_diff) 
-              !$omp end atomic
-                end do
-              !$omp end parallel do
+                
+              !> calculate geo data and initial correction 
+              if (it_vl .eq. 0) then 
+                !!$omp parallel do private(i_s, diff)
+                  do i_s = 1, size(geo%components(i_c)%stripe)
+                    call geo%components(i_c)%stripe(i_s)%calc_geo_data(geo%components(i_c)%stripe(i_s)%ver) 
+                  end do 
+
+                  do  i_s = 1, size(geo%components(i_c)%stripe)
+                    call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt(elems_non_corr, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
+                  end do 
+
+                  do i_s = 1, size(geo%components(i_c)%stripe)
+                    vel = 0.0_wp
+                    do jj = 1, size(geo%components(i_c)%stripe)
+                      call geo%components(i_c)%stripe(jj)%compute_vel(geo%components(i_c)%stripe(i_s)%cen, v)
+                      vel = vel + v                      
+                    end do 
+                    
+                    geo%components(i_c)%stripe(i_s)%vel = vel
+                    !call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt_final(elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
+                    call geo%components(i_c)%stripe(i_s)%correction_c81_vortlatt(airfoil_data, linsys, diff, it_vl, i_s)
+                !!$omp atomic
+                    max_diff = max(diff, max_diff) 
+                !!$omp end atomic
+                  end do
+                !!$omp end parallel do
+              else 
+                !!$omp parallel do private(i_s, diff)
+                  do i_s = 1, size(geo%components(i_c)%stripe)
+                    vel = 0.0_wp
+                    do jj = 1, size(geo%components(i_c)%stripe)
+                      call geo%components(i_c)%stripe(jj)%compute_vel(geo%components(i_c)%stripe(i_s)%cen, v)
+                      vel = vel + v
+                    end do 
+                    geo%components(i_c)%stripe(i_s)%vel = vel 
+                    !call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt_final(elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
+                    call geo%components(i_c)%stripe(i_s)%correction_c81_vortlatt(airfoil_data, linsys, diff, it_vl, i_s)
+                !!$omp atomic
+                    max_diff = max(diff, max_diff) 
+                !!$omp end atomic
+                  end do
+                !!$omp end parallel do
+              end if 
             end if 
           end do 
-          !write(*,*) 'max_diff           ', max_diff
-          !> debug output of the system
+          !write(*,*) 'max_diff', max_diff
+
+          !> Debug output of the system
           if ((sim_param%debug_level .ge. 50) .and. time_2_debug_out) then
             write(frmt,'(I4.4)') it
             write(frmt_vl,'(I4.4)') it_vl
@@ -893,21 +925,31 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           if (linsys%rank .gt. 0) then
             call solve_linsys(linsys)     
           endif
-          
-          do i_el = 1 , sel      
-            elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
-            select type(el => elems(i_el)%p)        
-              class is(t_vortlatt)   
-                !> compute dforce using AVL formula
-                call el%compute_dforce_jukowski()
-                el%pres = sum(el%dforce * el%nor)/el%area
-            end select            
-          end do
 
           it_vl = it_vl + 1
 
         end do !(while)
 
+        
+        do i_c = 1, size(geo%components)
+          if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
+            trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
+              do i_s = 1, size(geo%components(i_c)%stripe)
+                call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt_final(elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
+              enddo 
+            end if 
+          end do 
+        
+        do i_el = 1 , sel      
+          elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
+          select type(el => elems(i_el)%p)        
+            class is(t_vortlatt)   
+              !> compute dforce using AVL formula
+              call el%compute_dforce_jukowski()
+              el%pres = sum(el%dforce * el%nor)/el%area              
+          end select            
+        end do
+        
         if(it_vl .eq. sim_param%vl_maxiter) then
           call warning('dust','dust','max iteration reached for non linear vl:&
                       increase VLmaxiter!') 
@@ -919,19 +961,20 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         do i_c = 1, size(geo%components)
           if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
             trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
-            do i_s = 1, size(geo%components(i_c)%stripe)  
+            do i_s = 1, size(geo%components(i_c)%stripe) 
               d_cd = 0.5_wp * sim_param%rho_inf *  & 
-                      geo%components(i_c)%stripe(i_s)%unorm**2.0_wp * & 
+                      geo%components(i_c)%stripe(i_s)%vel_2d**2.0_wp * & 
                       geo%components(i_c)%stripe(i_s)%cd *  &
-                      (sin(geo%components(i_c)%stripe(i_s)%alpha) * & 
+                      sin(geo%components(i_c)%stripe(i_s)%al_ctr_pt) * & 
                       geo%components(i_c)%stripe(i_s)%nor +  &
-                      cos(geo%components(i_c)%stripe(i_s)%alpha) * & 
-                      geo%components(i_c)%stripe(i_s)%tang(:,1) )
-
+                      (cos(geo%components(i_c)%stripe(i_s)%al_ctr_pt) * & 
+                      geo%components(i_c)%stripe(i_s)%tang_cen )
+              
               do i_p = 1, size(geo%components(i_c)%stripe(i_s)%panels)
                 geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce = &
-                            geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce + &
+                            geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce +&
                             d_cd * geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area
+              
               end do
             end do
           end if 
@@ -941,6 +984,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
       linsys%skip = .false.
     end if 
 
+!write(*,*) 'dforce_post_vc   ', elems(11)%p%dforce
   ! Explicit elements:
   ! - liftlin: _pres and _dforce computed in solve_liftin()
   ! - actdisk: avg delta_pressure and force computed here,
@@ -1043,7 +1087,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     if(it .lt. nstep) then
       time = min(sim_param%tend, sim_param%time_vec(it+1))
       !> Update geometry
-      call update_geometry(geo, te, time, .false.)
+      call update_geometry(geo, te, time, .false., .true.)
       if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
             call complete_wake(wake, geo, elems_tot, te)
       end if

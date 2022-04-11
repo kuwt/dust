@@ -59,7 +59,7 @@ use mod_param, only: &
 implicit none
 
 public :: c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
-          t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p, t_stripe
+          t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
 private
 
@@ -191,7 +191,7 @@ type, abstract, extends(c_elem) :: c_pot_elem
   !> Delta velocity, due to hinge motion of the element center, evaluated
   ! with finite difference method: dvel_h = ( dcen_h - dcen_h_old ) / dt
   real(wp) :: dvel_h(3) ! = 0.0_wp
-  
+  real(wp) :: loc_ctr_pt(3)
   contains
 
   procedure(i_compute_pot)   , deferred, pass(this) :: compute_pot
@@ -226,42 +226,6 @@ type, abstract, extends(c_pot_elem) :: c_impl_elem
   procedure(i_get_bernoulli_source), deferred, pass(this) :: get_bernoulli_source
 
 end type c_impl_elem
-
-type :: t_stripe  
-  !> Adim coodinates of the stripe center wrt span
-  real(wp) :: csi_cen
-  !> Profile data [start-end]
-  integer  :: i_airfoil(2)  
-  !> Panel array
-  type(t_pot_elem_p), allocatable :: panels(:) 
-  !> Area of the stripe
-  real(wp) :: area 
-  !> Collocation point
-  real(wp) :: ac_stripe(3)
-  !> Chord 
-  real(wp) :: chord
-  !> Velocity at quarter chord
-  real(wp) :: vel(3) 
-  !> Local tangent in the center of the stripe
-  real(wp) :: tang(3,2)
-  !> Normal in the center of the stripe
-  real(wp) :: nor(3)
-  !> Body component of the velocity 
-  real(wp) :: ub(3)
-  !> Norm of stripe velocity
-  real(wp) :: unorm  
-  !> Drag coefficient 
-  real(wp) :: cd
-  !> Lift coefficient (from c81)
-  real(wp) :: cl_visc
-  !> Induced AoA 
-  real(wp) :: alpha_ind
-  !> AoA to input c81
-  real(wp) :: alpha
-  !> AoA at previous time step (only for dynstall)
-  real(wp) :: alpha_old = 0.0_wp 
-  
-end type
 
 !----------------------------------------------------------------------
 

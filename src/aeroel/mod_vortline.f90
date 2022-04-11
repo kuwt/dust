@@ -152,8 +152,8 @@ subroutine compute_vel_vortline (this, pos, vel)
                       cross(this%edge_uni(:),hv)
     else
 !     ! (a/r+(s-a)/r)* h/r_Rankine^2.
-      if ( ( R1 .gt. this%edge_len*r_cutoff ) .and. &! avoid singularity
-           ( R2 .gt. this%edge_len*r_cutoff )   ) then
+      if ((R1 .gt. this%edge_len*r_cutoff) .and. &! avoid singularity
+          (R2 .gt. this%edge_len*r_cutoff)) then
         r_Ran = r_Rankine * this%edge_len
         vdou = ((this%edge_len-ai)/R2 + ai/R1)/(r_Ran**2.0_wp)* &
                          cross(this%edge_uni(:),hv)

@@ -74,9 +74,6 @@ use mod_math, only: &
 use mod_c81, only: &
   t_aero_tab, interp_aero_coeff
 
-!use mod_aero_elements, only: &
-!  c_elem, t_elem_p
-
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
@@ -89,10 +86,6 @@ implicit none
 
 public :: t_liftlin, t_liftlin_p, update_liftlin,  &
           build_ll_kernel, solve_liftlin, solve_liftlin_piszkin
-!         solve_liftlin_optim , &
-!         solve_liftlin_optim_regul , &
-!         solve_liftlin_newton,
-
 
 !----------------------------------------------------------------------
 
@@ -137,7 +130,6 @@ contains
   procedure, pass(this) :: compute_pres     => compute_pres_liftlin
   procedure, pass(this) :: compute_dforce   => compute_dforce_liftlin
   procedure, pass(this) :: calc_geo_data    => calc_geo_data_liftlin
-  ! procedure, pass(this) :: get_vort_vel     => get_vort_vel_liftlin
 
   !> new routines for load computations
   procedure, pass(this) :: get_vel_ctr_pt   => get_vel_ctr_pt_liftlin
@@ -231,7 +223,6 @@ subroutine compute_vel_liftlin (this, pos, vel)
 
   ! doublet ---
   call velocity_calc_doublet(this, vdou, pos)
-
   vel = vdou*this%mag
 
 
@@ -272,11 +263,6 @@ subroutine compute_cp_liftlin (this, elems)
   call error(this_sub_name, this_mod_name, 'This was not supposed to &
   &happen, a team of professionals is underway to remove the evidence')
 
-!! only steady loads: steady data from table: L -> gam -> p_equiv
-!this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &
-!        norm2(uinf - this%ub) * this%dy / this%area * &
-!             elems(this%id)%p%idou
-
 end subroutine compute_cp_liftlin
 
 !----------------------------------------------------------------------
@@ -286,17 +272,11 @@ end subroutine compute_cp_liftlin
 subroutine compute_pres_liftlin (this, R_g)
  class(t_liftlin) , intent(inout) :: this
  real(wp)         , intent(in)    :: R_g(3,3)
- !type(t_elem_p), intent(in) :: elems(:)
 
  character(len=*), parameter      :: this_sub_name='compute_pres_liftlin'
 
   call error(this_sub_name, this_mod_name, 'This was not supposed to &
   &happen, a team of professionals is underway to remove the evidence')
-
-!! only steady loads: steady data from table: L -> gam -> p_equiv
-!this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &
-!        norm2(uinf - this%ub) * this%dy / this%area * &
-!             elems(this%id)%p%idou
 
 end subroutine compute_pres_liftlin
 
@@ -313,10 +293,6 @@ subroutine compute_dforce_liftlin (this)
   call error(this_sub_name, this_mod_name, 'This was not supposed to &
   &happen, a team of professionals is underway to remove the evidence')
 
-!! only steady loads: steady data from table: L -> gam -> p_equiv
-!this%cp =   2.0_wp / norm2(uinf)**2.0_wp * &
-!        norm2(uinf - this%ub) * this%dy / this%area * &
-!             elems(this%id)%p%idou
 
 end subroutine compute_dforce_liftlin
 
@@ -327,7 +303,6 @@ end subroutine compute_dforce_liftlin
 !! Here the extrapolation of the lifting line solution is performed
 subroutine update_liftlin(elems_ll, linsys)
  type(t_liftlin_p), intent(inout) :: elems_ll(:)
- !type(t_expl_elem_p), intent(inout) :: elems_ll(:)
  type(t_linsys), intent(inout) :: linsys
 
  real(wp), allocatable :: res_temp(:)
@@ -338,9 +313,6 @@ subroutine update_liftlin(elems_ll, linsys)
   if (it .gt. 2) then
     allocate(res_temp(size(linsys%res_expl,1)))
     res_temp = linsys%res_expl(:,1)
-!   ! linear extrapolation ---
-!   linsys%res_expl(:,1) = 2.0_wp*res_temp - linsys%res_expl(:,2)
-!   linsys%res_expl(:,2) = res_temp
     ! no extrapolation ---
     linsys%res_expl(:,1) = res_temp
     linsys%res_expl(:,2) = res_temp
@@ -459,11 +431,11 @@ subroutine solve_liftlin_piszkin( &
  ! mach and reynolds number for each el
  real(wp) :: mach , reynolds
  ! arrays used for force projection
- real(wp) , allocatable :: a_v(:)   ! size(elems_ll)
- real(wp) , allocatable :: c_m(:,:) ! size(elems_ll) , 3
- real(wp) , allocatable :: u_v(:)   ! size(elems_ll)
- real(wp) , allocatable :: ui_v(:,:) ! size(elems_ll)
- real(wp) , allocatable :: dcl_v(:) ! size(elems_ll)
+ real(wp) , allocatable :: a_v(:)   
+ real(wp) , allocatable :: c_m(:,:) 
+ real(wp) , allocatable :: u_v(:)   
+ real(wp) , allocatable :: ui_v(:,:) 
+ real(wp) , allocatable :: dcl_v(:) 
 
  !> sim_param
  ! fixed point algorithm for ll
@@ -883,56 +855,55 @@ end subroutine solve_liftlin_piszkin
 !! system. It is fully explicit, but by being nonlinear requires an
 !! iterative solution.
 subroutine solve_liftlin(elems_ll, elems_tot, &
-                         elems_impl, elems_ad, &
-                         elems_wake, elems_vort, &
-                         airfoil_data, it)
- !type(t_expl_elem_p), intent(inout) :: elems_ll(:)
- type(t_liftlin_p), intent(inout) :: elems_ll(:)
- type(t_pot_elem_p),  intent(in)    :: elems_tot(:)
- type(t_impl_elem_p), intent(in)    :: elems_impl(:)
- type(t_expl_elem_p), intent(in)    :: elems_ad(:)
- type(t_pot_elem_p),  intent(in)    :: elems_wake(:)
- type(t_vort_elem_p), intent(in)    :: elems_vort(:)
- type(t_aero_tab),    intent(in)    :: airfoil_data(:)
- real(wp) :: wind(3)
- integer  :: i_l, j, ic
- real(wp) :: vel(3), v(3), up(3)
- real(wp), allocatable :: vel_w(:,:) , vel_w_vort(:,:)
- real(wp) :: unorm, alpha, alpha_2d
- real(wp) :: cl
- real(wp), allocatable :: aero_coeff(:)
- real(wp), allocatable :: dou_temp(:)
- real(wp), allocatable :: alpha_temp(:)
+                          elems_impl, elems_ad, &
+                          elems_wake, elems_vort, &
+                          airfoil_data, it)
+  type(t_liftlin_p), intent(inout)   :: elems_ll(:)
+  type(t_pot_elem_p),  intent(in)    :: elems_tot(:)
+  type(t_impl_elem_p), intent(in)    :: elems_impl(:)
+  type(t_expl_elem_p), intent(in)    :: elems_ad(:)
+  type(t_pot_elem_p),  intent(in)    :: elems_wake(:)
+  type(t_vort_elem_p), intent(in)    :: elems_vort(:)
+  type(t_aero_tab),    intent(in)    :: airfoil_data(:)
+  real(wp) :: wind(3)
+  integer  :: i_l, j, ic
+  real(wp) :: vel(3), v(3), up(3)
+  real(wp), allocatable :: vel_w(:,:) , vel_w_vort(:,:)
+  real(wp) :: unorm, alpha, alpha_2d
+  real(wp) :: cl
+  real(wp), allocatable :: aero_coeff(:)
+  real(wp), allocatable :: dou_temp(:)
+  real(wp), allocatable :: alpha_temp(:)
 
- ! mach and reynolds number for each el
- real(wp) :: mach , reynolds
- ! arrays used for force projection
- real(wp) , allocatable :: a_v(:)   ! size(elems_ll)
- real(wp) , allocatable :: c_m(:,:) ! size(elems_ll) , 3
- real(wp) , allocatable :: u_v(:)   ! size(elems_ll)
+  ! mach and reynolds number for each el
+  real(wp) :: mach , reynolds
+  ! arrays used for force projection
+  real(wp) , allocatable :: a_v(:)   ! size(elems_ll)
+  real(wp) , allocatable :: c_m(:,:) ! size(elems_ll) , 3
+  real(wp) , allocatable :: u_v(:)   ! size(elems_ll)
 
- !> sim_param
- ! fixed point algorithm for ll
- real(wp) :: fp_tol , fp_damp , diff, diff_alpha
- integer  :: fp_maxIter
- ! stall regularisation: params read as inputs
- logical  :: stall_regularisation
- real(wp):: al_stall
- integer :: i_do , i , nn_stall , n_stall
- integer :: n_iter_reg
- ! load computation
- logical :: load_avl
- real(wp) :: e_l(3) , e_d(3)
+  !> sim_param
+  ! fixed point algorithm for ll
+  real(wp) :: fp_tol , fp_damp , diff, diff_alpha
+  integer  :: fp_maxIter
+  ! stall regularisation: params read as inputs
+  logical  :: stall_regularisation
+  real(wp):: al_stall
+  integer :: i_do , i , nn_stall , n_stall
+  integer :: n_iter_reg
+  ! load computation
+  logical :: load_avl
+  real(wp) :: e_l(3) , e_d(3)
 
- real(wp) :: max_mag_ll
+  real(wp) :: max_mag_ll
 
- type(t_liftlin), pointer :: el
+  type(t_liftlin), pointer :: el
 
- integer, intent(in) :: it
+  integer, intent(in) :: it
 
- real(wp) , allocatable :: diff_v(:)
- character(len=max_char_len) :: msg
- character(len=*), parameter :: this_sub_name = 'solve_liftlin'
+  real(wp) , allocatable :: diff_v(:)
+  character(len=max_char_len) :: msg
+  character(len=*), parameter :: this_sub_name = 'solve_liftlin'
 
   allocate( diff_v(sim_param%llMaxIter+1) ) ; diff_v = 0.0_wp
 
@@ -949,12 +920,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   load_avl   = sim_param%llLoadsAVL
 
 
-  !> allocate and fill Gamma_old array of the ll intensity at previous dt
-  !allocate(Gamma_old(size(elems_ll)))
-  !do i_l = 1 , size(elems_ll)
-  !  Gamma_old(i_l) = elems_ll(i_l)%p%mag
-  !end do
-
   !> allocate temporary arrays
   allocate(dou_temp(size(elems_ll))) ; dou_temp = 0.0_wp
   allocate(alpha_temp(size(elems_ll))) ; alpha_temp = 0.0_wp
@@ -965,7 +930,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   allocate(vel_w_vort(3,size(elems_ll))) ; vel_w_vort = 0.0_wp
 !$omp parallel do private(i_l, j, v) schedule(dynamic)
   do i_l = 1,size(elems_ll)
-    do j = 1,size(elems_impl) ! body panels: liftlin, vor che tenga contotlat
+    do j = 1,size(elems_impl) ! body panels: liftlin, 
       call elems_impl(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
@@ -1017,18 +982,15 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   ! IS THIS LOOP USED? (u_v) seems to be overwritten few lines down)
 !$omp parallel do private(i_l, el, wind) schedule(dynamic,4)
   do i_l=1,size(elems_ll)
-   !select type(el => elems_ll(i_l)%p)
-   !type is(t_liftlin)
-     el => elems_ll(i_l)%p
-     wind = variable_wind(el%cen,sim_param%time)
-     u_v(i_l) = norm2((wind-el%ub) - &
-         el%bnorm_cen*sum(el%bnorm_cen*(wind-el%ub)))
-     el%vel_2d_isolated = norm2((wind-el%ub) - &
+      el => elems_ll(i_l)%p
+      wind = variable_wind(el%cen,sim_param%time)
+      u_v(i_l) = norm2((wind-el%ub) - &
+            el%bnorm_cen*sum(el%bnorm_cen*(wind-el%ub)))
+      el%vel_2d_isolated = norm2((wind-el%ub) - &
                           el%bnorm_cen*sum(el%bnorm_cen*(wind-el%ub)))
-     el%vel_outplane_isolated = sum(el%bnorm_cen*(wind-el%ub))
-     el%alpha_isolated = atan2(sum((wind-el%ub)*el%nor), &
-                               sum((wind-el%ub)*el%tang_cen))*180.0_wp/pi
-   !end select
+      el%vel_outplane_isolated = sum(el%bnorm_cen*(wind-el%ub))
+      el%alpha_isolated = atan2(sum((wind-el%ub)*el%nor), &
+                                sum((wind-el%ub)*el%tang_cen))*180.0_wp/pi
   end do
 !$omp end parallel do
 
@@ -1043,6 +1005,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       ! compute velocity
       vel = 0.0_wp
       do j = 1,size(elems_ll)
+        write(*,*) ''
         call elems_ll(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)
         vel = vel + v
       enddo
@@ -1050,32 +1013,33 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       !select type(el => elems_ll(i_l)%p) ; type is(t_liftlin)
       el => elems_ll(i_l)%p
 
-        ! overall relative velocity computed in the centre of the ll elem
-        wind = variable_wind(el%cen,sim_param%time)
-        vel = vel/(4.0_wp*pi) + wind - el%ub + vel_w(:,i_l)
-        ! "effective" velocity = proj. of vel in the n-t plane
-        up =  el%nor*sum(el%nor*vel) + el%tang_cen*sum(el%tang_cen*vel)
-        u_v(i_l) = norm2(up)
-        unorm = u_v(i_l)      ! velocity w/o induced velocity
+      ! overall relative velocity computed in the centre of the ll elem
+      wind = variable_wind(el%cen,sim_param%time)
 
-        ! Angle of incidence (full velocity)
-        alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
-        alpha = alpha * 180.0_wp/pi  ! .c81 tables defined with angles in [deg]
+      vel = vel/(4.0_wp*pi) + wind - el%ub + vel_w(:,i_l)
+        
+      ! "effective" velocity = proj. of vel in the n-t plane
+      up =  el%nor*sum(el%nor*vel) + el%tang_cen*sum(el%tang_cen*vel)
+      u_v(i_l) = norm2(up)
+      unorm = u_v(i_l)      ! velocity w/o induced velocity
+      ! Angle of incidence (full velocity)
+      alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
+      alpha = alpha * 180.0_wp/pi  ! .c81 tables defined with angles in [deg]
 
-        ! === Piszkin, Lewinski (1976) LL model for swept wings ===
-        ! the control point is approximately at 3/4 of the chord, but the induced
-        ! angle of incidence needs to be modified, introducing a "2D correction"
-        !
-        !> "2D correction" of the induced angle
-        alpha_2d = el%mag / ( pi * el%chord * unorm ) *180.0_wp/pi
-        alpha = alpha - alpha_2d
-        ! =========================================================
+      ! === Piszkin, Lewinski (1976) LL model for swept wings ===
+      ! the control point is approximately at 3/4 of the chord, but the induced
+      ! angle of incidence needs to be modified, introducing a "2D correction"
+      !
+      !> "2D correction" of the induced angle
+      alpha_2d = el%mag / ( pi * el%chord * unorm ) *180.0_wp/pi
+      alpha = alpha - alpha_2d
 
-        ! compute local Reynolds and Mach numbers for the section
-        ! needed to enter the LUT (.c81) of aerodynamic loads (2d airfoil)
-        mach     = unorm / sim_param%a_inf
-        reynolds = sim_param%rho_inf * unorm * &
-                   el%chord / sim_param%mu_inf
+      ! =========================================================
+      ! compute local Reynolds and Mach numbers for the section
+      ! needed to enter the LUT (.c81) of aerodynamic loads (2d airfoil)
+      mach     = unorm / sim_param%a_inf
+      reynolds = sim_param%rho_inf * unorm * &
+                  el%chord / sim_param%mu_inf
 
         ! Read the aero coeff from .c81 tables
       call interp_aero_coeff ( airfoil_data,  el%csi_cen, el%i_airfoil , &
@@ -1089,12 +1053,11 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       diff = max(diff,abs(elems_ll(i_l)%p%mag-dou_temp(i_l)))
 !$omp end atomic
 
-        c_m(i_l,:) = aero_coeff
-        a_v(i_l)   = alpha * pi/180.0_wp ! [rad]
+      c_m(i_l,:) = aero_coeff
+      a_v(i_l)   = alpha * pi/180.0_wp ! [rad]
 
-        el%vel_outplane = sum(el%bnorm_cen*vel)
-      !end select
-
+      el%vel_outplane = sum(el%bnorm_cen*vel)
+      
     enddo  ! i_l
 !$omp end parallel do
     ! === Stall regularisation ===
@@ -1105,8 +1068,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     !   - read al_stall from tables (?), now it is an input from the user
     if ( stall_regularisation ) then ! *** stall regularisation ***
 
-      if ( ( mod( ic , n_iter_reg ) .eq. 0 ) .or. &
-           ( ic .eq. fp_maxIter ) ) then
+      if (  ( mod( ic , n_iter_reg ) .eq. 0 ) .or. &
+            ( ic .eq. fp_maxIter ) ) then
 
         al_stall = al_stall * 180.0_wp / pi
         a_v = a_v * 180.0_wp / pi
@@ -1120,9 +1083,9 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
           do while ( ( i_do .eq. 1 ) .and. ( nn_stall .le. n_stall ) .and. &
                     ( i_l + nn_stall .le. size(elems_ll) ) )
 
-            if ( ( all(a_v(i_l:i_l+nn_stall-1) .ge. al_stall ) ) .and. &
-                 ( a_v(i_l-1       ) .lt. al_stall )             .and. &
-                 ( a_v(i_l+nn_stall) .lt. al_stall ) ) then ! correct
+            if (( all(a_v(i_l:i_l+nn_stall-1) .ge. al_stall ) ) .and. &
+                ( a_v(i_l-1       ) .lt. al_stall )             .and. &
+                ( a_v(i_l+nn_stall) .lt. al_stall ) ) then ! correct
 
               do i = 1 , nn_stall
                 a_v(     i_l+i-1) =  real(i,wp)/real(nn_stall+1,wp) &
@@ -1130,7 +1093,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
                                        real(nn_stall+1,wp) * a_v(i_l-1)
 
                 dou_temp(i_l+i-1) = real(i,wp)/real(nn_stall+1,wp) * &
-                     dou_temp(i_l+nn_stall) + (real(nn_stall+1-i,wp))/&
+                      dou_temp(i_l+nn_stall) + (real(nn_stall+1-i,wp))/&
                                   real(nn_stall+1,wp) * dou_temp(i_l-1)
               end do
 
@@ -1159,12 +1122,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
     ! === Update ll intensity ===
     do i_l = 1,size(elems_ll)
-
       elems_ll(i_l)%p%mag = ( dou_temp(i_l)+ fp_damp*elems_ll(i_l)%p%mag )&
                               /(1.0_wp+fp_damp)
-      !elems_ll(i_l)%p%mag = ( dou_temp(i_l)+ fp_damp*elems_ll(i_l)%p%Gamma_old )&
-      !                       /(1.0_wp+fp_damp)
-
       max_mag_ll = max(max_mag_ll,abs(elems_ll(i_l)%p%mag))
     enddo
 
@@ -1175,7 +1134,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   enddo !solver iterations
   if(ic .ge. fp_maxIter) then
     write(msg,'(A,I0,A)') 'Lifting lines iterative solution NOT CONVERGED &
-                           &after ',fp_maxIter,' iterations'
+                            &after ',fp_maxIter,' iterations'
     call warning(this_sub_name, this_mod_name, msg)
   endif
 
@@ -1189,10 +1148,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   ! compute LL sectional loads from singularity intensities.
   do i_l = 1,size(elems_ll)
 
-   !select type(el => elems_ll(i_l)%p)
-   !type is(t_liftlin)      vel_w_vort(:,i_l) = vel_w_vort(:,i_l) + v
-
-   el => elems_ll(i_l)%p
+    el => elems_ll(i_l)%p
     ! avg delta_p = \vec{F}.\vec{n} / A = ( L*cos(al)+D*sin(al) ) / A
     !> steady pressure contribution ( overwritten below )
     el%pres   = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
@@ -1284,7 +1240,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     el%vel_2d = u_v(i_l)
     el%aero_coeff = c_m(i_l,:)
 
-   !end select
+    !end select
   end do
 
   if(sim_param%debug_level .ge. 3) then
@@ -1329,39 +1285,39 @@ end subroutine compute_dforce_jukowski_liftlin
 ! computation, using AVL expression (~ VL elements)
 !
 subroutine get_vel_ctr_pt_liftlin(this, elems, wake_elems)
- class(t_liftlin), intent(inout) :: this
- type(t_pot_elem_p),intent(in):: elems(:)
- type(t_pot_elem_p),intent(in):: wake_elems(:)
+  class(t_liftlin), intent(inout) :: this
+  type(t_pot_elem_p),intent(in):: elems(:)
+  type(t_pot_elem_p),intent(in):: wake_elems(:)
 
- real(wp) :: v(3),x0(3), wind(3)
- integer :: j
+  real(wp) :: v(3),x0(3), wind(3)
+  integer :: j
 
- ! Initialisation to zero
- this%vel_ctr_pt = 0.0_wp
+  ! Initialisation to zero
+  this%vel_ctr_pt = 0.0_wp
 
- ! Control point at 1/4-fraction of the chord
- x0 = 0.5_wp*( this%ver(:,1) + this%ver(:,2) )
+  ! Control point at 1/4-fraction of the chord
+  x0 = 0.5_wp*( this%ver(:,1) + this%ver(:,2) )
 
- !=== Compute the velocity from all the elements ===
- do j = 1,size(wake_elems)  ! wake panels
+  !=== Compute the velocity from all the elements ===
+  do j = 1,size(wake_elems)  ! wake panels
 
-   call wake_elems(j)%p%compute_vel(x0,v)
-   this%vel_ctr_pt = this%vel_ctr_pt + v
+    call wake_elems(j)%p%compute_vel(x0,v)
+    this%vel_ctr_pt = this%vel_ctr_pt + v
 
- enddo
+  enddo
 
- do j = 1,size(elems) ! body elements
+  do j = 1,size(elems) ! body elements
 
-   call elems(j)%p%compute_vel(x0,v)
-   this%vel_ctr_pt = this%vel_ctr_pt + v
+    call elems(j)%p%compute_vel(x0,v)
+    this%vel_ctr_pt = this%vel_ctr_pt + v
 
- enddo
+  enddo
 
- wind = variable_wind(this%ctr_pt, sim_param%time)
- this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp*pi) &
-               + wind + this%uvort - this%ub
+  wind = variable_wind(this%ctr_pt, sim_param%time)
+  this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp*pi) &
+                + wind + this%uvort - this%ub
 
- this%al_ctr_pt = atan2( sum(this%vel_ctr_pt * this%nor     ) , &
+  this%al_ctr_pt = atan2(sum(this%vel_ctr_pt * this%nor    ) , &
                          sum(this%vel_ctr_pt * this%tang_cen) )
 
 end subroutine get_vel_ctr_pt_liftlin
@@ -1382,26 +1338,15 @@ subroutine calc_geo_data_liftlin(this, vert)
   ! center, for the lifting line is the mid-point
   this%cen =  sum ( this%ver(:,1:2),2 ) / 2.0_wp
 
-! this%cen =  sum ( this%ver,2 ) / real(nsides,wp) ! <<<< NO ! ............
-! ... %cen coinces with control point. %cen must be c/2 far from the ll ...
-! ... if the non penetration b.c. is used ( u_rel.n = 0 )               ...
-
   ! unit normal and area, ll should always have 4 sides
-  nor = cross( this%ver(:,3) - this%ver(:,1) , &
-               this%ver(:,4) - this%ver(:,2)     )
+  nor = cross(this%ver(:,3) - this%ver(:,1) , &
+              this%ver(:,4) - this%ver(:,2)     )
 
   ! -- 0.75 chord -- look for other "0.75 chord" tag
 ! this%area = 0.5_wp * norm2(nor) / 0.75_wp
   this%area = 0.5_wp * norm2(nor)
   this%nor = nor / norm2(nor)   ! then overwritten
 
-  ! *** 2019-02-27 ***
-  ! computation of tangent vectors %tang, moved at the end of the routine...
-  ! ...
-  ! *** 2019-02-27 ***
-
-  ! vector connecting two consecutive vertices:
-  ! edge_vec(:,1) =  ver(:,2) - ver(:,1)
   ! ll should always have 4 sides
   do is = 1 , nsides
     this%edge_vec(:,is) = this%ver(:,next_qua(is)) - this%ver(:,is)
@@ -1422,13 +1367,10 @@ subroutine calc_geo_data_liftlin(this, vert)
   this%tang_cen = this%tang_cen / norm2(this%tang_cen)
 
   this%bnorm_cen = cross(this%tang_cen, this%nor)  ! old
-! this%bnorm_cen = this%ver(:,2) - this%ver(:,1)
   this%bnorm_cen = this%bnorm_cen / norm2(this%bnorm_cen)
 
-  ! -- 0.75 chord -- look for other "0.75 chord" tag
   ! correct the chord value ----
   this%chord = sum(this%edge_len((/2,4/)))*0.5_wp
-! this%chord = this%chord / 0.75_wp
 
   ! === Piszkin, Lewinski (1976) LL model for swept wings ===
   ! - cos_lambda = cos(lambda) , where lambda is the local sweep angle
@@ -1440,16 +1382,13 @@ subroutine calc_geo_data_liftlin(this, vert)
   cos_lambda  = norm2( cross( this%tang_cen , -this%edge_uni(:,1) ) )
 
   !> modified ~3/4 control point
-  !this%ctr_pt = this%cen + this%tang_cen * this%chord / 2.0_wp
   this%ctr_pt = this%cen + this%tang_cen * this%chord / 2.0_wp
-  ! this%ctr_pt = this%cen + this%tang_cen * this%chord / ( 2.0_wp * cos_lambda )
 
   !> 2 * pi * | x_CP - x{1/4*c} | * cos(lambda)
   this%d_2pi_coslambda = norm2( this%cen - this%ctr_pt ) * &
                          2.0_wp * pi * cos_lambda
   ! !> overwrite centre
   this%cen    = this%ctr_pt
-  !
   ! === Piszkin, Lewinski (1976) LL model for swept wings ===
 
   ! overwrite nor
@@ -1463,8 +1402,8 @@ subroutine calc_geo_data_liftlin(this, vert)
   tanl = 0.5_wp * ( this%ver(:,nsides) + this%ver(:,1) ) - cen
 
   ! they should not be used, but ...
-  this%tang(:,1) = tanl / norm2(tanl)                   ! this%tang_cen    !
-  this%tang(:,2) = cross( this%nor, this%tang(:,1)  )   ! this%bnorm_cen   !
+  this%tang(:,1) = tanl / norm2(tanl)                   
+  this%tang(:,2) = cross( this%nor, this%tang(:,1)  )   
   ! *** 2019-02-27 ***
 
   !TODO: is it necessary to initialize it here?
@@ -1501,34 +1440,8 @@ subroutine calc_geo_data_liftlin(this, vert)
 
   this%nor = matmul ( rm, this%nor )
   this%tang_cen = matmul ( rm, this%tang_cen )
-
+  
 end subroutine calc_geo_data_liftlin
 
-
-!----------------------------------------------------------------------
-! TODO: use this function to compute the induced velocity from
-! vortex elements (vortex particles, vortex lines at TE) on the
-! LL. In order to correctly use this function, the field %uvort
-! should not be overwritten, when the use_fmm_option is set .T.
-!
-! !> Calculate the vorticity induced velocity from vortical elements
-! subroutine get_vort_vel_liftlin(this, vort_elems, uinf)
-!  class(t_liftlin), intent(inout)    :: this
-!  type(t_vort_elem_p), intent(in)    :: vort_elems(:)
-!  real(wp), intent(in) :: uinf(3)
-!
-!  integer :: iv
-!  real(wp) :: vel(3)
-!
-!  !this%uvort = 0.0_wp
-!
-!  do iv=1,size(vort_elems)
-!    call vort_elems(iv)%p%compute_vel(this%cen, uinf, vel)
-!    this%uvort = this%uvort + vel/(4*pi)
-!  enddo
-!
-! end subroutine
-
-!----------------------------------------------------------------------
 
 end module mod_liftlin

@@ -173,7 +173,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   character(len=max_char_len)  :: comp_el_type
   character                    :: ElType
   character(len=max_char_len)  :: mesh_file_type
-  
+  real(wp), allocatable        :: curv_ac(:,:)
   !> Hinge 
   integer                      :: n_hinges
   type(t_parse), pointer       :: hinge_prs
@@ -252,9 +252,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   character(len=*), parameter :: this_sub_name = 'build_component'
 
-  !=====
+
   !===== Define the parameters ====
-  !=====
+
   !> Mesh file
   call geo_prs%CreateStringOption('MeshFile','Mesh file definition')
   call geo_prs%CreateStringOption('MeshFileType','Mesh file type')
@@ -321,15 +321,15 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   call geo_prs%CreateRealOption('traction', &
               'Traction of the rotor')
   call geo_prs%CreateRealOption('Radius', &
-               'Radius of the rotor')
+              'Radius of the rotor')
 
   !> Parameters for gap sewing and edge identification
   call geo_prs%CreateRealOption('TolSewing', &
               'Dimension of the gaps that will be filled, to close TE', &
               '0.001')  ! very rough default value
   call geo_prs%CreateRealOption('InnerProductTe', &
-               'Threshold of the inner product of adiacent elements &
-               &across the TE','-0.5')  ! very rough default value
+              'Threshold of the inner product of adiacent elements &
+              &across the TE','-0.5')  ! very rough default value
 
   !> Parameters for te unit tangent vector generation
   call geo_prs%CreateLogicalOption('ProjTe','Remove some component &
@@ -341,11 +341,11 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   call geo_prs%CreateLogicalOption('SuppressTe','Suppress the trailing edge &
               &from the component','F')
   call geo_prs%CreateRealOption('ScaleTe','Scale the t.e. individually in &
-               &each component','1.0')
+              &each component','1.0')
 
   !> Section name from CGNS file
   call geo_prs%CreateStringOption('SectionName', &
-               'Section name from CGNS file', multiple=.true.)
+              'Section name from CGNS file', multiple=.true.)
 
   !> Scaling factor to scale CGNS files
   call geo_prs%CreateRealArrayOption('Offset',&
@@ -363,7 +363,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   call geo_prs%CreateIntOption('Rev_Nelem_long', &
               'Number of elements along the length of the body revolution.')
   call geo_prs%CreateIntOption('Rev_Nelem_rev', &
-         'Number of elements around the body of revolution circumference.')
+          'Number of elements around the body of revolution circumference.')
 
   !=====
   !===== Read the parameters ====
@@ -394,9 +394,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       (trim(ElType) .ne. 'l') .and. ( trim(ElType) .ne. 'a')) then
 
     call error (this_sub_name, this_mod_name, 'Wrong ElType ('// &
-         trim(ElType)//') for component'//trim(comp_tag)// &
-         ', defined in file: '//trim(geo_file)//'. ElType must be:'// &
-         ' p,v,l,a.')
+        trim(ElType)//') for component'//trim(comp_tag)// &
+        ', defined in file: '//trim(geo_file)//'. ElType must be:'// &
+        ' p,v,l,a.')
   end if
   !> Hinges ---------------------------------------------------------------
   n_hinges = getint(geo_prs, 'n_hinges')
@@ -489,8 +489,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   else
     tol_sewing = getreal(geo_prs,'TolSewing')
     call warning(this_sub_name, this_mod_name, 'More than one &
-       &TolSewing parameter defined for component'//trim(comp_tag)// &
-       ', defined in file: '//trim(geo_file)//'.')
+        &TolSewing parameter defined for component'//trim(comp_tag)// &
+        ', defined in file: '//trim(geo_file)//'.')
   end if
 
   !> InnerProductTe
@@ -504,8 +504,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   else
     inner_product_threshold = getreal(geo_prs,'InnerProductTe')
     call warning(this_sub_name, this_mod_name, 'More than one &
-       &InnerProductTe parameter defined for component'//trim(comp_tag)// &
-       ', defined in file: '//trim(geo_file)//'. First value used.')
+        &InnerProductTe parameter defined for component'//trim(comp_tag)// &
+        ', defined in file: '//trim(geo_file)//'. First value used.')
   end if
 
   !> Trailing edge projection
@@ -544,13 +544,13 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       te_proj_vec  = getrealarray(geo_prs, 'ProjTeVector',3)
     elseif ( i_count .lt. 1 ) then
       call error (this_sub_name, this_mod_name, 'ProjTe = T, but &
-         & no ProjTeVector defined for component'//trim(comp_tag)// &
-         ', defined in file: '//trim(geo_file)//'.')
+          & no ProjTeVector defined for component'//trim(comp_tag)// &
+          ', defined in file: '//trim(geo_file)//'.')
     else
       te_proj_vec  = getrealarray(geo_prs, 'ProjTeVector',3)
       call warning(this_sub_name, this_mod_name, 'ProjTe = T, but &
-         & more than one ProjTeVector defined for component'//trim(comp_tag)// &
-         ', defined in file: '//trim(geo_file)//'. First value used.')
+          & more than one ProjTeVector defined for component'//trim(comp_tag)// &
+          ', defined in file: '//trim(geo_file)//'. First value used.')
     end if
   end if
 
@@ -614,7 +614,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
           c_ref_p(:,i) = rr(:,i) - coupling_node
           !> Orientation
           c_ref_p(:,i) = matmul( transpose(coupling_node_rot), &
-                                 c_ref_p(:,i) )
+                                  c_ref_p(:,i) )
         end do
 
         allocate(c_ref_c(3, size(ee,2))); c_ref_c = 0.0_wp
@@ -632,7 +632,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
           
           !> Orientation
           c_ref_c(:,i) = matmul( transpose(coupling_node_rot), &
-                                 c_ref_c(:,i) )
+                                  c_ref_c(:,i) )
         end do
 
         !> Write to hdf5 geo file
@@ -705,15 +705,15 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
             case('parametric','pointwise')
               call symmetry_mesh_structured(ee, rr,  &
-                                             npoints_chord_tot , nelems_span , &
-                                             symmetry_point, symmetry_normal, rr_sym)
+                                            npoints_chord_tot , nelems_span , &
+                                            symmetry_point, symmetry_normal, rr_sym)
                 nelems_span_tot = 2*nelems_span
 
             case default
-             call error(this_sub_name, this_mod_name,&
-                   'Symmetry routines implemented for MeshFileType = &
-                   & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
-                   'MeshFileType = '//trim(mesh_file_type))
+              call error(this_sub_name, this_mod_name,&
+                  'Symmetry routines implemented for MeshFileType = &
+                  & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
+                  'MeshFileType = '//trim(mesh_file_type))
           end select
 
         end if
@@ -757,7 +757,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
           !> Orientation
           c_ref_c(:,i) = matmul( transpose(coupling_node_rot), &
-                                 c_ref_c(:,i) )
+                                c_ref_c(:,i) )
         end do
 
         !> Write to hdf5 geo file
@@ -822,8 +822,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       endif
 
       ! 3D section
-      allocate ( rr (3,nSections*(nelems_span-1)+2), &
-                 ee (4,nSections*nelems_span) )
+      allocate (rr (3,nSections*(nelems_span-1)+2), &
+                ee (4,nSections*nelems_span) )
 
       call meshbyrev (rr_te(:,1),rr_te(:,2), nSections, rr, ee)
 
@@ -853,13 +853,25 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call read_mesh_parametric(trim(mesh_file), ee, rr, &
                               npoints_chord_tot, nelems_span, &
                               airfoil_list, i_airfoil_e, normalised_coord_e, &
-                              aero_table)  
+                              aero_table)!, curv_ac)  
+
       !> Write additional fields for vl correction
       if (aero_table) then 
+
+        if ( mesh_symmetry ) then
+          call symmetry_update_vl_lists( nelem_span_list , &
+                chord_p , i_airfoil_e , normalised_coord_e )
+        end if
+        if ( mesh_mirror ) then
+          call mirror_update_vl_lists( nelem_span_list , &
+                chord_p , i_airfoil_e , normalised_coord_e )
+        end if
+  
         call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)
         call write_hdf5(i_airfoil_e,        'i_airfoil_e',        geo_loc)
         call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)
-        call write_hdf5('true',             'aero_table',         geo_loc)
+        !call write_hdf5(curv_ac,            'curv_ac',            geo_loc)
+        call write_hdf5('true',             'aero_table',         geo_loc)        
       else
         call write_hdf5('false',            'aero_table',         geo_loc)
       endif
@@ -1063,7 +1075,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       if (aero_table) then 
         call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)
         call write_hdf5(i_airfoil_e,        'i_airfoil_e',        geo_loc)
-        call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)
+        call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)        
+        !call write_hdf5(curv_ac,            'curv_ac',            geo_loc)
         call write_hdf5('true',             'aero_table',         geo_loc)
       else
         call write_hdf5('false',            'aero_table',         geo_loc)
@@ -2513,6 +2526,130 @@ subroutine mirror_update_ll_lists ( nelem_span_list , &
 end subroutine mirror_update_ll_lists
 
 !----------------------------------------------------------------------
+!> Updates lifting lines fields in case of symmetry
+subroutine symmetry_update_vl_lists ( nelem_span_list , &
+                      chord_p , i_airfoil_e , normalised_coord_e )
+
+  integer , allocatable , intent(inout) :: nelem_span_list(:)
+  integer , allocatable , intent(inout) :: i_airfoil_e(:,:)
+  real(wp), allocatable , intent(inout) :: normalised_coord_e(:,:)
+  real(wp), allocatable , intent(inout) :: chord_p(:)
+
+  integer , allocatable :: nelem_span_list_tmp(:)
+  integer , allocatable :: i_airfoil_e_tmp(:,:)
+  real(wp), allocatable :: normalised_coord_e_tmp(:,:)
+  real(wp), allocatable :: chord_p_tmp(:)
+
+  integer :: nelem_span_section
+  integer :: nelems
+  integer :: npts   ! nelem + 1
+
+  integer :: i , siz
+
+  ! Update dimensions ----------
+  nelems = size(i_airfoil_e,2) * 2
+  npts  = nelems + 1
+  nelem_span_section = size(nelem_span_list) * 2
+
+  !> Fill temporary arrays
+  allocate(nelem_span_list_tmp( nelem_span_section ))
+  siz = size(nelem_span_list)
+  do i = 1 , siz
+    nelem_span_list_tmp( siz+i   ) = nelem_span_list(i)
+    nelem_span_list_tmp( siz-i+1 ) = nelem_span_list(i)
+  end do
+
+  allocate(i_airfoil_e_tmp( 2, nelems ))
+  siz = size(i_airfoil_e,2)
+  do i = 1 , siz
+    i_airfoil_e_tmp( 1:2 , siz+i   ) = i_airfoil_e( 1:2    , i )
+    i_airfoil_e_tmp( 1:2 , siz-i+1 ) = i_airfoil_e( 2:1:-1 , i )
+  end do
+
+  allocate(normalised_coord_e_tmp( 2, nelems ))
+  siz = size(normalised_coord_e,2)
+  do i = 1 , siz
+    normalised_coord_e_tmp( 1:2 , siz+i   ) = normalised_coord_e( 1:2    , i )
+    normalised_coord_e_tmp( 1:2 , siz-i+1 ) = 1.0_wp - normalised_coord_e( 2:1:-1 , i )
+  end do
+
+  allocate(chord_p_tmp( npts ))
+  siz = size(chord_p)
+  chord_p_tmp( siz ) = chord_p(1)
+  do i = 2 , siz
+    chord_p_tmp( siz+i-1 ) = chord_p( i )
+    chord_p_tmp( siz-i+1 ) = chord_p( i )
+  end do
+
+  ! Move_alloc to the original arrays -------------------------
+  call move_alloc(    nelem_span_list_tmp ,     nelem_span_list )
+  call move_alloc(        i_airfoil_e_tmp ,         i_airfoil_e )
+  call move_alloc( normalised_coord_e_tmp ,  normalised_coord_e )
+  call move_alloc(            chord_p_tmp ,             chord_p )
+
+end subroutine symmetry_update_vl_lists
+
+!----------------------------------------------------------------------
+
+!> Updates lifting lines fields in case of mirroring
+subroutine mirror_update_vl_lists ( nelem_span_list , &
+  chord_p , i_airfoil_e , normalised_coord_e )
+
+  integer , allocatable , intent(inout) :: nelem_span_list(:)
+  integer , allocatable , intent(inout) :: i_airfoil_e(:,:)
+  real(wp), allocatable , intent(inout) :: normalised_coord_e(:,:)
+  real(wp), allocatable , intent(inout) :: chord_p(:)
+
+  integer , allocatable :: nelem_span_list_tmp(:)
+  integer , allocatable :: i_airfoil_e_tmp(:,:)
+  real(wp), allocatable :: normalised_coord_e_tmp(:,:)
+  real(wp), allocatable :: chord_p_tmp(:)
+
+  integer :: nelem_span_section
+  integer :: nelem
+  integer :: npts   ! nelem + 1
+
+  integer :: i , siz
+
+  ! Update dimensions ----------
+  nelem = sum(nelem_span_list)
+  npts  = nelem + 1
+  nelem_span_section = size(nelem_span_list)
+
+
+  !> Fill temporary arrays
+  allocate(nelem_span_list_tmp( nelem_span_section ))
+  siz = size(nelem_span_list)
+  do i = 1 , siz
+    nelem_span_list_tmp( siz-i+1 ) = nelem_span_list(i)
+  end do
+
+  allocate(i_airfoil_e_tmp( 2, size(i_airfoil_e,2) ))
+  siz = size(i_airfoil_e,2)
+  do i = 1 , siz
+    i_airfoil_e_tmp( 1:2 , siz-i+1 ) = i_airfoil_e( 2:1:-1 , i )
+  end do
+
+  allocate(normalised_coord_e_tmp( 2, size(normalised_coord_e,2) ))
+  do i = 1 , siz
+    normalised_coord_e_tmp( 1:2 , siz-i+1 ) = 1.0_wp - normalised_coord_e( 2:1:-1 , i )
+  end do
+
+  allocate(chord_p_tmp( npts ))
+  siz = size(chord_p)
+  chord_p_tmp( siz ) = chord_p(1)
+  do i = 2 , siz
+    chord_p_tmp( siz-i+1 ) = chord_p( i )
+  end do
+
+  ! Move_alloc to the original arrays -------------------------
+  call move_alloc(    nelem_span_list_tmp ,     nelem_span_list )
+  call move_alloc(        i_airfoil_e_tmp ,         i_airfoil_e )
+  call move_alloc( normalised_coord_e_tmp ,  normalised_coord_e )
+  call move_alloc(            chord_p_tmp ,             chord_p )
+
+end subroutine mirror_update_vl_lists
+
 
 !> [X,Y] = cigar2D(L,R,RN,N)
 !!

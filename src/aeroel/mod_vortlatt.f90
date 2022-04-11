@@ -70,11 +70,11 @@ use mod_param, only: &
   wp, pi, max_char_len, prev_tri, next_tri, prev_qua, next_qua
 
 use mod_math, only: &
-  cross, dot 
+  cross, dot, linear_interp 
 
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
-  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p, t_stripe
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
 
 use mod_c81, only: &
   t_aero_tab, interp_aero_coeff
@@ -130,8 +130,7 @@ type, extends(c_impl_elem) :: t_vortlatt
 end type
 
 character(len=*), parameter :: this_mod_name='mod_vortlatt'
-public get_vel_ac_stripe, calc_geo_data_stripe, correction_c81_vortlatt
-
+public 
 !----------------------------------------------------------------------
 contains
 !----------------------------------------------------------------------
@@ -439,6 +438,7 @@ grad = grad_dou*this%mag
 
 end subroutine compute_grad_vortlatt
 
+
 !----------------------------------------------------------------------
 
 !> Compute an approximate value of the mean DELTA pressure on the actual
@@ -448,7 +448,7 @@ end subroutine compute_grad_vortlatt
 !!  s.t. vec{dforce} = pres * vec{n}  ( since vec{n} = vec{n_upper} )
 !!
 !! see compute_dforce_vortlatt
-subroutine compute_pres_vortlatt(this) !, R_g)
+subroutine compute_pres_vortlatt(this) 
   class(t_vortlatt), intent(inout) :: this
   integer  :: i_stripe
   real(wp) :: wind(3)
@@ -518,9 +518,9 @@ subroutine compute_dforce_jukowski_vortlatt(this)
 
   if ( i_stripe .gt. 1 ) then
     this%dforce = sim_param%rho_inf * gam &
-                * ( this%mag - this%stripe_elem(i_stripe-1)%p%mag )  / sqrt(1 - mach**2)
+                * ( this%mag - this%stripe_elem(i_stripe-1)%p%mag )  !/ sqrt(1 - mach**2)
   else
-    this%dforce = sim_param%rho_inf * gam * this%mag  / sqrt(1 - mach**2)
+    this%dforce = sim_param%rho_inf * gam * this%mag !/ sqrt(1 - mach**2)
   end if
   
   ! === Unsteady contribution ===
@@ -533,175 +533,7 @@ subroutine compute_dforce_jukowski_vortlatt(this)
 end subroutine compute_dforce_jukowski_vortlatt
 
 
-subroutine correction_c81_vortlatt(airfoil_data, stripe, linsys, diff, it_vl, i_s)
-  type(t_aero_tab),  intent(in)    :: airfoil_data(:)
-  type(t_stripe),    intent(inout) :: stripe
-  type(t_linsys),    intent(inout) :: linsys
-  real(wp)                         :: diff
-  real(wp)                         :: mach, reynolds
-  real(wp)                         :: alpha, alpha_2d, alcl0
-  real(wp)                         :: al0
-  real(wp),    allocatable         :: aero_coeff(:)
-  real(wp)                         :: up(3), unorm
-  real(wp)                         :: force(3), mag
-  integer                          :: i_c, n_pan, id_pan
-  real(wp)                         :: cl_inv, cl_visc
-  real(wp)                         :: rel_fct, rhs_diff
-  integer,           intent(in)    :: it_vl, i_s
-  integer                          :: id_a, i_a
-  integer                          :: imach, nmach
-  real(wp)                         :: machend, mach1, mach2
-  !> Dynamic stall
-  real(wp)                         :: thicc = 0.12 !> get as input? 
-                                      !(should be the last 2 digits of NACA profile)
-  real(wp)                         :: alpha_ref, K1, dAlpha_dt
-  real(wp)                         :: rad_break, rad_dyn, M1, M2, g1, g2, g2_max
 
-  !> Relaxation factor
-  rel_fct = sim_param%vl_relax
-  
-  !> Total panel on stripe 
-  n_pan = size(stripe%panels)
-  
-  !> Local Mach number 
-  mach = abs(dot(stripe%vel, stripe%tang(:,1)) / sim_param%a_inf)
-  
-  !> Local reynolds number 
-  reynolds = sim_param%rho_inf * norm2(stripe%vel) * &
-                          stripe%chord / sim_param%mu_inf
-
-  !> Force calculation on the stripe 
-  force = 0.0_wp
-  do i_c = 1, n_pan
-    force = force + stripe%panels(i_c)%p%dforce 
-  end do
-
-  !> Induced alpha on stripe for drag calculation 
-  stripe%alpha_ind = atan2(dot(stripe%vel,stripe%nor) , &
-                          dot(stripe%vel,stripe%tang(:,1))) 
-
-  !> Sectional lift coefficient 
-  cl_inv = dot(force,stripe%nor)/(0.5_wp*sim_param%rho_inf*dot(stripe%vel,stripe%vel)*stripe%area)
-
-  !> AoA of the stripe (from inviscid calculation)
-  if (it_vl .eq. 0) then  
-
-    !> Interpolation of alcl0
-    al0 = 0.0_wp
-
-    do i_a = 1, 2
-      id_a = stripe%i_airfoil(i_a)
-      imach = 1 
-      nmach = size(airfoil_data(id_a)%aero_coeff(1)%coeff(1)%par2)
-      mach1   = airfoil_data(id_a)%aero_coeff(1)%coeff(1)%par2(imach)
-      machend = airfoil_data(id_a)%aero_coeff(1)%coeff(1)%par2(nmach)
-      
-      !> Find closest mach number 
-      do while ((mach .ge. mach1 ) .and. (imach .lt. nmach))
-        imach = imach + 1
-        mach1 = airfoil_data(id_a)%aero_coeff(1)%coeff(1)%par2(imach)
-      end do
-      imach = imach - 1
-      mach1 = airfoil_data(id_a)%aero_coeff(1)%coeff(1)%par2(imach)
-      mach2 = airfoil_data(id_a)%aero_coeff(1)%coeff(1)%par2(imach+1)
-
-      !> Linear interpolation of alpha0 
-      al0 = al0 + airfoil_data(id_a)%aero_coeff(1)%alcl0(imach) + &
-              (mach - mach1)/(mach2 - mach1) * &
-              ( airfoil_data(id_a)%aero_coeff(1)%alcl0(imach+1) - &
-              airfoil_data(id_a)%aero_coeff(1)%alcl0(imach  ) )
-    
-    end do
-    !> Take the average of al0
-    alcl0 = al0/2 
-    !write(*,*) 'alcl0', alcl0
-    
-    !> AoA of the stripe         
-    !> "2D correction" of the induced angle
-    up = 0.0_wp 
-    unorm = 0.0_wp
-    up =  stripe%nor*sum(stripe%nor*stripe%vel) + stripe%tang(:,1)*sum(stripe%tang(:,1)*stripe%vel)
-    unorm = norm2(up)      ! velocity w/o induced velocity
-    stripe%unorm = unorm
-    ! Angle of incidence (full velocity)
-    !alpha = atan2(sum(up*stripe%nor), sum(up*stripe%tang(:,1)))
-    !alpha = alpha * 180.0_wp/pi  ! .c81 tables defined with angles in [deg]
-
-    mag = 0.0_wp
-    do i_c = 1, n_pan
-      if ( i_c .gt. 1 ) then
-        mag = mag + ( stripe%panels(i_c)%p%mag - stripe%panels(i_c - 1)%p%mag ) 
-      else
-        mag = mag + stripe%panels(i_c)%p%mag
-      end if
-      !write(*,*) 'i_c           ', i_c
-      !write(*,*) 'stripe%panels(i_c)%p%mag      ', stripe%panels(i_c)%p%mag
-    end do
-
-    alpha = - mag / ( pi * stripe%chord * unorm ) * 180.0_wp/pi + alcl0
-    !alpha = (cl_inv/(2.0_wp*pi*sqrt(1-mach**2))) * 180/pi + alcl0! deg to enter in c81 table
-
-    !if (i_s .eq. 20) then
-    !  write(*,*) 'alpha          ',  alpha 
-    !  write(*,*) 'alpha_2d       ', alpha_2d
-    !endif
-
-    !> Dynamic stall
-    if(sim_param%vl_dynstall) then
-
-      dAlpha_dt = (alpha*pi/180.0_wp - stripe%alpha_old)/sim_param%dt 
-      rad_break = 0.06_wp + 1.5_wp*(0.6_wp - thicc/stripe%chord)
-      rad_dyn = sqrt(abs(stripe%chord * dAlpha_dt/(2.0_wp* norm2(stripe%vel))))
-
-      !> dynamic stall lift
-      M1 = 0.4_wp + 5.0_wp*(0.6_wp - thicc/stripe%chord)
-      M2 = 0.9_wp + 2.5_wp*(0.6_wp - thicc/stripe%chord)
-      g2_max = 1.4_wp - 6.0_wp*(0.6_wp - thicc/stripe%chord)
-      g2 = min(g2_max,max(0.0_wp, (mach-M2)/(M1-M2)))
-      g1 = g2/2.0_wp
-      K1 = 0.75_wp + sign(0.25_wp, dAlpha_dt)
-
-      if(rad_dyn .LE. rad_break) then
-        alpha_ref = alpha - K1*g1*rad_dyn*sign(1.0_wp,dAlpha_dt) * 180_wp/pi ! deg
-      else
-        alpha_ref = alpha - K1*(g1*rad_break + g2*(rad_dyn-rad_break))* & 
-                            sign(1.0_wp,dAlpha_dt) * 180_wp/pi               ! deg
-      end if
-
-    else
-      alpha_ref = alpha
-    end if ! dynstall
-
-    stripe%alpha = alpha_ref  
-    
-    !> Interpolation of the aerodynamic coefficents 
-    call interp_aero_coeff ( airfoil_data,  stripe%csi_cen, stripe%i_airfoil , &
-                          (/alpha_ref, mach, reynolds/), aero_coeff )
-    
-    !> Aerodynamic coefficients from c81 table  
-    stripe%cl_visc = aero_coeff(1)
-    stripe%cd = aero_coeff(2)  
-    cl_visc = stripe%cl_visc    
-
-    deallocate(aero_coeff)
-  else 
-    cl_visc = stripe%cl_visc
-  endif 
-  
-  !> Update term rhs (absolute)
-  rhs_diff = (cl_visc - cl_inv)
-
-  !> Update tolerance  
-  diff = abs(cl_visc - cl_inv)
-  
-  do i_c = 1, n_pan
-    !> Take the id of the panel in the linsys 
-    id_pan = stripe%panels(i_c)%p%id
-    !> Update of the rhs 
-    linsys%b(id_pan) =  (1 + rel_fct*rhs_diff)*linsys%b(id_pan)
-  end do 
-
-end subroutine correction_c81_vortlatt
 
 !----------------------------------------------------------------------
 !> Compute an approximate value of the induced velocity at 1/4 of chord
@@ -728,7 +560,7 @@ subroutine get_vel_ctr_pt_vortlatt(this, elems, wake_elems, vort_elems)
 
   !> Control point at 1/4-fraction of the chord
   x0 = this%cen + (this%edge_vec(:,4) - this%edge_vec(:,2))/4.0_wp
-  
+
   !=== Compute the velocity from all the elements ===
   do j = 1,size(wake_elems)  ! wake panels
     call wake_elems(j)%p%compute_vel(x0, v)
@@ -744,52 +576,13 @@ subroutine get_vel_ctr_pt_vortlatt(this, elems, wake_elems, vort_elems)
     call elems(j)%p%compute_vel(x0, v)
     this%vel_ctr_pt = this%vel_ctr_pt + v
   enddo
-  
-  !> induced velocity on leading edge side
+
   wind = variable_wind(this%cen, sim_param%time)
-  
   this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp * pi) &
                     + wind - this%ub
-
+  
 end subroutine get_vel_ctr_pt_vortlatt
 
-subroutine get_vel_ac_stripe(stripe, elems, wake_elems, vort_elems)
-  class(t_stripe),      intent(inout)    :: stripe
-  type(t_pot_elem_p),   intent(in)       :: elems(:)
-  type(t_pot_elem_p),   intent(in)       :: wake_elems(:)
-  type(t_vort_elem_p),  intent(in)       :: vort_elems(:)
-
-  real(wp) :: v(3), x0(3), wind(3)
-  integer :: j
-
-  ! Initialisation to zero
-  stripe%vel = 0.0_wp
-
-  ! Control point at 1/4-fraction of the chord
-  x0 = stripe%ac_stripe
-
-  !=== Compute the velocity from all the elements ===
-  do j = 1,size(wake_elems)  ! wake panels
-    call wake_elems(j)%p%compute_vel(x0,v)
-    stripe%vel = stripe%vel + v
-  enddo
-
-  do j = 1, size(elems) ! body elements
-    call elems(j)%p%compute_vel(x0,v)
-    stripe%vel = stripe%vel + v
-  enddo
-  
-  do j = 1,size(vort_elems) ! wake vorticity elements 
-    call vort_elems(j)%p%compute_vel(x0,v)
-    stripe%vel = stripe%vel + v
-  enddo
-  
-  !> induced velocity on leading edge side
-  wind = variable_wind(stripe%ac_stripe, sim_param%time)
-  stripe%vel = stripe%vel/(4.0_wp * pi) &
-                + wind - stripe%ub
-
-end subroutine get_vel_ac_stripe
 !!!----------------------------------------------------------------------
 !> Calculate the geometrical quantities of a vortex lattice
 !!
@@ -824,7 +617,6 @@ subroutine calc_geo_data_vortlatt(this, vert)
   if (norm2(nor) .lt. 1e-16_wp) then 
     nor(3) = 1e-16_wp
   end if
-
 
   this%nor = nor / norm2(nor)
   
@@ -866,36 +658,8 @@ subroutine calc_geo_data_vortlatt(this, vert)
 
 end subroutine calc_geo_data_vortlatt
 
+!> Calc geo data of the stripe: equivalent to calc_geo_data_liftlin 
 
-subroutine calc_geo_data_stripe(stripe)
-  type(t_stripe), intent(inout) :: stripe
-  integer                       :: n_pan
-  real(wp)                      :: nor(3), tang(3)
-
-  n_pan = size(stripe%panels)
-
-  nor = cross(stripe%panels(n_pan)%p%ver(:,3) - stripe%panels(1)%p%ver(:,1) , &
-              stripe%panels(n_pan)%p%ver(:,4) - stripe%panels(1)%p%ver(:,2) )
-
-  !> Avoid numerical singularities when compiled in debug mode
-  if (norm2(nor) .lt. 1e-16_wp) then 
-    nor(3) = 1e-16_wp
-  end if
-
-  stripe%nor = nor / norm2(nor)
-  
-  tang = (stripe%panels(n_pan)%p%ver(:,3) + stripe%panels(n_pan)%p%ver(:,4))/2 - &
-          (stripe%panels(1)%p%ver(:,1) + stripe%panels(1)%p%ver(:,2))/2
-  
-  stripe%tang(:,1) = tang / norm2(tang)
-  stripe%tang(:,2) = cross(stripe%nor, stripe%tang(:,1))
-  
-  !> velocity as linear interpolation 
-  stripe%ub = stripe%panels(n_pan)%p%ub*0.25_wp + stripe%panels(1)%p%ub*0.75_wp 
-  stripe%ac_stripe = (stripe%panels(1)%p%ver(:,2) + stripe%panels(1)%p%ver(:,1))/2 - &
-                    0.25_wp * ((stripe%panels(1)%p%ver(:,2) + stripe%panels(1)%p%ver(:,1))/2 - &
-                    (stripe%panels(n_pan)%p%ver(:,3) + stripe%panels(n_pan)%p%ver(:,4))/2)
-end subroutine calc_geo_data_stripe
 
 
 !----------------------------------------------------------------------
