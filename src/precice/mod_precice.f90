@@ -47,13 +47,6 @@
 
 module mod_precice
 
-! *** to do ***
-!> update position of the TE, using the rotation of the LE
-!> update velocity field, exploiting connectivity
-!> update velocity field, including the contribution of the angular vel
-!> update force    field, exploiting connectivity
-! *** to do ***
-
 use mod_param, only: &
   wp, pi
 
