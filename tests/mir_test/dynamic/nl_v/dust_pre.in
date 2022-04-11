@@ -1,0 +1,11 @@
+
+CompName = right_wing
+GeoFile = wing_right.in
+RefTag = Dynamic
+
+CompName = left_wing
+GeoFile = wing_left.in
+RefTag = Dynamic
+
+FileName = geo_input.h5 
+
