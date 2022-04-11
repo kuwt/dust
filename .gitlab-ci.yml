@@ -32,7 +32,7 @@ build-job:       # This job runs in the build stage, which runs first.
   script:
     - mkdir build && cd build 
     - cmake -D CMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE WITH_PRECICE=$WITH_PRECICE ../
-    - sudo make install -j8
+    - make install -j8
     - echo "Build $CMAKE_BUILD_TYPE, USE_PRECICE =$WITH_PRECICE completed"
 
 unit-test-job:   # This job runs in the test stage.
