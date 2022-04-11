@@ -1,0 +1,7 @@
+
+CompName = wing
+GeoFile = wing.in
+RefTag = Dynamic
+
+FileName = geo_input.h5 
+
