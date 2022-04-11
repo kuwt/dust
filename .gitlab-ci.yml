@@ -22,10 +22,10 @@ variables:
   WITH_PRECICE: "NO"
   CMAKE_BUILD_TYPE: "Release"
 
-before_script:
-  - sudo apt-get update
-  - sudo apt install -y cmake gcc g++ gfortran libtool autoconf automake
-  - sudo apt-get install -y libcgns-dev libhdf5-dev libopenblas0  
+#before_script:
+#  - sudo apt-get update
+#  - sudo apt install -y cmake gcc g++ gfortran libtool autoconf automake
+#  - sudo apt-get install -y libcgns-dev libhdf5-dev libopenblas0  
 
 build-job:       # This job runs in the build stage, which runs first.
   stage: build
