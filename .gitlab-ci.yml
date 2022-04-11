@@ -23,7 +23,7 @@ variables:
   CMAKE_BUILD_TYPE: "Release"
 
 before_script:
-  - sudo apt-get update 
+  - sudo apt-get update && apt-get -y install sudo
   - sudo apt install cmake gcc g++ gfortran libtool autoconf automake
   - sudo apt install libcgns3.4 libcgns-dev libhdf5-dev libopenblas0
 
