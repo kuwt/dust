@@ -37,7 +37,7 @@ pwd = os.getcwd()
 sets_descr = ['Rotor with a cgns nacelle']
 
 #run the first set of simulations, set a
-os.chdir("./reg_test_b")
+os.chdir("./tests/reg_test_b")
 pre_ret = sbprc.call([pre])
 runs = ['dust_base.in']
 descr = ['basic configuration']
