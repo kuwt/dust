@@ -19,9 +19,9 @@ in most linux distributions.
   ```
 
 #### Libraries
-  ```bash
+~~~bash
   $ sudo apt make liblapack-dev libblas-dev libcgns-dev libhdf5-dev libopenblas0
-  ```
+~~~
 
 ## DUST building and installation (tested under Ubuntu20.04):
 
