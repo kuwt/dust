@@ -13,16 +13,27 @@ in most linux distributions.
 
 ## Ubuntu 20.04
 
+<details>
+  <summary markdown="span">Compilers</summary>
+
 #### Compilers
   ```bash
   $ sudo apt install gcc g++ gfortran
   ```
+</details>
+
+<details>
+  <summary markdown="span">Libraries</summary>
 
 #### Libraries
-~~~bash
+  ```bash
   $ sudo apt make liblapack-dev libblas-dev libcgns-dev libhdf5-dev libopenblas0
-~~~
+  ```
+</details>
 
+<details>
+  <summary markdown="span">Installation</summary>
+  
 ## DUST building and installation (tested under Ubuntu20.04):
 
 - Create a build folder inside this folder (can be "build" or anything else) and move into it:
@@ -56,3 +67,30 @@ in most linux distributions.
   Other install folders can be set by setting
 
   cmake -D CMAKE_INSTALL_PREFIX=/path/to/install/folder ../
+</details>
+
+## Coupling with preCICE-MBDyn
+
+Compile DUST with **$WITH_PRECICE**=**ON**.
+
+<details>
+  <summary markdown="span">preCICE</summary>
+
+#### preCICE
+Visit <https://precice.org/quickstart.html>
+
+</details>
+
+<details>
+  <summary markdown="span">MBDyn</summary>
+
+#### MBDyn
+Visit <https://www.mbdyn.org/?Software_Installation>. 
+
+MBDyn must be compiled on branch **develop** with 
+the following configure command:
+ ```bash
+  $ ./configure --enable-netcdf --with-lapack --enable-python
+  ```
+</details>
+

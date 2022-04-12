@@ -1,35 +1,15 @@
+
+<img src="/uploads/3b37882713af00af40ea54104817261a/dust_logo.png" width="100">
+
 This is DUST, a flexible solution for aerodynamic simulation of complex 
 configurations.
 
-![dust_logo](/uploads/3b37882713af00af40ea54104817261a/dust_logo.png)
-
-Copyright (C) 2018-2022 Politecnico di Milano
+Copyright &copy; 2018-2022 Politecnico di Milano
                           with support from A^3 from Airbus
 
 ## License
 
-The source code of DUST is available free under the MIT license
-
-Permission is hereby granted, free of charge, to any person
-obtaining a copy of this software and associated documentation
-files (the "Software"), to deal in the Software without
-restriction, including without limitation the rights to use,
-copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following
-conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
+Please see the [license guidelines](license.md)
 
 ## Overview
 
@@ -45,45 +25,25 @@ calculates the solution and generates the results.
 The results are then employed by the postprocessor which elaborates the data
 according to the user requests.
 
-For the installation of DUST see INSTALL section.
-
-## Tested Compatibility
-
-COMPATIBILITY:
-DUST was tested under:
-  * Ubuntu 16.04
-    * gcc 5.4.0 and Ifort 18.0.1
-    * hdf5 1.8.16 and hdf5 1.10.2
-    * cgns 3.3.1 (3.1.4 works but has a different API and requires code modification)
-
-  * Ubuntu 18.04
-    * gcc 7.3.0
-    * hdf5 1.10.2
-    * cgns 3.3.1
-
-  * CentOS
-    * gcc 4.8.5
-    * hdf5 1.10.2
-    * cgns 3.3.1
-
 ## Documentation
 
-DOCUMENTATION:
- the source code is commented to be automatically documented with Doxygen.
- To create the documentation:
- cd src
- doxygen Doxyfile
+The source code is commented to be automatically documented with Doxygen.
+To create the documentation:
+cd src
+doxygen Doxyfile
 
- the documentation should be stored in the doc folder
- in html the documentation can be read and searched opening index.html in a web
- browser
- in latex the latex sources can be compiled by employing make, which would 
- generate the manual in refman.pdf
+The documentation should be stored in the doc folder in html the documentation can be
+read and searched opening index.html in a web browser in latex the latex sources can be
+compiled by employing make, which would generate the manual in refman.pdf.
+
+In the doc folder can be found a **quick_start.pdf** containing a description of the provided examples.
+
+
 
 ## Installation
 
-Please see the [installation guidelines](INSTALL.md)
+Please see the [installation guidelines](install.md)
 
 ## Contributors
 
-Please see the [contribution guidelines](contributors.md)
+Please see the [contributiors](contributors.md)
