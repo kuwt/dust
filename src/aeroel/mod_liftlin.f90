@@ -1005,7 +1005,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       ! compute velocity
       vel = 0.0_wp
       do j = 1,size(elems_ll)
-        write(*,*) ''
         call elems_ll(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)
         vel = vel + v
       enddo
