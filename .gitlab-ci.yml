@@ -42,6 +42,14 @@ unit-test-job:   # This job runs in the test stage.
   script:
     - python tests/run_a.py
     - python tests/run_b.py
+    - python tests/mir_test/static/run_mir_static_ll.py
+    - python tests/mir_test/static/run_mir_static_v.py
+    - python tests/mir_test/static/run_mir_static_p.py
+    # todo: static nl_vl
+    - python tests/mir_test/dynamic/run_mir_dynamic_ll.py
+    - python tests/mir_test/dynamic/run_mir_dynamic_v.py
+    - python tests/mir_test/dynamic/run_mir_dynamic_p.py
+    # todo: dynamic nl_vl
 
 lint-test-job:   # This job also runs in the test stage.
   stage: test    # It can run at the same time as unit-test-job (in parallel).

@@ -15,11 +15,11 @@ pars.add_argument('-r','--release', nargs='?', help='release to check with',
                   required=False, default='0.6.0')
 
 args = pars.parse_args()
-#exe_path = args.exe_path
-#exe_path = os.path.abspath(exe_path)
-pre    = 'dust_pre'
-solver = 'dust'
-post   = 'dust_post'
+exe_path = 'build/bin'
+exe_path = os.path.abspath(exe_path)
+pre    = exe_path + '/dust_pre'
+solver = exe_path + '/dust'
+post   = exe_path + '/dust_post'
 tol = args.tolerance
 
 vers_dic ={'0.5.11':'0-5-11', '0.5.12':'0-5-12', '0.5.13':'0-5-13',

@@ -26,11 +26,11 @@ pwd = os.getcwd()
 sets_descr = ['Basic wing with mirror']
 
 #run the first set of simulations, set a
-os.chdir("./tests/mir_test/static/v")
+os.chdir("./tests/mir_test/static/ll")
 pre_ret = sbprc.call([pre])
 runs = ['dust.in']
-descr = ['mirror static vortex lattice']
-runs_names = ['mirror static vortex lattice']
+descr = ['mirror static lifting line']
+runs_names = ['mirror static lifting line']
 sol_dsets = ['/ParticleWake/WakePoints', '/ParticleWake/WakeVort', 
       '/Components/Comp001/Solution/Vort', '/Components/Comp001/Solution/Pres',
       '/Components/Comp002/Solution/Vort', '/Components/Comp002/Solution/Pres']
