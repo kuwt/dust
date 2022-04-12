@@ -58,6 +58,8 @@ for i, run in enumerate(runs):
     check_data = np.array(check_file[dset_name])
     err = np.linalg.norm(check_data-ref_data)/np.linalg.norm(ref_data)
     errors[i,j] = err
+    if err > tol:
+      raise TypeError('Test Failed!')
 
 
 #delete all the produced files
