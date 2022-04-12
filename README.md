@@ -27,18 +27,7 @@ according to the user requests.
 
 ## Documentation
 
-The source code is commented to be automatically documented with Doxygen.
-To create the documentation:
-cd src
-doxygen Doxyfile
-
-The documentation should be stored in the doc folder in html the documentation can be
-read and searched opening index.html in a web browser in latex the latex sources can be
-compiled by employing make, which would generate the manual in refman.pdf.
-
-In the doc folder can be found a **quick_start.pdf** containing a description of the provided examples.
-
-
+In the doc folder can be found a **[quick_start.pdf](doc/quick_start.pdf)** containing a description of the provided examples.
 
 ## Installation
 
