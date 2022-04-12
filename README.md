@@ -1,52 +1,37 @@
-|*****************************************************************************|
-|         ______  __  _____________                                           |
-|   .....__/ __ \/ / / / ___/_  __/                                           |
-|  .....__/ / / / / / /\__ \ / /    DUST: a flexible solution for aerodynamic |
-| .....__/ /_/ / /_/ /___/ // /           simulation of complex configurations| 
-|.....__/_____/\____//____//_/                                                |
-|                                                                             |
-|*****************************************************************************|
+This is DUST, a flexible solution for aerodynamic simulation of complex 
+configurations.
 
 ![dust_logo](/uploads/3b37882713af00af40ea54104817261a/dust_logo.png)
 
 Copyright (C) 2018-2022 Politecnico di Milano
                           with support from A^3 from Airbus
 
-This is DUST, a flexible solution for aerodynamic simulation of complex 
-configurations.
-
 ## License
 
 The source code of DUST is available free under the MIT license
 
-!!=====================================================================
-!!
-!! Permission is hereby granted, free of charge, to any person
-!! obtaining a copy of this software and associated documentation
-!! files (the "Software"), to deal in the Software without
-!! restriction, including without limitation the rights to use,
-!! copy, modify, merge, publish, distribute, sublicense, and/or sell
-!! copies of the Software, and to permit persons to whom the
-!! Software is furnished to do so, subject to the following
-!! conditions:
-!! 
-!! The above copyright notice and this permission notice shall be
-!! included in all copies or substantial portions of the Software.
-!! 
-!! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-!! EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-!! OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-!! NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-!! HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-!! WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-!! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-!! OTHER DEALINGS IN THE SOFTWARE.
-!! 
-!!=====================================================================
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
 
-|*****************************************************************************|
-| Last revision June 8, 2018                                                  |
-|*****************************************************************************|
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+## Overview
 
 DUST comprises a solver, a preprocessor and a post processor.
 
@@ -60,7 +45,7 @@ calculates the solution and generates the results.
 The results are then employed by the postprocessor which elaborates the data
 according to the user requests.
 
-For the installation of DUST see INSTALL 
+For the installation of DUST see INSTALL section.
 
 ## Tested Compatibility
 
@@ -94,3 +79,9 @@ DOCUMENTATION:
  browser
  in latex the latex sources can be compiled by employing make, which would 
  generate the manual in refman.pdf
+
+ ## Installation
+
+ ## Contributors
+
+Please see the [contribution guidelines](CONTRIBUTE.md)
