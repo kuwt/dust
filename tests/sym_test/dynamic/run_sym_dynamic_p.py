@@ -26,11 +26,11 @@ pwd = os.getcwd()
 sets_descr = ['Basic wing with symmetry']
 
 #run the first set of simulations, set a
-os.chdir("./tests/sym_test/static/p")
+os.chdir("./tests/sym_test/dynamic/p")
 pre_ret = sbprc.call([pre])
 runs = ['dust.in']
-descr = ['symmetry static panel']
-runs_names = ['symmetry static panel']
+descr = ['symmetry dynamic panel']
+runs_names = ['symmetry dynamic panel']
 sol_dsets = ['/ParticleWake/WakePoints', '/ParticleWake/WakeVort', 
       '/Components/Comp001/Solution/Vort', '/Components/Comp001/Solution/Pres']
 

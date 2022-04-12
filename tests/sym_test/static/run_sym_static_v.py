@@ -26,11 +26,11 @@ pwd = os.getcwd()
 sets_descr = ['Basic wing with symmetry']
 
 #run the first set of simulations, set a
-os.chdir("./tests/sym_test/dynamic/v")
+os.chdir("./tests/sym_test/static/v")
 pre_ret = sbprc.call([pre])
 runs = ['dust.in']
-descr = ['symmetry dynamic vortex lattice']
-runs_names = ['symmetry dynamic vortex lattice']
+descr = ['symmetry static vortex lattice']
+runs_names = ['symmetry static vortex lattice']
 sol_dsets = ['/ParticleWake/WakePoints', '/ParticleWake/WakeVort', 
       '/Components/Comp001/Solution/Vort', '/Components/Comp001/Solution/Pres']
 
