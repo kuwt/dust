@@ -82,6 +82,8 @@ DOCUMENTATION:
 
 ## Installation
 
+Please see the [installation guidelines](INSTALL.md)
+
 ## Contributors
 
 Please see the [contribution guidelines](contributors.md)
