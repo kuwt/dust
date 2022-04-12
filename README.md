@@ -80,8 +80,8 @@ DOCUMENTATION:
  in latex the latex sources can be compiled by employing make, which would 
  generate the manual in refman.pdf
 
- ## Installation
+## Installation
 
- ## Contributors
+## Contributors
 
-Please see the [contribution guidelines](CONTRIBUTE.md)
+Please see the [contribution guidelines](contributors.md)
