@@ -30,6 +30,7 @@ variables:
 before_script:
   - pip install h5py 
   - pip install pytest
+  - pip install pyprecice
 
 build-job:       # This job runs in the build stage, which runs first.
   stage: build
