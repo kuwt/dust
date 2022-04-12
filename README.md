@@ -15,6 +15,8 @@ Copyright (C) 2018-2022 Politecnico di Milano
 This is DUST, a flexible solution for aerodynamic simulation of complex 
 configurations.
 
+## License
+
 The source code of DUST is available free under the MIT license
 
 !!=====================================================================
@@ -60,6 +62,7 @@ according to the user requests.
 
 For the installation of DUST see INSTALL 
 
+## Tested Compatibility
 
 COMPATIBILITY:
 DUST was tested under:
@@ -77,6 +80,8 @@ DUST was tested under:
     * gcc 4.8.5
     * hdf5 1.10.2
     * cgns 3.3.1
+
+## Documentation
 
 DOCUMENTATION:
  the source code is commented to be automatically documented with Doxygen.
