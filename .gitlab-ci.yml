@@ -41,6 +41,7 @@ build-job:       # This job runs in the build stage, which runs first.
 unit-test-job:   # This job runs in the test stage.
   stage: test    # It only starts when the job in the build stage completes successfully.
   script:
+    #> DUST TEST
     # build and compile
     - mkdir build && cd build 
     - cmake -D CMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -D WITH_PRECICE=$WITH_PRECICE ../
@@ -68,6 +69,16 @@ unit-test-job:   # This job runs in the test stage.
     - python tests/sym_test/dynamic/run_sym_dynamic_v.py -t $TOL
     - python tests/sym_test/dynamic/run_sym_dynamic_p.py -t $TOL
     # todo: dynamic nl_vl
+    #> COUPLED TEST
+    - cd build 
+    - cmake -D CMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -D WITH_PRECICE=YES ../
+    - make -j8
+    - echo "Build $CMAKE_BUILD_TYPE, USE_PRECICE =YES completed"
+    - cd ..
+    #>> mirror test <<
+    - python tests/mir_test/coupled/run_mir_coupled_v.py -t $TOL
+    - python tests/mir_test/coupled/run_mir_coupled_p.py -t $TOL
+    - python tests/mir_test/coupled/run_mir_coupled_ll.py -t $TOL
 
 lint-test-job:   # This job also runs in the test stage.
   stage: test    # It can run at the same time as unit-test-job (in parallel).

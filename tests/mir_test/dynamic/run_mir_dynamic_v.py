@@ -58,9 +58,6 @@ for i, run in enumerate(runs):
     check_data = np.array(check_file[dset_name])
     err = np.linalg.norm(check_data-ref_data)/np.linalg.norm(ref_data)
     errors[i,j] = err
-    if err > tol:
-      raise TypeError('Test Failed!')
-
 
 #delete all the produced files
 files = os.listdir('Output/')
@@ -76,6 +73,11 @@ for i, run in enumerate(descr):
   for j, dset in enumerate(sol_descr):
     print('Difference on ',dset,': ',errors[i,j])
 
+for i, run in enumerate(runs):
+  for j, dset_name in enumerate(sol_dsets):
+    errors[i,j] = err
+    if err > tol:
+      raise TypeError('Test Failed!')
 
 #whatever happened, get back to the previous folder
 os.chdir(pwd)

@@ -6,6 +6,7 @@ import argparse
 import os
 import math as mth
 import h5py
+import subprocess
 
 pars = argparse.ArgumentParser()
 pars.add_argument('-t','--tolerance', nargs='?', help='tolerance for the test',
@@ -23,19 +24,22 @@ post   = exe_path + '/dust_post'
 tol = args.tolerance
 
 pwd = os.getcwd()
-sets_descr = ['Basic wing with symmetry']
+sets_descr = ['Basic wing with mirror, coupled']
 
 #run the first set of simulations, set a
-os.chdir("./tests/sym_test/dynamic/v")
-pre_ret = sbprc.call([pre])
+os.chdir("./tests/mir_test/coupled/p")
+
+pre_ret = sbprc.call('./run.sh')
 runs = ['dust.in']
-descr = ['symmetry dynamic vortex lattice']
-runs_names = ['symmetry dynamic vortex lattice']
+descr = ['mirror coupled panel']
+runs_names = ['mirror coupled panel']
 sol_dsets = ['/ParticleWake/WakePoints', '/ParticleWake/WakeVort', 
-      '/Components/Comp001/Solution/Vort', '/Components/Comp001/Solution/Pres']
+      '/Components/Comp001/Solution/Vort', '/Components/Comp001/Solution/Pres',
+      '/Components/Comp002/Solution/Vort', '/Components/Comp002/Solution/Pres']
 
 sol_descr = ['Particles position   ', 'Particles Intensity  ', 
-             'Component 1 Intensity', 'Component 1 Pressure ']
+             'Component 1 Intensity', 'Component 1 Pressure ',
+             'Component 2 Intensity', 'Component 2 Pressure ']
 
 errors = np.zeros([len(runs),len(sol_dsets)])
 for i, run in enumerate(runs):
@@ -44,11 +48,12 @@ for i, run in enumerate(runs):
   ref_name = 'ref'
   check_name = 'test'
   suffix = '.h5'
-  folder = './Output/'
+  folder_ref = './../../static/p/Output/'
+  folder_test = './dust/Output/'
   res = '_res_0011'
 
-  ref_filename = folder+ref_name+res+suffix
-  check_filename = folder+check_name+res+suffix
+  ref_filename = folder_ref + ref_name + res + suffix
+  check_filename = folder_test + check_name + res + suffix
   ref_file = h5py.File(ref_filename, 'r')
   check_file = h5py.File(check_filename, 'r')
   for j, dset_name in enumerate(sol_dsets):
@@ -58,11 +63,11 @@ for i, run in enumerate(runs):
     errors[i,j] = err
 
 #delete all the produced files
-files = os.listdir('Output/')
+files = os.listdir('dust/Output/')
 for file in files:
   if file.startswith('test'):
-    os.remove(os.path.join('Output/',file))
-os.remove('geo_input.h5')
+    os.remove(os.path.join('dust/Output/',file))
+os.remove('dust/geo_input.h5')
 
 #print the errors:
 print('Difference w.r.t. reference:')
