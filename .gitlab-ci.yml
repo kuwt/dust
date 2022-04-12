@@ -45,6 +45,7 @@ unit-test-job:   # This job runs in the test stage.
   script:
     #> DUST TEST
     # build and compile
+    - export PATH=$PATH:/usr/local/mbdyn/bin
     - mbdyn
     - mkdir build && cd build 
     - cmake -D CMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -D WITH_PRECICE=$WITH_PRECICE ../
