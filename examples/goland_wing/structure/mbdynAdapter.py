@@ -3,15 +3,13 @@ import numpy as np
 import os
 import precice
 import pdb
-# from precice import *
-
+import time
 class MBDynAdapter:
-
   class Participant:
     def __init__(self, name='MBDyn'):
       """ Do nothing """
       self.name  = name
-      self.field = [] # list()
+      self.field = [] 
 
     class Mesh:
       def __init__(self, name='MBDynNodes', id=0):
@@ -41,9 +39,6 @@ class MBDynAdapter:
              'type':'scalar/vector', 'io':'read/write' }
   
     #> Use MBDyn interface, containing info about MBDyn-mbc_py
-    # interface
-    #print('CIAO')
-    #pdb.set_trace()
 
     self.mbd = mbdInterface
         
@@ -57,23 +52,12 @@ class MBDynAdapter:
                   'read' ]
      
     #> === PreCICE interface ====================================
-    comm_rank = 0; comm_size = 1 
-    #if 'self.interface' in locals():
-      
-    #print('CIAO')
-    #pdb.set_trace()
-    #print(self.p['name'])
-    #print(config_file_name)
-    #print(comm_rank)
-    #print(comm_size)
-    
+    comm_rank = 0; comm_size = 1   
     
     self.interface = precice.Interface( self.p['name'], \
                                         config_file_name, \
                                         comm_rank, comm_size )
-   
-    #print('CIAO2')
-    #pdb.set_trace()
+
     self.dim = self.interface.get_dimensions()
 
     self.p['mesh']['id'] = \
@@ -100,21 +84,12 @@ class MBDynAdapter:
     # PreCICE communication
     self.p['mesh']['nodes'] = self.mbd.refConfigNodes()
     # old: initial configuration as the reference configuration
-    #self.p['mesh']['nodes'] = self.mbd.data['Position']['data']
     self.p['mesh']['nnodes'] = np.size( self.mbd.data['Position']['data'], 0 )
     self.p['mesh']['dim']    = np.size( self.mbd.data['Position']['data'], 1 )
     self.p['mesh']['node_id'] = self.interface.set_mesh_vertices( \
                     self.p['mesh']['id'], self.p['mesh']['nodes'] )
 
-    #> Connectivity
-    #> Edges
-    # ...
-    #> Elements
-    # ...
-    
-    print( self.p['mesh']['node_id'] )
-
-    if ( self.debug ): # check ----------------------------------
+    if ( self.debug ): 
       for i in np.arange(self.mbd.socket.nnodes):
         print('  ', i,': ', self.p['mesh']['node_id'][i],' , ', \
                             self.p['mesh']['nodes'][i,:] )
@@ -122,8 +97,8 @@ class MBDynAdapter:
     #> === Initialize ===========================================
     self.dt_precice = self.interface.initialize()
     self.is_ongoing = self.interface.is_coupling_ongoing()
-    if ( self.debug ): # check ----------------------------------
-      print(' interface.is_coupling_ongoing(): ', self.is_ongoing )
+    if ( self.debug ): 
+      print(' interface.is_coupling_ongoing: \033[0;32m ▶ %s' % self.is_ongoing )
 
     #> === Initialize data ======================================
     cowid = precice.action_write_initial_data()
@@ -131,14 +106,14 @@ class MBDynAdapter:
       if ( self.p['fields'][fie]['io'] == 'write' ):
         if ( self.p['fields'][fie]['type'] == 'scalar' ):
           self.interface.write_block_scalar_data( \
-                                 self.p['fields'][fie]['id'], \
-                                 self.p['mesh']['node_id'],   \
-                                 self.mbd.data[fie]['data'] )
+                                  self.p['fields'][fie]['id'], \
+                                  self.p['mesh']['node_id'],   \
+                                  self.mbd.data[fie]['data'] )
         if ( self.p['fields'][fie]['type'] == 'vector' ):
           self.interface.write_block_vector_data( \
-                                 self.p['fields'][fie]['id'], \
-                                 self.p['mesh']['node_id'],   \
-                                 self.mbd.data[fie]['data'] )
+                                  self.p['fields'][fie]['id'], \
+                                  self.p['mesh']['node_id'],   \
+                                  self.mbd.data[fie]['data'] )
       
       self.interface.mark_action_fulfilled( cowic )
 
@@ -157,23 +132,26 @@ class MBDynAdapter:
     force = np.zeros((n, nd))
 
     t = 0.
+    niter = 0.
     is_ongoing = self.interface.is_coupling_ongoing()
     while ( is_ongoing ):
-    
+      niter = niter + 1
+      if (niter == 1):
+        start = time.time()
+      print('\033[0m   Iteration ▶ ', niter)
+      
       if ( self.interface.is_action_required( cowic ) ):
-        pos_t = self.mbd.data['Position']['data'][:,:] #; print(' pos_t: ', pos_t )
-        vel_t = self.mbd.data['Velocity']['data'][:,:] #; print(' vel_t: ', vel_t )
-        rot_t = self.mbd.data['Rotation']['data'][:,:] #; print(' rot_t: ', rot_t )
-        ome_t = self.mbd.data['AngularVelocity']['data'][:,:] #; print(' rot_t: ', rot_t )
+        pos_t = self.mbd.data['Position']['data'][:,:] 
+        vel_t = self.mbd.data['Velocity']['data'][:,:] 
+        rot_t = self.mbd.data['Rotation']['data'][:,:] 
+        ome_t = self.mbd.data['AngularVelocity']['data'][:,:]
         self.interface.mark_action_fulfilled( cowic )
    
       #> Set MBDyn nodal values of forces and moments
-      #print(' debug, self.mbd.data[''Force''][data] :')
-      #print(self.mbd.data['Force']['data'])
       for i in np.arange(n):
-        self.mbd.nodal.n_f[i*nd:(i+1)*nd] = self.mbd.data['Force' ]['data'][i,:] # force[i,:]
-        self.mbd.nodal.n_m[i*nd:(i+1)*nd] = self.mbd.data['Moment']['data'][i,:] #
-
+        self.mbd.nodal.n_f[i*nd:(i+1)*nd] = self.mbd.data['Force' ]['data'][i,:] 
+        self.mbd.nodal.n_m[i*nd:(i+1)*nd] = self.mbd.data['Moment']['data'][i,:] 
+      
       dt = min( dt_set, dt_precice )
     
       #> === Communication with MBDyn ===========================
@@ -190,25 +168,19 @@ class MBDynAdapter:
       self.mbd.data['Rotation'       ]['data'] = np.reshape( self.mbd.nodal.n_theta, (n, nd))
       self.mbd.data['AngularVelocity']['data'] = np.reshape( self.mbd.nodal.n_omega, (n, nd))
 
-      #print(' Position, Velocity, Rotation ')
-      #for i in np.arange(n):
-      #  print(i, ' ', self.mbd.data['Position']['data'][i,:], ' ', \
-      #                self.mbd.data['Velocity']['data'][i,:], ' ', \
-      #                self.mbd.data['Rotation']['data'][i,:], ' ')
-
       #> Write to AeroSolver
       for fie in self.p['fields']:
         if ( self.p['fields'][fie]['io'] == 'write' ):
           if ( self.p['fields'][fie]['type'] == 'scalar' ):
             self.interface.write_block_scalar_data( \
-                                   self.p['fields'][fie]['id'], \
-                                   self.p['mesh']['node_id'],   \
-                                   self.mbd.data[fie]['data'] )
+                                    self.p['fields'][fie]['id'], \
+                                    self.p['mesh']['node_id'],   \
+                                    self.mbd.data[fie]['data'] )
           if ( self.p['fields'][fie]['type'] == 'vector' ):
             self.interface.write_block_vector_data( \
-                                   self.p['fields'][fie]['id'], \
-                                   self.p['mesh']['node_id'],   \
-                                   self.mbd.data[fie]['data'] )
+                                    self.p['fields'][fie]['id'], \
+                                    self.p['mesh']['node_id'],   \
+                                    self.mbd.data[fie]['data'] )
     
       is_ongoing = self.interface.is_coupling_ongoing()
       dt_precice = self.interface.advance(dt)
@@ -219,17 +191,13 @@ class MBDynAdapter:
           if ( self.p['fields'][fie]['type'] == 'scalar' ):
             self.mbd.data[fie]['data'] = \
               self.interface.read_block_scalar_data( \
-                                   self.p['fields'][fie]['id'], \
-                                   self.p['mesh']['node_id']    )
+                                    self.p['fields'][fie]['id'], \
+                                    self.p['mesh']['node_id']    )
           if ( self.p['fields'][fie]['type'] == 'vector' ):
             self.mbd.data[fie]['data'] = \
               self.interface.read_block_vector_data( \
-                                   self.p['fields'][fie]['id'], \
-                                   self.p['mesh']['node_id']    )
-      #print(' Force, Moments ')
-      #for i in np.arange(n):
-      #  print(i, ' ', self.mbd.data['Force' ]['data'][i,:], ' ', \
-      #                self.mbd.data['Moment']['data'][i,:])
+                                    self.p['fields'][fie]['id'], \
+                                    self.p['mesh']['node_id']    )
 
       #> Check convergence: iterate or finalize the timestep
       if ( self.interface.is_action_required( coric ) ): # dt not converged
@@ -245,18 +213,20 @@ class MBDynAdapter:
         if ( self.mbd.nodal.recv() ):
           print('**** break, after nodal.recv() ****'); break
         t = t + dt
-    
+        niter = 0
+        end = time.time()
+        print('\033[0m   Elapsed Time:', round((end - start),8), 'sec')
+        print('\033[0;32m ------------------------------- ')
+        print('\033[0;32m ◀ Simulation Time ▶ ', round(t, 6))
+        print('\033[0;32m ------------------------------- \033[0m ')
+            
     print(' before finalize() ')
     self.interface.finalize()
     print(' Finalize auxiliary coupling ')
     
-    #> ~~~ PreCICE coupling between mbdyn and aero solver ~~~~~~~~~~~
-    
+    #> ~~~ PreCICE coupling between mbdyn and aero solver ~~~~~~~~~~~   
     self.mbd.nodal.destroy()
-    # os.rmdir(tmpdir)
-    
-  #def __del__(self):
-  #  print('destroy mbd')
+
         
 
 
