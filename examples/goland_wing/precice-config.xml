@@ -1,6 +1,11 @@
 <?xml version="1.0"?>
 
 <precice-configuration>
+<log>
+    <sink
+      filter="(%Severity% > error)"
+      format="\033[0;33m ◀ in progress ▶ %ColorizedSeverity% %Message%"
+      enabled="true" /></log> 
 
   <solver-interface dimensions="3">
 
