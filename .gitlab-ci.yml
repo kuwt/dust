@@ -26,7 +26,11 @@ build-job:       # This job runs in the build stage, which runs first.
     - make -j8
     - echo "Build $CMAKE_BUILD_TYPE, USE_PRECICE =$WITH_PRECICE completed"
     - cd ..
-
+  artifacts:
+    paths:
+      - build/bin/ 
+    untracked: true
+    
 #test_single_components:   # This job runs in the test stage.
 #  stage: test    # It only starts when the job in the build stage completes successfully.
 #  script:
