@@ -44,11 +44,12 @@ for i, run in enumerate(runs):
   ref_name = 'ref'
   check_name = 'test'
   suffix = '.h5'
-  folder = './Output/'
+  folder_ref = './../../static/p/Output/'
+  folder_test = './Output/'
   res = '_res_0011'
 
-  ref_filename = folder+ref_name+res+suffix
-  check_filename = folder+check_name+res+suffix
+  ref_filename = folder_ref + ref_name + res + suffix
+  check_filename = folder_test + check_name + res + suffix
   ref_file = h5py.File(ref_filename, 'r')
   check_file = h5py.File(check_filename, 'r')
   for j, dset_name in enumerate(sol_dsets):
