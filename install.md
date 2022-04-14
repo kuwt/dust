@@ -27,7 +27,7 @@ in most linux distributions.
 
 #### Libraries
   ```bash
-  $ sudo apt make liblapack-dev libblas-dev libcgns-dev libhdf5-dev libopenblas0
+  $ sudo apt install liblapack-dev libblas-dev libcgns-dev libhdf5-dev libopenblas0
   ```
 </details>
 
@@ -49,7 +49,7 @@ in most linux distributions.
   ```
   where:
   - **$CMAKE_BUILD_TYPE** can be **Release** or **Debug**
-  - **$WITH_PRECICE** can be **ON** or **OFF**
+  - **$WITH_PRECICE** can be **YES** or **NO**
 
 - Build DUST:
 
