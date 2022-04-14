@@ -79,9 +79,9 @@ test_symmetry_dynamic_components:
     - "test_symmetry_static_components"
 
 build_dust_coupled: 
-  stage: build
+  stage: test
   script: 
-    - cd build 
+    - mkdir build && cd build
     - cmake -D CMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -D WITH_PRECICE=YES ../
     - make -j8
     - echo "Build $CMAKE_BUILD_TYPE, USE_PRECICE =YES completed"
@@ -90,6 +90,9 @@ build_dust_coupled:
     paths:
       - build/bin/ 
     untracked: true
+  needs: 
+    - "build_dust_alone"
+    - "test_symmetry_static_components"
 
 test_mirror_coupled_components: 
   stage: test
