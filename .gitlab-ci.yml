@@ -18,7 +18,7 @@ before_script:
   - pip install pyprecice
   - export PATH=$PATH:/usr/local/mbdyn/bin
 
-build-job:       # This job runs in the build stage, which runs first.
+build_dust_alone:       # This job runs in the build stage, which runs first.
   stage: build
   script:
     - mkdir build && cd build 
@@ -47,7 +47,7 @@ test_mirror_static_components:
     - python tests/mir_test/static/run_mir_static_v.py -t $TOL
     - python tests/mir_test/static/run_mir_static_p.py -t $TOL
   needs:
-    - "build-job"
+    - "build_dust_alone"
 
 test_mirror_dynamic_components: 
   stage: test
@@ -56,6 +56,7 @@ test_mirror_dynamic_components:
     - python tests/mir_test/dynamic/run_mir_dynamic_v.py -t $TOL
     - python tests/mir_test/dynamic/run_mir_dynamic_p.py -t $TOL
   needs:
+    - "build_dust_alone"
     - "test_mirror_static_components" 
 
 test_symmetry_static_components: 
@@ -65,7 +66,7 @@ test_symmetry_static_components:
     - python tests/sym_test/static/run_sym_static_v.py -t $TOL
     - python tests/sym_test/static/run_sym_static_p.py -t $TOL
   needs:
-    - "build-job"
+    - "build_dust_alone"
 
 test_symmetry_dynamic_components: 
   stage: test
@@ -74,18 +75,21 @@ test_symmetry_dynamic_components:
     - python tests/sym_test/dynamic/run_sym_dynamic_v.py -t $TOL
     - python tests/sym_test/dynamic/run_sym_dynamic_p.py -t $TOL
   needs:
+    - "build_dust_alone"
     - "test_symmetry_static_components"
 
-test_build_coupled: 
-  stage: test
+build_dust_coupled: 
+  stage: build
   script: 
     - cd build 
     - cmake -D CMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -D WITH_PRECICE=YES ../
     - make -j8
     - echo "Build $CMAKE_BUILD_TYPE, USE_PRECICE =YES completed"
     - cd ..
-  needs:
-    - "test_mirror_static_components"
+  artifacts:
+    paths:
+      - build/bin/ 
+    untracked: true
 
 test_mirror_coupled_components: 
   stage: test
@@ -94,7 +98,7 @@ test_mirror_coupled_components:
     - python tests/mir_test/coupled/run_mir_coupled_p.py -t $TOL
     - python tests/mir_test/coupled/run_mir_coupled_ll.py -t $TOL
   needs: 
-    - "test_build_coupled" 
+    - "build_dust_coupled" 
     - "test_mirror_static_components"
 
 test_symmetry_coupled_components:
@@ -104,7 +108,7 @@ test_symmetry_coupled_components:
     - python tests/sym_test/coupled/run_sym_coupled_p.py -t $TOL
     - python tests/sym_test/coupled/run_sym_coupled_ll.py -t $TOL
   needs: 
-    - "test_build_coupled" 
+    - "build_dust_coupled" 
     - "test_symmetry_static_components"
 
 deploy-job:      # This job runs in the deploy stage.
