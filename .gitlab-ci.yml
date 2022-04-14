@@ -22,7 +22,7 @@ build_dust_alone:       # This job runs in the build stage, which runs first.
   stage: build
   script:
     - mkdir build && cd build 
-    - cmake -D CMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -D WITH_PRECICE=$WITH_PRECICE ../
+    - cmake -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DWITH_PRECICE=$WITH_PRECICE ../
     - make -j8
     - echo "Build $CMAKE_BUILD_TYPE, USE_PRECICE =$WITH_PRECICE completed"
     - cd ..
@@ -81,10 +81,11 @@ test_symmetry_dynamic_components:
 build_dust_coupled: 
   stage: test
   script: 
+    - rm -rf build
     - mkdir build && cd build
-    - cmake -D CMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -D WITH_PRECICE=YES ../
+    - cmake -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DWITH_PRECICE=YES ../
     - make -j8
-    - echo "Build $CMAKE_BUILD_TYPE, USE_PRECICE =YES completed"
+    - echo "Build $CMAKE_BUILD_TYPE, USE_PRECICE=YES completed"
     - cd ..
   artifacts:
     paths:
