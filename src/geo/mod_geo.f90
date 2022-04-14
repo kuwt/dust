@@ -2255,8 +2255,8 @@ subroutine create_strip_connectivity(geo)
 
             ! > get the control point as the point at 0.5 c of the chord (!)
             ! It is updated at every timestep to account for curvature
-            comp%stripe(i_s)%cen = sum(comp%stripe(i_s)%ver(:,1:2))/2.0_wp
-
+            comp%stripe(i_s)%cen = sum(comp%stripe(i_s)%ver(:,1:2),2)/2.0_wp 
+            
             nor = cross(comp%stripe(i_s)%ver(:,3) - comp%stripe(i_s)%ver(:,1),&
                         comp%stripe(i_s)%ver(:,4) - comp%stripe(i_s)%ver(:,2))
             
@@ -2296,13 +2296,15 @@ subroutine create_strip_connectivity(geo)
               comp%stripe(i_s)%area = comp%stripe(i_s)%area + comp%stripe(i_s)%panels(i)%p%area 
             end do
 
-            comp%stripe(i_s)%ctr_pt = comp%stripe(i_s)%cen +  & 
+            comp%stripe(i_s)%ctr_pt = comp%stripe(i_s)%cen -  & 
                                       comp%stripe(i_s)%tang_cen * comp%stripe(i_s)%chord / 2.0_wp
             
             !comp%stripe(i_s)%curv_ac = sum(comp%curv_ac(:,i_s))/2 
             !> Update velocity 
-            call calc_node_vel(comp%stripe(i_s)%cen, geo%refs(comp%ref_id)%G_g, &
+
+            call calc_node_vel(comp%stripe(i_s)%ctr_pt, geo%refs(comp%ref_id)%G_g, &
                                 geo%refs(comp%ref_id)%f_g, comp%stripe(i_s)%ub)
+            
           endif    
           
       end do 
@@ -2414,11 +2416,9 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
           if (time_cycle .and. & 
               trim(comp%comp_el_type) .eq. 'v' .and. &
               trim(comp%aero_correction) .eq. 'true') then
-              write(*,*) 'comp%stripe', size(comp%stripe)
-
-            do ie = 1, size(comp%stripe)
               
-              call calc_node_vel(comp%stripe(ie)%cen, geo%refs(comp%ref_id)%G_g, &
+            do ie = 1, size(comp%stripe)              
+              call calc_node_vel(comp%stripe(ie)%ctr_pt, geo%refs(comp%ref_id)%G_g, &
                                 geo%refs(comp%ref_id)%f_g, comp%stripe(ie)%ub)
             end do  
           endif 
