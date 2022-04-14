@@ -46,7 +46,7 @@ for i, run in enumerate(runs):
   ref_name = 'ref'
   check_name = 'test'
   suffix = '.h5'
-  folder_ref = './../static/v/Output/'
+  folder_ref = './../../static/v/Output/'
   folder_test = './Output/'
   res = '_res_0011'
 
