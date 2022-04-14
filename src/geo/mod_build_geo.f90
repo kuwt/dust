@@ -597,6 +597,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     !> *** to do *** symmetry and mirror. So far, finalize run with an error
     if ( coupled_comp ) then
       write(*,*) ' coupling_type: ', trim(coupling_type)
+
       if ( trim(coupling_type) .eq. 'll' ) then
         call error(this_sub_name, this_mod_name, &
                     'It is not possible to couple with lifting lines method&
@@ -676,50 +677,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     endif
 
 #if USE_PRECICE
-
     if ( coupled_comp ) then
-
-      if ( mesh_symmetry .or. mesh_mirror ) then
-
-        if ( mesh_mirror ) then
-          select case (trim(mesh_file_type))
-            case('cgns', 'basic', 'revolution' )  ! TODO: check basic
-              call mirror_mesh(ee, rr, mirror_point, mirror_normal)
-            case('parametric','pointwise')
-              call mirror_mesh_structured(ee, rr,  &
-                                            npoints_chord_tot , nelems_span , &
-                                            mirror_point, mirror_normal)
-
-            case default
-              call error(this_sub_name, this_mod_name,&
-                  'Mirror routines implemented for MeshFileType = &
-                  & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
-                  'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
-          end select
-
-        end if
-        if ( mesh_symmetry ) then
-          select case (trim(mesh_file_type))
-            case('cgns', 'basic', 'revolution' )  ! TODO: check basic
-              call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
-
-            case('parametric','pointwise')
-              call symmetry_mesh_structured(ee, rr,  &
-                                            npoints_chord_tot , nelems_span , &
-                                            symmetry_point, symmetry_normal, rr_sym)
-                nelems_span_tot = 2*nelems_span
-
-            case default
-              call error(this_sub_name, this_mod_name,&
-                  'Symmetry routines implemented for MeshFileType = &
-                  & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
-                  'MeshFileType = '//trim(mesh_file_type))
-          end select
-
-        end if
-      end if
-
       write(*,*) ' coupling_type: ', trim(coupling_type)
+
       if ( trim(coupling_type) .eq. 'll' ) then
         call error(this_sub_name, this_mod_name, &
                     'It is not possible to couple with lifting lines method&
@@ -769,6 +729,34 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         rr = matmul( transpose(coupling_node_rot), rr )
       end if
     end if
+
+  if ( mesh_symmetry .or. mesh_mirror ) then
+!
+        if ( mesh_mirror ) then
+          select case (trim(mesh_file_type))
+            case('cgns', 'basic', 'revolution' )  ! TODO: check basic
+              call mirror_mesh(ee, rr, mirror_point, mirror_normal)
+            case default
+              call error(this_sub_name, this_mod_name,&
+                  'Mirror routines implemented for MeshFileType = &
+                  & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
+                  'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
+          end select
+        end if
+
+        if ( mesh_symmetry ) then
+          select case (trim(mesh_file_type))
+            case('cgns')  
+              call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
+            case default
+              call error(this_sub_name, this_mod_name,&
+                  'Symmetry routines implemented for MeshFileType = &
+                  & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
+                  'MeshFileType = '//trim(mesh_file_type))
+          end select
+!
+        end if
+      end if
 #endif
 
   case('revolution')
@@ -870,7 +858,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)
         call write_hdf5(i_airfoil_e,        'i_airfoil_e',        geo_loc)
         call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)
-        !call write_hdf5(curv_ac,            'curv_ac',            geo_loc)
         call write_hdf5('true',             'aero_table',         geo_loc)        
       else
         call write_hdf5('false',            'aero_table',         geo_loc)
@@ -962,14 +949,16 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
           if ( mesh_symmetry ) then
             select case (trim(mesh_file_type))
               case('cgns', 'basic', 'revolution' )  ! TODO: check basic
-                call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
+                !call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
 
               case('parametric','pointwise')
-                call symmetry_mesh_structured(ee, rr,  &
-                                              npoints_chord_tot , nelems_span , &
-                                              symmetry_point, symmetry_normal, rr_sym)
-                  nelems_span_tot = 2*nelems_span
 
+                  call symmetry_mesh_structured(ee, rr,  &
+                                                npoints_chord_tot , nelems_span , &
+                                                symmetry_point, symmetry_normal, rr_sym)
+                  nelems_span_tot = 2*nelems_span
+                  ! TODO: fix mesh symmetry-> the rr before symmetry take the normal coupling nod, 
+                  ! instead the rr_sym take the coupling nod symmetry  
               case default
                 call error(this_sub_name, this_mod_name,&
                           'Symmetry routines implemented for MeshFileType = &
@@ -1173,6 +1162,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call mirror_mesh_structured(ee, rr,  &
                                       npoints_chord_tot , nelems_span , &
                                       mirror_point, mirror_normal)
+        
 
       case default
         call error(this_sub_name, this_mod_name,&
@@ -1444,6 +1434,7 @@ subroutine symmetry_mesh_structured( ee, rr, &
       mabs  = abs( sum((rr(:,i1)-cent)*norm) ) ; imabs = i1
     end if
   end do
+
   m = sum( (rr(:,imabs) - cent) * norm )
   if ( m .gt. 0.0_wp ) then
     minmaxPn = sum( (rr(:,1)-cent)*norm )
@@ -1555,7 +1546,6 @@ subroutine symmetry_mesh_structured( ee, rr, &
   l = sum(cent * n)
 
   !now reflect the points
-! if ( ( .not. sew_first_sec ) .or. ( .not. sew_first_sec ) ) then ! only one sec to sew
   if ( ( .not. sew_last_sec ) ) then ! only one sec to sew
     do ip=1,np-npoints_chord_tot
       d = sum( rr(:,ip+npoints_chord_tot) * n) - l
@@ -1584,8 +1574,6 @@ subroutine symmetry_mesh_structured( ee, rr, &
 ! !move alloc back to the original vectors
   call move_alloc(rr_temp, rr)
   call move_alloc(ee_sort, ee)
-
-
 
   if ( allocated(ee_temp) )  deallocate(ee_temp)
 
