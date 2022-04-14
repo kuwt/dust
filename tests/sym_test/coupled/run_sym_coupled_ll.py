@@ -61,11 +61,11 @@ for i, run in enumerate(runs):
     errors[i,j] = err
 
 #delete all the produced files
-files = os.listdir('Output/')
+files = os.listdir('./dust/Output/')
 for file in files:
   if file.startswith('test'):
-    os.remove(os.path.join('Output/',file))
-os.remove('geo_input.h5')
+    os.remove(os.path.join('./dust/Output/',file))
+os.remove('./dust/geo_input.h5')
 
 #print the errors:
 print('Difference w.r.t. reference:')
