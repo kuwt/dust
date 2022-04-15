@@ -108,6 +108,12 @@ test_mirror_coupled_components:
 test_symmetry_coupled_components:
   stage: test
   script:  
+    - rm -rf build
+    - mkdir build && cd build
+    - cmake -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DWITH_PRECICE=YES ../
+    - make -j8
+    - echo "Build $CMAKE_BUILD_TYPE, USE_PRECICE=YES completed"
+    - cd ..
     - python tests/sym_test/coupled/run_sym_coupled_v.py -t $TOL
     - python tests/sym_test/coupled/run_sym_coupled_p.py -t $TOL
     - python tests/sym_test/coupled/run_sym_coupled_ll.py -t $TOL
