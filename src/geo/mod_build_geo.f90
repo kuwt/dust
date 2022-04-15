@@ -949,16 +949,14 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
           if ( mesh_symmetry ) then
             select case (trim(mesh_file_type))
               case('cgns', 'basic', 'revolution' )  ! TODO: check basic
-                !call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
-
+                call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
               case('parametric','pointwise')
-
-                  call symmetry_mesh_structured(ee, rr,  &
-                                                npoints_chord_tot , nelems_span , &
-                                                symmetry_point, symmetry_normal, rr_sym)
-                  nelems_span_tot = 2*nelems_span
-                  ! TODO: fix mesh symmetry-> the rr before symmetry take the normal coupling nod, 
-                  ! instead the rr_sym take the coupling nod symmetry  
+                call symmetry_mesh_structured(ee, rr,  &
+                                              npoints_chord_tot , nelems_span , &
+                                              symmetry_point, symmetry_normal, rr_sym)
+                nelems_span_tot = 2*nelems_span
+                ! TODO: fix mesh symmetry-> the rr before symmetry take the normal coupling nod, 
+                ! instead the rr_sym take the coupling nod symmetry  
               case default
                 call error(this_sub_name, this_mod_name,&
                           'Symmetry routines implemented for MeshFileType = &
@@ -1040,9 +1038,12 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)
 
         if ( mesh_symmetry ) then
-          rr(:,1:(size(rr,2)-size(rr_sym,2))) = matmul( transpose(coupling_node_rot), rr(:,1:size(rr,2)-size(rr_sym,2) ))
-          rr(:,size(rr,2)-size(rr_sym,2)+1:size(rr,2)) = matmul( transpose(coupling_node_rot_mir), rr_sym )
-        else
+        !  do i = 1,size(rr,2)
+        !    write(*,*) 'rr(:,i)', rr(:,i)
+        !  enddo
+        !  rr(:,1:(size(rr,2)-size(rr_sym,2))) = matmul( transpose(coupling_node_rot), rr(:,1:size(rr,2)-size(rr_sym,2) ))
+        !  rr(:,size(rr,2)-size(rr_sym,2)+1:size(rr,2)) = matmul( transpose(coupling_node_rot_mir), rr_sym )
+        !else
           rr = matmul( transpose(coupling_node_rot), rr )
         end if
       end if
@@ -1065,7 +1066,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)
         call write_hdf5(i_airfoil_e,        'i_airfoil_e',        geo_loc)
         call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)        
-        !call write_hdf5(curv_ac,            'curv_ac',            geo_loc)
         call write_hdf5('true',             'aero_table',         geo_loc)
       else
         call write_hdf5('false',            'aero_table',         geo_loc)
