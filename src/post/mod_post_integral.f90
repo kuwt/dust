@@ -131,7 +131,7 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
  character(len=max_char_len) :: ref_tag
  integer                     :: ref_id
  real(wp) :: F_ref(3) , F_bas(3) , F_bas1(3)
- real(wp) :: M_ref(3) , M_bas(3)
+ real(wp) :: M_ref(3) , M_bas(3), ac(3)
  real(wp) :: F_ave(3), M_ave(3)
  real(wp), allocatable :: force(:,:), moment(:,:)
  real(wp) :: P_inf , rho
@@ -264,9 +264,17 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
 
         F_bas = F_bas + F_bas1
 
-        M_bas = M_bas + cross( comps(ic)%el(ie)%cen    &
-                      - refs_off(:,ref_id) , F_bas1 )  &
-                      + comps(ic)%el(ie)%dmom   ! updated 2018-07-12
+        if (trim(comps(ic)%comp_el_type) .eq. 'l') then
+          ac = sum ( comps(ic)%el(ie)%ver(:,1:2),2 ) / 2.0_wp
+          M_bas = M_bas + cross( ac   &
+                        - refs_off(:,ref_id) , F_bas1 )  &
+                        + comps(ic)%el(ie)%dmom  
+        else
+          M_bas = M_bas + cross( comps(ic)%el(ie)%cen    &
+                        - refs_off(:,ref_id) , F_bas1 )  &
+                        + comps(ic)%el(ie)%dmom  
+        endif
+
 
       end do !ie
 
