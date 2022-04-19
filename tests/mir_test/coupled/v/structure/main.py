@@ -11,11 +11,12 @@ import tempfile
 from numpy import *
 import numpy as np
 # ===========================================================================
-exe_path = 'build/bin'
+
+exe_path = '../../../../../build/bin'
 exe_path = os.path.abspath(exe_path)
-pre    = exe_path + '/dust_pre'
-solver = exe_path + '/dust'
-post   = exe_path + '/dust_post'
+dust_pre    = exe_path + '/dust_pre'
+dust = exe_path + '/dust'
+dust_post   = exe_path + '/dust_post'
 
 #> MBDyn model parameters 
 nnodes = 1
@@ -64,9 +65,12 @@ path = tmpdir + '/mbdyn.sock'
 print(' path: ', path)
 os.environ['MBSOCK'] = path
 
-# launch coupled simulation
-
-dust = subprocess.run("cd ../dust && ./../../../../../build/bin/dust_pre && ./../../../../../build/bin/dust > " + dust_log + " &", shell=True)
+# ===========================================================================
+# launch DUST
+print('\033[0;33m ------------------------------------ \033[0m')
+print('\033[0;33m ◀ DUST prepocessor and DUST append ▶ \033[0m')
+print('\033[0;33m ------------------------------------ \033[0m')
+dust = subprocess.run("cd ../dust &&" + dust_pre + "> log_pre.log &&" + dust + ">" + dust_log + " &", shell=True)
 
 # set launch dust && MBDyn command
 str_mbdyn = 'mbdyn -f ' + mbdyn_file + ' -o ' + output_mbdyn + '/' + file_str + ' > ' + output_mbdyn + '/' + file_str + '.txt 2>&1 &'
