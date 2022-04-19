@@ -1005,7 +1005,12 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       ! compute velocity
       vel = 0.0_wp
       do j = 1,size(elems_ll)
-        call elems_ll(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)
+        if (ic .eq. 1) then
+          elems_ll(j)%p%mag = elems_ll(j)%p%Gamma_old
+          call elems_ll(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)
+        else
+          call elems_ll(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)
+        endif
         vel = vel + v
       enddo
 
@@ -1014,7 +1019,6 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
       ! overall relative velocity computed in the centre of the ll elem
       wind = variable_wind(el%cen,sim_param%time)
-
       vel = vel/(4.0_wp*pi) + wind - el%ub + vel_w(:,i_l)
         
       ! "effective" velocity = proj. of vel in the n-t plane
