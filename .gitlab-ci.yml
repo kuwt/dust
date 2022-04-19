@@ -100,7 +100,7 @@ test_mirror_coupled_components:
   script:  
     - python tests/mir_test/coupled/run_mir_coupled_v.py -t $TOL
     - python tests/mir_test/coupled/run_mir_coupled_p.py -t $TOL
-    #- python tests/mir_test/coupled/run_mir_coupled_ll.py -t $TOL
+    - python tests/mir_test/coupled/run_mir_coupled_ll.py -t $TOL
   needs: 
     - "build_dust_coupled" 
     - "test_mirror_static_components"
@@ -110,7 +110,7 @@ test_symmetry_coupled_components:
   script:  
     - python tests/sym_test/coupled/run_sym_coupled_v.py -t $TOL
     - python tests/sym_test/coupled/run_sym_coupled_p.py -t $TOL
-    #- python tests/sym_test/coupled/run_sym_coupled_ll.py -t $TOL
+    - python tests/sym_test/coupled/run_sym_coupled_ll.py -t $TOL
   needs: 
     - "build_dust_coupled" 
     - "test_symmetry_static_components"
