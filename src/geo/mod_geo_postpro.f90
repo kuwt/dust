@@ -440,7 +440,13 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         allocate( comps(i_comp)%hinge(ih)%act%rr( 3,comps(i_comp)%hinge(ih)%n_nodes ) )
         
         comps(i_comp)%hinge(ih)%act%rr = comps(i_comp)%hinge(ih)%ref%rr
- 
+#if USE_PRECICE
+        coupling_node_rot = comps(i_comp)%coupling_node_rot
+#else
+        coupling_node_rot(1,:) = (/ 1._wp, 0._wp, 0._wp/)
+        coupling_node_rot(2,:) = (/ 0._wp, 1._wp, 0._wp/)
+        coupling_node_rot(3,:) = (/ 0._wp, 0._wp, 1._wp/)
+#endif
         call comps(i_comp)%hinge(ih)%build_connectivity( rr, coupling_node_rot)
 
       end do
