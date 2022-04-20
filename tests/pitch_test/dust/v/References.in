@@ -20,15 +20,9 @@ Motion = {
  }
  Rotation   = {
  Input      = position
- Input_Type = simple_function         !
- Function   =  1                      ! 0:uniform,1:sin 
- !File       = rot.in                 ! File = xxx.dat (nt,2)
+ Input_Type = from_file         !
+ File       = sine.dat                 ! File = xxx.dat (nt,2)
  Axis       = (/ 0.0 , 1.0 , 0.0 /)   
- Amplitude  = 0.174532925199433                  
- Omega      = 6.283185307179586                   
- Phase      = 0.0                     
- Offset     = 0.0                     
- !Psi_0      = 0.0                    ! Initial position: needed if the input is velocity
  }
 }
 

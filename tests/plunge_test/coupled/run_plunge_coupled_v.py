@@ -24,14 +24,14 @@ post   = exe_path + '/dust_post'
 tol = args.tolerance
 
 pwd = os.getcwd()
-sets_descr = ['Pitch wing, coupled']
+sets_descr = ['Plunge wing, coupled']
 
 #run the first set of simulations, set a
-os.chdir("./tests/pitch_test/coupled/v")
+os.chdir("./tests/plunge_test/coupled/v")
 
 pre_ret = sbprc.call('./run.sh')
 runs = ['dust.in']
-descr = ['Pitch coupled vortex lattice']
+descr = ['plunge coupled vortex lattice']
 runs_names = ['mirror coupled vortex lattice']
 sol_dsets = ['/ParticleWake/WakePoints', '/ParticleWake/WakeVort', 
       '/Components/Comp001/Solution/Vort', '/Components/Comp001/Solution/Pres']

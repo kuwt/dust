@@ -6,7 +6,6 @@ import argparse
 import os
 import math as mth
 import h5py
-import subprocess
 
 pars = argparse.ArgumentParser()
 pars.add_argument('-t','--tolerance', nargs='?', help='tolerance for the test',
@@ -24,15 +23,14 @@ post   = exe_path + '/dust_post'
 tol = args.tolerance
 
 pwd = os.getcwd()
-sets_descr = ['Pitch wing, coupled']
+sets_descr = ['Basic wing with mirror']
 
 #run the first set of simulations, set a
-os.chdir("./tests/pitch_test/coupled/v")
-
-pre_ret = sbprc.call('./run.sh')
+os.chdir("./tests/plunge_test/dust/v")
+pre_ret = sbprc.call([pre])
 runs = ['dust.in']
-descr = ['Pitch coupled vortex lattice']
-runs_names = ['mirror coupled vortex lattice']
+descr = ['plunge dust vortex lattice']
+runs_names = ['plunge dust vortex lattice']
 sol_dsets = ['/ParticleWake/WakePoints', '/ParticleWake/WakeVort', 
       '/Components/Comp001/Solution/Vort', '/Components/Comp001/Solution/Pres']
 
@@ -46,8 +44,8 @@ for i, run in enumerate(runs):
   ref_name = 'ref'
   check_name = 'test'
   suffix = '.h5'
-  folder_ref = './../../dust/v/Output/'
-  folder_test = './dust/Output/'
+  folder_ref = './Output/'
+  folder_test = './Output/'
   res = '_res_0011'
 
   ref_filename = folder_ref + ref_name + res + suffix
@@ -61,11 +59,11 @@ for i, run in enumerate(runs):
     errors[i,j] = err
 
 #delete all the produced files
-files = os.listdir('dust/Output/')
+files = os.listdir('Output/')
 for file in files:
   if file.startswith('test'):
-    os.remove(os.path.join('dust/Output/',file))
-os.remove('dust/geo_input.h5')
+    os.remove(os.path.join('Output/',file))
+os.remove('geo_input.h5')
 
 #print the errors:
 print('Difference w.r.t. reference:')

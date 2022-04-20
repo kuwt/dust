@@ -69,7 +69,7 @@
     <!-- === Coupling scheme ================================ -->
     <coupling-scheme:serial-implicit>
       <participants first="MBDyn" second="dust" />
-      <max-time value="1.0" />
+      <max-time value="1.1" />
       <time-window-size value="-1" valid-digits="10" method="first-participant" />
       <exchange data="Position"        from="MBDyn" mesh="MBDynNodes" to="dust" />
       <exchange data="Rotation"        from="MBDyn" mesh="MBDynNodes" to="dust" />
