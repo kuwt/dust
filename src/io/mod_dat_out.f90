@@ -56,7 +56,7 @@ use mod_handling, only: &
 !---------------------------------------------------------------------
 implicit none
 
-public :: dat_out_probes_header , dat_out_loads_header , dat_out_aa_header, &
+public :: dat_out_probes_header, dat_out_loads_header, dat_out_hinge_header,  dat_out_aa_header, &
           dat_out_sectional, dat_out_sectional_ll, dat_out_sectional_vl, dat_out_aa
 
 private
@@ -102,6 +102,39 @@ subroutine dat_out_loads_header ( fid , comps_meas , ref_sys , average)
   endif
 
 end subroutine dat_out_loads_header
+
+subroutine dat_out_hinge_header ( fid , comps_meas , hinge_tag , average)
+  integer , intent(in)          :: fid
+  character(len=*), intent(in)  :: comps_meas(:)
+  character(len=*), intent(in)  :: hinge_tag
+  logical, intent(in)           :: average
+
+  character(len=max_char_len)   :: istr
+  integer :: n_comps , ic
+
+  n_comps = size(comps_meas)
+
+  write(istr,'(I0)') n_comps
+  write(fid,*) '# Hinge Moment: N.components: ' , trim(istr)
+  write(fid,*) '#             Hinge_tag     : ' , trim(hinge_tag)
+  
+  !> three-dimensional space
+  write(fid,'(A)',advance='no') ' #                 Components  : '
+  
+  do ic = 1 , n_comps - 1
+    write(fid,'(A)',advance='no') trim(comps_meas(ic))//' , '
+  end do
+
+  write(fid,'(A)') trim(comps_meas(n_comps))
+  
+  if (.not. average)  then
+    write(fid,*) '#  t , M_h , ref_mat(9) , ref_off(3) '
+  else
+    write(fid,*) '# M_h_ave,&
+                  & ref_mat(9) , ref_off(3) '
+  endif
+
+end subroutine dat_out_hinge_header
 
 !---------------------------------------------------------------------
 

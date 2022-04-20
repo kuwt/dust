@@ -142,7 +142,7 @@ use mod_post_flowfield, only: &
   post_flowfield
 
 use mod_post_integral, only: &
-  post_integral
+  post_integral, post_hinge_moment
 
 use mod_post_sectional, only: &
   post_sectional
@@ -163,7 +163,7 @@ integer                                   :: n_analyses, ia
 character(len=max_char_len)               :: basename, data_basename
 character(len=max_char_len)               :: an_name, an_type
 integer                                   :: an_start, an_end, an_step
-integer                                   :: n_comp, i_comp
+integer                                   :: n_comp, i_comp, n_hinge
 character(len=max_char_len), allocatable  :: components_names(:)
 character(len=max_char_len), allocatable  :: var_names(:)
 character(len=max_char_len)               :: lowstr
@@ -214,6 +214,8 @@ call sbprms%CreateLogicalOption('SeparateWake', 'Output the wake in a separate &
 call sbprms%CreateStringOption('Format','Output format')
 call sbprms%CreateStringOption('Component','Component to analyse', &
                               multiple=.true.)
+call sbprms%CreateStringOption('Hinge_Tag','Hinge to analyse', &
+                              multiple=.true.)                              
 call sbprms%CreateStringOption('Variable','Variables to be saved: velocity, pressure or&
                               & vorticity', multiple=.true.)
 
@@ -306,6 +308,8 @@ do ia = 1,n_analyses
   !> Check if we are analysing all the components or just some
   all_comp = .false.
   n_comp = countoption(sbprms, 'Component')
+  n_hinge = countoption(sbprms, 'Hinge_Tag')
+
   if (n_comp .eq. 0)  then
     all_comp = .true.
   else
@@ -328,6 +332,12 @@ do ia = 1,n_analyses
     case('integral_loads')
       call post_integral( sbprms , basename , data_basename , an_name , ia , &
                           out_frmt , components_names , all_comp , &
+                          an_start , an_end , an_step, average )
+
+    !> Hinge Moment
+    case('hinge_moment')
+      call post_hinge_moment( sbprms , basename , data_basename , an_name , ia , &
+                          out_frmt , components_names , all_comp ,  &
                           an_start , an_end , an_step, average )
 
     !> Visualizations

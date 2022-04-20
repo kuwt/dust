@@ -408,13 +408,13 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
 
         !> read input and fill component%hinge fields
         call read_hdf5( comps(i_comp)%hinge(ih)%nodes_input, &
-                                                         'Nodes_Input', hiloc)
+                                              'Nodes_Input', hiloc)
         call read_hdf5( comps(i_comp)%hinge(ih)%offset, &
-                                                         'Offset', hiloc)
+                                              'Offset', hiloc)
         call read_hdf5( comps(i_comp)%hinge(ih)%span_blending, &
                                               'Spanwise_Blending', hiloc)
         call read_hdf5( comps(i_comp)%hinge(ih)%ref_dir, &
-                                                        'Ref_Dir', hiloc)
+                                              'Ref_Dir', hiloc)
         call read_hdf5_al( comps(i_comp)%hinge(ih)%ref%rr, 'rr', hiloc)
         comps(i_comp)%hinge(ih)%n_nodes = size( &
            comps(i_comp)%hinge(ih)%ref%rr, 2)
@@ -448,6 +448,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         coupling_node_rot(3,:) = (/ 0._wp, 0._wp, 1._wp/)
 #endif
         call comps(i_comp)%hinge(ih)%build_connectivity( rr, coupling_node_rot)
+        call comps(i_comp)%hinge(ih)%build_connectivity_cen( rr, ee, coupling_node_rot)
 
       end do
 
