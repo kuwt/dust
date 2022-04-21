@@ -219,8 +219,8 @@ type :: t_hinge
   !> Connectivity between hinge nodes and non-rotating structural nodes,
   ! read from mbdyn through preCICE
   type(t_hinge_conn) :: hin
-  
-  type(t_hinge_input) :: tag 
+
+  character(len=max_char_len) ::  tag 
   !> Interpolated rotation vector of the hinge nodes, attached to the non-
   ! rotating part of the component
   real(wp), allocatable :: hin_rot(:,:)

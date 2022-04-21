@@ -61,12 +61,12 @@ use mod_parse, only: &
   countoption
 
 use mod_hdf5_io, only: &
-   h5loc, &
-   open_hdf5_file, &
-   close_hdf5_file, &
-   open_hdf5_group, &
-   close_hdf5_group, &
-   read_hdf5
+  h5loc, &
+  open_hdf5_file, &
+  close_hdf5_file, &
+  open_hdf5_group, &
+  close_hdf5_group, &
+  read_hdf5
 
 use mod_stringtools, only: &
   LowCase, isInList, stricmp
@@ -106,39 +106,37 @@ contains
 subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
                           out_frmt, components_names, all_comp , &
                           an_start, an_end, an_step, average )
-  type(t_parse), pointer :: sbprms
-  character(len=*) , intent(in) :: basename
-  character(len=*) , intent(in) :: data_basename
-  character(len=*) , intent(in) :: an_name
-  integer          , intent(in) :: ia
-  character(len=*) , intent(in) :: out_frmt
+  type(t_parse), pointer                                   :: sbprms
+  character(len=*), intent(in)                             :: basename
+  character(len=*), intent(in)                             :: data_basename
+  character(len=*), intent(in)                             :: an_name
+  integer, intent(in)                                      :: ia
+  character(len=*), intent(in)                             :: out_frmt
   character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
-  logical , intent(in) :: all_comp
-  integer , intent(in) :: an_start , an_end , an_step
-  logical , intent(in) :: average
+  logical, intent(in)                                      :: all_comp
+  integer, intent(in)                                      :: an_start , an_end , an_step
+  logical, intent(in)                                      :: average
 
+  type(t_geo_component), allocatable                       :: comps(:)
+  integer(h5loc)                                           :: floc , ploc
+  real(wp), allocatable                                    :: points(:,:)
+  integer                                                  :: nelem
 
-  type(t_geo_component), allocatable :: comps(:)
-  integer(h5loc) :: floc , ploc
-  real(wp), allocatable :: points(:,:)
-  integer :: nelem
-
-  character(len=max_char_len) :: filename
-  character(len=max_char_len) , allocatable :: refs_tag(:)
-  real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
-  real(wp), allocatable :: refs_G(:,:,:), refs_f(:,:)
-  real(wp), allocatable :: vort(:), cp(:)
-  character(len=max_char_len) :: ref_tag
-  integer                     :: ref_id
-  real(wp) :: F_ref(3) , F_bas(3) , F_bas1(3)
-  real(wp) :: M_ref(3) , M_bas(3), ac(3)
-  real(wp) :: F_ave(3), M_ave(3)
-  real(wp), allocatable :: force(:,:), moment(:,:)
-  real(wp) :: P_inf , rho
-  integer :: ic , it , ie , ierr , ires , fid_out , nstep
-  real(wp), allocatable :: time(:)
-  real(wp) :: t
-
+  character(len=max_char_len)                              :: filename
+  character(len=max_char_len), allocatable                 :: refs_tag(:)
+  real(wp), allocatable                                    :: refs_R(:,:,:), refs_off(:,:)
+  real(wp), allocatable                                    :: refs_G(:,:,:), refs_f(:,:)
+  real(wp), allocatable                                    :: vort(:), cp(:)
+  character(len=max_char_len)                              :: ref_tag
+  integer                                                  :: ref_id
+  real(wp)                                                 :: F_ref(3), F_bas(3), F_bas1(3)
+  real(wp)                                                 :: M_ref(3), M_bas(3), ac(3)
+  real(wp)                                                 :: F_ave(3), M_ave(3)
+  real(wp), allocatable                                    :: force(:,:), moment(:,:)
+  real(wp)                                                 :: P_inf , rho
+  integer                                                  :: ic , it , ie , ierr , ires , fid_out , nstep
+  real(wp), allocatable                                    :: time(:)
+  real(wp)                                                 :: t
 
   character(len=*), parameter :: this_sub_name = 'post_integral'
 
@@ -162,10 +160,6 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
   call load_components_postpro(comps, points, nelem, floc, &
                                 components_names,  all_comp)
   call close_hdf5_file(floc)
-
-! ! Check if the desired components really exist
-! write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',an_start,'.h5'
-! call check_if_components_exist ( components_names , filename )
 
   ! Prepare_geometry_postpro
   call prepare_geometry_postpro(comps)
@@ -298,7 +292,6 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
         write(fid_out,'(9'//ascii_real//')',advance='no') refs_R(:,:, ref_id)
         write(fid_out,'(3'//ascii_real//')',advance='no') refs_off(:, ref_id)
         write(fid_out,'(A)',advance='no') nl
-      !write(fid_out,*) ' '
 
       case('tecplot')
         time(ires) = t
@@ -333,7 +326,6 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
 
   end select
 
-
   !TODO: move deallocate(comps) outside this routine,
   !      because it is common to all the analyses
   call destroy_elements(comps)
@@ -347,48 +339,42 @@ end subroutine post_integral
 ! ----------------------------------------------------------------------
 
 subroutine post_hinge_moment( sbprms, basename, data_basename, an_name , ia , &
-  out_frmt, components_names, all_comp , &
-  an_start, an_end, an_step, average )
-  type(t_parse), pointer :: sbprms
-  character(len=*) , intent(in) :: basename
-  character(len=*) , intent(in) :: data_basename
-  character(len=*) , intent(in) :: an_name
-  integer          , intent(in) :: ia
-  character(len=*) , intent(in) :: out_frmt
-  character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
-  character(len=max_char_len), allocatable :: hinge_tag_available(:) !from comp%hinge 
-  logical , intent(in) :: all_comp
-  integer , intent(in) :: an_start , an_end , an_step
-  logical , intent(in) :: average
-  character(len=max_char_len)  :: hinge_str
-  character(len=2)             :: hinge_id_hdf5
-  integer                                           :: n_comp, i_comp, n_comp_tot 
-  character(len=max_char_len)                       :: cname 
+                            out_frmt, components_names, all_comp , hinge_tag, all_hinge, &
+                            an_start, an_end, an_step, average )
+  type(t_parse), pointer                                    :: sbprms
+  character(len=*), intent(in)                              :: basename
+  character(len=*), intent(in)                              :: data_basename
+  character(len=*), intent(in)                              :: an_name
+  integer, intent(in)                                       :: ia
+  character(len=*), intent(in)                              :: out_frmt
+  character(len=max_char_len), allocatable , intent(inout)  :: components_names(:)
+  character(len=max_char_len), allocatable, intent(inout)   :: hinge_tag(:) 
+  logical, intent(in)                                       :: all_comp, all_hinge 
+  integer, intent(in)                                       :: an_start , an_end , an_step
+  logical, intent(in)                                       :: average
+  
+  integer                                                   :: i_comp 
+  type(t_geo_component), allocatable                        :: comps(:)
+  integer(h5loc)                                            :: floc, ploc
+  real(wp), allocatable                                     :: points(:,:)
+  integer                                                   :: nelem, i_hinge
+  character(len=max_char_len)                               :: filename
+  character(len=max_char_len), allocatable                  :: refs_tag(:)
+  real(wp), allocatable                                     :: refs_R(:,:,:), refs_off(:,:)
+  real(wp), allocatable                                     :: refs_G(:,:,:), refs_f(:,:)
+  real(wp), allocatable                                     :: vort(:), cp(:)
+  character(len=max_char_len)                               :: ref_tag
+  real(wp)                                                  :: F_ref(3), F_bas(3), F_bas1(3)
+  real(wp)                                                  :: M_ref(3), M_bas(3)
+  real(wp)                                                  :: M_ave(3), F_ave(3) 
+  real(wp), allocatable                                     :: force(:,:), moment(:,:)
+  real(wp)                                                  :: hinge_R(3,3) = 0.0_wp 
+  real(wp)                                                  :: P_inf , rho
+  integer                                                   :: ic , it , ie , ierr , ires , fid_out , nstep
+  real(wp), allocatable                                     :: time(:)
+  real(wp)                                                  :: t
 
-  type(t_geo_component), allocatable :: comps(:)
-  integer(h5loc) :: floc, ploc, gloc, comp_loc, hinge_loc, hinge_i_loc
-  real(wp), allocatable :: points(:,:)
-  integer :: nelem, n_hinge
-
-  character(len=max_char_len), allocatable :: hinge_tag(:) !from dust_post
-  character(len=max_char_len) :: filename
-  character(len=max_char_len) , allocatable :: refs_tag(:)
-  real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
-  real(wp), allocatable :: refs_G(:,:,:), refs_f(:,:)
-  real(wp), allocatable :: vort(:), cp(:)
-  character(len=max_char_len) :: ref_tag, tag
-  integer                     :: hinge_id, ref_id
-  real(wp) :: F_ref(3) , F_bas(3) , F_bas1(3)
-  real(wp) :: M_ref(3) , M_bas(3), ac(3)
-  real(wp) :: F_ave(3), M_ave(3)
-  real(wp), allocatable :: force(:,:), moment(:,:)
-  real(wp) :: P_inf , rho
-  integer :: ic , it , ie , ierr , ires , fid_out , nstep
-  real(wp), allocatable :: time(:)
-  real(wp) :: t
-
-
-  character(len=*), parameter :: this_sub_name = 'post_hinge_moment'
+  character(len=*), parameter                               :: this_sub_name = 'post_hinge_moment'
 
   write(msg,'(A,I0,A)') nl//'++++++++++ Analysis: ',ia,' hinge moment'//nl
   call printout(trim(msg))
@@ -406,207 +392,181 @@ subroutine post_hinge_moment( sbprms, basename, data_basename, an_name , ia , &
 
   ! load the geo components just once just once
   call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
+  
   !TODO: here get the run id
   call load_components_postpro(comps, points, nelem, floc, &
         components_names,  all_comp)
 
-  call open_hdf5_group(floc,'Components',gloc)
-  call read_hdf5(n_comp_tot,'NComponents',gloc)
-  write(cname,'(A,I3.3)') 'Comp', 1
-  call open_hdf5_group(gloc, trim(cname), comp_loc)
-  call open_hdf5_group(comp_loc, 'Hinges', hinge_loc) 
-  call read_hdf5(n_hinge, 'n_hinges', hinge_loc)
-  do ic = 1, n_hinge
-    write(hinge_id_hdf5,'(I2.2)') ic
-    hinge_str = 'Hinge_'//hinge_id_hdf5
-
-    call open_hdf5_group(hinge_loc, trim(hinge_str), hinge_i_loc)
-    call read_hdf5(tag, 'tag', hinge_i_loc)
-    
-  end do 
-  call close_hdf5_group(hinge_i_loc)
-  call close_hdf5_group(hinge_loc)
-  call close_hdf5_group(comp_loc)
-  call close_hdf5_group(gloc)
-  
-  call close_hdf5_file(floc)
-  
-
-
   ! Prepare_geometry_postpro
   call prepare_geometry_postpro(comps)
+
+  ! Reference system where the loads are projected:
+  !  read the input and check if it exist
+  ref_tag = '0'
+
+  write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_', an_start,'.h5'
+  call open_hdf5_file(trim(filename),floc)
+  call load_refs(floc,refs_R,refs_off,refs_G,refs_f,refs_tag)
+  call close_hdf5_file(floc)
+
+  ! Hinge tag where the hinge moment is calculated:
+  !  read the input and check if it exist
+  nstep = (an_end-an_start)/an_step + 1
+  ! Output format
+  do i_comp = 1, size(components_names)
+    do i_hinge = 1, size(hinge_tag)
+      select case(trim(out_frmt))
+
+      case('dat')
+        ! Open output .dat file
+        call new_file_unit(fid_out, ierr)
+        write(filename,'(A)') trim(basename)//'_'//trim(an_name)// & 
+                              '_'//trim(components_names(i_comp))//'_'//& 
+                              trim(hinge_tag(i_hinge))//'.dat'
+
+        open(unit=fid_out,file=trim(filename))
+        call dat_out_hinge_header( fid_out , components_names(i_comp) , hinge_tag(i_hinge), average )
+
+      case('tecplot')
+        if (.not. average) then
+          allocate(force(3,nstep), moment(3,nstep), time(nstep))
+        else
+          call error(this_sub_name, this_mod_name, 'Cannot output in tecplot format&
+          & when averaging the results')
+        endif
+
+      case default
+        call error('dust_post','','Unknown format '//trim(out_frmt)//&
+        ' for integral_loads analysis. Choose dat or tecplot.')
+
+      end select
+    enddo
+  enddo 
+! 
+  ires = 0
+  if(average) then
+    M_ave = 0.0_wp
+    F_ave = 0.0_wp
+  endif
+
+  do it=an_start, an_end, an_step ! Time loop
+
+    ires = ires + 1
+    !> Open the file:
+    write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
+
+    call open_hdf5_file(trim(filename),floc)
+
+    ! Load u_inf --------------------------------
+    call open_hdf5_group(floc,'Parameters',ploc)
+    call read_hdf5(P_inf,'P_inf',ploc)
+    call read_hdf5(rho,'rho_inf',ploc)
+    call close_hdf5_group(ploc)
+
+    ! Load the references and move the points ---
+    ! Move the points ---------------------------
+    call update_points_postpro(comps, points, refs_R, refs_off, &
+                                filen = trim(filename) )
+    ! Load the results --------------------------
+    call load_res(floc, comps, vort, cp, t)
   
-  !! Hinge tag where the hinge moment is calculated:
-  !!  read the input and check if it exist
-  !hinge_tag = getstr(sbprms,'Hinge_Tag')
-!
-  !write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',an_start,'.h5'
-  !call open_hdf5_file(trim(filename),floc)
-  !call load_refs(floc,refs_R,refs_off,refs_G,refs_f,refs_tag)
-  !call close_hdf5_file(floc)
-!
-  !hinge_id = -333  ! check input    
-  !do it = lbound(hinge_tag,1) , ubound(hinge_tag,1)
-  !  if ( stricmp(hinge_tag(it),  hinge_tag_available) ) hinge_id = it
-  !end do
-!
-  !if ( hinge_id .eq. -333 ) then
-  !  call warning(this_sub_name, this_mod_name, 'Unknown hinge tag &
-  !      &requested for the analysis, these are the valid hinge tag: ')
-  !  call printout('   Available hinge tag: ')
-  !
-  !  do it = lbound(hinge_tag,1) , ubound(hinge_tag,1)
-  !    write(msg,*) ' ref_id : ' , it , ' hinge_tag ' , trim(hinge_tag_available(it))
-  !    call printout(trim(msg))
-  !  end do  enddo
-!
-  !  call warning(this_sub_name, this_mod_name, 'Analysis skipped')
-  !  return ! jump this analysis if the reference frame is not available
-  !
-  !end if
-  !
-  !nstep = (an_end-an_start)/an_step + 1
-  !! Output format
-  !select case(trim(out_frmt))
-!
-  !case('dat')
-  !! Open output .dat file
-  !call new_file_unit(fid_out, ierr)
-  !write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.dat'
-  !open(unit=fid_out,file=trim(filename))
-  !call dat_out_hinge_header( fid_out , components_names , hinge_tag, average )
-!
-  !case('tecplot')
-  !if (.not. average) then
-  !  allocate(force(3,nstep), moment(3,nstep), time(nstep))
-  !else
-  !  call error(this_sub_name, this_mod_name, 'Cannot output in tecplot format&
-  !  & when averaging the results')
-  !endif
-!
-  !case default
-  !call error('dust_post','','Unknown format '//trim(out_frmt)//&
-  !' for integral_loads analysis. Choose dat or tecplot.')
-!
-  !end select
-!
-  !ires = 0
-  !if(average) then
-  !  F_ave = 0.0_wp; M_ave = 0.0_wp
-  !endif
-!
-  !do it=an_start, an_end, an_step ! Time loop
-  !  write(*,*) 'caio' 
-  !  ires = ires+1
-!
-  !  ! Open the file:
-  !  write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
-!
-  !  call open_hdf5_file(trim(filename),floc)
-!
-  !  ! Load u_inf --------------------------------
-  !  call open_hdf5_group(floc,'Parameters',ploc)
-  !  call read_hdf5(P_inf,'P_inf',ploc)
-  !  call read_hdf5(rho,'rho_inf',ploc)
-  !  call close_hdf5_group(ploc)
-!
-  !  ! Load the references and move the points ---
-  !  call load_refs(floc,refs_R,refs_off)
-  !  ! Move the points ---------------------------
-  !  call update_points_postpro(comps, points, refs_R, refs_off, &
-  !                              filen = trim(filename) )
-  !  ! Load the results --------------------------
-  !  call load_res(floc, comps, vort, cp, t)
-  !  write(*,*) 'comps(1)%hinge(1)%act%rr', comps(1)%hinge(1)%act%rr ! asse cerniera 
-  !  do ic = 1, size(comps(1)%hinge(1)%rot_cen%node_id,1)
-  !    write(*,*) 'ic comps(1)%hinge(1)%rot_cen%node_id(ic)', comps(1)%hinge(1)%rot_cen%node_id(ic)
-  !    write(*,*) comps(1)%el(comps(1)%hinge(1)%rot_cen%node_id(ic))%dforce
-  !  end do  
-  !  call close_hdf5_file(floc)
-!
-!
-!
-  !  ! Initialise integral loads in the desired ref.frame
-  !  F_ref = 0.0_wp ; M_ref = 0.0_wp
-!
-  !  ! Update the overall load with the comtribution from all the components
-  !  do ic = 1 , size(comps)
-!
-  !    ! Initialise integral loads in the local ref.frame
-  !    F_bas = 0.0_wp ; M_bas = 0.0_wp
-!
-  !    ! Loads from the ic-th component in the base ref.frame
-  !    do ie = 1 , size(comps(ic)%el)
-  !      F_bas1 = comps(ic)%el(ie)%dforce
-  !      F_bas = F_bas + F_bas1
-  !      if (trim(comps(ic)%comp_el_type) .eq. 'l') then
-  !        ac = sum ( comps(ic)%el(ie)%ver(:,1:2),2 ) / 2.0_wp
-  !        M_bas = M_bas + cross( ac   &
-  !                            - refs_off(:,ref_id) , F_bas1 )  &
-  !                            + comps(ic)%el(ie)%dmom  
-  !      else
-  !        M_bas = M_bas + cross( comps(ic)%el(ie)%cen    &
-  !                        - refs_off(:,ref_id) , F_bas1 )  &
-  !                        + comps(ic)%el(ie)%dmom  
-  !      endif
-!
-  !    end do !ie
-!
-  !    ! From the base ref.sys to the chosen ref.sys (offset and rotation)
-  !    F_ref = F_ref + matmul( &
-  !    transpose( refs_R(:,:, ref_id) ) , F_bas )
-  !    M_ref = M_ref + matmul( &
-  !    transpose( refs_R(:,:, ref_id) ) , M_bas )
-!
-  !  end do !ic
-!
-  !  if(.not. average) then
-  !  ! Update output dat file / update output arrays for tecplot
-  !    select case(trim(out_frmt))
-  !    case ('dat')
-  !      write(fid_out, '('//ascii_real//')',advance='no') t
-  !      write(fid_out,'(3'//ascii_real//')',advance='no') F_ref
-  !      write(fid_out,'(3'//ascii_real//')',advance='no') M_ref
-  !      write(fid_out,'(9'//ascii_real//')',advance='no') refs_R(:,:, ref_id)
-  !      write(fid_out,'(3'//ascii_real//')',advance='no') refs_off(:, ref_id)
-  !      write(fid_out,'(A)',advance='no') nl
-  !    end select
-  !  else
-  !    F_ave = F_ave*(real(ires-1,wp)/real(ires,wp)) + F_ref/real(ires,wp)
-  !    M_ave = M_ave*(real(ires-1,wp)/real(ires,wp)) + M_ref/real(ires,wp)
-  !  endif
-!
-  !end do ! Time loop
-!
-  !! Close dat file / write tec file
-  !select case(trim(out_frmt))
-!
-  !case('dat')
-  !  if(.not. average) then
-  !    close(fid_out)
-  !  else
-  !    write(fid_out,'(3'//ascii_real//')' ,advance='no') F_ave
-  !    write(fid_out,'(3'//ascii_real//')' ,advance='no') M_ave
-  !    write(fid_out,'(9'//ascii_real//')',advance='no') refs_R(:,:, ref_id)
-  !    write(fid_out,'(3'//ascii_real//')',advance='no') refs_off(:, ref_id)
-  !  endif
-!
-  !case('tecplot')
-  !  write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt'
-  !  call tec_out_loads(filename, time, force, moment)
-  !  deallocate(time, force, moment)
-!
-  !end select
-!
-!
-  !!TODO: move deallocate(comps) outside this routine,
-  !!      because it is common to all the analyses
-  !call destroy_elements(comps)
-  !deallocate(comps,components_names)
-!
-  !write(msg,'(A,I0,A)') nl//'++++++++++ Hinge moment done'//nl
-  !call printout(trim(msg))
-!
+    call close_hdf5_file(floc)
+
+    !> Initialise integral loads in the desired ref.frame
+    F_ref = 0.0_wp ; M_ref = 0.0_wp
+
+    !> Update the overall load with the comtribution from all the components
+    do ic = 1 , size(comps)
+      do i_hinge = 1, size(comps(ic)%hinge)
+
+        !> Initialise integral loads in the local ref.frame
+        F_bas = 0.0_wp ; M_bas = 0.0_wp
+        !> Loads from the ic-th component in the base ref.frame for the rotated reagion 
+        do ie = 1 , size(comps(ic)%hinge(i_hinge)%rot_cen%node_id, 1)
+          F_bas1 =  comps(ic)%el(comps(ic)%hinge(i_hinge)%rot_cen%node_id(ie))%dforce 
+          F_bas = F_bas + F_bas1
+          M_bas = M_bas + cross( comps(ic)%el(comps(ic)%hinge(i_hinge)%rot_cen%node_id(ie))%cen &
+                          - comps(ic)%hinge(i_hinge)%act%rr(:,1) , F_bas1 )  &
+                          + comps(ic)%el(comps(ic)%hinge(i_hinge)%rot_cen%node_id(ie))%dmom  
+        end do 
+
+        !!> Loads from the ic-th component in the base ref.frame for the blending reagion 
+        do ie = 1 , size(comps(ic)%hinge(i_hinge)%blen_cen%node_id, 1)
+          F_bas1 =  comps(ic)%el(comps(ic)%hinge(i_hinge)%blen_cen%node_id(ie))%dforce 
+          F_bas = F_bas + F_bas1
+          M_bas = M_bas + cross( comps(ic)%el(comps(ic)%hinge(i_hinge)%blen_cen%node_id(ie))%cen &
+                          - comps(ic)%hinge(i_hinge)%act%rr(:,1) , F_bas1 )  &
+                          + comps(ic)%el(comps(ic)%hinge(i_hinge)%blen_cen%node_id(ie))%dmom  
+        end do 
+
+        !> From the base ref.sys to the chosen ref.sys (offset and rotation)
+        
+        hinge_R(1,:) = comps(ic)%hinge(i_hinge)%act%v(:,1)
+        hinge_R(2,:) = comps(ic)%hinge(i_hinge)%act%h(:,1)
+        hinge_R(3,:) = comps(ic)%hinge(i_hinge)%act%n(:,1)
+        F_ref = F_ref + matmul( &
+              transpose(hinge_R) , F_bas )
+        M_ref = M_ref + matmul( &
+              transpose(hinge_R) , M_bas )
+
+        if(.not. average) then
+        ! Update output dat file / update output arrays for tecplot
+          select case(trim(out_frmt))
+          case ('dat')
+            write(fid_out, '('//ascii_real//')',advance='no') t
+            write(fid_out,'(3'//ascii_real//')',advance='no') F_ref
+            write(fid_out,'(3'//ascii_real//')',advance='no') M_ref
+            write(fid_out,'(9'//ascii_real//')',advance='no') hinge_R
+            write(fid_out,'(3'//ascii_real//')',advance='no') comps(ic)%hinge(i_hinge)%act%rr(:,1) 
+            write(fid_out,'(A)',advance='no') nl
+          case('tecplot')
+            time(ires) = t
+            force(:,ires) = F_ref
+            moment(:,ires) = M_ref
+          end select
+        else
+          F_ave = F_ave*(real(ires-1,wp)/real(ires,wp)) + F_ref/real(ires,wp)
+          M_ave = M_ave*(real(ires-1,wp)/real(ires,wp)) + M_ref/real(ires,wp)
+        endif
+
+      enddo 
+    enddo 
+
+  end do ! Time loop
+  do ic = 1 , size(comps)
+    do i_hinge = 1, size(comps(ic)%hinge)
+
+    ! Close dat file / write tec file
+    select case(trim(out_frmt))
+
+    case('dat')
+      if(.not. average) then
+        close(fid_out)
+      else
+        write(fid_out,'(3'//ascii_real//')' ,advance='no') F_ave
+        write(fid_out,'(3'//ascii_real//')' ,advance='no') M_ave
+        write(fid_out,'(9'//ascii_real//')',advance='no') hinge_R
+        write(fid_out,'(3'//ascii_real//')',advance='no') comps(ic)%hinge(i_hinge)%act%rr(:,1)
+      endif
+
+    case('tecplot')
+      write(filename,'(A)')   trim(basename)//'_'//trim(an_name)// & 
+                              '_'//trim(components_names(i_comp))//'_'//& 
+                              trim(hinge_tag(i_hinge))//'.plt'
+
+      call tec_out_loads(filename, time, force, moment)
+      deallocate(time, force, moment)
+
+    end select
+    enddo
+  enddo
+  call destroy_elements(comps)
+  deallocate(comps, components_names, hinge_tag)
+
+  write(msg,'(A,I0,A)') nl//'++++++++++ Hinge moment done'//nl
+  call printout(trim(msg))
+
+
 end subroutine post_hinge_moment
 ! ----------------------------------------------------------------------
 
