@@ -16,3 +16,18 @@ Analysis = {
   Variable = Vorticity
   Variable = Pressure
 }
+
+Analysis = {
+  Type = hinge_moment
+  Name = hm
+
+  StartRes = 1
+  EndRes = 100
+  StepRes = 1
+
+  Format = dat
+  Average = F
+  Component = Wing
+  HingeTag = Aileron
+}
+
