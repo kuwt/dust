@@ -18,7 +18,7 @@ Analysis = {
 }
 
 Analysis = {
-  Type = hinge_moment
+  Type = hinge_loads
   Name = hm
 
   StartRes = 1

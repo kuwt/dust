@@ -142,7 +142,7 @@ use mod_post_flowfield, only: &
   post_flowfield
 
 use mod_post_integral, only: &
-  post_integral, post_hinge_moment
+  post_integral, post_hinge_loads
 
 use mod_post_sectional, only: &
   post_sectional
@@ -356,8 +356,8 @@ do ia = 1, n_analyses
                           an_start , an_end , an_step, average )
 
     !> Hinge Moment
-    case('hinge_moment')
-      call post_hinge_moment( sbprms , basename , data_basename , an_name , ia , &
+    case('hinge_loads')
+      call post_hinge_loads( sbprms , basename , data_basename , an_name , ia , &
                           out_frmt , components_names,  all_comp, hinge_tag, all_hinge,   &
                           an_start , an_end , an_step, average )
 

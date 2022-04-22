@@ -92,7 +92,7 @@ use mod_math, only: &
 
 implicit none
 
-public :: post_integral, post_hinge_moment
+public :: post_integral, post_hinge_loads
 
 private
 
@@ -338,7 +338,7 @@ end subroutine post_integral
 
 ! ----------------------------------------------------------------------
 
-subroutine post_hinge_moment( sbprms, basename, data_basename, an_name , ia , &
+subroutine post_hinge_loads( sbprms, basename, data_basename, an_name , ia , &
                             out_frmt, components_names, all_comp , hinge_tag, all_hinge, &
                             an_start, an_end, an_step, average )
   type(t_parse), pointer                                    :: sbprms
@@ -374,9 +374,9 @@ subroutine post_hinge_moment( sbprms, basename, data_basename, an_name , ia , &
   real(wp), allocatable                                     :: time(:)
   real(wp)                                                  :: t
 
-  character(len=*), parameter                               :: this_sub_name = 'post_hinge_moment'
+  character(len=*), parameter                               :: this_sub_name = 'post_hinge_loads'
 
-  write(msg,'(A,I0,A)') nl//'++++++++++ Analysis: ',ia,' hinge moment'//nl
+  write(msg,'(A,I0,A)') nl//'++++++++++ Analysis: ',ia,' hinge loads'//nl
   call printout(trim(msg))
 
   !debug
@@ -563,11 +563,11 @@ subroutine post_hinge_moment( sbprms, basename, data_basename, an_name , ia , &
   call destroy_elements(comps)
   deallocate(comps, components_names, hinge_tag)
 
-  write(msg,'(A,I0,A)') nl//'++++++++++ Hinge moment done'//nl
+  write(msg,'(A,I0,A)') nl//'++++++++++ Hinge loads done'//nl
   call printout(trim(msg))
 
 
-end subroutine post_hinge_moment
+end subroutine post_hinge_loads
 ! ----------------------------------------------------------------------
 
 end module mod_post_integral
