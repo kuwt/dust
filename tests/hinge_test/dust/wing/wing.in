@@ -2,7 +2,7 @@
 MeshFileType = parametric
 ElType       = v
 !> === Coupled with external structural solver (T/F) ===
-Coupled      = T
+Coupled      = F
 CouplingType = rbf
 CouplingNodeFile = ./wing/coupling_nodes.in 
 
@@ -25,11 +25,11 @@ Hinge = {
   Hinge_Offset  = 0.01
   Hinge_Spanwise_Blending = 0.001
 
-  Hinge_Rotation_Input = coupling
-  Hinge_Rotation_Coupling = {
-  Coupling_Node_Subset = range
-  Coupling_Node_First  = 2
-  Coupling_Node_Last  =  3
+  Hinge_Rotation_Input = function:const
+  Hinge_Rotation_Function = {
+  Amplitude = 20.0 ! deg
+  Omega = 12.5 ! rad/sec
+  Phase = 0.0 ! deg
   }
 }
 !!
@@ -40,16 +40,18 @@ Hinge = {
   Node2 = (/ 0.5, -1.0, 0.0/)  ! In the local ref.frame
   Node1 = (/ 0.5, -3.0, 0.0/)
   N_Nodes = 2
-
-  Hinge_Ref_Dir = (/ 1.0, 0.0, 0.0 /)
+  Hinge_Ref_Dir = (/ 1.0, 0.0 , 0.0 /)
   Hinge_Offset  = 0.01
   Hinge_Spanwise_Blending = 0.001
 
-  Hinge_Rotation_Input = coupling
-  Hinge_Rotation_Coupling = {
-  Coupling_Node_Subset = range
-  Coupling_Node_First  = 4
-  Coupling_Node_Last  =  5
+  !Hinge_Rotation_Input = from_file
+  !File_Name = flap_l.dat
+
+  Hinge_Rotation_Input = function:const
+  Hinge_Rotation_Function = {
+  Amplitude = -20.0 ! deg
+  Omega = 12.5 ! rad/sec
+  Phase = 0.0 ! deg
   }
 }
 !===============================================================

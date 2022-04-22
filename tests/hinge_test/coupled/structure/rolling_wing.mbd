@@ -5,8 +5,8 @@ end: data;
 
 # === initial value problem =====================================
 begin: initial value;
-  initial time: 0.0;
-  final time: 1;
+  initial time: -0.1;
+  final time: 2.0;
   time step: 0.1;
 
   max iterations: 250;
@@ -28,11 +28,11 @@ set: const integer AIRCRAFT = 100;
 set: const integer FLAPERON_RIGHT = 200;
 set: const integer FLAPERON_LEFT = 300;
 # ------------------FLAPERON--------------------
-set: const real T_START_FLAPERON_RIGHT = 0.05; 
+set: const real T_START_FLAPERON_RIGHT = -0.01; 
 set: const real T_PERIOD_FLAPERON_RIGHT = 0.01; 
 set: const real DEG_FLAPERON_RIGHT = deg2rad*(20.0); 
 
-set: const real T_START_FLAPERON_LEFT = 0.05; 
+set: const real T_START_FLAPERON_LEFT = -0.01; 
 set: const real T_PERIOD_FLAPERON_LEFT = 0.01; 
 set: const real DEG_FLAPERON_LEFT = deg2rad*(-20.0);
 # === control data ==============================================
@@ -45,7 +45,7 @@ begin: control data;
 
   default output: reference frames;
 	default orientation: orientation vector;
-  output results: netcdf;
+  output results: netcdf, sync, no text;
 
 end: control data;
 
@@ -64,26 +64,26 @@ reference: AIRCRAFT,
 
 # right flaperon
 reference: FLAPERON_RIGHT + 1,
-  reference, AIRCRAFT, 0.21336, 0.9144,  0,
+  reference, AIRCRAFT, 0.5, 1.0,  0,
   reference, AIRCRAFT, eye,
   reference, AIRCRAFT, null,
   reference, AIRCRAFT, null;
 
 reference: FLAPERON_RIGHT + 2,
-  reference, AIRCRAFT, 0.21336, 0.9144+0.9144,  0,
+  reference, AIRCRAFT, 0.5, 3,  0,
   reference, AIRCRAFT, eye,
   reference, AIRCRAFT, null,
   reference, AIRCRAFT, null;
 
 # left flaperon
 reference: FLAPERON_LEFT + 1,
-  reference, AIRCRAFT, 0.21336, -0.9144,  0,
+  reference, AIRCRAFT, 0.5, -1,  0,
   reference, AIRCRAFT, eye,
   reference, AIRCRAFT, null,
   reference, AIRCRAFT, null;
 
 reference: FLAPERON_LEFT + 2,
-  reference, AIRCRAFT, 0.21336, -(0.9144+0.9144),  0,
+  reference, AIRCRAFT, 0.5, -3,  0,
   reference, AIRCRAFT, eye,
   reference, AIRCRAFT, null,
   reference, AIRCRAFT, null;
@@ -101,12 +101,16 @@ begin: nodes;
   structural:  FLAPERON_RIGHT + 1, dynamic,  # static,
     reference, FLAPERON_RIGHT + 1, null,
     reference, FLAPERON_RIGHT + 1, eye,
+      #1, cos(DEG_FLAPERON_RIGHT), 0, -sin(DEG_FLAPERON_RIGHT),
+      #2, 0, 1, 0,
     reference, FLAPERON_RIGHT + 1, null,
     reference, FLAPERON_RIGHT + 1, null;
 
   structural:  FLAPERON_RIGHT + 2, dynamic,  # static,
     reference, FLAPERON_RIGHT + 2, null,
     reference, FLAPERON_RIGHT + 2, eye,
+      #1, cos(DEG_FLAPERON_RIGHT), 0, -sin(DEG_FLAPERON_RIGHT),
+      #2, 0, 1, 0,
     reference, FLAPERON_RIGHT + 2, null,
     reference, FLAPERON_RIGHT + 2, null;
 
@@ -114,12 +118,16 @@ begin: nodes;
   structural:  FLAPERON_LEFT + 1, dynamic,  # static,
     reference, FLAPERON_LEFT + 1, null,
     reference, FLAPERON_LEFT + 1, eye,
+      #1, cos(DEG_FLAPERON_LEFT), 0, sin(DEG_FLAPERON_LEFT),
+      #2, 0, 1, 0,
     reference, FLAPERON_LEFT + 1, null,
     reference, FLAPERON_LEFT + 1, null;
 
   structural:  FLAPERON_LEFT + 2, dynamic,  # static,
     reference, FLAPERON_LEFT + 2, null,
     reference, FLAPERON_LEFT + 2, eye,
+      #1, cos(DEG_FLAPERON_LEFT), 0, sin(DEG_FLAPERON_LEFT),
+      #2, 0, 1, 0,
     reference, FLAPERON_LEFT + 2, null,
     reference, FLAPERON_LEFT + 2, null;
 
@@ -174,24 +182,8 @@ begin: elements;
       #null;
       component,
       0.0,
-      #  #array, 4,
-      #cosine, T_START_FLAPERON_RIGHT,  pi/T_PERIOD_FLAPERON_RIGHT, 							+DEG_FLAPERON_RIGHT/2, half, 0.0, 
-      #double step,
-      #  T_START_FLAPERON_RIGHT,
-      #  T_START_FLAPERON_RIGHT + T_PERIOD_FLAPERON_RIGHT,
-      #  DEG_FLAPERON_RIGHT,
-      #  0.0,
+      #0.0,
       cosine, T_START_FLAPERON_RIGHT, pi/T_PERIOD_FLAPERON_RIGHT, DEG_FLAPERON_RIGHT/2, half, 0.0,
-      #  #cosine, T_START_FLAPERON + 2*T_PERIOD_FLAPERON + 0.1, pi/T_PERIOD_FLAPERON, -DEG_FLAPERON/2, half, 0.0,
-      #  #cosine, T_START_FLAPERON + 3*T_PERIOD_FLAPERON + 0.1, pi/T_PERIOD_FLAPERON, +DEG_FLAPERON/2, half, 0.0,
-      #  #cosine, T_START_FLAPERON + 4*T_PERIOD_FLAPERON + 0.1, pi/T_PERIOD_FLAPERON, +DEG_FLAPERON/2, half, 0.0,
-      #  #cosine, T_START_FLAPERON + 5*T_PERIOD_FLAPERON + 0.1, pi/T_PERIOD_FLAPERON, -DEG_FLAPERON/2, half, 0.0,
-      #  #cosine, T_START_FLAPERON + 6*T_PERIOD_FLAPERON + 0.1, pi/T_PERIOD_FLAPERON, -DEG_FLAPERON/2, half, 0.0,
-      #  #cosine, T_START_FLAPERON + 7*T_PERIOD_FLAPERON + 0.1, pi/T_PERIOD_FLAPERON, +DEG_FLAPERON/2, half, 0.0,			
-      #  #double step, T_START_FLAPERON, 								T_START_FLAPERON + T_PERIOD_FLAPERON, 					 +DEG_FLAPERON, 0,
-      #  #double step, T_START_FLAPERON + 1*T_PERIOD_FLAPERON + 0.3,  T_START_FLAPERON + 2*T_PERIOD_FLAPERON + 0.3, 			 -DEG_FLAPERON, 0,
-      #  #double step, T_START_FLAPERON + 2*T_PERIOD_FLAPERON + 0.3 + 0.2, T_START_FLAPERON + 3*T_PERIOD_FLAPERON + 0.3 + 0.2, -DEG_FLAPERON, 0,
-      #  #double step, T_START_FLAPERON + 3*T_PERIOD_FLAPERON + 0.3 + 0.2 + 0.3, T_START_FLAPERON + 4*T_PERIOD_FLAPERON + 0.3 + 0.2 + 0.3, +DEG_FLAPERON, 0,
       0.0;		
 
   joint: FLAPERON_RIGHT + 2, total joint,
@@ -216,11 +208,11 @@ begin: elements;
 
   joint: FLAPERON_RIGHT + 3, total joint,
     FLAPERON_RIGHT + 1, 
-      position, reference, FLAPERON_RIGHT + 1,  0.0, 0.821,	0.0,
+      position, reference, FLAPERON_RIGHT + 1,  0.0, 2,	0.0,
       position orientation, reference, FLAPERON_RIGHT + 1, eye,
       rotation orientation, reference, AIRCRAFT, eye,
     FLAPERON_RIGHT + 2,
-      position, reference, FLAPERON_RIGHT + 1,  0.0, 0.821,	0.0,
+      position, reference, FLAPERON_RIGHT + 1,  0.0, 2,	0.0,
       position orientation, reference, FLAPERON_RIGHT + 1, eye,
       rotation orientation, reference, AIRCRAFT, eye,
     position constraint,
@@ -256,12 +248,7 @@ begin: elements;
       #null;
       component,
       0.0,
-      #cosine, T_START_FLAPERON_LEFT,  pi/T_PERIOD_FLAPERON_LEFT, 							+DEG_FLAPERON_LEFT/2, half, 0.0, 
-      #double step,
-      #  T_START_FLAPERON_LEFT,
-      #  T_START_FLAPERON_LEFT + T_PERIOD_FLAPERON_LEFT,
-      #  DEG_FLAPERON_LEFT,
-      #  0.0,
+      #0.0,
       cosine, T_START_FLAPERON_LEFT, pi/T_PERIOD_FLAPERON_LEFT, DEG_FLAPERON_LEFT/2, half, 0.0,
       0.0;		
 
@@ -287,11 +274,11 @@ begin: elements;
 
   joint: FLAPERON_LEFT + 3, total joint,
     FLAPERON_LEFT + 1, 
-      position, reference, FLAPERON_LEFT + 1,  0.0, -0.821,	0.0,
+      position, reference, FLAPERON_LEFT + 1,  0.0, -2,	0.0,
       position orientation, reference, FLAPERON_LEFT + 1, eye,
       rotation orientation, reference, AIRCRAFT, eye,
     FLAPERON_LEFT + 2,
-      position, reference, FLAPERON_LEFT + 1,  0.0, -0.821,	0.0,
+      position, reference, FLAPERON_LEFT + 1,  0.0, -2,	0.0,
       position orientation, reference, FLAPERON_LEFT + 1, eye,
       rotation orientation, reference, AIRCRAFT, eye,
     position constraint,

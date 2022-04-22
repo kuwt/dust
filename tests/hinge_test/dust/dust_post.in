@@ -8,7 +8,7 @@ Analysis = {
   Format = vtk !tecplot ! vtk ! tecplot
 
   StartRes = 1
-  EndRes = 19
+  EndRes = 21
   StepRes = 1
   Wake = T
   SeparateWake = T
@@ -21,7 +21,7 @@ Analysis = {
   Name = hm
 
   StartRes = 1
-  EndRes = 19
+  EndRes = 21
   StepRes = 1
 
   Format = dat
@@ -35,7 +35,7 @@ Analysis = {
   Name = hm
 
   StartRes = 1
-  EndRes = 19
+  EndRes = 21
   StepRes = 1
 
   Format = dat

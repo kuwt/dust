@@ -1,0 +1,16 @@
+
+>>>>>> DUST PREPROCESSOR beginning >>>>>>
+
+
+
+Reading input parameters from file "dust_pre.in"
+
+
+Reading input parameters from file "./wing/wing.in"
+  n_coupling_nodes:            5
+
+
+Reading input parameters from file "./wing/wing.in"
+
+<<<<<< DUST PREPROCESSOR end       <<<<<<
+

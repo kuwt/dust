@@ -6,16 +6,16 @@ GeometryFile = geo_input.h5
 ReferenceFile = References.in 
 
 ! Timings ---------------------
-tstart = -0.1
+tstart = 0.0
 tend = 2.0
 dt = 0.1
 dt_out = 0.1
 output_start = T 
 ndt_update_wake = 1 
-debug_level = 0 
+debug_level = 1 
 ! Reference values ---------------------
 rho_inf = 1.225000 
-u_inf = (/10, 0., 0./)
+u_inf = (/1, 0., 0./)
 KVortexRad = 1
 
 ! Model parameters -------------------

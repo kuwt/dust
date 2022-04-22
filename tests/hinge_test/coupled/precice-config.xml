@@ -82,12 +82,12 @@
 
       
       <!--<min-iteration-convergence-measure min-iterations="30" data="Moment" mesh="MBDynNodes" />-->
-      <relative-convergence-measure limit="1.0e-8" data="Position" mesh="MBDynNodes" />
-      <relative-convergence-measure limit="1.0e-8" data="Rotation" mesh="MBDynNodes" />
+      <relative-convergence-measure limit="1.0e-6" data="Position" mesh="MBDynNodes" />
+      <relative-convergence-measure limit="1.0e-6" data="Rotation" mesh="MBDynNodes" />
       <!--<absolute-convergence-measure limit="1.0e-3" data="Force" mesh="MBDynNodes" />
       <absolute-convergence-measure limit="1.0e-3" data="Moment" mesh="MBDynNodes" />-->
-      <relative-convergence-measure limit="1.0e-8" data="Velocity" mesh="MBDynNodes" />
-      <relative-convergence-measure limit="1.0e-8" data="AngularVelocity" mesh="MBDynNodes" /> 
+      <relative-convergence-measure limit="1.0e-6" data="Velocity" mesh="MBDynNodes" />
+      <relative-convergence-measure limit="1.0e-6" data="AngularVelocity" mesh="MBDynNodes" /> 
       <acceleration:aitken>
         <data name="Force" mesh="MBDynNodes"/>
         <initial-relaxation value="0.1"/>
