@@ -442,7 +442,7 @@ subroutine post_hinge_loads( sbprms, basename, data_basename, an_name , ia , &
       end select
     enddo
   enddo 
-! 
+
   ires = 0
   if(average) then
     M_ave = 0.0_wp
@@ -478,86 +478,86 @@ subroutine post_hinge_loads( sbprms, basename, data_basename, an_name , ia , &
     !> Update the overall load with the comtribution from all the components
     do ic = 1 , size(comps)
       do i_hinge = 1, size(comps(ic)%hinge)
+        if (stricmp(comps(ic)%hinge(i_hinge)%tag, hinge_tag(1)))then 
+          !> Initialise integral loads in the local ref.frame
+          F_bas = 0.0_wp ; M_bas = 0.0_wp
+          !> Loads from the ic-th component in the base ref.frame for the rotated reagion 
+          do ie = 1 , size(comps(ic)%hinge(i_hinge)%rot_cen%node_id, 1)
+            F_bas1 =  comps(ic)%el(comps(ic)%hinge(i_hinge)%rot_cen%node_id(ie))%dforce 
+            F_bas = F_bas + F_bas1
+            M_bas = M_bas + cross( comps(ic)%el(comps(ic)%hinge(i_hinge)%rot_cen%node_id(ie))%cen &
+                            - comps(ic)%hinge(i_hinge)%act%rr(:,1) , F_bas1 )  &
+                            + comps(ic)%el(comps(ic)%hinge(i_hinge)%rot_cen%node_id(ie))%dmom  
+          end do 
 
-        !> Initialise integral loads in the local ref.frame
-        F_bas = 0.0_wp ; M_bas = 0.0_wp
-        !> Loads from the ic-th component in the base ref.frame for the rotated reagion 
-        do ie = 1 , size(comps(ic)%hinge(i_hinge)%rot_cen%node_id, 1)
-          F_bas1 =  comps(ic)%el(comps(ic)%hinge(i_hinge)%rot_cen%node_id(ie))%dforce 
-          F_bas = F_bas + F_bas1
-          M_bas = M_bas + cross( comps(ic)%el(comps(ic)%hinge(i_hinge)%rot_cen%node_id(ie))%cen &
-                          - comps(ic)%hinge(i_hinge)%act%rr(:,1) , F_bas1 )  &
-                          + comps(ic)%el(comps(ic)%hinge(i_hinge)%rot_cen%node_id(ie))%dmom  
-        end do 
+          !> Loads from the ic-th component in the base ref.frame for the blending reagion 
+          do ie = 1 , size(comps(ic)%hinge(i_hinge)%blen_cen%node_id, 1)
+            F_bas1 =  comps(ic)%el(comps(ic)%hinge(i_hinge)%blen_cen%node_id(ie))%dforce 
+            F_bas = F_bas + F_bas1
+            M_bas = M_bas + cross( comps(ic)%el(comps(ic)%hinge(i_hinge)%blen_cen%node_id(ie))%cen &
+                            - comps(ic)%hinge(i_hinge)%act%rr(:,1) , F_bas1 )  &
+                            + comps(ic)%el(comps(ic)%hinge(i_hinge)%blen_cen%node_id(ie))%dmom  
+          end do 
 
-        !!> Loads from the ic-th component in the base ref.frame for the blending reagion 
-        do ie = 1 , size(comps(ic)%hinge(i_hinge)%blen_cen%node_id, 1)
-          F_bas1 =  comps(ic)%el(comps(ic)%hinge(i_hinge)%blen_cen%node_id(ie))%dforce 
-          F_bas = F_bas + F_bas1
-          M_bas = M_bas + cross( comps(ic)%el(comps(ic)%hinge(i_hinge)%blen_cen%node_id(ie))%cen &
-                          - comps(ic)%hinge(i_hinge)%act%rr(:,1) , F_bas1 )  &
-                          + comps(ic)%el(comps(ic)%hinge(i_hinge)%blen_cen%node_id(ie))%dmom  
-        end do 
+          !> From the base ref.sys to the chosen ref.sys (offset and rotation)
+          hinge_R(1,:) = comps(ic)%hinge(i_hinge)%act%v(:,1)
+          hinge_R(2,:) = comps(ic)%hinge(i_hinge)%act%h(:,1)
+          hinge_R(3,:) = comps(ic)%hinge(i_hinge)%act%n(:,1)
+          F_ref = F_ref + matmul( &
+                transpose(hinge_R) , F_bas )
+          M_ref = M_ref + matmul( &
+                transpose(hinge_R) , M_bas )
 
-        !> From the base ref.sys to the chosen ref.sys (offset and rotation)
-        
-        hinge_R(1,:) = comps(ic)%hinge(i_hinge)%act%v(:,1)
-        hinge_R(2,:) = comps(ic)%hinge(i_hinge)%act%h(:,1)
-        hinge_R(3,:) = comps(ic)%hinge(i_hinge)%act%n(:,1)
-        F_ref = F_ref + matmul( &
-              transpose(hinge_R) , F_bas )
-        M_ref = M_ref + matmul( &
-              transpose(hinge_R) , M_bas )
-
-        if(.not. average) then
-        ! Update output dat file / update output arrays for tecplot
-          select case(trim(out_frmt))
-          case ('dat')
-            write(fid_out, '('//ascii_real//')',advance='no') t
-            write(fid_out,'(3'//ascii_real//')',advance='no') F_ref
-            write(fid_out,'(3'//ascii_real//')',advance='no') M_ref
-            write(fid_out,'(9'//ascii_real//')',advance='no') hinge_R
-            write(fid_out,'(3'//ascii_real//')',advance='no') comps(ic)%hinge(i_hinge)%act%rr(:,1) 
-            write(fid_out,'(A)',advance='no') nl
-          case('tecplot')
-            time(ires) = t
-            force(:,ires) = F_ref
-            moment(:,ires) = M_ref
-          end select
-        else
-          F_ave = F_ave*(real(ires-1,wp)/real(ires,wp)) + F_ref/real(ires,wp)
-          M_ave = M_ave*(real(ires-1,wp)/real(ires,wp)) + M_ref/real(ires,wp)
+          if(.not. average) then
+          ! Update output dat file / update output arrays for tecplot
+            select case(trim(out_frmt))
+            case ('dat')
+              write(fid_out, '('//ascii_real//')',advance='no') t
+              write(fid_out,'(3'//ascii_real//')',advance='no') F_ref
+              write(fid_out,'(3'//ascii_real//')',advance='no') M_ref
+              write(fid_out,'(9'//ascii_real//')',advance='no') hinge_R
+              write(fid_out,'(3'//ascii_real//')',advance='no') comps(ic)%hinge(i_hinge)%act%rr(:,1) 
+              write(fid_out,'(A)',advance='no') nl
+            case('tecplot')
+              time(ires) = t
+              force(:,ires) = F_ref
+              moment(:,ires) = M_ref
+            end select
+          else
+            F_ave = F_ave*(real(ires-1,wp)/real(ires,wp)) + F_ref/real(ires,wp)
+            M_ave = M_ave*(real(ires-1,wp)/real(ires,wp)) + M_ref/real(ires,wp)
+          endif
         endif
-
       enddo 
     enddo 
-
   end do ! Time loop
+  
   do ic = 1 , size(comps)
     do i_hinge = 1, size(comps(ic)%hinge)
-
-    ! Close dat file / write tec file
-    select case(trim(out_frmt))
-
-    case('dat')
-      if(.not. average) then
-        close(fid_out)
-      else
-        write(fid_out,'(3'//ascii_real//')' ,advance='no') F_ave
-        write(fid_out,'(3'//ascii_real//')' ,advance='no') M_ave
-        write(fid_out,'(9'//ascii_real//')',advance='no') hinge_R
-        write(fid_out,'(3'//ascii_real//')',advance='no') comps(ic)%hinge(i_hinge)%act%rr(:,1)
-      endif
-
-    case('tecplot')
-      write(filename,'(A)')   trim(basename)//'_'//trim(an_name)// & 
-                              '_'//trim(components_names(i_comp))//'_'//& 
-                              trim(hinge_tag(i_hinge))//'.plt'
-
-      call tec_out_loads(filename, time, force, moment)
-      deallocate(time, force, moment)
-
-    end select
+      if (stricmp(comps(ic)%hinge(i_hinge)%tag, hinge_tag(1))) then 
+        ! Close dat file / write tec file
+        select case(trim(out_frmt))
+        
+        case('dat')
+          if(.not. average) then
+            close(fid_out)
+          else
+            write(fid_out,'(3'//ascii_real//')' ,advance='no') F_ave
+            write(fid_out,'(3'//ascii_real//')' ,advance='no') M_ave
+            write(fid_out,'(9'//ascii_real//')',advance='no') hinge_R
+            write(fid_out,'(3'//ascii_real//')',advance='no') comps(ic)%hinge(i_hinge)%act%rr(:,1)
+          endif
+        
+        case('tecplot')
+          write(filename,'(A)')   trim(basename)//'_'//trim(an_name)// & 
+                                  '_'//trim(components_names(i_comp))//'_'//& 
+                                  trim(hinge_tag(i_hinge))//'.plt'
+        
+          call tec_out_loads(filename, time, force, moment)
+          deallocate(time, force, moment)
+        
+        end select
+      endif 
     enddo
   enddo
   call destroy_elements(comps)
