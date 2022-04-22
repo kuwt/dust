@@ -503,10 +503,8 @@ subroutine post_hinge_loads( sbprms, basename, data_basename, an_name , ia , &
           hinge_R(1,:) = comps(ic)%hinge(i_hinge)%act%v(:,1)
           hinge_R(2,:) = comps(ic)%hinge(i_hinge)%act%h(:,1)
           hinge_R(3,:) = comps(ic)%hinge(i_hinge)%act%n(:,1)
-          F_ref = F_ref + matmul( &
-                transpose(hinge_R) , F_bas )
-          M_ref = M_ref + matmul( &
-                transpose(hinge_R) , M_bas )
+          F_ref = F_ref + matmul(hinge_R, F_bas )
+          M_ref = M_ref + matmul(hinge_R, M_bas )
 
           if(.not. average) then
           ! Update output dat file / update output arrays for tecplot
