@@ -327,7 +327,7 @@ do ia = 1, n_analyses
     endif
   endif
 
-  if (trim(an_type) .eq. 'hinge_moment') then 
+  if (trim(an_type) .eq. 'hinge_loads') then 
     all_hinge = .false. 
     n_hinge = countoption(sbprms, 'HingeTag')
     if (n_hinge .eq. 0)  then
