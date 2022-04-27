@@ -81,7 +81,7 @@ contains
 !----------------------------------------------------------------------
 
 subroutine read_mesh_parametric(mesh_file,ee,rr, &
-                    npoints_chord_tot, nelem_span_tot, hinges, &
+                    npoints_chord_tot, nelem_span_tot, hinges, n_hinges, &
                     airfoil_list_actual, i_airfoil_e, normalised_coord_e, & 
                     aero_table_out, curv_ac)
 
@@ -89,6 +89,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   integer  , allocatable, intent(out)       :: ee(:,:)
   real(wp) , allocatable, intent(out)       :: rr(:,:)
   integer  , intent(out), optional          :: npoints_chord_tot, nelem_span_tot 
+  integer  , intent(in)                     :: n_hinges
 
   type(t_hinge_input), allocatable, intent(inout) :: hinges(:)
   type(t_parse)                             :: pmesh_prs
@@ -335,8 +336,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   ! get chordwise division
   allocate(chord_fraction(nelem_chord+1))
   type_chord = getstr(pmesh_prs,'type_chord')
-
-  if (size(hinges) .ge. 1) then 
+  
+  if (n_hinges .ge. 1) then 
+          
     allocate(rrv_le(2,nSections));  rrv_le = 0.0_wp 
     allocate(rrv_te(2,nSections));  rrv_te = 0.0_wp 
     allocate(ac_line(2,nSections));  ac_line = 0.0_wp 
@@ -354,7 +356,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       rrv_le(2, iRegion + 1) = ac_line(2, iRegion + 1)
       rrv_te(2, iRegion + 1) = ac_line(2, iRegion + 1)
       
-      do ih = 1, size(hinges)
+      do ih = 1, n_hinges
         if ((hinges(ih)%node1(2) .ge. ac_line(2, iRegion)) .and. & 
             (hinges(ih)%node1(2) .le. ac_line(2, iRegion + 1))) then 
             
@@ -395,10 +397,12 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
     do ih = 1, size(hinges)
       csi_hinge_not_unique(ih) = hinges(ih)%csi1
-      csi_hinge_not_unique(ih+1) = hinges(ih)%csi2
+      csi_hinge_not_unique(ih+2) = hinges(ih)%csi2      
     enddo 
 
     call unique(csi_hinge_not_unique, csi_hinge, 1e-2_wp)
+
+
   endif 
 
   
