@@ -649,9 +649,11 @@ subroutine read_options(this, filename, printout_val)
 
   !call info(this_sub_name, this_mod_name, &
   !                  'Reading parameters from file "'//trim(filename)//'":')
-  call printout(nl//nl//'Reading input parameters from file "'//&
+  if (this%printout_val) then 
+    call printout(nl//'Reading input parameters from file "'//&
                 trim(filename)//'"')
-
+  endif 
+  
   ! Open parameter file for reading
   iniUnit= 100 !getfreeunit()
   open(unit=iniUnit,file=trim(filename),status='old',action='read', &
