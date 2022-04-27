@@ -60,7 +60,10 @@ use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption
 
 use mod_math, only: & 
-  linear_interp
+  linear_interp, unique
+
+use mod_hinges, only: &
+  t_hinge, t_hinge_input 
 !----------------------------------------------------------------------
 
 implicit none
@@ -78,7 +81,7 @@ contains
 !----------------------------------------------------------------------
 
 subroutine read_mesh_parametric(mesh_file,ee,rr, &
-                    npoints_chord_tot, nelem_span_tot, &
+                    npoints_chord_tot, nelem_span_tot, hinges, &
                     airfoil_list_actual, i_airfoil_e, normalised_coord_e, & 
                     aero_table_out, curv_ac)
 
@@ -87,6 +90,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   real(wp) , allocatable, intent(out)       :: rr(:,:)
   integer  , intent(out), optional          :: npoints_chord_tot, nelem_span_tot 
 
+  type(t_hinge_input), allocatable, intent(inout) :: hinges(:)
   type(t_parse)                             :: pmesh_prs
   integer                                   :: ee_size , rr_size
   logical                                   :: twist_linear_interp
@@ -114,6 +118,10 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   integer,  allocatable, intent(out), optional :: i_airfoil_e(:,:)
   real(wp), allocatable, intent(out), optional :: normalised_coord_e(:,:)
 
+  !> hinge mesh 
+  real(wp), allocatable                     :: rrv_le(:,:), rrv_te(:,:), ac_line(:,:) 
+  integer                                   :: ih
+  real(wp), allocatable                     :: csi_hinge_not_unique(:), csi_hinge(:)
   !> Regions  
   integer , allocatable                     :: nelem_span_list(:)
   real(wp), allocatable                     :: span_list(:) 
@@ -327,6 +335,73 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   ! get chordwise division
   allocate(chord_fraction(nelem_chord+1))
   type_chord = getstr(pmesh_prs,'type_chord')
+
+  if (size(hinges) .ge. 1) then 
+    allocate(rrv_le(2,nSections));  rrv_le = 0.0_wp 
+    allocate(rrv_te(2,nSections));  rrv_te = 0.0_wp 
+    allocate(ac_line(2,nSections));  ac_line = 0.0_wp 
+    
+    !write(*,*) 'hinge', hinges(1)%node1
+    rrv_le (1,1) = -chord_list(1)*ref_chord_fraction
+    rrv_te (1,1) = chord_list(1)*(1 - ref_chord_fraction)    
+    do iRegion = 1, nRegions
+      !> sweep line
+      ac_line(1, iRegion + 1) = span_list(iRegion)*sin(-sweep_list(iRegion)*pi/180.0_wp) + ac_line(1, iRegion)
+      ac_line(2, iRegion + 1) = span_list(iRegion) + ac_line(2, iRegion)
+      !> verteces 
+      rrv_le(1, iRegion + 1) = ac_line(1, iRegion + 1) - chord_list(iRegion + 1)*ref_chord_fraction 
+      rrv_te(1, iRegion + 1) = ac_line(1, iRegion + 1) + chord_list(iRegion + 1)*(1 - ref_chord_fraction) 
+      rrv_le(2, iRegion + 1) = ac_line(2, iRegion + 1)
+      rrv_te(2, iRegion + 1) = ac_line(2, iRegion + 1)
+      
+      do ih = 1, size(hinges)
+        if ((hinges(ih)%node1(2) .ge. ac_line(2, iRegion)) .and. & 
+            (hinges(ih)%node1(2) .le. ac_line(2, iRegion + 1))) then 
+            
+            call linear_interp((/ rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
+                                (/rrv_le(2, iRegion), rrv_le(2, iRegion + 1)/), & 
+                                hinges(ih)%node1(2), hinges(ih)%le1(1))
+            call linear_interp((/ rrv_te(1, iRegion), rrv_te(1, iRegion + 1)/), &
+                                (/rrv_te(2, iRegion), rrv_te(2, iRegion + 1)/), & 
+                                hinges(ih)%node1(2), hinges(ih)%te1(1))
+            hinges(ih)%le1(2) = hinges(ih)%node1(2) 
+            hinges(ih)%te1(2) = hinges(ih)%node1(2)
+            hinges(ih)%chord1 = abs(hinges(ih)%le1(1) - hinges(ih)%te1(1))
+            hinges(ih)%csi1 = (hinges(ih)%node1(1) - hinges(ih)%le1(1)) / hinges(ih)%chord1 
+        endif    
+
+        if ((hinges(ih)%node2(2) .ge. ac_line(2, iRegion)) .and. & 
+                (hinges(ih)%node2(2) .le. ac_line(2, iRegion + 1))) then 
+            
+            call linear_interp((/ rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
+                              (/rrv_le(2, iRegion), rrv_le(2, iRegion + 1)/), & 
+                              hinges(ih)%node2(2), hinges(ih)%le2(1))
+            call linear_interp((/ rrv_te(1, iRegion), rrv_te(1, iRegion + 1)/), &
+                              (/rrv_te(2, iRegion), rrv_te(2, iRegion + 1)/), & 
+                              hinges(ih)%node2(2), hinges(ih)%te2(1))
+            hinges(ih)%le2(2) = hinges(ih)%node2(2) 
+            hinges(ih)%te2(2) = hinges(ih)%node2(2)
+            hinges(ih)%chord2 = abs(hinges(ih)%le2(1) - hinges(ih)%te2(1))
+            hinges(ih)%csi2 = (hinges(ih)%node2(1) - hinges(ih)%le2(1)) / hinges(ih)%chord2 
+
+        endif
+        ! TODO: add warning/errors   
+        
+
+      enddo
+
+    enddo 
+    allocate(csi_hinge_not_unique(2*size(hinges))); csi_hinge_not_unique = 0.0_wp 
+
+    do ih = 1, size(hinges)
+      csi_hinge_not_unique(ih) = hinges(ih)%csi1
+      csi_hinge_not_unique(ih+1) = hinges(ih)%csi2
+    enddo 
+
+    call unique(csi_hinge_not_unique, csi_hinge, 1e-2_wp)
+  endif 
+
+  
   call define_division(type_chord, nelem_chord, chord_fraction)
 
 

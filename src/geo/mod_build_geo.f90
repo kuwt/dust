@@ -839,7 +839,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       !> TODO : actually it is possible to define the parameters in the GeoFile
       !> directly, find a good way to do this
       call read_mesh_parametric(trim(mesh_file), ee, rr, &
-                              npoints_chord_tot, nelems_span, &
+                              npoints_chord_tot, nelems_span, hinges, &
                               airfoil_list, i_airfoil_e, normalised_coord_e, &
                               aero_table)!, curv_ac)  
 
@@ -868,7 +868,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         
     elseif (ElType .eq. 'p') then
       call read_mesh_parametric(trim(mesh_file), ee, rr, &
-                                npoints_chord_tot, nelems_span)
+                                npoints_chord_tot, nelems_span, hinges)
       !> Nelems_span_tot will be overwritten if symmetry is required (around l.220)
       nelems_span_tot =   nelems_span
 

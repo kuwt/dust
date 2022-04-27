@@ -56,7 +56,7 @@ use mod_handling, only: &
 
 implicit none
 
-public :: dot, cross , linear_interp , compute_qr, rotation_vector_combination, sort_vector_real
+public :: dot, cross , linear_interp , compute_qr, rotation_vector_combination, sort_vector_real, unique
 
 private
 
@@ -314,26 +314,64 @@ end subroutine rotation_vector_combination
 
 ! ----------------------------------------------------------------------
 
-subroutine sort_vector_real( vec, nel, sor, ind )
+subroutine sort_vector_real( vec, nel, sort, ind )
   real(wp), intent(inout)               :: vec(:)
   integer , intent(in)                  :: nel
-  real(wp), allocatable, intent(out)    :: sor(:)
+  real(wp), allocatable, intent(out)    :: sort(:)
   integer , allocatable, intent(out)    :: ind(:)
 
   real(wp)                              :: maxv
   integer                               :: i
 
-  allocate(sor(nel)); sor = 0.0_wp
+  allocate(sort(nel)); sort = 0.0_wp
   allocate(ind(nel)); ind = 0
 
   maxv = maxval(vec)
   do i = 1, nel
-    sor(i) = minval(vec, 1)
+    sort(i) = minval(vec, 1)
     ind(i) = minloc(vec, 1)
     vec(ind(i)) = maxv + 0.1_wp 
   end do
 
 end subroutine sort_vector_real
+
+subroutine unique(vec, vec_unique, tol)  
+  real(wp), intent(inout)               :: vec(:) 
+  real(wp), allocatable, intent(out) :: vec_unique(:)
+  real(wp), intent(in)               :: tol
+
+  real(wp), allocatable              :: vec_sort(:) 
+  real(wp), allocatable              :: vec_tmp(:)
+  integer, allocatable               :: ind(:)
+  integer                            :: nel, i, j, u 
+  
+  nel = size(vec)
+
+  call sort_vector_real(vec, nel, vec_sort, ind)
+  
+  i = 1
+  j = 2
+  u = 1
+  allocate(vec_tmp(nel)); vec_tmp = 0.0_wp 
+  vec_tmp(1) = vec_sort(1)
+
+  do while (j .le. nel)
+    if (abs(vec_sort(j) - vec_sort(i)) .le. tol) then  
+      j = j + 1
+    else
+      u = u + 1
+      vec_tmp(u) = vec_sort(j) 
+      i = j 
+      j = j + 1   
+    endif 
+  enddo
+
+  allocate(vec_unique(u)); vec_unique = 0.0_wp 
+
+  vec_unique = vec_tmp(1:u) 
+
+end subroutine unique  
+  
 
 ! ----------------------------------------------------------------------
 

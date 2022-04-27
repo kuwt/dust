@@ -87,6 +87,12 @@ type :: t_hinge_input
   real(wp) :: rotation_omega
   real(wp) :: rotation_phase
   integer, allocatable :: coupling_nodes(:)
+  real(wp) :: le1(2) 
+  real(wp) :: te1(2) 
+  real(wp) :: le2(2)
+  real(wp) :: te2(2)
+  real(wp) :: chord1, chord2
+  real(wp) :: csi1, csi2
 end type t_hinge_input
 
 ! ---------------------------------------------------------------
@@ -1073,23 +1079,32 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
     !> Open hinge sub-parser
     call getsuboption(geo_prs, 'Hinge', hinge_prs)
 
-     hinges(i) % tag = getstr(hinge_prs, 'Hinge_Tag')
-     hinges(i) % nodes_input = getstr(hinge_prs, 'Hinge_Nodes_Input')
+      hinges(i)%tag = getstr(hinge_prs, 'Hinge_Tag')
+      hinges(i)%nodes_input = getstr(hinge_prs, 'Hinge_Nodes_Input')
 
-     if ( trim(hinges(i) % nodes_input) .eq. 'parametric' ) then
-       hinges(i) % node1 = getrealarray(hinge_prs, 'Node1', 3)
-       hinges(i) % node2 = getrealarray(hinge_prs, 'Node2', 3)
-       hinges(i) % n_nodes = getint(hinge_prs, 'N_Nodes')
-       hinges(i) % node_file = 'hinge with parametric input. If you read this &
-           &string, something probabily went wrong.'
-       allocate( hinges(i)%rr( 3, hinges(i)%n_nodes ) )
-       do j = 1, hinges(i)%n_nodes
-          hinges(i) % rr(:,j) = hinges(i) % node1 + &
-                              ( hinges(i) % node2 - hinges(i) % node1 ) * &
-                               dble(j-1)/dble(hinges(i)%n_nodes-1)
-       end do
+      if ( trim(hinges(i) % nodes_input) .eq. 'parametric' ) then
+        hinges(i)%node1 = getrealarray(hinge_prs, 'Node1', 3)
+        hinges(i)%node2 = getrealarray(hinge_prs, 'Node2', 3)
+        hinges(i)%le1 = 0.0_wp
+        hinges(i)%le2 = 0.0_wp
+        hinges(i)%te1 = 0.0_wp
+        hinges(i)%te2 = 0.0_wp
+        hinges(i)%chord1 = 0.0_wp
+        hinges(i)%chord2 = 0.0_wp
+        hinges(i)%csi1 = 0.0_wp
+        hinges(i)%csi2 = 0.0_wp
 
-     elseif ( trim(hinges(i) % nodes_input) .eq. 'from_file' ) then
+        hinges(i)%n_nodes = getint(hinge_prs, 'N_Nodes')
+        hinges(i)%node_file = 'hinge with parametric input. If you read this &
+                              &string, something probabily went wrong.'
+        allocate( hinges(i)%rr( 3, hinges(i)%n_nodes ) )
+        do j = 1, hinges(i)%n_nodes
+            hinges(i)%rr(:,j) = hinges(i)%node1 + &
+                               (hinges(i)%node2 - hinges(i)%node1 ) * &
+                                  dble(j-1)/dble(hinges(i)%n_nodes-1)
+        end do
+
+      elseif ( trim(hinges(i) % nodes_input) .eq. 'from_file' ) then
        ! *** to do *** fill dummy node1, node2, n_nodes fields
        hinges(i) % node_file = getstr(hinge_prs,'Node_File')
        call read_hinge_nodes( hinges(i)%node_file, &
@@ -1102,9 +1117,9 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
 
      !> Hinge reference direction (zero rotation direction) and offset to
      ! avoid irregular behavior during hinge rotation
-     hinges(i) % ref_dir = getrealarray(hinge_prs, 'Hinge_Ref_Dir', 3)
-     hinges(i) % offset  = getreal(hinge_prs, 'Hinge_Offset')
-     hinges(i) % span_blending = getreal(hinge_prs, 'Hinge_Spanwise_Blending')
+     hinges(i)%ref_dir = getrealarray(hinge_prs, 'Hinge_Ref_Dir', 3)
+     hinges(i)%offset  = getreal(hinge_prs, 'Hinge_Offset')
+     hinges(i)%span_blending = getreal(hinge_prs, 'Hinge_Spanwise_Blending')
 
      !> Hinge input: function, amplitude
      !> Overwrite 'constant' rotation_input with 'function:const'
