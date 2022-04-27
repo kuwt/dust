@@ -336,21 +336,21 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   ! get chordwise division
   allocate(chord_fraction(nelem_chord+1))
   type_chord = getstr(pmesh_prs,'type_chord')
-  
+  !> build adaptive mesh for hinged case   
   if (n_hinges .ge. 1) then 
-          
+    !> allocate surface points for the component 
     allocate(rrv_le(2,nSections));  rrv_le = 0.0_wp 
-    allocate(rrv_te(2,nSections));  rrv_te = 0.0_wp 
+    allocate(rrv_te(2,nSections));  rrv_te = 0.0_wp
+    !> allocate aerodynamic center line for the component 
     allocate(ac_line(2,nSections));  ac_line = 0.0_wp 
-    
-    !write(*,*) 'hinge', hinges(1)%node1
+    !> initialize first section 
     rrv_le (1,1) = -chord_list(1)*ref_chord_fraction
     rrv_te (1,1) = chord_list(1)*(1 - ref_chord_fraction)    
     do iRegion = 1, nRegions
-      !> sweep line
+      !> aerodynamic center line
       ac_line(1, iRegion + 1) = span_list(iRegion)*sin(-sweep_list(iRegion)*pi/180.0_wp) + ac_line(1, iRegion)
       ac_line(2, iRegion + 1) = span_list(iRegion) + ac_line(2, iRegion)
-      !> verteces 
+      !> leading edge and trailing edge points in wind axis  
       rrv_le(1, iRegion + 1) = ac_line(1, iRegion + 1) - chord_list(iRegion + 1)*ref_chord_fraction 
       rrv_te(1, iRegion + 1) = ac_line(1, iRegion + 1) + chord_list(iRegion + 1)*(1 - ref_chord_fraction) 
       rrv_le(2, iRegion + 1) = ac_line(2, iRegion + 1)
@@ -359,50 +359,59 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       do ih = 1, n_hinges
         if ((hinges(ih)%node1(2) .ge. ac_line(2, iRegion)) .and. & 
             (hinges(ih)%node1(2) .le. ac_line(2, iRegion + 1))) then 
-            
+            !> interpolate at hinge station to get the leading edge point
             call linear_interp((/ rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
                                 (/rrv_le(2, iRegion), rrv_le(2, iRegion + 1)/), & 
                                 hinges(ih)%node1(2), hinges(ih)%le1(1))
+            !> interpolate at hinge station to get the trailing edge point
             call linear_interp((/ rrv_te(1, iRegion), rrv_te(1, iRegion + 1)/), &
                                 (/rrv_te(2, iRegion), rrv_te(2, iRegion + 1)/), & 
                                 hinges(ih)%node1(2), hinges(ih)%te1(1))
+            
             hinges(ih)%le1(2) = hinges(ih)%node1(2) 
             hinges(ih)%te1(2) = hinges(ih)%node1(2)
+            !> hinge chord  
             hinges(ih)%chord1 = abs(hinges(ih)%le1(1) - hinges(ih)%te1(1))
+            !> hinge node adimensional location along chord
             hinges(ih)%csi1 = (hinges(ih)%node1(1) - hinges(ih)%le1(1)) / hinges(ih)%chord1 
         endif    
 
         if ((hinges(ih)%node2(2) .ge. ac_line(2, iRegion)) .and. & 
                 (hinges(ih)%node2(2) .le. ac_line(2, iRegion + 1))) then 
-            
+            !> interpolate at hinge station to get the leading edge point
             call linear_interp((/ rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
                               (/rrv_le(2, iRegion), rrv_le(2, iRegion + 1)/), & 
                               hinges(ih)%node2(2), hinges(ih)%le2(1))
+            !> interpolate at hinge station to get the trailing edge point
             call linear_interp((/ rrv_te(1, iRegion), rrv_te(1, iRegion + 1)/), &
                               (/rrv_te(2, iRegion), rrv_te(2, iRegion + 1)/), & 
                               hinges(ih)%node2(2), hinges(ih)%te2(1))
             hinges(ih)%le2(2) = hinges(ih)%node2(2) 
             hinges(ih)%te2(2) = hinges(ih)%node2(2)
+            !> hinge chord
             hinges(ih)%chord2 = abs(hinges(ih)%le2(1) - hinges(ih)%te2(1))
+            !> hinge node adimensional location along chord
             hinges(ih)%csi2 = (hinges(ih)%node2(1) - hinges(ih)%le2(1)) / hinges(ih)%chord2 
 
         endif
-        ! TODO: add warning/errors   
         
+        if (hinges(ih)%csi1 .gt. 1.0_wp .or. hinges(ih)%csi2 .gt. 1.0_wp) then
+          call error(this_sub_name, this_mod_name, '"Hinge "'//trim(hinges(ih)%tag)// & 
+                    '"outside of the chord"' ) 
+        endif  
 
       enddo
 
     enddo 
+    !> cast all the adimensional location into a single vector  
     allocate(csi_hinge_not_unique(2*size(hinges))); csi_hinge_not_unique = 0.0_wp 
-
     do ih = 1, size(hinges)
       csi_hinge_not_unique(ih) = hinges(ih)%csi1
       csi_hinge_not_unique(ih+2) = hinges(ih)%csi2      
     enddo 
-
+    !> delete doubled nodes or merge them in single one if the distance is lower the 1% the chord lenght 
     call unique(csi_hinge_not_unique, csi_hinge, 1e-2_wp)
-
-
+    
   endif 
 
   
@@ -545,7 +554,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
       if ( .not. twist_linear_interp ) then
 
-
         if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then
           ! uniform spacing in span
           rr(:,ista:iend) = rrSection1 + real(i1,wp) / &
@@ -601,7 +609,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                   reshape( (/ cos(twist_rad), sin(twist_rad) , &
                         -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
                                                                 rr_tw_2 )
-        ! === Interpolation weight ===
+        !> Interpolation weight 
         if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then
           interp_weight = real(i1,wp) / real(nelem_span_list(iRegion),wp)
         else if ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then
@@ -1038,29 +1046,8 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr, curv_ac )
     read(fid,*) rr_geo(:,i1)
   end do
   close(fid)
-
-  allocate(csi_half(nelems_chord+1))
-  select case (trim(discr))
-  case('uniform')
-    do i1 = 1 , nelems_chord+1
-      csi_half(i1) = real(i1-1,wp)/real(nelems_chord,wp)
-    end do
-  case('cosine')
-    do i1 = 1 , nelems_chord+1
-      csi_half(i1) = (1.0_wp - cos(pi*real(i1-1,wp)/real(nelems_chord,wp)) )&
-                                                                      / 2.0_wp
-    end do
-  case('cosineLE' , 'cosineIB')
-    do i1 = 1 , nelems_chord+1
-      csi_half(i1) = sin(pi/2.0_wp*real(i1-1,wp)/real(nelems_chord,wp))
-    end do
-  case('cosineTE' , 'cosineOB')
-    do i1 = 1 , nelems_chord+1
-      csi_half(i1) = (1.0_wp - cos(pi/2.0_wp*real(i1-1,wp) &
-                                    /real(nelems_chord,wp)) )
-    end do
-  case default
-  end select
+  
+  call define_division(trim(discr), nelems_chord, csi_half)  
 
   if ( ElType .eq. 'p' ) then
     nelems_chord_tot = 2*nelems_chord+1
