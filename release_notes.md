@@ -1,3 +1,12 @@
+#### 0.7.0-a 
+- Added .c81 correction for vortex lattice element 
+- Added variable vortexrad to the simulation 
+- Added multiple regression test and ci/cd gitlab integration 
+- Added hinge postprocessing 
+- Bugfix for ll load postprocessing 
+- Improved profile generation from .dat file 
+- Improved coupled simulation (cleanup adapter, improved velocity calculation) 
+
 #### 0.6.1-b
 - Fix trailing edge orientation for hinged wake first panel
 - Fixed some bugs when compiling in debug mode
@@ -38,7 +47,6 @@
 - Fixed some bugs
 
 #### 0.5.10-b
-
 - Enabled the use of single precision in all the code
 - Enabled the interaction of particles on panels with FMM
 - Possibility to suppress the trailing edge of single components
@@ -49,87 +57,70 @@
 - Some minor optimizations
 
 #### 0.5.9-b
-
 - introduced pointwise parametric geometry 
 
 #### 0.5.8-b
-
 - additional output for sectional loads of lifting lines
 - added additional output and postprocessing for aeroacoustics
 
 #### 0.5.7-b
-
 - Introduced turbulent viscosity
 - Introduced HCAS
 - Updated particles redistribution
 - Some bug fixed and minor improvements
 
 #### 0.5.6-b
-
 - Minor bugs fixed
 - More output in the lifting lines sectional loads
 
 #### 0.5.5-b
-
 - More efficient linear system treatment
 - Joining of trailing edges
 - Some bugs fixed
 
 #### 0.5.4-b
-
 - Minor bug fixe bug fixess 
 
 #### 0.5.3-b
-
 - Some improvements in the lifting lines
 - Minor bugs fixed
 - Better output and user interface
 
 #### 0.5.2-a
-
 - Minor improvements
 - Some bugs fixed
 
 
 #### 0.5.1-a
-
 - Minor bugfixes
 - Updated and extended examples
 
 #### 0.5.0-a
-
 - Introduced Fast Multipole for particles evolution
 - Introduced vortex stretching and diffusion for vortex particles intensity evolution
 - Completely new calculation of pressure based on Poisson solution
 - Introduced vorticity effects: separation simulation
 
-
 #### 0.4.1-a
-
 - Added the possibility of defining wings and blades mirrored
 
 #### 0.4.0-a
-
 - Some minor features introduced
 - Extensive bug fixing
 
 #### 0.3.0-a
-
 - Added the generation and advection of vortex particles
 - Added postprocessing of such particles
 - Added postprocessing features, averaging etc.
 - Bug fixes
 
-
 #### 0.2.1-a
-
 - Extended models for multiple geometries (i.e. rotors)
 - Added restart capabilities
 - Some minor fixes
 - Some documentation and examples added
 
 #### 0.2.0-a
-
 - Added the lifting line model for lifting surfaces, to enable table lookup of aerodynamic coefficients
 - Added actuator disk model with ring wake for a simple representation of rotors
 - Added extensive postprocessing, in binary tecplot, binary vtk and .dat format
@@ -140,7 +131,6 @@
 
 
 #### 0.1.0-a
-
 - Added a more comprehensive motion interface
   - New input
   - Possibility of motions of the pole
