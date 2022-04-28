@@ -212,7 +212,7 @@ subroutine initialize_mesh( this, geo )
         dnnodes = size(geo%components(i_comp)%rbf%nodes,2)
         !> Increment number of nodes
         nnodes = nnodes + dnnodes
-        !> Hinges ---
+        !> Hinges 
         n_hinges = size(geo%components(i_comp)%hinge)
         do ih = 1, n_hinges
           if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. &

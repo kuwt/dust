@@ -1079,10 +1079,10 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
     !> Open hinge sub-parser
     call getsuboption(geo_prs, 'Hinge', hinge_prs)
 
-      hinges(i)%tag = getstr(hinge_prs, 'Hinge_Tag')
-      hinges(i)%nodes_input = getstr(hinge_prs, 'Hinge_Nodes_Input')
+     hinges(i)%tag = getstr(hinge_prs, 'Hinge_Tag')
+     hinges(i)%nodes_input = getstr(hinge_prs, 'Hinge_Nodes_Input')
 
-      if ( trim(hinges(i) % nodes_input) .eq. 'parametric' ) then
+     if ( trim(hinges(i) % nodes_input) .eq. 'parametric' ) then
         hinges(i)%node1 = getrealarray(hinge_prs, 'Node1', 3)
         hinges(i)%node2 = getrealarray(hinge_prs, 'Node2', 3)
         hinges(i)%le1 = 0.0_wp
@@ -1097,14 +1097,14 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
         hinges(i)%n_nodes = getint(hinge_prs, 'N_Nodes')
         hinges(i)%node_file = 'hinge with parametric input. If you read this &
                               &string, something probabily went wrong.'
-        allocate( hinges(i)%rr( 3, hinges(i)%n_nodes ) )
+       allocate( hinges(i)%rr( 3, hinges(i)%n_nodes ) )
         do j = 1, hinges(i)%n_nodes
             hinges(i)%rr(:,j) = hinges(i)%node1 + &
                                (hinges(i)%node2 - hinges(i)%node1 ) * &
                                   dble(j-1)/dble(hinges(i)%n_nodes-1)
         end do
 
-      elseif ( trim(hinges(i) % nodes_input) .eq. 'from_file' ) then
+     elseif ( trim(hinges(i) % nodes_input) .eq. 'from_file' ) then
        ! *** to do *** fill dummy node1, node2, n_nodes fields
        hinges(i) % node_file = getstr(hinge_prs,'Node_File')
        call read_hinge_nodes( hinges(i)%node_file, &
