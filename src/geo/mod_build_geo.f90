@@ -453,8 +453,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       close(21)
     end if
 
-    if ((trim(coupling_type) .ne. 'll'    ) .and. &
-        (trim(coupling_type) .ne. 'rigid' ) .and. &
+    if ((trim(coupling_type) .ne. 'rigid' ) .and. &
         (trim(coupling_type) .ne. 'rbf'   ) ) then
       
       call error (this_sub_name, this_mod_name, &
@@ -462,7 +461,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         ', but CouplingType is equal to: '//trim(coupling_type)// &
         ', it is not assigned, or it is assigned &
         &as ''none''. Assign a valid CouplingType:'//nl// &
-        '  ll   : ll/beam coupling'//nl// &
         '  rigid: rigid component/node'//nl// &
         '  rbf  : generic component/node'//nl//'Stop'//nl)
     end if
@@ -598,12 +596,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     if ( coupled_comp ) then
       write(*,*) ' coupling_type: ', trim(coupling_type)
 
-      if ( trim(coupling_type) .eq. 'll' ) then
-        call error(this_sub_name, this_mod_name, &
-                    'It is not possible to couple with lifting lines method&
-                    &generic cgns meshes')
-
-      elseif ( trim(coupling_type) .eq. 'rigid' ) then
+      if ( trim(coupling_type) .eq. 'rigid' ) then
         !> Rigid coupling between a rigid component and a "structural" node,
         ! defined as an input, coupling_node. This node represents the
         ! reference configuration for data communication between the aerodynamic
@@ -680,11 +673,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     if ( coupled_comp ) then
       write(*,*) ' coupling_type: ', trim(coupling_type)
 
-      if ( trim(coupling_type) .eq. 'll' ) then
-        call error(this_sub_name, this_mod_name, &
-                    'It is not possible to couple with lifting lines method&
-                    &generic cgns meshes')
-      elseif ( trim(coupling_type) .eq. 'rigid' ) then
+      if ( trim(coupling_type) .eq. 'rigid' ) then
         !> Rigid coupling between a rigid component and a "structural" node,
         ! defined as an input, coupling_node. This node represents the
         ! reference configuration for data communication between the aerodynamic
@@ -966,39 +955,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
           end if
         end if
 
-      if ( trim(coupling_type) .eq. 'll' ) then
-        !> Compute the reference chord vector, for geometry transformation
-        ! of the deformable component. Meant for blades, wings defined using
-        ! the local y-axis as the spanwise direction and the x-axis as the
-        ! streamwise direction, pointing from the LE towards the TE
-        allocate(c_ref_p(3, nelems_span+1)); c_ref_p = 0.0_wp
-        do i = 1, size(c_ref_p,2)
-          c_ref_p(:,i) = chord_p(i) * &
-              matmul( transpose(coupling_node_rot) , &
-                      (/ cos(theta_p(i)), 0.0_wp, -sin(theta_p(i)) /) )
-        end do
-
-        allocate(c_ref_c(3, size(ee,2))); c_ref_c = 0.0_wp
-        do i =1, size(c_ref_c,2)
-          do j = 1, 4
-            n_non_zero = 0
-            if ( ee(j,i) .ne. 0 ) then
-              n_non_zero = n_non_zero + 1
-              c_ref_c(:,i) = c_ref_c(:,i) + rr(:,ee(j,i))
-            end if
-          end do
-          !> Offset
-          c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero)
-          ! *** to do *** check if the lines above for c_ref_c are useless in
-          ! ll coupling. If they are needed, check if a rotation is missing
-          ! ( see above, lines for c_ref_p )
-        end do
-
-        !> Write to hdf5 geo file
-        call write_hdf5(c_ref_p,'c_ref_p',geo_loc)
-        call write_hdf5(c_ref_c,'c_ref_c',geo_loc)
-
-      elseif ( trim(coupling_type) .eq. 'rigid' ) then
+      if ( trim(coupling_type) .eq. 'rigid' ) then
         !> Rigid coupling between a rigid component and a "structural" node,
         ! defined as an input, coupling_node. This node represents the
         ! reference configuration for data communication between the aerodynamic

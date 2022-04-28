@@ -972,16 +972,6 @@ subroutine load_components(geo, in_file, out_file, te)
     comp_coupling = .false.
 #if USE_PRECICE
     if ( trim(comp_coupling_str) .eq. 'true' ) comp_coupling = .true.
-
-    if ( trim(comp_coupling_str) .eq. 'true' ) then
-      if ( ( comp_el_type(1:1) .ne. 'l' ) .and. &
-            ( trim(comp_coupling_type) .eq. 'll' ) ) then
-        call error (this_sub_name, this_mod_name, &
-            ' Coupled = T and CouplingType = ll for component <'//trim(comp_name)// &
-            '>, but it is not a LL element. So far, coupling is implemented &
-            &for lifting line elements only. Stop'//nl)
-      end if
-    end if
 #else
     if ( trim(comp_coupling_str) .eq. 'true' ) then
       call error (this_sub_name, this_mod_name, &
@@ -1207,8 +1197,7 @@ subroutine load_components(geo, in_file, out_file, te)
       !> PreCICE coupling 
       if ( trim(comp_coupling_str) .eq. 'true' ) then
 
-        if (( trim(comp_coupling_type) .eq. 'll' ) .or. &
-            ( trim(comp_coupling_type) .eq. 'rigid' ) ) then
+        if (trim(comp_coupling_type) .eq. 'rigid' ) then
           call read_hdf5_al(c_ref_p, 'c_ref_p', geo_loc)
           call read_hdf5_al(c_ref_c, 'c_ref_c', geo_loc)
           allocate(geo%components(i_comp)%c_ref_p( size(c_ref_p,1) , &
@@ -1218,21 +1207,10 @@ subroutine load_components(geo, in_file, out_file, te)
           geo%components(i_comp)%c_ref_p = c_ref_p
           geo%components(i_comp)%c_ref_c = c_ref_c
 
-          if ( trim(comp_coupling_type) .eq. 'll' ) then
-            call read_hdf5_al(xac_p  , 'x_ac_p' , geo_loc)
-            allocate( geo%components(i_comp)%xac( size(xac_p,1) ) )
-            geo%components(i_comp)%xac     = xac_p
-          end if
-          !> === PreCICE connectivity for LL ===
-          if ( trim(comp_coupling_type) .eq. 'll' ) then
-            !> For ll/beam coupling, only LE nodes are coupled with structural
-            !  nodes, while each TE node follows its LE node with a rigid motion
-            np_precice = size(rr,2)/2
-          elseif ( trim(comp_coupling_type) .eq. 'rigid' ) then
-            !> For rigid coupling, the motion of all the nodes of the components
-            !  is defined through the motion of the coupling_node
-            np_precice = 1
-          end if
+          !> For rigid coupling, the motion of all the nodes of the components
+          !  is defined through the motion of the coupling_node
+          np_precice = 1
+
           !> Allocate and fill i_points_precice array containing the
           !  connectivity between dust with PreCICE nodes
           allocate(geo%components(i_comp)%i_points_precice( np_precice ))

@@ -202,18 +202,7 @@ subroutine initialize_mesh( this, geo )
     coupling      = geo%components(i_comp)%coupling
     coupling_type = geo%components(i_comp)%coupling_type
     if ( coupling ) then
-      if ( trim(coupling_type) .eq. 'll' ) then
-        !> ll coupling
-        if ( trim(geo%components(i_comp)%comp_el_type) .eq. 'l' ) then
-          !> Set PreCICE nodes with LE only! ***to do***
-          dnnodes = size(geo%components(i_comp)%i_points) / 2
-          !> Increment number of nodes
-          nnodes = nnodes + dnnodes
-        else
-          write(*,*) ' Error in initialize mesh. CouplingType=ll '&
-                      'while comp_el_type .ne. l. Stop'; stop
-        end if
-      elseif ( trim(coupling_type) .eq. 'rigid' ) then
+      if ( trim(coupling_type) .eq. 'rigid' ) then
         !> rigid coupling
         !> Increment number of nodes
         dnnodes = 1
@@ -234,7 +223,7 @@ subroutine initialize_mesh( this, geo )
         end do
       else
         write(*,*) ' Error in initialize mesh. CouplingType= '// &
-                    trim(coupling_type)//', while only ll, rigid'&
+                    trim(coupling_type)//', while only rigid'&
                     ' CouplingType are implemented. Stop'; stop
       end if
     end if
@@ -253,14 +242,7 @@ subroutine initialize_mesh( this, geo )
     coupling      = geo%components(i_comp)%coupling
     coupling_type = geo%components(i_comp)%coupling_type
     if ( coupling ) then
-      if ( trim(coupling_type) .eq. 'll' ) then
-        !> ll coupling
-        dnnodes = size(geo%components(i_comp)%i_points) / 2
-        !> Here in the local reference frame ! ***to do***
-        this%mesh%nodes(:,nnodes+1:nnodes+dnnodes) = &
-          geo%components(i_comp)%loc_points(:,1:2*dnnodes:2)
-        nnodes = nnodes + dnnodes
-      elseif ( trim(coupling_type) .eq. 'rigid' ) then
+      if ( trim(coupling_type) .eq. 'rigid' ) then
         !> rigid coupling
         dnnodes = 1
         !> Here in the local reference frame ! ***to do***
@@ -360,7 +342,6 @@ subroutine initialize_fields( this )
     end if
   end do
 
-
 end subroutine initialize_fields
 
 !----------------------------------------------------------------
@@ -392,59 +373,8 @@ subroutine update_force( this, geo, elems )
 
     if ( comp%coupling ) then
 
-      !> ll coupling -----------------------------------------------------------
-      if ( trim(comp%coupling_type) .eq. 'll' ) then
-
-        !> Reset force and moment fields, to be filled by accumulation
-        do i = 1, size(comp%i_points_precice)
-          this%fields(j_for)%fdata(:, comp%i_points_precice(i) ) = 0.0_wp
-          this%fields(j_mom)%fdata(:, comp%i_points_precice(i) ) = 0.0_wp
-        end do
-
-        if ( comp%comp_el_type(1:1) .eq. 'l' ) then
-          do i = 1, size(comp%i_points_precice)-1
-
-            ip = comp%i_points_precice(i)
-
-            !> Accumulation of forces
-            this%fields(j_for)%fdata(:, ip)   = this%fields(j_for)%fdata(:, ip) + &
-                                     0.5_wp * comp%el(i)%dforce
-            this%fields(j_for)%fdata(:, ip+1) = this%fields(j_for)%fdata(:, ip+1) + &
-                                     0.5_wp * comp%el(i)%dforce
-
-            !> Rotation matrix
-            n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(i))
-            theta = norm2( n_rot )
-            if ( theta .lt. eps ) then
-              n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
-              theta = 0.0_wp
-            else
-              n_rot = n_rot / theta
-            end if
-
-            off = 0.5_wp * ( comp%xac(i) + comp%xac(i+1) )
-            chord = 0.5_wp * ( comp%c_ref_p(:,i) + comp%c_ref_p(:,i+1) )
-            chord = -off * chord/norm2(chord)
-            off_rot =  cos(theta) * chord + &
-                       sin(theta) * cross( n_rot, chord ) + &
-                     ( 1.0_wp - cos(theta) )*sum( chord*n_rot ) * n_rot
-            ell = ( this%fields(j_pos)%fdata(:, comp%i_points_precice(i+1) ) &
-                  - this%fields(j_pos)%fdata(:, comp%i_points_precice(i  ) ) ) * 0.5_wp
-            radius_1 =   ell + off_rot
-            radius_2 = - ell + off_rot
-
-            !> Accumulation of moments
-            this%fields(j_mom)%fdata(:, ip)   = this%fields(j_mom)%fdata(:, ip) + &
-                                     0.5_wp * comp%el(i)%dmom + &
-                   0.5_wp * cross( radius_1 , comp%el(i)%dforce )
-            this%fields(j_mom)%fdata(:, ip+1) = this%fields(j_mom)%fdata(:, ip+1) + &
-                                     0.5_wp * comp%el(i)%dmom + &
-                   0.5_wp * cross( radius_2 , comp%el(i)%dforce )
-          end do
-        end if
-
       !> rigid coupling --------------------------------------------------------
-      elseif ( trim(comp%coupling_type) .eq. 'rigid' ) then
+      if ( trim(comp%coupling_type) .eq. 'rigid' ) then
         !> rigid coupling. All the forces and moments are reduced to
         ! the coupling_node
         ip = comp%i_points_precice(1)
@@ -547,10 +477,8 @@ subroutine update_force( this, geo, elems )
                     comp%rbf%cen%wei(iw,i) * comp%el(i)%dforce
 
             !> Moments
-            ! ================================================================================
-            !!! IF to activate only for ll element with RBF coupling!!!!
             if ( comp%comp_el_type(1:1) .eq. 'l' ) then
-              comp%el(i)%cen =  sum ( comp%el(i)%ver(:,1:2),2 ) / 2.0_wp !! only for l component
+              comp%el(i)%cen =  sum ( comp%el(i)%ver(:,1:2),2 ) / 2.0_wp
             endif
 
             this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) + &
@@ -661,8 +589,6 @@ subroutine update_force_coupled_hinge( this, comp, hinge, j_for, j_mom )
   end do
 
   !> Blen
-  ! *** to do *** use the law of motion in the blending region to obtain
-  ! a consistent interpolation of force and moments (Power_a = Power_b + Power_h)
   n_nodes = size( hinge%blen_cen%node_id )
   do i = 1, n_nodes
 
@@ -713,7 +639,6 @@ subroutine update_force_coupled_hinge( this, comp, hinge, j_for, j_mom )
 
   end do
 
-
 end subroutine update_force_coupled_hinge
 
 !----------------------------------------------------------------
@@ -752,83 +677,8 @@ subroutine update_elems( this, geo, elems, te )
 
     if ( comp%coupling ) then
 
-      !> ll coupling -----------------------------------------------------------
-      if ( trim(comp%coupling_type) .eq. 'll' ) then
-
-        !> Reset comp%el()%ub, vel_ctr_pt: these fields are the average value of the
-        ! velocity of the neighboring points and they will be filled "by accumulation"
-        do i = 1, size(comp%el)
-          select type( el => comp%el(i) ); type is(t_liftlin)
-            el%ub = 0.0_wp ;  el%vel_ctr_pt = 0.0_wp
-          end select
-        end do
-
-        do i = 1, size(comp%i_points_precice)
-
-          !> === Position of LE and TE ===
-          !> Rotation matrix
-          n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(i))
-          theta = norm2( n_rot )
-          if ( theta .lt. eps ) then
-            n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
-            theta = 0.0_wp
-          else
-            n_rot = n_rot / theta
-          end if
-          !> Angular velocity of the point at the LE
-          omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(i))
-
-          chord = comp%c_ref_p(:,i)
-          chord_rot =  cos(theta) * chord + &
-                       sin(theta) * cross( n_rot, chord ) + &
-                     ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
-
-          !> Position of the LE
-          geo%points(:, comp%i_points( 2*i-1 ) ) = &
-              this%fields(j_pos)%fdata(:, comp%i_points_precice( i ) ) &
-              - chord_rot * comp%xac(i)/norm2(chord_rot)
-
-          !> Position of the TE
-          geo%points(:, comp%i_points( 2*i ) ) = &
-              geo%points(:, comp%i_points( 2*i-1 ) ) + &
-              chord_rot
-
-          !> Velocity of the LE
-          geo%points_vel(:, comp%i_points( 2*i-1 ) ) = &
-              this%fields(j_vel)%fdata(:, comp%i_points_precice( i ) ) - &
-              cross( omega, chord_rot ) * comp%xac(i)/norm2(chord_rot)
-
-          !> Velocity of the TE
-          geo%points_vel(:, comp%i_points( 2*i ) ) = &
-              this%fields(j_vel)%fdata(:, comp%i_points_precice( i ) ) + &
-              cross( omega, chord_rot ) * ( 1.0_wp - comp%xac(i)/norm2(chord_rot) )
-
-          !> Velocity of the control point on the LL ( accumulation ), vel_ctr_pt
-          ! and velocity of the center of the QUAD el, ub
-          ! These velocities are evaluated as the average of the points of the
-          ! elements, exploiting the implicit connectivity of the LL components
-          ! *** to do *** for general elements, an explicit definition of the
-          ! connectivity may be required
-          if ( i .lt. size(comp%i_points_precice) ) then
-            select type( el => comp%el(i) ); type is(t_liftlin)
-              el%ub = el%ub + &
-                    0.25_wp * ( geo%points_vel(:, comp%i_points( 2*i-1 ) ) + &
-                                geo%points_vel(:, comp%i_points( 2*i   ) ) )
-            end select
-          end if
-          if ( i .gt. 1 ) then
-            select type( el => comp%el(i-1) ); type is(t_liftlin)
-              el%ub = el%ub + &
-                    0.25_wp * ( geo%points_vel(:, comp%i_points( 2*i-1 ) ) + &
-                                geo%points_vel(:, comp%i_points( 2*i   ) ) )
-            end select
-          end if
-
-
-        end do ! precice points associated to the component
-
       !> rigid coupling --------------------------------------------------------
-      elseif ( trim(comp%coupling_type) .eq. 'rigid' ) then
+      if ( trim(comp%coupling_type) .eq. 'rigid' ) then
 
         !> === Coupling node ===
         !> Position
@@ -1094,7 +944,7 @@ subroutine update_elems( this, geo, elems, te )
           end do
 
         endif 
-!!
+
         !!> *** to do *** move to a function: update_elems_coupled_hinges(), here in mod_precice
         !!> *** to do *** blending regions
         !! -------------------------------------------------------------------------------
@@ -1376,7 +1226,7 @@ subroutine update_elems( this, geo, elems, te )
         call error('update_elems','mod_precice', &
                   ' Wrong CouplingType: '//trim(comp%coupling_type)// &
                   ' for component: '//trim(comp%comp_name)// &
-                  '. So far, available CouplingType inputs are: ll, rigid, rbf.'// &
+                  '. So far, available CouplingType inputs are: rigid, rbf.'// &
                   ' Stop.'); stop
       end if
 
@@ -1419,29 +1269,6 @@ subroutine update_near_field_wake( this, geo, wake, te )
     if ( geo%components( wake%pan_gen_icomp(ip) )%coupling ) then
 
       if ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) &
-            .eq. 'll' ) then
-
-        !> LL coupling
-        i_point = wake%pan_gen_points(1,ip)
-        dist = geo%points(:,i_point) - geo%points(:,i_point-1)
-        dist = dist/norm2(dist)
-
-        vel_te = geo%points_vel(:, wake%pan_gen_icomp(ip))
-        wind = variable_wind(geo%points(:,wake%pan_gen_icomp),sim_param%time)
-
-        if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
-          wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-                                      dist*wake%pan_gen_scaling(ip)* &
-                                      norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &
-                                      real(sim_param%ndt_update_wake,wp)
-        else
-          wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-                                      dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
-                                      sim_param%min_vel_at_te*sim_param%dt * &
-                                      real(sim_param%ndt_update_wake,wp)
-        end if
-
-      elseif ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) &
               .eq. 'rigid' ) then
 
         !> rigid coupling
@@ -1473,8 +1300,8 @@ subroutine update_near_field_wake( this, geo, wake, te )
              real(sim_param%ndt_update_wake,wp)
         end if
 
-      elseif ( trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) &
-               .eq. 'rbf' ) then
+      elseif (trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) &
+              .eq. 'rbf' ) then
 
         !> rbf coupling (general coupling)
         !> Rotation
@@ -1498,19 +1325,19 @@ subroutine update_near_field_wake( this, geo, wake, te )
 
 
 
-           ! *** to do ***
-           ! So far, t_te inherits orientation ONLY from the closest coupling node,
-           ! without interpolation with rbf coefficients
-           n_rot = this%fields(j_rot)%fdata(:, &
-                   comp%i_points_precice( comp%rbf%nod%ind(1,iw) ) )
-           theta = norm2( n_rot )
- 
-           if ( theta .lt. eps ) then
-             n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
-             theta = 0.0_wp
-           else
-             n_rot = n_rot / theta
-           end if
+          ! *** to do ***
+          ! So far, t_te inherits orientation ONLY from the closest coupling node,
+          ! without interpolation with rbf coefficients
+          n_rot = this%fields(j_rot)%fdata(:, &
+                  comp%i_points_precice( comp%rbf%nod%ind(1,iw) ) )
+          theta = norm2( n_rot )
+
+          if ( theta .lt. eps ) then
+            n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
+            theta = 0.0_wp
+          else
+            n_rot = n_rot / theta
+          end if
 
                dist =  cos(theta) * wake%pan_gen_dir(:,ip) + &
                        sin(theta) * cross( n_rot, wake%pan_gen_dir(:,ip) ) + &
@@ -1555,7 +1382,7 @@ subroutine update_near_field_wake( this, geo, wake, te )
       call wake%wake_panels(ip,ir)%calc_geo_data( &
         reshape((/wake%pan_w_points(:,p1,ir),   wake%pan_w_points(:,p2,ir), &
                   wake%pan_w_points(:,p2,ir+1), wake%pan_w_points(:,p1,ir+1)/),&
-                                                                     (/3,4/)))
+                                                                    (/3,4/)))
     enddo
   enddo
 
