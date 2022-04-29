@@ -33,60 +33,37 @@ The results are then employed by the postprocessor which elaborates the data
 according to the user requests.
 
 ## Core Features
-<p>
-<details>
 
-  <summary markdown="span">Flexible Geometry and Movement </summary>
+#### Flexible Geometry and Movement
 
-  Import custom surface meshes. Or build them parametrically. Assign them to a reference frame, and make it move. And rotors build themselves!
+Import custom surface meshes. Or build them parametrically. Assign them to a reference frame, and make it move. And rotors build themselves!
 
-</details>
-</p>
-<p>
-<details>
+### Scalable Models 
 
-  <summary markdown="span">Scalable Models  </summary>
+Choose the fidelity level: from single dimensional lifting line to fully three dimensional objects choose the right model for the required fidelity, for every component, all in the same simulation. 
 
-  Choose the fidelity level: from single dimensional lifting line to fully three dimensional objects choose the right model for the required fidelity,
-  for every component, all in the same simulation. 
+### Particles Wake
 
-</details>
-</p>
-<p>
-<details>
+Choose the Fast Multipole optimized particle wake to simulate complex interactions among wakes and with solid bodies with exceptional robustness. 
 
-  <summary markdown="span">Particles Wake </summary>
+### Designed for Performance 
 
-   Choose the Fast Multipole optimized particle wake to simulate complex interactions among wakes and with solid bodies with exceptional robustness. 
+Designed from scratch to deliver mid-fidelity aerodynamics analysis at workstation level, with no requirements for cluster level resources. 
 
-</details>
-</p>
-<p>
-<details>
+### Transient Maneuver
 
-  <summary markdown="span">Designed for Performance  </summary>
+<img src="/uploads/80fb401b59239a9e0f2348e33bb8b3e3/gif_1_.gif" alt="Vid" width="700px"/>
 
-  Designed from scratch to deliver mid-fidelity aerodynamics analysis at workstation level, with no requirements for cluster level resources. 
+### Aeroelastic Simulation
 
-</details>
-</p>
+<img src="/uploads/b8a3d697608fdd1bd29869ae9bdfa20a/gif.gif" alt="Vid" width="700px"/>
 
 
 ## Documentation
 
 In the doc folder can be found a **[quick_start.pdf](doc/quick_start.pdf)** containing a description of the provided examples.
 
-<div class="panel panel-info">
 
-**Output**
-{: .panel-heading}
-
-<div class="panel-body">
-<figure class="video_container">
-  <iframe src="https://www.youtube.com/embed/enMumwvLAug" frameborder="0" allowfullscreen="true"> </iframe>
-</figure>
-</div>
-</div>
 
 ## Installation
 
