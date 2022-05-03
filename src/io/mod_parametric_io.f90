@@ -81,7 +81,7 @@ contains
 !----------------------------------------------------------------------
 
 subroutine read_mesh_parametric(mesh_file,ee,rr, &
-                    npoints_chord_tot, nelem_span_tot, hinges, n_hinges, mesh_mirror, &
+                    npoints_chord_tot, nelem_span_tot, hinges, n_hinges, mesh_mirror, mesh_symmetry, &
                     airfoil_list_actual, i_airfoil_e, normalised_coord_e, & 
                     aero_table_out, curv_ac)
 
@@ -90,7 +90,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   real(wp) , allocatable, intent(out)       :: rr(:,:)
   integer  , intent(out), optional          :: npoints_chord_tot, nelem_span_tot 
   integer  , intent(in)                     :: n_hinges
-  logical  , intent(in)                     :: mesh_mirror
+  logical  , intent(in)                     :: mesh_mirror, mesh_symmetry
 
   type(t_hinge_input), allocatable, intent(inout) :: hinges(:)
   type(t_parse)                             :: pmesh_prs
@@ -347,7 +347,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     !> allocate aerodynamic center line for the component 
     allocate(ac_line(2,nSections));  ac_line = 0.0_wp 
     !> initialize first section 
-    if (mesh_mirror) then 
+    if (mesh_mirror .or. mesh_symmetry) then 
       rrv_le (1,nRegions + 1) = -chord_list(nRegions + 1)*ref_chord_fraction
       rrv_te (1,nRegions + 1) = chord_list(nRegions + 1)*(1 - ref_chord_fraction)
     else
@@ -356,7 +356,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     endif     
     do iRegion = 1, nRegions
       !> aerodynamic center line      
-      if (mesh_mirror) then 
+      if (mesh_mirror .or. mesh_symmetry) then 
         ac_line(1, iRegion + 1) = span_list(iRegion)*sin(sweep_list(iRegion)*pi/180.0_wp) + ac_line(1, iRegion)
         ac_line(2, iRegion + 1) = -(span_list(iRegion) + ac_line(2, iRegion))
       else 
@@ -365,7 +365,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       endif 
     enddo
 
-    if (mesh_mirror) then  
+    if (mesh_mirror .or. mesh_symmetry) then  
       ac_line(:, nRegions+1:1:-1) = ac_line
       chord_list(nRegions+1:1:-1) = chord_list
 
@@ -390,7 +390,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     endif 
     do iRegion = 1, nRegions
       do ih = 1, n_hinges
-        if (mesh_mirror) then 
+        if (mesh_mirror .or. mesh_symmetry) then 
 
           if ((hinges(ih)%node2(2) .le. ac_line(2, iRegion + 1)) .and. & 
               (hinges(ih)%node2(2) .ge. ac_line(2, iRegion))) then 
