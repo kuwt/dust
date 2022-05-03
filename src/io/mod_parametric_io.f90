@@ -81,7 +81,7 @@ contains
 !----------------------------------------------------------------------
 
 subroutine read_mesh_parametric(mesh_file,ee,rr, &
-                    npoints_chord_tot, nelem_span_tot, hinges, n_hinges, &
+                    npoints_chord_tot, nelem_span_tot, hinges, n_hinges, mesh_mirror, &
                     airfoil_list_actual, i_airfoil_e, normalised_coord_e, & 
                     aero_table_out, curv_ac)
 
@@ -90,6 +90,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   real(wp) , allocatable, intent(out)       :: rr(:,:)
   integer  , intent(out), optional          :: npoints_chord_tot, nelem_span_tot 
   integer  , intent(in)                     :: n_hinges
+  logical  , intent(in)                     :: mesh_mirror
 
   type(t_hinge_input), allocatable, intent(inout) :: hinges(:)
   type(t_parse)                             :: pmesh_prs
@@ -121,11 +122,11 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
   !> hinge mesh 
   real(wp), allocatable                     :: rrv_le(:,:), rrv_te(:,:), ac_line(:,:) 
-  integer                                   :: ih, ia 
+  integer                                   :: ih, ia
   real(wp), allocatable                     :: csi_hinge_not_unique(:), csi_hinge(:)
   real(wp), allocatable                     :: delta_x(:), delta_x_no_off(:), csi_adim(:) 
   integer, allocatable                      :: point_region(:)
-  
+  real(wp)                                  :: merge_tol 
   !> Regions  
   integer , allocatable                     :: nelem_span_list(:)
   real(wp), allocatable                     :: span_list(:) 
@@ -296,7 +297,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   allocate(airfoil_table_list(nSections))
   allocate(curv_ac_section1(nRegions)); curv_ac_section1 = 0.0_wp
   allocate(curv_ac_section2(nRegions)); curv_ac_section2 = 0.0_wp
-!  allocate(curv_ac(2,nSections)); curv_ac = 0.0_wp
 
   do iSection= 1, nSections
     chord_list(iSection)   = getreal(pmesh_prs,'chord')
@@ -347,74 +347,149 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     !> allocate aerodynamic center line for the component 
     allocate(ac_line(2,nSections));  ac_line = 0.0_wp 
     !> initialize first section 
-    rrv_le (1,1) = -chord_list(1)*ref_chord_fraction
-    rrv_te (1,1) = chord_list(1)*(1 - ref_chord_fraction)    
+    if (mesh_mirror) then 
+      rrv_le (1,nRegions + 1) = -chord_list(nRegions + 1)*ref_chord_fraction
+      rrv_te (1,nRegions + 1) = chord_list(nRegions + 1)*(1 - ref_chord_fraction)
+    else
+      rrv_le (1,1) = -chord_list(1)*ref_chord_fraction
+      rrv_te (1,1) = chord_list(1)*(1 - ref_chord_fraction)
+    endif     
     do iRegion = 1, nRegions
-      !> aerodynamic center line
-      ac_line(1, iRegion + 1) = span_list(iRegion)*sin(-sweep_list(iRegion)*pi/180.0_wp) + ac_line(1, iRegion)
-      ac_line(2, iRegion + 1) = span_list(iRegion) + ac_line(2, iRegion)
+      !> aerodynamic center line      
+      if (mesh_mirror) then 
+        ac_line(1, iRegion + 1) = span_list(iRegion)*sin(sweep_list(iRegion)*pi/180.0_wp) + ac_line(1, iRegion)
+        ac_line(2, iRegion + 1) = -(span_list(iRegion) + ac_line(2, iRegion))
+      else 
+        ac_line(1, iRegion + 1) = span_list(iRegion)*sin(sweep_list(iRegion)*pi/180.0_wp) + ac_line(1, iRegion)
+        ac_line(2, iRegion + 1) = +(span_list(iRegion) + ac_line(2, iRegion))
+      endif 
+    enddo
+
+    if (mesh_mirror) then  
+      ac_line(:, nRegions+1:1:-1) = ac_line
+      chord_list(nRegions+1:1:-1) = chord_list
+
+      do iRegion = 1, nRegions + 1
       !> leading edge and trailing edge points in wind axis  
-      rrv_le(1, iRegion + 1) = ac_line(1, iRegion + 1) - chord_list(iRegion + 1)*ref_chord_fraction 
-      rrv_te(1, iRegion + 1) = ac_line(1, iRegion + 1) + chord_list(iRegion + 1)*(1 - ref_chord_fraction) 
-      rrv_le(2, iRegion + 1) = ac_line(2, iRegion + 1)
-      rrv_te(2, iRegion + 1) = ac_line(2, iRegion + 1)
-      
+        rrv_le(1, iRegion) = ac_line(1, iRegion) - chord_list(iRegion)*ref_chord_fraction 
+        rrv_te(1, iRegion) = ac_line(1, iRegion) + chord_list(iRegion)*(1 - ref_chord_fraction) 
+        rrv_le(2, iRegion) = ac_line(2, iRegion)
+        rrv_te(2, iRegion) = ac_line(2, iRegion)
+      end do 
+      chord_list(nRegions+1:1:-1) = chord_list
+    else 
+
+      do iRegion = 1, nRegions
+        !> leading edge and trailing edge points in wind axis  
+        rrv_le(1, iRegion + 1) = ac_line(1, iRegion + 1) - chord_list(iRegion + 1)*ref_chord_fraction 
+        rrv_te(1, iRegion + 1) = ac_line(1, iRegion + 1) + chord_list(iRegion + 1)*(1 - ref_chord_fraction) 
+        rrv_le(2, iRegion + 1) = ac_line(2, iRegion + 1)
+        rrv_te(2, iRegion + 1) = ac_line(2, iRegion + 1)
+      end do 
+    
+    endif 
+    do iRegion = 1, nRegions
       do ih = 1, n_hinges
-        if ((hinges(ih)%node1(2) .ge. ac_line(2, iRegion)) .and. & 
-            (hinges(ih)%node1(2) .le. ac_line(2, iRegion + 1))) then 
-            !> interpolate at hinge station to get the leading edge point
-            call linear_interp((/ rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
-                                (/rrv_le(2, iRegion), rrv_le(2, iRegion + 1)/), & 
+        if (mesh_mirror) then 
+
+          if ((hinges(ih)%node2(2) .le. ac_line(2, iRegion + 1)) .and. & 
+              (hinges(ih)%node2(2) .ge. ac_line(2, iRegion))) then 
+              !> interpolate at hinge station to get the leading edge point
+              call linear_interp((/ rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
+                                  (/rrv_le(2, iRegion), rrv_le(2, iRegion + 1)/), & 
+                                  hinges(ih)%node2(2), hinges(ih)%le2(1))
+              !> interpolate at hinge station to get the trailing edge point
+              call linear_interp((/ rrv_te(1, iRegion), rrv_te(1, iRegion + 1)/), &
+                                  (/rrv_te(2, iRegion), rrv_te(2, iRegion + 1)/), & 
+                                  hinges(ih)%node2(2), hinges(ih)%te2(1))
+              hinges(ih)%le2(2) = hinges(ih)%node2(2) 
+              hinges(ih)%te2(2) = hinges(ih)%node2(2)
+              !> hinge chord  
+              hinges(ih)%chord2 = abs(hinges(ih)%le2(1) - hinges(ih)%te2(1))
+              !> hinge node adimensional location along chord
+              hinges(ih)%csi2 = (hinges(ih)%node2(1) - hinges(ih)%le2(1)) / hinges(ih)%chord2 
+
+          endif    
+
+          if ((hinges(ih)%node1(2) .le. ac_line(2, iRegion + 1)) .and. & 
+              (hinges(ih)%node1(2) .ge. ac_line(2, iRegion))) then 
+              !> interpolate at hinge station to get the leading edge point
+              call linear_interp((/rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
+                                (/ rrv_le(2, iRegion), rrv_le(2, iRegion + 1)/), & 
                                 hinges(ih)%node1(2), hinges(ih)%le1(1))
-            !> interpolate at hinge station to get the trailing edge point
-            call linear_interp((/ rrv_te(1, iRegion), rrv_te(1, iRegion + 1)/), &
-                                (/rrv_te(2, iRegion), rrv_te(2, iRegion + 1)/), & 
+              !> interpolate at hinge station to get the trailing edge point
+              call linear_interp((/rrv_te(1, iRegion), rrv_te(1, iRegion + 1)/), &
+                                (/ rrv_te(2, iRegion), rrv_te(2, iRegion + 1)/), & 
                                 hinges(ih)%node1(2), hinges(ih)%te1(1))
-            
-            hinges(ih)%le1(2) = hinges(ih)%node1(2) 
-            hinges(ih)%te1(2) = hinges(ih)%node1(2)
-            !> hinge chord  
-            hinges(ih)%chord1 = abs(hinges(ih)%le1(1) - hinges(ih)%te1(1))
-            !> hinge node adimensional location along chord
-            hinges(ih)%csi1 = (hinges(ih)%node1(1) - hinges(ih)%le1(1)) / hinges(ih)%chord1 
-        endif    
+              hinges(ih)%le1(2) = hinges(ih)%node1(2) 
+              hinges(ih)%te1(2) = hinges(ih)%node1(2)
+              !> hinge chord
+              hinges(ih)%chord1 = abs(hinges(ih)%le1(1) - hinges(ih)%te1(1))
+              !> hinge node adimensional location along chord
+              hinges(ih)%csi1 = (hinges(ih)%node1(1) - hinges(ih)%le1(1)) / hinges(ih)%chord1 
+          endif 
+        else
+          if ((hinges(ih)%node1(2) .ge. ac_line(2, iRegion)) .and. & 
+              (hinges(ih)%node1(2) .le. ac_line(2, iRegion + 1))) then 
+              
+              !> interpolate at hinge station to get the leading edge point
+              call linear_interp((/ rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
+                                  (/rrv_le(2, iRegion), rrv_le(2, iRegion + 1)/), & 
+                                  hinges(ih)%node1(2), hinges(ih)%le1(1))
 
-        if ((hinges(ih)%node2(2) .ge. ac_line(2, iRegion)) .and. & 
-                (hinges(ih)%node2(2) .le. ac_line(2, iRegion + 1))) then 
-            !> interpolate at hinge station to get the leading edge point
-            call linear_interp((/ rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
-                              (/rrv_le(2, iRegion), rrv_le(2, iRegion + 1)/), & 
-                              hinges(ih)%node2(2), hinges(ih)%le2(1))
-            !> interpolate at hinge station to get the trailing edge point
-            call linear_interp((/ rrv_te(1, iRegion), rrv_te(1, iRegion + 1)/), &
-                              (/rrv_te(2, iRegion), rrv_te(2, iRegion + 1)/), & 
-                              hinges(ih)%node2(2), hinges(ih)%te2(1))
-            hinges(ih)%le2(2) = hinges(ih)%node2(2) 
-            hinges(ih)%te2(2) = hinges(ih)%node2(2)
-            !> hinge chord
-            hinges(ih)%chord2 = abs(hinges(ih)%le2(1) - hinges(ih)%te2(1))
-            !> hinge node adimensional location along chord
-            hinges(ih)%csi2 = (hinges(ih)%node2(1) - hinges(ih)%le2(1)) / hinges(ih)%chord2 
+              !> interpolate at hinge station to get the trailing edge point
+              call linear_interp((/ rrv_te(1, iRegion), rrv_te(1, iRegion + 1)/), &
+                                  (/rrv_te(2, iRegion), rrv_te(2, iRegion + 1)/), & 
+                                  hinges(ih)%node1(2), hinges(ih)%te1(1))
+              
+              hinges(ih)%le1(2) = hinges(ih)%node1(2) 
+              hinges(ih)%te1(2) = hinges(ih)%node1(2)
+              !> hinge chord  
+              hinges(ih)%chord1 = abs(hinges(ih)%le1(1) - hinges(ih)%te1(1))
+              !> hinge node adimensional location along chord
+              hinges(ih)%csi1 = (hinges(ih)%node1(1) - hinges(ih)%le1(1)) / hinges(ih)%chord1 
+          endif    
 
-        endif
-        
+          if ((hinges(ih)%node2(2) .ge. ac_line(2, iRegion)) .and. & 
+                  (hinges(ih)%node2(2) .le. ac_line(2, iRegion + 1))) then 
+              !> interpolate at hinge station to get the leading edge point
+              call linear_interp((/ rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
+                                (/rrv_le(2, iRegion), rrv_le(2, iRegion + 1)/), & 
+                                hinges(ih)%node2(2), hinges(ih)%le2(1))
+              !> interpolate at hinge station to get the trailing edge point
+              call linear_interp((/ rrv_te(1, iRegion), rrv_te(1, iRegion + 1)/), &
+                                (/rrv_te(2, iRegion), rrv_te(2, iRegion + 1)/), & 
+                                hinges(ih)%node2(2), hinges(ih)%te2(1))
+              hinges(ih)%le2(2) = hinges(ih)%node2(2) 
+              hinges(ih)%te2(2) = hinges(ih)%node2(2)
+              !> hinge chord
+              hinges(ih)%chord2 = abs(hinges(ih)%le2(1) - hinges(ih)%te2(1))
+              !> hinge node adimensional location along chord
+              hinges(ih)%csi2 = (hinges(ih)%node2(1) - hinges(ih)%le2(1)) / hinges(ih)%chord2 
+          endif          
+        endif 
         if (hinges(ih)%csi1 .gt. 1.0_wp .or. hinges(ih)%csi2 .gt. 1.0_wp) then
           call error(this_sub_name, this_mod_name, '"Hinge '//trim(hinges(ih)%tag)// & 
                     ' outside of the chord"' ) 
         endif  
 
       enddo
-
-    enddo 
-    !> cast all the adimensional location into a single vector  
-    allocate(csi_hinge_not_unique(2*size(hinges))); csi_hinge_not_unique = 0.0_wp 
-    do ih = 1, size(hinges)
-      csi_hinge_not_unique(ih) = hinges(ih)%csi1
-      csi_hinge_not_unique(ih+2) = hinges(ih)%csi2      
-    enddo 
-    !> delete doubled nodes or merge them in single one if the distance is lower the 1% the chord lenght 
-    call unique(csi_hinge_not_unique, csi_hinge, 1e-2_wp)
+    enddo
     
+    !> cast all the adimensional location into a single vector  
+    allocate(csi_hinge_not_unique(2)); csi_hinge_not_unique = 0.0_wp 
+    do ih = 1, size(hinges)
+      csi_hinge_not_unique(1) = hinges(ih)%csi1
+      csi_hinge_not_unique(2) = hinges(ih)%csi2      
+      merge_tol = hinges(ih)%merge_tol
+      call unique(csi_hinge_not_unique, csi_hinge, merge_tol)
+      if (ih .gt. 1) then
+        csi_hinge = csi_hinge - 0.1_wp 
+        csi_hinge_not_unique = csi_hinge
+      endif
+    end do 
+    
+
     allocate(point_region(size(csi_hinge) + 1))
     allocate(delta_x(size(csi_hinge) + 1)); delta_x = 0.0_wp
     allocate(delta_x_no_off(size(csi_hinge) + 1)); delta_x_no_off = 0.0_wp ! maybe useless 
@@ -423,7 +498,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       !> first leading edge region 
       if (ia .eq. 1) then 
         delta_x(ia) = csi_hinge(ia)
-        point_region(ia) = ceiling(nelem_chord*delta_x(ia))
+        point_region(ia) = floor(nelem_chord*delta_x(ia))
         allocate(csi_adim(point_region(ia) + 1)); csi_adim = 0.0_wp
         call define_division(type_chord, point_region(ia), csi_adim)
         chord_fraction(1:point_region(ia) + 1) = delta_x(ia)*csi_adim 
@@ -445,19 +520,21 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       else 
         delta_x_no_off(ia) = csi_hinge(ia) - csi_hinge(ia-1) 
         delta_x(ia) = delta_x(ia - 1) + delta_x_no_off(ia) 
-        point_region(ia) = ceiling(nelem_chord*delta_x_no_off(ia)) 
+        point_region(ia) = floor(nelem_chord*delta_x_no_off(ia)) 
         
         allocate(csi_adim(point_region(ia) + 1)); csi_adim = 0.0_wp
         call define_division(type_chord, point_region(ia), csi_adim)
         chord_fraction((sum(point_region(1:ia - 1)) + 1) : (sum(point_region(1:ia)) + 1) ) = & 
             (delta_x(ia) - delta_x(ia - 1))*csi_adim + delta_x(ia - 1)   
+      
         deallocate(csi_adim)
       endif 
     enddo 
+    deallocate(point_region, ac_line, rrv_le, rrv_te)
   else
     call define_division(type_chord, nelem_chord, chord_fraction)
   endif 
-
+  
   ! Initialize the span division to the maximum dimension
   allocate(span_fraction(maxval(nelem_span_list))) ; span_fraction = 0.0_wp
   allocate(rrSection1(3,npoint_chord_tot)) ; rrSection1 = 0.0_wp
@@ -491,7 +568,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       curv_ac_section1(iRegion) = curv_ac_section2(iRegion-1)      
 
     else   ! first section                      ! build points
-      write(*,*) 'chord_fraction' , chord_fraction
+      !write(*,*) 'chord_fraction' , chord_fraction
       call define_section(chord_list(iRegion), trim(adjustl(airfoil_list(iRegion))), &
                           twist_list(iRegion), ElType, nelem_chord,              &
                           type_chord , chord_fraction, ref_chord_fraction,       &

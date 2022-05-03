@@ -780,7 +780,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
     ! check if the elem belongs to more than two sections of the reference line: if .t. -> error
     if ( ( ref_line_interp_s_all(i  ) .lt. airfoil_list_actual_s(j  ) ) .and. &
           ( ref_line_interp_s_all(i+1) .gt. airfoil_list_actual_s(j+1) ) ) then
- 
+
       write(*,*) ' error in read_mesh_pointwise_ll: '
       write(*,*) '  element i =', i , ' belongs to more than 2 sections: '
       write(*,*) '  centre of the el.            : ' , s_cen_e
