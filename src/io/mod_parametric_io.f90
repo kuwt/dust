@@ -996,31 +996,6 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr, curv_ac )
 
   allocate(st_geo(np_geo),s_geo(np_geo))
   st_geo = 0.0_wp ; s_geo = 0.0_wp
-  ! st_geo(1) = s_geo(1) = 0.0_wp
-
-  do i1 = 2 , np_geo
-    st_geo(i1) = st_geo(i1-1) + abs(rr_geo(1,i1)-rr_geo(1,i1-1))
-  end do
-  s_geo = st_geo / st_geo(np_geo)
-
-
-  allocate(rr(2,nelems_chord_tot)) ; rr = 0.0_wp
-  rr(:,1) = rr_geo(:,1)
-  rr(:,nelems_chord_tot) = rr_geo(:,np_geo)
-  do i1 = 2 , nelems_chord_tot - 1
-    do i2 = 2 , np_geo
-
-      if ( csi(i1) .lt. s_geo(i2) ) then
-        ds_geo = s_geo(i2)-s_geo(i2-1)
-        rr(:,i1) = (csi(i1)-s_geo(i2-1))/ds_geo * rr_geo(:,i2) + &
-                   (s_geo(i2)-csi(i1)  )/ds_geo * rr_geo(:,i2-1)
-        exit
-      end if
-    end do
-  end do
-
-  allocate(st_geo(np_geo),s_geo(np_geo))
-  st_geo = 0.0_wp ; s_geo = 0.0_wp
 
   do i1 = 2 , np_geo
     st_geo(i1) = st_geo(i1-1) + norm2(rr_geo(:,i1)-rr_geo(:,i1-1))
