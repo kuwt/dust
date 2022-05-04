@@ -112,6 +112,9 @@ else
   cmd_set_filename = .false.
 endif
 
+call printout(nl//'Reading input parameters from file "'//&
+                trim(input_file_name)//'"'//nl)
+                
 call prms%CreateStringOption('CompName','Component Name', multiple=.true.)
 call prms%CreateStringOption('GeoFile','Geometry definition files', multiple=.true.)
 call prms%CreateStringOption('RefTag','Reference Tag of the component', multiple=.true.)

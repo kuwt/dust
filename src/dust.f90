@@ -253,6 +253,9 @@ else
   input_file_name = input_file_name_def
 endif
 
+call printout(nl//'Reading input parameters from file "'//&
+                trim(input_file_name)//'"'//nl)
+
 !> Define the parameters to be read
 !> Time
 call prms%CreateRealOption('tstart', "Starting time")

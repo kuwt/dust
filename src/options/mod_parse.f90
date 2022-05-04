@@ -115,7 +115,7 @@ use MOD_Options, only: &
     StringOption, SubOption
 
 use MOD_StringTools, only: &
-  LowCase!, use_escape_codes!, set_formatting, clear_formatting
+  LowCase, stricmp!, use_escape_codes!, set_formatting, clear_formatting
 
 use mod_param, only: &
   wp, max_char_len, nl
@@ -690,19 +690,20 @@ subroutine read_options(this, filename, printout_val)
     ! Replace brackets
     aStr=Replace(aStr,"(/"," ",Every=.true.)
     aStr=Replace(aStr,"/)"," ",Every=.true.)
-    ! Lower case
-    call LowCase(char(aStr),HelpStr)
+    
+    HelpStr = char(aStr)        
+
     ! If something remaind, this should be an option
     if (LEN_TRIM(HelpStr).gt.2) then
       ! read the option
-      if (.not.actually_reading%read_option(HelpStr, sub_option, prev_read)) then
+      if (.not. actually_reading%read_option(HelpStr, sub_option, prev_read)) then
         if (firstWarn) then
           firstWarn=.false.
-          !=!write(UNIT_StdOut,'(100("!"))')
-          !=!write(UNIT_StdOut, *) "warning: The following options in file "&
-          !=                                //trim(filename)//" are unknown!"
+          write(UNIT_StdOut, *) "WARNING: The following options in file "&
+                                        //trim(filename)//" are unknown!"
+          write(UNIT_StdOut,*) "   ", trim(HelpStr)                              
         end if
-        !=!write(UNIT_StdOut,*) "   ", trim(HelpStr)
+        ! write(UNIT_StdOut,*) "   ", trim(HelpStr)
       end if
 
       if (associated(sub_option)) then
@@ -771,6 +772,13 @@ function read_option(this, line, sub_option, prev_read) result(found)
   if (i==0) return
   name = line(1:i-1)
   rest = line(i+1:)
+
+  ! compatibility with legacy naming convention
+  if(name .eq. "CompName" .or. name .eq. "GeometryFile" .or. name .eq. "MeshFileType" &
+    & .or. name .eq. "Reference_Tag" .or. name .eq. "StartRes") then
+    call printout(nl//'WARNING: the input file is using legacy syntax, which will be &
+            & deprecated in the next release. Please update this file.'//nl)
+  end if
 
   !default, we have not found a sub-option
   sub_option => null()

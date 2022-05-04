@@ -185,6 +185,9 @@ else
   input_file_name = input_file_name_def
 endif
 
+call printout(nl//'Reading input parameters from file "'//&
+                trim(input_file_name)//'"'//nl)
+
 call prms%CreateStringOption('basename','Base name of the processed data')
 call prms%CreateStringOption('data_basename','Base name of the data to be &
                               &processed')
