@@ -1,0 +1,38 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Reference_Tag = Dynamic
+Parent_Tag = 0
+Origin = (/0.0, 0.0, 0.0/)
+Orientation = (/1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0/)
+Multiple = F
+Moving = T
+Motion = {
+ Pole = {
+ Input      = position                ! position , velocity
+ Input_Type = simple_function         ! from_file , simple_function
+ Function   = (/  0  ,  0  ,  0  /)   ! 0:uniform,1:sin 
+ !File       = xxx.dat                 ! File = xxx.dat (nt,4) 
+ Amplitude  = 0.00
+ Vector     = (/ 0.0 , 0.0 , 0.0 /)
+ Omega      = (/ 0.0 , 0.0 , 0.0 /)
+ Phase      = (/ 0.0 , 0.0 , 0.0 /)
+ Offset     = (/ 0.0 , 0.0 , 0.0 /)
+!Position_0 = ...                     ! Initial position: needed if the input is velocity
+ }
+ Rotation   = {
+ Input      = position
+ Input_Type = from_file         !
+ File       = sine.dat                 ! File = xxx.dat (nt,2)
+ Axis       = (/ 0.0 , 1.0 , 0.0 /)   
+ }
+}
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Reference_Tag = Static
+Parent_Tag = 0
+Origin = (/0.0, -6.0, 0.0/)
+Orientation = (/1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0/)
+Multiple = F
+Moving = F
+
+

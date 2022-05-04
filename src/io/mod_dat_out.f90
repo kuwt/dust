@@ -56,7 +56,7 @@ use mod_handling, only: &
 !---------------------------------------------------------------------
 implicit none
 
-public :: dat_out_probes_header , dat_out_loads_header , dat_out_aa_header, &
+public :: dat_out_probes_header, dat_out_loads_header, dat_out_hinge_header,  dat_out_aa_header, &
           dat_out_sectional, dat_out_sectional_ll, dat_out_sectional_vl, dat_out_aa
 
 private
@@ -102,6 +102,31 @@ subroutine dat_out_loads_header ( fid , comps_meas , ref_sys , average)
   endif
 
 end subroutine dat_out_loads_header
+
+subroutine dat_out_hinge_header ( fid , comps_meas , hinge_tag , average)
+  integer , intent(in)          :: fid
+  character(len=*), intent(in)  :: comps_meas
+  character(len=*), intent(in)  :: hinge_tag
+  logical, intent(in)           :: average
+
+  write(fid,*) '# Hinge Moment: '
+  !> three-dimensional space
+  write(fid,'(A)',advance='no') ' #               Components  : '
+  write(fid,'(A)') trim(comps_meas)
+
+  !> three-dimensional space
+  write(fid,'(A)',advance='no') ' #                    Hinge  : '
+  write(fid,'(A)') trim(hinge_tag)
+
+  if (.not. average)  then
+    write(fid,*) '#  t , Fv , Fh , Fn , Mv , Mh , Mn , axis_mat(9) , node_hinge(3) '
+  else
+    write(fid,*) '# Fv_average , Fh_average , Fn_average ,&
+                  & Mv_average , Mh_average , Mn_average ,&
+                  & axis_mat(9) , node_hinge(3) '
+  endif
+
+end subroutine dat_out_hinge_header
 
 !---------------------------------------------------------------------
 
@@ -240,20 +265,20 @@ end subroutine dat_out_sectional
 
 subroutine dat_out_sectional_ll (basename, compname, y_cen, y_span, time, &
                                 ll_sec, average )
- character(len=*) , intent(in) :: basename
- character(len=*) , intent(in) :: compname
- real(wp) , intent(in)         :: y_cen(:)
- real(wp) , intent(in)         :: y_span(:)
- real(wp) , intent(in)         :: time(:)
- real(wp) , intent(in)         :: ll_sec(:,:,:)
- logical,   intent(in)         :: average
+  character(len=*) , intent(in) :: basename
+  character(len=*) , intent(in) :: compname
+  real(wp) , intent(in)         :: y_cen(:)
+  real(wp) , intent(in)         :: y_span(:)
+  real(wp) , intent(in)         :: time(:)
+  real(wp) , intent(in)         :: ll_sec(:,:,:)
+  logical,   intent(in)         :: average
 
- character(len=8)              :: nnum
- character(len=max_char_len)   :: filename
- integer                       :: it , nt , fid , ierr, il
- character(len=*), parameter   :: this_sub_name = 'dat_out_sectional_ll'
- character(len=21)             :: load_str(9)
- character(len=max_char_len)   :: description_str(9)
+  character(len=8)              :: nnum
+  character(len=max_char_len)   :: filename
+  integer                       :: it , nt , fid , ierr, il
+  character(len=*), parameter   :: this_sub_name = 'dat_out_sectional_ll'
+  character(len=21)             :: load_str(9)
+  character(len=max_char_len)   :: description_str(9)
 
   load_str(1) = 'Cl' 
   load_str(2) = 'Cd' 
@@ -402,7 +427,6 @@ subroutine dat_out_sectional_vl (basename, compname, y_cen, y_span, time, &
     endif
     close(fid)
   enddo
-
 
 end subroutine dat_out_sectional_vl
 

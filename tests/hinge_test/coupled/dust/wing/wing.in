@@ -1,0 +1,75 @@
+!> === Mesh and elements types ===
+MeshFileType = parametric
+ElType       = v
+!> === Coupled with external structural solver (T/F) ===
+Coupled      = T
+CouplingType = rbf
+CouplingNodeFile = ./wing/coupling_nodes.in 
+
+!> === Geometry definition ===
+starting_point = (/ 0.0, -4 , 0.0/)
+reference_chord_fraction = 0.25
+
+!CouplingNodeOrientation = (/ 0.0,1.0,0.0, -1.0,0.0,0.0, 0.0,0.0,1.0 /)
+
+n_hinges = 2
+Hinge = {
+  Hinge_Tag = Flap_r
+  Hinge_Nodes_Input = parametric 
+  !Hinge_Nodes_Input_Parametric = {
+  Node1 = (/ 0.5, 1.0, 0.0/)  ! In the local ref.frame
+  Node2 = (/ 0.5, 3.0, 0.0/)
+  N_Nodes = 2
+
+  Hinge_Ref_Dir = (/ 1.0, 0.0, 0.0 /)
+  Hinge_Offset  = 0.01
+  Hinge_Spanwise_Blending = 0.001
+
+  Hinge_Rotation_Input = coupling
+  Hinge_Rotation_Coupling = {
+  Coupling_Node_Subset = range
+  Coupling_Node_First  = 2
+  Coupling_Node_Last  =  3
+  }
+}
+!!
+Hinge = {
+  Hinge_Tag = Flap_l
+  Hinge_Nodes_Input = parametric 
+  !Hinge_Nodes_Input_Parametric = {
+  Node2 = (/ 0.5, -1.0, 0.0/)  ! In the local ref.frame
+  Node1 = (/ 0.5, -3.0, 0.0/)
+  N_Nodes = 2
+
+  Hinge_Ref_Dir = (/ 1.0, 0.0, 0.0 /)
+  Hinge_Offset  = 0.01
+  Hinge_Spanwise_Blending = 0.001
+
+  Hinge_Rotation_Input = coupling
+  Hinge_Rotation_Coupling = {
+  Coupling_Node_Subset = range
+  Coupling_Node_First  = 4
+  Coupling_Node_Last  =  5
+  }
+}
+!===============================================================
+
+
+nelem_chord = 15
+type_chord = uniform
+! First section
+chord = 1.0
+twist = 0.0
+airfoil = NACA0012
+
+! First region
+span = 8 
+sweep = 0.0
+dihed = 0.0
+nelem_span = 90
+type_span = uniform
+
+! Second section
+chord = 1.0
+twist = 0.0
+airfoil = NACA0012

@@ -704,7 +704,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
 #if USE_PRECICE
 
   do i_comp = 1, size(geo%components)
-    if (geo%components(i_comp)%coupling) then 
+    if ((geo%components(i_comp)%coupling) .and. (trim(geo%components(i_comp)%coupling_type) .eq. 'rbf')) then 
       !> build connectivity for the panel center 
       allocate(cen(3, size(geo%components(i_comp)%el))); cen = 0.0_wp 
 
@@ -972,16 +972,6 @@ subroutine load_components(geo, in_file, out_file, te)
     comp_coupling = .false.
 #if USE_PRECICE
     if ( trim(comp_coupling_str) .eq. 'true' ) comp_coupling = .true.
-
-    if ( trim(comp_coupling_str) .eq. 'true' ) then
-      if ( ( comp_el_type(1:1) .ne. 'l' ) .and. &
-            ( trim(comp_coupling_type) .eq. 'll' ) ) then
-        call error (this_sub_name, this_mod_name, &
-            ' Coupled = T and CouplingType = ll for component <'//trim(comp_name)// &
-            '>, but it is not a LL element. So far, coupling is implemented &
-            &for lifting line elements only. Stop'//nl)
-      end if
-    end if
 #else
     if ( trim(comp_coupling_str) .eq. 'true' ) then
       call error (this_sub_name, this_mod_name, &
@@ -1152,11 +1142,12 @@ subroutine load_components(geo, in_file, out_file, te)
         call open_hdf5_group(hloc, 'Hinge_'//hinge_id_str, hiloc)
 
         !> Read input and fill component%hinge fields
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%nodes_input, 'Nodes_Input', hiloc)
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%offset, 'Offset', hiloc)
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%span_blending, 'Spanwise_Blending', hiloc)
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%ref_dir, 'Ref_Dir', hiloc)
-        call read_hdf5_al( geo%components(i_comp)%hinge(ih)%ref%rr, 'rr', hiloc)
+        call read_hdf5(geo%components(i_comp)%hinge(ih)%nodes_input,   'Nodes_Input', hiloc)
+        call read_hdf5(geo%components(i_comp)%hinge(ih)%offset,        'Offset', hiloc)
+        call read_hdf5(geo%components(i_comp)%hinge(ih)%span_blending, 'Spanwise_Blending', hiloc)
+        call read_hdf5(geo%components(i_comp)%hinge(ih)%ref_dir,       'Ref_Dir', hiloc)
+        call read_hdf5(geo%components(i_comp)%hinge(ih)%tag,           'Tag', hiloc)
+        call read_hdf5_al(geo%components(i_comp)%hinge(ih)%ref%rr,     'rr', hiloc)
 
         geo%components(i_comp)%hinge(ih)%n_nodes = size( geo%components(i_comp)%hinge(ih)%ref%rr, 2)
 
@@ -1206,8 +1197,7 @@ subroutine load_components(geo, in_file, out_file, te)
       !> PreCICE coupling 
       if ( trim(comp_coupling_str) .eq. 'true' ) then
 
-        if (( trim(comp_coupling_type) .eq. 'll' ) .or. &
-            ( trim(comp_coupling_type) .eq. 'rigid' ) ) then
+        if (trim(comp_coupling_type) .eq. 'rigid' ) then
           call read_hdf5_al(c_ref_p, 'c_ref_p', geo_loc)
           call read_hdf5_al(c_ref_c, 'c_ref_c', geo_loc)
           allocate(geo%components(i_comp)%c_ref_p( size(c_ref_p,1) , &
@@ -1217,21 +1207,10 @@ subroutine load_components(geo, in_file, out_file, te)
           geo%components(i_comp)%c_ref_p = c_ref_p
           geo%components(i_comp)%c_ref_c = c_ref_c
 
-          if ( trim(comp_coupling_type) .eq. 'll' ) then
-            call read_hdf5_al(xac_p  , 'x_ac_p' , geo_loc)
-            allocate( geo%components(i_comp)%xac( size(xac_p,1) ) )
-            geo%components(i_comp)%xac     = xac_p
-          end if
-          !> === PreCICE connectivity for LL ===
-          if ( trim(comp_coupling_type) .eq. 'll' ) then
-            !> For ll/beam coupling, only LE nodes are coupled with structural
-            !  nodes, while each TE node follows its LE node with a rigid motion
-            np_precice = size(rr,2)/2
-          elseif ( trim(comp_coupling_type) .eq. 'rigid' ) then
-            !> For rigid coupling, the motion of all the nodes of the components
-            !  is defined through the motion of the coupling_node
-            np_precice = 1
-          end if
+          !> For rigid coupling, the motion of all the nodes of the components
+          !  is defined through the motion of the coupling_node
+          np_precice = 1
+
           !> Allocate and fill i_points_precice array containing the
           !  connectivity between dust with PreCICE nodes
           allocate(geo%components(i_comp)%i_points_precice( np_precice ))
@@ -1479,6 +1458,7 @@ subroutine load_components(geo, in_file, out_file, te)
                                                   'Spanwise_Blending', hiloc)
           call write_hdf5( geo%components(i_comp)%hinge(ih)%ref_dir, &
                                                             'Ref_Dir', hiloc)
+          call write_hdf5( geo%components(i_comp)%hinge(ih)%tag, 'Tag', hiloc)
           call write_hdf5( geo%components(i_comp)%hinge(ih)%ref%rr, 'rr', hiloc)
 
           call write_hdf5( geo%components(i_comp)%hinge(ih)%input_type, &
@@ -2255,8 +2235,8 @@ subroutine create_strip_connectivity(geo)
 
             ! > get the control point as the point at 0.5 c of the chord (!)
             ! It is updated at every timestep to account for curvature
-            comp%stripe(i_s)%cen = sum(comp%stripe(i_s)%ver(:,1:2))/2.0_wp
-
+            comp%stripe(i_s)%cen = sum(comp%stripe(i_s)%ver(:,1:2),2)/2.0_wp 
+            
             nor = cross(comp%stripe(i_s)%ver(:,3) - comp%stripe(i_s)%ver(:,1),&
                         comp%stripe(i_s)%ver(:,4) - comp%stripe(i_s)%ver(:,2))
             
@@ -2296,13 +2276,15 @@ subroutine create_strip_connectivity(geo)
               comp%stripe(i_s)%area = comp%stripe(i_s)%area + comp%stripe(i_s)%panels(i)%p%area 
             end do
 
-            comp%stripe(i_s)%ctr_pt = comp%stripe(i_s)%cen +  & 
+            comp%stripe(i_s)%ctr_pt = comp%stripe(i_s)%cen -  & 
                                       comp%stripe(i_s)%tang_cen * comp%stripe(i_s)%chord / 2.0_wp
             
             !comp%stripe(i_s)%curv_ac = sum(comp%curv_ac(:,i_s))/2 
             !> Update velocity 
-            call calc_node_vel(comp%stripe(i_s)%cen, geo%refs(comp%ref_id)%G_g, &
+
+            call calc_node_vel(comp%stripe(i_s)%ctr_pt, geo%refs(comp%ref_id)%G_g, &
                                 geo%refs(comp%ref_id)%f_g, comp%stripe(i_s)%ub)
+            
           endif    
           
       end do 
@@ -2414,11 +2396,9 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
           if (time_cycle .and. & 
               trim(comp%comp_el_type) .eq. 'v' .and. &
               trim(comp%aero_correction) .eq. 'true') then
-              write(*,*) 'comp%stripe', size(comp%stripe)
-
-            do ie = 1, size(comp%stripe)
               
-              call calc_node_vel(comp%stripe(ie)%cen, geo%refs(comp%ref_id)%G_g, &
+            do ie = 1, size(comp%stripe)              
+              call calc_node_vel(comp%stripe(ie)%ctr_pt, geo%refs(comp%ref_id)%G_g, &
                                 geo%refs(comp%ref_id)%f_g, comp%stripe(ie)%ub)
             end do  
           endif 

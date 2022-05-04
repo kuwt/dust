@@ -189,7 +189,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   character(len=max_char_len) :: coupling_type
   real(wp)                    :: coupling_node(3)
   real(wp)                    :: coupling_node_rot(3,3)
-  real(wp)                    :: coupling_node_rot_mir(3,3)
 #if USE_PRECICE
   character(len=max_char_len) :: coupling_node_file
   real(wp), allocatable       :: coupling_nodes(:,:)
@@ -422,12 +421,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                         getrealarray(geo_prs, 'CouplingNodeOrientation', 9), &
                         (/3,3/) )
 
-    if ( mesh_symmetry .or. mesh_mirror ) then ! Fixme (not working)
-      coupling_node_rot_mir = reshape( &
-                          getrealarray(geo_prs, 'CouplingNodeOrientationMirror', 9), &
-                          (/3,3/) )
-    end if
-
     if (  trim(coupling_type) .eq. 'rbf' ) then
       !> Open coupling_nodes_file and read nodes for FSI
       n_coupling_nodes = 0 
@@ -453,8 +446,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       close(21)
     end if
 
-    if ((trim(coupling_type) .ne. 'll'    ) .and. &
-        (trim(coupling_type) .ne. 'rigid' ) .and. &
+    if ((trim(coupling_type) .ne. 'rigid' ) .and. &
         (trim(coupling_type) .ne. 'rbf'   ) ) then
       
       call error (this_sub_name, this_mod_name, &
@@ -462,7 +454,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         ', but CouplingType is equal to: '//trim(coupling_type)// &
         ', it is not assigned, or it is assigned &
         &as ''none''. Assign a valid CouplingType:'//nl// &
-        '  ll   : ll/beam coupling'//nl// &
         '  rigid: rigid component/node'//nl// &
         '  rbf  : generic component/node'//nl//'Stop'//nl)
     end if
@@ -567,7 +558,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   call write_hdf5(trim(coupling_type)    ,'CouplingType' ,comp_loc)
   call write_hdf5(     coupling_node     ,'CouplingNode' ,comp_loc)  
   call write_hdf5(     coupling_node_rot ,'CouplingNodeOrientation',comp_loc)
-  call write_hdf5(     coupling_node_rot_mir ,'CouplingNodeOrientationMirror',comp_loc)
   call new_hdf5_group(comp_loc, 'Geometry', geo_loc)
 
   !=====
@@ -594,15 +584,10 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     endif
 
 #if USE_PRECICE
-    !> *** to do *** symmetry and mirror. So far, finalize run with an error
     if ( coupled_comp ) then
       write(*,*) ' coupling_type: ', trim(coupling_type)
-      if ( trim(coupling_type) .eq. 'll' ) then
-        call error(this_sub_name, this_mod_name, &
-                    'It is not possible to couple with lifting lines method&
-                    &generic cgns meshes')
 
-      elseif ( trim(coupling_type) .eq. 'rigid' ) then
+      if ( trim(coupling_type) .eq. 'rigid' ) then
         !> Rigid coupling between a rigid component and a "structural" node,
         ! defined as an input, coupling_node. This node represents the
         ! reference configuration for data communication between the aerodynamic
@@ -676,97 +661,30 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     endif
 
 #if USE_PRECICE
-
     if ( coupled_comp ) then
-
-      if ( mesh_symmetry .or. mesh_mirror ) then
-
-        if ( mesh_mirror ) then
-          select case (trim(mesh_file_type))
-            case('cgns', 'basic', 'revolution' )  ! TODO: check basic
-              call mirror_mesh(ee, rr, mirror_point, mirror_normal)
-            case('parametric','pointwise')
-              call mirror_mesh_structured(ee, rr,  &
-                                            npoints_chord_tot , nelems_span , &
-                                            mirror_point, mirror_normal)
-
-            case default
-              call error(this_sub_name, this_mod_name,&
-                  'Mirror routines implemented for MeshFileType = &
-                  & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
-                  'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
-          end select
-
-        end if
-        if ( mesh_symmetry ) then
-          select case (trim(mesh_file_type))
-            case('cgns', 'basic', 'revolution' )  ! TODO: check basic
-              call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
-
-            case('parametric','pointwise')
-              call symmetry_mesh_structured(ee, rr,  &
-                                            npoints_chord_tot , nelems_span , &
-                                            symmetry_point, symmetry_normal, rr_sym)
-                nelems_span_tot = 2*nelems_span
-
-            case default
-              call error(this_sub_name, this_mod_name,&
-                  'Symmetry routines implemented for MeshFileType = &
-                  & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
-                  'MeshFileType = '//trim(mesh_file_type))
-          end select
-
-        end if
-      end if
-
       write(*,*) ' coupling_type: ', trim(coupling_type)
-      if ( trim(coupling_type) .eq. 'll' ) then
-        call error(this_sub_name, this_mod_name, &
-                    'It is not possible to couple with lifting lines method&
-                    &generic cgns meshes')
-      elseif ( trim(coupling_type) .eq. 'rigid' ) then
-        !> Rigid coupling between a rigid component and a "structural" node,
-        ! defined as an input, coupling_node. This node represents the
-        ! reference configuration for data communication between the aerodynamic
-        ! and the structural solvers
 
-        allocate(c_ref_p(3, size(rr,2))); c_ref_p = 0.0_wp
+      if ( mesh_mirror ) then
+        select case (trim(mesh_file_type))
+          case('cgns', 'basic', 'revolution' )  ! TODO: check basic
+            call mirror_mesh(ee, rr, mirror_point, mirror_normal)
+          case default
+            call error(this_sub_name, this_mod_name,&
+                'Mirror routines implemented for MeshFileType = &
+                & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
+                'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
+        end select
 
-        do i =1, size(c_ref_p,2)
-
-          !> Offset
-          c_ref_p(:,i) = rr(:,i) - coupling_node
-
-          !> Orientation
-          c_ref_p(:,i) = matmul(transpose(coupling_node_rot), &
-                                c_ref_p(:,i))
-
-        end do
-
-        allocate(c_ref_c(3, size(ee,2))); c_ref_c = 0.0_wp
-        do i =1, size(c_ref_c,2)
-          n_non_zero = 0
-          do j = 1, 4
-            if ( ee(j,i) .ne. 0 ) then
-              n_non_zero = n_non_zero + 1
-              c_ref_c(:,i) = c_ref_c(:,i) + rr(:,ee(j,i))
-            end if
-          end do
-          !> Offset
-          c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero) - coupling_node
-
-          !> Orientation
-          c_ref_c(:,i) = matmul( transpose(coupling_node_rot), &
-                                c_ref_c(:,i) )
-        end do
-
-        !> Write to hdf5 geo file
-        call write_hdf5(c_ref_p,'c_ref_p',geo_loc)
-        call write_hdf5(c_ref_c,'c_ref_c',geo_loc)
-
-      elseif ( trim(coupling_type) .eq. 'rbf' ) then
-        call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)        
-        rr = matmul( transpose(coupling_node_rot), rr )
+      elseif ( mesh_symmetry ) then
+        select case (trim(mesh_file_type))
+          case('cgns')  
+            call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
+          case default
+            call error(this_sub_name, this_mod_name,&
+                'Symmetry routines implemented for MeshFileType = &
+                & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
+                'MeshFileType = '//trim(mesh_file_type))
+        end select
       end if
     end if
 #endif
@@ -851,7 +769,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       !> TODO : actually it is possible to define the parameters in the GeoFile
       !> directly, find a good way to do this
       call read_mesh_parametric(trim(mesh_file), ee, rr, &
-                              npoints_chord_tot, nelems_span, &
+                              npoints_chord_tot, nelems_span, hinges, n_hinges, mesh_mirror, mesh_symmetry,&
                               airfoil_list, i_airfoil_e, normalised_coord_e, &
                               aero_table)!, curv_ac)  
 
@@ -870,7 +788,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)
         call write_hdf5(i_airfoil_e,        'i_airfoil_e',        geo_loc)
         call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)
-        !call write_hdf5(curv_ac,            'curv_ac',            geo_loc)
         call write_hdf5('true',             'aero_table',         geo_loc)        
       else
         call write_hdf5('false',            'aero_table',         geo_loc)
@@ -881,7 +798,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         
     elseif (ElType .eq. 'p') then
       call read_mesh_parametric(trim(mesh_file), ee, rr, &
-                                npoints_chord_tot, nelems_span)
+                                npoints_chord_tot, nelems_span, hinges, n_hinges, mesh_mirror, mesh_symmetry)
       !> Nelems_span_tot will be overwritten if symmetry is required (around l.220)
       nelems_span_tot =   nelems_span
 
@@ -963,13 +880,13 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
             select case (trim(mesh_file_type))
               case('cgns', 'basic', 'revolution' )  ! TODO: check basic
                 call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
-
               case('parametric','pointwise')
                 call symmetry_mesh_structured(ee, rr,  &
                                               npoints_chord_tot , nelems_span , &
                                               symmetry_point, symmetry_normal, rr_sym)
-                  nelems_span_tot = 2*nelems_span
-
+                nelems_span_tot = 2*nelems_span
+                ! TODO: fix mesh symmetry-> the rr before symmetry take the normal coupling nod, 
+                ! instead the rr_sym take the coupling nod symmetry  
               case default
                 call error(this_sub_name, this_mod_name,&
                           'Symmetry routines implemented for MeshFileType = &
@@ -979,39 +896,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
           end if
         end if
 
-      if ( trim(coupling_type) .eq. 'll' ) then
-        !> Compute the reference chord vector, for geometry transformation
-        ! of the deformable component. Meant for blades, wings defined using
-        ! the local y-axis as the spanwise direction and the x-axis as the
-        ! streamwise direction, pointing from the LE towards the TE
-        allocate(c_ref_p(3, nelems_span+1)); c_ref_p = 0.0_wp
-        do i = 1, size(c_ref_p,2)
-          c_ref_p(:,i) = chord_p(i) * &
-              matmul( transpose(coupling_node_rot) , &
-                      (/ cos(theta_p(i)), 0.0_wp, -sin(theta_p(i)) /) )
-        end do
-
-        allocate(c_ref_c(3, size(ee,2))); c_ref_c = 0.0_wp
-        do i =1, size(c_ref_c,2)
-          do j = 1, 4
-            n_non_zero = 0
-            if ( ee(j,i) .ne. 0 ) then
-              n_non_zero = n_non_zero + 1
-              c_ref_c(:,i) = c_ref_c(:,i) + rr(:,ee(j,i))
-            end if
-          end do
-          !> Offset
-          c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero)
-          ! *** to do *** check if the lines above for c_ref_c are useless in
-          ! ll coupling. If they are needed, check if a rotation is missing
-          ! ( see above, lines for c_ref_p )
-        end do
-
-        !> Write to hdf5 geo file
-        call write_hdf5(c_ref_p,'c_ref_p',geo_loc)
-        call write_hdf5(c_ref_c,'c_ref_c',geo_loc)
-
-      elseif ( trim(coupling_type) .eq. 'rigid' ) then
+      if ( trim(coupling_type) .eq. 'rigid' ) then
         !> Rigid coupling between a rigid component and a "structural" node,
         ! defined as an input, coupling_node. This node represents the
         ! reference configuration for data communication between the aerodynamic
@@ -1050,12 +935,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
         call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)
 
-        if ( mesh_symmetry ) then
-          rr(:,1:(size(rr,2)-size(rr_sym,2))) = matmul( transpose(coupling_node_rot), rr(:,1:size(rr,2)-size(rr_sym,2) ))
-          rr(:,size(rr,2)-size(rr_sym,2)+1:size(rr,2)) = matmul( transpose(coupling_node_rot_mir), rr_sym )
-        else
           rr = matmul( transpose(coupling_node_rot), rr )
-        end if
+
       end if
 
     end if
@@ -1076,7 +957,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)
         call write_hdf5(i_airfoil_e,        'i_airfoil_e',        geo_loc)
         call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)        
-        !call write_hdf5(curv_ac,            'curv_ac',            geo_loc)
         call write_hdf5('true',             'aero_table',         geo_loc)
       else
         call write_hdf5('false',            'aero_table',         geo_loc)
@@ -1173,6 +1053,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call mirror_mesh_structured(ee, rr,  &
                                       npoints_chord_tot , nelems_span , &
                                       mirror_point, mirror_normal)
+        
 
       case default
         call error(this_sub_name, this_mod_name,&
@@ -1444,6 +1325,7 @@ subroutine symmetry_mesh_structured( ee, rr, &
       mabs  = abs( sum((rr(:,i1)-cent)*norm) ) ; imabs = i1
     end if
   end do
+
   m = sum( (rr(:,imabs) - cent) * norm )
   if ( m .gt. 0.0_wp ) then
     minmaxPn = sum( (rr(:,1)-cent)*norm )
@@ -1555,7 +1437,6 @@ subroutine symmetry_mesh_structured( ee, rr, &
   l = sum(cent * n)
 
   !now reflect the points
-! if ( ( .not. sew_first_sec ) .or. ( .not. sew_first_sec ) ) then ! only one sec to sew
   if ( ( .not. sew_last_sec ) ) then ! only one sec to sew
     do ip=1,np-npoints_chord_tot
       d = sum( rr(:,ip+npoints_chord_tot) * n) - l
@@ -1584,8 +1465,6 @@ subroutine symmetry_mesh_structured( ee, rr, &
 ! !move alloc back to the original vectors
   call move_alloc(rr_temp, rr)
   call move_alloc(ee_sort, ee)
-
-
 
   if ( allocated(ee_temp) )  deallocate(ee_temp)
 

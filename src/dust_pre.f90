@@ -95,7 +95,7 @@ real(wp)                                  :: inner_prod_thr
 integer                                   :: n_geo, n_tag, n_name, i
 
 
-call printout(nl//'>>>>>> DUST PREPROCESSOR beginning >>>>>>'//nl)
+call printout(nl//'>>>>>> DUST PREPROCESSOR beginning >>>>>>')
 call initialize_hdf5()
 
 !> Input reading 

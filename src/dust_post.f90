@@ -142,7 +142,7 @@ use mod_post_flowfield, only: &
   post_flowfield
 
 use mod_post_integral, only: &
-  post_integral
+  post_integral, post_hinge_loads
 
 use mod_post_sectional, only: &
   post_sectional
@@ -163,12 +163,15 @@ integer                                   :: n_analyses, ia
 character(len=max_char_len)               :: basename, data_basename
 character(len=max_char_len)               :: an_name, an_type
 integer                                   :: an_start, an_end, an_step
-integer                                   :: n_comp, i_comp
+integer                                   :: n_comp, i_comp 
+integer                                   :: n_hinge, i_hinge
+character(len=max_char_len), allocatable  :: hinge_tag(:)
 character(len=max_char_len), allocatable  :: components_names(:)
 character(len=max_char_len), allocatable  :: var_names(:)
 character(len=max_char_len)               :: lowstr
 character(len=max_char_len)               :: out_frmt
 logical                                   :: all_comp
+logical                                   :: all_hinge
 logical                                   :: average
 
 call printout(nl//'>>>>>> DUST POSTPROCESSOR beginning >>>>>>'//nl)
@@ -214,6 +217,8 @@ call sbprms%CreateLogicalOption('SeparateWake', 'Output the wake in a separate &
 call sbprms%CreateStringOption('Format','Output format')
 call sbprms%CreateStringOption('Component','Component to analyse', &
                               multiple=.true.)
+call sbprms%CreateStringOption('HingeTag','Hinge to analyse', &
+                              multiple=.true.)                              
 call sbprms%CreateStringOption('Variable','Variables to be saved: velocity, pressure or&
                               & vorticity', multiple=.true.)
 
@@ -287,7 +292,7 @@ call check_basename(trim(basename),'dust postprocessor')
 call check_basename(trim(data_basename),'dust postprocessor')
 
 !> Cycle on all the analyses
-do ia = 1,n_analyses
+do ia = 1, n_analyses
 
   !> Get general parameter for the analysis
   call getsuboption(prms,'Analysis',sbprms)
@@ -306,6 +311,7 @@ do ia = 1,n_analyses
   !> Check if we are analysing all the components or just some
   all_comp = .false.
   n_comp = countoption(sbprms, 'Component')
+
   if (n_comp .eq. 0)  then
     all_comp = .true.
   else
@@ -321,6 +327,25 @@ do ia = 1,n_analyses
     endif
   endif
 
+  if (trim(an_type) .eq. 'hinge_loads') then 
+    all_hinge = .false. 
+    n_hinge = countoption(sbprms, 'HingeTag')
+    if (n_hinge .eq. 0)  then
+      all_hinge = .true.
+    else
+      allocate(hinge_tag(n_hinge))
+      do i_hinge = 1, n_hinge
+        hinge_tag(i_hinge) = getstr(sbprms, 'HingeTag')
+      enddo
+      call LowCase(hinge_tag(1), lowstr)    ! char
+      if(trim(lowstr) .eq. 'all') then
+        all_hinge = .true.
+        n_hinge = 0
+        deallocate(hinge_tag)
+      endif
+    endif
+  endif 
+
   !> Fork the different kind of analyses
   select case( trim(an_type) )
 
@@ -328,6 +353,12 @@ do ia = 1,n_analyses
     case('integral_loads')
       call post_integral( sbprms , basename , data_basename , an_name , ia , &
                           out_frmt , components_names , all_comp , &
+                          an_start , an_end , an_step, average )
+
+    !> Hinge Moment
+    case('hinge_loads')
+      call post_hinge_loads( sbprms , basename , data_basename , an_name , ia , &
+                          out_frmt , components_names,  all_comp, hinge_tag, all_hinge,   &
                           an_start , an_end , an_step, average )
 
     !> Visualizations

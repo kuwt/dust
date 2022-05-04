@@ -60,7 +60,10 @@ use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, countoption
 
 use mod_math, only: & 
-  linear_interp
+  linear_interp, unique
+
+use mod_hinges, only: &
+  t_hinge, t_hinge_input 
 !----------------------------------------------------------------------
 
 implicit none
@@ -78,7 +81,7 @@ contains
 !----------------------------------------------------------------------
 
 subroutine read_mesh_parametric(mesh_file,ee,rr, &
-                    npoints_chord_tot, nelem_span_tot, &
+                    npoints_chord_tot, nelem_span_tot, hinges, n_hinges, mesh_mirror, mesh_symmetry, &
                     airfoil_list_actual, i_airfoil_e, normalised_coord_e, & 
                     aero_table_out, curv_ac)
 
@@ -86,7 +89,10 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   integer  , allocatable, intent(out)       :: ee(:,:)
   real(wp) , allocatable, intent(out)       :: rr(:,:)
   integer  , intent(out), optional          :: npoints_chord_tot, nelem_span_tot 
+  integer  , intent(in)                     :: n_hinges
+  logical  , intent(in)                     :: mesh_mirror, mesh_symmetry
 
+  type(t_hinge_input), allocatable, intent(inout) :: hinges(:)
   type(t_parse)                             :: pmesh_prs
   integer                                   :: ee_size , rr_size
   logical                                   :: twist_linear_interp
@@ -114,6 +120,13 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   integer,  allocatable, intent(out), optional :: i_airfoil_e(:,:)
   real(wp), allocatable, intent(out), optional :: normalised_coord_e(:,:)
 
+  !> hinge mesh 
+  real(wp), allocatable                     :: rrv_le(:,:), rrv_te(:,:), ac_line(:,:) 
+  integer                                   :: ih, ia
+  real(wp), allocatable                     :: csi_hinge_not_unique(:), csi_hinge(:)
+  real(wp), allocatable                     :: delta_x(:), delta_x_no_off(:), csi_adim(:) 
+  integer, allocatable                      :: point_region(:)
+  real(wp)                                  :: merge_tol 
   !> Regions  
   integer , allocatable                     :: nelem_span_list(:)
   real(wp), allocatable                     :: span_list(:) 
@@ -284,7 +297,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   allocate(airfoil_table_list(nSections))
   allocate(curv_ac_section1(nRegions)); curv_ac_section1 = 0.0_wp
   allocate(curv_ac_section2(nRegions)); curv_ac_section2 = 0.0_wp
-!  allocate(curv_ac(2,nSections)); curv_ac = 0.0_wp
 
   do iSection= 1, nSections
     chord_list(iSection)   = getreal(pmesh_prs,'chord')
@@ -327,9 +339,202 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   ! get chordwise division
   allocate(chord_fraction(nelem_chord+1))
   type_chord = getstr(pmesh_prs,'type_chord')
-  call define_division(type_chord, nelem_chord, chord_fraction)
+  !> build adaptive mesh for hinged case   
+  if (n_hinges .ge. 1) then 
+    !> allocate surface points for the component 
+    allocate(rrv_le(2,nSections));  rrv_le = 0.0_wp 
+    allocate(rrv_te(2,nSections));  rrv_te = 0.0_wp
+    !> allocate aerodynamic center line for the component 
+    allocate(ac_line(2,nSections));  ac_line = 0.0_wp 
+    !> initialize first section 
+    if (mesh_mirror .or. mesh_symmetry) then 
+      rrv_le (1,nRegions + 1) = -chord_list(nRegions + 1)*ref_chord_fraction
+      rrv_te (1,nRegions + 1) = chord_list(nRegions + 1)*(1 - ref_chord_fraction)
+    else
+      rrv_le (1,1) = -chord_list(1)*ref_chord_fraction
+      rrv_te (1,1) = chord_list(1)*(1 - ref_chord_fraction)
+    endif     
+    do iRegion = 1, nRegions
+      !> aerodynamic center line      
+      if (mesh_mirror .or. mesh_symmetry) then 
+        ac_line(1, iRegion + 1) = span_list(iRegion)*sin(sweep_list(iRegion)*pi/180.0_wp) + ac_line(1, iRegion)
+        ac_line(2, iRegion + 1) = -(span_list(iRegion) + ac_line(2, iRegion))
+      else 
+        ac_line(1, iRegion + 1) = span_list(iRegion)*sin(sweep_list(iRegion)*pi/180.0_wp) + ac_line(1, iRegion)
+        ac_line(2, iRegion + 1) = +(span_list(iRegion) + ac_line(2, iRegion))
+      endif 
+    enddo
 
+    if (mesh_mirror .or. mesh_symmetry) then  
+      ac_line(:, nRegions+1:1:-1) = ac_line
+      chord_list(nRegions+1:1:-1) = chord_list
 
+      do iRegion = 1, nRegions + 1
+      !> leading edge and trailing edge points in wind axis  
+        rrv_le(1, iRegion) = ac_line(1, iRegion) - chord_list(iRegion)*ref_chord_fraction 
+        rrv_te(1, iRegion) = ac_line(1, iRegion) + chord_list(iRegion)*(1 - ref_chord_fraction) 
+        rrv_le(2, iRegion) = ac_line(2, iRegion)
+        rrv_te(2, iRegion) = ac_line(2, iRegion)
+      end do 
+      chord_list(nRegions+1:1:-1) = chord_list
+    else 
+
+      do iRegion = 1, nRegions
+        !> leading edge and trailing edge points in wind axis  
+        rrv_le(1, iRegion + 1) = ac_line(1, iRegion + 1) - chord_list(iRegion + 1)*ref_chord_fraction 
+        rrv_te(1, iRegion + 1) = ac_line(1, iRegion + 1) + chord_list(iRegion + 1)*(1 - ref_chord_fraction) 
+        rrv_le(2, iRegion + 1) = ac_line(2, iRegion + 1)
+        rrv_te(2, iRegion + 1) = ac_line(2, iRegion + 1)
+      end do 
+    
+    endif 
+    do iRegion = 1, nRegions
+      do ih = 1, n_hinges
+        if (mesh_mirror .or. mesh_symmetry) then 
+
+          if ((hinges(ih)%node2(2) .le. ac_line(2, iRegion + 1)) .and. & 
+              (hinges(ih)%node2(2) .ge. ac_line(2, iRegion))) then 
+              !> interpolate at hinge station to get the leading edge point
+              call linear_interp((/ rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
+                                  (/rrv_le(2, iRegion), rrv_le(2, iRegion + 1)/), & 
+                                  hinges(ih)%node2(2), hinges(ih)%le2(1))
+              !> interpolate at hinge station to get the trailing edge point
+              call linear_interp((/ rrv_te(1, iRegion), rrv_te(1, iRegion + 1)/), &
+                                  (/rrv_te(2, iRegion), rrv_te(2, iRegion + 1)/), & 
+                                  hinges(ih)%node2(2), hinges(ih)%te2(1))
+              hinges(ih)%le2(2) = hinges(ih)%node2(2) 
+              hinges(ih)%te2(2) = hinges(ih)%node2(2)
+              !> hinge chord  
+              hinges(ih)%chord2 = abs(hinges(ih)%le2(1) - hinges(ih)%te2(1))
+              !> hinge node adimensional location along chord
+              hinges(ih)%csi2 = (hinges(ih)%node2(1) - hinges(ih)%le2(1)) / hinges(ih)%chord2 
+
+          endif    
+
+          if ((hinges(ih)%node1(2) .le. ac_line(2, iRegion + 1)) .and. & 
+              (hinges(ih)%node1(2) .ge. ac_line(2, iRegion))) then 
+              !> interpolate at hinge station to get the leading edge point
+              call linear_interp((/rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
+                                (/ rrv_le(2, iRegion), rrv_le(2, iRegion + 1)/), & 
+                                hinges(ih)%node1(2), hinges(ih)%le1(1))
+              !> interpolate at hinge station to get the trailing edge point
+              call linear_interp((/rrv_te(1, iRegion), rrv_te(1, iRegion + 1)/), &
+                                (/ rrv_te(2, iRegion), rrv_te(2, iRegion + 1)/), & 
+                                hinges(ih)%node1(2), hinges(ih)%te1(1))
+              hinges(ih)%le1(2) = hinges(ih)%node1(2) 
+              hinges(ih)%te1(2) = hinges(ih)%node1(2)
+              !> hinge chord
+              hinges(ih)%chord1 = abs(hinges(ih)%le1(1) - hinges(ih)%te1(1))
+              !> hinge node adimensional location along chord
+              hinges(ih)%csi1 = (hinges(ih)%node1(1) - hinges(ih)%le1(1)) / hinges(ih)%chord1 
+          endif 
+        else
+          if ((hinges(ih)%node1(2) .ge. ac_line(2, iRegion)) .and. & 
+              (hinges(ih)%node1(2) .le. ac_line(2, iRegion + 1))) then 
+              
+              !> interpolate at hinge station to get the leading edge point
+              call linear_interp((/ rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
+                                  (/rrv_le(2, iRegion), rrv_le(2, iRegion + 1)/), & 
+                                  hinges(ih)%node1(2), hinges(ih)%le1(1))
+
+              !> interpolate at hinge station to get the trailing edge point
+              call linear_interp((/ rrv_te(1, iRegion), rrv_te(1, iRegion + 1)/), &
+                                  (/rrv_te(2, iRegion), rrv_te(2, iRegion + 1)/), & 
+                                  hinges(ih)%node1(2), hinges(ih)%te1(1))
+              
+              hinges(ih)%le1(2) = hinges(ih)%node1(2) 
+              hinges(ih)%te1(2) = hinges(ih)%node1(2)
+              !> hinge chord  
+              hinges(ih)%chord1 = abs(hinges(ih)%le1(1) - hinges(ih)%te1(1))
+              !> hinge node adimensional location along chord
+              hinges(ih)%csi1 = (hinges(ih)%node1(1) - hinges(ih)%le1(1)) / hinges(ih)%chord1 
+          endif    
+
+          if ((hinges(ih)%node2(2) .ge. ac_line(2, iRegion)) .and. & 
+                  (hinges(ih)%node2(2) .le. ac_line(2, iRegion + 1))) then 
+              !> interpolate at hinge station to get the leading edge point
+              call linear_interp((/ rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
+                                (/rrv_le(2, iRegion), rrv_le(2, iRegion + 1)/), & 
+                                hinges(ih)%node2(2), hinges(ih)%le2(1))
+              !> interpolate at hinge station to get the trailing edge point
+              call linear_interp((/ rrv_te(1, iRegion), rrv_te(1, iRegion + 1)/), &
+                                (/rrv_te(2, iRegion), rrv_te(2, iRegion + 1)/), & 
+                                hinges(ih)%node2(2), hinges(ih)%te2(1))
+              hinges(ih)%le2(2) = hinges(ih)%node2(2) 
+              hinges(ih)%te2(2) = hinges(ih)%node2(2)
+              !> hinge chord
+              hinges(ih)%chord2 = abs(hinges(ih)%le2(1) - hinges(ih)%te2(1))
+              !> hinge node adimensional location along chord
+              hinges(ih)%csi2 = (hinges(ih)%node2(1) - hinges(ih)%le2(1)) / hinges(ih)%chord2 
+          endif          
+        endif 
+        if (hinges(ih)%csi1 .gt. 1.0_wp .or. hinges(ih)%csi2 .gt. 1.0_wp) then
+          call error(this_sub_name, this_mod_name, '"Hinge '//trim(hinges(ih)%tag)// & 
+                    ' outside of the chord"' ) 
+        endif  
+
+      enddo
+    enddo
+    
+    !> cast all the adimensional location into a single vector  
+    allocate(csi_hinge_not_unique(2)); csi_hinge_not_unique = 0.0_wp 
+    do ih = 1, size(hinges)
+      csi_hinge_not_unique(1) = hinges(ih)%csi1
+      csi_hinge_not_unique(2) = hinges(ih)%csi2      
+      merge_tol = hinges(ih)%merge_tol
+      call unique(csi_hinge_not_unique, csi_hinge, merge_tol)
+      if (ih .gt. 1) then
+        csi_hinge = csi_hinge - 0.1_wp 
+        csi_hinge_not_unique = csi_hinge
+      endif
+    end do 
+    
+
+    allocate(point_region(size(csi_hinge) + 1))
+    allocate(delta_x(size(csi_hinge) + 1)); delta_x = 0.0_wp
+    allocate(delta_x_no_off(size(csi_hinge) + 1)); delta_x_no_off = 0.0_wp ! maybe useless 
+    
+    do ia = 1, size(csi_hinge) + 1
+      !> first leading edge region 
+      if (ia .eq. 1) then 
+        delta_x(ia) = csi_hinge(ia)
+        point_region(ia) = floor(nelem_chord*delta_x(ia))
+        allocate(csi_adim(point_region(ia) + 1)); csi_adim = 0.0_wp
+        call define_division(type_chord, point_region(ia), csi_adim)
+        chord_fraction(1:point_region(ia) + 1) = delta_x(ia)*csi_adim 
+        deallocate(csi_adim)
+
+      !> trailing edge region 
+      elseif (ia .eq. (size(csi_hinge) + 1)) then 
+        delta_x_no_off(ia) = 1.0_wp - csi_hinge(ia-1) 
+        delta_x(ia) = delta_x(ia - 1) + delta_x_no_off(ia) 
+        point_region(ia) = nelem_chord - sum(point_region(1:ia - 1)) 
+        
+        allocate(csi_adim(point_region(ia) + 1)); csi_adim = 0.0_wp
+        call define_division(type_chord, point_region(ia), csi_adim)
+        chord_fraction((sum(point_region(1:ia - 1)) + 1) : (sum(point_region) + 1) ) = & 
+            (delta_x(ia) - delta_x(ia - 1))*csi_adim + delta_x(ia - 1)  
+        deallocate(csi_adim) 
+        
+      !> regions between two hinge points 
+      else 
+        delta_x_no_off(ia) = csi_hinge(ia) - csi_hinge(ia-1) 
+        delta_x(ia) = delta_x(ia - 1) + delta_x_no_off(ia) 
+        point_region(ia) = floor(nelem_chord*delta_x_no_off(ia)) 
+        
+        allocate(csi_adim(point_region(ia) + 1)); csi_adim = 0.0_wp
+        call define_division(type_chord, point_region(ia), csi_adim)
+        chord_fraction((sum(point_region(1:ia - 1)) + 1) : (sum(point_region(1:ia)) + 1) ) = & 
+            (delta_x(ia) - delta_x(ia - 1))*csi_adim + delta_x(ia - 1)   
+      
+        deallocate(csi_adim)
+      endif 
+    enddo 
+    deallocate(point_region, ac_line, rrv_le, rrv_te)
+  else
+    call define_division(type_chord, nelem_chord, chord_fraction)
+  endif 
+  
   ! Initialize the span division to the maximum dimension
   allocate(span_fraction(maxval(nelem_span_list))) ; span_fraction = 0.0_wp
   allocate(rrSection1(3,npoint_chord_tot)) ; rrSection1 = 0.0_wp
@@ -363,6 +568,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       curv_ac_section1(iRegion) = curv_ac_section2(iRegion-1)      
 
     else   ! first section                      ! build points
+      !write(*,*) 'chord_fraction' , chord_fraction
       call define_section(chord_list(iRegion), trim(adjustl(airfoil_list(iRegion))), &
                           twist_list(iRegion), ElType, nelem_chord,              &
                           type_chord , chord_fraction, ref_chord_fraction,       &
@@ -466,7 +672,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
       if ( .not. twist_linear_interp ) then
 
-
         if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then
           ! uniform spacing in span
           rr(:,ista:iend) = rrSection1 + real(i1,wp) / &
@@ -522,7 +727,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                   reshape( (/ cos(twist_rad), sin(twist_rad) , &
                         -sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
                                                                 rr_tw_2 )
-        ! === Interpolation weight ===
+        !> Interpolation weight 
         if ( trim(type_span_list(iRegion)) .eq. 'uniform' ) then
           interp_weight = real(i1,wp) / real(nelem_span_list(iRegion),wp)
         else if ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then
@@ -669,7 +874,8 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
                           reference_point, point_list, curv_ac)
 
   real(wp), allocatable , intent(out)     :: point_list(:,:)
-  real(wp), intent(in)                    :: reference_point(:), chord_fraction(:)
+  real(wp), intent(in)                    :: reference_point(:) 
+  real(wp), intent(inout)                 :: chord_fraction(:)
   character(len=*) , intent(in)           :: type_chord
   real(wp), intent(in)                    :: reference_chord_fraction, twist, chord
   integer, intent(in)                     :: nelem_chord
@@ -691,7 +897,7 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   if ( airfoil(len_trim(airfoil)-3 : len_trim(airfoil)) .eq. '.dat' ) then
 
     call check_file_exists(airfoil, this_sub_name, this_mod_name)
-    call read_airfoil ( airfoil , trim(type_chord) , ElType , nelem_chord , point_list, curv_ac )
+    call read_airfoil ( airfoil , trim(type_chord) , ElType , nelem_chord , chord_fraction, point_list, curv_ac )
 
   else if ( airfoil(1:4) .eq. 'NACA' ) then
     if ( len_trim(airfoil) .eq. 8 ) then      ! NACA 4-digit -------
@@ -930,7 +1136,7 @@ endsubroutine naca5digits
 
 !-------------------------------------------------------------------------------
 
-subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr, curv_ac )
+subroutine read_airfoil (filen , discr , ElType , nelems_chord , csi_half, rr, curv_ac )
 
   character(len=*), intent(in) :: filen
   character(len=*), intent(in) :: discr
@@ -939,11 +1145,12 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr, curv_ac )
   real(wp)        , allocatable , intent(out) :: rr(:,:)
   real(wp) , intent(out)                      :: curv_ac
   real(wp)                                    :: csi_ac 
+  real(wp),         intent(in) :: csi_half(:)
 
   integer :: nelems_chord_tot
   real(wp) , allocatable :: rr_geo(:,:)
   integer :: np_geo
-  real(wp) , allocatable :: csi_half(:) , csi(:)
+  real(wp) , allocatable :: csi(:)
   real(wp) , allocatable :: st_geo(:) , s_geo(:)
   real(wp) :: ds_geo
 
@@ -960,34 +1167,12 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr, curv_ac )
   end do
   close(fid)
 
-  allocate(csi_half(nelems_chord+1))
-  select case (trim(discr))
-  case('uniform')
-    do i1 = 1 , nelems_chord+1
-      csi_half(i1) = real(i1-1,wp)/real(nelems_chord,wp)
-    end do
-  case('cosine')
-    do i1 = 1 , nelems_chord+1
-      csi_half(i1) = (1.0_wp - cos(pi*real(i1-1,wp)/real(nelems_chord,wp)) )&
-                                                                      / 2.0_wp
-    end do
-  case('cosineLE' , 'cosineIB')
-    do i1 = 1 , nelems_chord+1
-      csi_half(i1) = sin(pi/2.0_wp*real(i1-1,wp)/real(nelems_chord,wp))
-    end do
-  case('cosineTE' , 'cosineOB')
-    do i1 = 1 , nelems_chord+1
-      csi_half(i1) = (1.0_wp - cos(pi/2.0_wp*real(i1-1,wp) &
-                                    /real(nelems_chord,wp)) )
-    end do
-  case default
-  end select
-
   if ( ElType .eq. 'p' ) then
     nelems_chord_tot = 2*nelems_chord+1
     allocate(csi(nelems_chord_tot))
-    csi(             1  :nelems_chord+1) = 0.5_wp * csi_half
-    csi(nelems_chord+2:2*nelems_chord+1) =-0.5_wp * csi_half(nelems_chord:1:-1) + 1.0_wp
+    csi(             1  :nelems_chord + 1) =  -0.5_wp * csi_half(nelems_chord+1:1:-1)
+    csi(nelems_chord+2:2*nelems_chord+1) = 0.5_wp * csi_half(2:nelems_chord + 1)
+    csi = csi(nelems_chord_tot:1:-1) + 0.5_wp
   elseif ( ElType .eq. 'v' ) then
     nelems_chord_tot = nelems_chord+1
     allocate(csi(nelems_chord_tot))
@@ -1015,6 +1200,7 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr, curv_ac )
       end if
     end do
   end do
+  write(*,*) 'rr', rr(1,:)
   !> get position of aerodynamic center 
   csi_ac = 0.75_wp ! control point for vl corrected
   if ( ElType .eq. 'v' ) then
@@ -1022,6 +1208,7 @@ subroutine read_airfoil ( filen , discr , ElType , nelems_chord , rr, curv_ac )
   else  
     curv_ac = 0.0_wp
   endif 
+
   
 end subroutine read_airfoil
 

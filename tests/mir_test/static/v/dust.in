@@ -19,7 +19,7 @@ ReferenceFile = References.in
 ! Model parameters -------------------
 particles_box_min = (/ -5, -10, -5 /)
 particles_box_max = (/ 20,  10,  5 /)
-KVortexRad = 1
+KVortexRad = -1
 FMM = F
 Vortstretch = T
 Diffusion = T

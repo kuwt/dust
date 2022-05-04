@@ -486,7 +486,7 @@ module mod_stripe
     cos_lambda  = norm2(cross(this%tang_cen , -this%edge_uni(:,1)))
     
     !> control point
-    this%ctr_pt = this%cen + this%tang_cen * this%chord / 2.0_wp
+    this%ctr_pt = this%cen - this%tang_cen * this%chord / 2.0_wp
     
     !> 2 * pi * | x_CP - x{1/4*c} | * cos(lambda)
     this%d_2pi_coslambda = norm2( this%cen - this%ctr_pt ) * &
@@ -497,7 +497,7 @@ module mod_stripe
     ! overwrite nor
     this%nor = cross( this%bnorm_cen , this%tang_cen )
     this%nor = this%nor / norm2(this%nor) 
-  
+    ! ubody as intepolation FIXME
   end subroutine calc_geo_data_stripe
 
 

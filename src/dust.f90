@@ -563,7 +563,6 @@ else ! Set to zero the intensity of all the singularities
   if (size(elems_ll) .gt. 0) then
     do i_el = 1, size(elems_ll)
       elems_ll(i_el)%p%Gamma_old = 0.0_wp
-      elems_ll(i_el)%p%Gamma_old_old = 0.0_wp
     end do
   endif
 endif
@@ -1009,7 +1008,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     call precicef_ongoing(precice%is_ongoing)
     if (precice%is_ongoing .eq. 1) then
       call precicef_advance( precice%dt_precice )
-      write(*,*) ' ++++ dt_precice: ', precice%dt_precice
+      !write(*,*) ' ++++ dt_precice: ', precice%dt_precice
     end if
 
     !> Write force and moments to structural solver
@@ -1118,15 +1117,15 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     end do 
 
 #if USE_PRECICE
-    ! *** to do *** dirty implementation. it-update moved into #if USE_PRECICE
-    ! statement, to avoid double time counter update, when the code is not coupled
-    ! with external softwares through PRECICE.
-    ! #if .not. USE_PRECICE, it-update occurs at the beginning of the time loop,
-    ! approximately at l.615.
-    ! Is there a reasone why it-update should occur in two different places of the
-    ! time loop (at the begin w/o precice, at the end w/ precice)?
-    !> Update n. time step
-    it = it + 1
+      ! *** to do *** dirty implementation. it-update moved into #if USE_PRECICE
+      ! statement, to avoid double time counter update, when the code is not coupled
+      ! with external softwares through PRECICE.
+      ! #if .not. USE_PRECICE, it-update occurs at the beginning of the time loop,
+      ! approximately at l.615.
+      ! Is there a reasone why it-update should occur in two different places of the
+      ! time loop (at the begin w/o precice, at the end w/ precice)?
+      !> Update n. time step
+      it = it + 1
     endif ! End of the if statement that check whether the timestep
           ! has converged or not
 #endif

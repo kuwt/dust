@@ -106,19 +106,19 @@ use mod_handling, only: &
 !-----------------------------------------------------------------------
  !Interfaces
 
- interface write_hdf5
-  module procedure write_string_hdf5, &
-                   write_1d_string_hdf5, &
-                   write_2d_string_hdf5, &
-                   write_int_hdf5, &
-                   write_1d_int_hdf5, &
-                   write_2d_int_hdf5, &
-                   write_3d_int_hdf5, &
-                   write_real_hdf5, &
-                   write_1d_real_hdf5, &
-                   write_2d_real_hdf5, &
-                   write_3d_real_hdf5
- end interface
+   interface write_hdf5
+   module procedure write_string_hdf5, &
+                     write_1d_string_hdf5, &
+                     write_2d_string_hdf5, &
+                     write_int_hdf5, &
+                     write_1d_int_hdf5, &
+                     write_2d_int_hdf5, &
+                     write_3d_int_hdf5, &
+                     write_real_hdf5, &
+                     write_1d_real_hdf5, &
+                     write_2d_real_hdf5, &
+                     write_3d_real_hdf5
+   end interface
 
  interface write_hdf5_attr
   module procedure write_1d_int_hdf5_attr, &

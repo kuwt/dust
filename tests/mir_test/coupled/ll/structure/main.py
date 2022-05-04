@@ -12,6 +12,12 @@ from numpy import *
 import numpy as np
 # ===========================================================================
 
+exe_path = '../../../../../build/bin'
+exe_path = os.path.abspath(exe_path)
+dust_pre    = exe_path + '/dust_pre'
+dust = exe_path + '/dust'
+dust_post   = exe_path + '/dust_post'
+
 #> MBDyn model parameters 
 nnodes = 1
 dt = 0.1
@@ -33,6 +39,10 @@ tmpdir = tempfile.mkdtemp('', '.mbdyn_')
 
 
 # clean up
+print('\033[0;33m ------------------------------------------ \033[0m')
+print('\033[0;33m ◀ Removing __pycache__ and old log files ▶ \033[0m')
+print('\033[0;33m ------------------------------------------ \033[0m')
+
 if os.path.isfile('precice-MBDyn-events.json'):
     subprocess.run('rm -fv precice-MBDyn-events.json' , shell=True)
     subprocess.run('rm -fv precice-MBDyn-iterations.log' , shell=True)
@@ -59,15 +69,17 @@ path = tmpdir + '/mbdyn.sock'
 print(' path: ', path)
 os.environ['MBSOCK'] = path
 
-# launch coupled simulation
+# ===========================================================================
+# launch DUST
+print('\033[0;33m ------------------------------------ \033[0m')
+print('\033[0;33m ◀ DUST prepocessor and DUST append ▶ \033[0m')
+print('\033[0;33m ------------------------------------ \033[0m')
+dust = subprocess.run("cd ../dust &&" + dust_pre + "> log_pre.log &&" + dust + ">" + dust_log + " &", shell=True)
 
-dust = subprocess.run("cd ../dust && dust_pre && dust > " + dust_log + " &", shell=True)
-
-# set launch dust && MBDyn command
+# launch MBDyn
 str_mbdyn = 'mbdyn -f ' + mbdyn_file + ' -o ' + output_mbdyn + '/' + file_str + ' > ' + output_mbdyn + '/' + file_str + '.txt 2>&1 &'
 str_run   =  str_mbdyn  + '> log.mbd &'    
 mbdyn = subprocess.run(str_run , shell=True)
-
 
 #> Import stuff for precice 
 from mbc_py_interface import mbcNodal
@@ -82,27 +94,18 @@ writeNodes = False
 #> Initialize MBDyn/mbc_py interface: negotiate and recv()
 
 mbd = MBDynInterface()
-
 mbd.initialize( path=path, verbose=1, nnodes=nnodes, accels=1, \
                 dumpAuxFile=True )
 
 #> ==============================================================
 #> Send MBDyn exposed nodes to the other solver, if needed
-n = mbd.socket.nnodes
-print(' n: ', n)
-
+#n = mbd.socket.nnodes
 #> Build reference "Lagrangian" grid for preCICE-MBDyn solver,
 #  from the position negotiated through MBDyn-mbc_py interface
-print(" Build structural model ")
-print(" ... ")
-
-print(" Initialize MBDyn adapter ")
+print('\033[0;33m ---------------------------- \033[0m')
+print('\033[0;33m ◀ Initialize MBDyn adapter ▶ \033[0m')
+print('\033[0;33m ---------------------------- \033[0m')
 adapter = MBDynAdapter( mbd )
-
-if ( adapter.debug ):
-    print(' participant: ', adapter.p["name"] )
-    print(' solver     : ', adapter.p["mesh"]["name"] )
-    print(' fields     : ', adapter.p["fields"] )
 
 #> ==============================================================
 #> Start coupled simulation with PreCICE

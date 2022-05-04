@@ -1,0 +1,27 @@
+  Using PreCICE 
+
+>>>>>> DUST beginning >>>>>>
+
+
+====== Input parameters: ======
+
+
+Reading input parameters from file "dust.in"
+  sim_param%llSolver : GammaMethod
+
+====== Geometry Creation ======
+
+
+Reading input parameters from file "References.in"
+Reading geometry from file "geo_input.h5"
+
+====== Initializing Octree ======
+
+====== Initializing Wake ======
+
+====== Initializing Linear System ======
+  is coupling ongoing:            1
+  is coupling ongoing:            1
+  dt_precice         :   0.10000000000000001     
+
+////////// Performing Computations //////////
