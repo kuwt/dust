@@ -994,15 +994,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
         call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)
 
-        if ( mesh_symmetry ) then
-        !  do i = 1,size(rr,2)
-        !    write(*,*) 'rr(:,i)', rr(:,i)
-        !  enddo
-        !  rr(:,1:(size(rr,2)-size(rr_sym,2))) = matmul( transpose(coupling_node_rot), rr(:,1:size(rr,2)-size(rr_sym,2) ))
-        !  rr(:,size(rr,2)-size(rr_sym,2)+1:size(rr,2)) = matmul( transpose(coupling_node_rot_mir), rr_sym )
-        !else
           rr = matmul( transpose(coupling_node_rot), rr )
-        end if
+
       end if
 
     end if
