@@ -1183,10 +1183,9 @@ subroutine read_airfoil (filen , discr , ElType , nelems_chord , csi_half, rr, c
   st_geo = 0.0_wp ; s_geo = 0.0_wp
 
   do i1 = 2 , np_geo
-    st_geo(i1) = st_geo(i1-1) + abs(rr_geo(1,i1)-rr_geo(1,i1-1))
+    st_geo(i1) = st_geo(i1-1) + norm2(rr_geo(:,i1)-rr_geo(:,i1-1))
   end do
   s_geo = st_geo / st_geo(np_geo)
-
 
   allocate(rr(2,nelems_chord_tot)) ; rr = 0.0_wp
   rr(:,1) = rr_geo(:,1)

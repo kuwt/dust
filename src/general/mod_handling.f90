@@ -137,8 +137,8 @@ contains
 !> Stop the execution
 subroutine dust_abort()
 
-  call abort()
-
+  stop
+  
 end subroutine dust_abort
 
 !-----------------------------------------------------------------------
@@ -157,7 +157,7 @@ end subroutine pure_abort
 
 !> Get time (only time differences are meaningful)
 !!
-!! Should work bot within OMP and in normal execution
+!! Should work both within OMP and in normal execution
 function dust_time() result(t)
  real(t_realtime) :: t
 
@@ -518,10 +518,10 @@ subroutine check_basename(basename,sub_name,mod_name)
 
   if( estat.ne.0 .or. cstat.ne.0) then
     !got a problem with the basename
-    call put_msg(1, 'ERROR: problems creating output &
-      & with basename: '//trim(basename)//' , please check if folder exists &
-      & and is writable. Stopping execution.' )
-    call exit(-1)
+    call error(trim(sub_name),'Problems creating output with basename: '&
+         & //trim(basename)//', possibly invalid path; please check if folder exists &
+         & and is writable.')
+
   else
     !the basename is good, remove the test file
     call execute_command_line('rm '//trim(basename)//'.try', &
