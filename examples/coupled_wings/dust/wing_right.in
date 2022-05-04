@@ -8,8 +8,8 @@ CouplingNodeFile = coupling_nodes_right.in
 
 CouplingNodeOrientation = (/0.5,   0.836516303737808,   0.224143868042013, -0.852868531952443,   0.430682165754551,   0.295174760618610, 0.150383733180435,  -0.338752631992439,   0.928779514800424/)
 
-nelem_chord = 15
-type_chord = cosineLE   
+nelem_chord = 20
+type_chord = cosine   
 starting_point = (/0.222655776165707,0.595417457320121 ,0.181114485501542/)
 reference_chord_fraction = 0.25
 
@@ -23,8 +23,9 @@ Hinge = {
 
   
   Hinge_Ref_Dir = (/ 1.0, 0.0, 0.0 /)
-  Hinge_Offset  = 0.05
+  Hinge_Offset  = 0.02
   Hinge_Spanwise_Blending = 0.001
+  Hinge_Merge_Tol = 0.15
 
   Hinge_Rotation_Input = coupling
   Hinge_Rotation_Coupling = {
@@ -43,11 +44,11 @@ airfoil = NACA0012
 span = 3.404582542679879
 sweep = 30.0
 dihed = 15
-nelem_span = 20
+nelem_span = 25
 type_span = uniform
 
 ! Second section
-chord = 1.5
+chord = 2.0
 twist = 10
 airfoil = NACA0012
 
@@ -59,18 +60,18 @@ nelem_span = 7
 type_span = uniform
 
 ! Second section
-chord = 1.0
+chord = 1.5
 twist = 0
 airfoil = NACA0012
 
 ! First region
 span = 0.1
-sweep = 70.0
+sweep = 60.0
 dihed = 80
 nelem_span = 7
 type_span = uniform
 
 ! Second section
-chord = 0.5
+chord = 1.0
 twist = 0
 airfoil = NACA0012

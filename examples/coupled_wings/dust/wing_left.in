@@ -11,8 +11,8 @@ mesh_mirror = T
 mirror_point   = (/0.0 , 0.0,  0.0/)
 mirror_normal = (/0.0 , 1.0,  0.0/)
 
-nelem_chord = 15
-type_chord = cosineLE   ! uniform  cosineLE  cosineTE
+nelem_chord = 20
+type_chord = cosine   ! uniform  cosineLE  cosineTE
 starting_point = (/0.222655776165707,0.595417457320121 ,0.181114485501542/)
 reference_chord_fraction = 0.25
 
@@ -24,8 +24,10 @@ Hinge = {
   Node2 = (/ 1.473342035233606, -1.434004005481840, 0.284465743940698  /)  ! In the local ref.frame
   N_Nodes = 2
   Hinge_Ref_Dir = (/ 1.0, 0.0, 0.0 /)
-  Hinge_Offset  = 0.05
+  Hinge_Offset  = 0.02
   Hinge_Spanwise_Blending = 0.001
+  Hinge_Merge_Tol = 0.15
+
   Hinge_Rotation_Input = coupling
   Hinge_Rotation_Coupling = {
   Coupling_Node_Subset = range
@@ -33,26 +35,6 @@ Hinge = {
   Coupling_Node_Last  =  6
   }
 }
-!Hinge = {
-!  Hinge_Tag = Aileron_left
-!  Hinge_Nodes_Input = parametric      
-!  Node2 = (/ 1.4178, -1.4557, 0.3473/)  
-!  Node1 = (/ 2.4026  , -3.1615  , 0.6946/)
-!  N_Nodes = 2
-!  ! }
-!  ! Hinge_Nodes_Input_From_File = {
-!  !   Node_File = hinge_node.dat
-!  ! }
-!  Hinge_Ref_Dir = (/ 1.0, 0.0 , 0.0 /)
-!  Hinge_Offset  = 0.1
-!  Hinge_Spanwise_Blending = 0.01
-!  Hinge_Rotation_Input = function:sin
-!  Hinge_Rotation_Function = {
-!    Amplitude = -30.0    ! deg
-!    Omega     =  12.5    ! rad/sec
-!    Phase     =  0.0     ! deg
-!  }
-!}
 
 ! First section
 chord = 2.0
@@ -63,11 +45,11 @@ airfoil = NACA0012
 span = 3.404582542679879
 sweep = 30.0
 dihed = 15
-nelem_span = 20
+nelem_span = 25
 type_span = uniform
 
 ! Second section
-chord = 1.5
+chord = 2.0
 twist = 10
 airfoil = NACA0012
 
@@ -79,7 +61,7 @@ nelem_span = 7
 type_span = uniform
 
 ! Second section
-chord = 1.0
+chord = 1.5
 twist = 0
 airfoil = NACA0012
 
@@ -91,6 +73,6 @@ nelem_span = 7
 type_span = uniform
 
 ! Second section
-chord = 0.5
+chord = 1.0
 twist = 0
 airfoil = NACA0012
