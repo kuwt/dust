@@ -22,8 +22,8 @@ build_dust_alone:       # This job runs in the build stage, which runs first.
   stage: build
   script:
     - mkdir build && cd build 
-    - cmake -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DWITH_PRECICE=$WITH_PRECICE ../
-    - make -j8
+    - cmake -DCMAKE_INSTALL_PREFIX=/ -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DWITH_PRECICE=$WITH_PRECICE ../
+    - make DESTDIR=/home/gitlab-runner/.local install -j8
     - echo "Build $CMAKE_BUILD_TYPE, USE_PRECICE =$WITH_PRECICE completed"
     - cd ..
   artifacts:
@@ -83,8 +83,8 @@ build_dust_coupled:
   script: 
     - rm -rf build
     - mkdir build && cd build
-    - cmake -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DWITH_PRECICE=YES ../
-    - make -j8
+    - cmake -DCMAKE_INSTALL_PREFIX=/ -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DWITH_PRECICE=YES ../
+    - make DESTDIR=/home/gitlab-runner/.local install -j8
     - echo "Build $CMAKE_BUILD_TYPE, USE_PRECICE=YES completed"
     - cd ..
   artifacts:

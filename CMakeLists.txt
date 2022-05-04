@@ -6,7 +6,6 @@ project(Dust)
 LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 #BUG in CMake 3.7.x a policy error in find OpenMP raises unwanted warings
-#unless..
 if(POLICY CMP0012)
   cmake_policy(SET CMP0012 NEW)
 endif()
@@ -46,7 +45,6 @@ ENDIF()
 
 
 # =========== COMPILER ========================
-#SET(CMAKE_Fortran_COMPILER "/home/matteo/LocalUtils/gcc/install/bin/gfortran")
 
 find_package(OpenMP)
 if (OPENMP_FOUND)
@@ -78,21 +76,6 @@ ELSE()
   message(ERROR "Unknown compiler")
 ENDIF()
 
-
-#LIBRARIES
-# +++++++++++++++++++
-
-## Libraries --------
-#find_library(PTHREAD_LIB pthread)
-#if(NOT PTHREAD_LIB)
-#  message(FATAL_ERROR "pthread library not found")
-#endif()
-## -lgfortran ???
-#
-#link_directories(/home/davide/Software/BLAS/lapack-3.7.0/lib)
-#link_directories(/home/davide/Software/BLAS/xianyi-OpenBLAS-bcfc298/lib)
-
-# +++++++++++++++++++
 
 #> Lapack -------------------------------------------------------
 OPTION(DUST_MKL "Use MKL libraries instead of BLAS/LAPACK" OFF)
@@ -178,10 +161,8 @@ target_link_libraries(dust_pre  dustlib ${linkedlibs})
 add_executable(dust_post  ${PROJECT_SOURCE_DIR}/src/dust_post.f90)
 add_dependencies(dust_post dustlib)
 target_link_libraries(dust_post  dustlib ${linkedlibs})
-# only for testing pipline! 
-#install(TARGETS dust dust_pre dust_post DESTINATION bin)
 
-#add_executable(dust_potential_test  ${PROJECT_SOURCE_DIR}/src/dust_potential_test.f90)
-#add_dependencies(dust_potential_test dustlib)
-#target_link_libraries(dust_potential_test dustlib ${linkedlibs})
+# only for testing pipline! 
+install(TARGETS dust dust_pre dust_post DESTINATION bin)
+
 
