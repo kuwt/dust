@@ -852,6 +852,19 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call write_hdf5(radius,'Radius', comp_loc)
 
     end if
+    ! scale
+    offset   = getrealarray(geo_prs, 'Offset',3)
+    scaling  = getreal(geo_prs, 'ScalingFactor')
+
+    if (any(offset .ne. 0.0_wp)) then
+      do i = 1,size(rr,2)
+        rr(:,i) = rr(:,i) + offset
+      enddo
+    endif
+
+    if (scaling .ne. 1.0_wp) then
+      rr = rr * scaling
+    endif
 
 #if USE_PRECICE
 
