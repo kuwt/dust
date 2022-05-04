@@ -189,7 +189,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   character(len=max_char_len) :: coupling_type
   real(wp)                    :: coupling_node(3)
   real(wp)                    :: coupling_node_rot(3,3)
-  real(wp)                    :: coupling_node_rot_mir(3,3)
 #if USE_PRECICE
   character(len=max_char_len) :: coupling_node_file
   real(wp), allocatable       :: coupling_nodes(:,:)
@@ -422,12 +421,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                         getrealarray(geo_prs, 'CouplingNodeOrientation', 9), &
                         (/3,3/) )
 
-    if ( mesh_symmetry .or. mesh_mirror ) then ! Fixme (not working)
-      coupling_node_rot_mir = reshape( &
-                          getrealarray(geo_prs, 'CouplingNodeOrientationMirror', 9), &
-                          (/3,3/) )
-    end if
-
     if (  trim(coupling_type) .eq. 'rbf' ) then
       !> Open coupling_nodes_file and read nodes for FSI
       n_coupling_nodes = 0 
@@ -565,7 +558,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   call write_hdf5(trim(coupling_type)    ,'CouplingType' ,comp_loc)
   call write_hdf5(     coupling_node     ,'CouplingNode' ,comp_loc)  
   call write_hdf5(     coupling_node_rot ,'CouplingNodeOrientation',comp_loc)
-  call write_hdf5(     coupling_node_rot_mir ,'CouplingNodeOrientationMirror',comp_loc)
   call new_hdf5_group(comp_loc, 'Geometry', geo_loc)
 
   !=====
@@ -592,7 +584,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     endif
 
 #if USE_PRECICE
-    !> *** to do *** symmetry and mirror. So far, finalize run with an error
     if ( coupled_comp ) then
       write(*,*) ' coupling_type: ', trim(coupling_type)
 
@@ -673,79 +664,29 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     if ( coupled_comp ) then
       write(*,*) ' coupling_type: ', trim(coupling_type)
 
-      if ( trim(coupling_type) .eq. 'rigid' ) then
-        !> Rigid coupling between a rigid component and a "structural" node,
-        ! defined as an input, coupling_node. This node represents the
-        ! reference configuration for data communication between the aerodynamic
-        ! and the structural solvers
+      if ( mesh_mirror ) then
+        select case (trim(mesh_file_type))
+          case('cgns', 'basic', 'revolution' )  ! TODO: check basic
+            call mirror_mesh(ee, rr, mirror_point, mirror_normal)
+          case default
+            call error(this_sub_name, this_mod_name,&
+                'Mirror routines implemented for MeshFileType = &
+                & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
+                'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
+        end select
 
-        allocate(c_ref_p(3, size(rr,2))); c_ref_p = 0.0_wp
-
-        do i =1, size(c_ref_p,2)
-
-          !> Offset
-          c_ref_p(:,i) = rr(:,i) - coupling_node
-
-          !> Orientation
-          c_ref_p(:,i) = matmul(transpose(coupling_node_rot), &
-                                c_ref_p(:,i))
-
-        end do
-
-        allocate(c_ref_c(3, size(ee,2))); c_ref_c = 0.0_wp
-        do i =1, size(c_ref_c,2)
-          n_non_zero = 0
-          do j = 1, 4
-            if ( ee(j,i) .ne. 0 ) then
-              n_non_zero = n_non_zero + 1
-              c_ref_c(:,i) = c_ref_c(:,i) + rr(:,ee(j,i))
-            end if
-          end do
-          !> Offset
-          c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero) - coupling_node
-
-          !> Orientation
-          c_ref_c(:,i) = matmul( transpose(coupling_node_rot), &
-                                c_ref_c(:,i) )
-        end do
-
-        !> Write to hdf5 geo file
-        call write_hdf5(c_ref_p,'c_ref_p',geo_loc)
-        call write_hdf5(c_ref_c,'c_ref_c',geo_loc)
-
-      elseif ( trim(coupling_type) .eq. 'rbf' ) then
-        call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)        
-        rr = matmul( transpose(coupling_node_rot), rr )
+      elseif ( mesh_symmetry ) then
+        select case (trim(mesh_file_type))
+          case('cgns')  
+            call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
+          case default
+            call error(this_sub_name, this_mod_name,&
+                'Symmetry routines implemented for MeshFileType = &
+                & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
+                'MeshFileType = '//trim(mesh_file_type))
+        end select
       end if
     end if
-
-  if ( mesh_symmetry .or. mesh_mirror ) then
-!
-        if ( mesh_mirror ) then
-          select case (trim(mesh_file_type))
-            case('cgns', 'basic', 'revolution' )  ! TODO: check basic
-              call mirror_mesh(ee, rr, mirror_point, mirror_normal)
-            case default
-              call error(this_sub_name, this_mod_name,&
-                  'Mirror routines implemented for MeshFileType = &
-                  & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
-                  'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
-          end select
-        end if
-
-        if ( mesh_symmetry ) then
-          select case (trim(mesh_file_type))
-            case('cgns')  
-              call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
-            case default
-              call error(this_sub_name, this_mod_name,&
-                  'Symmetry routines implemented for MeshFileType = &
-                  & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
-                  'MeshFileType = '//trim(mesh_file_type))
-          end select
-!
-        end if
-      end if
 #endif
 
   case('revolution')

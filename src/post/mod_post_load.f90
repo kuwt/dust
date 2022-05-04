@@ -545,7 +545,7 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
     call open_hdf5_group(floc,'ParticleWake',gloc)
     call read_hdf5_al(vppoints,'WakePoints',gloc)
     call read_hdf5_al(wvort_read,'WakeVort',gloc)
-    !call read_hdf5_al(v_rad,'VortexRad',gloc)
+    call read_hdf5_al(v_rad,'VortexRad',gloc)
     if(present(vpturbvisc)) call read_hdf5_al(vpturbvisc,'turbvisc',gloc)
     allocate(vpvort(size(wvort_read,2)))
     do ip = 1,size(vpvort)

@@ -704,7 +704,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
 #if USE_PRECICE
 
   do i_comp = 1, size(geo%components)
-    if (geo%components(i_comp)%coupling) then 
+    if ((geo%components(i_comp)%coupling) .and. (trim(geo%components(i_comp)%coupling_type) .eq. 'rbf')) then 
       !> build connectivity for the panel center 
       allocate(cen(3, size(geo%components(i_comp)%el))); cen = 0.0_wp 
 
