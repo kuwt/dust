@@ -1,53 +1,53 @@
 basename =     Postpro/goland_test
 data_basename = Output/goland_test
 
-Analysis = {
-  Name = vl
-  Type = Viz
+analysis = {
+  name = vl
+  type = Viz
 
-  Format = vtk !tecplot
+  format = vtk !tecplot
 
-  StartRes = 1
-  EndRes = 2000
-  StepRes = 1
-  Wake = T
-  SeparateWake = T
-  Variable = Velocity
-  Variable = Vorticity
-  Variable = Pressure
+  start_res = 1
+  end_res = 2000
+  step_res = 1
+  wake = T
+  Separatewake = T
+  variable = Velocity
+  variable = Vorticity
+  variable = Pressure
 }
 
 
-!Analysis = {
-!Type = flow_field
-!Name = ff
-!StartRes = 872!  psi270
-!EndRes = 872
-!StepRes = 5
-!Format = vtk !tecplot
-!Average = F
-!Variable = pressure 
-!Variable = Velocity
-!Nxyz   = (/  300 ,  60   ,  80   /)
-!!Nxyz = (/ 400, 400 , 240/)
-!!Nxyz = (/ 300, 300 , 180/)
-!Minxyz = (/  -1,  4, -2 /)
-!Maxxyz = (/  14,  7,  2/)
+!analysis = {
+!type = flow_field
+!name = ff
+!start_res = 872!  psi270
+!end_res = 872
+!step_res = 5
+!format = vtk !tecplot
+!average = F
+!variable = pressure 
+!variable = Velocity
+!n_xyz   = (/  300 ,  60   ,  80   /)
+!!n_xyz = (/ 400, 400 , 240/)
+!!n_xyz = (/ 300, 300 , 180/)
+!min_xyz = (/  -1,  4, -2 /)
+!max_xyz = (/  14,  7,  2/)
 !}
 !!!
 !!
 
 
-!Analysis = {
+!analysis = {
 !
 !  
-!  Type = integral_loads
-!  Name = loads
-!  StartRes = 1 
-!  EndRes   = 2000
-!  StepRes  = 1
-!  Format   = dat
+!  type = integral_loads
+!  name = loads
+!  start_res = 1 
+!  end_res   = 2000
+!  step_res  = 1
+!  format   = dat
 !    
-!  Reference_Tag = 0
+!  reference_tag = 0
 !  
 !}

@@ -166,7 +166,7 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
 
   ! Reference system where the loads are projected:
   !  read the input and check if it exist
-  ref_tag = getstr(sbprms,'Reference_Tag')
+  ref_tag = getstr(sbprms,'reference_tag')
 
   write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_', an_start,'.h5'
   call open_hdf5_file(trim(filename),floc)

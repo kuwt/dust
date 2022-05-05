@@ -13,13 +13,13 @@ output_start = T
 u_inf = (/0.1, 0.0, 0.0/)
 
 ! geometry input -----------------
-GeometryFile = geo_input.h5
-ReferenceFile = References.in
+geometry_file = geo_input.h5
+reference_file = References.in
 
 ! Model parameters -------------------
-FMM = F
-Vortstretch = F
-Diffusion = F
+fmm = F
+vortstretch = F
+diffusion = F
 
 ! wake parameters  -------------
 n_wake_panels = 65

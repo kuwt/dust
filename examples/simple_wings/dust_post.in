@@ -1,63 +1,63 @@
 basename = Postprocessing/post
 data_basename = Output/wings
 
-Analysis = {
-  Name = v1
-  Type = Viz
+analysis = {
+  name = v1
+  type = Viz
 
-  Format = vtk !tecplot
+  format = vtk !tecplot
 
-  StartRes = 1
-  EndRes = 61
-  StepRes = 1
-  Wake = T
+  start_res = 1
+  end_res = 61
+  step_res = 1
+  wake = T
 
-  Variable = Vorticity
-  Variable = Pressure
-
-}
-
-Analysis = {
-
-Type = integral_loads
-Name = loads_left
-StartRes = 1 
-EndRes   = 61
-StepRes  = 1
-Format   = dat
-
-Component = left_wing  
-Reference_Tag = 0
+  variable = Vorticity
+  variable = Pressure
 
 }
 
-Analysis = {
+analysis = {
 
-Type = integral_loads
-Name = loads_right
-StartRes = 1 
-EndRes   = 61
-StepRes  = 1
-Format   = dat
+type = integral_loads
+name = loads_left
+start_res = 1 
+end_res   = 61
+step_res  = 1
+format   = dat
 
-Component = right_wing  
-Reference_Tag = 0
+component = left_wing  
+reference_tag = 0
 
 }
 
-Analysis = {
+analysis = {
 
-Type = integral_loads
-Name = loads_full
-StartRes = 30 
-EndRes   = 61
-StepRes  = 1
-Format   = dat
+type = integral_loads
+name = loads_right
+start_res = 1 
+end_res   = 61
+step_res  = 1
+format   = dat
 
-Average = T
-Component = left_wing  
-Component = right_wing  
-Reference_Tag = 0
+component = right_wing  
+reference_tag = 0
+
+}
+
+analysis = {
+
+type = integral_loads
+name = loads_full
+start_res = 30 
+end_res   = 61
+step_res  = 1
+format   = dat
+
+average = T
+component = left_wing  
+component = right_wing  
+reference_tag = 0
 
 }
 

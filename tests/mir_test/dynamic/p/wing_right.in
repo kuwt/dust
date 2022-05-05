@@ -1,5 +1,5 @@
-MeshFileType = parametric
-ElType = p
+Meshfiletype = parametric
+Eltype = p
 
 nelem_chord = 5
 type_chord = uniform   ! uniform  cosineLE  cosineTE

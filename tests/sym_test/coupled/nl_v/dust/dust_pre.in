@@ -1,7 +1,7 @@
 
-CompName = Wing
-GeoFile  = ./wing/wing.in
-RefTag   = Wing_PreCICE
+comp_name = Wing
+Geofile  = ./wing/wing.in
+ref_tag   = Wing_PreCICE
 
-FileName = geo_input.h5 
+filename = geo_input.h5 
 

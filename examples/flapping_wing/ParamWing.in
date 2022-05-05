@@ -1,5 +1,5 @@
-MeshFileType = parametric
-ElType = p
+Meshfiletype = parametric
+Eltype = p
 
 starting_point = (/0.0,0.0,0.0/) !Beginning of the extruded geometry
 reference_chord_fraction = 0.0   !fraction of chord at which the extrusion line

@@ -1,7 +1,7 @@
 
-CompName = wing
-GeoFile = wing.in
-RefTag = Dynamic
+comp_name = wing
+Geofile = wing.in
+ref_tag = Dynamic
 
-FileName = geo_input.h5 
+filename = geo_input.h5 
 

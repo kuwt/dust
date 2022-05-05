@@ -13,16 +13,16 @@ output_start = T
 u_inf = (/10.0, 0.0, 0.0/)
 
 ! geometry input -----------------
-GeometryFile = geo_input.h5
-ReferenceFile = References.in
+geometry_file = geo_input.h5
+reference_file = References.in
 
 ! Model parameters -------------------
 particles_box_min = (/ -5, -10, -5 /)
 particles_box_max = (/ 20,  10,  5 /)
-KVortexRad = -1
-FMM = F
-Vortstretch = T
-Diffusion = T
+Kvortex_rad = -1
+fmm = F
+vortstretch = T
+diffusion = T
 PenetrationAvoidance = T
 
 ! wake parameters  -------------

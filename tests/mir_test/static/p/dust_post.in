@@ -1,18 +1,18 @@
 basename = Postpro/test
 data_basename = Output/test
 
-Analysis = {
-  Name = v1
-  Type = Viz
+analysis = {
+  name = v1
+  type = Viz
 
-  Format = vtk !tecplot
+  format = vtk !tecplot
 
-  StartRes = 1
-  EndRes = 10
-  StepRes = 1
-  Wake = T
+  start_res = 1
+  end_res = 10
+  step_res = 1
+  wake = T
 
-  Variable = Vorticity
-  Variable = Pressure
+  variable = Vorticity
+  variable = Pressure
 
 }

@@ -184,10 +184,10 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
     n_probes = countoption(sbprms,'Point')
     allocate(rr_probes(3,n_probes))
     do ip = 1 , n_probes
-      rr_probes(:,ip) = getrealarray(sbprms,'Point',3)
+      rr_probes(:,ip) = getrealarray(sbprms,'point',3)
     end do
    case('from_file')
-    filename_in = getstr(sbprms,'File')   ! N probes and then their coordinates
+    filename_in = getstr(sbprms,'file')   ! N probes and then their coordinates
     fid_out = 21
     open(unit=fid_out,file=trim(filename_in))
     read(fid_out,*) n_probes
@@ -212,7 +212,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
     probe_vel = .true. ; probe_p = .true. ; probe_vort = .true.
   else
    do i_var = 1 , n_vars
-    var_name = getstr(sbprms,'Variable') ; call LowCase(var_name)
+    var_name = getstr(sbprms,'variable') ; call LowCase(var_name)
     select case(trim(var_name))
      case ( 'velocity' ) ; probe_vel = .true.
      case ( 'pressure' ) ; probe_p   = .true.

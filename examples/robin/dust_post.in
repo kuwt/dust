@@ -1,48 +1,48 @@
 data_basename = ./Output/robin
 basename =     ./Postpro/robin
 
-Analysis = {
+analysis = {
 
-Type = viz  
-Name = viz  
-StartRes = 1
-EndRes   = 41
-StepRes  = 1
-Format = vtk
+type = viz  
+name = viz  
+start_res = 1
+end_res   = 41
+step_res  = 1
+format = vtk
 
-Wake = T
-Component = Rotor 
-Component = Fuselage 
+wake = T
+component = Rotor 
+component = Fuselage 
 
-Variable = vorticity 
-Variable = pressure  
-
-}
-
-Analysis = {
-
-Type = integral_loads
-Name = loads_rotor_abs
-StartRes = 1 
-EndRes   = 41  
-StepRes  = 1
-Format   = dat
-
-Component = Rotor   
-Reference_Tag = 0
+variable = vorticity 
+variable = pressure  
 
 }
 
-Analysis = {
+analysis = {
 
-Type = integral_loads
-Name = loads_rotor_shaft
-StartRes = 1 
-EndRes   = 41
-StepRes  = 1
-Format   = dat
+type = integral_loads
+name = loads_rotor_abs
+start_res = 1 
+end_res   = 41  
+step_res  = 1
+format   = dat
 
-Component = Rotor   
-Reference_Tag = Gimbal
+component = Rotor   
+reference_tag = 0
+
+}
+
+analysis = {
+
+type = integral_loads
+name = loads_rotor_shaft
+start_res = 1 
+end_res   = 41
+step_res  = 1
+format   = dat
+
+component = Rotor   
+reference_tag = Gimbal
 
 }

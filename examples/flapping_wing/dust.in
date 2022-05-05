@@ -15,13 +15,13 @@ restart_from_file = F
 u_inf = (/1.0, 0.0, 0.0/)
 
 ! --- Geometry files ---
-GeometryFile = geo_input.h5
-ReferenceFile = References.in
+geometry_file = geo_input.h5
+reference_file = References.in
 
-! Wake parameters -------------
+! wake parameters -------------
 n_wake_panels = 65
 
 ! Model parameters -------------------
-FMM = F
-Vortstretch = F
-Diffusion = F
+fmm = F
+vortstretch = F
+diffusion = F

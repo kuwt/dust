@@ -255,28 +255,28 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   !===== Define the parameters ====
 
   !> Mesh file
-  call geo_prs%CreateStringOption('MeshFile','Mesh file definition')
-  call geo_prs%CreateStringOption('MeshFileType','Mesh file type')
+  call geo_prs%CreateStringOption('mesh_file','Mesh file definition')
+  call geo_prs%CreateStringOption('mesh_file_type','Mesh file type')
   
   !> Element types
-  call geo_prs%CreateStringOption('ElType', &
+  call geo_prs%CreateStringOption('el_type', &
               'element type (temporary) p:panel, v:vortex ring, l:lifting line')
   
   !> Coupled simulation component
-  call geo_prs%CreateLogicalOption('Coupled', &
+  call geo_prs%CreateLogicalOption('coupled', &
               'Component of a coupled simulation, w/ a structural solver?', 'F')
-  call geo_prs%CreateStringOption('CouplingType', &
+  call geo_prs%CreateStringOption('coupling_type', &
               'Type of the coupling: &
               &ll   : ll/beam coupling, &
               &rigid: rigid component/node, &
               &rbf: rigid component/node, &
               &none', 'none')
-  call geo_prs%CreateRealArrayOption('CouplingNode', &
+  call geo_prs%CreateRealArrayOption('coupling_node', &
               'Node for rigid coupling in the reference configuration (x, y, z)', &
               '(/0.0, 0.0, 0.0/)')
-  call geo_prs%CreateStringOption('CouplingNodeFile', &
+  call geo_prs%CreateStringOption('coupling_node_file', &
               'File containing the nodes for FSI (fluid structure interaction)')
-  call geo_prs%CreateRealArrayOption('CouplingNodeOrientation', &
+  call geo_prs%CreateRealArrayOption('coupling_node_orientation', &
               'Orientation of the node for rigid coupling. This array contains the &
               &local components (in the local reference frame of the geometrical &
               &component) of the unit vectors of the coupling node ref.frame: &
@@ -319,49 +319,49 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   !> Parameters for the actuator disks
   call geo_prs%CreateRealOption('traction', &
               'Traction of the rotor')
-  call geo_prs%CreateRealOption('Radius', &
+  call geo_prs%CreateRealOption('radius', &
               'Radius of the rotor')
 
   !> Parameters for gap sewing and edge identification
-  call geo_prs%CreateRealOption('TolSewing', &
+  call geo_prs%CreateRealOption('tol_se_wing', &
               'Dimension of the gaps that will be filled, to close TE', &
               '0.001')  ! very rough default value
-  call geo_prs%CreateRealOption('InnerProductTe', &
+  call geo_prs%CreateRealOption('inner_product_te', &
               'Threshold of the inner product of adiacent elements &
               &across the TE','-0.5')  ! very rough default value
 
   !> Parameters for te unit tangent vector generation
-  call geo_prs%CreateLogicalOption('ProjTe','Remove some component &
+  call geo_prs%CreateLogicalOption('proj_te','Remove some component &
               &from te vectors.')
-  call geo_prs%CreateStringOption('ProjTeDir','Parallel or normal to &
+  call geo_prs%CreateStringOption('proj_te_dir','Parallel or normal to &
               &ProjTeVector direction.','parallel')
-  call geo_prs%CreateRealArrayOption('ProjTeVector','Vector used for &
+  call geo_prs%CreateRealArrayOption('proj_te_vector','Vector used for &
               &the te projection.')
-  call geo_prs%CreateLogicalOption('SuppressTe','Suppress the trailing edge &
+  call geo_prs%CreateLogicalOption('suppress_te','Suppress the trailing edge &
               &from the component','F')
-  call geo_prs%CreateRealOption('ScaleTe','Scale the t.e. individually in &
+  call geo_prs%CreateRealOption('scale_te','Scale the t.e. individually in &
               &each component','1.0')
 
   !> Section name from CGNS file
-  call geo_prs%CreateStringOption('SectionName', &
+  call geo_prs%CreateStringOption('section_name', &
               'Section name from CGNS file', multiple=.true.)
 
   !> Scaling factor to scale CGNS files
-  call geo_prs%CreateRealArrayOption('Offset',&
+  call geo_prs%CreateRealArrayOption('offset',&
               'Offset the points coordinates (before scaling)','(/0.0, 0.0, 0.0/)')
-  call geo_prs%CreateRealOption('ScalingFactor', &
+  call geo_prs%CreateRealOption('scaling_factor', &
                                 'Scaling of the points coordinates.', '1.0')
 
   !> Body of revolution
-  call geo_prs%CreateRealOption('Rev_Length',&
+  call geo_prs%CreateRealOption('rev_length',&
               'Length of the body of revolution measured from nose to nose')
-  call geo_prs%CreateRealOption('Rev_Radius', &
+  call geo_prs%CreateRealOption('rev_radius', &
               'Radius of the body of revolution section.')
-  call geo_prs%CreateRealOption('Rev_Nose_Radius', &
+  call geo_prs%CreateRealOption('rev_nose_radius', &
               'Radius of the body of revolution nose.')
-  call geo_prs%CreateIntOption('Rev_Nelem_long', &
+  call geo_prs%CreateIntOption('rev_nelem_long', &
               'Number of elements along the length of the body revolution.')
-  call geo_prs%CreateIntOption('Rev_Nelem_rev', &
+  call geo_prs%CreateIntOption('rev_nelem_rev', &
           'Number of elements around the body of revolution circumference.')
 
   !=====
@@ -370,7 +370,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   call check_file_exists(geo_file,this_sub_name,this_mod_name)
   call geo_prs%read_options(geo_file,printout_val=.false.)
 
-  mesh_file_type  = getstr(geo_prs,'MeshFileType')
+  mesh_file_type  = getstr(geo_prs,'mesh_file_type')
   
   !> Symmetry
   mesh_symmetry   = getlogical(geo_prs, 'mesh_symmetry')
@@ -383,10 +383,10 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   mirror_normal = getrealarray(geo_prs, 'mirror_normal',3)
   
   ! Trailing edge options 
-  suppress_te   = getlogical(geo_prs, 'SuppressTe')
-  scale_te      = getreal(geo_prs, 'ScaleTe')
+  suppress_te   = getlogical(geo_prs, 'suppress_te')
+  scale_te      = getreal(geo_prs, 'scale_te')
 
-  comp_el_type  = getstr(geo_prs,'ElType')
+  comp_el_type  = getstr(geo_prs,'el_type')
   ElType        = comp_el_type(1:1)
 
   if ((trim(ElType) .ne. 'p') .and. ( trim(ElType) .ne. 'v') .and. &
@@ -405,17 +405,17 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   end if
 
   !> Coupling -------------------------------------------------------------
-  coupled_comp = getlogical(geo_prs, 'Coupled')
+  coupled_comp = getlogical(geo_prs, 'coupled')
   coupled_str = 'false'
 #if USE_PRECICE
   if ( coupled_comp ) then
 
     coupled_str   = 'true'
-    coupling_type = getstr(geo_prs, 'CouplingType')
-    coupling_node = getrealarray(geo_prs, 'CouplingNode', 3)
+    coupling_type = getstr(geo_prs, 'coupling_type')
+    coupling_node = getrealarray(geo_prs, 'coupling_node', 3)
     
     if ( countoption(geo_prs, 'CouplingNodeFile') .ne. 0 ) &
-        coupling_node_file = getstr(geo_prs, 'CouplingNodeFile')
+        coupling_node_file = getstr(geo_prs, 'coupling_node_file')
     
     coupling_node_rot = reshape( &
                         getrealarray(geo_prs, 'CouplingNodeOrientation', 9), &
@@ -473,12 +473,12 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   i_count = countoption(geo_prs,'TolSewing')
   
   if ( i_count .eq. 1 ) then
-    tol_sewing = getreal(geo_prs,'TolSewing')
+    tol_sewing = getreal(geo_prs,'tol_se_wing')
   else if ( i_count .eq. 0 ) then
     !> Inherit tol_sewing from general parameter
     tol_sewing = global_tol_sew
   else
-    tol_sewing = getreal(geo_prs,'TolSewing')
+    tol_sewing = getreal(geo_prs,'tol_se_wing')
     call warning(this_sub_name, this_mod_name, 'More than one &
         &TolSewing parameter defined for component'//trim(comp_tag)// &
         ', defined in file: '//trim(geo_file)//'.')
@@ -488,12 +488,12 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   i_count = countoption(geo_prs,'InnerProductTe')
 
   if ( i_count .eq. 1 ) then
-    inner_product_threshold = getreal(geo_prs,'InnerProductTe')
+    inner_product_threshold = getreal(geo_prs,'inner_product_te')
   else if ( i_count .eq. 0 ) then
     !> Inherit inner_product_threshold from general parameter
     inner_product_threshold = global_inner_prod_te
   else
-    inner_product_threshold = getreal(geo_prs,'InnerProductTe')
+    inner_product_threshold = getreal(geo_prs,'inner_product_te')
     call warning(this_sub_name, this_mod_name, 'More than one &
         &InnerProductTe parameter defined for component'//trim(comp_tag)// &
         ', defined in file: '//trim(geo_file)//'. First value used.')
@@ -503,20 +503,20 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   i_count = countoption(geo_prs,'ProjTe')
   te_proj_logical = .false.
   if ( i_count .eq. 1 ) then
-    te_proj_logical = getlogical(geo_prs,'ProjTe')
+    te_proj_logical = getlogical(geo_prs,'proj_te')
   end if
 
   if ( te_proj_logical ) then
     i_count = countoption(geo_prs,'ProjTeDir' )
     if ( i_count .eq. 1 ) then
-      te_proj_dir  = getstr(geo_prs, 'ProjTeDir')
+      te_proj_dir  = getstr(geo_prs, 'proj_te_dir')
     elseif ( i_count .lt. 1 ) then
       te_proj_dir = 'parallel'
       call warning (this_sub_name, this_mod_name, 'ProjTe = T, but &
         & no ProjTeVDir defined for component'//trim(comp_tag)// &
         ', defined in file: '//trim(geo_file)//" Default: 'parallel'.")
     else
-      te_proj_dir = getstr(geo_prs, 'ProjTeDir')
+      te_proj_dir = getstr(geo_prs, 'proj_te_dir')
       call warning(this_sub_name, this_mod_name, 'ProjTe = T, and &
         & more than one ProjTeDir defined for component'//trim(comp_tag)// &
         ', defined in file: '//trim(geo_file)//'. First value used.')
@@ -532,13 +532,13 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   if ( te_proj_logical ) then
     i_count = countoption(geo_prs,'ProjTeVector' )
     if ( i_count .eq. 1 ) then
-      te_proj_vec  = getrealarray(geo_prs, 'ProjTeVector',3)
+      te_proj_vec  = getrealarray(geo_prs, 'proj_te_vector',3)
     elseif ( i_count .lt. 1 ) then
       call error (this_sub_name, this_mod_name, 'ProjTe = T, but &
           & no ProjTeVector defined for component'//trim(comp_tag)// &
           ', defined in file: '//trim(geo_file)//'.')
     else
-      te_proj_vec  = getrealarray(geo_prs, 'ProjTeVector',3)
+      te_proj_vec  = getrealarray(geo_prs, 'proj_te_vector',3)
       call warning(this_sub_name, this_mod_name, 'ProjTe = T, but &
           & more than one ProjTeVector defined for component'//trim(comp_tag)// &
           ', defined in file: '//trim(geo_file)//'. First value used.')
@@ -566,12 +566,12 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   select case (trim(mesh_file_type))
 
   case('basic')
-    mesh_file = getstr(geo_prs,'MeshFile')
+    mesh_file = getstr(geo_prs,'mesh_file')
     call read_mesh_basic(trim(mesh_file),ee, rr)
 
     !> Scale
-    offset   = getrealarray(geo_prs, 'Offset',3)
-    scaling  = getreal(geo_prs, 'ScalingFactor')
+    offset   = getrealarray(geo_prs, 'offset',3)
+    scaling  = getreal(geo_prs, 'scaling_factor')
 
     if (any(offset .ne. 0.0_wp)) then
       do i = 1,size(rr,2)
@@ -633,7 +633,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 #endif
 
   case('cgns')
-    mesh_file = getstr(geo_prs,'MeshFile')
+    mesh_file = getstr(geo_prs,'mesh_file')
 
     ! Check the selection of mesh sections
     nSections = countoption(geo_prs, 'SectionName')
@@ -647,8 +647,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     call read_mesh_cgns(trim(mesh_file), sectionNamesCGNS,  ee, rr)
 
     ! scale
-    offset   = getrealarray(geo_prs, 'Offset',3)
-    scaling  = getreal(geo_prs, 'ScalingFactor')
+    offset   = getrealarray(geo_prs, 'offset',3)
+    scaling  = getreal(geo_prs, 'scaling_factor')
 
     if (any(offset .ne. 0.0_wp)) then
       do i = 1,size(rr,2)
@@ -694,10 +694,10 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       if ( countoption(geo_prs,'MeshFile') .lt. 1 ) then
 
         !> Size of the body of revolution
-        trac        = getreal(geo_prs, 'Rev_Nose_Radius');
-        length      = getreal(geo_prs, 'Rev_Length') - 2.0_wp * trac;
-        radius      = getreal(geo_prs, 'Rev_Radius');
-        nelems_span = getint (geo_prs, 'Rev_Nelem_long');
+        trac        = getreal(geo_prs, 'rev_nose_radius');
+        length      = getreal(geo_prs, 'rev_length') - 2.0_wp * trac;
+        radius      = getreal(geo_prs, 'rev_radius');
+        nelems_span = getint (geo_prs, 'rev_nelem_long');
 
         if ( trac <= 0.0_wp ) then
           call error(this_sub_name, this_mod_name,  &
@@ -725,14 +725,14 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
       else
 
-        mesh_file = getstr(geo_prs,'MeshFile')
+        mesh_file = getstr(geo_prs,'mesh_file')
         call read_real_array_from_file ( 2, mesh_file, rr_te )
         nelems_span = size(rr_te,1)-1
 
       endif
 
       !> Discretization of the body of revolution
-      nSections = getint (geo_prs, 'Rev_Nelem_rev');
+      nSections = getint (geo_prs, 'rev_nelem_rev');
 
       if ( nSections < 1 ) then
         call error(this_sub_name, this_mod_name,  &
@@ -748,8 +748,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       deallocate (rr_te)
 
       ! scale
-      offset   = getrealarray(geo_prs, 'Offset',3)
-      scaling  = getreal(geo_prs, 'ScalingFactor')
+      offset   = getrealarray(geo_prs, 'offset',3)
+      scaling  = getreal(geo_prs, 'scaling_factor')
 
       if (any(offset .ne. 0.0_wp)) then
         do i = 1,size(rr,2)
@@ -848,7 +848,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call read_actuatordisk_parametric(trim(mesh_file),ee,rr)
       trac = getreal(geo_prs,'traction')
       call write_hdf5(trac,'Traction',comp_loc)
-      radius = getreal(geo_prs,'Radius')
+      radius = getreal(geo_prs,'radius')
       call write_hdf5(radius,'Radius', comp_loc)
 
     end if

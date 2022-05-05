@@ -2,8 +2,8 @@
 basename = ./Output/test
 
 ! Geometry input -----------------
-GeometryFile = geo_input.h5 
-ReferenceFile = References.in 
+geometry_file = geo_input.h5 
+reference_file = References.in 
 
 ! Timings ---------------------
 tstart = 0.0 
@@ -20,19 +20,19 @@ u_inf = (/40, 0., 0./)
 ! Model parameters -------------------
 particles_box_min = (/  -9, -16, -4 /)
 particles_box_max = (/  23,  16,  4/)
-FMM = T
+fmm = T
 ! octree parameters--------------------
-BoxLength = 8
-NBox = (/4, 4 , 1/)
-OctreeOrigin = (/-9 , -16 , -4/)
-NOctreeLevels = 6
-MinOctreePart = 5
-MultipoleDegree = 2
-Vortstretch = T
-Diffusion = T
-! Wake parameters  -------------
+box_length = 8
+n_box = (/4, 4 , 1/)
+octree_origin = (/-9 , -16 , -4/)
+n_octree_levels = 6
+min_octree_part = 5
+multipole_degree = 2
+vortstretch = T
+diffusion = T
+! wake parameters  -------------
 n_wake_panels = 2
 n_wake_particles = 200000
 ! wake regularisation
-KVortexRad = 1 
+Kvortex_rad = 1 
 

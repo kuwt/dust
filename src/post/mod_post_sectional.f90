@@ -275,8 +275,8 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
   call prepare_geometry_postpro(comps)
 
   ! Read the axis for the computation of the sectional loads
-  axis_dir = getrealarray(sbprms,'AxisDir',3)
-  axis_nod = getrealarray(sbprms,'AxisNod',3)
+  axis_dir = getrealarray(sbprms,'axis_dir',3)
+  axis_nod = getrealarray(sbprms,'axis_nod',3)
 
   ! if a box is defined ---> use the box
   comp_input = trim(comps(1)%comp_input )
@@ -286,7 +286,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
   & box defined for sectional loads')
 
   !> decide on printing lifting lines data
-  print_ll = getlogical(sbprms,'LiftingLineData')
+  print_ll = getlogical(sbprms,'lifting_line_data')
   if (trim(comps(1)%comp_el_type) .ne. 'l')  then
     print_ll = .false.
     call warning(this_sub_name, this_mod_name, 'Cannot output lifting &
@@ -295,7 +295,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
   endif
 
   !> decide on printing corrected vortex lattice data
-  print_vl = getlogical(sbprms,'VortexLatticeData')
+  print_vl = getlogical(sbprms,'vortex_lattice_data')
   
   if (trim(comps(1)%comp_el_type) .eq. 'v' .and.  &
     trim(comps(1)%aero_correction) .ne. 'true')  then
@@ -530,15 +530,15 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
     ! Read input for box and build the 8 nodes of the box -----------------------------
     call getsuboption(sbprms,'BoxSect',bxprms)
     allocate(box_coord(8,3),box_coord_tmp(8,3))
-    ref_node = getrealarray(bxprms,'refNode',3)
-    vVec = getrealarray(bxprms,'faceVec',3)
-    baseLen = getrealarray(bxprms,'faceBas',2)
-    heigLen = getrealarray(bxprms,'faceHei',2)
-    bVec = getrealarray(bxprms,'spanVec',3)
-    spanLen = getreal(bxprms,'spanLen')
-    n_sect = getint(bxprms,'numSect')
-    reshape_box = getlogical(bxprms,'reshapeBox')
-    nVec = getrealarray(sbprms,'AxisMom',3)
+    ref_node = getrealarray(bxprms,'ref_node',3)
+    vVec = getrealarray(bxprms,'face_vec',3)
+    baseLen = getrealarray(bxprms,'face_bas',2)
+    heigLen = getrealarray(bxprms,'face_hei',2)
+    bVec = getrealarray(bxprms,'span_vec',3)
+    spanLen = getreal(bxprms,'span_len')
+    n_sect = getint(bxprms,'num_sect')
+    reshape_box = getlogical(bxprms,'reshape_box')
+    nVec = getrealarray(sbprms,'axis_mom',3)
 
     ! Normalise
     vVec = vVec / norm2(vVec)

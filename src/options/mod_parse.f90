@@ -699,9 +699,9 @@ subroutine read_options(this, filename, printout_val)
       if (.not. actually_reading%read_option(HelpStr, sub_option, prev_read)) then
         if (firstWarn) then
           firstWarn=.false.
-          write(UNIT_StdOut, *) "WARNING: The following options in file "&
-                                        //trim(filename)//" are unknown!"
-          write(UNIT_StdOut,*) "   ", trim(HelpStr)                              
+          !write(UNIT_StdOut, *) "WARNING: The following options in file "&
+          !                              //trim(filename)//" are unknown!"
+          !write(UNIT_StdOut,*) "   ", trim(HelpStr)                              
         end if
         ! write(UNIT_StdOut,*) "   ", trim(HelpStr)
       end if

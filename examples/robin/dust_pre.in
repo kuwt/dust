@@ -1,13 +1,13 @@
-! Components -------------------
+! components -------------------
 
-CompName = Fuselage
-GeoFile = robin-helo.in 
-RefTag = Root
+comp_name = Fuselage
+Geofile = robin-helo.in 
+ref_tag = Root
 
-CompName = Rotor
-GeoFile = ll_blade_robin_refined.in 
-RefTag = Hub 
+comp_name = Rotor
+Geofile = ll_blade_robin_refined.in 
+ref_tag = Hub 
 
 ! .hdf5 geometry file ----------
-FileName = ./geo_input.h5 
+filename = ./geo_input.h5 
 

@@ -2,8 +2,8 @@
 basename = ./Output/goland_test
 
 ! Geometry input -----------------
-GeometryFile = geo_input.h5 
-ReferenceFile = References.in 
+geometry_file = geo_input.h5 
+reference_file = References.in 
 
 ! Timings ---------------------
 tstart = 0.000000 
@@ -20,44 +20,44 @@ u_inf = (/200, 0., 0./)
 ! Model parameters -------------------
 particles_box_min = (/  -1, -1, -4 /)
 particles_box_max = (/  23,  7,  4/)
-FMM = T
+fmm = T
 ! octree parameters--------------------
-BoxLength = 8
-NBox = (/3, 1 , 1/)
-OctreeOrigin = (/-1 , -1 , -4/)
-NOctreeLevels = 6
-MinOctreePart = 5
-MultipoleDegree = 2
-Vortstretch = T
-Diffusion = T
-! Wake parameters  -------------
+box_length = 8
+n_box = (/3, 1 , 1/)
+octree_origin = (/-1 , -1 , -4/)
+n_octree_levels = 6
+min_octree_part = 5
+multipole_degree = 2
+vortstretch = T
+diffusion = T
+! wake parameters  -------------
 n_wake_panels = 3
 n_wake_particles = 200000
 ! wake regularisation
-DivergenceFiltering = T
-FilterTimescale = 40
-RankineRad=0.03  !0.1
-VortexRad = 0.05 ! 0.15
-CutoffRad = 0.001
+divergence_filtering = T
+filter_time_scale = 40
+rankine_rad=0.03  !0.1
+vortex_rad = 0.05 ! 0.15
+cutoff_rad = 0.001
 ! lifting lines solver-----------------
-LLtol = 1.0e-6
-LLdamp = 20
-LLReynoldsCorrections = F
+ll_tol = 1.0e-6
+ll_damp = 20
+ll_reynolds_corrections = F
 LLMaxIter = 400
 
 ! --- Lifting Lines parameters ---
-!LLsolver = GammaMethod ! AlphaMethod !GammaMethod
-!!LLReynoldsCorrections = F
-!!LLReynoldsCorrectionsNfact = 0.2
-!LLmaxIter = 400
-!LLtol = 1.0 e -6
-!LLdamp = 20.0
-!!LLstallRegularisation = T
-!LLstallRegularisationNelems = 1
+!ll_solver = GammaMethod ! AlphaMethod !GammaMethod
+!!ll_reynolds_corrections = F
+!!ll_reynolds_correctionsNfact = 0.2
+!ll_max_iter = 400
+!ll_tol = 1.0 e -6
+!ll_damp = 20.0
+!!ll_stall_regularisation = T
+!ll_stall_regularisationNelems = 1
 !LLstallRegularizationsNiters = 1
 !!LLstallRegularizationAlphaStall = 15
-!LLartificialViscosity = 100000
-!!LLartificialViscosityAdaptive = T
-!!LLartificialViscosityAdaptive_Alpha = 15
-!!LLartificialViscosityAdaptive_dAlpha = 3
-!LLloadsAVL = T
+!ll_artificial_viscosity = 100000
+!!ll_artificial_viscosityAdaptive = T
+!!ll_artificial_viscosityAdaptive_Alpha = 15
+!!ll_artificial_viscosityAdaptive_dAlpha = 3
+!ll_loads_avl = T

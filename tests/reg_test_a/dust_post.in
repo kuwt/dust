@@ -1,31 +1,31 @@
 basename =     ./Postpro/ref_dynamic_base
 data_basename = ./Output/ref_dynamic_base
 
-Analysis = {
-  Name = v1
-  Type = Viz
+analysis = {
+  name = v1
+  type = Viz
 
-  Format = vtk
-  !Format = tecplot
+  format = vtk
+  !format = tecplot
 
-  StartRes = 1
-  EndRes =  11
-  StepRes = 1
-  Wake = T
+  start_res = 1
+  end_res =  11
+  step_res = 1
+  wake = T
 
-  Variable = Vorticity
-  Variable = Pressure
+  variable = Vorticity
+  variable = Pressure
 
 }
 
-Analysis = {
-  Type = integral_loads
-  Name = load_wing
-  StartRes = 1
-  EndRes = 11
-  StepRes = 1
-  Format = dat
-  Average = F
-  Component = All
-  Reference_Tag = 0
+analysis = {
+  type = integral_loads
+  name = load_wing
+  start_res = 1
+  end_res = 11
+  step_res = 1
+  format = dat
+  average = F
+  component = All
+  reference_tag = 0
 }
