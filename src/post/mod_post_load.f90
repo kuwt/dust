@@ -139,25 +139,25 @@ end subroutine load_refs
 !----------------------------------------------------------------------
 
 subroutine load_res(floc, comps, vort, press, t, surfvel)
-  integer(h5loc), intent(in) :: floc
-  type(t_geo_component), intent(inout) :: comps(:)
-  real(wp), allocatable, intent(out) :: vort(:)
-  real(wp), allocatable, intent(out) :: press(:)
-  real(wp), intent(out) :: t
+  integer(h5loc), intent(in)                   :: floc
+  type(t_geo_component), intent(inout)         :: comps(:)
+  real(wp), allocatable, intent(out)           :: vort(:)
+  real(wp), allocatable, intent(out)           :: press(:)
+  real(wp), intent(out)                        :: t
   real(wp), allocatable, intent(out), optional :: surfvel(:,:)
 
-  integer :: ncomps, icomp, ie
-  integer :: nelems, offset, nelems_comp
-  integer(h5loc) :: gloc1, gloc2, gloc3
-  character(len=max_char_len) :: cname
-  real(wp), allocatable :: vort_read(:)!, cp_read(:)
-  real(wp), allocatable :: pres_read(:), dforce_read(:,:), surfvel_read(:,:)
-  real(wp), allocatable :: dmom_read(:,:)
-  integer :: ncomps_sol
-  logical :: got_surfvel
-  logical :: saved_dmom
+  integer                                      :: ncomps, icomp, ie
+  integer                                      :: nelems, offset, nelems_comp
+  integer(h5loc)                               :: gloc1, gloc2, gloc3
+  character(len=max_char_len)                  :: cname
+  real(wp), allocatable                        :: vort_read(:)!, cp_read(:)
+  real(wp), allocatable                        :: pres_read(:), dforce_read(:,:), surfvel_read(:,:)
+  real(wp), allocatable                        :: dmom_read(:,:)
+  integer                                      :: ncomps_sol
+  logical                                      :: got_surfvel
+  logical                                      :: saved_dmom
 
-  character(len=*), parameter :: this_sub_name = 'load_res'
+  character(len=*), parameter                  :: this_sub_name = 'load_res'
 
   got_surfvel = present(surfvel)
   ncomps = size(comps)
@@ -273,18 +273,18 @@ end subroutine load_res
 !----------------------------------------------------------------------
 
 subroutine load_ll(floc, comps, ll_data)
-  integer(h5loc), intent(in) :: floc
-  type(t_geo_component), intent(inout) :: comps(:)
-  real(wp), intent(out) :: ll_data(:,:)
+  integer(h5loc), intent(in)              :: floc
+  type(t_geo_component), intent(inout)    :: comps(:)
+  real(wp), intent(out)                   :: ll_data(:,:)
 
-  integer :: ncomps, icomp
-  integer :: nelems, offset, nelems_comp
-  integer(h5loc) :: gloc1, gloc2, gloc3
-  character(len=max_char_len) :: cname
-  real(wp), allocatable :: ll_data_read(:,:)
-  integer :: ncomps_sol
+  integer                                 :: ncomps, icomp
+  integer                                 :: nelems, offset, nelems_comp
+  integer(h5loc)                          :: gloc1, gloc2, gloc3
+  character(len=max_char_len)             :: cname
+  real(wp), allocatable                   :: ll_data_read(:,:)
+  integer                                 :: ncomps_sol
 
-  character(len=*), parameter :: this_sub_name = 'load_ll'
+  character(len=*), parameter             :: this_sub_name = 'load_ll'
 
   ncomps = size(comps)
   nelems = 0
@@ -398,31 +398,31 @@ end subroutine load_vl
 
 subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
                           vpvort_v, v_rad, vpturbvisc)
-  integer(h5loc), intent(in) :: floc
-  real(wp), allocatable, intent(out) :: wpoints(:,:)
-  integer, allocatable, intent(out)  :: welems(:,:)
-  real(wp), allocatable, intent(out) :: wvort(:)
-  real(wp), allocatable, intent(out) :: vppoints(:,:)
-  real(wp), allocatable, intent(out) :: vpvort(:)
-  real(wp), allocatable, intent(out) :: vpvort_v(:,:)
-  real(wp), allocatable, intent(out) :: v_rad(:)
+  integer(h5loc), intent(in)                   :: floc
+  real(wp), allocatable, intent(out)           :: wpoints(:,:)
+  integer, allocatable, intent(out)            :: welems(:,:)
+  real(wp), allocatable, intent(out)           :: wvort(:)
+  real(wp), allocatable, intent(out)           :: vppoints(:,:)
+  real(wp), allocatable, intent(out)           :: vpvort(:)
+  real(wp), allocatable, intent(out)           :: vpvort_v(:,:)
+  real(wp), allocatable, intent(out)           :: v_rad(:)
   real(wp), allocatable, intent(out), optional :: vpturbvisc(:)
 
-  integer(h5loc) :: gloc
-  logical :: got_dset
-  real(wp), allocatable :: wpoints_read(:,:,:)
-  real(wp), allocatable :: wpoints_pan(:,:), wpoints_rin(:,:)
-  integer, allocatable  :: wstart(:,:), wconn(:)
-  real(wp), allocatable :: wcen(:,:,:)
-  real(wp), allocatable :: wvort_read(:,:)
-  real(wp), allocatable :: wvort_pan(:), wvort_rin(:)
-  integer, allocatable  :: welems_pan(:,:), welems_rin(:,:)
-  integer :: nstripes, npoints_row, nrows, ndisks, nelem_w
-  integer :: iew, ir, is, ip
-  integer :: first_elem, act_disk, next_elem
+  integer(h5loc)                               :: gloc
+  logical                                      :: got_dset
+  real(wp), allocatable                        :: wpoints_read(:,:,:)
+  real(wp), allocatable                        :: wpoints_pan(:,:), wpoints_rin(:,:)
+  integer, allocatable                         :: wstart(:,:), wconn(:)
+  real(wp), allocatable                        :: wcen(:,:,:)
+  real(wp), allocatable                        :: wvort_read(:,:)
+  real(wp), allocatable                        :: wvort_pan(:), wvort_rin(:)
+  integer, allocatable                         :: welems_pan(:,:), welems_rin(:,:)
+  integer                                      :: nstripes, npoints_row
+  integer                                      :: nrows, ndisks, nelem_w
+  integer                                      :: iew, ir, is, ip
+  integer                                      :: first_elem, act_disk, next_elem
 
-
-  !get the panel wake
+  !> get the panel wake
   got_dset = check_dset_hdf5('PanelWake',floc)
   if(got_dset) then
 
@@ -430,7 +430,6 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
     call read_hdf5_al(wpoints_read,'WakePoints',gloc)
     call read_hdf5_al(wstart,'StartPoints',gloc)
     call read_hdf5_al(wvort_read,'WakeVort',gloc)
-
 
     nstripes = size(wvort_read,1); nrows = size(wvort_read,2);
     npoints_row = size(wpoints_read,2)
@@ -456,11 +455,11 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
     deallocate(wpoints_read, wstart, wvort_read)
     call close_hdf5_group(gloc)
   else
-    !panel wake not present, allocate stuff at zero size
+    !> panel wake not present, allocate stuff at zero size
     allocate(wvort_pan(0), wpoints_pan(3,0), welems_pan(4,0))
   endif
 
-  !get the ring wake
+  !> get the ring wake
   got_dset = check_dset_hdf5('RingWake',floc)
   if(got_dset) then
 
@@ -520,7 +519,7 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
     allocate(wvort_rin(0), wpoints_rin(3,0), welems_rin(4,0))
   endif
 
-  !Stitch together the two wakes
+  !> Stitch together the two wakes
   allocate(wpoints(3,size(wpoints_pan,2)+size(wpoints_rin,2)))
   wpoints(:,1:size(wpoints_pan,2)) = wpoints_pan
   wpoints(:,size(wpoints_pan,2)+1:size(wpoints,2)) = wpoints_rin
@@ -532,7 +531,6 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
                                                     size(wpoints_pan,2)
   welems(4,size(welems_pan,2)+1:size(welems,2)) = 0
   deallocate(welems_pan, welems_rin)
-
 
   allocate(wvort(size(wvort_pan)+size(wvort_rin)))
   wvort(1:size(wvort_pan)) = wvort_pan
@@ -561,17 +559,17 @@ end subroutine load_wake_viz
 !----------------------------------------------------------------------
 
 subroutine load_wake_pan(floc, wpoints, wstart, wvort)
-  integer(h5loc), intent(in) :: floc
-  real(wp), allocatable, intent(out) :: wpoints(:,:,:)
-  integer, allocatable, intent(out) :: wstart(:,:)
-  real(wp), allocatable, intent(out) :: wvort(:,:)
+  integer(h5loc), intent(in)            :: floc
+  real(wp), allocatable, intent(out)    :: wpoints(:,:,:)
+  integer, allocatable, intent(out)     :: wstart(:,:)
+  real(wp), allocatable, intent(out)    :: wvort(:,:)
 
-  integer(h5loc) :: gloc
+  integer(h5loc)                        :: gloc
 
   call open_hdf5_group(floc,'PanelWake',gloc)
   call read_hdf5_al(wpoints,'WakePoints',gloc)
-  call read_hdf5_al(wstart,'StartPoints',gloc)
-  call read_hdf5_al(wvort,'WakeVort',gloc)
+  call read_hdf5_al(wstart, 'StartPoints',gloc)
+  call read_hdf5_al(wvort,  'WakeVort',gloc)
   call close_hdf5_group(gloc)
 
 end subroutine load_wake_pan
@@ -601,25 +599,25 @@ end subroutine load_wake_ring
 !> Load the wake for the postprocessing.
 !! do everything
 subroutine load_wake_post(floc, wake, wake_p)
-  integer(h5loc), intent(in) :: floc
-  type(t_wake), target, intent(out)  :: wake
-  type(t_elem_p), allocatable, intent(out) :: wake_p(:)
+  integer(h5loc), intent(in)                :: floc
+  type(t_wake), target, intent(out)         :: wake
+  type(t_elem_p), allocatable, intent(out)  :: wake_p(:)
 
-  integer(h5loc) :: gloc
-  real(wp), allocatable :: wpoints_pan(:,:,:)
-  integer,  allocatable :: wstart_pan(:,:)
-  real(wp), allocatable :: wvort_pan(:,:)
-  real(wp), allocatable :: wpoints_rin(:,:,:)
-  integer,  allocatable :: wconn_rin(:)
-  real(wp), allocatable :: wvort_rin(:,:)
-  real(wp), allocatable :: vppoints(:,:), vpvort(:,:)
-  real(wp), allocatable :: v_rad(:)
-  integer :: n_wake_stripes , npan, ndisks, nrows
-  integer :: nsides
-  integer :: p1 , p2
-  integer :: ip , iw, id, ir, iconn, i
-  integer :: npt_disk
-  integer, allocatable :: disk_pts(: )
+  integer(h5loc)                            :: gloc
+  real(wp), allocatable                     :: wpoints_pan(:,:,:)
+  integer,  allocatable                     :: wstart_pan(:,:)
+  real(wp), allocatable                     :: wvort_pan(:,:)
+  real(wp), allocatable                     :: wpoints_rin(:,:,:)
+  integer,  allocatable                     :: wconn_rin(:)
+  real(wp), allocatable                     :: wvort_rin(:,:)
+  real(wp), allocatable                     :: vppoints(:,:), vpvort(:,:)
+  real(wp), allocatable                     :: v_rad(:)
+  integer                                   :: n_wake_stripes , npan, ndisks, nrows
+  integer                                   :: nsides
+  integer                                   :: p1 , p2
+  integer                                   :: ip , iw, id, ir, iconn, i
+  integer                                   :: npt_disk
+  integer, allocatable                      :: disk_pts(: )
 
   !=== Panels ===
   call open_hdf5_group(floc,'PanelWake',gloc)
@@ -799,17 +797,17 @@ end subroutine
 
 !TODO: include the possibility of defining multiple components as an input
 subroutine check_if_components_exist( components_list , filename )
-  character(len=*) , intent(in) :: components_list(:)
-  character(len=*) , intent(in) :: filename
+  character(len=*), intent(in)              :: components_list(:)
+  character(len=*), intent(in)              :: filename
 
   character(len=max_char_len) , allocatable :: components(:)
-  character(len=max_char_len) :: cname !, msg
-  integer(h5loc) :: floc , gloc , cloc
-  integer :: n_comp_tot , n_comp_inp
+  character(len=max_char_len)               :: cname 
+  integer(h5loc)                            :: floc , gloc , cloc
+  integer                                   :: n_comp_tot , n_comp_inp
 
-  integer :: i1 , i2 , i_check , i_comp
+  integer                                   :: i1 , i2 , i_check , i_comp
 
-  character(len=*), parameter :: this_sub_name = 'check_if_components_exist'
+  character(len=*), parameter               :: this_sub_name = 'check_if_components_exist'
 
   n_comp_inp = size(components_list)
 
