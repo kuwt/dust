@@ -234,7 +234,7 @@ module mod_stripe
     alpha = atan2(dot(up, this%nor), dot(up,this%tang_cen)) 
 
     !> "2D correction" of the induced angle
-    alpha_2d = mag_inv / ( pi * this%chord * unorm ) 
+    alpha_2d = - mag_inv / ( pi * this%chord * unorm ) 
 
     alpha = (alpha - alpha_2d) * 180.0_wp/pi  
 
@@ -497,13 +497,9 @@ module mod_stripe
     ! overwrite nor
     this%nor = cross( this%bnorm_cen , this%tang_cen )
     this%nor = this%nor / norm2(this%nor) 
-    ! ubody as intepolation FIXME
   end subroutine calc_geo_data_stripe
 
-
-  !--------------------------------------------------------------------------
   !------------------------------DUMMY FUNCTIONS-----------------------------
-  !--------------------------------------------------------------------------
 
   subroutine build_row_stripe(this, elems, linsys, ie, ista, iend)
     class(t_stripe), intent(inout)   :: this

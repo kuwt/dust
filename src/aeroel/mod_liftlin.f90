@@ -714,7 +714,7 @@ subroutine solve_liftlin_piszkin( &
   enddo !solver iterations
   if(ic .ge. fp_maxIter) then
     write(msg,'(A,I0,A)') 'Lifting lines iterative solution NOT CONVERGED &
-                           &after ',fp_maxIter,' iterations'
+                            &after ',fp_maxIter,' iterations'
     call warning(this_sub_name, this_mod_name, msg)
   endif
 
@@ -737,9 +737,9 @@ subroutine solve_liftlin_piszkin( &
   ! compute LL sectional loads from singularity intensities.
   do i_l = 1,size(elems_ll)
 
-   !select type(el => elems_ll(i_l)%p)
-   !type is(t_liftlin)
-   el => elems_ll(i_l)%p
+    !select type(el => elems_ll(i_l)%p)
+    !type is(t_liftlin)
+    el => elems_ll(i_l)%p
     ! avg delta_p = \vec{F}.\vec{n} / A = ( L*cos(al)+D*sin(al) ) / A
     !> steady pressure contribution ( overwritten below )
     el%pres   = 0.5_wp * sim_param%rho_inf * u_v(i_l)**2.0_wp * &
@@ -1267,17 +1267,17 @@ end subroutine solve_liftlin
 ! the subroutine solve_liftlin
 !
 subroutine compute_dforce_jukowski_liftlin(this, elems, wake_elems)
- class(t_liftlin), intent(inout) :: this
- type(t_pot_elem_p),intent(in):: elems(:)
- type(t_pot_elem_p),intent(in):: wake_elems(:)
+  class(t_liftlin), intent(inout) :: this
+  type(t_pot_elem_p),intent(in):: elems(:)
+  type(t_pot_elem_p),intent(in):: wake_elems(:)
 
- real(wp) :: gam(3)
+  real(wp) :: gam(3)
 
- call this % get_vel_ctr_pt( elems , wake_elems )
+  call this%get_vel_ctr_pt( elems , wake_elems )
 
- gam = cross ( this % vel_ctr_pt, this % edge_vec(:,1) )
+  gam = cross ( this%vel_ctr_pt, this%edge_vec(:,1) )
 
- this%dforce = sim_param%rho_inf * gam * this%mag
+  this%dforce = sim_param%rho_inf * gam * this%mag
 
 end subroutine compute_dforce_jukowski_liftlin
 
@@ -1328,12 +1328,12 @@ end subroutine get_vel_ctr_pt_liftlin
 !----------------------------------------------------------------------
 
 subroutine calc_geo_data_liftlin(this, vert)
- class(t_liftlin), intent(inout) :: this
- real(wp), intent(in) :: vert(:,:)
+  class(t_liftlin), intent(inout) :: this
+  real(wp), intent(in) :: vert(:,:)
 
- integer  :: is, nsides
- real(wp) :: rm(3,3), nor(3), tanl(3) , cen(3)
- real(wp) :: cos_lambda, st, ct, mc
+  integer  :: is, nsides
+  real(wp) :: rm(3,3), nor(3), tanl(3) , cen(3)
+  real(wp) :: cos_lambda, st, ct, mc
 
   this%ver = vert
   nsides = this%n_ver
