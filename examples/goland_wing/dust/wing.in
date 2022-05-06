@@ -1,11 +1,11 @@
 !> === Mesh and elements types ===
-MeshFileType = parametric
-ElType       = p
-!> === Coupled with external structural solver (T/F) ===
-Coupled      = T
-CouplingType = rbf
-CouplingNodeFile = coupling_nodes.in 
-CouplingNodeOrientation = (/ 1.0,0.0,0.0, 0.0,1.0,0.0,  0.0,0.0,1.0 /)
+Meshfiletype = parametric
+Eltype       = p
+!> === coupled with external structural solver (T/F) ===
+coupled      = T
+Couplingtype = rbf
+coupling_nodefile = coupling_nodes.in 
+coupling_nodeorientation = (/ 1.0,0.0,0.0, 0.0,1.0,0.0,  0.0,0.0,1.0 /)
 !> === Geometry definition ===
 starting_point = (/ -0.14632 , 0.0 , 0.0/)
 reference_chord_fraction = 0.25

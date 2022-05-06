@@ -11,7 +11,7 @@ dt_out = 0.000751577
 output_start = T
 
 ! geometry -----------------------------
-GeometryFile = geo_input.h5
+geometry_file = geo_input.h5
 
 ! restart ------------------------------
 restart_from_file= F
@@ -19,13 +19,13 @@ restart_file = ./Output/starting_res.h5
 reset_time = F
 
 ! reference frames ---------------------
-ReferenceFile = ./References.in
+reference_file = ./References.in
 
 ! Model parameters ---------------------
-VortexRad = 0.03
-FMM = T
-Vortstretch = T
-Diffusion = T
+vortex_rad = 0.03
+fmm = T
+vortstretch = T
+diffusion = T
 PenetrationAvoidance = T
 
 ! wake parameters ----------------------
@@ -35,13 +35,13 @@ particles_box_min = (/ -2.0, -2.0, -7.0/)
 particles_box_max = (/  6.0,  2.0,  1.0/)
 
 ! octree parameters--------------------
-BoxLength = 4
-NBox = (/2,1,2/)
-OctreeOrigin = (/-2.0, -2.0, -7.0/)
-NOctreeLevels = 6
-MinOctreePart = 5
-MultipoleDegree = 2
+box_length = 4
+n_box = (/2,1,2/)
+octree_origin = (/-2.0, -2.0, -7.0/)
+n_octree_levels = 6
+min_octree_part = 5
+multipole_degree = 2
 
 ! lifting lines solver-----------------
-LLtol = 1.0e-4
-LLdamp = 5.0
+ll_tol = 1.0e-4
+ll_damp = 5.0

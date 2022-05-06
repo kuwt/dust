@@ -253,6 +253,9 @@ else
   input_file_name = input_file_name_def
 endif
 
+call printout(nl//'Reading input parameters from file "'//&
+                trim(input_file_name)//'"'//nl)
+
 !> Define the parameters to be read
 !> Time
 call prms%CreateRealOption('tstart', "Starting time")
@@ -264,8 +267,8 @@ call prms%CreateRealOption('dt_debug_out', "debug output time interval")
 call prms%CreateIntOption ('ndt_update_wake', 'n. dt between two wake updates', '1')
 
 !> Input
-call prms%CreateStringOption('GeometryFile','Main geometry definition file')
-call prms%CreateStringOption('ReferenceFile','Reference frames file','no_set')
+call prms%CreateStringOption('geometry_file','Main geometry definition file')
+call prms%CreateStringOption('reference_file','Reference frames file','no_set')
 
 !> Output
 call prms%CreateStringOption('basename','oputput basename','./')
@@ -296,107 +299,107 @@ call prms%CreateRealArrayOption('particles_box_min', 'min coordinates of the &
                                 &particles bounding box', '(/-10.0, -10.0, -10.0/)')
 call prms%CreateRealArrayOption('particles_box_max', 'max coordinates of the &
                                 &particles bounding box', '(/10.0, 10.0, 10.0/)')
-call prms%CreateRealOption('ImplicitPanelScale', "Scaling of the first implicit wake panel", '0.3')
-call prms%CreateRealOption('ImplicitPanelMinVel', "Minimum velocity at the trailing edge", '1.0e-8')
+call prms%CreateRealOption('implicit_panel_scale', "Scaling of the first implicit wake panel", '0.3')
+call prms%CreateRealOption('implicit_panel_min_vel', "Minimum velocity at the trailing edge", '1.0e-8')
 call prms%CreateLogicalOption('rigid_wake','rigid wake?','F')
 call prms%CreateRealArrayOption('rigid_wake_vel', "rigid wake velocity" )
 call prms%CreateLogicalOption('join_te','join trailing edge','F')
 call prms%CreateRealOption('join_te_factor', "join the trailing edges when closer than factor*te element size",'1.0' )
 
 !> Regularisation 
-call prms%CreateRealOption('FarFieldRatioDoublet', &
+call prms%CreateRealOption('far_field_ratio_doublet', &
       "Multiplier for far field threshold computation on doublet", '10.0')
-call prms%CreateRealOption('FarFieldRatioSource', &
+call prms%CreateRealOption('far_field_ratio_source', &
       "Multiplier for far field threshold computation on sources", '10.0')
-call prms%CreateRealOption('DoubletThreshold', &
+call prms%CreateRealOption('doublet_threshold', &
       "Thresold for considering the point in plane in doublets", '1.0e-6')
-call prms%CreateRealOption('RankineRad', &
+call prms%CreateRealOption('rankine_rad', &
       "Radius of Rankine correction for vortex induction near core", '0.1')
-call prms%CreateRealOption('VortexRad', &
+call prms%CreateRealOption('vortex_rad', &
       "Radius of vortex core, for particles", '0.1')
-call prms%CreateRealOption('KVortexRad', &
+call prms%CreateRealOption('k_vortex_rad', &
       "Radius coefficient of vortex core, for particles", '-1.0') ! default is OFF
-call prms%CreateRealOption('CutoffRad', &
+call prms%CreateRealOption('cutoff_rad', &
       "Radius of complete cutoff  for vortex induction near core", '0.001')
 
 !> Lifting line elements
-call prms%CreateStringOption('LLsolver','Solver for the LL elements', &
+call prms%CreateStringOption('ll_solver','Solver for the LL elements', &
                           &'GammaMethod')
-call prms%CreateLogicalOption('LLReynoldsCorrections', &
+call prms%CreateLogicalOption('ll_reynolds_corrections', &
                           &'Use Reynolds corrections for the .c81 tables?', 'F')
-call prms%CreateRealOption('LLReynoldsCorrectionsNfact', &
+call prms%CreateRealOption('ll_reynolds_corrections_nfact', &
                           &'Exponent in (Re/Re_T)^n correction', '0.2')
-call prms%CreateIntOption('LLmaxIter', &
+call prms%CreateIntOption('ll_max_iter', &
                           &'Maximum number of iteration in LL algorithm', '100')
-call prms%CreateRealOption('LLtol', 'Tolerance for the relative error in &
+call prms%CreateRealOption('ll_tol', 'Tolerance for the relative error in &
                           &fixed point iteration for LL','1.0e-6' )
-call prms%CreateRealOption('LLdamp', 'Damping param in fixed point iteration &
+call prms%CreateRealOption('ll_damp', 'Damping param in fixed point iteration &
                           &for LL used to avoid oscillations','25.0')
-call prms%CreateLogicalOption('LLstallRegularisation', &
+call prms%CreateLogicalOption('ll_stall_regularisation', &
                           &'Avoid "unphysical" separations in inner sections of LL?','T')
-call prms%CreateIntOption('LLstallRegularisationNelems', &
+call prms%CreateIntOption('ll_stall_regularisation_nelems', &
                           &'Number of "unphysical" separations to be removed', '1' )
-call prms%CreateIntOption('LLstallRegularisationNiters', &
+call prms%CreateIntOption('ll_stall_regularisation_niters', &
                           &'Number of timesteps between two regularisations', '1' )
-call prms%CreateRealOption('LLstallRegularisationAlphaStall', &
+call prms%CreateRealOption('ll_stall_regularisation_alpha_stall', &
                           &'Stall angle used as threshold for regularisation [deg]', '15.0' )
-call prms%CreateRealOption('LLartificialViscosity', &
+call prms%CreateRealOption('ll_artificial_viscosity', &
                           &'Constant artificial viscosity for regularisation', '0.0' )
-call prms%CreateLogicalOption('LLartificialViscosityAdaptive', &
+call prms%CreateLogicalOption('ll_artificial_viscosity_adaptive', &
                           &'Adaptive artificial viscosity algorithm', 'F' )
-call prms%CreateRealOption('LLartificialViscosityAdaptive_Alpha', &
+call prms%CreateRealOption('ll_artificial_viscosity_adaptive_alpha', &
                           &'Adaptive Artificial Viscosity algorithm, reference AOA [deg]')
-call prms%CreateRealOption('LLartificialViscosityAdaptive_dAlpha', &
+call prms%CreateRealOption('ll_artificial_viscosity_adaptive_dalpha', &
                           &'Adaptive Artificial Viscosity algorithm, reference AOA [deg]')
-call prms%CreateLogicalOption('LLloadsAVL', &
+call prms%CreateLogicalOption('ll_loads_avl', &
                           &'Use AVL expression for inviscid load computation','T')
 
 !> VL correction parameter 
-call prms%CreateRealOption('VLrelax', 'Relaxation factor for rhs update','1.0')
-call prms%CreateIntOption('VLmaxiter', &
+call prms%CreateRealOption('vl_relax', 'Relaxation factor for rhs update','1.0')
+call prms%CreateIntOption('vl_maxiter', &
                           &'Maximum number of iteration in VL algorithm', '100')
-call prms%CreateRealOption('VLtol', 'Tolerance for the absolute error on lift coefficient in &
+call prms%CreateRealOption('vl_tol', 'Tolerance for the absolute error on lift coefficient in &
                           &fixed point iteration for VL','1.0e-3' )
-call prms%CreateIntOption('VLstartstep', &
+call prms%CreateIntOption('vl_start_step', &
                           &'Step in which the VL correction start', '1')
-call prms%CreateLogicalOption('VLdynstall', 'Dynamic stall on corrected VL', 'F')
+call prms%CreateLogicalOption('vl_dynstall', 'Dynamic stall on corrected VL', 'F')
 
 !> Octree and multipole data 
-call prms%CreateLogicalOption('FMM','Employ fast multipole method?','T')
-call prms%CreateLogicalOption('FMMPanels','Employ fast multipole method &
+call prms%CreateLogicalOption('fmm','Employ fast multipole method?','T')
+call prms%CreateLogicalOption('fmm_panels','Employ fast multipole method &
                               &also for panels?','F')
-call prms%CreateRealOption('BoxLength','length of the octree box')
-call prms%CreateIntArrayOption('NBox','number of boxes in each direction')
-call prms%CreateRealArrayOption( 'OctreeOrigin', "rigid wake velocity" )
-call prms%CreateIntOption('NOctreeLevels','number of octree levels')
-call prms%CreateIntOption('MinOctreePart','minimum number of octree particles')
-call prms%CreateIntOption('MultipoleDegree','multipole expansion degree')
-call prms%CreateLogicalOption('DynLayers','Use dynamic layers','F')
-call prms%CreateIntOption('NMaxOctreeLevels','maximum number of octree levels')
-call prms%CreateRealOption('LeavesTimeRatio','Ratio that triggers the &
+call prms%CreateRealOption('box_length','length of the octree box')
+call prms%CreateIntArrayOption('n_box','number of boxes in each direction')
+call prms%CreateRealArrayOption( 'octree_origin', "rigid wake velocity" )
+call prms%CreateIntOption('n_octree_levels','number of octree levels')
+call prms%CreateIntOption('min_octree_part','minimum number of octree particles')
+call prms%CreateIntOption('multipole_degree','multipole expansion degree')
+call prms%CreateLogicalOption('dyn_layers','Use dynamic layers','F')
+call prms%CreateIntOption('nmax_octree_levels','maximum number of octree levels')
+call prms%CreateRealOption('leaves_time_ratio','Ratio that triggers the &
                                           &increase of the number of levels')
 
 !> Models options
-call prms%CreateLogicalOption('Vortstretch','Employ vortex stretching','T')
-call prms%CreateLogicalOption('VortstretchFromElems','Employ vortex stretching&
+call prms%CreateLogicalOption('vortstretch','Employ vortex stretching','T')
+call prms%CreateLogicalOption('vortstretch_from_elems','Employ vortex stretching&
                               & from geometry elements','F')
-call prms%CreateLogicalOption('DivergenceFiltering','Employ divergence filtering','T')
-call prms%CreateRealOption('FilterTimescale','Filter timescale','40.0')
-call prms%CreateLogicalOption('Diffusion','Employ vorticity diffusion','T')
-call prms%CreateLogicalOption('TurbulentViscosity','Employ turbulent &
+call prms%CreateLogicalOption('divergence_filtering','Employ divergence filtering','T')
+call prms%CreateRealOption('filter_time_scale','Filter timescale','40.0')
+call prms%CreateLogicalOption('diffusion','Employ vorticity diffusion','T')
+call prms%CreateLogicalOption('turbulent_viscosity','Employ turbulent &
                               &viscosity','F')
 call prms%CreateLogicalOption('PenetrationAvoidance','Employ penetration avoidance','F')
-call prms%CreateRealOption('PenetrationAvoidanceCheckRadius', &
+call prms%CreateRealOption('penetration_avoidance_check_radius', &
       'Check radius for penetration avoidance','5.0')
-call prms%CreateRealOption('PenetrationAvoidanceElementRadius', &
+call prms%CreateRealOption('penetration_avoidance_element_radius', &
       'Element impact radius for penetration avoidance','1.5')
-call prms%CreateLogicalOption('ViscosityEffects','Simulate viscosity &
+call prms%CreateLogicalOption('viscosity_effects','Simulate viscosity &
                                                               & effects','F')
-call prms%CreateLogicalOption('ParticlesRedistribution','Employ particles &
+call prms%CreateLogicalOption('particles_redistribution','Employ particles &
                                                         &redistribution','F')
-call prms%CreateIntOption('OctreeLevelSolid','Level at which the panels &
+call prms%CreateIntOption('octree_level_solid','Level at which the panels &
                           & are considered for particles redistribution')
-call prms%CreateRealOption('ParticlesRedistributionRatio','How many times &
+call prms%CreateRealOption('particles_redistribution_ratio','How many times &
           &a particle need to be smaller than the average of the cell to be&
           & eliminated','3.0')
 
@@ -406,16 +409,16 @@ call prms%CreateRealOption('HCAS_time','HCAS deployment time')
 call prms%CreateRealArrayOption('HCAS_velocity','HCAS velocity')
 
 !> Variable wind
-call prms%CreateLogicalOption('Gust','Gust perturbation','F')
-call prms%CreateStringOption('GustType','Gust model','AMC')
-call prms%CreateRealArrayOption('GustOrigin','Gust origin point')
-call prms%CreateRealArrayOption('GustFrontDirection','Gust front direction vector')
-call prms%CreateRealArrayOption('GustFrontSpeed','Gust front speed')
-call prms%CreateRealOption('GustUDes','Design gust velocity')
-call prms%CreateRealArrayOption('GustPerturbationDirection','Gust perturbation &
+call prms%CreateLogicalOption('gust','Gust perturbation','F')
+call prms%CreateStringOption('gust_type','Gust model','AMC')
+call prms%CreateRealArrayOption('gust_origin','Gust origin point')
+call prms%CreateRealArrayOption('gust_front_direction','Gust front direction vector')
+call prms%CreateRealArrayOption('gust_front_speed','Gust front speed')
+call prms%CreateRealOption('gust_u_des','Design gust velocity')
+call prms%CreateRealArrayOption('gust_perturbation_direction','Gust perturbation &
                               &direction vector','(/0.0, 0.0, 1.0/)')
-call prms%CreateRealOption('GustGradient','Gust gradient')
-call prms%CreateRealOption('GustStartTime','Gust starting time','0.0')
+call prms%CreateRealOption('gust_gradient','Gust gradient')
+call prms%CreateRealOption('gust_start_time','Gust starting time','0.0')
 
 !> Get the parameters and print them out
 call printout(nl//'====== Input parameters: ======')
@@ -1242,45 +1245,45 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
 
   !> Names
   sim_param%basename              = getstr(prms, 'basename')
-  sim_param%GeometryFile          = getstr(prms, 'GeometryFile')
-  sim_param%ReferenceFile         = getstr(prms, 'ReferenceFile')
+  sim_param%GeometryFile          = getstr(prms, 'geometry_file')
+  sim_param%ReferenceFile         = getstr(prms, 'reference_file')
 
   !> Method parameters
-  sim_param%FarFieldRatioDoublet  = getreal(prms, 'FarFieldRatioDoublet')
-  sim_param%FarFieldRatioSource   = getreal(prms, 'FarFieldRatioSource')
-  sim_param%DoubletThreshold      = getreal(prms, 'DoubletThreshold')
-  sim_param%RankineRad            = getreal(prms, 'RankineRad')
-  sim_param%VortexRad             = getreal(prms, 'VortexRad')
-  sim_param%KVortexRad             = getreal(prms, 'KVortexRad')
-  sim_param%CutoffRad             = getreal(prms, 'CutoffRad')
-  sim_param%first_panel_scaling   = getreal(prms, 'ImplicitPanelScale')
-  sim_param%min_vel_at_te         = getreal(prms, 'ImplicitPanelMinVel')
-  sim_param%use_vs                = getlogical(prms, 'Vortstretch')
-  sim_param%vs_elems              = getlogical(prms, 'VortstretchFromElems')
-  sim_param%use_vd                = getlogical(prms, 'Diffusion')
-  sim_param%use_tv                = getlogical(prms, 'TurbulentViscosity')
-  sim_param%use_ve                = getlogical(prms, 'ViscosityEffects')
+  sim_param%FarFieldRatioDoublet  = getreal(prms, 'far_field_ratio_doublet')
+  sim_param%FarFieldRatioSource   = getreal(prms, 'far_field_ratio_source')
+  sim_param%DoubletThreshold      = getreal(prms, 'doublet_threshold')
+  sim_param%RankineRad            = getreal(prms, 'rankine_rad')
+  sim_param%VortexRad             = getreal(prms, 'vortex_rad')
+  sim_param%KVortexRad             = getreal(prms, 'k_vortex_rad')
+  sim_param%CutoffRad             = getreal(prms, 'cutoff_rad')
+  sim_param%first_panel_scaling   = getreal(prms, 'implicit_panel_scale')
+  sim_param%min_vel_at_te         = getreal(prms, 'implicit_panel_min_vel')
+  sim_param%use_vs                = getlogical(prms, 'vortstretch')
+  sim_param%vs_elems              = getlogical(prms, 'vortstretch_from_elems')
+  sim_param%use_vd                = getlogical(prms, 'diffusion')
+  sim_param%use_tv                = getlogical(prms, 'turbulent_viscosity')
+  sim_param%use_ve                = getlogical(prms, 'viscosity_effects')
   sim_param%use_pa                = getlogical(prms, 'PenetrationAvoidance')
   !> Check on penetration avoidance 
   if(sim_param%use_pa) then
-    sim_param%pa_rad_mult = getreal(prms, 'PenetrationAvoidanceCheckRadius')
-    sim_param%pa_elrad_mult = getreal(prms,'PenetrationAvoidanceElementRadius')
+    sim_param%pa_rad_mult = getreal(prms, 'penetration_avoidance_check_radius')
+    sim_param%pa_elrad_mult = getreal(prms,'penetration_avoidance_element_radius')
   endif
 
   !> Lifting line elements
-  sim_param%llSolver                        = getstr(    prms, 'LLsolver')
+  sim_param%llSolver                        = getstr(    prms, 'll_solver')
   sim_param%llReynoldsCorrections           = getlogical(prms, 'LLreynoldsCorrections')
   sim_param%llReynoldsCorrectionsNfact      = getreal(   prms, 'LLreynoldsCorrectionsNfact')
-  sim_param%llMaxIter                       = getint(    prms, 'LLmaxIter'            )
-  sim_param%llTol                           = getreal(   prms, 'LLtol'                )
-  sim_param%llDamp                          = getreal(   prms, 'LLdamp'               )
-  sim_param%llStallRegularisation           = getlogical(prms, 'LLstallRegularisation')
-  sim_param%llStallRegularisationNelems     = getint(    prms, 'LLstallRegularisationNelems')
-  sim_param%llStallRegularisationNiters     = getint(    prms, 'LLstallRegularisationNiters')
-  sim_param%llStallRegularisationAlphaStall = getreal(   prms, 'LLstallRegularisationAlphaStall')
-  sim_param%llArtificialViscosity           = getreal(   prms, 'LLartificialViscosity')
-  sim_param%llArtificialViscosityAdaptive   = getlogical(prms, 'LLartificialViscosityAdaptive')
-  sim_param%llLoadsAVL                      = getlogical(prms, 'LLloadsAVL')
+  sim_param%llMaxIter                       = getint(    prms, 'll_max_iter'            )
+  sim_param%llTol                           = getreal(   prms, 'll_tol'                )
+  sim_param%llDamp                          = getreal(   prms, 'll_damp'               )
+  sim_param%llStallRegularisation           = getlogical(prms, 'll_stall_regularisation')
+  sim_param%llStallRegularisationNelems     = getint(    prms, 'll_stall_regularisation_nelems')
+  sim_param%llStallRegularisationNiters     = getint(    prms, 'll_stall_regularisation_niters')
+  sim_param%llStallRegularisationAlphaStall = getreal(   prms, 'll_stall_regularisation_alpha_stall')
+  sim_param%llArtificialViscosity           = getreal(   prms, 'll_artificial_viscosity')
+  sim_param%llArtificialViscosityAdaptive   = getlogical(prms, 'll_artificial_viscosity_adaptive')
+  sim_param%llLoadsAVL                      = getlogical(prms, 'll_loads_avl')
   !> check LL inputs
   if ((trim(sim_param%llSolver) .ne. 'GammaMethod') .and. &
       (trim(sim_param%llSolver) .ne. 'AlphaMethod')) then
@@ -1317,46 +1320,46 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
           & LLartificialViscosity_dAlpha not set as an input, while LLartificialViscosityAdaptive&
           & is set equal to T. Set these parameters [deg].')
       else
-        sim_param%llArtificialViscosityAdaptive_Alpha = getreal(prms,'LLartificialViscosityAdaptive_Alpha')
-        sim_param%llArtificialViscosityAdaptive_dAlpha= getreal(prms,'LLartificialViscosityAdaptive_dAlpha')
+        sim_param%llArtificialViscosityAdaptive_Alpha = getreal(prms,'ll_artificial_viscosity_adaptive_alpha')
+        sim_param%llArtificialViscosityAdaptive_dAlpha= getreal(prms,'ll_artificial_viscosity_adaptive_dalpha')
       end if
     end if
   end if
   write(*,*) ' sim_param%llSolver : ' , trim(sim_param%llSolver)
   !> VL correction 
-  sim_param%vl_tol                        = getreal(prms, 'VLtol')
-  sim_param%vl_relax                      = getreal(prms, 'VLrelax')
-  sim_param%vl_maxiter                    = getint(prms, 'VLmaxiter')
-  sim_param%vl_startstep                  = getint(prms, 'VLstartstep')
+  sim_param%vl_tol                        = getreal(prms, 'vl_tol')
+  sim_param%vl_relax                      = getreal(prms, 'vl_relax')
+  sim_param%vl_maxiter                    = getint(prms, 'vl_maxiter')
+  sim_param%vl_startstep                  = getint(prms, 'vl_start_step')
   !>  VL Dynamic stall
-  sim_param%vl_dynstall                   = getlogical(prms, 'VLdynstall')  
+  sim_param%vl_dynstall                   = getlogical(prms, 'vl_dynstall')  
   
   !> Octree and FMM parameters
-  sim_param%use_fmm                       = getlogical(prms, 'FMM')
+  sim_param%use_fmm                       = getlogical(prms, 'fmm')
 
   if(sim_param%use_fmm) then
-    sim_param%use_fmm_pan                 = getlogical(prms, 'FMMPanels')
-    sim_param%BoxLength                   = getreal(prms, 'BoxLength')
-    sim_param%NBox                        = getintarray(prms, 'NBox',3)
-    sim_param%OctreeOrigin                = getrealarray(prms, 'OctreeOrigin',3)
-    sim_param%NOctreeLevels               = getint(prms, 'NOctreeLevels')
-    sim_param%MinOctreePart               = getint(prms, 'MinOctreePart')
-    sim_param%MultipoleDegree             = getint(prms,'MultipoleDegree')
-    sim_param%use_dyn_layers              = getlogical(prms,'DynLayers')
+    sim_param%use_fmm_pan                 = getlogical(prms, 'fmm_panels')
+    sim_param%BoxLength                   = getreal(prms, 'box_length')
+    sim_param%NBox                        = getintarray(prms, 'n_box',3)
+    sim_param%OctreeOrigin                = getrealarray(prms, 'octree_origin',3)
+    sim_param%NOctreeLevels               = getint(prms, 'n_octree_levels')
+    sim_param%MinOctreePart               = getint(prms, 'min_octree_part')
+    sim_param%MultipoleDegree             = getint(prms,'multipole_degree')
+    sim_param%use_dyn_layers              = getlogical(prms,'dyn_layers')
 
     if(sim_param%use_dyn_layers) then
-      sim_param%NMaxOctreeLevels          = getint(prms, 'NMaxOctreeLevels')
-      sim_param%LeavesTimeRatio           = getreal(prms, 'LeavesTimeRatio')
+      sim_param%NMaxOctreeLevels          = getint(prms, 'nmax_octree_levels')
+      sim_param%LeavesTimeRatio           = getreal(prms, 'leaves_time_ratio')
     else
       sim_param%NMaxOctreeLevels          = sim_param%NOctreeLevels
     endif
 
-    sim_param%use_pr                      = getlogical(prms, 'ParticlesRedistribution')
+    sim_param%use_pr                      = getlogical(prms, 'particles_redistribution')
 
     if(sim_param%use_pr) then
-      sim_param%part_redist_ratio         = getreal(prms,'ParticlesRedistributionRatio')
+      sim_param%part_redist_ratio         = getreal(prms,'particles_redistribution_ratio')
       if ( countoption(prms,'OctreeLevelSolid') .gt. 0 ) then
-        sim_param%lvl_solid               = getint(prms, 'OctreeLevelSolid')
+        sim_param%lvl_solid               = getint(prms, 'octree_level_solid')
       else
         sim_param%lvl_solid               = max(sim_param%NOctreeLevels-2,1)
       endif
@@ -1373,27 +1376,27 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   endif
 
   !> Variable_wind
-  sim_param%use_gust                      = getlogical(prms, 'Gust')
+  sim_param%use_gust                      = getlogical(prms, 'gust')
 
   if(sim_param%use_gust) then
-    sim_param%GustType                    = getstr(prms,'GustType')
-    sim_param%gust_origin                 = getrealarray(prms, 'GustOrigin',3)
+    sim_param%GustType                    = getstr(prms,'gust_type')
+    sim_param%gust_origin                 = getrealarray(prms, 'gust_origin',3)
 
     if(countoption(prms,'GustFrontDirection') .gt. 0) then
-      sim_param%gust_front_direction      = getrealarray(prms, 'GustFrontDirection',3)
+      sim_param%gust_front_direction      = getrealarray(prms, 'gust_front_direction',3)
     else
       sim_param%gust_front_direction      = sim_param%u_inf
     end if
     
     if(countoption(prms,'GustFrontSpeed') .gt. 0) then
-      sim_param%gust_front_speed          = getreal(prms, 'GustFrontSpeed')
+      sim_param%gust_front_speed          = getreal(prms, 'gust_front_speed')
     else
       sim_param%gust_front_speed          = norm2(sim_param%u_inf)
     end if
-    sim_param%gust_u_des                  = getreal(prms,'GustUDes')
-    sim_param%gust_perturb_direction      = getrealarray(prms,'GustPerturbationDirection',3)
-    sim_param%gust_time                   = getreal(prms,'GustStartTime')
-    sim_param%gust_gradient               = getreal(prms,'GustGradient')
+    sim_param%gust_u_des                  = getreal(prms,'gust_u_des')
+    sim_param%gust_perturb_direction      = getrealarray(prms,'gust_perturbation_direction',3)
+    sim_param%gust_time                   = getreal(prms,'gust_start_time')
+    sim_param%gust_gradient               = getreal(prms,'gust_gradient')
   end if
 
   !> Manage restart

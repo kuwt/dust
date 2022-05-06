@@ -129,7 +129,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
   !Prepare all the parameters to be read in the file
   ! Global parameters
-  call pmesh_prs%CreateStringOption('ElType', &
+  call pmesh_prs%CreateStringOption('el_type', &
                 'element type (temporary) p panel v vortex ring')
   call pmesh_prs%CreateLogicalOption('mesh_symmetry', &
                 'symmetry yes/no','F' )
@@ -192,7 +192,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
   nelem_chord     = 1          !  getint(pmesh_prs,'nelem_chord')   !!! USELESS !!!
   nelem_chord_tot = 1          !  getint(pmesh_prs,'nelem_chord')   !!! USELESS !!!
-  ElType  = getstr(pmesh_prs,'ElType')
+  ElType  = getstr(pmesh_prs,'el_type')
   symmetry= getlogical(pmesh_prs,'mesh_symmetry')
   mesh_flat= getlogical(pmesh_prs,'mesh_flat')
 

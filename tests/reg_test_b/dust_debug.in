@@ -20,8 +20,8 @@ reset_time = F
 
 
 ! geo input ----------------------
-ReferenceFile = ./References.in
-GeometryFile = ./geo_input.h5
+reference_file = ./References.in
+geometry_file = ./geo_input.h5
 
 ! reference values ---------------------
 u_inf = (/ 0.0 , 0.0 , 0.0 /)
@@ -31,14 +31,14 @@ u_ref = 6.28
 !mu_inf = 1e-2
 
 ! Model parameters -------------------
-VortexRad = 0.05
-RankineRad = 0.005
-CutoffRad = 0.001
-FMM = T
-Vortstretch = F
-Diffusion = F
+vortex_rad = 0.05
+rankine_rad = 0.005
+cutoff_rad = 0.001
+fmm = T
+vortstretch = F
+diffusion = F
 PenetrationAvoidance = F
-ParticlesRedistribution = F
+particles_redistribution = F
 
 
 ! wake parameters -------------
@@ -49,13 +49,13 @@ particles_box_min = (/-3.0, -3.0, -5.0/)
 particles_box_max = (/ 3.0,  3.0,   1.0/)
 rigid_wake = F
 rigid_wake_vel = (/0.0, 0.0, -0.344/)
-ImplicitPanelMinVel = 0.1
+implicit_panel_min_vel = 0.1
 
 ! octree things-------------------
-BoxLength = 6
-NBox = (/1,1,1/)
-OctreeOrigin = (/-3.0, -3.0, -5.0/)
-NOctreeLevels = 6
-MinOctreePart = 5
-MultipoleDegree = 2
+box_length = 6
+n_box = (/1,1,1/)
+octree_origin = (/-3.0, -3.0, -5.0/)
+n_octree_levels = 6
+min_octree_part = 5
+multipole_degree = 2
 

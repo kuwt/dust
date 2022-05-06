@@ -112,12 +112,15 @@ else
   cmd_set_filename = .false.
 endif
 
-call prms%CreateStringOption('CompName','Component Name', multiple=.true.)
-call prms%CreateStringOption('GeoFile','Geometry definition files', multiple=.true.)
-call prms%CreateStringOption('RefTag','Reference Tag of the component', multiple=.true.)
-call prms%CreateRealOption('TolSewing','Global parameter for closing gaps','0.001')
-call prms%CreateRealOption('InnerProductTe','Global parameter for edge identification','-0.5')
-call prms%CreateStringOption('FileName','Preprocessor output file')
+call printout(nl//'Reading input parameters from file "'//&
+                trim(input_file_name)//'"'//nl)
+                
+call prms%CreateStringOption('comp_name','Component Name', multiple=.true.)
+call prms%CreateStringOption('geo_file','Geometry definition files', multiple=.true.)
+call prms%CreateStringOption('ref_tag','Reference Tag of the component', multiple=.true.)
+call prms%CreateRealOption('tol_se_wing','Global parameter for closing gaps','0.001')
+call prms%CreateRealOption('inner_product_te','Global parameter for edge identification','-0.5')
+call prms%CreateStringOption('file_name','Preprocessor output file')
 
 call check_file_exists(input_file_name,'dust preprocessor')
 call prms%read_options(input_file_name, printout_val=.false.)
@@ -125,23 +128,23 @@ call prms%read_options(input_file_name, printout_val=.false.)
 n_name          = countoption(prms, 'CompName')
 n_geo           = countoption(prms, 'GeoFile')
 n_tag           = countoption(prms, 'RefTag')
-tol_sew         = getreal(prms, 'TolSewing')
-inner_prod_thr  = getreal(prms, 'InnerProductTe')
+tol_sew         = getreal(prms, 'tol_se_wing')
+inner_prod_thr  = getreal(prms, 'inner_product_te')
 
 if(n_geo .ne. n_name)  call error('dust_pre','','Different number of components &
   & and components names in input file "'//trim(input_file_name)//'"')
 if(n_geo .ne. n_tag)  call error('dust_pre','','Different number of components &
   & and references tags in input file "'//trim(input_file_name)//'"')
 
-output_file_name_read = getstr(prms, 'FileName')
+output_file_name_read = getstr(prms, 'file_name')
 
 allocate(comp_names(n_geo), geo_files(n_geo), ref_tags(n_geo))
 do i=1,n_geo
-  comp_names(i) = getstr(prms, 'CompName')
-  geo_files(i)  = getstr(prms, 'GeoFile', olink=lnk)
+  comp_names(i) = getstr(prms, 'comp_name')
+  geo_files(i)  = getstr(prms, 'geo_file', olink=lnk)
   call check_opt_consistency(lnk, prev=.true., prev_opt='CompName')
   call check_opt_consistency(lnk, next=.true., next_opt='RefTag')
-  ref_tags(i)   = getstr(prms, 'RefTag')
+  ref_tags(i)   = getstr(prms, 'ref_tag')
 enddo
 
 if (.not. cmd_set_filename) output_file_name = output_file_name_read

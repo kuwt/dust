@@ -161,15 +161,15 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   call printout(trim(msg))
 
   ! Print the wake or not
-  out_wake = getlogical(sbprms,'Wake')
-  separate_wake = getlogical(sbprms,'SeparateWake')
+  out_wake = getlogical(sbprms,'wake')
+  separate_wake = getlogical(sbprms,'separate_wake')
 
   !Check which variables to analyse
   out_vort = .false.; out_vel = .false.; out_press =.false.; out_cp = .false.
   n_var = countoption(sbprms, 'Variable')
   allocate(var_names(n_var))
   do i_var = 1, n_var
-    var_names(i_var) = getstr(sbprms, 'Variable') ; call LowCase(var_names(i_var))
+    var_names(i_var) = getstr(sbprms, 'variable') ; call LowCase(var_names(i_var))
   enddo
   out_vort = isInList('vorticity',var_names) ! Always lower case string in the code !
   out_vort_vec = isInList('vorticity_vector',var_names) ! Always lower case string in the code !

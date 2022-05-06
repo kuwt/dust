@@ -1428,7 +1428,7 @@ subroutine read_lines ( pmesh_prs , line_prs , lines  , nelems_span_tot)
 
     call getsuboption( pmesh_prs , 'Line' , line_prs )
 
-    lines(i) % l_type     = getstr(      line_prs , 'Type'   )
+    lines(i) % l_type     = getstr(      line_prs , 'type'   )
     lines(i) % end_points = getintarray( line_prs , 'EndPoints' , 2 )
     lines(i) % nelems     = getint(      line_prs , 'Nelems' )
     lines(i) % type_span  = getstr(      line_prs , 'Type_span')
@@ -1486,7 +1486,7 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
 
 
   ! === Prepare fields to be read by the parser ===
-  call pmesh_prs%CreateStringOption('ElType', &
+  call pmesh_prs%CreateStringOption('el_type', &
                 'element type (temporary) p panel v vortex ring', &
                 multiple=.false.)
   ! if eltype = 'p','v' -> nelem_chord, type_chord, = 'l' -> no *_chord* field
@@ -1515,7 +1515,7 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
   !...
 
   ! === Point subparser ===
-  call pmesh_prs%CreateSubOption('Point','Point group',point_prs, &
+  call pmesh_prs%CreateSubOption('point','Point group',point_prs, &
                   multiple=.true.)
 
   call point_prs%CreateIntOption('Id', 'Point Id.' )
@@ -1550,7 +1550,7 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
   call pmesh_prs%CreateSubOption('Line','Line group',line_prs, &
                 multiple=.true.)
   ! --- line group ---
-  call line_prs%CreateStringOption(       'Type', &
+  call line_prs%CreateStringOption(       'type', &
                 'type of the line connecting points: Straight or Spline' )
   call line_prs%CreateIntArrayOption('EndPoints', &
                 'list of point id.s belonging to the line' )

@@ -159,7 +159,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
   !Prepare all the parameters to be read in the file
   ! Global parameters
-  call pmesh_prs%CreateStringOption('ElType', &
+  call pmesh_prs%CreateStringOption('el_type', &
                 'element type (temporary) p panel v vortex ring');
   call pmesh_prs%CreateLogicalOption('AirfoilTableCorrection', &
                 'include presence of aerodynamic .c81 for corrections', &
@@ -222,7 +222,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   call pmesh_prs%read_options(mesh_file,printout_val=.true.)
   
   nelem_chord = getint(pmesh_prs,'nelem_chord')
-  ElType  = getstr(pmesh_prs,'ElType')
+  ElType  = getstr(pmesh_prs,'el_type')
 
   nSections = countoption(pmesh_prs, 'chord')
   nRegions  = countoption(pmesh_prs, 'span')
@@ -1263,23 +1263,23 @@ subroutine read_actuatordisk_parametric(mesh_file,ee,rr)
   integer :: ind1, ind2
   character(len=*), parameter ::  this_sub_name = 'read_actuatordisk_parametric' 
 
-  call pmesh_prs%CreateStringOption('ElType', &
+  call pmesh_prs%CreateStringOption('el_type', &
                 'element type (temporary) p panel v vortex ring &
                 & l lifting line a actuator disk')
-  call pmesh_prs%CreateRealOption('Radius', 'Radius of the actuator disk')
+  call pmesh_prs%CreateRealOption('radius', 'Radius of the actuator disk')
   call pmesh_prs%CreateIntOption('nstep','Number of subdivisions')
   call pmesh_prs%CreateIntOption('Axis','Which axis to align the disk')
 
   !read the parameters
   call pmesh_prs%read_options(trim(mesh_file),printout_val=.true.)
 
-  ElType = getstr(pmesh_prs,'ElType')
+  ElType = getstr(pmesh_prs,'el_type')
 
   if(trim(ElType) .ne. 'a') call error(this_sub_name, this_mod_name, &
     'This should have not happened, a team of professionals is under way to &
     &remove the evidence')
 
-  r = getreal(pmesh_prs,'Radius')
+  r = getreal(pmesh_prs,'radius')
   nstep = getint(pmesh_prs,'nstep')
   ax = getint(pmesh_prs,'Axis')
 

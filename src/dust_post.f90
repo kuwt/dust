@@ -185,86 +185,89 @@ else
   input_file_name = input_file_name_def
 endif
 
+call printout(nl//'Reading input parameters from file "'//&
+                trim(input_file_name)//'"'//nl)
+
 call prms%CreateStringOption('basename','Base name of the processed data')
 call prms%CreateStringOption('data_basename','Base name of the data to be &
                               &processed')
 
-call prms%CreateRealOption( 'FarFieldRatioDoublet', &
+call prms%CreateRealOption( 'far_field_ratio_doublet', &
       "Multiplier for far field threshold computation on doublet", '10.0')
-call prms%CreateRealOption( 'FarFieldRatioSource', &
+call prms%CreateRealOption( 'far_field_ratio_source', &
       "Multiplier for far field threshold computation on sources", '10.0')
-call prms%CreateRealOption( 'DoubletThreshold', &
+call prms%CreateRealOption( 'doublet_threshold', &
       "Thresold for considering the point in plane in doublets", '1.0e-6')
-call prms%CreateRealOption( 'RankineRad', &
+call prms%CreateRealOption( 'rankine_rad', &
       "Radius of Rankine correction for vortex induction near core", '0.1')
-call prms%CreateRealOption( 'VortexRad', &
+call prms%CreateRealOption( 'vortex_rad', &
       "Radius of vortex core, for particles", '0.1')
-call prms%CreateRealOption( 'CutoffRad', &
+call prms%CreateRealOption( 'cutoff_rad', &
       "Radius of complete cutoff  for vortex induction near core", '0.001')
 
-call prms%CreateSubOption('Analysis','Definition of the motion of a frame', &
+call prms%CreateSubOption('analysis','Definition of the motion of a frame', &
                           sbprms, multiple=.true.)
-call sbprms%CreateStringOption('Type','type of analysis')
-call sbprms%CreateStringOption('Name','specification of the analysis')
-call sbprms%CreateIntOption('StartRes', 'Starting result of the analysis')
-call sbprms%CreateIntOption('EndRes', 'Final result of the analysis')
-call sbprms%CreateIntOption('StepRes', 'Result stride of the analysis')
-call sbprms%CreateLogicalOption('Average', 'Perform time averaging','F')
-call sbprms%CreateLogicalOption('Wake', 'Output also the wake for &
+call sbprms%CreateStringOption('type','type of analysis')
+call sbprms%CreateStringOption('name','specification of the analysis')
+call sbprms%CreateIntOption('start_res', 'Starting result of the analysis')
+call sbprms%CreateIntOption('end_res', 'Final result of the analysis')
+call sbprms%CreateIntOption('step_res', 'Result stride of the analysis')
+call sbprms%CreateLogicalOption('average', 'Perform time averaging','F')
+call sbprms%CreateLogicalOption('wake', 'Output also the wake for &
                                 &visualization','T')
-call sbprms%CreateLogicalOption('SeparateWake', 'Output the wake in a separate &
+call sbprms%CreateLogicalOption('separate_wake', 'Output the wake in a separate &
                                 &way','F')
-call sbprms%CreateStringOption('Format','Output format')
-call sbprms%CreateStringOption('Component','Component to analyse', &
+call sbprms%CreateStringOption('format','Output format')
+call sbprms%CreateStringOption('component','Component to analyse', &
                               multiple=.true.)
-call sbprms%CreateStringOption('HingeTag','Hinge to analyse', &
+call sbprms%CreateStringOption('hinge_tag','Hinge to analyse', &
                               multiple=.true.)                              
-call sbprms%CreateStringOption('Variable','Variables to be saved: velocity, pressure or&
+call sbprms%CreateStringOption('variable','Variables to be saved: velocity, pressure or&
                               & vorticity', multiple=.true.)
 
 ! probe output -------------
 call sbprms%CreateStringOption('InputType','How to specify probe coordinates',&
                               multiple=.true.)
-call sbprms%CreateRealArrayOption('Point','Point coordinates in dust_post.in',&
+call sbprms%CreateRealArrayOption('point','Point coordinates in dust_post.in',&
                               multiple=.true.)
-call sbprms%CreateStringOption('File','File containing the coordinates of the probes',&
+call sbprms%CreateStringOption('file','File containing the coordinates of the probes',&
                               multiple=.true.)
 ! flow field output --------
-call sbprms%CreateIntArrayOption( 'Nxyz','number of points per coordinate',&
+call sbprms%CreateIntArrayOption( 'n_xyz','number of points per coordinate',&
                               multiple=.true.)
-call sbprms%CreateRealArrayOption('Minxyz','lower bounds of the box',&
+call sbprms%CreateRealArrayOption('min_xyz','lower bounds of the box',&
                               multiple=.true.)
-call sbprms%CreateRealArrayOption('Maxxyz','upper bounds of the box',&
+call sbprms%CreateRealArrayOption('max_xyz','upper bounds of the box',&
                               multiple=.true.)
 ! loads --------------------
-call sbprms%CreateStringOption('CompName','Components where loads are computed',&
+call sbprms%CreateStringOption('comp_name','Components where loads are computed',&
                               multiple=.true.)
-call sbprms%CreateStringOption('Reference_Tag','Reference frame where loads&
+call sbprms%CreateStringOption('reference_tag','Reference frame where loads&
                             & are computed',multiple=.true.)
 ! sectional loads ----------
-call sbprms%CreateRealArrayOption('AxisDir','Direction of the axis defined the reference&
+call sbprms%CreateRealArrayOption('axis_dir','Direction of the axis defined the reference&
                             & points for sectional loads analisys', multiple=.true.)
-call sbprms%CreateRealArrayOption('AxisNod','Node belonging to the axis used for sectional&
+call sbprms%CreateRealArrayOption('axis_nod','Node belonging to the axis used for sectional&
                             & loads analisys', multiple=.true.)
-call sbprms%CreateLogicalOption('LiftingLineData', 'Output lifting line data&
+call sbprms%CreateLogicalOption('lifting_line_data', 'Output lifting line data&
                             & alongside sectional loads','F')
-call sbprms%CreateLogicalOption('VortexLatticeData', 'Output of corrected vortex lattice data&
+call sbprms%CreateLogicalOption('vortex_lattice_data', 'Output of corrected vortex lattice data&
                             & alongside sectional loads','F')
 
 ! sectional loads: box -----
-call sbprms%CreateSubOption('BoxSect','Definition of the box for sectional loads', &
+call sbprms%CreateSubOption('box_sect','Definition of the box for sectional loads', &
                           bxprms)
-call bxprms%CreateRealArrayOption('refNode','reference node to build the box')
-call bxprms%CreateRealArrayOption('faceVec','vector identifying the direction of the base side &
+call bxprms%CreateRealArrayOption('ref_node','reference node to build the box')
+call bxprms%CreateRealArrayOption('face_vec','vector identifying the direction of the base side &
                           &of the sections')
-call bxprms%CreateRealArrayOption('faceBas','dimension along faceVec of the first and last sections')
-call bxprms%CreateRealArrayOption('faceHei','dimension orthogonal to faceVec of the first and last sections')
-call bxprms%CreateRealArrayOption('spanVec','vector defining the out-of plane direction of the box')
-call bxprms%CreateRealOption('spanLen','dimension along the spanVec direction')
-call bxprms%CreateIntOption('numSect','number of sections')
-call bxprms%CreateLogicalOption('reshapeBox','logical input to reshape the box if &
+call bxprms%CreateRealArrayOption('face_bas','dimension along faceVec of the first and last sections')
+call bxprms%CreateRealArrayOption('face_hei','dimension orthogonal to faceVec of the first and last sections')
+call bxprms%CreateRealArrayOption('span_vec','vector defining the out-of plane direction of the box')
+call bxprms%CreateRealOption('span_len','dimension along the spanVec direction')
+call bxprms%CreateIntOption('num_sect','number of sections')
+call bxprms%CreateLogicalOption('reshape_box','logical input to reshape the box if &
                           &it is "too large"')
-call sbprms%CreateRealArrayOption('AxisMom','axis for the computation of the moment. Perpendicular to sections')
+call sbprms%CreateRealArrayOption('axis_mom','axis for the computation of the moment. Perpendicular to sections')
 
 sbprms=>null()
 
@@ -274,12 +277,12 @@ call prms%read_options(input_file_name, printout_val=.false.)
 basename = getstr(prms,'basename')
 data_basename = getstr(prms,'data_basename')
 
-sim_param%FarFieldRatioDoublet  = getreal(prms, 'FarFieldRatioDoublet')
-sim_param%FarFieldRatioSource  = getreal(prms, 'FarFieldRatioSource')
-sim_param%DoubletThreshold   = getreal(prms, 'DoubletThreshold')
-sim_param%RankineRad = getreal(prms, 'RankineRad')
-sim_param%VortexRad = getreal(prms, 'VortexRad')
-sim_param%CutoffRad  = getreal(prms, 'CutoffRad')
+sim_param%FarFieldRatioDoublet  = getreal(prms, 'far_field_ratio_doublet')
+sim_param%FarFieldRatioSource  = getreal(prms, 'far_field_ratio_source')
+sim_param%DoubletThreshold   = getreal(prms, 'doublet_threshold')
+sim_param%RankineRad = getreal(prms, 'rankine_rad')
+sim_param%VortexRad = getreal(prms, 'vortex_rad')
+sim_param%CutoffRad  = getreal(prms, 'cutoff_rad')
 
 call initialize_doublet()
 call initialize_surfpan()
@@ -296,17 +299,17 @@ do ia = 1, n_analyses
 
   !> Get general parameter for the analysis
   call getsuboption(prms,'Analysis',sbprms)
-  an_type  = getstr(sbprms,'Type')
+  an_type  = getstr(sbprms,'type')
   
   call LowCase(an_type)
-  an_name  = getstr(sbprms,'Name')
-  out_frmt = getstr(sbprms,'Format')
+  an_name  = getstr(sbprms,'name')
+  out_frmt = getstr(sbprms,'format')
   
   call LowCase(out_frmt)
-  an_start = getint(sbprms,'StartRes')
-  an_end   = getint(sbprms,'EndRes')
-  an_step  = getint(sbprms,'StepRes')
-  average  = getlogical(sbprms, 'Average')
+  an_start = getint(sbprms,'start_res')
+  an_end   = getint(sbprms,'end_res')
+  an_step  = getint(sbprms,'step_res')
+  average  = getlogical(sbprms, 'average')
 
   !> Check if we are analysing all the components or just some
   all_comp = .false.
@@ -317,7 +320,7 @@ do ia = 1, n_analyses
   else
     allocate(components_names(n_comp))
     do i_comp = 1, n_comp
-      components_names(i_comp) = getstr(sbprms, 'Component')
+      components_names(i_comp) = getstr(sbprms, 'component')
     enddo
     call LowCase(components_names(1),lowstr)    ! char
     if(trim(lowstr) .eq. 'all') then
@@ -335,7 +338,7 @@ do ia = 1, n_analyses
     else
       allocate(hinge_tag(n_hinge))
       do i_hinge = 1, n_hinge
-        hinge_tag(i_hinge) = getstr(sbprms, 'HingeTag')
+        hinge_tag(i_hinge) = getstr(sbprms, 'hinge_tag')
       enddo
       call LowCase(hinge_tag(1), lowstr)    ! char
       if(trim(lowstr) .eq. 'all') then

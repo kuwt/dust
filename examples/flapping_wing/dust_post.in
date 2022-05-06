@@ -1,81 +1,81 @@
 basename = Postprocessing/post
 data_basename = Output/flapwing
 
-Analysis = {
-  Name = v1
-  Type = Viz
+analysis = {
+  name = v1
+  type = Viz
 
-  Format = vtk
+  format = vtk
 
-  StartRes = 1
-  EndRes = 61
-  StepRes = 1
-  Wake = T
+  start_res = 1
+  end_res = 61
+  step_res = 1
+  wake = T
 
-  Variable = Vorticity
+  variable = Vorticity
 
 }
 
-Analysis = {
-  Type = integral_loads
-  Name = loads1
+analysis = {
+  type = integral_loads
+  name = loads1
 
-  StartRes = 1
-  EndRes = 61
-  StepRes = 1
+  start_res = 1
+  end_res = 61
+  step_res = 1
 
-  Format = dat
+  format = dat
   
-  CompName = wing
-  Reference_Tag = 0
+  comp_name = wing
+  reference_tag = 0
 }
 
-Analysis = {
-  Type = integral_loads
-  Name = loads2
+analysis = {
+  type = integral_loads
+  name = loads2
 
-  StartRes = 1
-  EndRes = 61
-  StepRes = 1
+  start_res = 1
+  end_res = 61
+  step_res = 1
 
-  Format = dat
+  format = dat
   
-  CompName = wing
-  Reference_Tag = Wing
+  comp_name = wing
+  reference_tag = Wing
 }
 
-Analysis = {
-  Name = flow1
-  Type = flow_field
+analysis = {
+  name = flow1
+  type = flow_field
 
-  StartRes = 1
-  EndRes = 61
-  StepRes = 1
+  start_res = 1
+  end_res = 61
+  step_res = 1
   
-  Format = vtk !tecplot, vtk
+  format = vtk !tecplot, vtk
 
-  Variable = Velocity
+  variable = Velocity
 
-  Nxyz = (/30,1,30/)
-  Minxyz = (/-2.0, 3.5, -3.0/)
-  Maxxyz = (/5.0, 3.5, 3.0/)
+  n_xyz = (/30,1,30/)
+  min_xyz = (/-2.0, 3.5, -3.0/)
+  max_xyz = (/5.0, 3.5, 3.0/)
  
 }
 
-Analysis = {
-  Name = flow2
-  Type = flow_field
+analysis = {
+  name = flow2
+  type = flow_field
 
-  StartRes = 1
-  EndRes = 61
-  StepRes = 1
+  start_res = 1
+  end_res = 61
+  step_res = 1
   
-  Format = vtk !tecplot, vtk
+  format = vtk !tecplot, vtk
 
-  Variable = Velocity
+  variable = Velocity
 
-  Nxyz = (/1,30,30/)
-  Minxyz = (/2.0, 0.0, -3.0/)
-  Maxxyz = (/2.0, 5.0, 3.0/)
+  n_xyz = (/1,30,30/)
+  min_xyz = (/2.0, 0.0, -3.0/)
+  max_xyz = (/2.0, 5.0, 3.0/)
  
 }

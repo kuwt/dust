@@ -1,5 +1,5 @@
-MeshFile = erica-nacelle.cgns
-MeshFileType = cgns
-ElType = p
-ScalingFactor = 0.0010811 !1/R R = 925 mm
+Meshfile = erica-nacelle.cgns
+Meshfiletype = cgns
+Eltype = p
+scaling_factor = 0.0010811 !1/R R = 925 mm
 

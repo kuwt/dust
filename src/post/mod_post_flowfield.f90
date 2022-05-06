@@ -194,7 +194,7 @@ if ( n_vars .eq. 0 ) then ! default: velocity | pressure | vorticity
   probe_vel = .true. ; probe_p = .true. ; probe_vort = .true.
 else
  do i_var = 1 , n_vars
-  var_name = getstr(sbprms,'Variable')
+  var_name = getstr(sbprms,'variable')
   call LowCase(var_name)
   select case(trim(var_name))
    case ( 'velocity' ) ; probe_vel = .true.
@@ -236,9 +236,9 @@ do ic = 1 , size(comps)
 end do
 
 ! Read box dimensions ...
-nxyz   = getintarray( sbprms,'Nxyz'  ,3)
-minxyz = getrealarray(sbprms,'Minxyz',3)
-maxxyz = getrealarray(sbprms,'Maxxyz',3)
+nxyz   = getintarray( sbprms,'n_xyz'  ,3)
+minxyz = getrealarray(sbprms,'min_xyz',3)
+maxxyz = getrealarray(sbprms,'max_xyz',3)
 
 ! ... allocate 'box' and deal with inconsistent input
 if ( nxyz(1) .gt. 1 ) then ! x-coord

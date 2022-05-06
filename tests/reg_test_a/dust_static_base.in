@@ -5,8 +5,8 @@ basename       = ./Output/test_static_base
 basename_debug =  ./Debug/test_static_base
 
 ! geometry input -----------------
-GeometryFile = geo_input.h5
-ReferenceFile = References_static.in
+geometry_file = geo_input.h5
+reference_file = References_static.in
 
 ! Timings ---------------------
 tstart = 0.0
@@ -26,19 +26,19 @@ p_inf = 101325
 mu_inf = 1.81e-5
 
 ! Model parameters -------------------
-FMM = F
-Vortstretch = F
-Diffusion = F
+fmm = F
+vortstretch = F
+diffusion = F
 PenetrationAvoidance = F
 
 ! wake parameters  -------------
 n_wake_panels = 5
-RankineRad = 0.0001
-CutoffRad  = 0.000001
+rankine_rad = 0.0001
+cutoff_rad  = 0.000001
 rigid_wake = F
 
 ! Particles ----------------------------------------
-VortexRad = 0.10
+vortex_rad = 0.10
 n_wake_particles = 10000
 particles_box_min = (/ -1.0 , -10.0 , -10.0 /)
 particles_box_max = (/ 20.0 ,  10.0 ,  10.0 /)
