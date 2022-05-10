@@ -1,9 +1,9 @@
-Meshfiletype = parametric
-Eltype = p
+mesh_file_type = parametric
+el_type = p
 
 !> === coupled with external structural solver (T/F) ===
 coupled      = T
-Couplingtype = rbf
+coupling_type = rbf
 coupling_nodefile = coupling_nodes_right.in 
 
 coupling_nodeorientation = (/0.5,   0.836516303737808,   0.224143868042013, -0.852868531952443,   0.430682165754551,   0.295174760618610, 0.150383733180435,  -0.338752631992439,   0.928779514800424/)
@@ -16,19 +16,19 @@ reference_chord_fraction = 0.25
 n_hinges = 1
 hinge = {
   hinge_Tag = Aileron_right
-  hinge_Nodes_input = parametric      ! or from_file
+  hinge_nodes_input = parametric      ! or from_file
   node_1 = (/ 1.473342035233606, 1.434004005481840, 0.284465743940698  /)  ! In the local ref.frame
   node_2 = (/ 2.223342035233606  , 2.688778461088552  , 0.620681546003718/)
   n_nodes = 2
 
   
-  hinge_Ref_Dir = (/ 1.0, 0.0, 0.0 /)
+  hinge_ref_dir = (/ 1.0, 0.0, 0.0 /)
   hinge_offset  = 0.02
-  hinge_Spanwise_Blending = 0.001
-  hinge_Merge_Tol = 0.15
+  hinge_spanwise_blending = 0.001
+  hinge_merge_tol = 0.15
 
   hinge_rotation_input = coupling
-  hinge_rotation_Coupling = {
+  hinge_rotation_coupling = {
   coupling_node_subset = range
   coupling_node_first  = 5
   coupling_node_last  =  6

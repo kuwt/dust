@@ -1,5 +1,5 @@
-Meshfiletype = parametric
-Eltype = l
+mesh_file_type = parametric
+el_type = l
 
 type_chord = uniform   ! uniform  cosineLE  cosineTE
 starting_point = (/0.0,0.0,0.0/)

@@ -1,5 +1,5 @@
-Meshfiletype = parametric
-Eltype = p
+mesh_file_type = parametric
+el_type = p
 
 starting_point = (/0.0,0.0,0.0/) !Beginning of the extruded geometry
 reference_chord_fraction = 0.0   !fraction of chord at which the extrusion line
@@ -14,7 +14,7 @@ type_chord = cosineLE            !type of element distribution in chord
 ! First section (ideally a wing rib)
 chord = 1.0           !chord length
 twist = 10            !chord twist (deg)
-airfoil = NACA3018    !Airfoil profile (only 4 digits naca supported at the 
+airfoil = NACA3018    !airfoil profile (only 4 digits naca supported at the 
                       ! moment, dufferent profiles could be loaded from file)
 
 ! First region (ideally a wing bay)

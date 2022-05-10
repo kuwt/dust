@@ -1384,15 +1384,15 @@ subroutine read_points ( eltype , pmesh_prs , point_prs , points )
     points(i) % id          = getint(      point_prs, 'Id')
     points(i) % coord       = getrealarray(point_prs, 'Coordinates',3)
     if ( ( eltype .eq. 'p' ) .or. ( eltype .eq. 'v' ) ) then
-      points(i) % airfoil     = getstr(      point_prs, 'Airfoil')
+      points(i) % airfoil     = getstr(      point_prs, 'airfoil')
     else if ( eltype .eq. 'l' ) then
       points(i) % airfoil     = getstr(      point_prs, 'airfoil_table')
     else
       write(*,*) ' Error in read_points (Internal error: some of the programmers &
                   &did it bad): eltype must be either "p","v","l". Stop' ; stop
     end if
-    points(i) % chord       = getreal(     point_prs, 'Chord')
-    points(i) % theta       = getreal(     point_prs, 'Twist')
+    points(i) % chord       = getreal(     point_prs, 'chord')
+    points(i) % theta       = getreal(     point_prs, 'twist')
     points(i) % sec_nor_str = getstr(      point_prs, 'SectionNormal')
     if ( trim(points(i)%sec_nor_str) .eq. 'vector' ) then
       points(i) % sec_nor = getrealarray(  point_prs, 'SectionNormalVector',3)
@@ -1431,7 +1431,7 @@ subroutine read_lines ( pmesh_prs , line_prs , lines  , nelems_span_tot)
     lines(i) % l_type     = getstr(      line_prs , 'type'   )
     lines(i) % end_points = getintarray( line_prs , 'EndPoints' , 2 )
     lines(i) % nelems     = getint(      line_prs , 'Nelems' )
-    lines(i) % type_span  = getstr(      line_prs , 'Type_span')
+    lines(i) % type_span  = getstr(      line_prs , 'type_span')
 
     !> tension , bias parameters
     if ( trim(lines(i)%l_type) .eq. 'Spline' ) then

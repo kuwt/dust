@@ -61,9 +61,9 @@ multiplicity = {
   rot_axis = (/0.0, 0.0, 1.0/)
   rot_rate = 6.28318530717959 !2*pi, T=1
   psi_0 = 0.0
-  Hub_offset = 0.0
+  hub_offset = 0.0
 
-  N_dofs = 3
+  n_dofs = 3
   dof = {
     hinge_type = Flap
     hinge_offset = (/ 0.0 , 0.032432 , 0.0 /)

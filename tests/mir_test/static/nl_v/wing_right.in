@@ -1,5 +1,5 @@
-Meshfiletype = parametric
-Eltype = v
+mesh_file_type = parametric
+el_type = v
 AirfoilTableCorrection = T
 
 nelem_chord = 5

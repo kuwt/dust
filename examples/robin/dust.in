@@ -26,7 +26,7 @@ vortex_rad = 0.03
 fmm = T
 vortstretch = T
 diffusion = T
-PenetrationAvoidance = T
+penetration_avoidance = T
 
 ! wake parameters ----------------------
 n_wake_panels = 1

@@ -390,7 +390,7 @@ call prms%CreateRealOption('filter_time_scale','Filter timescale','40.0')
 call prms%CreateLogicalOption('diffusion','Employ vorticity diffusion','T')
 call prms%CreateLogicalOption('turbulent_viscosity','Employ turbulent &
                               &viscosity','F')
-call prms%CreateLogicalOption('PenetrationAvoidance','Employ penetration avoidance','F')
+call prms%CreateLogicalOption('penetration_avoidance','Employ penetration avoidance','F')
 call prms%CreateRealOption('penetration_avoidance_check_radius', &
       'Check radius for penetration avoidance','5.0')
 call prms%CreateRealOption('penetration_avoidance_element_radius', &
@@ -1260,7 +1260,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%use_vd                = getlogical(prms, 'diffusion')
   sim_param%use_tv                = getlogical(prms, 'turbulent_viscosity')
   sim_param%use_ve                = getlogical(prms, 'viscosity_effects')
-  sim_param%use_pa                = getlogical(prms, 'PenetrationAvoidance')
+  sim_param%use_pa                = getlogical(prms, 'penetration_avoidance')
   !> Check on penetration avoidance 
   if(sim_param%use_pa) then
     sim_param%pa_rad_mult = getreal(prms, 'penetration_avoidance_check_radius')
@@ -1269,8 +1269,8 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
 
   !> Lifting line elements
   sim_param%llSolver                        = getstr(    prms, 'll_solver')
-  sim_param%llReynoldsCorrections           = getlogical(prms, 'LLreynoldsCorrections')
-  sim_param%llReynoldsCorrectionsNfact      = getreal(   prms, 'LLreynoldsCorrectionsNfact')
+  sim_param%llReynoldsCorrections           = getlogical(prms, 'll_reynolds_corrections')
+  sim_param%llReynoldsCorrectionsNfact      = getreal(   prms, 'll_reynolds_corrections_nfact')
   sim_param%llMaxIter                       = getint(    prms, 'll_max_iter'            )
   sim_param%llTol                           = getreal(   prms, 'll_tol'                )
   sim_param%llDamp                          = getreal(   prms, 'll_damp'               )

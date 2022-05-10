@@ -1,5 +1,5 @@
-Meshfiletype = pointwise
-Eltype = l
+mesh_file_type = pointwise
+el_type = l
 
 mesh_symmetry = F
 mesh_mirror = F
@@ -11,8 +11,8 @@ point = {
   Id = 1
   Coordinates = (/ 0.0 , 0.0 , 0.0 /)
   airfoil_table = airfoils/naca0020_mod.c81
-  Chord = 1.0
-  Twist = 5.0
+  chord = 1.0
+  twist = 5.0
   SectionNormal = yAxis
 }
 
@@ -20,8 +20,8 @@ point = {
   Id = 2
   Coordinates = (/ -0.5 , 3.0 , -0.5 /)
   airfoil_table = airfoils/naca0020_mod.c81
-  Chord = 1.0
-  Twist = 10.0
+  chord = 1.0
+  twist = 10.0
   SectionNormal = referenceLine
 }
 

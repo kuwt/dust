@@ -853,8 +853,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
     end if
     ! scale
-    offset   = getrealarray(geo_prs, 'Offset',3)
-    scaling  = getreal(geo_prs, 'ScalingFactor')
+    offset   = getrealarray(geo_prs, 'offset',3)
+    scaling  = getreal(geo_prs, 'scaling_factor')
 
     if (any(offset .ne. 0.0_wp)) then
       do i = 1,size(rr,2)

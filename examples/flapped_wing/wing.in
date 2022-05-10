@@ -1,5 +1,5 @@
-Meshfiletype = parametric
-Eltype = p
+mesh_file_type = parametric
+el_type = p
 
 mesh_symmetry = T
 symmetry_point   = (/0.0 , 0.0,  0.0/)
@@ -13,7 +13,7 @@ reference_chord_fraction = 0.25
 n_hinges = 2
 hinge = {
   hinge_Tag = Aileron_right
-  hinge_Nodes_input = parametric      ! or from_file
+  hinge_nodes_input = parametric      ! or from_file
   node_1 = (/ 1.4178, 1.4557, 0.3473/)  ! In the local ref.frame
   node_2 = (/ 2.4026  , 3.1615  , 0.6946/)
   n_nodes = 2
@@ -21,9 +21,9 @@ hinge = {
   ! hinge_Nodes_input_From_file = {
   !   Node_file = hinge_node.dat
   ! }
-  hinge_Ref_Dir = (/ 1.0, 0.0 , 0.0 /)
+  hinge_ref_dir = (/ 1.0, 0.0 , 0.0 /)
   hinge_offset  = 0.1
-  hinge_Spanwise_Blending = 0.01
+  hinge_spanwise_blending = 0.01
   hinge_rotation_input = function:sin
   hinge_rotation_function = {
     amplitude = 30.0    ! deg
@@ -33,7 +33,7 @@ hinge = {
 }
 hinge = {
   hinge_Tag = Aileron_left
-  hinge_Nodes_input = parametric      
+  hinge_nodes_input = parametric      
   node_2 = (/ 1.4178, -1.4557, 0.3473/)  
   node_1 = (/ 2.4026  , -3.1615  , 0.6946/)
   n_nodes = 2
@@ -41,9 +41,9 @@ hinge = {
   ! hinge_Nodes_input_From_file = {
   !   Node_file = hinge_node.dat
   ! }
-  hinge_Ref_Dir = (/ 1.0, 0.0 , 0.0 /)
+  hinge_ref_dir = (/ 1.0, 0.0 , 0.0 /)
   hinge_offset  = 0.1
-  hinge_Spanwise_Blending = 0.01
+  hinge_spanwise_blending = 0.01
   hinge_rotation_input = function:sin
   hinge_rotation_function = {
     amplitude = -30.0    ! deg

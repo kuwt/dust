@@ -37,7 +37,7 @@ cutoff_rad = 0.001
 fmm = T
 vortstretch = F
 diffusion = F
-PenetrationAvoidance = F
+penetration_avoidance = F
 particles_redistribution = F
 
 

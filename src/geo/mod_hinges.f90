@@ -1276,7 +1276,7 @@ subroutine hinge_input_parser( geo_prs, hinge_prs, &
   !> Hinge_Rotation_Input = from_file
   call hinge_prs%CreateSubOption('hinge_rotation_file', &
                'Parser for hinge input from file', file_prs )
-  call file_prs%CreateStringOption('filename', &
+  call file_prs%CreateStringOption('file_name', &
       'Name of the file containing the input of the hinge rotation')
   !> Hinge_Rotation_Input = coupling
   call hinge_prs%CreateSubOption('hinge_rotation_coupling', &

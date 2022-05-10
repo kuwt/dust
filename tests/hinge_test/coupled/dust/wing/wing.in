@@ -1,9 +1,9 @@
 !> === Mesh and elements types ===
-Meshfiletype = parametric
-Eltype       = v
+mesh_file_type = parametric
+el_type       = v
 !> === coupled with external structural solver (T/F) ===
 coupled      = T
-Couplingtype = rbf
+coupling_type = rbf
 coupling_nodefile = ./wing/coupling_nodes.in 
 
 !> === Geometry definition ===
@@ -15,18 +15,18 @@ reference_chord_fraction = 0.25
 n_hinges = 2
 hinge = {
   hinge_Tag = Flap_r
-  hinge_Nodes_input = parametric 
+  hinge_nodes_input = parametric 
   !hinge_Nodes_input_Parametric = {
   node_1 = (/ 0.5, 1.0, 0.0/)  ! In the local ref.frame
   node_2 = (/ 0.5, 3.0, 0.0/)
   n_nodes = 2
 
-  hinge_Ref_Dir = (/ 1.0, 0.0, 0.0 /)
+  hinge_ref_dir = (/ 1.0, 0.0, 0.0 /)
   hinge_offset  = 0.01
-  hinge_Spanwise_Blending = 0.001
+  hinge_spanwise_blending = 0.001
 
   hinge_rotation_input = coupling
-  hinge_rotation_Coupling = {
+  hinge_rotation_coupling = {
   coupling_node_subset = range
   coupling_node_first  = 2
   coupling_node_last  =  3
@@ -35,18 +35,18 @@ hinge = {
 !!
 hinge = {
   hinge_Tag = Flap_l
-  hinge_Nodes_input = parametric 
+  hinge_nodes_input = parametric 
   !hinge_Nodes_input_Parametric = {
   node_2 = (/ 0.5, -1.0, 0.0/)  ! In the local ref.frame
   node_1 = (/ 0.5, -3.0, 0.0/)
   n_nodes = 2
 
-  hinge_Ref_Dir = (/ 1.0, 0.0, 0.0 /)
+  hinge_ref_dir = (/ 1.0, 0.0, 0.0 /)
   hinge_offset  = 0.01
-  hinge_Spanwise_Blending = 0.001
+  hinge_spanwise_blending = 0.001
 
   hinge_rotation_input = coupling
-  hinge_rotation_Coupling = {
+  hinge_rotation_coupling = {
   coupling_node_subset = range
   coupling_node_first  = 4
   coupling_node_last  =  5

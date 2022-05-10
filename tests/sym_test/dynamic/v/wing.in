@@ -1,5 +1,5 @@
-Meshfiletype = parametric
-Eltype = v
+mesh_file_type = parametric
+el_type = v
 
 mesh_symmetry = T
 symmetry_point   = (/0.0 , 0.0,  0.0/)

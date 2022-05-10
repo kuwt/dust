@@ -43,7 +43,7 @@ cutoff_rad = 0.001
 ll_tol = 1.0e-6
 ll_damp = 20
 ll_reynolds_corrections = F
-LLMaxIter = 400
+ll_max_iter = 400
 
 ! --- Lifting Lines parameters ---
 !ll_solver = GammaMethod ! AlphaMethod !GammaMethod

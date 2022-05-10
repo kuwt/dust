@@ -1948,7 +1948,7 @@ end subroutine check_input_from_file
 !
 !      multType = trim(getstr(sbprms,'MultType'))
 !      nBlades  = getint(sbprms,'n_blades')
-!      nDofs    = getint(sbprms,'N_dofs')
+!      nDofs    = getint(sbprms,'n_dofs')
 !
 !      ! debug ----
 !      write(*,*) ' multType , nBlades , nDofs ' , trim(multType) , nBlades , nDofs

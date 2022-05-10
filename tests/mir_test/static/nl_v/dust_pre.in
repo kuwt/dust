@@ -1,11 +1,11 @@
 
 comp_name = right_wing
-Geofile = wing_right.in
+geo_file = wing_right.in
 ref_tag = Static
 
 comp_name = left_wing
-Geofile = wing_left.in
+geo_file = wing_left.in
 ref_tag = Static
 
-filename = geo_input.h5 
+file_name = geo_input.h5 
 

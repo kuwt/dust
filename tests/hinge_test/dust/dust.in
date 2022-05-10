@@ -31,6 +31,6 @@ min_octree_part = 5
 multipole_degree = 2
 vortstretch = F
 diffusion = F
-PenetrationAvoidance = T
+penetration_avoidance = T
 ! wake parameters  -------------
 n_wake_panels = 3

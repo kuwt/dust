@@ -1,9 +1,9 @@
 !> === Mesh and elements types ===
-Meshfiletype = parametric
-Eltype       = p
+mesh_file_type = parametric
+el_type       = p
 !> === coupled with external structural solver (T/F) ===
 coupled      = T
-Couplingtype = rbf
+coupling_type = rbf
 coupling_nodefile = ./wing/coupling_nodes.in 
 
 !> === Geometry definition ===

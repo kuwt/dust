@@ -1,12 +1,12 @@
 
-Meshfile = ./tank/tank_
-Meshfiletype = basic
-Eltype = p
+mesh_file = ./tank/tank_
+mesh_file_type = basic
+el_type = p
 !scaling_factor = 0.0015
 
 !> === coupled with external structural solver (T/F) ===
 coupled      = T
-Couplingtype =  rigid
+coupling_type =  rigid
 coupling_node = (/0.0,   0.0,    0.0/)
 offset = (/ 0., -1.5, 0./) 
 coupling_nodeorientation = (/0.836516303737808,  -0.500000000000000,   0.224143868042013, 0.430682165754551,   0.852868531952443,   0.295174760618610, -0.338752631992439,  -0.150383733180435,   0.928779514800424/)
@@ -15,4 +15,4 @@ coupling_nodeorientation = (/0.836516303737808,  -0.500000000000000,   0.2241438
 
 tol_se_wing = 0.00000001
 inner_product_te = -0.88
-SuppressTE = T
+suppress_te = T

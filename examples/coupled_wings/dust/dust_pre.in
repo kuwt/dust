@@ -1,15 +1,15 @@
 
 comp_name = Wing_right
-Geofile  = wing_right.in
+geo_file  = wing_right.in
 ref_tag   = WingRef
 
 comp_name = Wing_left
-Geofile  = wing_left.in
+geo_file  = wing_left.in
 ref_tag   = WingRef
 
 comp_name = Fuselage
-Geofile  = fuselage.in
+geo_file  = fuselage.in
 ref_tag   = WingRef
 
-filename = geo_input.h5 
+file_name = geo_input.h5 
 

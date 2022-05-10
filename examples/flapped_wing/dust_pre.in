@@ -1,8 +1,8 @@
 
 comp_name = Wing
-!Geofile  = wing_ll.in
-Geofile  = wing.in
+!geo_file  = wing_ll.in
+geo_file  = wing.in
 ref_tag   = WingRef
 
-filename = geo_input.h5 
+file_name = geo_input.h5 
 

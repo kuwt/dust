@@ -11,7 +11,7 @@ analysis = {
   end_res = 10
   step_res = 1
   wake = T
-  Separatewake = F
+  separate_wake = F
   variable = Vorticity
   variable = Pressure
 }
