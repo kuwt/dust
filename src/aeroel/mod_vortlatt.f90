@@ -499,13 +499,14 @@ end subroutine compute_dforce_dummy
 !  using Kutta-Jukowski theorem as implemented in AVL:
 !  the velocity
 !
-subroutine compute_dforce_jukowski_vortlatt(this)
+subroutine compute_dforce_jukowski_vortlatt(this, correction)
 
   class(t_vortlatt), intent(inout) :: this
-  real(wp) :: gam(3), wind(3)
+  logical, intent(in)              :: correction 
+  real(wp)                         :: gam(3), wind(3)
 
-  integer  :: i_stripe
-  real(wp) :: mach
+  integer                          :: i_stripe
+  real(wp)                         :: mach
   
   ! Prandt -- Glauert correction for compressibility effect
   wind = variable_wind(this%cen, sim_param%time)
@@ -515,13 +516,23 @@ subroutine compute_dforce_jukowski_vortlatt(this)
   ! === Steady contribution (KJ) ===
   gam = cross ( this%vel_ctr_pt, this%edge_vec(:,1) )
   i_stripe = size(this%stripe_elem)
-
-  if ( i_stripe .gt. 1 ) then
-    this%dforce = sim_param%rho_inf * gam &
-                * ( this%mag - this%stripe_elem(i_stripe-1)%p%mag )  / sqrt(1 - mach**2)
-  else
-    this%dforce = sim_param%rho_inf * gam * this%mag / sqrt(1 - mach**2)
-  end if
+  if (correction) then 
+    !> apply the prantdl glauert correction (for non corrected vl)
+    if ( i_stripe .gt. 1 ) then
+      this%dforce = sim_param%rho_inf * gam &
+                  * ( this%mag - this%stripe_elem(i_stripe-1)%p%mag )  / sqrt(1 - mach**2)
+    else
+      this%dforce = sim_param%rho_inf * gam * this%mag / sqrt(1 - mach**2)
+    end if
+  else 
+    !> apply the prantdl glauert correction (for non corrected vl)
+    if ( i_stripe .gt. 1 ) then
+      this%dforce = sim_param%rho_inf * gam &
+                  * ( this%mag - this%stripe_elem(i_stripe-1)%p%mag )
+    else
+      this%dforce = sim_param%rho_inf * gam * this%mag 
+    end if
+  endif   
   
   ! === Unsteady contribution ===
   this%dforce = this%dforce &

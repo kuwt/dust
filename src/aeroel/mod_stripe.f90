@@ -190,8 +190,7 @@ module mod_stripe
     real(wp)                         :: alpha_ref, K1, dAlpha_dt
     real(wp)                         :: rad_break, rad_dyn, M1, M2, g1, g2, g2_max
   
-    !> Relaxation factor
-    rel_fct = sim_param%vl_relax
+
     
     !> Total panel on stripe 
     n_pan = size(this%panels)
@@ -234,7 +233,7 @@ module mod_stripe
     alpha = atan2(dot(up, this%nor), dot(up,this%tang_cen)) 
 
     !> "2D correction" of the induced angle
-    alpha_2d = - mag_inv / ( pi * this%chord * unorm ) 
+    alpha_2d = mag_inv / ( pi * this%chord * unorm ) 
 
     alpha = (alpha - alpha_2d) * 180.0_wp/pi  
 
@@ -262,7 +261,7 @@ module mod_stripe
       !> Take the id of the panel in the linsys 
       id_pan = this%panels(i_c)%p%id
       !> Update of the rhs 
-      linsys%b(id_pan) =  (1 + rel_fct*rhs_diff)*linsys%b(id_pan)       
+      linsys%b(id_pan) =  (1 + rhs_diff)*linsys%b(id_pan)       
     end do 
 
     ! === Update AOAs and aerodynamic coefficients ===
@@ -315,7 +314,6 @@ module mod_stripe
     this%vel = 0.0_wp
     ! Control point at 1/2-fraction of the chord (with curvature)
     x0 = this%cen
-  
     !=== Compute the velocity from all the elements ===
     do j = 1,size(wake_elems)  ! wake panels
       call wake_elems(j)%p%compute_vel(x0,v)
@@ -370,32 +368,29 @@ module mod_stripe
     type(t_pot_elem_p),   intent(in)      :: wake_elems(:)
     type(t_vort_elem_p),  intent(in)      :: vort_elems(:)
 
-    real(wp) :: v(3),x0(3), wind(3), vel_ctr_pt(3)
+    real(wp) :: v(3), x0(3), wind(3), vel_ctr_pt(3)
     integer :: j
   
     ! Initialisation to zero
-    vel_ctr_pt = 0.0_wp
-  
+    vel_ctr_pt = 0.0_wp  
     ! Control point at leading edge 
-    x0 = this%cen  - this%tang_cen * this%chord / 2.0_wp
-  
-    !=== Compute the velocity from all the elements ===
-  
+    x0 = 0.5_wp*( this%ver(:,1) + this%ver(:,2) )
+    
     !=== Compute the velocity from all the elements ===
     do j = 1,size(wake_elems)  ! wake panels
       call wake_elems(j)%p%compute_vel(x0, v)
       vel_ctr_pt = vel_ctr_pt + v
     enddo
 
-    do j = 1,size(vort_elems) ! wake vorticity elements 
-      call vort_elems(j)%p%compute_vel(x0, v)
-      vel_ctr_pt = vel_ctr_pt + v
-    enddo
+    !do j = 1,size(vort_elems) ! wake vorticity elements 
+    !  call vort_elems(j)%p%compute_vel(x0, v)
+    !  vel_ctr_pt = vel_ctr_pt + v
+    !enddo
 
-    do j = 1,size(elems) ! body elements
-      call elems(j)%p%compute_vel(x0, v)
-      vel_ctr_pt = vel_ctr_pt + v
-    enddo
+    !do j = 1,size(elems) ! body elements
+    !  call elems(j)%p%compute_vel(x0, v)
+    !  vel_ctr_pt = vel_ctr_pt + v
+    !enddo
   
     wind = variable_wind(x0, sim_param%time)
 
@@ -446,8 +441,10 @@ module mod_stripe
     end if
   
     this%nor = nor / norm2(nor)
-
+    
+    !> mid-point between trailing edge 
     this%cen = sum (this%ver(:,1:2),2) / 2.0_wp
+    
     cen  = sum(this%ver,2) / 4.0_wp
     !> local tangent unit vector as in PANAIR
     tanl =  0.5_wp *  ( this%ver(:,4) + this%ver(:,1) ) - cen 
@@ -481,18 +478,17 @@ module mod_stripe
     this%bnorm_cen = this%bnorm_cen / norm2(this%bnorm_cen)
     
     this%chord = sum(this%edge_len((/2,4/)))*0.5_wp
-  
+
     !> sweep angle
     cos_lambda  = norm2(cross(this%tang_cen , -this%edge_uni(:,1)))
     
-    !> control point
-    this%ctr_pt = this%cen - this%tang_cen * this%chord / 2.0_wp
-    
+    !> control point at panel center 
+    this%ctr_pt = this%cen + this%tang_cen * this%chord / 2.0_wp    
+
     !> 2 * pi * | x_CP - x{1/4*c} | * cos(lambda)
     this%d_2pi_coslambda = norm2( this%cen - this%ctr_pt ) * &
                             2.0_wp*pi*cos_lambda
-    
-    this%cen    = this%ctr_pt! + this%curv_ac*this%nor
+    this%cen    = this%ctr_pt
 
     ! overwrite nor
     this%nor = cross( this%bnorm_cen , this%tang_cen )
