@@ -1200,7 +1200,7 @@ subroutine read_airfoil (filen , discr , ElType , nelems_chord , csi_half, rr, c
       end if
     end do
   end do
-  write(*,*) 'rr', rr(1,:)
+
   !> get position of aerodynamic center 
   csi_ac = 0.75_wp ! control point for vl corrected
   if ( ElType .eq. 'v' ) then
