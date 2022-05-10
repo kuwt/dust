@@ -126,6 +126,7 @@ module mod_stripe
     real(wp) :: vel_outplane
     real(wp) :: vel_outplane_isolated
     real(wp) :: al_ctr_pt
+    real(wp) :: vel_ctr_pt(3)
     real(wp) :: aero_coeff(3) 
     !> Stripe 'curvature'
     real(wp) :: curv_ac 
@@ -140,6 +141,7 @@ module mod_stripe
     procedure, pass(this) :: get_vel_ctr_pt           => get_vel_ctr_pt_stripe
     procedure, pass(this) :: calc_geo_data            => calc_geo_data_stripe
     procedure, pass(this) :: get_vel_ctr_pt_final     => get_vel_ctr_pt_final_stripe
+    procedure, pass(this) :: update_aoa               => update_aoa_stripe
     !> Dummy for intel workaround
     procedure, pass(this) :: build_row                => build_row_stripe
     procedure, pass(this) :: build_row_static         => build_row_static_stripe
@@ -183,7 +185,7 @@ module mod_stripe
     real(wp)                         :: machend, mach1, mach2
     integer                          :: irey, nRe, i_Re
     real(wp)                         :: reyn1, reyn2, al0_Re
-    real(wp)                         :: e_l(3), e_d(3), c_m(3)
+    
     !> Dynamic stall
     real(wp)                         :: thicc = 0.12 !> get as input? 
                                         !(should be the last 2 digits of NACA profile)
@@ -191,7 +193,9 @@ module mod_stripe
     real(wp)                         :: rad_break, rad_dyn, M1, M2, g1, g2, g2_max
   
 
-    
+    !> Relaxation factor
+    rel_fct = sim_param%vl_relax
+
     !> Total panel on stripe 
     n_pan = size(this%panels)
     
@@ -210,7 +214,7 @@ module mod_stripe
     this%vel_outplane = dot(this%bnorm_cen,this%vel)
     
     ! "effective" velocity = proj. of vel in the n-t plane
-    up =  this%nor*dot(this%nor,this%vel) + this%tang_cen*dot(this%tang_cen,this%vel)
+    up = this%nor*dot(this%nor,this%vel) + this%tang_cen*dot(this%tang_cen,this%vel)
     unorm = norm2(up)      ! velocity w/o induced velocity
     this%vel_2d = unorm
 
@@ -242,18 +246,16 @@ module mod_stripe
                         (/alpha, mach, reynolds/), aero_coeff )
   
     !> Aerodynamic coefficients from c81 table  
-    c_m = aero_coeff
     this%cl_visc = aero_coeff(1)
     this%cd = aero_coeff(2)  
-    
+    this%aero_coeff = aero_coeff
+
     cl_visc = this%cl_visc    
     cl_inv = -2.0_wp * mag_inv / (unorm*this%chord)    
 
-    !deallocate(aero_coeff)   
-
     !> Update term rhs (absolute)
     rhs_diff = (cl_visc - cl_inv)
-
+    
     !> Update tolerance  
     diff = abs(cl_visc - cl_inv)
     
@@ -261,32 +263,10 @@ module mod_stripe
       !> Take the id of the panel in the linsys 
       id_pan = this%panels(i_c)%p%id
       !> Update of the rhs 
-      linsys%b(id_pan) =  (1 + rhs_diff)*linsys%b(id_pan)       
+      linsys%b(id_pan) =  (1 + rel_fct*rhs_diff)*linsys%b(id_pan)              
     end do 
 
-    ! === Update AOAs and aerodynamic coefficients ===
-    !> unit vector in the direction of the relative velocity (_d for drag)
-    !  and in the direction of the lift (_l for lift)
-    e_l = this%nor * cos(this%al_ctr_pt) - this%tang_cen*sin(this%al_ctr_pt )
-    e_d = this%nor * sin(this%al_ctr_pt) + this%tang_cen*cos(this%al_ctr_pt )
-    e_l = e_l/norm2(e_l)
-    e_d = e_d/norm2(e_d)
     
-    !> Force calculation on the stripe 
-    dforce = 0.0_wp
-    do i_c = 1, n_pan
-      dforce = dforce + this%panels(i_c)%p%dforce
-    end do
-    
-    !> Update aerodynamic coefficients and AOA
-    c_m(1) = sum(dforce* e_l) / &
-                (0.5_wp*sim_param%rho_inf*unorm ** 2.0_wp * this%area )
-    c_m(2) = sum(dforce*e_d)/&
-                (0.5_wp*sim_param%rho_inf*unorm ** 2.0_wp * this%area )
-    
-    this%alpha = this%al_ctr_pt * 180_wp/pi
-    this%aero_coeff = c_m(:) 
-
   end subroutine correction_c81_vortlatt
 
   !----------------------------------------------------------------------
@@ -307,7 +287,7 @@ module mod_stripe
     type(t_pot_elem_p),   intent(in)       :: wake_elems(:)
     type(t_vort_elem_p),  intent(in)       :: vort_elems(:)
   
-    real(wp) :: v(3), x0(3)
+    real(wp) :: v(3) , x0(3)
     integer :: j
   
     ! Initialisation to zero
@@ -382,25 +362,60 @@ module mod_stripe
       vel_ctr_pt = vel_ctr_pt + v
     enddo
 
-    !do j = 1,size(vort_elems) ! wake vorticity elements 
-    !  call vort_elems(j)%p%compute_vel(x0, v)
-    !  vel_ctr_pt = vel_ctr_pt + v
-    !enddo
+    do j = 1,size(vort_elems) ! wake vorticity elements 
+      call vort_elems(j)%p%compute_vel(x0, v)
+      vel_ctr_pt = vel_ctr_pt + v
+    enddo
 
-    !do j = 1,size(elems) ! body elements
-    !  call elems(j)%p%compute_vel(x0, v)
-    !  vel_ctr_pt = vel_ctr_pt + v
-    !enddo
+    do j = 1,size(elems) ! body elements
+      call elems(j)%p%compute_vel(x0, v)
+      vel_ctr_pt = vel_ctr_pt + v
+    enddo
   
-    wind = variable_wind(x0, sim_param%time)
-
-    vel_ctr_pt = vel_ctr_pt/(4.0_wp*pi) + wind -  this%ub
-
-    this%al_ctr_pt = atan2(sum(vel_ctr_pt*this%nor    ) , &
-                          sum(vel_ctr_pt*this%tang_cen) )
+    this%vel_ctr_pt = vel_ctr_pt/(4.0_wp*pi)
   
   end subroutine get_vel_ctr_pt_final_stripe
 
+  subroutine update_aoa_stripe(this) 
+    class(t_stripe),intent(inout)    :: this
+
+    real(wp)                         :: e_l(3), e_d(3), c_m(3)
+    real(wp)                         :: dforce(3)
+    integer                          :: i_c, n_pan 
+
+    ! === Update AOAs and aerodynamic coefficients ===
+    !> unit vector in the direction of the relative velocity (_d for drag)
+    !  and in the direction of the lift (_l for lift)
+
+    this%al_ctr_pt = atan2(sum(this%vel_ctr_pt * this%nor    ) , &
+                         sum(this%vel_ctr_pt * this%tang_cen) )
+    !e_l = this%nor * cos(this%al_ctr_pt) + this%tang_cen*sin(this%al_ctr_pt )
+    !e_d = this%nor * sin(this%al_ctr_pt) - this%tang_cen*cos(this%al_ctr_pt )
+    !e_l = e_l/norm2(e_l)
+    !e_d = e_d/norm2(e_d)
+    this%alpha = this%al_ctr_pt * 180_wp/pi
+    !> Force calculation on the stripe 
+    !dforce = 0.0_wp
+    !!> Total panel on stripe 
+    !n_pan = size(this%panels)
+    !do i_c = 1, n_pan
+    !  dforce = dforce + this%panels(i_c)%p%dforce
+    !end do
+
+
+  
+    !> Update aerodynamic coefficients and AOA
+    !c_m(1) = sum(dforce*e_l) / &
+    !            (0.5_wp*sim_param%rho_inf*this%vel_2d ** 2.0_wp * this%area )
+    !c_m(2) = sum(dforce*e_d)/&
+    !            (0.5_wp*sim_param%rho_inf*this%vel_2d ** 2.0_wp * this%area )
+    !!write(*,*) 'dforce', dforce
+    !write(*,*) 'e_d   ', e_d
+    !write(*,*) 'c_m   ', this%aero_coeff(2)
+    
+    !this%aero_coeff = c_m(:) 
+    
+  end subroutine
 
   subroutine compute_grad_stripe(this, pos, grad)
     class(t_stripe), intent(in) :: this

@@ -492,7 +492,7 @@ subroutine solve_liftlin_piszkin( &
   allocate(vel_w_vort(3,size(elems_ll))) ; vel_w_vort = 0.0_wp
 !$omp parallel do private(i_l, j, v) schedule(dynamic)
   do i_l = 1,size(elems_ll)
-    do j = 1,size(elems_impl) ! body panels: liftlin, vor che tenga contotlat
+    do j = 1,size(elems_impl) ! body panels: liftlin
       call elems_impl(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
     enddo
@@ -1063,6 +1063,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       
     enddo  ! i_l
 !$omp end parallel do
+
+
     ! === Stall regularisation ===
     ! avoid "unphysical" stall on an elem between 2 elems without stall. Check
     ! ll section of nn_stall elems, with nn_stall \in (1,llRegularisationNelems)
@@ -1135,6 +1137,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     if ( diff/max(max_mag_ll,1e-9_wp) .le. fp_tol ) exit ! convergence
 
   enddo !solver iterations
+  
   if(ic .ge. fp_maxIter) then
     write(msg,'(A,I0,A)') 'Lifting lines iterative solution NOT CONVERGED &
                             &after ',fp_maxIter,' iterations'

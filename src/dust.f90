@@ -217,7 +217,7 @@ real(wp), allocatable             :: al_kernel(:,:), al_v(:)
 integer                           :: i_el, i_c, i_s, i, sel, i_p, jj
 integer                           :: it_vl, id_pan
 real(wp)                          :: tol, diff, max_diff 
-real(wp)                          :: d_cd(3), vel(3), v(3)
+real(wp)                          :: d_cd(3), vel(3), v(3), x0(3), wind(3)
 real(wp), allocatable             :: res_tmp(:)
 
 !> octree parameters
@@ -855,8 +855,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
       it_vl = 0
       max_diff = tol + 1e-6_wp
       linsys%skip = .true.
-      !> initialize residual solution 
-      allocate(res_tmp(size(linsys%res))); res_tmp = linsys%res 
+
       !> Select time step to start the vl correction 
       !  (avoid strange behaviour at the begining of simulation)
       if (it .gt. sim_param%vl_startstep) then 
@@ -872,13 +871,15 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                 
               !> calculate geo data and initial correction 
               if (it_vl .eq. 0) then 
-
+                !> calc geo quantities 
                 do i_s = 1, size(geo%components(i_c)%stripe)
                   call geo%components(i_c)%stripe(i_s)%calc_geo_data(geo%components(i_c)%stripe(i_s)%ver) 
                 end do 
+                !> calc induced velocity from all components: vel_w
                 do  i_s = 1, size(geo%components(i_c)%stripe)
                   call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt(elems_non_corr, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
                 end do 
+                !> calc velocity induced by stripe component: vel 
                 do i_s = 1, size(geo%components(i_c)%stripe)
                   vel = 0.0_wp
                   do jj = 1, size(geo%components(i_c)%stripe)
@@ -890,6 +891,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                   max_diff = max(diff, max_diff) 
                 end do
               else 
+                !> update only the induced velocity by stripe on stipe: vel_w is fixed 
                 do i_s = 1, size(geo%components(i_c)%stripe)
                   vel = 0.0_wp
                   do jj = 1, size(geo%components(i_c)%stripe)
@@ -918,25 +920,33 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
             call solve_linsys(linsys)     
           endif
 
-          !> Relax the solution 
-          do i_el = 1, sel
-            linsys%res(i_el) = (linsys%res(i_el) + sim_param%vl_relax*res_tmp(i_el)) &
-                                /(1.0_wp + sim_param%vl_relax)
-          enddo 
-          
           it_vl = it_vl + 1
 
         end do !(while)
 
-        deallocate(res_tmp)
         do i_c = 1, size(geo%components)
           if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
-            trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
+            trim(geo%components(i_c)%aero_correction) .eq. 'true') then           
+
+              !> calc velocity induced by stripe component: vel 
               do i_s = 1, size(geo%components(i_c)%stripe)
-                call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt_final(elems_tot, (/ wake%pan_p, wake%rin_p /), wake%vort_p) !! FIXME!! 
-              enddo 
-            end if 
-          end do 
+                vel = 0.0_wp
+                x0 =  0.5_wp*( geo%components(i_c)%stripe(i_s)%ver(:,1) + geo%components(i_c)%stripe(i_s)%ver(:,2) )
+
+                call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt_final(elems_non_corr, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
+
+                do jj = 1, size(geo%components(i_c)%stripe)
+                  call geo%components(i_c)%stripe(jj)%compute_vel(x0, v)
+                  vel = vel + v                      
+                end do                     
+
+                wind = variable_wind(x0, sim_param%time)
+                geo%components(i_c)%stripe(i_s)%vel_ctr_pt = geo%components(i_c)%stripe(i_s)%vel_ctr_pt  + &
+                                                            wind + vel - geo%components(i_c)%stripe(i_s)%ub
+
+              end do
+          end if 
+        end do 
         
         do i_el = 1 , sel      
           elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
@@ -949,6 +959,16 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           end select            
         end do
         
+        do i_c = 1, size(geo%components)
+          if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
+            trim(geo%components(i_c)%aero_correction) .eq. 'true') then           
+            do i_s = 1, size(geo%components(i_c)%stripe)
+              call geo%components(i_c)%stripe(i_s)%update_aoa() 
+            end do
+          end if 
+        end do 
+
+
         if(it_vl .eq. sim_param%vl_maxiter) then
           call warning('dust','dust','max iteration reached for non linear vl:&
                       increase VLmaxiter!') 
@@ -977,8 +997,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               end do
             end do
           end if 
-        end do 
-        
+        end do         
       endif
       linsys%skip = .false.
     end if 
