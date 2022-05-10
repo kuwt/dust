@@ -6,35 +6,35 @@ preCICE~(\url{https://github.com/precice/}) is an open-source software released 
 
 \section{Compilation}
 \textcolor{red}{TODO}
-\section{Input Files}
+\section{input Files}
 \textcolor{red}{TODO}
 \subsection{DUST}
 \label{subsec:DUSTpreCICE}
 The DUST component input card is enriched of the following parameters:
 \begin{itemize}
-    \item \param{Coupled} \textit{required:} no. \textit{default:} F. \textit{type:} logical.
+    \item \param{coupled} \textit{required:} no. \textit{default:} F. \textit{type:} logical.
     
-    Component of a coupled simulation with respect to a structural solver.
+    component of a coupled simulation with respect to a structural solver.
     
-    \item \param{CouplingType} \textit{required:} yes. \textit{type:} string. 
-    Type of the coupling:
+    \item \param{coupling_type} \textit{required:} yes. \textit{type:} string. 
+    type of the coupling:
     \begin{itemize}
         \item \opt{rigid}: rigid component and node 
         \item \opt{rbf}: Generic DUST component and node coupling
     \end{itemize}
     Although three different types of are implemented, the most general one is the \opt{rbf} since it can manage all DUST components and can be coupled with both rigid and flexible elements.  
    
-   \item \param{CouplingNode} \textit{required:} no. \textit{type:} real array, length 3. \textit{default:} (0.0, 0.0, 0.0)
+   \item \param{coupling_node} \textit{required:} no. \textit{type:} real array, length 3. \textit{default:} (0.0, 0.0, 0.0)
    
    Node for \opt{rigid} coupling in the reference configuration (x, y, z).
    
-   \item \param{CouplingNodeFile} \textit{required:} yes. \textit{type:} string. 
+   \item \param{coupling_node_file} \textit{required:} yes. \textit{type:} string. 
    
-   File containing the nodes for FSI (fluid structure interaction). It is required for \opt{rbf} coupling. 
+   file containing the nodes for FSI (fluid structure interaction). It is required for \opt{rbf} coupling. 
    
-   \item \param{CouplingNodeOrientation} \textit{required:} no. \textit{type:} real array, length 3. \textit{default:} (1.,0.,0., 0.,1.,0., 0.,0.,1.)
+   \item \param{coupling_node_orientation} \textit{required:} no. \textit{type:} real array, length 3. \textit{default:} (1.,0.,0., 0.,1.,0., 0.,0.,1.)
    
-   Orientation of the node for rigid coupling. This array contains the local components (in the local reference frame of the geometrical           component) of the unit vectors of the coupling node reference frame. In the \opt{rbf} frame indicates the rotation matrix from the structural component to the DUST component reference frame. 
+   orientation of the node for rigid coupling. This array contains the local components (in the local reference frame of the geometrical           component) of the unit vectors of the coupling node reference frame. In the \opt{rbf} frame indicates the rotation matrix from the structural component to the DUST component reference frame. 
    
 \end{itemize}
 \subsection{preCICE XML}
@@ -51,7 +51,7 @@ First of all, the fields exposed to communication between the two solvers are de
     <!-- === Data =========================================== -->
     
     <data:vector name="Position" />
-    <data:vector name="Rotation" />
+    <data:vector name="rotation" />
     <data:vector name="Velocity" />
     <data:vector name="AngularVelocity" />
     <data:vector name="Force" />
@@ -64,7 +64,7 @@ In this case, both DUST and MBDyn use all the exposed fields.
     <!-- === Mesh =========================================== -->
     <mesh name="MBDynNodes">
       <use-data name="Position" />
-      <use-data name="Rotation" />
+      <use-data name="rotation" />
       <use-data name="Velocity" />
       <use-data name="AngularVelocity" />
       <use-data name="Force" />
@@ -73,7 +73,7 @@ In this case, both DUST and MBDyn use all the exposed fields.
 
     <mesh name="dust_mesh">
       <use-data name="Position" />
-      <use-data name="Rotation" />
+      <use-data name="rotation" />
       <use-data name="Velocity" />
       <use-data name="AngularVelocity" />
       <use-data name="Force" />
@@ -87,7 +87,7 @@ In this part are declared the two participants, MBDyn and DUST. For each partici
     <participant name="MBDyn">
       <use-mesh   name="MBDynNodes" provide="yes"/>
       <write-data name="Position"        mesh="MBDynNodes" />
-      <write-data name="Rotation"        mesh="MBDynNodes" />
+      <write-data name="rotation"        mesh="MBDynNodes" />
       <write-data name="Velocity"        mesh="MBDynNodes" />
       <write-data name="AngularVelocity" mesh="MBDynNodes" />
       <read-data  name="Force"           mesh="MBDynNodes" />
@@ -100,7 +100,7 @@ In this part are declared the two participants, MBDyn and DUST. For each partici
       <write-data name="Force"           mesh="dust_mesh" />
       <write-data name="Moment"          mesh="dust_mesh" />
       <read-data  name="Position"        mesh="dust_mesh" />
-      <read-data  name="Rotation"        mesh="dust_mesh" />
+      <read-data  name="rotation"        mesh="dust_mesh" />
       <read-data  name="Velocity"        mesh="dust_mesh" />
       <read-data  name="AngularVelocity" mesh="dust_mesh" />
       <mapping:nearest-neighbor direction="read"  from="MBDynNodes" to="dust_mesh"
@@ -138,14 +138,14 @@ To control the number of sub-iterations within an implicit coupling loop, you ca
       <max-time value="100.0" />
       <time-window-size value="-1" valid-digits="10" method="first-participant" />
       <exchange data="Position"        from="MBDyn" mesh="MBDynNodes" to="dust" />
-      <exchange data="Rotation"        from="MBDyn" mesh="MBDynNodes" to="dust" />
+      <exchange data="rotation"        from="MBDyn" mesh="MBDynNodes" to="dust" />
       <exchange data="Velocity"        from="MBDyn" mesh="MBDynNodes" to="dust" />
       <exchange data="AngularVelocity" from="MBDyn" mesh="MBDynNodes" to="dust" />
       <exchange data="Force"           from="dust"  mesh="MBDynNodes" to="MBDyn" />
       <exchange data="Moment"          from="dust"  mesh="MBDynNodes" to="MBDyn" />
       <max-iterations value="60"/>
       <absolute-convergence-measure limit="1.0e-4" data="Position" mesh="MBDynNodes" />
-      <absolute-convergence-measure limit="1.0e-3" data="Rotation" mesh="MBDynNodes" />
+      <absolute-convergence-measure limit="1.0e-3" data="rotation" mesh="MBDynNodes" />
       <absolute-convergence-measure limit="1.0e-3" data="Velocity" mesh="MBDynNodes" />
       <absolute-convergence-measure limit="1.0e-3" data="AngularVelocity" mesh="MBDynNodes" /> 
 \end{lstlisting}
@@ -176,7 +176,7 @@ Both examples will use the \opt{rbf} coupling type.
 Let consider the case of a symmetric wing. According to MBDyn manual, it is easier to define the beam axis oriented with the local $x$. Let define the angles $\lambda$, $\delta$, $\theta$ as the sweep, dihedral and twist angle. In order to pass from the global or wind axis frame of reference to the local beam axis the following rotation matrix are used: 
 
 \begin{itemize}
-    \item Rotation matrix from the DUST reference frame to the MBDyn reference frame:
+    \item rotation matrix from the DUST reference frame to the MBDyn reference frame:
     \begin{equation}
         \mathbf{R}_{b} = 
         \begin{bmatrix}
@@ -187,7 +187,7 @@ Let consider the case of a symmetric wing. According to MBDyn manual, it is easi
         \label{eq:rotbeam}
     \end{equation}
 
-    \item Twist rotation of the MBDyn node around the beam axis $x$. 
+    \item twist rotation of the MBDyn node around the beam axis $x$. 
     \begin{equation}
         \mathbf{R}_{\theta} = 
         \begin{bmatrix}
@@ -198,7 +198,7 @@ Let consider the case of a symmetric wing. According to MBDyn manual, it is easi
         \label{eq:rottwist}
     \end{equation}
     
-    \item Sweep rotation of the MBDyn node. The sweep is taken positive for a rotation about $-z$. 
+    \item sweep rotation of the MBDyn node. The sweep is taken positive for a rotation about $-z$. 
     \begin{equation}
         \mathbf{R}_{\lambda} = 
         \begin{bmatrix}

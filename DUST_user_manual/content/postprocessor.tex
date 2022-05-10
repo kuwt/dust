@@ -25,7 +25,7 @@ The different possible analysis that can be performed on the results are:
 \end{itemize}
 
 
-\section{Input file}
+\section{input file}
 \label{sec:Post_InputFile}
 
 The input file of the postprocessor contains first all the information required for retrieving the correct results and to process the data (model parameters etc.) and then in separate sections all the analyses that are requested. An arbitrary number of analyses can be requested in a single input file, however it is also possible to group the analyses in different input files then invoked multiple times as different inputs for the postprocessor. 
@@ -40,36 +40,36 @@ data_basename = ./Output/sim_results
 basename =     ./Postpro/postpro_output
 
 !--- Model Parameters (as in solver) ---
-FarFieldRatioDoublet = 10.0
-FarFieldRatioSource = 10.0
-DoubletThreshold = 1.0e-6
-RankineRad = 0.1
-VortexRad = 0.1
-CutoffRad = 0.001
+far_field_ratio_doublet = 10.0
+far_field_ratio_source = 10.0
+doublet_threshold = 1.0e-6
+rankine_rad = 0.1
+vortex_rad = 0.1
+cutoff_rad = 0.001
 
-Analysis = {
+analysis = {
 
-Type = viz  
-Name = vis01
-StartRes = 1
-EndRes   = 100 
-StepRes  = 1
-Format = vtk
-Wake = T
-Variable = Vorticity 
+type = viz  
+name = vis01
+start_res = 1
+end_res   = 100 
+step_res  = 1
+format = vtk
+wake = T
+variable = Vorticity 
 }
 
-Analysis = {
+analysis = {
 
-Type = integral_loads
-Name = load01
-StartRes = 1
-EndRes   = 100 
-StepRes  = 1
-Format = dat
-Average = F
-Component = all
-Reference_Tag = RotorHub
+type = integral_loads
+name = load01
+start_res = 1
+end_res   = 100 
+step_res  = 1
+format = dat
+average = F
+component = all
+reference_tag = RotorHub
 }
 
 \end{inputfile}
@@ -83,109 +83,109 @@ Base name (with path) of the data which must be analysed.
 
 Base name (with path) of the postprocessing results
 
-\item \param{FarFieldRatioDoublet}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 10
+\item \param{far_field_ratio_doublet}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 10
 
 Ratio with respect to element length to set the thresholds for far field approximation. Same as in solver input file \ref{file:dust.in}.
 
-\item \param{FarFieldRatioSource}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 10
+\item \param{far_field_ratio_source}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 10
 
-As for \param{FarFieldRatioDoublet} determines the threshold after which far field approximations are employed, just for sources. Same as in solver input file \ref{file:dust.in}.
+As for \param{far_field_ratio_doublet} determines the threshold after which far field approximations are employed, just for sources. Same as in solver input file \ref{file:dust.in}.
 
-\item \param{DoubletThreshold}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 1.0e-6
+\item \param{doublet_threshold}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 1.0e-6
 
 Parameter which sets the distance threshold under which the evaluation point, with respect to a panel, is considered inside the plane of the panel. Same as in solver input file \ref{file:dust.in}.
 
-\item \param{RankineRad}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.1
+\item \param{rankine_rad}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.1
 
 Parameter which sets the radius under which the Rankine approximation of vortexes cores is employed. Used for aerodynamic elements and panels (i.e. everything except vortex particles). Same as in solver input file \ref{file:dust.in}.
 
-\item \param{VortexRad}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.1
+\item \param{vortex_rad}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.1
 
 Parameter which sets the radius of the vortex particles. Same as in solver input file \ref{file:dust.in}.
 
-\item \param{CutoffRad}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.001
+\item \param{cutoff_rad}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.001
 
 Parameter which sets the radius under which the vortexes interaction is completely set to zero. Same as in solver input file \ref{file:dust.in}.
 
-\item \param{Analysis}: \textit{required:} at least one. \textit{multiple:} yes
+\item \param{analysis}: \textit{required:} at least one. \textit{multiple:} yes
 
 Grouping keyword containing the information for a single postprocessing analysis.
 
 \end{itemize}
 
-The grouping keyword  \param{Analysis} specifies a single analysis, and the parameters contained in the group depend on the type of the analysis. A series of  \param{Analysis} groups can be contained in a single input file.
+The grouping keyword  \param{analysis} specifies a single analysis, and the parameters contained in the group depend on the type of the analysis. A series of  \param{analysis} groups can be contained in a single input file.
 
 \subsection{Visualizations}
 
 Visualizations are the main form of assessment of the results, they allow to see the movement of geometry and wake and the intensity of the solution on the surfaces and on the wake.
 
-An example \param{Analysis} group for a visualization is:
+An example \param{analysis} group for a visualization is:
 
 \begin{inputfile}[frame=single, caption={dust\_post.in for visualization}, label={file:dust_post.in_viz}]
 !--- Data Names ---
 data_basename = ./Output/sim_results
 basename =     ./Postpro/postpro_output
 
-Analysis = {
+analysis = {
 
-Type = viz  
-Name = vis01
-StartRes = 1
-EndRes   = 100 
-StepRes  = 1
-Format = vtk
-Wake = T
-Average = F
-Variable = Vorticity 
-Component = all
+type = viz  
+name = vis01
+start_res = 1
+end_res   = 100 
+step_res  = 1
+format = vtk
+wake = T
+average = F
+variable = Vorticity 
+component = all
 
 }
 \end{inputfile}
 
 \begin{itemize}
-\item \param{Type}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{type}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Type of the analysis, \opt{viz} for surface visualizations
+type of the analysis, \opt{viz} for surface visualizations
 
-\item \param{Name}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{name}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Name of the analysis, will be appended as a suffix to \param{basename}
+name of the analysis, will be appended as a suffix to \param{basename}
 
-\item \param{StartRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{start_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 First result in the time series of the solver results to analyse.
 
-\item \param{EndRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{end_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 Last result in the time series of the solver results to analyse.
 
-\item \param{StepRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{step_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 Stride to employ when loading the time series of the solver results. 
 
-\item \param{Format}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{format}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Format of the processed results, can be \opt{vtk} for vtk output or \opt{tecplot} for tecplot plt files
+format of the processed results, can be \opt{vtk} for vtk output or \opt{tecplot} for tecplot plt files
 
-\item \param{Wake}: \textit{required:} no. \textit{multiple:} no. \textit{default:} True
+\item \param{wake}: \textit{required:} no. \textit{multiple:} no. \textit{default:} True
 
 Output the wake in the postprocessing.
 
-\item \param{SeparateWake}: \textit{required:} no. \textit{multiple:} no. \textit{default:} False
+\item \param{separate_wake}: \textit{required:} no. \textit{multiple:} no. \textit{default:} False
 
-Since in vtk output is difficult to separate in the visualization process the different pieces of the solution, it is possible to output the wake in separate files with respect to the surface solution. It affects only the vtk output and only if \param{Wake} is set to true.
+Since in vtk output is difficult to separate in the visualization process the different pieces of the solution, it is possible to output the wake in separate files with respect to the surface solution. It affects only the vtk output and only if \param{wake} is set to true.
 
-\item \param{Average}: \textit{required:} no. \textit{multiple:} no. \textit{default:} False
+\item \param{average}: \textit{required:} no. \textit{multiple:} no. \textit{default:} False
 
-Average the results in the given time span, and output just one averaged result. When used in visualizations, \param{Wake} must be False.
+average the results in the given time span, and output just one averaged result. When used in visualizations, \param{wake} must be False.
 
-\item \param{Variable}: \textit{required:} at least one for each \param{Analysis}. \textit{multiple:} yes.
+\item \param{variable}: \textit{required:} at least one for each \param{analysis}. \textit{multiple:} yes.
 
-Variable to output in the processed result. More than one variable can be generated in the same analysis. At the moment \opt{Vorticity}, \opt{Pressure} and \opt{Surface\_Velocity} are implemented.
+variable to output in the processed result. More than one variable can be generated in the same analysis. At the moment \opt{Vorticity}, \opt{Pressure} and \opt{Surface\_Velocity} are implemented.
 
 Note that that even if the keyword \opt{Vorticity} is employed, the printed result is labelled Singularity\_Intensity since it represent the intensity of the surface/point solution on the different elements. The keyword is likely to be changed also in the future releases.
 
-\item \param{Component}: \textit{required:} no. \textit{multiple:} yes. \textit{default:} all.
+\item \param{component}: \textit{required:} no. \textit{multiple:} yes. \textit{default:} all.
 
 Geometrical component to include in the visualization. More component can be included. If not declared, or if declared \opt{all} all the components are loaded and processed. 
 \end{itemize}
@@ -194,58 +194,58 @@ Geometrical component to include in the visualization. More component can be inc
 
 Integral loads allow to obtain the time history of the loads acting on one or more components, in one of the reference frames defined in section \ref{sec:Solver_ReferenceFrames}.
 
-An example \param{Analysis} group for integral loads is:
+An example \param{analysis} group for integral loads is:
 
 \begin{inputfile}[frame=single, caption={dust\_post.in for integral loads}, label={file:dust_post.in_load}]
 !--- Data Names ---
 data_basename = ./Output/sim_results
 basename =     ./Postpro/postpro_output
 
-Analysis = {
+analysis = {
 
-Type = integral_loads
-Name = load01
-StartRes = 1
-EndRes   = 100 
-StepRes  = 1
-Format = dat
-Average = F
-Component = all
-Reference_Tag = RotorHub
+type = integral_loads
+name = load01
+start_res = 1
+end_res   = 100 
+step_res  = 1
+format = dat
+average = F
+component = all
+reference_tag = RotorHub
 
 }
 \end{inputfile}
 
 \begin{itemize}
-\item \param{Type}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{type}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Type of the analysis, \opt{integral\_loads} for integral loads
+type of the analysis, \opt{integral\_loads} for integral loads
 
-\item \param{Name}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{name}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Name of the analysis, will be appended as a suffix to \param{basename}
+name of the analysis, will be appended as a suffix to \param{basename}
 
-\item \param{StartRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{start_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 First result in the time series of the solver results to analyse.
 
-\item \param{EndRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{end_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 Last result in the time series of the solver results to analyse.
 
-\item \param{StepRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{step_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 Stride to employ when loading the time series of the solver results. 
 
-\item \param{Format}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{format}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Format of the processed results, can be \opt{dat} for formatted ascii files output or \opt{tecplot} for tecplot plt files
+format of the processed results, can be \opt{dat} for formatted ascii files output or \opt{tecplot} for tecplot plt files
 
-\item \param{Average}: \textit{required:} no. \textit{multiple:} no. \textit{default:} False
+\item \param{average}: \textit{required:} no. \textit{multiple:} no. \textit{default:} False
 
-Average the results in the given time span.
+average the results in the given time span.
 
-\item \param{Component}: \textit{required:} no. \textit{multiple:} yes. \textit{default:} all.
+\item \param{component}: \textit{required:} no. \textit{multiple:} yes. \textit{default:} all.
 
 Geometrical component to include in the loads computation. More component can be included. If not declared, or if declared \opt{all} all the components are loaded and processed. 
 
@@ -282,62 +282,62 @@ The last lines of the file contain the actual data. As an example, for a 100-tim
      0.000000E+000 -0.100000E+001  0.000000E+000
 \end{inputfile}
 
-\subsection{Hinge Loads}
+\subsection{hinge Loads}
 
-Hinge loads allows to obtain the time history of the load acting to one control surface along the hinge axis reference frame as defined in figure~\ref{fig:hingeref}. 
+hinge loads allows to obtain the time history of the load acting to one control surface along the hinge axis reference frame as defined in figure~\ref{fig:hingeref}. 
 
-An example \param{Analysis} group for hinge loads is:
+An example \param{analysis} group for hinge loads is:
 
 \begin{inputfile}
-Analysis = {
-  Type = hinge_loads
-  Name = hm
+analysis = {
+  type = hinge_loads
+  name = hm
 
-  StartRes = 1
-  EndRes = 20
-  StepRes = 1
+  start_res = 1
+  end_res = 20
+  step_res = 1
 
-  Format = dat
-  Average = F
-  Component = Wing
-  HingeTag = Aileron
+  format = dat
+  average = F
+  component = Wing
+  hinge_tag = Aileron
 }
 \end{inputfile}
 
 \begin{itemize}
-\item \param{Type}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{type}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Type of the analysis, \opt{hinge\_loads} for hinge loads
+type of the analysis, \opt{hinge\_loads} for hinge loads
 
-\item \param{Name}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{name}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Name of the analysis, will be appended as a suffix to \param{basename}
+name of the analysis, will be appended as a suffix to \param{basename}
 
-\item \param{StartRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{start_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 First result in the time series of the solver results to analyse.
 
-\item \param{EndRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{end_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 Last result in the time series of the solver results to analyse.
 
-\item \param{StepRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{step_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 Stride to employ when loading the time series of the solver results. 
 
-\item \param{Format}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{format}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Format of the processed results, can be \opt{dat} for formatted ascii files output or \opt{tecplot} for tecplot plt files
+format of the processed results, can be \opt{dat} for formatted ascii files output or \opt{tecplot} for tecplot plt files
 
-\item \param{Average}: \textit{required:} no. \textit{multiple:} no. \textit{default:} False
+\item \param{average}: \textit{required:} no. \textit{multiple:} no. \textit{default:} False
 
-Average the results in the given time span.
+average the results in the given time span.
 
-\item \param{Component}: \textit{required:} no. \textit{multiple:} yes. \textit{default:} all.
+\item \param{component}: \textit{required:} no. \textit{multiple:} yes. \textit{default:} all.
 
 Geometrical component to include in the loads computation. More component can be included. If not declared, or if declared \opt{all} all the components are loaded and processed. 
 
-\item \param{HingeTag}: \textit{required:} yes. \textit{multiple:} no.
+\item \param{hinge_tag}: \textit{required:} yes. \textit{multiple:} no.
 
 The tag of the control surface of the component in which the loads should be referred to. 
 
@@ -347,9 +347,9 @@ The tag of the control surface of the component in which the loads should be ref
 The output file containing hinge loads measurements in \param{.dat} format has the following structure.
 The first 4 lines of the file constitute the header of the file. The first three lines contains the number of the geometrical components \param{n\_comp} whose loads are integrated, the tag of reference system in which the components of the integral loads are expressed, the tags of the \param{n\_comp} components analyzed. As an example,
 \begin{inputfile}
- 1: # Hinge Moment: 
+ 1: # hinge Moment: 
  2: #               Components  : Wing
- 3: #                    Hinge  : Aileron
+ 3: #                    hinge  : Aileron
 \end{inputfile}
 The fourth line is the header of the following lines, containing the time, the three components of force and moment loads, the 9 elements of the (unrolled) rotation matrix and the 3 global coordinates of the origin of the hinge reference system, required to compute the components of the loads in the global reference frame, given those in the hinge axis reference frame. The hinge moment is located always under the column \opt{Mh}. 
 \begin{inputfile}
@@ -377,72 +377,72 @@ The last lines of the file contain the actual data. As an example, for a 20-time
 
 Probes allow to obtain a time history of some variables in some points by sampling the solution at such points. 
 
-An example \param{Analysis} group for probes is:
+An example \param{analysis} group for probes is:
 
 \begin{inputfile}[frame=single, caption={dust\_post.in for probes}, label={file:dust_post.in_probes}]
 !--- Data Names ---
 data_basename = ./Output/sim_results
 basename =     ./Postpro/postpro_output
 
-Analysis = {
+analysis = {
 
-Type = probes
-Name = prb01
-StartRes = 1
-EndRes   = 100 
-StepRes  = 1
-Format = dat
+type = probes
+name = prb01
+start_res = 1
+end_res   = 100 
+step_res  = 1
+format = dat
 
-Variable = Velocity
+variable = Velocity
 
 InputType = point_list
-Point = (/0.0, 1.0, 2.0/)
-Point = (/1.0, 0.0, -2.0/)
+point = (/0.0, 1.0, 2.0/)
+point = (/1.0, 0.0, -2.0/)
 
 !InputType = from_file
-!File = point_list.dat
+!file = point_list.dat
 
 }
 \end{inputfile}
 
 \begin{itemize}
-\item \param{Type}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{type}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Type of the analysis, \opt{probes} for probes
+type of the analysis, \opt{probes} for probes
 
-\item \param{Name}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{name}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Name of the analysis, will be appended as a suffix to \param{basename}
+name of the analysis, will be appended as a suffix to \param{basename}
 
-\item \param{StartRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{start_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 First result in the time series of the solver results to analyse.
 
-\item \param{EndRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{end_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 Last result in the time series of the solver results to analyse.
 
-\item \param{StepRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{step_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 Stride to employ when loading the time series of the solver results. 
 
-\item \param{Format}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{format}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Format of the processed results, can be \opt{dat} for formatted ascii files output or \opt{tecplot} for tecplot plt files
+format of the processed results, can be \opt{dat} for formatted ascii files output or \opt{tecplot} for tecplot plt files
 
-\item \param{Variable}: \textit{required:} at least one for each \param{Analysis}. \textit{multiple:} yes.
+\item \param{variable}: \textit{required:} at least one for each \param{analysis}. \textit{multiple:} yes.
 
-Variable to output in the processed result. More than one variable can be generated in the same analysis. At the moment only \opt{Velocity} is implemented.
+variable to output in the processed result. More than one variable can be generated in the same analysis. At the moment only \opt{Velocity} is implemented.
 
-\item \param{InputType}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{InputType}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 The way the probing points are specified, \opt{point\_list} for a series of points specified directly in the input file, \opt{from\_file} to load the list of points from a formatted ascii file.
 
-\item \param{Point}: \textit{required:} at least one if \param{InputType} is \opt{point\_list} \textit{multiple:} yes.
+\item \param{point}: \textit{required:} at least one if \param{InputType} is \opt{point\_list} \textit{multiple:} yes.
 
 Position of the probing point.
 
-\item \param{File}: \textit{required:} yes if \param{InputType} is \opt{from\_file} \textit{multiple:} no.
+\item \param{file}: \textit{required:} yes if \param{InputType} is \opt{from\_file} \textit{multiple:} no.
 
 Location and name of the file containing the list of probing points.
 
@@ -477,73 +477,73 @@ while \param{n\_probes} $\times$ 3 columns follow, containing the global compone
 
 Flow fields allow to probe systematically the domain obtaining the solution probed in a structured series of points in 1-2 or 3 dimensions, allowing the visualization of the flow field induced by the solution of the singular elements.
 
-An example \param{Analysis} group for flow fields is:
+An example \param{analysis} group for flow fields is:
 
 \begin{inputfile}[frame=single, caption={dust\_post.in for flow fields}, label={file:dust_post.in_flow_fields}]
 !--- Data Names ---
 data_basename = ./Output/sim_results
 basename =     ./Postpro/postpro_output
 
-Analysis = {
+analysis = {
 
-Type = flow_field
-Name = ff01
-StartRes = 1
-EndRes   = 100 
-StepRes  = 1
-Format = vtk
-Average = F
+type = flow_field
+name = ff01
+start_res = 1
+end_res   = 100 
+step_res  = 1
+format = vtk
+average = F
 
-Variable = Velocity
+variable = Velocity
 
-Nxyz = (/ 10, 10, 1/)
-Minxyz = (/ -2.0, -2.0, 1.0 /)
-Maxxyz = (/ 2.0, 2.0, 1.0 /)
+n_xyz = (/ 10, 10, 1/)
+min_xyz = (/ -2.0, -2.0, 1.0 /)
+max_xyz = (/ 2.0, 2.0, 1.0 /)
 }
 \end{inputfile}
 
 \begin{itemize}
-\item \param{Type}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{type}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Type of the analysis, \opt{flow\_field} for flow fields
+type of the analysis, \opt{flow\_field} for flow fields
 
-\item \param{Name}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{name}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Name of the analysis, will be appended as a suffix to \param{basename}
+name of the analysis, will be appended as a suffix to \param{basename}
 
-\item \param{StartRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{start_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 First result in the time series of the solver results to analyse.
 
-\item \param{EndRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{end_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 Last result in the time series of the solver results to analyse.
 
-\item \param{StepRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{step_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 Stride to employ when loading the time series of the solver results. 
 
-\item \param{Format}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{format}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Format of the processed results, can be \opt{vtk} for binary vtk files output or \opt{tecplot} for tecplot plt files
+format of the processed results, can be \opt{vtk} for binary vtk files output or \opt{tecplot} for tecplot plt files
 
-\item \param{Average}: \textit{required:} no. \textit{multiple:} no. \textit{default:} False
+\item \param{average}: \textit{required:} no. \textit{multiple:} no. \textit{default:} False
 
-Average the results in the given time span, only one averaged result will be printed. 
+average the results in the given time span, only one averaged result will be printed. 
 
-\item \param{Variable}: \textit{required:} at least one for each \param{Analysis}. \textit{multiple:} yes.
+\item \param{variable}: \textit{required:} at least one for each \param{analysis}. \textit{multiple:} yes.
 
-Variable to output in the processed result. More than one variable can be generated in the same analysis. At the moment only \opt{Velocity} is implemented.
+variable to output in the processed result. More than one variable can be generated in the same analysis. At the moment only \opt{Velocity} is implemented.
 
-\item \param{Nxyz}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no.
+\item \param{n_xyz}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no.
 
 Number of points in each direction of the sampling box. To have a 2D plane or a 1D line insert 1 point as number of points in the relevant direction
 
-\item \param{Minxyz}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no.
+\item \param{min_xyz}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no.
 
 Minimum of the coordinates of the box containing the structured sampling points.
 
-\item \param{Maxxyz}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no.
+\item \param{max_xyz}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no.
 
 Maximum of the coordinates of the box containing the structured sampling points.
 
@@ -557,77 +557,77 @@ The way the sectional loads are retrieved is different when employing a parametr
 
 In the first case is sufficient to provide the reference line for the moments calculation, and the subdivision is already implied in the structure of the parametric element. 
 
-An example \param{Analysis} group for sectional loads on parametric components:
+An example \param{analysis} group for sectional loads on parametric components:
 
 \begin{inputfile}[frame=single, caption={dust\_post.in for sectional load on parametric components}, label={file:dust_post.in_sectional_param}]
 !--- Data Names ---
 data_basename = ./Output/sim_results
 basename =     ./Postpro/postpro_output
 
-Analysis = {
+analysis = {
 
-Type = sectional_loads
-Name = sl01
-StartRes = 1
-EndRes   = 100 
-StepRes  = 1
-Format = dat
-Average = F
+type = sectional_loads
+name = sl01
+start_res = 1
+end_res   = 100 
+step_res  = 1
+format = dat
+average = F
 
-Component = wing
+component = wing
 
-AxisNod = (/ 0.0, 0.0, 0.0 /)
-AxisDir = (/ 0.0, 0.1, 0.0 /)
+axis_nod = (/ 0.0, 0.0, 0.0 /)
+axis_dir = (/ 0.0, 0.1, 0.0 /)
 
-LiftingLineData = F
-VortexLatticeData = F
+lifting_line_data = F
+vortex_lattice_data = F
 }
 \end{inputfile}
 
 \begin{itemize}
-\item \param{Type}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{type}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Type of the analysis, \opt{sectional\_loads} for sectional loads
+type of the analysis, \opt{sectional\_loads} for sectional loads
 
-\item \param{Name}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{name}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Name of the analysis, will be appended as a suffix to \param{basename}
+name of the analysis, will be appended as a suffix to \param{basename}
 
-\item \param{StartRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{start_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 First result in the time series of the solver results to analyse.
 
-\item \param{EndRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{end_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 Last result in the time series of the solver results to analyse.
 
-\item \param{StepRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{step_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 Stride to employ when loading the time series of the solver results. 
 
-\item \param{Format}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{format}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Format of the processed results, can be \opt{dat} for formatted ascii files output or \opt{tecplot} for tecplot plt files
+format of the processed results, can be \opt{dat} for formatted ascii files output or \opt{tecplot} for tecplot plt files
 
-\item \param{Average}: \textit{required:} no. \textit{multiple:} no. \textit{default:} False
+\item \param{average}: \textit{required:} no. \textit{multiple:} no. \textit{default:} False
 
-Average the results in the given time span.
+average the results in the given time span.
 
-\item \param{Component}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no.
+\item \param{component}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no.
 
-Component (parametrically generated) to analyse. Only one component can be enabled for each analysis. 
+component (parametrically generated) to analyse. Only one component can be enabled for each analysis. 
 
-\item \param{AxisNod}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no.
+\item \param{axis_nod}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no.
 
 Coordinates of the node from which to start the line around which to calculate the distribution of moment along the span.
 
-\item \param{AxisDir}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no.
+\item \param{axis_dir}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no.
 
-Direction of the line (starting from \param{AxisNod}) around which to calculate the distribution of moment along the span.
+Direction of the line (starting from \param{axis_nod}) around which to calculate the distribution of moment along the span.
 
-\item \param{LiftingLineData}: \textit{required:} no. \textit{multiple:} no. \textit{Default:} False
+\item \param{lifting_line_data}: \textit{required:} no. \textit{multiple:} no. \textit{Default:} False
 
-\item \param{VortexLatticeData}: \textit{required:} no. \textit{multiple:} no. \textit{Default:} False
+\item \param{vortex_lattice_data}: \textit{required:} no. \textit{multiple:} no. \textit{Default:} False
 
 Output additional informations regarding span distribution of several quantities of interest for the lifting lines. It works only for parametric elements which are lifting lines.
 
@@ -635,34 +635,34 @@ Output additional informations regarding span distribution of several quantities
 
 On generic components it is necessary to define an ordered slender box with orientation to prescribe the interpolation along a series of sections of the surface data of the components to obtain the distribution of loads along the prescribed direction.
 
-An example \param{Analysis} group for sectional loads on generic components:
+An example \param{analysis} group for sectional loads on generic components:
 
 \begin{inputfile}[frame=single, caption={dust\_post.in for sectional load on generic components}, label={file:dust_post.in_sectional_param}]
 !--- Data Names ---
 data_basename = ./Output/sim_results
 basename =     ./Postpro/postpro_output
 
-Analysis = {
+analysis = {
 
-Type = sectional_loads
-Name = sl01
-StartRes = 1
-EndRes   = 100 
-StepRes  = 1
-Format = dat
-Average = F
+type = sectional_loads
+name = sl01
+start_res = 1
+end_res   = 100 
+step_res  = 1
+format = dat
+average = F
 
-Component = wing
+component = wing
 
-BoxSect = {
- refNode = (/ -0.5 ,-0.5 , -0.3 /)
- faceVec = (/ 1.0 , 0.0 , 0.0 /)
- faceBas = (/ 2.0 , 1.0 /) 
- faceHei = (/ 1.0 , 1.0 /)
- spanVec = (/ 0.0 , 1.0 , 0.0 /)
- spanLen = 3.0
- numSect = 10
- reshapeBox = T 
+box_sect = {
+ ref_node = (/ -0.5 ,-0.5 , -0.3 /)
+ face_vec = (/ 1.0 , 0.0 , 0.0 /)
+ face_bas = (/ 2.0 , 1.0 /) 
+ face_hei = (/ 1.0 , 1.0 /)
+ span_vec = (/ 0.0 , 1.0 , 0.0 /)
+ span_len = 3.0
+ num_sect = 10
+ reshape_box = T 
 } 
 
 
@@ -670,71 +670,71 @@ BoxSect = {
 \end{inputfile}
 
 \begin{itemize}
-\item \param{Type}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{type}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Type of the analysis, \opt{sectional\_loads} for sectional loads
+type of the analysis, \opt{sectional\_loads} for sectional loads
 
-\item \param{Name}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{name}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Name of the analysis, will be appended as a suffix to \param{basename}
+name of the analysis, will be appended as a suffix to \param{basename}
 
-\item \param{StartRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{start_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 First result in the time series of the solver results to analyse.
 
-\item \param{EndRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{end_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 Last result in the time series of the solver results to analyse.
 
-\item \param{StepRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{step_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 Stride to employ when loading the time series of the solver results. 
 
-\item \param{Format}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{format}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Format of the processed results, can be \opt{dat} for formatted ascii files output or \opt{tecplot} for tecplot plt files
+format of the processed results, can be \opt{dat} for formatted ascii files output or \opt{tecplot} for tecplot plt files
 
-\item \param{Average}: \textit{required:} no. \textit{multiple:} no. \textit{default:} False
+\item \param{average}: \textit{required:} no. \textit{multiple:} no. \textit{default:} False
 
-Average the results in the given time span.
+average the results in the given time span.
 
-\item \param{Component}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no.
+\item \param{component}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no.
 
-Component to analyse. Only one component can be enabled for each analysis. 
+component to analyse. Only one component can be enabled for each analysis. 
 
-\item \param{BoxSect}: \textit{required:} one for each \param{Analysis} if component not parametrically generated. \textit{multiple:} no.
+\item \param{box_sect}: \textit{required:} one for each \param{analysis} if component not parametrically generated. \textit{multiple:} no.
 
 Grouping keyword containing the information about the box generated to interpolate the sectional loads
 
-\item \param{refNode}: \textit{required:} one for each \param{BoxSect}. \textit{multiple:} no.
+\item \param{ref_node}: \textit{required:} one for each \param{box_sect}. \textit{multiple:} no.
 
 Coordinates of the point from which to build the bounding box for the sectional loads.
 
-\item \param{faceVec}: \textit{required:} one for each \param{BoxSect}. \textit{multiple:} no.
+\item \param{face_vec}: \textit{required:} one for each \param{box_sect}. \textit{multiple:} no.
 
 Direction of the base faces of the bounding box (roughly the chord direction). The bounding box is extruded between the two faces. 
 
-\item \param{faceBas}: \textit{required:} one for each \param{BoxSect}. \textit{multiple:} no.
+\item \param{face_bas}: \textit{required:} one for each \param{box_sect}. \textit{multiple:} no.
 
-Lenght of the base faces in the \param{faceVec} direction. It must have two components, one for the first beginning face, one for the last end face. 
+Lenght of the base faces in the \param{face_vec} direction. It must have two components, one for the first beginning face, one for the last end face. 
 
-\item \param{faceHei}: \textit{required:} one for each \param{BoxSect}. \textit{multiple:} no.
+\item \param{face_hei}: \textit{required:} one for each \param{box_sect}. \textit{multiple:} no.
 
-Height of the base faces, normal to the \param{faceVec} direction. It must have two components, one for the first beginning face, one for the last end face. 
+Height of the base faces, normal to the \param{face_vec} direction. It must have two components, one for the first beginning face, one for the last end face. 
 
-\item \param{spanVec}: \textit{required:} one for each \param{BoxSect}. \textit{multiple:} no.
+\item \param{span_vec}: \textit{required:} one for each \param{box_sect}. \textit{multiple:} no.
 
 Direction of the span for the sectional loads, indicates the direction between the beginning and end faces of the bounding box.
 
-\item \param{spanLen}: \textit{required:} one for each \param{BoxSect}. \textit{multiple:} no.
+\item \param{span_len}: \textit{required:} one for each \param{box_sect}. \textit{multiple:} no.
 
 Length of the span for the sectional loads, indicates the distance between the beginning and end faces of the bounding box.
 
-\item \param{numSect}: \textit{required:} one for each \param{BoxSect}. \textit{multiple:} no.
+\item \param{num_sect}: \textit{required:} one for each \param{box_sect}. \textit{multiple:} no.
 
 Number of sections, i.e. subdivisions in the span direction of the box. The subdivision must be coarse enough to avoid having one single surface panel appearing in three different sections. This means that for an equally spaced mesh and a tightly fitted box that there should be a number of sections lower or equal to the number of surface elements in the span direction. 
 
-\item \param{reshapeBox}: \textit{required:} one for each \param{BoxSect}. \textit{multiple:} no.
+\item \param{reshape_box}: \textit{required:} one for each \param{box_sect}. \textit{multiple:} no.
 
 Enables the possibility to reshape a too loose sections box to closely fit the component. Automatically reduces the size of the span to fit the component, keeping the same number of subdivision (thus generating a finer subdivision than requested)
 
@@ -779,16 +779,16 @@ As an example, the lines collecting the fields described above of the first and 
 \end{inputfile}
 The geometrical component of the example is attached to a steady reference frame, whose origin has global components $( 0.0, -1.0, 0.0 )$ and whose axes are aligned with those of the global reference frame, so that the rotation matrix $\underline{\underline{R}}$ is equal to the identity matrix.
 
-The extra files produced if \param{LiftingLineData}  or if \param{VortexLatticeData} are set to \param{T} do not contain the 12 columns of the rotation matrix and the global components of the origin of the local reference frame.
+The extra files produced if \param{lifting_line_data}  or if \param{vortex_lattice_data} are set to \param{T} do not contain the 12 columns of the rotation matrix and the global components of the origin of the local reference frame.
 
 The files generated by sectional loads contain, as sectional quantity:
 \begin{itemize}
     \item \texttt{Fx}: force acting on the section, \texttt{x} direction of the component local reference frame
     \item \texttt{Fy}: force acting on the section, \texttt{y} direction of the component local reference frame
     \item \texttt{Fz}: force acting on the section, \texttt{z} direction of the component local reference frame
-    \item \texttt{Mo}: moment acting on the section, with respect to the axis specified in the definition of the sectional load with \param{AxisNod} and \param{AxisDir}
+    \item \texttt{Mo}: moment acting on the section, with respect to the axis specified in the definition of the sectional load with \param{axis_nod} and \param{axis_dir}
 \end{itemize}
-additionally, when \param{LiftingLineData} or \param{VortexLatticeData} are set to \param{T} the following quantities are printed:
+additionally, when \param{lifting_line_data} or \param{vortex_lattice_data} are set to \param{T} the following quantities are printed:
 \begin{itemize}
     \item \texttt{Cl}: two dimensional lift coefficient of the section, as retrieved from the lookup tables
     \item \texttt{Cd}: two dimensional drag coefficient of the section, as retrieved from the lookup tables
@@ -820,47 +820,47 @@ The aeroacoustics postprocessing is a specific analysis used to extract from res
 data_basename = ./Output/sim_results
 basename =     ./Postpro/postpro_output
 
-Analysis = {
+analysis = {
 
-Type = aeroacoustics
-Name = aer01
-StartRes = 1
-EndRes   = 100 
-StepRes  = 1
-Format = dat
+type = aeroacoustics
+name = aer01
+start_res = 1
+end_res   = 100 
+step_res  = 1
+format = dat
 
-Component = wing
-Component = tail
+component = wing
+component = tail
 
 }
 \end{inputfile}
 
 \begin{itemize}
-\item \param{Type}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{type}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Type of the analysis, \opt{aeroacoustics} for aeroacoustics data
+type of the analysis, \opt{aeroacoustics} for aeroacoustics data
 
-\item \param{Name}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{name}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Name of the analysis, will be appended as a suffix to \param{basename}
+name of the analysis, will be appended as a suffix to \param{basename}
 
-\item \param{StartRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{start_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 First result in the time series of the solver results to analyse.
 
-\item \param{EndRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{end_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 Last result in the time series of the solver results to analyse.
 
-\item \param{StepRes}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{step_res}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 Stride to employ when loading the time series of the solver results. 
 
-\item \param{Format}: \textit{required:} one for each \param{Analysis}. \textit{multiple:} no
+\item \param{format}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
-Format of the processed results, can only be \opt{dat} for formatted ascii files output in case of aeroacoustics data analysis
+format of the processed results, can only be \opt{dat} for formatted ascii files output in case of aeroacoustics data analysis
 
-\item \param{Component}: \textit{required:} no. \textit{multiple:} yes. \textit{default:} all components.
+\item \param{component}: \textit{required:} no. \textit{multiple:} yes. \textit{default:} all components.
 
 Components to include in the aeroacoustics data. Only the data of the selected components will be included in the output file. 
 

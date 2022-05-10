@@ -14,7 +14,7 @@ default input file \texttt{dust\_pre.in}}, label={command:dus_pre_default}]
 \end{command}
 
 
-\section{Input file}
+\section{input file}
 \label{sec:Pre_InputFile}
 
 The input file of the preprocessor specifies the geometrical components required for the model, their name and the reference system to which they will be attached.
@@ -22,42 +22,42 @@ The input file of the preprocessor specifies the geometrical components required
 The format is the same as all the other input files, as already specified in section\ref{sec:InputFilesFormat}.
 
 \begin{inputfile}[frame=single, caption={dust\_pre.in}, label={file:dust_pre.in}]
-CompName = rotor
-GeoFile  = blade.in
-RefTag   = Hub01
+comp_name = rotor
+geo_file  = blade.in
+ref_tag   = Hub01
 
-CompName = wing
-GeoFile  = wing.in
-RefTag   = Root01
+comp_name = wing
+geo_file  = wing.in
+ref_tag   = Root01
 
-TolSewing  = 0.001
-InnerProductTe = -0.5
-FileName = ./geo_input.h5 
+tol_se_wing  = 0.001
+inner_product_te = -0.5
+file_name = ./geo_input.h5 
 \end{inputfile}
 
 An example of the preprocessor input file is presented in file \ref{file:dust_pre.in}, while the detailed parameters are:
 \begin{itemize}
-\item \param{CompName}: \textit{required:} at least one. \textit{multiple:} yes. \textit{type} string.
+\item \param{comp_name}: \textit{required:} at least one. \textit{multiple:} yes. \textit{type} string.
 
 This is the name assigned to the geometrical component. Will be mainly used by the user afterwards to specify postprocess analyses.
 
-\item \param{GeoFile}: \textit{required:} at least one. \textit{multiple:} yes. \textit{position:} must be after \param{CompName}. \textit{type:} string. 
+\item \param{geo_file}: \textit{required:} at least one. \textit{multiple:} yes. \textit{position:} must be after \param{comp_name}. \textit{type:} string. 
 
 Indicates the auxiliary input file which must be provided with the details on the mesh of the component. It is a string with the path to the location of the file. In case of relative path the path is relative to the location in which the preprocessor was called.
 
-\item \param{RefTag}: \textit{required:} at least one. \textit{multiple:} yes. \textit{position:} must be after \param{GeoFile}. \textit{type:} string
+\item \param{ref_tag}: \textit{required:} at least one. \textit{multiple:} yes. \textit{position:} must be after \param{geo_file}. \textit{type:} string
 
 Provides a string tag which indicates the reference frame to which the geometrical component is attached. Must correspond to one of the reference frames that will be provided to the solver. 
 
-\item \param{TolSewing}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.001  \textit{type:} real.
+\item \param{tol_se_wing}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.001  \textit{type:} real.
 
 Define the global tolerance at which the mesh node are merged to identify the open trailing edges. More details in section \ref{sec:TrailingEdge}.
 
-\item \param{InnerProductTe}: \textit{required:} no. \textit{multiple:} no. \textit{default:} -0.5 \textit{type:} real.
+\item \param{inner_product_te}: \textit{required:} no. \textit{multiple:} no. \textit{default:} -0.5 \textit{type:} real.
 
 Define the global tolerance for the identification of trailing edges using the inner product of the normals.
 
-\item \param{FileName}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string.
+\item \param{file_name}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string.
 
 Define the name of the binary file which contains the geometry, to be used by the solver.
 \end{itemize}
@@ -65,12 +65,12 @@ Define the name of the binary file which contains the geometry, to be used by th
 As discussed in section \ref{sec:BynaryFilesFormat} the file, being a DUST internal file is in binary hdf5 format. The use of the .h5 extension is not compulsory in a unix environment, but is recommended to distinguish internal binary files from input/output files in different formats.
 
 \section{Geometry file}
-The geometry file defines the parameters required to generate the geometry mesh of a component. Different components, with different component names and attached to different reference frames, can have the same geometry and hence use the same geometry file. A geometry file can be also use to define a parametric geometry, but details on that case will be described in section \ref{sec:Parametric_mesh_generation}. File \ref{file:geo_file.in} is an example of a geometry file for a non parametric geometry.
+The geometry file defines the parameters required to generate the geometry mesh of a component. Different components, with different component names and attached to different reference frames, can have the same geometry and hence use the same geometry file. A geometry file can be also use to define a parametric geometry, but details on that case will be described in section \ref{sec:Parametric_mesh_generation}. file \ref{file:geo_file.in} is an example of a geometry file for a non parametric geometry.
 
 \begin{inputfile}[frame=single, caption={geo\_file.in}, label={file:geo_file.in}]
-MeshFile = component-mesh.cgns
-MeshFileType = cgns
-ElType = p
+mesh_file = component-mesh.cgns
+mesh_file_type = cgns
+el_type = p
 
 mesh_symmetry = F
 symmetry_point  = (/0.0, 0.0, 0.0/)
@@ -80,34 +80,34 @@ mesh_mirror = F
 mirror_point  = (/0.0, 0.0, 0.0/)
 mirror_normal = (/1.0, 0.0, 0.0/)
 
-TolSewing  = 0.001
-InnerProductTe = -0.5
+tol_se_wing  = 0.001
+inner_product_te = -0.5
 
-ProjTe = T
-ProjTeDir = parallel
-ProjTeVector = (/1.0, 0.0, 0.0/)
-SuppressTE = F
+proj_te = T
+proj_te_dir = parallel
+proj_te_vector = (/1.0, 0.0, 0.0/)
+suppress_te = F
 
-SectionName = cgns_comp_1
-SectionName = cgns_comp_2
+section_name = cgns_comp_1
+section_name = cgns_comp_2
 
-Offset = (/0.0, 0.0, 0.0/)
-ScalingFactor = 1.0
+offset = (/0.0, 0.0, 0.0/)
+scaling_factor = 1.0
 \end{inputfile}
 
 The detailed parameters of the geometry file are:
 \begin{itemize}
-\item \param{MeshFile}: \textit{required:} yes (if not parametric). \textit{multiple:} no. \textit{type:} string. 
+\item \param{mesh_file}: \textit{required:} yes (if not parametric). \textit{multiple:} no. \textit{type:} string. 
 
-Name of the file containing the mesh.
+name of the file containing the mesh.
 
-\item \param{MeshFileType}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string
+\item \param{mesh_file_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string
 
-Type of the mesh. Valid options at the moment are \opt{cgns} for cgns, \opt{parametric} for parametrically generated meshes and \opt{basic} for ascii input meshes. The last is only for development purposes. 
+type of the mesh. Valid options at the moment are \opt{cgns} for cgns, \opt{parametric} for parametrically generated meshes and \opt{basic} for ascii input meshes. The last is only for development purposes. 
 
-\item \param{ElType}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} character.
+\item \param{el_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} character.
 
-Type of the elements of the mesh. \opt{p} stands for surface panels to model solid bodies, \opt{v} stands for vortex lattice elements used to model flat surfaces, \opt{l} stands for lifting lines used to produce a 1D model of a lifting surface (only for parametric input) and finally \opt{a} stands for actuator disk, to produce a simple model of a rotor (only for parametric input). 
+type of the elements of the mesh. \opt{p} stands for surface panels to model solid bodies, \opt{v} stands for vortex lattice elements used to model flat surfaces, \opt{l} stands for lifting lines used to produce a 1D model of a lifting surface (only for parametric input) and finally \opt{a} stands for actuator disk, to produce a simple model of a rotor (only for parametric input). 
 
 \item \param{mesh\_symmetry} \textit{required:} no. \textit{multiple:} no. \textit{default:} false. \textit{type:} logical.
 
@@ -115,7 +115,7 @@ Choose to reflect the mesh around a point and a direction. Useful to produce ful
 
 \item \param{symmetry\_point}: \textit{required:} only if \param{mesh\_symmetry} is true. \textit{multiple:} no. \textit{default:} (0.0, 0.0, 0.0). \textit{type:} real array, length 3.
 
-Point around which to reflect the mesh.
+point around which to reflect the mesh.
 
 \item \param{symmetry\_normal}: \textit{required:} only if \param{mesh\_symmetry} is true. \textit{multiple:} no. \textit{default:} (0.0, 1.0, 0.0). \textit{type:} real array, length 3.
 
@@ -127,51 +127,51 @@ Choose to mirror the mesh around a point and a direction. Same as \param{mesh\_s
 
 \item \param{mirror\_point}: \textit{required:} only if \param{mesh\_mirror} is true. \textit{multiple:} no. \textit{default:} (0.0, 0.0, 0.0). \textit{type:} real array, length 3.
 
-Point around which to mirror the mesh.
+point around which to mirror the mesh.
 
 \item \param{mirror\_normal}: \textit{required:} only if \param{mesh\_mirror} is true. \textit{multiple:} no. \textit{default:} (0.0, 1.0, 0.0). \textit{type:} real array, length 3.
 
 Direction in which to mirror the mesh.
 
-\item \param{TolSewing}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.001 \textit{type:} real.
+\item \param{tol_se_wing}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.001 \textit{type:} real.
 
 Tolerance in trailing edge merging of nodes. Override for the single component the value defined (or the default value) in the main input file to the preprocessor. Warning: the default value is not employed if the same parameter is defined (and not left default) in file \ref{file:dust_pre.in}. 
 
-\item \param{InnerProductTe}: \textit{required:} no. \textit{multiple:} no. \textit{default:} -0.5 \textit{type:} real
+\item \param{inner_product_te}: \textit{required:} no. \textit{multiple:} no. \textit{default:} -0.5 \textit{type:} real
 Tolerance for the identification of trailing edges using the inner product of the normals.
 Override for the single component the value defined (or the default value) in the main input file to the preprocessor. Warning: the default value is not employed if the same parameter is defined (and not left default) in file \ref{file:dust_pre.in}. 
 
-\item \param{ProjTe}: \textit{required:} no. \textit{multiple:} no. \textit{default:} false \textit{type:} logical.
+\item \param{proj_te}: \textit{required:} no. \textit{multiple:} no. \textit{default:} false \textit{type:} logical.
 
 Force the projection of the trailing edge in a specific direction
 
-\item \param{ProjTeDir}: \textit{required:} if \param{ProjectTe} is true. \textit{multiple:} no. \textit{type:} string.
+\item \param{proj_te_dir}: \textit{required:} if \param{ProjectTe} is true. \textit{multiple:} no. \textit{type:} string.
 
-Choose in which way to project the trailing edge. If it is \opt{parallel} the trailing edge direction will be forced in the direction given in \param{ProjTeVector}, while if it is \opt{normal} the trailing edge will be projected in a plane normal to \param{ProjTeVector}.
+Choose in which way to project the trailing edge. If it is \opt{parallel} the trailing edge direction will be forced in the direction given in \param{proj_te_vector}, while if it is \opt{normal} the trailing edge will be projected in a plane normal to \param{proj_te_vector}.
 
-\item \param{ProjTeVector}: \textit{required:} if \param{ProjectTe} is true. \textit{multiple:} no. \textit{type:} real array, length 3.
+\item \param{proj_te_vector}: \textit{required:} if \param{ProjectTe} is true. \textit{multiple:} no. \textit{type:} real array, length 3.
 
-Vector to specify the direction declared in \param{ProjTeDir}
+vector to specify the direction declared in \param{proj_te_dir}
 
-\item \param{SuppressTE}: \textit{required:} no. \textit{multiple:} no. \textit{default:} false \textit{type:} logical.
+\item \param{suppress_te}: \textit{required:} no. \textit{multiple:} no. \textit{default:} false \textit{type:} logical.
 
 Suppress the trailing edge from the component: even if a trailing edge is found, it is suppressed and the component will not release a wake from a trailing edge during the simulation.
 
-\item \param{SectionName} \textit{required:} no. \textit{multiple:} yes. \textit{type:} string 
+\item \param{section_name} \textit{required:} no. \textit{multiple:} yes. \textit{type:} string 
 
-To be used only with cgns meshes: specify only a subset of all the sections (geometrical components) available in the cgns file to be loaded and employed as geometry. If no \param{SectionName} is specified, all the sections of the cgns file will be employed.
+To be used only with cgns meshes: specify only a subset of all the sections (geometrical components) available in the cgns file to be loaded and employed as geometry. If no \param{section_name} is specified, all the sections of the cgns file will be employed.
 
-\item \param{Offset} \textit{required:} no. \textit{multiple:} no. \textit{default:} (0.0, 0.0, 0.0) \textit{type:} real array, length 3.
+\item \param{offset} \textit{required:} no. \textit{multiple:} no. \textit{default:} (0.0, 0.0, 0.0) \textit{type:} real array, length 3.
 
-Offset to apply to the loaded points. Allows to move the coordinates of the loaded points of the vector specified. 
+offset to apply to the loaded points. Allows to move the coordinates of the loaded points of the vector specified. 
 
-\item \param{ScalingFactor} \textit{required:} no. \textit{multiple:} no. \textit{default:} 1.0 \textit{type:} real.
+\item \param{scaling_factor} \textit{required:} no. \textit{multiple:} no. \textit{default:} 1.0 \textit{type:} real.
 
 Scaling factor to apply to the loaded points. Allows to scale the coordinates of the loaded points of the specified factor.
 
-Offset and scaling are applied in the following order:
+offset and scaling are applied in the following order:
 \begin{equation*}
-\mathbf{r} = Scaling (\mathbf{r}_{loaded}+Offset)
+\mathbf{r} = Scaling (\mathbf{r}_{loaded}+offset)
 \end{equation*}
 \end{itemize}
 
@@ -180,7 +180,7 @@ Offset and scaling are applied in the following order:
 
 The basic mesh input is an extremely simplified way to provide a surface mesh providing just the the position of points and point-element connectivity. 
 
-When employing the basic way of input, the preprocessor expects two ascii files containing the points location and connectivity. If the parameter \param{MeshFile} was set to \opt{/path/to/mesh/} the preprocessor expects the point locations to be in \opt{/path/to/mesh/rr.dat} and the connectivity in \opt{/path/to/mesh/ee.dat} \footnote{Note that the preprocessor just add the suffix \opt{ee.dat} and \opt{rr.dat} to the basename, one can have different basic mesh files in a folder by giving them different prefixes and providing the path with the prefix to the input file, e.g \param{MeshFile} = \opt{/path/to/mesh/filename\_} will look for \opt{/path/to/mesh/filename\_rr.dat} and \opt{/path/to/mesh/filename\_ee.dat}}
+When employing the basic way of input, the preprocessor expects two ascii files containing the points location and connectivity. If the parameter \param{mesh_file} was set to \opt{/path/to/mesh/} the preprocessor expects the point locations to be in \opt{/path/to/mesh/rr.dat} and the connectivity in \opt{/path/to/mesh/ee.dat} \footnote{Note that the preprocessor just add the suffix \opt{ee.dat} and \opt{rr.dat} to the basename, one can have different basic mesh files in a folder by giving them different prefixes and providing the path with the prefix to the input file, e.g \param{mesh_file} = \opt{/path/to/mesh/file_name\_} will look for \opt{/path/to/mesh/file_name\_rr.dat} and \opt{/path/to/mesh/file_name\_ee.dat}}
 
 The points coordinates must be provided in the \opt{rr.dat} file as three floating point numbers each row, for a total of $n_p$ rows, where $n_p$ is the number of points in the mesh. The three numbers represent the $x, y$ and $z$ coordinates of each point (in the local reference frame).
 
@@ -580,11 +580,11 @@ To generate the parametric geometry a geometry input file to be referenced in th
 \subsection{Surface panels and vortex lattices}
 
 \begin{inputfile}[frame=single, caption={paramtetric\_geo\_file.in}, label={file:parametric_geo_file.in}]
-MeshFileType = parametric
-ElType = v
+mesh_file_type = parametric
+el_type = v
 
-ScalingFactor = 1.0
-Offset = (/0.0, 0.0, 0.0/)
+scaling_factor = 1.0
+offset = (/0.0, 0.0, 0.0/)
 
 AirfoilTableCorrection = T
 
@@ -644,25 +644,25 @@ The type of geometry generated depends on the type of elements required. If surf
 
 All the detailed parameters of the geometry input file for parametric geometry are:
 \begin{itemize}
-\item \param{MeshFileType}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string. 
+\item \param{mesh_file_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string. 
 
 Use \param{parametric} for parametric geometry.
 
-\item \param{ElType}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} character.
+\item \param{el_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} character.
 
-Type of the elements of the mesh. \opt{p} stands for surface panels to model solid bodies, \opt{v} stands for vortex lattice elements used to model flat surfaces, \opt{l} stands for lifting lines used to produce a 1D model of a lifting surface. 
+type of the elements of the mesh. \opt{p} stands for surface panels to model solid bodies, \opt{v} stands for vortex lattice elements used to model flat surfaces, \opt{l} stands for lifting lines used to produce a 1D model of a lifting surface. 
 
-\item \param{Offset} \textit{required:} no. \textit{multiple:} no. \textit{default:} (0.0, 0.0, 0.0) \textit{type:} real array, length 3.
+\item \param{offset} \textit{required:} no. \textit{multiple:} no. \textit{default:} (0.0, 0.0, 0.0) \textit{type:} real array, length 3.
 
-Offset to apply to the loaded points. Allows to move the coordinates of the loaded points of the vector specified. 
+offset to apply to the loaded points. Allows to move the coordinates of the loaded points of the vector specified. 
 
-\item \param{ScalingFactor} \textit{required:} no. \textit{multiple:} no. \textit{default:} 1.0 \textit{type:} real.
+\item \param{scaling_factor} \textit{required:} no. \textit{multiple:} no. \textit{default:} 1.0 \textit{type:} real.
 
 Scaling factor to apply to the loaded points. Allows to scale the coordinates of the loaded points of the specified factor.
 
-Offset and scaling are applied in the following order:
+offset and scaling are applied in the following order:
 \begin{equation*}
-\mathbf{r} = Scaling (\mathbf{r}_{loaded}+Offset)
+\mathbf{r} = Scaling (\mathbf{r}_{loaded}+offset)
 \end{equation*}
 
 
@@ -677,7 +677,7 @@ Choose to reflect the mesh around a point and a direction. Useful to produce ful
 
 \item \param{symmetry\_point}: \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. \textit{default:} (0.0, 0.0, 0.0). \textit{type:} real array, length 3.
 
-Point around which to reflect the mesh.
+point around which to reflect the mesh.
 
 \item \param{symmetry\_normal}: \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. \textit{default:} (0.0, 1.0, 0.0). \textit{type:} real array, length 3.
 
@@ -689,7 +689,7 @@ Choose to mirror the mesh around a point and a direction. Same as \param{mesh\_s
 
 \item \param{mirror\_point}:  \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. \textit{default:} (0.0, 0.0, 0.0). \textit{type:} real array, length 3.
 
-Point around which to mirror the mesh.
+point around which to mirror the mesh.
 
 \item \param{mirror\_normal}: \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. \textit{default:} (0.0, 1.0, 0.0). \textit{type:} real array, length 3.
 
@@ -701,7 +701,7 @@ Choose to apply linear interpolation to the twist angle, instead of interpolatin
 
 \item \param{starting\_point} \textit{required:} no. \textit{multiple:} no. \textit{default:} (/ 0.0, 0.0, 0.0 /) \textit{type:} real array, length 3.
 
-Point in the local reference frame in which to start extruding the parametric geometry.
+point in the local reference frame in which to start extruding the parametric geometry.
 
 \item \param{reference\_chod\_fraction} \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.0 \textit{type:} real
 
@@ -717,7 +717,7 @@ Number of elements in chord direction. Note: if the elements are vortex lattice 
 
 \item \param{type\_chord} \textit{required:} no. \textit{multiple:} no. \textit{default:} uniform \textit{type:} string.
 
-Type of subdivision in the chord-wise direction. Can be \opt{uniform} for a uniform distribution, \opt{cosine} for a cosine distribution, refined both on the leading and trailing edge, \opt{cosineLE} for a half cosine refined only on leading edge or \opt{cosineTE} for a half cosine refined only on the trailing edge. 
+type of subdivision in the chord-wise direction. Can be \opt{uniform} for a uniform distribution, \opt{cosine} for a cosine distribution, refined both on the leading and trailing edge, \opt{cosineLE} for a half cosine refined only on leading edge or \opt{cosineTE} for a half cosine refined only on the trailing edge. 
 
 \item \param{chord} \textit{required:} at least 2. \textit{multiple:} yes. \textit{type:} real.
 
@@ -729,7 +729,7 @@ Angle of twist, in degrees, of the airfoil section.
 
 \item \param{airfoil}/\param{airfoil\_table} \textit{required:} in same number as \param{chord}. \textit{multiple:} yes. \textit{type:} string.
 
-Airfoil of the section. There are different ways to define an airfoil. It can be defined by the user as a series of points, and so \param{airfoil} must be the path to a .dat file (the extension is mandatory) containing the two dimensional coordinates of an airfoil; the file must have in the first line an integer representing the number of points provided, followed by the coordinates of each point on separate lines. It can also be an analytical NACA profile, and so must be provided as a NACAXXXX string (at the moment only 4 digits and some 5 digits are implemented). 
+airfoil of the section. There are different ways to define an airfoil. It can be defined by the user as a series of points, and so \param{airfoil} must be the path to a .dat file (the extension is mandatory) containing the two dimensional coordinates of an airfoil; the file must have in the first line an integer representing the number of points provided, followed by the coordinates of each point on separate lines. It can also be an analytical NACA profile, and so must be provided as a NACAXXXX string (at the moment only 4 digits and some 5 digits are implemented). 
 
 In case of lifting lines or when \param{AirfoilTableCorrection} is true on the vortex lattice, to mark the difference the \param{airfoil\_table} must be employed, and it refers to the path to the corresponding c81 lookup table. 
 
@@ -753,7 +753,7 @@ Number of elements in the spanwise direction, in the single region.
 
 \item \param{type\_span} \textit{required:} in same number as \param{span} \textit{multiple:} yes. \textit{type:} string.
 
-Type of refinement of the elements in the spanwise direction. As for the chordwise direction, the options are \opt{uniform} for a uniform distribution, \opt{cosine} for a cosine refinement both inboard and outboard, and \opt{cosineIB} and \opt{cosineOB} for half cosine refinement only inboard or outboard. 
+type of refinement of the elements in the spanwise direction. As for the chordwise direction, the options are \opt{uniform} for a uniform distribution, \opt{cosine} for a cosine refinement both inboard and outboard, and \opt{cosineIB} and \opt{cosineOB} for half cosine refinement only inboard or outboard. 
   
 \end{itemize}
 
@@ -784,14 +784,14 @@ Finally all the sections are connected with the appropriate number of elements, 
 \end{figure}
 
 \begin{inputfile}[frame=single, caption={Parametric geometry for figure \ref{fig:parametric_sections}}, label={file:parametric_example_file.in}]
-MeshFileType = parametric
-ElType = p
+mesh_file_type = parametric
+el_type = p
 
 nelem_chord = 10
 type_chord = uniform   ! uniform  cosineLE  cosineTE
 
-ScalingFactor = 1.0
-Offset = (/0.0, 0.0, 0.0/)
+scaling_factor = 1.0
+offset = (/0.0, 0.0, 0.0/)
 
 starting_point = (/0.0,0.0,0.0/)
 reference_chord_fraction = 0.25
@@ -889,7 +889,7 @@ Finally it is important to stress that the reference frames introduced in the pr
 \subsection{Hinged Surfaces}
 \label{sec:Hinge_surfaces}
 It is possible to introduce one or more movable surfaces in the parametric definition of a wing.
-As outlined by the scheme in Fig. \ref{fig:hinge} left, in a two-dimensional problem the control surface can be defined in the local reference frame of the component, by means of the hinge axis position $H$, the chordwise direction $\xi$ and a blending region $[-u, u]$ (defined by \param{Hinge\_Offset} parameter)introduced to avoid irregular behavior of the mesh along with the rotation angle $\theta$.
+As outlined by the scheme in Fig. \ref{fig:hinge} left, in a two-dimensional problem the control surface can be defined in the local reference frame of the component, by means of the hinge axis position $H$, the chordwise direction $\xi$ and a blending region $[-u, u]$ (defined by \param{hinge\_Offset} parameter)introduced to avoid irregular behavior of the mesh along with the rotation angle $\theta$.
 \begin{figure}[htbp]
 \vspace{-3cm}
 \centering
@@ -909,20 +909,20 @@ In a three-dimensional problem, the reference configuration of a control surface
     \centering
     \def\svgwidth{\columnwidth}
     \input{./images/hinge_ref_system.tex}
-    \caption{Hinge reference system for a swept wing}
+    \caption{hinge reference system for a swept wing}
      \label{fig:hingeref}
 \end{figure}
 
 The aerodynamic sections that are involved in the control surface are then the ones that satisfy the condition $y(A) < y(P) < y(B)$, where $y(P)$ is the ordinate of the $P_i-th$ aerodynamic mesh point expressed in the wind reference system. 
 As in the 2D case, we can then define the three regions for each stripe identified at the previous point. The y coordinate of the origin of the sectional reference frame is determined by linear interpolation between points A and B. 
-Points A and B corresponds to the user input \param{Node1} and \param{Node2}, respectively. The rotation axis is defined by $\Vec{h} = (B - A)$.
+Points A and B corresponds to the user input \param{node_1} and \param{node_2}, respectively. The rotation axis is defined by $\Vec{h} = (B - A)$.
 
 % input file
 \begin{inputfile}[frame=single, caption={Parametric geometry for flapped wing}, label={file:parametric_example_flapped_wing.in}]
-MeshFileType = parametric
-ElType = p
+mesh_file_type = parametric
+el_type = p
 ScaleFactor = 1.0
-Offset = (/0.0 , 0.0,  0.0/)
+offset = (/0.0 , 0.0,  0.0/)
 
 mesh_symmetry = T
 symmetry_point   = (/0.0 , 0.0,  0.0/)
@@ -934,45 +934,45 @@ starting_point = (/0.0,0.0,0.0/)
 reference_chord_fraction = 0.25
 
 n_hinges = 2
-Hinge = {
+hinge = {
   Hinge_Tag = Aileron_right
-  Hinge_Nodes_Input = parametric      ! or from_file
-  Node1 = (/ 1.4178, 1.4557, 0.3473/)  ! In the local ref.frame
-  Node2 = (/ 2.4026  , 3.1615  , 0.6946/)
-  N_Nodes = 2
+  hinge_nodes_input = parametric      ! or from_file
+  node_1 = (/ 1.4178, 1.4557, 0.3473/)  ! In the local ref.frame
+  node_2 = (/ 2.4026  , 3.1615  , 0.6946/)
+  n_nodes = 2
   ! }
   ! Hinge_Nodes_Input_From_File = {
   !   Node_File = hinge_node.dat
   ! }
-  Hinge_Ref_Dir = (/ 1.0, 0.0 , 0.0 /)
-  Hinge_Offset  = 0.1
-  Hinge_Spanwise_Blending = 0.01
-  Hinge_Rotation_Input = function:sin
-  Hinge_Rotation_Function = {
-    Amplitude = 30.0    ! deg
-    Omega     =  12.5   ! rad/sec
-    Phase     =  0.0    ! deg
+  hinge_ref_dir = (/ 1.0, 0.0 , 0.0 /)
+  hinge_offset  = 0.1
+  hinge_spanwise_blending = 0.01
+  hinge_rotation_input = function:sin
+  hinge_rotation_function = {
+    amplitude = 30.0    ! deg
+    omega     =  12.5   ! rad/sec
+    phase     =  0.0    ! deg
   }
 
-Hinge = {
+hinge = {
   Hinge_Tag = Aileron_left
-  Hinge_Nodes_Input = parametric      
-  Node2 = (/ 1.4178, -1.4557, 0.3473/)  
-  Node1 = (/ 2.4026  , -3.1615  , 0.6946/)
-  N_Nodes = 2
+  hinge_nodes_input = parametric      
+  node_2 = (/ 1.4178, -1.4557, 0.3473/)  
+  node_1 = (/ 2.4026  , -3.1615  , 0.6946/)
+  n_nodes = 2
   ! }
   ! Hinge_Nodes_Input_From_File = {
   !   Node_File = hinge_node.dat
   ! }
-  Hinge_Ref_Dir = (/ 1.0, 0.0 , 0.0 /)
-  Hinge_Offset  = 0.1
-  Hinge_Merge_Tol = 0.01
-  Hinge_Spanwise_Blending = 0.01
-  Hinge_Rotation_Input = function:sin
-  Hinge_Rotation_Function = {
-    Amplitude = -30.0    ! deg
-    Omega     =  12.5    ! rad/sec
-    Phase     =  0.0     ! deg
+  hinge_ref_dir = (/ 1.0, 0.0 , 0.0 /)
+  hinge_offset  = 0.1
+  hinge_merge_tol = 0.01
+  hinge_spanwise_blending = 0.01
+  hinge_rotation_input = function:sin
+  hinge_rotation_function = {
+    amplitude = -30.0    ! deg
+    omega     =  12.5    ! rad/sec
+    phase     =  0.0     ! deg
   }
 
 
@@ -1001,70 +1001,70 @@ All the detailed parameters of the Hinged surfaces input file are:
     
     Number of hinges and rotating parts (e. g. aileron) of the component.
     
-    \item \param{Hinge\_Tag}: \textit{required:} no. \textit{multiple:} same number as \param{n\_hinge} \textit{type:} string 
+    \item \param{hinge\_Tag}: \textit{required:} no. \textit{multiple:} same number as \param{n\_hinge} \textit{type:} string 
     
-    Name of the control surface.
+    name of the control surface.
     
-    \item \param{Hinge\_Nodes\_Input}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string
+    \item \param{hinge\_Nodes\_Input}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string
     
-    Type of hinge nodes input: \opt{parametric} or \opt{from\_file}. (TODO add details)
+    type of hinge nodes input: \opt{parametric} or \opt{from\_file}. (TODO add details)
     
-    \item \param{Node1} \textit{required:} yes. \textit{multiple:} no. \textit{type:} real array, length 3.
+    \item \param{node_1} \textit{required:} yes. \textit{multiple:} no. \textit{type:} real array, length 3.
     
     First node of the hinge. Components in the local reference frame of the component.
     
-    \item \param{Node2} \textit{required:} yes. \textit{multiple:} no. \textit{type:} real array, length 3.
+    \item \param{node_2} \textit{required:} yes. \textit{multiple:} no. \textit{type:} real array, length 3.
     
     Second node of the hinge. Components in the local reference frame of the component.
     
-    \item \param{Hinge\_Ref\_Dir} \textit{required:} yes. \textit{multiple:} no. \textit{type:} real array, length 3. 
+    \item \param{hinge\_Ref\_Dir} \textit{required:} yes. \textit{multiple:} no. \textit{type:} real array, length 3. 
     
     Reference direction of the hinges, indicating zero-deflection direction in the local reference frame of the component.
     
-    \item \param{Hinge\_Merge\_Tol} \textit{required:} no. \textit{multiple:} no. \textit{type:} real. \textit{default:} 0.01
+    \item \param{hinge\_Merge\_Tol} \textit{required:} no. \textit{multiple:} no. \textit{type:} real. \textit{default:} 0.01
     
     Tolerance for adaptive hinge mesh in chord adimensional length. 
     
-    \item \param{Hinge\_Offset} \textit{required:} no. \textit{multiple:} no. \textit{type:} real. \textit{default:} 0.
+    \item \param{hinge\_Offset} \textit{required:} no. \textit{multiple:} no. \textit{type:} real. \textit{default:} 0.
     
-    Offset in the \param{Hinge\_Ref\_Dir} needed for avoiding irregular behavior of the surface for large deflections.
+    offset in the \param{hinge\_Ref\_Dir} needed for avoiding irregular behavior of the surface for large deflections.
 
-    \item \param{Hinge\_Spanwise\_Blending} \textit{required:} no. \textit{multiple:} no. \textit{type:} real. \textit{default:} 0.
+    \item \param{hinge\_Spanwise\_Blending} \textit{required:} no. \textit{multiple:} no. \textit{type:} real. \textit{default:} 0.
     
     Blending in the spanwise direction needed for avoiding irregular behavior of the surface for large deflections.
     
-    \item \param{Hinge\_Rotation\_Input}
+    \item \param{hinge\_Rotation\_Input}
     \textit{required:} yes. \textit{type:} string.
     
-    Input type of the rotation: \opt{function}, \opt{from\_file} or \opt{coupling}. If the chosen option is \opt{coupling}, then the component must be coupled with preCICE (\param{Coupling} \opt{T}).
+    input type of the rotation: \opt{function}, \opt{from\_file} or \opt{coupling}. If the chosen option is \opt{coupling}, then the component must be coupled with preCICE (\param{Coupling} \opt{T}).
     
-    \item \param{Hinge\_Rotation\_Function}: \textit{required:} no. \textit{type:} string. 
+    \item \param{hinge\_Rotation\_Function}: \textit{required:} no. \textit{type:} string. 
     
     Parser for hinge input with simple functions; the supported functions are: \opt{function:const}, \opt{function:sin}, \opt{function:cos}. 
     \begin{itemize}
-        \item \param{Amplitude} \textit{required:} yes. \textit{type:} real. 
+        \item \param{amplitude} \textit{required:} yes. \textit{type:} real. 
         
-        Amplitude of the rotation in degrees for constant, cosine and sine functions. 
+        amplitude of the rotation in degrees for constant, cosine and sine functions. 
         
-        \item \param{Omega} \textit{required:} yes. \textit{type:} real. \textit{default:} 0.0 
+        \item \param{omega} \textit{required:} yes. \textit{type:} real. \textit{default:} 0.0 
         
         Angular velocity of the rotation function in \si{\deg\per\second}, for constant?, cosine and sine functions.
         
-        \item \param{Phase} \textit{required:} yes. \textit{type:} real. \textit{default:} 0.0
+        \item \param{phase} \textit{required:} yes. \textit{type:} real. \textit{default:} 0.0
         
-        Phase angle of the rotation function in \si{\deg}, for constant?, cosine and sine functions.
+        phase angle of the rotation function in \si{\deg}, for constant?, cosine and sine functions.
     \end{itemize}
-    \item \param{Hinge\_Rotation\_File} \textit{required:} no. \textit{type:} string. 
+    \item \param{hinge\_Rotation\_File} \textit{required:} no. \textit{type:} string. 
     
     Parser for hinge input from file
     
     \begin{itemize}
-        \item \param{Filename} \textit{required:} yes. \textit{type:} string. 
+        \item \param{file_name} \textit{required:} yes. \textit{type:} string. 
         
-        Name of the file containing the input of the hinge rotation
+        name of the file containing the input of the hinge rotation
     \end{itemize}
     
-    \item \param{Hinge\_Rotation\_Coupling} \textit{required:} no. \textit{type:} string.
+    \item \param{hinge\_Rotation\_Coupling} \textit{required:} no. \textit{type:} string.
     
     Parser for hinge input from coupling (see~\ref{subsec:DUSTpreCICE})
     
@@ -1083,7 +1083,7 @@ All the detailed parameters of the Hinged surfaces input file are:
         
         \item \param{Coupling\_Node\_Filename} \textit{required:} no. \textit{type:} string.
         
-        File collecting the IDs of the coupling nodes for hinge coupling
+        file collecting the IDs of the coupling nodes for hinge coupling
     \end{itemize}
     
     
@@ -1099,15 +1099,15 @@ All the detailed parameters of the Hinged surfaces input file are:
 %
 The \param{pointwise} mesh definition extends the capabilities of the \param{parametric} input. First, the reference line of the component is defined as a list of points connected with straight lines or Hermitian splines. The sections of a component are defined at each input points by means of their plane coordinates, their dimensions and rotation around an axis perpendicular to their own plane.
 %
-The input file is mainly composed of three sections: a generic section for the types of the aerodynamic elements and the symmetry and mirroring options, a section for the \param{Point} list and a section for the \param{Line}. The parameters of the first section are very similar to the ones used in the \param{parametric} description, except for the \param{starting\_point}, that is not needed here, since the point with \param{Id}$=1$ is meant to be the first point of the reference line.
+The input file is mainly composed of three sections: a generic section for the types of the aerodynamic elements and the symmetry and mirroring options, a section for the \param{point} list and a section for the \param{Line}. The parameters of the first section are very similar to the ones used in the \param{parametric} description, except for the \param{starting\_point}, that is not needed here, since the point with \param{Id}$=1$ is meant to be the first point of the reference line.
 \newline \noindent
 %
 An example of input file for \param{pointwise}-defined component is provided in file \ref{file:pointwise_example_file.in}. The description of this file and all the parameters follows.
 %
 
 \begin{inputfile}[frame=single, caption={''Pointwise'' geometry definition }, label={file:pointwise_example_file.in}]
-MeshFileType = pointwise
-ElType = p
+mesh_file_type = pointwise
+el_type = p
 
 mesh_symmetry = T
 symmetry_point = (/0.0,0.0,0.0/)
@@ -1125,71 +1125,71 @@ nelem_chord = 20
 type_chord = cosineLE
 
 ! === Points ===
-Point = {
+point = {
   Id = 1
   Coordinates = (/ 0.0 , 0.0 , 0.0 /)
-  Airfoil = NACA2412
-  Chord = 1.0
-  Twist = 5.0
+  airfoil = NACA2412
+  chord = 1.0
+  twist = 5.0
   SectionNormal = yAxis
 }
-Point = {
+point = {
   Id = 2
   Coordinates = (/ 1.5 , 3.0 , 0.3 /)
-  Airfoil = NACA2412
-  Chord = 0.4
-  Twist = 0.0
+  airfoil = NACA2412
+  chord = 0.4
+  twist = 0.0
   SectionNormal = yAxis
 }
-Point = {
+point = {
   Id = 3
   Coordinates = (/ 1.8 , 3.5 , 0.7 /)
-  Airfoil = NACA2412
-  Chord = 0.3
-  Twist = 0.0
+  airfoil = NACA2412
+  chord = 0.3
+  twist = 0.0
   SectionNormal = referenceLine ! (default)
 }
-Point = {
+point = {
   Id = 4
   Coordinates = (/ 2.1 , 3.5 , 1.1 /)
-  Airfoil = NACA2412
-  Chord = 0.3
-  Twist = 0.0
+  airfoil = NACA2412
+  chord = 0.3
+  twist = 0.0
   SectionNormal = referenceLine ! (default)
 }
-Point = {
+point = {
   Id = 5
   Coordinates = (/ 2.4 , 3.0 , 1.4 /)
-  Airfoil = NACA2412
-  Chord = 0.4
-  Twist = 0.0
+  airfoil = NACA2412
+  chord = 0.4
+  twist = 0.0
   SectionNormal = yAxisNeg
   FlipSection = T
 }
-Point = {
+point = {
   Id = 6
   Coordinates = (/ 3.5 , 0.0 , 1.5 /)
-  Airfoil = NACA2412
-  Chord = 1.0
-  Twist = 5.0
+  airfoil = NACA2412
+  chord = 1.0
+  twist = 5.0
   SectionNormal = yAxisNeg
   FlipSection = T
 }
 
 ! === Lines ===
 Line = {
-  Type = Straight
+  type = Straight
   EndPoints = (/ 1 , 2 /)
   Nelems = 5
 }
 Line = {
-  Type = Spline
+  type = Spline
   EndPoints = (/ 2 , 5 /)
   Nelems = 10
   ! see documentation for optional inputs
 }
 Line = {
-  Type = Straight
+  type = Straight
   EndPoints = (/ 5 , 6 /)
   Nelems = 5
 }
@@ -1199,27 +1199,27 @@ Line = {
 \begin{figure}[h!]
 \centering
 \includegraphics[width=.50\textwidth]{pointwise_2_referenceLine}
-    \caption{Pointwise definition of a component: reference line by \param{Point}s and \param{Line}s connecting them.}
+    \caption{Pointwise definition of a component: reference line by \param{point}s and \param{Line}s connecting them.}
 \label{fig:pointwise_reference_line}
 \end{figure}
 %
 \begin{figure}[h!]
 \centering
 \includegraphics[width=.70\textwidth]{pointwise_3_component_flip}
-    \caption{Pointwise definition of a component: section parameters (\param{Airfoil}, \param{chord}, \param{Twist}, \param{SectionNormal}) at \param{Point}s of the reference line and the number \param{Nelems} of elements along the reference line for each \param{Line}. The parameter \param{FlipSection} can be set to \param{.true.} in order to flip the $y$-coordinate of the airfoil, in the section reference frame: the comparison between the goemetry with \param{FlipSection} equal to \param{F} or \param{T}  at \param{Point} with \param{Id} = 5, 6 is shown in the picture for a non-symmetrical airfoil.}
+    \caption{Pointwise definition of a component: section parameters (\param{airfoil}, \param{chord}, \param{twist}, \param{SectionNormal}) at \param{point}s of the reference line and the number \param{Nelems} of elements along the reference line for each \param{Line}. The parameter \param{FlipSection} can be set to \param{.true.} in order to flip the $y$-coordinate of the airfoil, in the section reference frame: the comparison between the goemetry with \param{FlipSection} equal to \param{F} or \param{T}  at \param{point} with \param{Id} = 5, 6 is shown in the picture for a non-symmetrical airfoil.}
 \label{fig:pointwise_component}
 \end{figure}
 
 
 \begin{itemize}
 
-\item \param{MeshFileType}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string. 
+\item \param{mesh_file_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string. 
 
 Use \param{pointwise} for pointwise geometry.
 
-\item \param{ElType}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} character.
+\item \param{el_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} character.
 
-    Type of the elements of the mesh. \opt{p} stands for surface panels to model solid bodies, \opt{v} stands for vortex lattice elements used to model flat surfaces, {\color{red}\opt{l} stands for lifting lines used to produce a 1D model of a lifting surface}. 
+    type of the elements of the mesh. \opt{p} stands for surface panels to model solid bodies, \opt{v} stands for vortex lattice elements used to model flat surfaces, {\color{red}\opt{l} stands for lifting lines used to produce a 1D model of a lifting surface}. 
 
 \item \param{mesh\_symmetry} \textit{required:} no. \textit{multiple:} no. \textit{default:} false. \textit{type:} logical.
 
@@ -1227,7 +1227,7 @@ Choose to reflect the mesh around a point and a direction. Useful to produce ful
 
 \item \param{symmetry\_point}: \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. \textit{default:} (0.0, 0.0, 0.0). \textit{type:} real array, length 3.
 
-Point around which to reflect the mesh.
+point around which to reflect the mesh.
 
 \item \param{symmetry\_normal}: \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. \textit{default:} (0.0, 1.0, 0.0). \textit{type:} real array, length 3.
 
@@ -1239,7 +1239,7 @@ Choose to mirror the mesh around a point and a direction. Same as \param{mesh\_s
 
 \item \param{mirror\_point}: \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. \textit{default:} (0.0, 0.0, 0.0). \textit{type:} real array, length 3.
 
-Point around which to mirror the mesh.
+point around which to mirror the mesh.
 
 \item \param{mirror\_normal}: \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. \textit{default:} (0.0, 1.0, 0.0). \textit{type:} real array, length 3.
 
@@ -1259,36 +1259,36 @@ Number of elements in chord direction. Note: if the elements are vortex lattice 
 
 \item \param{type\_chord} \textit{required:} no. \textit{multiple:} no. \textit{default:} \param{uniform} \textit{type:} string.
 
-Type of subdivision in the chord-wise direction. Can be \opt{uniform} for a uniform distribution, \opt{cosine} for a cosine distribution, refined both on the leading and trailing edge, \opt{cosineLE} for a half cosine refined only on leading edge or \opt{cosineTE} for a half cosine refined only on the trailing edge. 
+type of subdivision in the chord-wise direction. Can be \opt{uniform} for a uniform distribution, \opt{cosine} for a cosine distribution, refined both on the leading and trailing edge, \opt{cosineLE} for a half cosine refined only on leading edge or \opt{cosineTE} for a half cosine refined only on the trailing edge. 
 
 \end{itemize}
 %
-A list of \param{Point} groups follows. These points are used to describe the reference line of the component. The parameters of a \param{Point} element are:
+A list of \param{point} groups follows. These points are used to describe the reference line of the component. The parameters of a \param{point} element are:
 \begin{itemize}
 
 \item \param{Id} \textit{required}: yes, \textit{multiple}: no, \textit{type}: integer.
 
-    Id. number of the \param{Point}, used in the point-to-line connectivity defined in \param{Line} groups.
+    Id. number of the \param{point}, used in the point-to-line connectivity defined in \param{Line} groups.
 
 \item \param{Coordinates}  \textit{required}: yes, \textit{multiple}: no, \textit{type:} real array, length 3.
 
     Coordinates of the point in the local reference frame of the component.
     
-\item \param{Airfoil}  \textit{required}: yes, \textit{multiple}: no, \textit{type}: string.
+\item \param{airfoil}  \textit{required}: yes, \textit{multiple}: no, \textit{type}: string.
 
     Same as in the parametric definition of a component. To be used for vortex lattices or surface panels
     
-\item \param{Airfoil\_table}  \textit{required}: yes, \textit{multiple}: no, \textit{type}: string.
+\item \param{airfoil\_table}  \textit{required}: yes, \textit{multiple}: no, \textit{type}: string.
 
-    Same as in the parametric definition of a component. To be used for lifting lines only in place of \param{Airfoil}
+    Same as in the parametric definition of a component. To be used for lifting lines only in place of \param{airfoil}
 
-\item \param{Chord}  \textit{required}: yes, \textit{multiple}: no, \textit{type}: real.
+\item \param{chord}  \textit{required}: yes, \textit{multiple}: no, \textit{type}: real.
 
     Define section dimensions, by its chord length.
 
-\item \param{Twist}  \textit{required}: yes, \textit{multiple}: no, \textit{type}: real.
+\item \param{twist}  \textit{required}: yes, \textit{multiple}: no, \textit{type}: real.
 
-    Angle of twist, in degrees, of the airfoil section. Rotation around the vector that is normal to the plane of the section.
+    Angle of twist, in degrees, of the airfoil section. rotation around the vector that is normal to the plane of the section.
 
 \item \param{SectionNormal} \textit{required}: no, \textit{multiple}: no , \textit{default}: \param{referenceLine} , \textit{type}: string.
 
@@ -1307,13 +1307,13 @@ A list of \param{Point} groups follows. These points are used to describe the re
 A list of \param{Line} groups follows. These lines are used to build the reference line of the component connecting the points defined above. The parameters of a \param{Line} element are:
 \begin{itemize}
 
-\item \param{Type} \textit{required}: yes, \textit{multiple}: no, \textit{type}: string.
+\item \param{type} \textit{required}: yes, \textit{multiple}: no, \textit{type}: string.
 
     Line type. It can be: \param{Straight} for straight lines, \param{Spline} for Hermitian splines.
 
 \item \param{EndPoints}  \textit{required}: yes, \textit{multiple}: no, \textit{type}: integer array, lenght 2.
 
-    \param{Id} numbers of the beginning and ending \param{Point}s of the line. For \param{Straight} lines, this two numbers must be consecutive. For \param{Spline}s the spline is built using these ones as the first and last points and all the points with \param{Id} in between as interior points, so that they must exist in the point list.
+    \param{Id} numbers of the beginning and ending \param{point}s of the line. For \param{Straight} lines, this two numbers must be consecutive. For \param{Spline}s the spline is built using these ones as the first and last points and all the points with \param{Id} in between as interior points, so that they must exist in the point list.
 
 \item \param{Nelems}  \textit{required}: yes, \textit{multiple}: no, \textit{type}: integer.
 
@@ -1321,13 +1321,13 @@ A list of \param{Line} groups follows. These lines are used to build the referen
 
 \item \param{type\_span} \textit{required}: no, \textit{multiple}: no, \textit{default}: \param{uniform}, \textit{type}: string.
 
-    Type of refinement of the elements in the spanwise direction. As for the chordwise direction, the options are \opt{uniform} for a uniform distribution, \opt{cosine} for a cosine refinement both inboard and outboard, and \opt{cosineIB} and \opt{cosineOB} for half cosine refinement only inboard or outboard. 
+    type of refinement of the elements in the spanwise direction. As for the chordwise direction, the options are \opt{uniform} for a uniform distribution, \opt{cosine} for a cosine refinement both inboard and outboard, and \opt{cosineIB} and \opt{cosineOB} for half cosine refinement only inboard or outboard. 
   
-\item \param{TangentVec1} \textit{required}: if \param{Line\%Type = Spline} and \param{Line\%EndPoints(1) = 1}, \textit{multiple}: no, \textit{type}: real array, length 3. 
+\item \param{TangentVec1} \textit{required}: if \param{Line\%type = Spline} and \param{Line\%EndPoints(1) = 1}, \textit{multiple}: no, \textit{type}: real array, length 3. 
 
     Tangent vector at the first point of a \param{Spline}. This is an optional input for \param{Spline}. If this field is not present, the spline inherits the tangent vector from the neighboring line (that must be a \param{Straight} line).
 
-\item \param{TangentVec2} \textit{required}: if \param{Line\%Type = Spline} and \param{Line\%EndPoints(2)} is the last point of the reference line, \textit{multiple}: no, \textit{type}: real array, length 3. 
+\item \param{TangentVec2} \textit{required}: if \param{Line\%type = Spline} and \param{Line\%EndPoints(2)} is the last point of the reference line, \textit{multiple}: no, \textit{type}: real array, length 3. 
 
     Tangent vector at the last point of a \param{Spline}. This is an optional input for \param{Spline}. If this field is not present, the spline inherits the tangent vector from the neighboring line (that must be a \param{Straight} line).
 
@@ -1378,8 +1378,8 @@ So far, the code has the following limitations:
 A simple parametric mesh generation to create bodies of revolution is available. With this type of input is possible to generate bodies by revolving an user provided profile or cylindrical bodies with smooth tapered ends only with parametric inputs. An example of input file for this kind of parametric input is available in file 
 
 \begin{inputfile}[frame=single, caption={Boies of revolution geometry definition }, label={file:revolution_example_file.in}]
-MeshFileType = revolution
-ElType = p
+mesh_file_type = revolution
+el_type = p
 
 mesh_symmetry = T
 symmetry_point = (/0.0,0.0,0.0/)
@@ -1389,23 +1389,23 @@ mesh_mirror = F
 mirror_point = (/0.0,0.0,0.0/)
 mirror_normal = (/0.0,1.0,0.0/)
 
-!MeshFile = rev_profile.dat
+!mesh_file = rev_profile.dat
 
-Rev_Length = 5.0
-Rev_Nose_Radius = 1.0
-Rev_Radius = 0.7
-Rev_Nelem_Long = 30
-Rev_Nelem_Rev = 10
+rev_length = 5.0
+rev_nose_radius = 1.0
+rev_radius = 0.7
+rev_nelem_long = 30
+rev_nelem_rev = 10
 
 \end{inputfile}
 
 \begin{itemize}
 
-\item \param{MeshFileType}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string. 
+\item \param{mesh_file_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string. 
 
 Use \param{revolution} for bodies of revolution
 
-\item \param{ElType}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} character.
+\item \param{el_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} character.
 
     Only \opt{p} for surface panels is supported for bodies of revolution.
 
@@ -1415,7 +1415,7 @@ Choose to reflect the mesh around a point and a direction. Useful to produce ful
 
 \item \param{symmetry\_point}: \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. \textit{default:} (0.0, 0.0, 0.0). \textit{type:} real array, length 3.
 
-Point around which to reflect the mesh.
+point around which to reflect the mesh.
 
 \item \param{symmetry\_normal}: \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. \textit{default:} (0.0, 1.0, 0.0). \textit{type:} real array, length 3.
 
@@ -1427,29 +1427,29 @@ Choose to mirror the mesh around a point and a direction. Same as \param{mesh\_s
 
 \item \param{mirror\_point}: \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. \textit{default:} (0.0, 0.0, 0.0). \textit{type:} real array, length 3.
 
-Point around which to mirror the mesh.
+point around which to mirror the mesh.
 
 \item \param{mirror\_normal}: \textit{required:} only if \param{mesh\_reflection} is true. \textit{multiple:} no. \textit{default:} (0.0, 1.0, 0.0). \textit{type:} real array, length 3.
 
 Direction in which to mirror the mesh.
 
-\item \param{MeshFile}: \textit{required:} no. \textit{multiple:} no. \textit{type:} string.
+\item \param{mesh_file}: \textit{required:} no. \textit{multiple:} no. \textit{type:} string.
 
-Name of an ascii file containing the point list describing the curve or profile to revolve, which will be revolved around the local x axis. If the input is present, the rest of the inputs are neglected and the body is built revolving the provided profile, otherwise if  \param{MeshFile} is not present, the parametric input is employed
+name of an ascii file containing the point list describing the curve or profile to revolve, which will be revolved around the local x axis. If the input is present, the rest of the inputs are neglected and the body is built revolving the provided profile, otherwise if  \param{mesh_file} is not present, the parametric input is employed
 
-\item \param{Rev\_Length}: \textit{required:} yes if \param{MeshFile} is not present. \textit{multiple:} no. \textit{type:} real.
+\item \param{Rev\_Length}: \textit{required:} yes if \param{mesh_file} is not present. \textit{multiple:} no. \textit{type:} real.
 
 Length of the parametric body of revolution, from tip to tip.
 
-\item \param{Rev\_Nose\_Radius}: \textit{required:} yes if \param{MeshFile} is not present. \textit{multiple:} no. \textit{type:} real.
+\item \param{Rev\_Nose\_Radius}: \textit{required:} yes if \param{mesh_file} is not present. \textit{multiple:} no. \textit{type:} real.
 
-Radius of the smooth circular tapering at the ends of the cylindrical body of revolution
+radius of the smooth circular tapering at the ends of the cylindrical body of revolution
 
-\item \param{Rev\_Radius}: \textit{required:} yes if \param{MeshFile} is not present. \textit{multiple:} no. \textit{type:} real.
+\item \param{Rev\_Radius}: \textit{required:} yes if \param{mesh_file} is not present. \textit{multiple:} no. \textit{type:} real.
 
-Radius of the central cylindrical section of the body of revolution
+radius of the central cylindrical section of the body of revolution
 
-\item \param{Rev\_Nelem\_Long}: \textit{required:} yes if \param{MeshFile} is not present. \textit{multiple:} no. \textit{type:} integer.
+\item \param{Rev\_Nelem\_Long}: \textit{required:} yes if \param{mesh_file} is not present. \textit{multiple:} no. \textit{type:} integer.
 
 Number of elements in the longitudinal direction of the body of revolution
 
@@ -1472,17 +1472,17 @@ In case of paranetrically generated elements, which represent extruded airfoils,
 In case of unstructured surface meshes, the preprocessor proceeds by trying to geometrically identify the trailing edge in sharp corners between elements. 
 
 Considering the (rather common) possibility that the trailing edges are left open, i.e. with element edges not geometrically connected and/or not logically connected in the connectivity, first the \DUST preprocessor merges the close nodes and generates an alternative connectivity taking into account the new connections. 
-This merging is just functional to the definition of the trailing edge, and will be discarded after the trailing edge had been identified. To control the merging, the parameter \param{TolSewing} can be declared in the preprocessor input file, to be applied globally, or in each (or some) single geometry input file to be applied to a single component. Each pair of nodes separated by a distance lower than \param{TolSewing} will be merged in this phase.
+This merging is just functional to the definition of the trailing edge, and will be discarded after the trailing edge had been identified. To control the merging, the parameter \param{tol_se_wing} can be declared in the preprocessor input file, to be applied globally, or in each (or some) single geometry input file to be applied to a single component. Each pair of nodes separated by a distance lower than \param{tol_se_wing} will be merged in this phase.
 
 After merging the mesh the new connectivity will be employed to identify the edges belonging to the trailing edge. The edges between two elements whose normal vectors are \emph{sufficiently} opposed are marked as trailing edge. In particular, the edge connecting the elements $i$ and $j$ is a trailing edge if 
 \begin{equation}
-    \Vec{n}_i\cdot\Vec{n}_j < \text{\param{InnerProductTe}},
+    \Vec{n}_i\cdot\Vec{n}_j < \text{\param{inner_product_te}},
 \end{equation}
 where $\Vec{n}_i,\Vec{n}_j$ are the normal unit vectors of the respective elements.
 
 Moreover during the preprocessing also the direction of the first wake panel is decided. During the simulation the whole wake is advected according to the velocity generated by the singularities of the bodies and the wake, however the first wake panel is geometrically pre-determined and its intensity is implicitly solved alongside the rest of the singularities of the body surfaces. The first panel starts from the trailing adge and its nodes, and its length is decided during the simulation, however the direction alongside it is stretched from the trailing edge is determined in the preprocessor. 
 
-If no specific indication is given, the direction of the first implicit wake panel is the average of the two edges directions from the upper and lower elements connected at the trailing edge node. It is however possible to alter this behaviour  by setting \param{ProjTe} to true. Then the user must provide a direction vector with \param{ProjTeVector}, which identifies the direction in which to project the first panel direction if \param{ProjTeDir} is \opt{parallel}, or is the normal to the plane in which to project the first panel direction if  \param{ProjTeDir} is \opt{normal}.
+If no specific indication is given, the direction of the first implicit wake panel is the average of the two edges directions from the upper and lower elements connected at the trailing edge node. It is however possible to alter this behaviour  by setting \param{proj_te} to true. Then the user must provide a direction vector with \param{proj_te_vector}, which identifies the direction in which to project the first panel direction if \param{proj_te_dir} is \opt{parallel}, or is the normal to the plane in which to project the first panel direction if  \param{proj_te_dir} is \opt{normal}.
 
 
 
@@ -1492,10 +1492,10 @@ If no specific indication is given, the direction of the first implicit wake pan
 Actuator disks are built employing a parametric input file just as file \ref{file:parametric_geo_file.in} but with different parameters, shown in file \ref{file:actdisk_geo_file.in} 
 
 \begin{inputfile}[frame=single, caption={actdisk\_geo\_file.in}, label={file:actdisk_geo_file.in}]
-MeshFileType = parametric
-ElType = a
+mesh_file_type = parametric
+el_type = a
 
-Radius = 2.5
+radius = 2.5
 nstep = 20
 Axis = 3
 traction = 10.0
@@ -1504,17 +1504,17 @@ traction = 10.0
 
 All the detailed parameters of the geometry input file for parametric actuator disks are:
 \begin{itemize}
-\item \param{MeshFileType}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string. 
+\item \param{mesh_file_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} string. 
 
 Use \param{parametric} for parametric geometry.
 
-\item \param{ElType}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} character.
+\item \param{el_type}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} character.
 
-Type of the elements of the mesh. For actuator disks must be \param{a}
+type of the elements of the mesh. For actuator disks must be \param{a}
 
-\item \param{Radius}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} real.
+\item \param{radius}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} real.
 
-Radius of the actuator disk.
+radius of the actuator disk.
 
 \item \param{nstep}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} integer.
 
@@ -1524,9 +1524,9 @@ Number of straight segments used to discretize the circle of the actuator disk.
 
 Which of the three axis of the reference frame to use as axis of the rotor. The reference frame is the one specified for the component in the preprocessor input, file \ref{file:dust_pre.in}
 
-\item \param{Traction}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} real.
+\item \param{traction}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} real.
 
-Traction of the actuator disk.
+traction of the actuator disk.
 \end{itemize}
 
 

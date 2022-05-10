@@ -24,13 +24,13 @@ For this reason it is possible to specify a variety of different analyses to be 
 
 
 
-\section{Input Files Format}
+\section{input Files format}
 \label{sec:InputFilesFormat}
 All the input files, which are used to define parameters to the DUST executables, share the same flexible, free format text files structure.
 
 The files are simple text files, without any requirement on the extension, however the extension \texttt{*.in} is recommended to distinguish the input files inside the case folders. The different executables automatically look for the input file \texttt{exe\_name.in} where they are invoked. 
 
-An example of text input file is presented in file \ref{file:example}. Input files employ loosely a Fortran syntax, and comprise of a series of keyword assignments.
+An example of text input file is presented in file \ref{file:example}. input files employ loosely a Fortran syntax, and comprise of a series of keyword assignments.
 The required keyword can generally be inserted in any order inside the input file, and should be written according to the following rules:
 \begin{itemize}
 \item All the parameters assignments are written with an equal sign, i.e. keyword = value, for any kind of value.
@@ -71,7 +71,7 @@ Regarding the number, position and compulsoriness of the keywords, depending on 
 \end{itemize}
 All the details on the parameters of the single files will be provided in the description of each input file in the following chapters.
 
-\section{Internal Binary Files Format}
+\section{Internal Binary Files format}
 \label{sec:BynaryFilesFormat}
 All the files that contain data, input geometry and results, which are not meant to be interpreted by the user but are only for internal use, are written in binary hdf5 format. 
 
@@ -79,7 +79,7 @@ The hdf5 format is a common opensource binary format which allows to store effic
 
 The standard extension for hdf5 files is \texttt{.h5} and, even if it is not compulsory, should be added to the binary filenames in the parameter when specified.
 
-\section{Output Files Format}
+\section{Output Files format}
 \label{sec:OutputFilesFormat}
 
 As previously discussed in section \ref{sec:Workflow} the binary files results are not meant to be interpreted by the user (even if the use of applications as hdfView can give a brief insight on some results). The postprocessor can interpret those results and output processed data readily employable by the user.

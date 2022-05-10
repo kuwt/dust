@@ -4,10 +4,10 @@ el_type       = v
 !> === coupled with external structural solver (T/F) ===
 coupled      = T
 coupling_type = rbf
-coupling_nodefile = ./wing/coupling_nodes_left.in 
+coupling_node_file = ./wing/coupling_nodes_left.in 
 
 !> === Geometry definition ===
-coupling_nodeorientation = (/ 1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0 /)
+coupling_node_orientation = (/ 1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0 /)
 
 nelem_chord = 5
 type_chord = uniform   ! uniform  cosineLE  cosineTE

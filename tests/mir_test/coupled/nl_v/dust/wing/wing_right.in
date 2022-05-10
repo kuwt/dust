@@ -5,12 +5,12 @@ AirfoilTableCorrection = T
 !> === coupled with external structural solver (T/F) ===
 coupled      = T
 coupling_type = rbf
-coupling_nodefile = ./wing/coupling_nodes_left.in 
+coupling_node_file = ./wing/coupling_nodes_left.in 
 
 !> === Geometry definition ===
 starting_point = (/0.0,0.0,0.0/)
 reference_chord_fraction = 0.25
-coupling_nodeorientation = (/ 1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0 /)
+coupling_node_orientation = (/ 1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0 /)
 
 nelem_chord = 5
 type_chord = uniform   ! uniform  cosineLE  cosineTE
