@@ -153,7 +153,7 @@ subroutine read_c81_table ( filen , coeff )
   real(wp) :: alcl0tmp, alcl0
   integer :: iAl , iMa
   real(wp) :: al1 , al2 , c1 , c2
-  integer :: ind_cl0 , istallp , istallm , stall_found
+  integer :: ind_cl0 , istallp , istallm, stall_found
   ! Reynolds effect corrections ---
 
   character(len=*), parameter :: this_sub_name = 'read_c81_table'
@@ -270,11 +270,12 @@ subroutine read_c81_table ( filen , coeff )
        
         ! --- cdmin --- cd = coeff(2)
         coeff%aero_coeff(iRe)%cdmin(iMa) = minval( coeff%aero_coeff(iRe)%coeff(2)%cf(:,iMa) )
-
+        
         ! --- positive and negative stall: alpha and cl ---
         istallp = ind_cl0 ; istallm = ind_cl0
         ! positive stall
         stall_found = 0
+
         ! ---
         do while ( ( istallp+1 .lt. cl1 ) .and. &
                    ( coeff%aero_coeff(iRe)%coeff(1)%cf(istallp+1,iMa) .gt. &

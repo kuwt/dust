@@ -232,6 +232,8 @@ subroutine dat_out_sectional (basename, compname, y_cen, y_span, time, &
     else
       write(filename,'(A)') trim(basename)//'_'//trim(load_str(i1))//'.dat'
     endif
+
+    
     open(unit=fid,file=trim(filename))
     ! Header -----------
     write(fid,'(A)') '# Sectional load '//trim(load_str(i1))//&
@@ -401,9 +403,9 @@ subroutine dat_out_sectional_vl (basename, compname, y_cen, y_span, time, &
   do il = 1 , size(load_str)
     call new_file_unit(fid, ierr)
     if(average) then
-      write(filename,'(A)') trim(basename)//'_vl_'//trim(load_str(il))//'_ave.dat'
+      write(filename,'(A)') trim(basename)//'_'//trim(load_str(il))//'_ave.dat'
     else
-      write(filename,'(A)') trim(basename)//'_vl_'//trim(load_str(il))//'.dat'
+      write(filename,'(A)') trim(basename)//'_'//trim(load_str(il))//'.dat'
     endif
     open(unit=fid,file=trim(filename))
     ! Header -----------

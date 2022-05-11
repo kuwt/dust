@@ -883,7 +883,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                 do i_s = 1, size(geo%components(i_c)%stripe)
                   vel = 0.0_wp
                   do jj = 1, size(geo%components(i_c)%stripe)
-                    call geo%components(i_c)%stripe(jj)%compute_vel(geo%components(i_c)%stripe(i_s)%cen, v)
+                    call geo%components(i_c)%stripe(jj)%compute_vel(geo%components(i_c)%stripe(i_s)%cen , v)
                     vel = vel + v                      
                   end do                     
                   geo%components(i_c)%stripe(i_s)%vel = vel
@@ -895,7 +895,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                 do i_s = 1, size(geo%components(i_c)%stripe)
                   vel = 0.0_wp
                   do jj = 1, size(geo%components(i_c)%stripe)
-                    call geo%components(i_c)%stripe(jj)%compute_vel(geo%components(i_c)%stripe(i_s)%cen, v)
+                    call geo%components(i_c)%stripe(jj)%compute_vel(geo%components(i_c)%stripe(i_s)%cen , v)
                     vel = vel + v
                   end do 
                   geo%components(i_c)%stripe(i_s)%vel = vel 
@@ -924,29 +924,29 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
 
         end do !(while)
 
-        do i_c = 1, size(geo%components)
-          if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
-            trim(geo%components(i_c)%aero_correction) .eq. 'true') then           
-
-              !> calc velocity induced by stripe component: vel 
-              do i_s = 1, size(geo%components(i_c)%stripe)
-                vel = 0.0_wp
-                x0 =  0.5_wp*( geo%components(i_c)%stripe(i_s)%ver(:,1) + geo%components(i_c)%stripe(i_s)%ver(:,2) )
-
-                call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt_final(elems_non_corr, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
-
-                do jj = 1, size(geo%components(i_c)%stripe)
-                  call geo%components(i_c)%stripe(jj)%compute_vel(x0, v)
-                  vel = vel + v                      
-                end do                     
-
-                wind = variable_wind(x0, sim_param%time)
-                geo%components(i_c)%stripe(i_s)%vel_ctr_pt = geo%components(i_c)%stripe(i_s)%vel_ctr_pt  + &
-                                                            wind + vel - geo%components(i_c)%stripe(i_s)%ub
-
-              end do
-          end if 
-        end do 
+        !do i_c = 1, size(geo%components)
+        !  if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
+        !    trim(geo%components(i_c)%aero_correction) .eq. 'true') then           
+!
+        !      !> calc velocity induced by stripe component: vel 
+        !      do i_s = 1, size(geo%components(i_c)%stripe)
+        !        vel = 0.0_wp
+        !        x0 =  0.5_wp*( geo%components(i_c)%stripe(i_s)%ver(:,1) + geo%components(i_c)%stripe(i_s)%ver(:,2) )
+!
+        !        call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt_final(elems_non_corr, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
+!
+        !        do jj = 1, size(geo%components(i_c)%stripe)
+        !          call geo%components(i_c)%stripe(jj)%compute_vel(x0, v)
+        !          vel = vel + v                      
+        !        end do                     
+!
+        !        wind = variable_wind(x0, sim_param%time)
+        !        geo%components(i_c)%stripe(i_s)%vel_ctr_pt = geo%components(i_c)%stripe(i_s)%vel_ctr_pt  + &
+        !                                                    wind + vel - geo%components(i_c)%stripe(i_s)%ub
+!
+        !      end do
+        !  end if 
+        !end do 
         
         do i_el = 1 , sel      
           elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
@@ -955,20 +955,9 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               !> compute dforce using AVL formula without prandtl glauert correction since it is 
               !  already contained in the .c81 table 
               call el%compute_dforce_jukowski(.false.) 
-              el%pres = sum(el%dforce * el%nor)/el%area              
           end select            
         end do
         
-        do i_c = 1, size(geo%components)
-          if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
-            trim(geo%components(i_c)%aero_correction) .eq. 'true') then           
-            do i_s = 1, size(geo%components(i_c)%stripe)
-              call geo%components(i_c)%stripe(i_s)%update_aoa() 
-            end do
-          end if 
-        end do 
-
-
         if(it_vl .eq. sim_param%vl_maxiter) then
           call warning('dust','dust','max iteration reached for non linear vl:&
                       increase VLmaxiter!') 
@@ -976,24 +965,27 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           call printout(message)
         endif
         
-        !> Viscous drag correction 
+        !> Viscous and pressure drag correction 
         do i_c = 1, size(geo%components)
           if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
             trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
             do i_s = 1, size(geo%components(i_c)%stripe) 
-              d_cd = 0.5_wp * sim_param%rho_inf *  & 
-                      geo%components(i_c)%stripe(i_s)%vel_2d**2.0_wp * & 
-                      geo%components(i_c)%stripe(i_s)%cd *  &
-                      sin(geo%components(i_c)%stripe(i_s)%al_ctr_pt) * & 
-                      geo%components(i_c)%stripe(i_s)%nor +  &
-                      (cos(geo%components(i_c)%stripe(i_s)%al_ctr_pt) * & 
-                      geo%components(i_c)%stripe(i_s)%tang_cen )
-              
+              d_cd =  0.5_wp * sim_param%rho_inf *  & 
+                      geo%components(i_c)%stripe(i_s)%vel_2d**2.0_wp *      &                 
+                      geo%components(i_c)%stripe(i_s)%cd * &
+                      (geo%components(i_c)%stripe(i_s)%tang_cen * &
+                      cos(geo%components(i_c)%stripe(i_s)%alpha*pi/180.0_wp) + & 
+                      (geo%components(i_c)%stripe(i_s)%nor) * &
+                      sin(geo%components(i_c)%stripe(i_s)%alpha*pi/180.0_wp ))
+
               do i_p = 1, size(geo%components(i_c)%stripe(i_s)%panels)
                 geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce = &
-                            geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce +&
+                            geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce + &
                             d_cd * geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area
-              
+                geo%components(i_c)%stripe(i_s)%panels(i_p)%p%pres = & 
+                            sum(geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce * &
+                                geo%components(i_c)%stripe(i_s)%panels(i_p)%p%nor)/ & 
+                                geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area 
               end do
             end do
           end if 
