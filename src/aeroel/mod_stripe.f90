@@ -173,10 +173,10 @@ module mod_stripe
     real(wp)                         :: alpha, alpha_2d, alcl0
     real(wp),    allocatable         :: al0(:)
     real(wp),    allocatable         :: aero_coeff(:)
-    real(wp)                         :: up(3), unorm
+    real(wp)                         :: up(3), unorm, corr_fact, dcl_da
     real(wp)                         :: dforce(3), mag_inv, mag_visc 
     integer                          :: i_c, n_pan, id_pan
-    real(wp)                         :: cl_inv, cl_visc
+    real(wp)                         :: cl_inv, cl_visc, e_l(3)
     real(wp)                         :: rel_fct, rhs_diff    
     integer                          :: id_a, i_a
     integer                          :: imach, nmach
@@ -206,7 +206,7 @@ module mod_stripe
     
     this%alpha_isolated = atan2(dot((wind-this%ub), this%nor), & 
                               dot((wind-this%ub), this%tang_cen))*180.0_wp/pi
-
+    
     this%vel = this%vel + wind - this%ub + this%vel_w
 
     this%vel_outplane = dot(this%bnorm_cen,this%vel)
@@ -217,12 +217,14 @@ module mod_stripe
     this%vel_2d = unorm
 
     mag_inv = 0.0_wp
+    dforce = 0.0_wp
     do i_c = 1, n_pan
       if ( i_c .gt. 1 ) then
         mag_inv = mag_inv + (this%panels(i_c)%p%mag - this%panels(i_c-1)%p%mag) 
       else
         mag_inv = mag_inv + this%panels(i_c)%p%mag
       end if
+      dforce = dforce + this%panels(i_c)%p%dforce
     end do 
 
     !> Local Mach number 
@@ -231,18 +233,21 @@ module mod_stripe
     !> Local Reynolds number 
     reynolds = sim_param%rho_inf * unorm * this%chord / sim_param%mu_inf
     
-    ! Angle of incidence (full velocity) 
+    !> get the airfoil slope at alpha 0 for the current mach  and re number  
+    call interp_aero_coeff ( airfoil_data,  this%csi_cen, this%i_airfoil , &
+                        (/0.0_wp, mach, reynolds/), aero_coeff, dcl_da )
+
     alpha = atan2(dot(up, this%nor), dot(up,this%tang_cen))
     
     !> "2D correction" of the induced angle
-    alpha_2d = mag_inv / ( pi * this%chord * unorm ) 
+    alpha_2d = mag_inv / ( dcl_da/2.0_wp * this%chord * unorm ) 
     
     alpha = (alpha - alpha_2d) * 180.0_wp/pi  
     
     !> Interpolation of the aerodynamic coefficents 
     call interp_aero_coeff ( airfoil_data,  this%csi_cen, this%i_airfoil , &
-                        (/alpha, mach, reynolds/), aero_coeff )
-    
+                        (/alpha, mach, reynolds/), aero_coeff, dcl_da )
+        
     !> Aerodynamic coefficients from c81 table  
     this%cl_visc = aero_coeff(1)
     this%cd = aero_coeff(2)  
@@ -250,7 +255,11 @@ module mod_stripe
     this%alpha  = alpha  
     
     cl_visc = this%cl_visc    
-    cl_inv = -2.0_wp * mag_inv / (unorm*this%chord)    
+    
+    !> get cl_inv as force projection along the aoa 
+    e_l = this%nor*cos(alpha/180.0_wp*pi) - this%tang_cen*sin(alpha/180.0_wp*pi)
+    cl_inv = sum(dforce * e_l) / &
+              (0.5_wp*sim_param%rho_inf*(unorm ** 2.0_wp)*this%area)
 
     !> Update term rhs (absolute)
     rhs_diff = (cl_visc - cl_inv)
@@ -292,7 +301,7 @@ module mod_stripe
     ! Initialisation to zero
     this%vel = 0.0_wp
     ! Control point at 1/4-fraction of the chord (with curvature)
-    x0 = this%cen    
+    x0 = this%cen  
     !=== Compute the velocity from all the elements ===
     do j = 1,size(wake_elems)  ! wake panels
       call wake_elems(j)%p%compute_vel(x0,v)

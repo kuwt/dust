@@ -214,7 +214,7 @@ real(wp), allocatable             ::      nor_SurfPan_old(:,:)
 real(wp), allocatable             :: al_kernel(:,:), al_v(:)
 
 !> VL viscous correction
-integer                           :: i_el, i_c, i_s, i, sel, i_p, jj
+integer                           :: i_el, i_c, i_s, i, sel, i_p, jj, i_c2, i_s2
 integer                           :: it_vl, id_pan
 real(wp)                          :: tol, diff, max_diff 
 real(wp)                          :: d_cd(3), vel(3), v(3), x0(3), wind(3)
@@ -879,30 +879,24 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                 do  i_s = 1, size(geo%components(i_c)%stripe)
                   call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt(elems_non_corr, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
                 end do 
+              endif 
+
+              do  i_s = 1, size(geo%components(i_c)%stripe)
                 !> calc velocity induced by stripe component: vel 
-                do i_s = 1, size(geo%components(i_c)%stripe)
-                  vel = 0.0_wp
-                  do jj = 1, size(geo%components(i_c)%stripe)
-                    call geo%components(i_c)%stripe(jj)%compute_vel(geo%components(i_c)%stripe(i_s)%cen , v)
-                    vel = vel + v                      
-                  end do                     
-                  geo%components(i_c)%stripe(i_s)%vel = vel
-                  call geo%components(i_c)%stripe(i_s)%correction_c81_vortlatt(airfoil_data, linsys, diff, it_vl, i_s)
-                  max_diff = max(diff, max_diff) 
-                end do
-              else 
-                !> update only the induced velocity by stripe on stipe: vel_w is fixed 
-                do i_s = 1, size(geo%components(i_c)%stripe)
-                  vel = 0.0_wp
-                  do jj = 1, size(geo%components(i_c)%stripe)
-                    call geo%components(i_c)%stripe(jj)%compute_vel(geo%components(i_c)%stripe(i_s)%cen , v)
-                    vel = vel + v
-                  end do 
-                  geo%components(i_c)%stripe(i_s)%vel = vel 
-                  call geo%components(i_c)%stripe(i_s)%correction_c81_vortlatt(airfoil_data, linsys, diff, it_vl, i_s)
-                  max_diff = max(diff, max_diff) 
-                end do
-              end if 
+                vel = 0.0_wp
+                do i_c2 = 1, size(geo%components) 
+                  if (trim(geo%components(i_c2)%comp_el_type) .eq. 'v' .and. &
+                      trim(geo%components(i_c2)%aero_correction) .eq. 'true') then 
+                      do i_s2 = 1, size(geo%components(i_c2)%stripe)
+                        call geo%components(i_c2)%stripe(i_s2)%compute_vel(geo%components(i_c)%stripe(i_s)%cen , v)
+                        vel = vel + v         
+                      end do 
+                  endif 
+                end do                       
+                geo%components(i_c)%stripe(i_s)%vel = vel
+                call geo%components(i_c)%stripe(i_s)%correction_c81_vortlatt(airfoil_data, linsys, diff, it_vl, i_s)
+                max_diff = max(diff, max_diff) 
+              end do                
             end if 
           end do 
 
@@ -921,6 +915,15 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           endif
 
           it_vl = it_vl + 1
+          do i_el = 1 , sel      
+            elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
+            select type(el => elems(i_el)%p)        
+              class is(t_vortlatt)   
+                !> compute dforce using AVL formula without prandtl glauert correction since it is 
+                !  already contained in the .c81 table 
+                call el%compute_dforce_jukowski(.false.) 
+            end select            
+          end do
 
         end do !(while)
 
@@ -948,15 +951,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         !  end if 
         !end do 
         
-        do i_el = 1 , sel      
-          elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
-          select type(el => elems(i_el)%p)        
-            class is(t_vortlatt)   
-              !> compute dforce using AVL formula without prandtl glauert correction since it is 
-              !  already contained in the .c81 table 
-              call el%compute_dforce_jukowski(.false.) 
-          end select            
-        end do
+        
         
         if(it_vl .eq. sim_param%vl_maxiter) then
           call warning('dust','dust','max iteration reached for non linear vl:&
@@ -982,6 +977,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                 geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce = &
                             geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce + &
                             d_cd * geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area
+                !> update pressure 
                 geo%components(i_c)%stripe(i_s)%panels(i_p)%p%pres = & 
                             sum(geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce * &
                                 geo%components(i_c)%stripe(i_s)%panels(i_p)%p%nor)/ & 
