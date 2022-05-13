@@ -1,36 +1,80 @@
-function sec_data = sec_load(file_out, type)
-    switch type
-        case 'l'
-            field = {'vel_outplane_isolated';
-                'vel_outplane';
-                'vel_2d_isolated';
-                'vel_2d';
-                'Mo';
-                'Fz';
-                'Fy';
-                'Fx';
-                'Cm';
-                'Cl';
-                'Cd';
-                'alpha_isolated';
-                'alpha'};
-        case 'v'
-            field = {'vel_outplane_isolated';
-                'vel_outplane';
-                'vel_2d_isolated';
-                'vel_2d';
-                'Cm';
-                'Cl';
-                'Cd';
-                'alpha_isolated';
-                'alpha'};
-    end
+%./\\\\\\\\\\\...../\\\......./\\\..../\\\\\\\\\..../\\\\\\\\\\\\\.
+%.\/\\\///////\\\..\/\\\......\/\\\../\\\///////\\\.\//////\\\////..
+%..\/\\\.....\//\\\.\/\\\......\/\\\.\//\\\....\///.......\/\\\......
+%...\/\\\......\/\\\.\/\\\......\/\\\..\////\\.............\/\\\......
+%....\/\\\......\/\\\.\/\\\......\/\\\.....\///\\...........\/\\\......
+%.....\/\\\......\/\\\.\/\\\......\/\\\.......\///\\\........\/\\\......
+%......\/\\\....../\\\..\//\\\...../\\\../\\\....\//\\\.......\/\\\......
+%.......\/\\\\\\\\\\\/....\///\\\\\\\\/..\///\\\\\\\\\/........\/\\\......
+%........\///////////........\////////......\/////////..........\///.......
+%%=========================================================================
+% 
+% Copyright (C) 2018 - 2022 Politecnico di Milano,
+% with support from A^3 from Airbus
+% and Davide Montagnani,
+% Matteo Tugnoli,
+% Federico Fonte
+% 
+% This file is part of DUST, an aerodynamic solver for complex
+% configurations.
+% 
+% Permission is hereby granted, free of charge, to any person
+% obtaining a copy of this software and associated documentation
+% files (the "Software"), to deal in the Software without
+% restriction, including without limitation the rights to use,
+% copy, modify, merge, publish, distribute, sublicense, and / or sell
+% copies of the Software, and to permit persons to whom the
+% Software is furnished to do so, subject to the following
+% conditions:
+% 
+% The above copyright notice and this permission notice shall be
+% included in all copies or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+% EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+% OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+% NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+% HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+% WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+% FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+% OTHER DEALINGS IN THE SOFTWARE.
+% 
+% Author: Alessandro Cocco 
+%=========================================================================
+
+function sec_data = sec_load(file_out)
+    % This matlab function parse the sectional loads file for lifting line and 
+    % corrected vortex lattice element. 
+    % The input is the same as the one required in the filed "basename" in the 
+    % dust_post.in file. 
+    % The output is a data structure of the form: 
+    %   sec_data.<field>.time     => simulation time 
+    %                   .value    => value matrix n_time x m_sec 
+    %                   .X        => position from global to local 
+    %                   .R        => rotation from global to local 
+    %   sec_data.sec              => position of the section from which the 
+    %                                <field> are extracted 
+    % For further details regarding the <field> please see the input manual. 
     
+    field = {'vel_outplane_isolated';
+        'vel_outplane';
+        'vel_2d_isolated';
+        'vel_2d';
+        'Mo';
+        'Fz';
+        'Fy';
+        'Fx';
+        'Cm';
+        'Cl';
+        'Cd';
+        'alpha_isolated';
+        'alpha'};
+
     % name file
     sec_data = struct('n_time',[],'n_sec',[], 'sec',[], 'l_sec',[],'vel_outplane',[],...
         'vel_outplane_isolated',[],'vel_2d_isolated',[],'vel_2d',[],'Mo',[],'Fx',[],...
         'Fy',[],'Fz',[],'Cm',[],'Cl',[],'Cd',[],'alpha_isolated',[],'alpha',[]);
-    
+
     for i = 1:numel(field)
         file = [file_out '_' field{i} '.dat'];
         sec_data = parse_file_sectional(file, field{i}, sec_data);
@@ -41,15 +85,16 @@ end
 
 function sec_data = parse_file_sectional(file, field, sec_data)
 
-    fid = fopen(file,'rt');
+    fid = fopen(file, 'rt');
+    
+    % initialization
     it = 0;
     skip_line = false;
-    sec_data.n_time = 0; % initialization
-    long_field = {  'Mo';
-        'Fz';
-        'Fy';
-        'Fx'};
-    
+    sec_data.n_time = 0; 
+    long_field = {'Mo';
+                'Fy';
+                'Fz';
+                'Fx'};
     while skip_line || ~feof(fid)
     
         if ~skip_line
@@ -59,7 +104,6 @@ function sec_data = parse_file_sectional(file, field, sec_data)
         end
     
         it = it + 1;
-    
     
         if it == 2
             line_2 = textscan(line_new, '# n_sec : %d ; n_time : %d. Next lines: y_cen , y_span');
