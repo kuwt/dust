@@ -152,13 +152,13 @@ contains
 !! the AIC of a lifting line on a surface panel, adding the contribution
 !! to an equation for the potential.
 subroutine compute_pot_liftlin (this, A, b, pos,i,j)
- class(t_liftlin), intent(inout) :: this
- real(wp), intent(out) :: A
- real(wp), intent(out) :: b
- real(wp), intent(in) :: pos(:)
- integer , intent(in) :: i,j
+  class(t_liftlin), intent(inout) :: this
+  real(wp), intent(out) :: A
+  real(wp), intent(out) :: b
+  real(wp), intent(in) :: pos(:)
+  integer , intent(in) :: i,j
 
- real(wp) :: dou
+  real(wp) :: dou
 
   if ( i .ne. j ) then
     call potential_calc_doublet(this, dou, pos)
@@ -181,14 +181,14 @@ end subroutine compute_pot_liftlin
 !! the AIC coefficients of a lifting line to a vortex ring, adding
 !! the contribution to an equation for the velocity
 subroutine compute_psi_liftlin (this, A, b, pos, nor, i, j )
- class(t_liftlin), intent(inout) :: this
- real(wp), intent(out) :: A
- real(wp), intent(out) :: b
- real(wp), intent(in) :: pos(:)
- real(wp), intent(in) :: nor(:)
- integer , intent(in) :: i , j
+  class(t_liftlin), intent(inout) :: this
+  real(wp), intent(out) :: A
+  real(wp), intent(out) :: b
+  real(wp), intent(in) :: pos(:)
+  real(wp), intent(in) :: nor(:)
+  integer , intent(in) :: i , j
 
- real(wp) :: vdou(3)
+  real(wp) :: vdou(3)
 
   call velocity_calc_doublet(this, vdou, pos)
 
@@ -213,12 +213,12 @@ end subroutine compute_psi_liftlin
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 subroutine compute_vel_liftlin (this, pos, vel)
- class(t_liftlin), intent(in) :: this
- real(wp), intent(in) :: pos(:)
+  class(t_liftlin), intent(in) :: this
+  real(wp), intent(in) :: pos(:)
 
- real(wp), intent(out) :: vel(3)
+  real(wp), intent(out) :: vel(3)
 
- real(wp) :: vdou(3)
+  real(wp) :: vdou(3)
 
 
   ! doublet ---
@@ -236,13 +236,12 @@ end subroutine compute_vel_liftlin
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 subroutine compute_grad_liftlin (this, pos, grad)
- class(t_liftlin), intent(in) :: this
- real(wp), intent(in) :: pos(:)
+  class(t_liftlin), intent(in) :: this
+  real(wp), intent(in) :: pos(:)
 
- real(wp), intent(out) :: grad(3,3)
+  real(wp), intent(out) :: grad(3,3)
 
- real(wp) :: grad_dou(3,3)
-
+  real(wp) :: grad_dou(3,3)
 
   ! doublet ---
   call gradient_calc_doublet(this, grad_dou, pos)
@@ -255,10 +254,10 @@ end subroutine compute_grad_liftlin
 !----------------------------------------------------------------------
 
 subroutine compute_cp_liftlin (this, elems)
- class(t_liftlin), intent(inout) :: this
- type(t_elem_p), intent(in) :: elems(:)
+  class(t_liftlin), intent(inout) :: this
+  type(t_elem_p), intent(in) :: elems(:)
 
- character(len=*), parameter      :: this_sub_name='compute_cp_liftlin'
+  character(len=*), parameter      :: this_sub_name='compute_cp_liftlin'
 
   call error(this_sub_name, this_mod_name, 'This was not supposed to &
   &happen, a team of professionals is underway to remove the evidence')
@@ -270,10 +269,10 @@ end subroutine compute_cp_liftlin
 !> The computation of the pressure in the lifting line is not meant to
 !! happen, loads are retrieved from the tables
 subroutine compute_pres_liftlin (this, R_g)
- class(t_liftlin) , intent(inout) :: this
- real(wp)         , intent(in)    :: R_g(3,3)
+  class(t_liftlin) , intent(inout) :: this
+  real(wp)         , intent(in)    :: R_g(3,3)
 
- character(len=*), parameter      :: this_sub_name='compute_pres_liftlin'
+  character(len=*), parameter      :: this_sub_name='compute_pres_liftlin'
 
   call error(this_sub_name, this_mod_name, 'This was not supposed to &
   &happen, a team of professionals is underway to remove the evidence')
@@ -285,10 +284,10 @@ end subroutine compute_pres_liftlin
 !> The computation of loads happens in solve_liftlin and not in
 !! this subroutine, which is not used
 subroutine compute_dforce_liftlin (this)
- class(t_liftlin), intent(inout) :: this
- !type(t_elem_p), intent(in) :: elems(:)
+  class(t_liftlin), intent(inout) :: this
+  !type(t_elem_p), intent(in) :: elems(:)
 
- character(len=*), parameter      :: this_sub_name='compute_dforce_liftlin'
+  character(len=*), parameter      :: this_sub_name='compute_dforce_liftlin'
 
   call error(this_sub_name, this_mod_name, 'This was not supposed to &
   &happen, a team of professionals is underway to remove the evidence')
@@ -302,8 +301,8 @@ end subroutine compute_dforce_liftlin
 !!
 !! Here the extrapolation of the lifting line solution is performed
 subroutine update_liftlin(elems_ll, linsys)
- type(t_liftlin_p), intent(inout) :: elems_ll(:)
- type(t_linsys), intent(inout) :: linsys
+  type(t_liftlin_p), intent(inout) :: elems_ll(:)
+  type(t_linsys), intent(inout) :: linsys
 
  real(wp), allocatable :: res_temp(:)
 
@@ -1004,7 +1003,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
       ! compute velocity
       vel = 0.0_wp
-      do j = 1,size(elems_ll)
+      do j = 1, size(elems_ll)
         if (ic .eq. 1) then
           elems_ll(j)%p%mag = elems_ll(j)%p%Gamma_old
           call elems_ll(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)

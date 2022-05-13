@@ -189,8 +189,10 @@ type(t_liftlin_p), allocatable    :: elems_ll(:)
 type(t_expl_elem_p), allocatable  :: elems_ad(:)
 !> All the elements (panels+ll)
 type(t_pot_elem_p), allocatable   :: elems_tot(:)
-!> All the non corrected elements (panels+ll-vl_nl)
+!> All the non corrected elements (panels+vl+ll+a-vl_nl)
 type(t_pot_elem_p), allocatable   :: elems_non_corr(:)
+!> All the corrected vortex lattice elements 
+type(t_pot_elem_p), allocatable   :: elems_corr(:) 
 
 !> Geometry
 type(t_geo)                       :: geo
@@ -210,7 +212,7 @@ character(len=max_char_len)       :: basename_debug
 
 real(wp), allocatable             :: res_old(:)
 real(wp), allocatable             :: surf_vel_SurfPan_old(:,:)
-real(wp), allocatable             ::      nor_SurfPan_old(:,:)
+real(wp), allocatable             :: nor_SurfPan_old(:,:)
 real(wp), allocatable             :: al_kernel(:,:), al_v(:)
 
 !> VL viscous correction
@@ -230,7 +232,6 @@ type(t_octree)                    :: octree
   logical                         :: precice_convergence
   integer                         :: j
   real(wp)                        :: sum_force(3)
-
 #endif
 
 
@@ -320,7 +321,7 @@ call prms%CreateRealOption('rankine_rad', &
 call prms%CreateRealOption('vortex_rad', &
       "Radius of vortex core, for particles", '0.1')
 call prms%CreateRealOption('k_vortex_rad', &
-      "Radius coefficient of vortex core, for particles", '-1.0') ! default is OFF
+      "Radius coefficient of vortex core, for particles", '1.0') ! default is ON
 call prms%CreateRealOption('cutoff_rad', &
       "Radius of complete cutoff  for vortex induction near core", '0.001')
 
@@ -495,7 +496,7 @@ target_file = trim(sim_param%basename)//'_geo.h5'
 
 call create_geometry(sim_param%GeometryFile, sim_param%ReferenceFile, &
                     input_file_name, geo, te, elems, elems_expl, elems_ad, &
-                    elems_ll, elems_non_corr, elems_tot, airfoil_data, target_file, run_id)
+                    elems_ll, elems_corr, elems_non_corr, elems_tot, airfoil_data, target_file, run_id)
 
 t1 = dust_time()
 if(sim_param%debug_level .ge. 1) then
@@ -881,27 +882,26 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               end do 
               !$omp end parallel do 
             endif 
-            !!$omp parallel do private(i_s)
+            !$omp parallel do private(i_s, i_c, i_s2, i_c2, vel, v) schedule(dynamic, 4) 
             do  i_s = 1, size(geo%components(i_c)%stripe)
               !> calc velocity induced by stripe component: vel 
               vel = 0.0_wp
-              do i_c2 = 1, size(geo%components) 
-                if (trim(geo%components(i_c2)%comp_el_type) .eq. 'v' .and. &
-                    trim(geo%components(i_c2)%aero_correction) .eq. 'true') then 
-                    do i_s2 = 1, size(geo%components(i_c2)%stripe)
-                      call geo%components(i_c2)%stripe(i_s2)%compute_vel(geo%components(i_c)%stripe(i_s)%cen , v)
-                      vel = vel + v         
-                    end do 
+              do i_c2 = 1, size(geo%components)
+                if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
+                    trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
+                  do i_s2 = 1, size(geo%components(i_c2)%stripe)
+                    call geo%components(i_c2)%stripe(i_s2)%compute_vel(geo%components(i_c)%stripe(i_s)%cen , v)
+                    vel = vel + v         
+                  end do 
                 endif 
-              end do                 
-                    
+              end do                                  
               geo%components(i_c)%stripe(i_s)%vel = vel
               call geo%components(i_c)%stripe(i_s)%correction_c81_vortlatt(airfoil_data, linsys, diff, it_vl, i_s)
-              !!$omp atomic
-              max_diff = max(diff, max_diff) 
-              !!$omp end atomic
+              !$omp atomic
+                max_diff = max(diff, max_diff) 
+              !$omp end atomic
             end do
-            !!$omp end parallel do                 
+            !$omp end parallel do                 
           end if 
         end do 
 
@@ -920,8 +920,13 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         endif
 
         it_vl = it_vl + 1
+        !$omp parallel do private(i_el)
         do i_el = 1 , sel      
           elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
+        enddo 
+        !$omp end parallel do 
+
+        do i_el = 1, sel 
           select type(el => elems(i_el)%p)        
             class is(t_vortlatt)   
               !> compute dforce using AVL formula without prandtl glauert correction since it is 
@@ -929,7 +934,6 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               call el%compute_dforce_jukowski(.false.) 
           end select            
         end do
-
       end do !(while)
 
       if(it_vl .eq. sim_param%vl_maxiter) then

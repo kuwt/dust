@@ -396,17 +396,18 @@ contains
 !!    moving elements after, and in the total elements surface panels
 !!    and vortex rings before, then lifting lines and finally actuator disks
 subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
-                      te, elems_impl, elems_expl, elems_ad, elems_ll, elems_non_corr, &
-                      elems_tot, airfoil_data, target_file, run_id)
-  character(len=*), intent(in)                       :: geo_file_name
-  character(len=*), intent(inout)                    :: ref_file_name
-  character(len=*), intent(in)                       :: in_file_name
-  type(t_geo), intent(out), target                   :: geo
+                      te, elems_impl, elems_expl, elems_ad, elems_ll, elems_corr, &
+                      elems_non_corr, elems_tot, airfoil_data, target_file, run_id)
+  character(len=*),    intent(in)                    :: geo_file_name
+  character(len=*),    intent(inout)                 :: ref_file_name
+  character(len=*),    intent(in)                    :: in_file_name
+  type(t_geo),         intent(out), target           :: geo
   type(t_impl_elem_p), allocatable, intent(out)      :: elems_impl(:)
   type(t_expl_elem_p), allocatable, intent(out)      :: elems_expl(:)
   type(t_expl_elem_p), allocatable, intent(out)      :: elems_ad(:)
-  type(t_liftlin_p), allocatable, intent(out)        :: elems_ll(:)
+  type(t_liftlin_p),   allocatable, intent(out)      :: elems_ll(:)
   type(t_pot_elem_p),  allocatable, intent(out)      :: elems_tot(:)
+  type(t_pot_elem_p),  allocatable, intent(out)      :: elems_corr(:)
   type(t_pot_elem_p),  allocatable, intent(out)      :: elems_non_corr(:)
   
   type(t_tedge), intent(out)                         :: te
@@ -559,9 +560,9 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
       end do 
     end if 
   end do 
-  
+  allocate(elems_corr(i_corr)) 
   allocate(elems_non_corr(geo%nelem_impl+geo%nelem_expl - i_corr))
-
+  i_corr = 0 
   do i_comp = 1,size(geo%components)
 
     if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p' .or. &
@@ -582,6 +583,13 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
         i_non_corr = i_non_corr + 1 
         elems_non_corr(i_non_corr)%p => geo%components(i_comp)%el(j)
       end do 
+
+    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'v' .and. &
+            trim(geo%components(i_comp)%aero_correction) .eq. 'true') then
+      do j = 1, size(geo%components(i_comp)%el)
+        i_corr = i_corr + 1 
+        elems_corr(i_corr)%p => geo%components(i_comp)%el(j) 
+      enddo
     
     elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'p') then 
       do j = 1,size(geo%components(i_comp)%el)
@@ -744,7 +752,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
         geo%components(i_comp)%rbf%ctr_pt%ind = geo%components(i_comp)%rbf%point%ind
         geo%components(i_comp)%rbf%ctr_pt%wei = geo%components(i_comp)%rbf%point%wei 
         
-        
         !> cleanup 
         deallocate(geo%components(i_comp)%rbf%point%ind, geo%components(i_comp)%rbf%point%wei)
         deallocate(ctr_pt) 
@@ -768,8 +775,6 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
           geo%components(i_comp)%rbf%ctr_pt%ind = geo%components(i_comp)%rbf%point%ind
           geo%components(i_comp)%rbf%ctr_pt%wei = geo%components(i_comp)%rbf%point%wei
     
-          
-
           !> cleanup 
           deallocate(geo%components(i_comp)%rbf%point%ind, geo%components(i_comp)%rbf%point%wei)
           deallocate(ctr_pt)
