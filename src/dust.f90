@@ -697,7 +697,7 @@ it = 1
     end do
 
     !> Update dust geometry ( elems and first wake panels )
-    call precice % update_elems( geo, elems_tot, te )
+    call precice%update_elems( geo, elems_tot, te )
 
     !> Update geo_data()
     do i_el = 1, size(elems_tot)
@@ -706,7 +706,7 @@ it = 1
     end do
 
     !> Update near-field wake
-    call precice % update_near_field_wake( geo, wake, te )
+    call precice%update_near_field_wake( geo, wake, te )
 
     !> Update dt--> mbdyn should take care of the dt and send it to precice (TODO)
 #else
@@ -821,174 +821,159 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
 #endif
 
 
-    ! ifort bugs workaround:
-    ! since even if the following calls looks thread safe, they mess up with
-    ! ifort and parallel runs, so the cycle is executed another time just for the
-    ! vortex lattices
-    if ( geo%nVortLatt .gt. 0) then
-      !$omp parallel do private(i_el)
-        do i_el = 1 , sel      
-          select type(el => elems(i_el)%p)        
-            class is(t_vortlatt)          
-              call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/), wake%vort_p)
-              !> compute dforce using AVL formula
-          end select
-        end do 
-      !$omp parallel do private(i_el)
+  ! ifort bugs workaround:
+  ! since even if the following calls looks thread safe, they mess up with
+  ! ifort and parallel runs, so the cycle is executed another time just for the
+  ! vortex lattices
+  if ( geo%nVortLatt .gt. 0) then
+    !$omp parallel do private(i_el)
       do i_el = 1 , sel      
         select type(el => elems(i_el)%p)        
           class is(t_vortlatt)          
-            call el%compute_dforce_jukowski(.true.) 
-          ! update the pressure field, p = df.n / area
-            ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
-            ! update the pressure field, p = df.n / area
-            el%pres = sum(el%dforce * el%nor)/el%area
-
+            call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/), wake%vort_p)
+            !> compute dforce using AVL formula
         end select
-      end do
-    end if 
+      end do 
+    !$omp end parallel do
+    do i_el = 1 , sel      
+      select type(el => elems(i_el)%p)        
+        class is(t_vortlatt)          
+          call el%compute_dforce_jukowski(.true.) 
+        ! update the pressure field, p = df.n / area
+          ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
+          ! update the pressure field, p = df.n / area
+          el%pres = sum(el%dforce * el%nor)/el%area
+      end select
+    end do
+  end if 
             
-    !> Vl correction for viscous forces 
-    if (sim_param%vl_correction) then
-      tol = sim_param%vl_tol
-      diff = 1.0_wp 
-      it_vl = 0
-      max_diff = tol + 1e-6_wp
-      linsys%skip = .true.
-
-      !> Select time step to start the vl correction 
-      !  (avoid strange behaviour at the begining of simulation)
-      if (it .gt. sim_param%vl_startstep) then 
-
-        do while (max_diff .gt. tol .and. it_vl .lt. sim_param%vl_maxiter)
-          
-          max_diff = 0.0_wp
-          diff = 0.0_wp
-          
-          do i_c = 1, size(geo%components)
-            if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
-              trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
-                
-              !> calculate geo data and initial correction 
-              if (it_vl .eq. 0) then 
-                !> calc geo quantities 
-                do i_s = 1, size(geo%components(i_c)%stripe)
-                  call geo%components(i_c)%stripe(i_s)%calc_geo_data(geo%components(i_c)%stripe(i_s)%ver) 
-                end do 
-                !> calc induced velocity from all components: vel_w
-                do  i_s = 1, size(geo%components(i_c)%stripe)
-                  call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt(elems_non_corr, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
-                end do 
-              endif 
-
-              do  i_s = 1, size(geo%components(i_c)%stripe)
-                !> calc velocity induced by stripe component: vel 
-                vel = 0.0_wp
-                do i_c2 = 1, size(geo%components) 
-                  if (trim(geo%components(i_c2)%comp_el_type) .eq. 'v' .and. &
-                      trim(geo%components(i_c2)%aero_correction) .eq. 'true') then 
-                      do i_s2 = 1, size(geo%components(i_c2)%stripe)
-                        call geo%components(i_c2)%stripe(i_s2)%compute_vel(geo%components(i_c)%stripe(i_s)%cen , v)
-                        vel = vel + v         
-                      end do 
-                  endif 
-                end do                       
-                geo%components(i_c)%stripe(i_s)%vel = vel
-                call geo%components(i_c)%stripe(i_s)%correction_c81_vortlatt(airfoil_data, linsys, diff, it_vl, i_s)
-                max_diff = max(diff, max_diff) 
-              end do                
-            end if 
-          end do 
-
-          !> Debug output of the system
-          if ((sim_param%debug_level .ge. 50) .and. time_2_debug_out) then
-            write(frmt,'(I4.4)') it
-            write(frmt_vl,'(I4.4)') it_vl
-            call dump_linsys(linsys,  &
-                            trim(basename_debug)//'A_'//trim(frmt)//'_it_'//trim(frmt_vl)//'.dat', &
-                            trim(basename_debug)//'b_'//trim(frmt)//'_it_'//trim(frmt_vl)//'.dat' )
-          endif
-
-          !> Solve the factorized system
-          if (linsys%rank .gt. 0) then
-            call solve_linsys(linsys)     
-          endif
-
-          it_vl = it_vl + 1
-          do i_el = 1 , sel      
-            elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
-            select type(el => elems(i_el)%p)        
-              class is(t_vortlatt)   
-                !> compute dforce using AVL formula without prandtl glauert correction since it is 
-                !  already contained in the .c81 table 
-                call el%compute_dforce_jukowski(.false.) 
-            end select            
-          end do
-
-        end do !(while)
-
-        !do i_c = 1, size(geo%components)
-        !  if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
-        !    trim(geo%components(i_c)%aero_correction) .eq. 'true') then           
-!
-        !      !> calc velocity induced by stripe component: vel 
-        !      do i_s = 1, size(geo%components(i_c)%stripe)
-        !        vel = 0.0_wp
-        !        x0 =  0.5_wp*( geo%components(i_c)%stripe(i_s)%ver(:,1) + geo%components(i_c)%stripe(i_s)%ver(:,2) )
-!
-        !        call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt_final(elems_non_corr, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
-!
-        !        do jj = 1, size(geo%components(i_c)%stripe)
-        !          call geo%components(i_c)%stripe(jj)%compute_vel(x0, v)
-        !          vel = vel + v                      
-        !        end do                     
-!
-        !        wind = variable_wind(x0, sim_param%time)
-        !        geo%components(i_c)%stripe(i_s)%vel_ctr_pt = geo%components(i_c)%stripe(i_s)%vel_ctr_pt  + &
-        !                                                    wind + vel - geo%components(i_c)%stripe(i_s)%ub
-!
-        !      end do
-        !  end if 
-        !end do 
+  !> Vl correction for viscous forces 
+  if (sim_param%vl_correction) then
+    tol = sim_param%vl_tol
+    diff = 1.0_wp 
+    it_vl = 0
+    max_diff = tol + 1e-6_wp
+    linsys%skip = .true.
+    t0 = dust_time()
+    !> Select time step to start the vl correction 
+    !  (avoid strange behaviour at the begining of simulation)
+    if (it .gt. sim_param%vl_startstep) then 
+      
+      do while (max_diff .gt. tol .and. it_vl .lt. sim_param%vl_maxiter)
         
+        max_diff = 0.0_wp
+        diff = 0.0_wp
         
-        
-        if(it_vl .eq. sim_param%vl_maxiter) then
-          call warning('dust','dust','max iteration reached for non linear vl:&
-                      increase VLmaxiter!') 
-          write(message,*) 'Last iteration error: ', max_diff
-          call printout(message)
-        endif
-        
-        !> Viscous and pressure drag correction 
         do i_c = 1, size(geo%components)
           if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
             trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
-            do i_s = 1, size(geo%components(i_c)%stripe) 
-              d_cd =  0.5_wp * sim_param%rho_inf *  & 
-                      geo%components(i_c)%stripe(i_s)%vel_2d**2.0_wp *      &                 
-                      geo%components(i_c)%stripe(i_s)%cd * &
-                      (geo%components(i_c)%stripe(i_s)%tang_cen * &
-                      cos(geo%components(i_c)%stripe(i_s)%alpha*pi/180.0_wp) + & 
-                      (geo%components(i_c)%stripe(i_s)%nor) * &
-                      sin(geo%components(i_c)%stripe(i_s)%alpha*pi/180.0_wp ))
-
-              do i_p = 1, size(geo%components(i_c)%stripe(i_s)%panels)
-                geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce = &
-                            geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce + &
-                            d_cd * geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area
-                !> update pressure 
-                geo%components(i_c)%stripe(i_s)%panels(i_p)%p%pres = & 
-                            sum(geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce * &
-                                geo%components(i_c)%stripe(i_s)%panels(i_p)%p%nor)/ & 
-                                geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area 
-              end do
+              
+            !> calculate geo data and initial correction 
+            if (it_vl .eq. 0) then 
+              !> calc geo quantities 
+              do i_s = 1, size(geo%components(i_c)%stripe)
+                call geo%components(i_c)%stripe(i_s)%calc_geo_data(geo%components(i_c)%stripe(i_s)%ver) 
+              end do 
+              !> calc induced velocity from all components: vel_w
+              !$omp parallel do private(i_s)
+              do  i_s = 1, size(geo%components(i_c)%stripe)
+                call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt(elems_non_corr, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
+              end do 
+              !$omp end parallel do 
+            endif 
+            !!$omp parallel do private(i_s)
+            do  i_s = 1, size(geo%components(i_c)%stripe)
+              !> calc velocity induced by stripe component: vel 
+              vel = 0.0_wp
+              do i_c2 = 1, size(geo%components) 
+                if (trim(geo%components(i_c2)%comp_el_type) .eq. 'v' .and. &
+                    trim(geo%components(i_c2)%aero_correction) .eq. 'true') then 
+                    do i_s2 = 1, size(geo%components(i_c2)%stripe)
+                      call geo%components(i_c2)%stripe(i_s2)%compute_vel(geo%components(i_c)%stripe(i_s)%cen , v)
+                      vel = vel + v         
+                    end do 
+                endif 
+              end do                 
+                    
+              geo%components(i_c)%stripe(i_s)%vel = vel
+              call geo%components(i_c)%stripe(i_s)%correction_c81_vortlatt(airfoil_data, linsys, diff, it_vl, i_s)
+              !!$omp atomic
+              max_diff = max(diff, max_diff) 
+              !!$omp end atomic
             end do
+            !!$omp end parallel do                 
           end if 
-        end do         
+        end do 
+
+        !> Debug output of the system
+        if ((sim_param%debug_level .ge. 50) .and. time_2_debug_out) then
+          write(frmt,'(I4.4)') it
+          write(frmt_vl,'(I4.4)') it_vl
+          call dump_linsys(linsys,  &
+                          trim(basename_debug)//'A_'//trim(frmt)//'_it_'//trim(frmt_vl)//'.dat', &
+                          trim(basename_debug)//'b_'//trim(frmt)//'_it_'//trim(frmt_vl)//'.dat' )
+        endif
+
+        !> Solve the factorized system
+        if (linsys%rank .gt. 0) then
+          call solve_linsys(linsys)     
+        endif
+
+        it_vl = it_vl + 1
+        do i_el = 1 , sel      
+          elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
+          select type(el => elems(i_el)%p)        
+            class is(t_vortlatt)   
+              !> compute dforce using AVL formula without prandtl glauert correction since it is 
+              !  already contained in the .c81 table 
+              call el%compute_dforce_jukowski(.false.) 
+          end select            
+        end do
+
+      end do !(while)
+
+      if(it_vl .eq. sim_param%vl_maxiter) then
+        call warning('dust','dust','max iteration reached for non linear vl:&
+                    increase VLmaxiter!') 
+        write(message,*) 'Last iteration error: ', max_diff
+        call printout(message)
       endif
-      linsys%skip = .false.
-    end if 
+        
+      !> Viscous and pressure drag correction 
+      do i_c = 1, size(geo%components)
+        if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
+          trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
+          do i_s = 1, size(geo%components(i_c)%stripe) 
+            d_cd =  0.5_wp * sim_param%rho_inf *  & 
+                    geo%components(i_c)%stripe(i_s)%vel_2d**2.0_wp *      &                 
+                    geo%components(i_c)%stripe(i_s)%cd * &
+                    (geo%components(i_c)%stripe(i_s)%tang_cen * &
+                    cos(geo%components(i_c)%stripe(i_s)%alpha*pi/180.0_wp) + & 
+                    (geo%components(i_c)%stripe(i_s)%nor) * &
+                    sin(geo%components(i_c)%stripe(i_s)%alpha*pi/180.0_wp ))
+
+            do i_p = 1, size(geo%components(i_c)%stripe(i_s)%panels)
+              geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce = &
+                          geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce + &
+                          d_cd * geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area
+              !> update pressure 
+              geo%components(i_c)%stripe(i_s)%panels(i_p)%p%pres = & 
+                          sum(geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce * &
+                              geo%components(i_c)%stripe(i_s)%panels(i_p)%p%nor)/ & 
+                              geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area 
+            end do
+          end do
+        end if 
+      end do         
+    endif
+    linsys%skip = .false.
+    t1 = dust_time()
+    if(sim_param%debug_level .ge. 1) then
+      write(message,'(A,F9.3,A)') 'Solve nonlinear vortex lattice in: ' , t1 - t0,' s.'
+      call printout(message)
+    endif
+
+  end if 
 
 !write(*,*) 'dforce_post_vc   ', elems(11)%p%dforce
   ! Explicit elements:
@@ -996,11 +981,11 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
   ! - actdisk: avg delta_pressure and force computed here,
   !            to include thier effects in postpro (e.g. integral loads)
 !$omp parallel do private(i_el)
-    do i_el = 1 , size(elems_ad)
-      call elems_ad(i_el)%p%compute_pres( &     ! update surf_vel field too
-            geo%refs( geo%components(elems_ad(i_el)%p%comp_id)%ref_id )%R_g)
-      call elems_ad(i_el)%p%compute_dforce()
-    end do
+  do i_el = 1 , size(elems_ad)
+    call elems_ad(i_el)%p%compute_pres( &     ! update surf_vel field too
+          geo%refs( geo%components(elems_ad(i_el)%p%comp_id)%ref_id )%R_g)
+    call elems_ad(i_el)%p%compute_dforce()
+  end do
 !$omp end parallel do
 
 #if USE_PRECICE
@@ -1088,8 +1073,8 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
             nor_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) = el%nor   ! el%surf_vel
       end select
     end do
-
-    !> Pressure integral equation 
+    t0 = dust_time()
+    !> update geometry 
     if(it .lt. nstep) then
       time = min(sim_param%tend, sim_param%time_vec(it+1))
       !> Update geometry
@@ -1098,7 +1083,13 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
             call complete_wake(wake, geo, elems_tot, te)
       end if
     endif
-  
+    t1 = dust_time() 
+
+    !> debug message
+    if(sim_param%debug_level .ge. 1) then
+      write(message,'(A,F9.3,A)') 'Updated geometry in: ' , t1 - t0,' s.'
+      call printout(message)
+    endif
     !> Save old solution (at the previous dt) of the linear system
     res_old = linsys%res
 

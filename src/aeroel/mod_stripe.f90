@@ -173,7 +173,7 @@ module mod_stripe
     real(wp)                         :: alpha, alpha_2d, alcl0
     real(wp),    allocatable         :: al0(:)
     real(wp),    allocatable         :: aero_coeff(:)
-    real(wp)                         :: up(3), unorm, corr_fact, dcl_da
+    real(wp)                         :: up(3), unorm, corr_fact, dcl_da, cl0, cl10
     real(wp)                         :: dforce(3), mag_inv, mag_visc 
     integer                          :: i_c, n_pan, id_pan
     real(wp)                         :: cl_inv, cl_visc, e_l(3)
@@ -217,14 +217,14 @@ module mod_stripe
     this%vel_2d = unorm
 
     mag_inv = 0.0_wp
-    dforce = 0.0_wp
+    !dforce = 0.0_wp
     do i_c = 1, n_pan
       if ( i_c .gt. 1 ) then
         mag_inv = mag_inv + (this%panels(i_c)%p%mag - this%panels(i_c-1)%p%mag) 
       else
         mag_inv = mag_inv + this%panels(i_c)%p%mag
       end if
-      dforce = dforce + this%panels(i_c)%p%dforce
+      !dforce = dforce + this%panels(i_c)%p%dforce
     end do 
 
     !> Local Mach number 
@@ -235,12 +235,21 @@ module mod_stripe
     
     !> get the airfoil slope at alpha 0 for the current mach  and re number  
     call interp_aero_coeff ( airfoil_data,  this%csi_cen, this%i_airfoil , &
-                        (/0.0_wp, mach, reynolds/), aero_coeff, dcl_da )
-
+                        (/0.0_wp, mach, reynolds/), aero_coeff)
+    
+    cl0 = aero_coeff(1)
+    call interp_aero_coeff ( airfoil_data,  this%csi_cen, this%i_airfoil , &
+                        (/10.0_wp, mach, reynolds/), aero_coeff)
+    
+    cl10 = aero_coeff(1)
+    dcl_da = (cl10-cl0)/10.0_wp*180.0_wp/pi  ! make dcl_da more robust
+    !if (it_vl .eq. 1) then 
+    !  write(*,*) dcl_da
+    !endif
     alpha = atan2(dot(up, this%nor), dot(up,this%tang_cen))
     
     !> "2D correction" of the induced angle
-    alpha_2d = mag_inv / ( dcl_da/2.0_wp * this%chord * unorm ) 
+    alpha_2d = mag_inv / ( dcl_da/2.0_wp* this%chord * unorm ) 
     
     alpha = (alpha - alpha_2d) * 180.0_wp/pi  
     
@@ -257,10 +266,10 @@ module mod_stripe
     cl_visc = this%cl_visc    
     
     !> get cl_inv as force projection along the aoa 
-    e_l = this%nor*cos(alpha/180.0_wp*pi) - this%tang_cen*sin(alpha/180.0_wp*pi)
-    cl_inv = sum(dforce * e_l) / &
-              (0.5_wp*sim_param%rho_inf*(unorm ** 2.0_wp)*this%area)
-
+    !e_l = this%nor*cos(alpha/180.0_wp*pi) - this%tang_cen*sin(alpha/180.0_wp*pi)
+    !cl_inv = sum(dforce * e_l) / &
+    !          (0.5_wp*sim_param%rho_inf*(unorm ** 2.0_wp)*this%area)
+    cl_inv = -2.0_wp * mag_inv / (unorm*this%chord)    
     !> Update term rhs (absolute)
     rhs_diff = (cl_visc - cl_inv)
     

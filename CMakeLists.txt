@@ -83,15 +83,18 @@ IF (DUST_MKL)
 #  SET(BLA_VENDOR "Intel") #search only for intel libraries
   find_package(MKL REQUIRED)
   LIST(APPEND incldirs ${MKL_INCLUDE_DIRS}) 
-  LIST(APPEND linkedlibs ${MKL_LIBRARIES} pthread dl)
+  #LIST(APPEND linkedlibs ${MKL_LIBRARIES} pthread dl)
+  LIST(APPEND linkedlibs "-Wl,--start-group" ${MKL_LIBRARIES} "-Wl,--end-group" pthread dl)
   IF(CMAKE_Fortran_COMPILER_ID MATCHES "Intel") 
     set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -mkl")
     set(CMAKE_Fortran_FLAGS_PROFILE "${CMAKE_Fortran_FLAGS_PROFILE} -mkl")
     set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} -mkl")
   ENDIF() 
 ELSE()
+  SET(BLA_VENDOR "OpenBLAS")
   find_package(LAPACK REQUIRED)
   LIST(APPEND linkedlibs ${LAPACK_LIBRARIES})
+
 ENDIF()
 
 #> HDF5 ---------------------------------------------------------

@@ -141,6 +141,7 @@ subroutine initialize_linsys(linsys, geo, elems, expl_elems, wake )
   allocate(linsys%res_expl(linsys%n_expl,2))
   linsys%b_static = 0.0_wp
   linsys%res_expl = 0.0_wp
+  linsys%P = 0
 
   !> Pressure
   !> Set the number of surface panels
@@ -352,36 +353,41 @@ subroutine solve_linsys(linsys)
   type(t_linsys), intent(inout) :: linsys
   integer                       :: INFO
   !logical, optional, intent(in) :: vl_correction
+  real                          :: t0, t1
   character(len=max_char_len)   :: msg
+  character(len=max_char_len)  :: message
   character(len=*), parameter   :: this_sub_name = 'solve_linsys'
 
   if (.not. linsys%skip) then
-  !> Operations on the side band matrices: done only if the system is
-  !> mixed static/dynamic and those matrices exists
-  if (linsys%nstatic .gt. 0 .and. linsys%nmoving .gt.0) then
-    !> Create the upper-diagonal block Usd
-    !> Swap in place Asd to get PssAsd
+    
+    !> Operations on the side band matrices: done only if the system is
+    !> mixed static/dynamic and those matrices exists
+    if (linsys%nstatic .gt. 0 .and. linsys%nmoving .gt.0) then
+      !> Create the upper-diagonal block Usd
+      !> Swap in place Asd to get PssAsd
+
+
 #if (DUST_PRECISION==1)
-  call slaswp(linsys%nmoving, &
-              linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
-              linsys%nstatic,1,linsys%nstatic,linsys%P(1:linsys%nstatic),1)
+    call slaswp(linsys%nmoving, &
+                linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
+                linsys%nstatic,1,linsys%nstatic,linsys%P(1:linsys%nstatic),1)
 #elif (DUST_PRECISION==2)
-  call dlaswp(linsys%nmoving, &
-              linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
-              linsys%nstatic,1,linsys%nstatic,linsys%P(1:linsys%nstatic),1)
+    call dlaswp(linsys%nmoving, &
+                linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank), &
+                linsys%nstatic,1,linsys%nstatic,linsys%P(1:linsys%nstatic),1)
 #endif /*DUST_PRECISION*/
 
   !> Solve Lss Usd = Pss Asd to get Usd and put it in place of Asd
 #if (DUST_PRECISION==1)
-  call strsm('L','L','N','U',linsys%nstatic,linsys%nmoving,1.0d+0,   &
-              linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic, &
-              linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank),    &
-              linsys%nstatic)
+    call strsm('L','L','N','U',linsys%nstatic,linsys%nmoving,1.0d+0,   &
+                linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic, &
+                linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank),    &
+                linsys%nstatic)
 #elif (DUST_PRECISION==2)
-  call dtrsm('L','L','N','U',linsys%nstatic,linsys%nmoving,1.0d+0,   &
-              linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic, &
-              linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank),    &
-              linsys%nstatic)               
+    call dtrsm('L','L','N','U',linsys%nstatic,linsys%nmoving,1.0d+0,   &
+                linsys%A(1:linsys%nstatic,1:linsys%nstatic),linsys%nstatic, &
+                linsys%A(1:linsys%nstatic,linsys%nstatic+1:linsys%rank),    &
+                linsys%nstatic)               
 #endif /*DUST_PRECISION*/
 
   !==>Solve the lower-diagoal block Lds
@@ -431,6 +437,7 @@ subroutine solve_linsys(linsys)
     call dgetrf(linsys%nmoving,linsys%nmoving, &
                 linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank), &
                 linsys%nmoving,linsys%P(linsys%nstatic+1:linsys%rank),info)
+    t1 = dust_time()
 #endif /*DUST_PRECISION*/
 
     if ( info .ne. 0 ) then
@@ -487,7 +494,7 @@ subroutine destroy_linsys(linsys)
   type(t_linsys), intent(out) :: linsys
 
   !> Dummy operation to suppress warning
-  linsys%rank = -1
+  !linsys%rank = -1
 
 end subroutine destroy_linsys
 
