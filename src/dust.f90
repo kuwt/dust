@@ -882,7 +882,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               end do 
               !$omp end parallel do 
             endif 
-            !$omp parallel do private(i_s, i_c, i_s2, i_c2, vel, v) schedule(dynamic, 4) 
+            !$omp parallel do private(i_s, i_s2, i_c2, vel, v) schedule(dynamic, 4) 
             do  i_s = 1, size(geo%components(i_c)%stripe)
               !> calc velocity induced by stripe component: vel 
               vel = 0.0_wp
