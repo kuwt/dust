@@ -17,13 +17,11 @@ hinge = {
   node_1 = (/ 1.4178, 1.4557, 0.3473/)  ! In the local ref.frame
   node_2 = (/ 2.4026  , 3.1615  , 0.6946/)
   n_nodes = 2
-  ! }
-  ! hinge_Nodes_input_From_file = {
-  !   Node_file = hinge_node.dat
-  ! }
+
   hinge_ref_dir = (/ 1.0, 0.0 , 0.0 /)
   hinge_offset  = 0.1
-  hinge_spanwise_blending = 0.01
+  hinge_spanwise_blending = 0.001
+  hinge_merge_tol = 0.15
   hinge_rotation_input = function:sin
   hinge_rotation_function = {
     amplitude = 30.0    ! deg
@@ -37,13 +35,11 @@ hinge = {
   node_2 = (/ 1.4178, -1.4557, 0.3473/)  
   node_1 = (/ 2.4026  , -3.1615  , 0.6946/)
   n_nodes = 2
-  ! }
-  ! hinge_Nodes_input_From_file = {
-  !   Node_file = hinge_node.dat
-  ! }
+
   hinge_ref_dir = (/ 1.0, 0.0 , 0.0 /)
   hinge_offset  = 0.1
-  hinge_spanwise_blending = 0.01
+  hinge_spanwise_blending = 0.001
+  hinge_merge_tol = 0.15
   hinge_rotation_input = function:sin
   hinge_rotation_function = {
     amplitude = -30.0    ! deg
