@@ -853,6 +853,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     tol = sim_param%vl_tol
     diff = 1.0_wp 
     it_vl = 0
+    
     max_diff = tol + 1e-6_wp
     linsys%skip = .true.
     t0 = dust_time()
@@ -871,10 +872,12 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               
             !> calculate geo data and initial correction 
             if (it_vl .eq. 0) then 
-              !> calc geo quantities 
+              !> calc geo quantities  
+              !$omp parallel do private(i_s)
               do i_s = 1, size(geo%components(i_c)%stripe)
                 call geo%components(i_c)%stripe(i_s)%calc_geo_data(geo%components(i_c)%stripe(i_s)%ver) 
               end do 
+              !$omp end parallel do 
               !> calc induced velocity from all components: vel_w
               !$omp parallel do private(i_s)
               do  i_s = 1, size(geo%components(i_c)%stripe)
@@ -882,6 +885,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               end do 
               !$omp end parallel do 
             endif 
+
             !$omp parallel do private(i_s, i_s2, i_c2, vel, v) schedule(dynamic, 4) 
             do  i_s = 1, size(geo%components(i_c)%stripe)
               !> calc velocity induced by stripe component: vel 
@@ -890,18 +894,20 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                 if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
                     trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
                   do i_s2 = 1, size(geo%components(i_c2)%stripe)
-                    call geo%components(i_c2)%stripe(i_s2)%compute_vel(geo%components(i_c)%stripe(i_s)%cen , v)
+                    call geo%components(i_c2)%stripe(i_s2)%compute_vel_stripe(geo%components(i_c)%stripe(i_s)%cen , v)
+                                                                              
                     vel = vel + v         
                   end do 
                 endif 
               end do                                  
               geo%components(i_c)%stripe(i_s)%vel = vel
               call geo%components(i_c)%stripe(i_s)%correction_c81_vortlatt(airfoil_data, linsys, diff, it_vl, i_s)
-              !$omp atomic
+            !$omp atomic
                 max_diff = max(diff, max_diff) 
-              !$omp end atomic
+            !$omp end atomic
             end do
-            !$omp end parallel do                 
+            !$omp end parallel do   
+            
           end if 
         end do 
 
@@ -920,6 +926,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         endif
 
         it_vl = it_vl + 1
+
         !$omp parallel do private(i_el)
         do i_el = 1 , sel      
           elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
@@ -947,6 +954,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
       do i_c = 1, size(geo%components)
         if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
           trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
+
           do i_s = 1, size(geo%components(i_c)%stripe) 
             d_cd =  0.5_wp * sim_param%rho_inf *  & 
                     geo%components(i_c)%stripe(i_s)%vel_2d**2.0_wp *      &                 
@@ -966,6 +974,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                               geo%components(i_c)%stripe(i_s)%panels(i_p)%p%nor)/ & 
                               geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area 
             end do
+
           end do
         end if 
       end do         

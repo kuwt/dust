@@ -100,6 +100,8 @@ module mod_stripe
     real(wp) :: ctr_pt(3)
     !> Chord 
     real(wp) :: chord
+    !> Doubled induced velocity 
+    real(wp) :: vdou(3)
     !> Velocity induced by corrected stripes  
     real(wp) :: vel(3) 
     !> Velocity induced by other elements 
@@ -128,19 +130,22 @@ module mod_stripe
     real(wp) :: al_ctr_pt
     real(wp) :: vel_ctr_pt(3)
     real(wp) :: aero_coeff(3) 
+    real(wp) :: mag_inv
     !> Stripe 'curvature'
     real(wp) :: curv_ac 
     !> Sweep angle 
     real(wp) :: d_2pi_coslambda
-  
+    !> Iteration counter (workound)
+    integer(wp) :: iteration 
   contains
 
     procedure, pass(this) :: correction_c81_vortlatt  => correction_c81_vortlatt
-    procedure, pass(this) :: compute_vel              => compute_vel_stripe
+    procedure, pass(this) :: compute_vel_stripe       => compute_vel_stripe
     procedure, pass(this) :: compute_grad             => compute_grad_stripe
     procedure, pass(this) :: get_vel_ctr_pt           => get_vel_ctr_pt_stripe
     procedure, pass(this) :: calc_geo_data            => calc_geo_data_stripe
     !> Dummy for intel workaround
+    procedure, pass(this) :: compute_vel              => compute_vel_dummy
     procedure, pass(this) :: build_row                => build_row_stripe
     procedure, pass(this) :: build_row_static         => build_row_static_stripe
     procedure, pass(this) :: add_wake                 => add_wake_stripe
@@ -216,17 +221,7 @@ module mod_stripe
     unorm = norm2(up)      ! velocity w/o induced velocity
     this%vel_2d = unorm
 
-    mag_inv = 0.0_wp
-    !dforce = 0.0_wp
-    do i_c = 1, n_pan
-      if ( i_c .gt. 1 ) then
-        mag_inv = mag_inv + (this%panels(i_c)%p%mag - this%panels(i_c-1)%p%mag) 
-      else
-        mag_inv = mag_inv + this%panels(i_c)%p%mag
-      end if
-      !dforce = dforce + this%panels(i_c)%p%dforce
-    end do 
-
+    mag_inv = this%mag_inv 
     !> Local Mach number 
     mach = unorm / sim_param%a_inf
     
@@ -242,10 +237,9 @@ module mod_stripe
                         (/10.0_wp, mach, reynolds/), aero_coeff)
     
     cl10 = aero_coeff(1)
+
     dcl_da = (cl10-cl0)/10.0_wp*180.0_wp/pi  ! make dcl_da more robust
-    !if (it_vl .eq. 1) then 
-    !  write(*,*) dcl_da
-    !endif
+    
     alpha = atan2(dot(up, this%nor), dot(up,this%tang_cen))
     
     !> "2D correction" of the induced angle
@@ -264,11 +258,7 @@ module mod_stripe
     this%alpha  = alpha  
     
     cl_visc = this%cl_visc    
-    
-    !> get cl_inv as force projection along the aoa 
-    !e_l = this%nor*cos(alpha/180.0_wp*pi) - this%tang_cen*sin(alpha/180.0_wp*pi)
-    !cl_inv = sum(dforce * e_l) / &
-    !          (0.5_wp*sim_param%rho_inf*(unorm ** 2.0_wp)*this%area)
+
     cl_inv = -2.0_wp * mag_inv / (unorm*this%chord)    
     !> Update term rhs (absolute)
     rhs_diff = (cl_visc - cl_inv)
@@ -332,29 +322,33 @@ module mod_stripe
   
   end subroutine get_vel_ctr_pt_stripe
 
-  subroutine compute_vel_stripe(this, pos, vel) 
-    class(t_stripe),    intent(in)    :: this
-    real(wp),  intent(in)             :: pos(:)
-    real(wp), intent(out)             :: vel(3) 
+  subroutine compute_vel_stripe(this, pos, vel)
+    class(t_stripe),    intent(inout)    :: this
+    real(wp),           intent(in)    :: pos(:)
+    real(wp),           intent(out)   :: vel(3) 
+    
     real(wp)                          :: vdou(3), mag
 
-    integer                           :: i_c, n_pan
+    integer                           :: i, n_pan
+  
     !> Total panel on stripe 
     n_pan = size(this%panels)
     
     call velocity_calc_doublet(this, vdou, pos)
-    !> Calculate total mag coming from the stripe 
     
+    !> Calculate total mag coming from the stripe 
     mag = 0.0_wp
-    do i_c = 1, n_pan
-      if ( i_c .gt. 1 ) then
-        mag = mag + ( this%panels(i_c)%p%mag - this%panels(i_c-1)%p%mag ) 
+    do i = 1, n_pan
+      if ( i .gt. 1 ) then
+        mag = mag + (this%panels(i)%p%mag - this%panels(i-1)%p%mag) 
       else
-        mag = mag + this%panels(i_c)%p%mag
+        mag = mag + this%panels(i)%p%mag
       end if
     end do 
 
-    vel = vdou*mag 
+    this%mag_inv = mag
+    
+    vel = vdou*this%mag_inv 
     vel = vel/(4.0_wp*pi)
     
   end subroutine compute_vel_stripe   
@@ -454,6 +448,14 @@ module mod_stripe
   end subroutine calc_geo_data_stripe
 
   !------------------------------DUMMY FUNCTIONS-----------------------------
+  subroutine compute_vel_dummy(this, pos, vel) 
+    class(t_stripe),    intent(in)    :: this
+    real(wp),           intent(in)    :: pos(:)
+    real(wp),           intent(out)   :: vel(3) 
+    
+    
+  end subroutine compute_vel_dummy   
+
 
   subroutine build_row_stripe(this, elems, linsys, ie, ista, iend)
     class(t_stripe), intent(inout)   :: this

@@ -407,6 +407,7 @@ abstract interface
     real(wp), intent(in)      :: pos(:)
     real(wp), intent(out)     :: vel(3)
   end subroutine
+
 end interface
 
 !----------------------------------------------------------------------
