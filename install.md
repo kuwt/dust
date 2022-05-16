@@ -27,7 +27,7 @@ in most linux distributions.
 
 #### Libraries
   ```bash
-  $ sudo apt install liblapack-dev libblas-dev libcgns-dev libhdf5-dev libopenblas0
+  $ sudo apt install liblapack-dev libblas-dev libopenblas-dev libopenblas0 libcgns-dev libhdf5-dev
   ```
 </details>
 
