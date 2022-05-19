@@ -279,6 +279,7 @@ type t_sim_param
   integer   :: vl_maxiter
   integer   :: vl_startstep
   logical   :: vl_dynstall = .false.
+  logical   :: rel_aitken  = .false. 
 
 contains
   procedure, pass(this) :: save_param => save_sim_param

@@ -167,10 +167,11 @@ module mod_stripe
   !----------------------------------------------------------------------
   contains
 
-  subroutine correction_c81_vortlatt(this, airfoil_data, linsys, diff, it_vl, i_s)
+  subroutine correction_c81_vortlatt(this, airfoil_data, linsys, diff, residual, it_vl, i_s)
     class(t_stripe),   intent(inout) :: this
     type(t_aero_tab),  intent(in)    :: airfoil_data(:)
     type(t_linsys),    intent(inout) :: linsys
+    real(wp),          intent(inout) :: residual(:)
     integer,           intent(in)    :: it_vl, i_s !> debug only
 
     real(wp)                         :: diff
@@ -234,11 +235,11 @@ module mod_stripe
     
     cl0 = aero_coeff(1)
     call interp_aero_coeff ( airfoil_data,  this%csi_cen, this%i_airfoil , &
-                        (/10.0_wp, mach, reynolds/), aero_coeff)
+                        (/8.0_wp, mach, reynolds/), aero_coeff)
     
     cl10 = aero_coeff(1)
 
-    dcl_da = (cl10-cl0)/10.0_wp*180.0_wp/pi  ! make dcl_da more robust
+    dcl_da = (cl10-cl0)/8.0_wp*180.0_wp/pi  ! make dcl_da more robust
     
     alpha = atan2(dot(up, this%nor), dot(up,this%tang_cen))
     
@@ -269,11 +270,12 @@ module mod_stripe
     do i_c = 1, n_pan
       !> Take the id of the panel in the linsys 
       id_pan = this%panels(i_c)%p%id
-      !> Update of the rhs 
-      linsys%b(id_pan) =  (1 + rel_fct*rhs_diff)*linsys%b(id_pan)              
+      !> Update of the rhs
+      residual(id_pan) =  rhs_diff*linsys%b(id_pan) 
+      !linsys%b(id_pan) =  (1 + rel_fct*rhs_diff)*linsys%b(id_pan)        
     end do 
-
     
+
   end subroutine correction_c81_vortlatt
 
   !----------------------------------------------------------------------

@@ -127,10 +127,11 @@ ll_loads_avl = T
 
 ! --- Vortex Lattice Correction ---
 vl_tol = 1.0e-5
-vl_relax = 1.0
+vl_relax = 0.1
 vl_maxiter = 100
-vl_start_step = 1
+vl_start_step = 0
 vl_dynstall = F
+relax_aitken = F 
 
 \end{inputfile}
 
@@ -530,20 +531,24 @@ Angle of attack after which the full artificial viscosity is introduced, thus af
 
 Angle of attack range before \param{ll_artificial_viscosity_adaptive\_Alpha} where the artificial viscosity is gradually introduced from zero to the maximum value set in \param{ll_artificial_viscosity}.
 
-\item \param{vl_tol}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 1.0e-3 \textit{type:} real. 
+\item \param{vl_tol}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 1.0e-4 \textit{type:} real. 
 Tolerance for the absolute error on lift coefficient in fixed point iteration for corrected vortex lattice.
 
-\item \param{vl_relax}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.05 \textit{type:} real. 
-Relaxation factor for rhs update
+\item \param{vl_relax}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.1 \textit{type:} real. 
+Constant relaxation factor for rhs update
+
+\item \param{aitken_relaxation}: \textit{required:} no. \textit{multiple:} no. \textit{default:} F \textit{type:} logical. 
+Activate the Aitken acceleration method during the vortex lattice fixed point iteration. The initial relaxation is the one specified in \opt{vl_relax}. 
 
 \item \param{vl_maxiter}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 100 \textit{type:} integer. 
 Max number of iteration for correction of vortex lattice
 
 \item \param{vl_start_step}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 1 \textit{type:} integer. 
-Time step to start correcting the vortex lattice element. It is advisable to avoid the first time step since the vortex lattice element behave in nonphysical manner at that time-step. 
+Time step to start correcting the vortex lattice element
 
-\item \param{vl_dynstall}: \textit{required:} no. \textit{multiple:} no. \textit{default:} F \textit{type:} integer. 
+\item \param{vl_dynstall}: \textit{required:} no. \textit{multiple:} no. \textit{default:} F \textit{type:} logical. 
 Activate Boeing\footnote{\url{https://apps.dtic.mil/sti/pdfs/AD0767240.pdf}} dynamic stall on the corrected \param{v} element.   
+
 
 
 \end{itemize}

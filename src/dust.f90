@@ -221,6 +221,9 @@ integer                           :: it_vl, id_pan
 real(wp)                          :: tol, diff, max_diff 
 real(wp)                          :: d_cd(3), vel(3), v(3), x0(3), wind(3)
 real(wp), allocatable             :: res_tmp(:)
+!> relaxation 
+real(wp), allocatable             :: residual_vl(:), residual_vl_old(:), residual_vl_delta(:)
+real(wp)                          :: rel_aitken, rel_fct 
 
 !> octree parameters
 type(t_octree)                    :: octree
@@ -358,14 +361,16 @@ call prms%CreateLogicalOption('ll_loads_avl', &
                           &'Use AVL expression for inviscid load computation','T')
 
 !> VL correction parameter 
-call prms%CreateRealOption('vl_relax', 'Relaxation factor for rhs update','1.0')
+call prms%CreateRealOption('vl_relax', 'Relaxation factor for rhs update','0.1')
 call prms%CreateIntOption('vl_maxiter', &
                           &'Maximum number of iteration in VL algorithm', '100')
 call prms%CreateRealOption('vl_tol', 'Tolerance for the absolute error on lift coefficient in &
-                          &fixed point iteration for VL','1.0e-3' )
+                          &fixed point iteration for VL','1.0e-4' )
 call prms%CreateIntOption('vl_start_step', &
-                          &'Step in which the VL correction start', '1')
+                          &'Step in which the VL correction start', '0')
 call prms%CreateLogicalOption('vl_dynstall', 'Dynamic stall on corrected VL', 'F')
+call prms%CreateLogicalOption('aitken_relaxation', 'Employ aitken acceleration method during &   
+                              the fixed point iteration', 'F') !> change default? 
 
 !> Octree and multipole data 
 call prms%CreateLogicalOption('fmm','Employ fast multipole method?','T')
@@ -847,7 +852,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
       end select
     end do
   end if 
-            
+  
   !> Vl correction for viscous forces 
   if (sim_param%vl_correction) then
     tol = sim_param%vl_tol
@@ -857,9 +862,16 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     max_diff = tol + 1e-6_wp
     linsys%skip = .true.
     t0 = dust_time()
+    
+
     !> Select time step to start the vl correction 
     !  (avoid strange behaviour at the begining of simulation)
     if (it .gt. sim_param%vl_startstep) then 
+
+      !> allocate residual terms for Aitken acceleration  
+      allocate(residual_vl(size(linsys%b)));        residual_vl = 0.0_wp
+      allocate(residual_vl_old(size(linsys%b)));    residual_vl_old = 0.0_wp  
+      allocate(residual_vl_delta(size(linsys%b)));  residual_vl_delta = 0.0_wp
       
       do while (max_diff .gt. tol .and. it_vl .lt. sim_param%vl_maxiter)
         
@@ -901,13 +913,12 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                 endif 
               end do                                  
               geo%components(i_c)%stripe(i_s)%vel = vel
-              call geo%components(i_c)%stripe(i_s)%correction_c81_vortlatt(airfoil_data, linsys, diff, it_vl, i_s)
+              call geo%components(i_c)%stripe(i_s)%correction_c81_vortlatt(airfoil_data, linsys, diff, residual_vl, it_vl, i_s)
             !$omp atomic
                 max_diff = max(diff, max_diff) 
             !$omp end atomic
             end do
-            !$omp end parallel do   
-            
+            !$omp end parallel do               
           end if 
         end do 
 
@@ -919,6 +930,17 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                           trim(basename_debug)//'A_'//trim(frmt)//'_it_'//trim(frmt_vl)//'.dat', &
                           trim(basename_debug)//'b_'//trim(frmt)//'_it_'//trim(frmt_vl)//'.dat' )
         endif
+
+        !> relaxation factor 
+        residual_vl_delta = residual_vl - residual_vl_old 
+        if (sim_param%rel_aitken .and. it_vl .gt. 2) then 
+          rel_aitken = -rel_aitken*dot(residual_vl_old , residual_vl_delta) / dot(residual_vl_delta, residual_vl_delta)
+          linsys%b = linsys%b + rel_aitken*residual_vl 
+        else
+          linsys%b = linsys%b + sim_param%vl_relax*residual_vl 
+          rel_aitken = -sim_param%vl_relax*dot(residual_vl_old , residual_vl_delta) / dot(residual_vl_delta, residual_vl_delta)
+        endif 
+        residual_vl_old = residual_vl
 
         !> Solve the factorized system
         if (linsys%rank .gt. 0) then
@@ -943,6 +965,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         end do
       end do !(while)
 
+      deallocate(residual_vl, residual_vl_old, residual_vl_delta)
       if(it_vl .eq. sim_param%vl_maxiter) then
         call warning('dust','dust','max iteration reached for non linear vl:&
                     increase VLmaxiter!') 
@@ -1339,6 +1362,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%vl_relax                      = getreal(prms, 'vl_relax')
   sim_param%vl_maxiter                    = getint(prms, 'vl_maxiter')
   sim_param%vl_startstep                  = getint(prms, 'vl_start_step')
+  sim_param%rel_aitken                    = getlogical(prms, 'aitken_relaxation')
   !>  VL Dynamic stall
   sim_param%vl_dynstall                   = getlogical(prms, 'vl_dynstall')  
   
