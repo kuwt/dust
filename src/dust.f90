@@ -361,7 +361,7 @@ call prms%CreateLogicalOption('ll_loads_avl', &
                           &'Use AVL expression for inviscid load computation','T')
 
 !> VL correction parameter 
-call prms%CreateRealOption('vl_relax', 'Relaxation factor for rhs update','0.1')
+call prms%CreateRealOption('vl_relax', 'Relaxation factor for rhs update','0.3')
 call prms%CreateIntOption('vl_maxiter', &
                           &'Maximum number of iteration in VL algorithm', '100')
 call prms%CreateRealOption('vl_tol', 'Tolerance for the absolute error on lift coefficient in &
@@ -370,7 +370,7 @@ call prms%CreateIntOption('vl_start_step', &
                           &'Step in which the VL correction start', '0')
 call prms%CreateLogicalOption('vl_dynstall', 'Dynamic stall on corrected VL', 'F')
 call prms%CreateLogicalOption('aitken_relaxation', 'Employ aitken acceleration method during &   
-                              the fixed point iteration', 'F') !> change default? 
+                              the fixed point iteration', 'T')  
 
 !> Octree and multipole data 
 call prms%CreateLogicalOption('fmm','Employ fast multipole method?','T')
@@ -907,7 +907,6 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                     trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
                   do i_s2 = 1, size(geo%components(i_c2)%stripe)
                     call geo%components(i_c2)%stripe(i_s2)%compute_vel_stripe(geo%components(i_c)%stripe(i_s)%cen , v)
-                                                                              
                     vel = vel + v         
                   end do 
                 endif 
@@ -934,11 +933,13 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         !> relaxation factor 
         residual_vl_delta = residual_vl - residual_vl_old 
         if (sim_param%rel_aitken .and. it_vl .gt. 2) then 
-          rel_aitken = -rel_aitken*dot(residual_vl_old , residual_vl_delta) / dot(residual_vl_delta, residual_vl_delta)
+          rel_aitken = -rel_aitken* dot(residual_vl_old, residual_vl_delta) / &
+                                    dot(residual_vl_delta, residual_vl_delta)
           linsys%b = linsys%b + rel_aitken*residual_vl 
         else
           linsys%b = linsys%b + sim_param%vl_relax*residual_vl 
-          rel_aitken = -sim_param%vl_relax*dot(residual_vl_old , residual_vl_delta) / dot(residual_vl_delta, residual_vl_delta)
+          rel_aitken = -sim_param%vl_relax* dot(residual_vl_old, residual_vl_delta) / & 
+                                            dot(residual_vl_delta, residual_vl_delta)
         endif 
         residual_vl_old = residual_vl
 
@@ -997,7 +998,6 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                               geo%components(i_c)%stripe(i_s)%panels(i_p)%p%nor)/ & 
                               geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area 
             end do
-
           end do
         end if 
       end do         
@@ -1008,7 +1008,6 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
       write(message,'(A,F9.3,A)') 'Solve nonlinear vortex lattice in: ' , t1 - t0,' s.'
       call printout(message)
     endif
-
   end if 
 
 !write(*,*) 'dforce_post_vc   ', elems(11)%p%dforce

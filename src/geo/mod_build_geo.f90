@@ -771,18 +771,18 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call read_mesh_parametric(trim(mesh_file), ee, rr, &
                               npoints_chord_tot, nelems_span, hinges, n_hinges, mesh_mirror, mesh_symmetry,&
                               airfoil_list, i_airfoil_e, normalised_coord_e, &
-                              aero_table)!, curv_ac)  
+                              aero_table, nelem_span_list)!, curv_ac)  
 
       !> Write additional fields for vl correction
       if (aero_table) then 
 
         if ( mesh_symmetry ) then
           call symmetry_update_vl_lists( nelem_span_list , &
-                chord_p , i_airfoil_e , normalised_coord_e )
+                i_airfoil_e , normalised_coord_e )
         end if
         if ( mesh_mirror ) then
           call mirror_update_vl_lists( nelem_span_list , &
-                chord_p , i_airfoil_e , normalised_coord_e )
+                 i_airfoil_e , normalised_coord_e )
         end if
   
         call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)
@@ -2420,18 +2420,15 @@ end subroutine mirror_update_ll_lists
 !----------------------------------------------------------------------
 !> Updates lifting lines fields in case of symmetry
 subroutine symmetry_update_vl_lists ( nelem_span_list , &
-                      chord_p , i_airfoil_e , normalised_coord_e )
+                       i_airfoil_e , normalised_coord_e )
 
   integer , allocatable , intent(inout) :: nelem_span_list(:)
   integer , allocatable , intent(inout) :: i_airfoil_e(:,:)
   real(wp), allocatable , intent(inout) :: normalised_coord_e(:,:)
-  real(wp), allocatable , intent(inout) :: chord_p(:)
 
   integer , allocatable :: nelem_span_list_tmp(:)
   integer , allocatable :: i_airfoil_e_tmp(:,:)
   real(wp), allocatable :: normalised_coord_e_tmp(:,:)
-  real(wp), allocatable :: chord_p_tmp(:)
-
   integer :: nelem_span_section
   integer :: nelems
   integer :: npts   ! nelem + 1
@@ -2465,19 +2462,12 @@ subroutine symmetry_update_vl_lists ( nelem_span_list , &
     normalised_coord_e_tmp( 1:2 , siz-i+1 ) = 1.0_wp - normalised_coord_e( 2:1:-1 , i )
   end do
 
-  allocate(chord_p_tmp( npts ))
-  siz = size(chord_p)
-  chord_p_tmp( siz ) = chord_p(1)
-  do i = 2 , siz
-    chord_p_tmp( siz+i-1 ) = chord_p( i )
-    chord_p_tmp( siz-i+1 ) = chord_p( i )
-  end do
 
   ! Move_alloc to the original arrays -------------------------
   call move_alloc(    nelem_span_list_tmp ,     nelem_span_list )
   call move_alloc(        i_airfoil_e_tmp ,         i_airfoil_e )
   call move_alloc( normalised_coord_e_tmp ,  normalised_coord_e )
-  call move_alloc(            chord_p_tmp ,             chord_p )
+  
 
 end subroutine symmetry_update_vl_lists
 
@@ -2485,17 +2475,16 @@ end subroutine symmetry_update_vl_lists
 
 !> Updates lifting lines fields in case of mirroring
 subroutine mirror_update_vl_lists ( nelem_span_list , &
-  chord_p , i_airfoil_e , normalised_coord_e )
+  i_airfoil_e , normalised_coord_e )
 
   integer , allocatable , intent(inout) :: nelem_span_list(:)
   integer , allocatable , intent(inout) :: i_airfoil_e(:,:)
   real(wp), allocatable , intent(inout) :: normalised_coord_e(:,:)
-  real(wp), allocatable , intent(inout) :: chord_p(:)
+
 
   integer , allocatable :: nelem_span_list_tmp(:)
   integer , allocatable :: i_airfoil_e_tmp(:,:)
   real(wp), allocatable :: normalised_coord_e_tmp(:,:)
-  real(wp), allocatable :: chord_p_tmp(:)
 
   integer :: nelem_span_section
   integer :: nelem
@@ -2527,19 +2516,12 @@ subroutine mirror_update_vl_lists ( nelem_span_list , &
     normalised_coord_e_tmp( 1:2 , siz-i+1 ) = 1.0_wp - normalised_coord_e( 2:1:-1 , i )
   end do
 
-  allocate(chord_p_tmp( npts ))
-  siz = size(chord_p)
-  chord_p_tmp( siz ) = chord_p(1)
-  do i = 2 , siz
-    chord_p_tmp( siz-i+1 ) = chord_p( i )
-  end do
-
+  
   ! Move_alloc to the original arrays -------------------------
   call move_alloc(    nelem_span_list_tmp ,     nelem_span_list )
   call move_alloc(        i_airfoil_e_tmp ,         i_airfoil_e )
   call move_alloc( normalised_coord_e_tmp ,  normalised_coord_e )
-  call move_alloc(            chord_p_tmp ,             chord_p )
-
+  
 end subroutine mirror_update_vl_lists
 
 
