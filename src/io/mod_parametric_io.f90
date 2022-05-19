@@ -82,8 +82,8 @@ contains
 
 subroutine read_mesh_parametric(mesh_file,ee,rr, &
                     npoints_chord_tot, nelem_span_tot, hinges, n_hinges, mesh_mirror, mesh_symmetry, &
-                    airfoil_list_actual, i_airfoil_e, normalised_coord_e, & 
-                    aero_table_out, nelem_span_list, curv_ac)
+                    nelem_span_list, airfoil_list_actual, i_airfoil_e, normalised_coord_e, & 
+                    aero_table_out, curv_ac)
 
   character(len=*), intent(in)              :: mesh_file
   integer  , allocatable, intent(out)       :: ee(:,:)
@@ -128,7 +128,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   integer, allocatable                      :: point_region(:)
   real(wp)                                  :: merge_tol 
   !> Regions  
-  integer , allocatable, intent(out), optional :: nelem_span_list(:)
+  integer , allocatable, intent(out)        :: nelem_span_list(:)
   real(wp), allocatable                     :: span_list(:) 
   real(wp), allocatable                     :: sweep_list(:) 
   real(wp), allocatable                     :: dihed_list(:)
@@ -271,7 +271,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   enddo
 
   ! type_span
-  allocate( type_span_list(nRegions));!   type_span_list = ''
+  allocate( type_span_list(nRegions));
   n_type_span = countoption(pmesh_prs,'type_span')
   if ( n_type_span .eq. 0 ) then ! default is 'uniform'
     do iRegion = 1 , nRegions
@@ -335,7 +335,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   enddo
 
   allocate(rr(3,rr_size)) ; rr = 0.0_wp
-  !allocate(chord_p(npoint_span_tot)) ; chord_p = 0.0_wp
+  
   ! get chordwise division
   allocate(chord_fraction(nelem_chord+1))
   type_chord = getstr(pmesh_prs,'type_chord')

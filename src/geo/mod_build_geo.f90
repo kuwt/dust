@@ -770,8 +770,8 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       !> directly, find a good way to do this
       call read_mesh_parametric(trim(mesh_file), ee, rr, &
                               npoints_chord_tot, nelems_span, hinges, n_hinges, mesh_mirror, mesh_symmetry,&
-                              airfoil_list, i_airfoil_e, normalised_coord_e, &
-                              aero_table, nelem_span_list)!, curv_ac)  
+                              nelem_span_list, airfoil_list, i_airfoil_e, normalised_coord_e, &
+                              aero_table)!, curv_ac)  
 
       !> Write additional fields for vl correction
       if (aero_table) then 
@@ -798,7 +798,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         
     elseif (ElType .eq. 'p') then
       call read_mesh_parametric(trim(mesh_file), ee, rr, &
-                                npoints_chord_tot, nelems_span, hinges, n_hinges, mesh_mirror, mesh_symmetry)
+                                npoints_chord_tot, nelems_span, hinges, n_hinges, mesh_mirror, mesh_symmetry, nelem_span_list)
       !> Nelems_span_tot will be overwritten if symmetry is required (around l.220)
       nelems_span_tot =   nelems_span
 
