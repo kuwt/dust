@@ -5,13 +5,13 @@
 - Added multiple regression test and ci/cd gitlab integration
 - Added hinge loads postprocessing
 - Added adaptive mesh generation for hinged surface  
+- Added utils for parsing sectional load in Matlab/Octave
 - Added user manual documentation
 - Bugfix for ll load postprocessing
-- Added utils for parsing sectional load in Matlab/Octave
 - Improved profile generation from .dat file
 - Improved coupled simulation (cleanup adapter, improved velocity calculation)
 - Improved cmake compilation for intel-mkl library
-- General bug-fix
+- Fixed some bugs
 
 #### 0.6.1-b
 

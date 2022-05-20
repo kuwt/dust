@@ -1,6 +1,6 @@
 mesh_file_type = parametric
 el_type = v
-AirfoilTableCorrection = T
+airfoil_table_correction = T
 
 nelem_chord = 5
 type_chord = uniform   ! uniform  cosineLE  cosineTE

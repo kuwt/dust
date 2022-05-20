@@ -782,7 +782,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         end if
         if ( mesh_mirror ) then
           call mirror_update_vl_lists( nelem_span_list , &
-                 i_airfoil_e , normalised_coord_e )
+                  i_airfoil_e , normalised_coord_e )
         end if
   
         call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)

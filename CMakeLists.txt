@@ -94,7 +94,6 @@ ELSE()
   SET(BLA_VENDOR "OpenBLAS")
   find_package(LAPACK REQUIRED)
   LIST(APPEND linkedlibs ${LAPACK_LIBRARIES})
-
 ENDIF()
 
 #> HDF5 ---------------------------------------------------------
@@ -127,8 +126,8 @@ execute_process(COMMAND
   OUTPUT_VARIABLE GIT_SHA1
   ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-configure_file("${PROJECT_SOURCE_DIR}/src/general/mod_version.f90.in" 
-               "${PROJECT_SOURCE_DIR}/src/general/mod_version.f90")
+configure_file( "${PROJECT_SOURCE_DIR}/src/general/mod_version.f90.in" 
+                "${PROJECT_SOURCE_DIR}/src/general/mod_version.f90")
 
 
 #add files

@@ -51,7 +51,7 @@ end: control data;
 
 # === reference frame ===========================================
 reference: GROUND,
-  reference, global, null,
+  reference, global, 0., -6.0, 0.,
   reference, global, eye,
   reference, global, null,
   reference, global, null;
