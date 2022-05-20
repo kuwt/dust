@@ -41,7 +41,7 @@ errors = np.zeros([len(runs),len(sol_dsets)])
 for i, run in enumerate(runs):
   solv_ret = sbprc.call([solver,run])
 
-  ref_name = 'test'
+  ref_name = 'ref'
   check_name = 'test'
   suffix = '.h5'
   folder = './Output/'
@@ -59,10 +59,10 @@ for i, run in enumerate(runs):
 
 #delete all the produced files
 files = os.listdir('Output/')
-#for file in files:
-#  if file.startswith('test'):
-#    os.remove(os.path.join('Output/',file))
-#os.remove('geo_input.h5')
+for file in files:
+  if file.startswith('test'):
+    os.remove(os.path.join('Output/',file))
+os.remove('geo_input.h5')
 
 #print the errors:
 print('Difference w.r.t. reference:')

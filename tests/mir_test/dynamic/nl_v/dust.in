@@ -27,9 +27,9 @@ penetration_avoidance = T
 ! wake parameters  -------------
 n_wake_panels = 1
 
-vl_tol = 1.0e-4
-vl_relax = 0.4
-vl_maxiter = 400 
+vl_tol = 1.0e-2
+vl_relax = 0.3
+vl_maxiter = 20 
 vl_startstep = 0
 vl_dynstall = F
 aitken_relaxation = T

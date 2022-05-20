@@ -106,10 +106,10 @@ test_symmetry_static_components:
     - python tests/sym_test/static/run_sym_static_nl_v.py -t $TOL
   needs:
     - "build_dust_alone"
-  artifacts:
-    paths:
-      - tests/sym_test/static/nl_v/Output/ 
-    untracked: true
+  #artifacts:
+  #  paths:
+  #    - tests/sym_test/static/nl_v/Output/ 
+  #  untracked: true
 
 
 test_symmetry_dynamic_components: 
