@@ -41,7 +41,7 @@ errors = np.zeros([len(runs),len(sol_dsets)])
 for i, run in enumerate(runs):
   solv_ret = sbprc.call([solver,run])
 
-  ref_name = 'test'
+  ref_name = 'ref'
   check_name = 'test'
   suffix = '.h5'
   folder_ref = './../../static/nl_v/Output/'
