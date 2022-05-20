@@ -144,35 +144,23 @@ build_dust_coupled:
 test_mirror_coupled_components: 
   stage: test
   script:  
-    - rm -rf build
-    - mkdir build && cd build
-    - cmake -DCMAKE_INSTALL_PREFIX=/ -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DWITH_PRECICE=YES ../
-    - make DESTDIR=/home/gitlab-runner/.local install -j8
-    - echo "Build $CMAKE_BUILD_TYPE, USE_PRECICE=YES completed"
-    - cd ..
     - python tests/mir_test/coupled/run_mir_coupled_v.py -t $TOL
     - python tests/mir_test/coupled/run_mir_coupled_p.py -t $TOL
     - python tests/mir_test/coupled/run_mir_coupled_ll.py -t $TOL
-    - python tests/sym_test/coupled/run_sym_dynamic_nl_v.py -t $TOL
+    - python tests/mir_test/coupled/run_mir_coupled_nl_v.py -t $TOL
   needs: 
-    #- "build_dust_coupled" 
+    - "build_dust_coupled" 
     - "test_mirror_static_components"
 
 test_symmetry_coupled_components:
   stage: test
   script:  
-    - rm -rf build
-    - mkdir build && cd build
-    - cmake -DCMAKE_INSTALL_PREFIX=/ -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DWITH_PRECICE=YES ../
-    - make DESTDIR=/home/gitlab-runner/.local install -j8
-    - echo "Build $CMAKE_BUILD_TYPE, USE_PRECICE=YES completed"
-    - cd ..
     - python tests/sym_test/coupled/run_sym_coupled_v.py -t $TOL
     - python tests/sym_test/coupled/run_sym_coupled_p.py -t $TOL
     - python tests/sym_test/coupled/run_sym_coupled_ll.py -t $TOL
-    - python tests/sym_test/dynamic/run_sym_dynamic_nl_v.py -t $TOL
+    - python tests/sym_test/coupled/run_sym_coupled_nl_v.py -t $TOL
   needs: 
-    #- "build_dust_coupled" 
+    - "build_dust_coupled" 
     - "test_symmetry_static_components"
 
 deploy-job:      # This job runs in the deploy stage.
