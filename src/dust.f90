@@ -1005,7 +1005,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     linsys%skip = .false.
     t1 = dust_time()
     if(sim_param%debug_level .ge. 1) then
-      write(message,'(A,F9.3,A)') 'Solve nonlinear vortex lattice in: ' , t1 - t0,' s.'
+      write(message,'(A,F9.3,A)') 'Solved nonlinear vortex lattice in: ' , t1 - t0,' s.'
       call printout(message)
     endif
   end if 

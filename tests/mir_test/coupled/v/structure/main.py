@@ -89,7 +89,7 @@ from mbdynAdapter import MBDynAdapter
 writeNodes = False
 #> Construct MBDyn/mbc_py interface
 #> Initialize MBDyn/mbc_py interface: negotiate and recv()
-
+print('precice version: ', precice.__version__)
 mbd = MBDynInterface()
 
 mbd.initialize( path=path, verbose=1, nnodes=nnodes, accels=1, \
