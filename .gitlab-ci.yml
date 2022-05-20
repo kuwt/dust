@@ -137,8 +137,9 @@ build_dust_coupled:
       - build/bin/ 
     untracked: true
   needs: 
-    - "test_mirror_static_components"
+    - "build_dust_alone"
     - "test_symmetry_static_components"
+    - "test_mirror_static_components"
 
 test_mirror_coupled_components: 
   stage: test
