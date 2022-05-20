@@ -81,10 +81,10 @@ test_mirror_static_components:
     - python tests/mir_test/static/run_mir_static_nl_v.py -t $TOL
   needs:
     - "build_dust_alone"
-  artifacts:
-    paths:
-      - tests/mir_test/static/nl_v/Output/ 
-    untracked: true
+  #artifacts:
+  #  paths:
+  #    - tests/mir_test/static/nl_v/Output/ 
+  #  untracked: true
 
 test_mirror_dynamic_components: 
   stage: test
