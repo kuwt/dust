@@ -1,23 +1,23 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-Reference_Tag = Wing1
-Parent_Tag = 0
-Origin = (/0.0, 0.0, 0.0/)
-Orientation = (/1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0/)
-Multiple = F
-Moving = F
+reference_tag = Wing1
+parent_tag = 0
+origin = (/0.0, 0.0, 0.0/)
+orientation = (/1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0/)
+multiple = F
+moving = F
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-Reference_Tag = Wing2
-Parent_Tag = 0
-Origin = (/0.5, 4.0, 0.5/)
-Orientation = (/1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0/)
-Multiple = F
-Moving = F
+reference_tag = Wing2
+parent_tag = 0
+origin = (/0.5, 4.0, 0.5/)
+orientation = (/1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0/)
+multiple = F
+moving = F
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-Reference_Tag = Wing3
-Parent_Tag = 0
-Origin = (/0.5, -4.0, 0.5/)
-Orientation = (/1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0/)
-Multiple = F
-Moving = F
+reference_tag = Wing3
+parent_tag = 0
+origin = (/0.5, -4.0, 0.5/)
+orientation = (/1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0/)
+multiple = F
+moving = F

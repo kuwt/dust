@@ -56,18 +56,28 @@ use mod_handling, only: &
 
 implicit none
 
-public :: cross , linear_interp , compute_qr, rotation_vector_combination
+public :: dot, cross , linear_interp , compute_qr, &
+          rotation_vector_combination, sort_vector_real, unique
 
 private
 
 interface linear_interp
-  module procedure linear_interp_vector, &
-                   linear_interp_array
+  module procedure  linear_interp_vector, &
+                    linear_interp_array
 end interface linear_interp
 
 character(len=*), parameter :: this_mod_name='mod_math'
 
 contains
+
+pure function dot(a, b)
+  real(wp)                           :: dot
+  real(wp), dimension(:), intent(in) :: a, b
+
+  dot = sum(a * b)
+
+end function dot
+
 
 ! ----------------------------------------------------------------------
 
@@ -83,13 +93,12 @@ end function cross
 
 ! ----------------------------------------------------------------------
 
-subroutine linear_interp_vector( val_vec , t_vec , t , val )
-  real(wp) , intent(in) :: val_vec(:)
-  real(wp) , intent(in) :: t_vec(:)
-  real(wp) , intent(in) :: t
-  real(wp) , intent(out) :: val
-
-  integer :: it , nt
+subroutine linear_interp_vector(val_vec , t_vec , t , val)
+  real(wp), intent(in)        :: val_vec(:)
+  real(wp), intent(in)        :: t_vec(:)
+  real(wp), intent(in)        :: t
+  real(wp), intent(out)       :: val
+  integer                     :: it , nt
   character(len=*), parameter :: this_sub_name='linear_interp_vector'
 
   nt = size(t_vec)
@@ -114,7 +123,7 @@ subroutine linear_interp_vector( val_vec , t_vec , t , val )
     if ( ( t .ge. t_vec( it ) ) .and. ( t .le. t_vec( it+1 ) ) ) then
 
       val = val_vec(it) + (t-t_vec(it))/(t_vec(it+1)-t_vec(it)) * &
-                                   ( val_vec(it+1)-val_vec(it) )
+                                  ( val_vec(it+1)-val_vec(it) )
 
     end if
 
@@ -135,7 +144,6 @@ subroutine linear_interp_array( val_arr , t_vec , t , val )
 
   nt = size(t_vec)
   allocate(val(size(val_arr,1)))
-
 
   ! Check dimensions -----
   if ( size(val_arr,2) .ne. nt ) then
@@ -158,7 +166,7 @@ subroutine linear_interp_array( val_arr , t_vec , t , val )
     if ( ( t .ge. t_vec( it ) ) .and. ( t .le. t_vec( it+1 ) ) ) then
 
       val = val_arr(:,it) + (t-t_vec(it))/(t_vec(it+1)-t_vec(it)) * &
-                                   ( val_arr(:,it+1)-val_arr(:,it) )
+                                  ( val_arr(:,it+1)-val_arr(:,it) )
 
     end if
 
@@ -169,34 +177,32 @@ end subroutine linear_interp_array
 ! ----------------------------------------------------------------------
 
 subroutine compute_qr ( A , Q , R )
- real(wp) , intent(inout) ::  A(:,:)
- real(wp) , allocatable , intent(inout) :: Q(:,:) , R(:,:)
+  real(wp) , intent(inout) ::  A(:,:)
+  real(wp) , allocatable , intent(inout) :: Q(:,:) , R(:,:)
 
- integer :: m , n , i_m
+  integer :: m , n , i_m
 
- ! lapack dgeqrf routine ----
- real(wp) , allocatable :: tau(:) , work(:)
- integer :: lwork , info
+  ! lapack dgeqrf routine ----
+  real(wp) , allocatable :: tau(:) , work(:)
+  integer :: lwork , info
 
- ! tmp matrices to get Q matrix -----
- real(wp) , allocatable :: H(:,:) , v(:,:) , eye(:,:)
-
- character(len=*), parameter :: this_sub_name='compute_qr'
+  ! tmp matrices to get Q matrix -----
+  real(wp) , allocatable :: H(:,:) , v(:,:) , eye(:,:)
+  character(len=*), parameter :: this_sub_name='compute_qr'
 
 
   ! input check and warnings
   if ( allocated(Q) ) then
     call warning(this_sub_name, this_mod_name, ' Q was already allocated.&
-                                           & Deallocated and re-allocated')
+                                          & Deallocated and re-allocated')
     deallocate(Q)
   end if
   if ( allocated(R) ) then
     call warning(this_sub_name, this_mod_name, ' R was already allocated.&
-                                           & Deallocated and re-allocated')
+                                          & Deallocated and re-allocated')
     deallocate(R)
   end if
 
-  !
   m = size(A,1)
   n = size(A,2)
 
@@ -223,7 +229,12 @@ subroutine compute_qr ( A , Q , R )
 
   ! Q square unitary matrix
   allocate( H(m,m) , v(m,1) ) ! ; H = 0.0_wp  ; v(:,1) = 0.0_wp
-  allocate( eye(m,m) ) ; eye = 0.0_wp ; do i_m = 1,m ; eye(i_m,i_m) = 1.0_wp ; end do
+  allocate( eye(m,m) ) ; eye = 0.0_wp ; 
+  
+  do i_m = 1, m 
+    eye(i_m,i_m) = 1.0_wp 
+  end do
+
   Q = eye ! Initialisation
   do i_m = 1 , min(m,n)
     v(:,1) = 0.0_wp ; v(i_m,1) = 1.0_wp ; v(i_m+1:m,1) = A(i_m+1:m,i_m) ;
@@ -281,11 +292,11 @@ subroutine rotation_vector_combination( r1, r2, r, th, n )
 
   !> Quaternion qs = q1 * q2 = cos(th/2) + sin(th/2) n · (i,j,k)
   qs = (/ &
-       q1(1)*q2(1) - q1(2)*q2(2) - q1(3)*q2(3) - q1(4)*q2(4) , &
-       q1(1)*q2(2) + q1(2)*q2(1) + q1(3)*q2(4) - q1(4)*q2(3) , &
-       q1(1)*q2(3) + q1(3)*q2(1) + q1(4)*q2(2) - q1(2)*q2(4) , &
-       q1(1)*q2(4) + q1(4)*q2(1) + q1(2)*q2(3) - q1(3)*q2(2)   &
-       /)
+        q1(1)*q2(1) - q1(2)*q2(2) - q1(3)*q2(3) - q1(4)*q2(4) , &
+        q1(1)*q2(2) + q1(2)*q2(1) + q1(3)*q2(4) - q1(4)*q2(3) , &
+        q1(1)*q2(3) + q1(3)*q2(1) + q1(4)*q2(2) - q1(2)*q2(4) , &
+        q1(1)*q2(4) + q1(4)*q2(1) + q1(2)*q2(3) - q1(3)*q2(2)   &
+        /)
 
   !> Rotation vector
   sin_t_2 = norm2(qs(2:4))
@@ -304,7 +315,64 @@ subroutine rotation_vector_combination( r1, r2, r, th, n )
 
 end subroutine rotation_vector_combination
 
+
 ! ----------------------------------------------------------------------
 
+subroutine sort_vector_real( vec, nel, sort, ind )
+  real(wp), intent(inout)               :: vec(:)
+  integer , intent(in)                  :: nel
+  real(wp), allocatable, intent(out)    :: sort(:)
+  integer , allocatable, intent(out)    :: ind(:)
+
+  real(wp)                              :: maxv
+  integer                               :: i
+
+  allocate(sort(nel)); sort = 0.0_wp
+  allocate(ind(nel)); ind = 0
+
+  maxv = maxval(vec)
+  do i = 1, nel
+    sort(i) = minval(vec, 1)
+    ind(i) = minloc(vec, 1)
+    vec(ind(i)) = maxv + 0.1_wp 
+  end do
+
+end subroutine sort_vector_real
+
+subroutine unique(vec, vec_unique, tol)  
+  real(wp), intent(inout)               :: vec(:) 
+  real(wp), allocatable, intent(out)    :: vec_unique(:)
+  real(wp), intent(in)                  :: tol
+
+  real(wp), allocatable                 :: vec_sort(:) 
+  real(wp), allocatable                 :: vec_tmp(:)
+  integer, allocatable                  :: ind(:)
+  integer                               :: nel, i, j, u 
+  
+  nel = size(vec)
+
+  call sort_vector_real(vec, nel, vec_sort, ind)
+  
+  i = 1;   j = 2;   u = 1
+
+  allocate(vec_tmp(nel)); vec_tmp = 0.0_wp 
+  vec_tmp(1) = vec_sort(1)
+  do while (j .le. nel)
+    if (abs(vec_sort(j) - vec_sort(i)) .le. tol) then  
+      j = j + 1
+    else
+      u = u + 1
+      vec_tmp(u) = vec_sort(j) 
+      i = j 
+      j = j + 1   
+    endif 
+  enddo
+
+  allocate(vec_unique(u)); vec_unique = 0.0_wp 
+  vec_unique = vec_tmp(1:u) 
+
+end subroutine unique  
+
+! ----------------------------------------------------------------------
 
 end module mod_math

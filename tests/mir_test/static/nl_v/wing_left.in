@@ -1,6 +1,6 @@
-MeshFileType = parametric
-ElType = v
-AirfoilTableCorrection = T
+mesh_file_type = parametric
+el_type = v
+airfoil_table_correction = T
 
 mesh_mirror = T
 mirror_point   = (/0.0 , 0.0,  0.0/)

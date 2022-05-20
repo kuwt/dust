@@ -1,8 +1,8 @@
 
-CompName = wing
-GeoFile = ParamWing.in
-RefTag = Wing
+comp_name = wing
+geo_file = ParamWing.in
+ref_tag = Wing
 
 
-FileName = geo_input.h5 
+file_name = geo_input.h5 
 

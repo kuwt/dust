@@ -43,6 +43,7 @@
 !!          Federico Fonte
 !!          Davide Montagnani
 !!          Matteo Tugnoli
+!!          Alessandro Cocco
 !!=========================================================================
 
 !> Module containing the subroutines to perform sectional loads
@@ -62,18 +63,18 @@ use mod_parse, only: &
   getsuboption,  countoption
 
 use mod_hdf5_io, only: &
-   initialize_hdf5, destroy_hdf5, &
-   h5loc, &
-   new_hdf5_file, &
-   open_hdf5_file, &
-   close_hdf5_file, &
-   new_hdf5_group, &
-   open_hdf5_group, &
-   close_hdf5_group, &
-   write_hdf5, &
-   read_hdf5, &
-   read_hdf5_al, &
-   check_dset_hdf5
+  initialize_hdf5, destroy_hdf5, &
+  h5loc, &
+  new_hdf5_file, &
+  open_hdf5_file, &
+  close_hdf5_file, &
+  new_hdf5_group, &
+  open_hdf5_group, &
+  close_hdf5_group, &
+  write_hdf5, &
+  read_hdf5, &
+  read_hdf5_al, &
+  check_dset_hdf5
 
 use mod_geo_postpro, only: &
   load_components_postpro, update_points_postpro , prepare_geometry_postpro
@@ -82,10 +83,10 @@ use mod_geometry, only: &
   t_geo, t_geo_component, destroy_elements
 
 use mod_post_load, only: &
-  load_refs, load_res, load_ll
+  load_refs, load_res, load_ll, load_vl
 
 use mod_dat_out, only: &
-   dat_out_sectional, dat_out_sectional_ll
+  dat_out_sectional, dat_out_sectional_ll,  dat_out_sectional_vl
 
 use mod_tecplot_out, only: &
   tec_out_sectional
@@ -97,10 +98,10 @@ implicit none
 
 ! type rof box sectional loads
 type t_box_secloads
-  integer :: nelems
-  integer  , allocatable :: elems(:)
-  real(wp) , allocatable :: fracs(:)
-  real(wp) , allocatable :: cen(:,:)
+  integer                :: nelems
+  integer , allocatable  :: elems(:)
+  real(wp), allocatable  :: fracs(:)
+  real(wp), allocatable  :: cen(:,:)
 end type t_box_secloads
 
 public :: post_sectional
@@ -114,90 +115,90 @@ contains
 
 ! ----------------------------------------------------------------------
 !TODO:
-! - deal with multiple components (DONE)
 ! - parametric components aligned with y-axis
 ! - tol_y_cen is hard-coded. write tol_y_cen as an input
-! - ...
+! - preCICE coupled components 
 subroutine post_sectional (sbprms, bxprms, basename, data_basename, an_name, &
-                           ia, out_frmt, components_names, all_comp, &
-                           an_start, an_end, an_step, average )
-type(t_parse), pointer :: sbprms
-type(t_parse), pointer :: bxprms
-character(len=*) , intent(in) :: basename
-character(len=*) , intent(in) :: data_basename
-character(len=*) , intent(in) :: an_name
-integer          , intent(in) :: ia
-character(len=*) , intent(in) :: out_frmt
+                          ia, out_frmt, components_names, all_comp, &
+                          an_start, an_end, an_step, average )
+type(t_parse), pointer                                  :: sbprms
+type(t_parse), pointer                                  :: bxprms
+character(len=*) , intent(in)                           :: basename
+character(len=*) , intent(in)                           :: data_basename
+character(len=*) , intent(in)                           :: an_name
+integer          , intent(in)                           :: ia
+character(len=*) , intent(in)                           :: out_frmt
 character(len=max_char_len), allocatable, intent(inout) :: components_names(:)
-logical , intent(in) :: all_comp
-integer , intent(in) :: an_start , an_end , an_step
-logical , intent(in) :: average
+logical , intent(in)                                    :: all_comp
+integer , intent(in)                                    :: an_start , an_end , an_step
+logical , intent(in)                                    :: average
 
-type(t_geo_component), allocatable :: comps(:)
-character(len=max_char_len) :: cname
-integer(h5loc) :: floc, gloc, cloc
-real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
-real(wp), allocatable :: vort(:), cp(:)
-real(wp), allocatable :: ll_data(:,:,:), ll_data_ave(:,:,:)
-real(wp), allocatable :: points(:,:)
-integer :: nelem
-integer :: n_comp , n_comp_tot , i_comp , id_comp , ax_coor , ref_id
-character(len=max_char_len), allocatable :: all_components_names(:)
-character(len=max_char_len), allocatable :: components_names_tmp(:)
-integer :: nelem_span , nelem_chor , n_sect , n_time
+type(t_geo_component), allocatable                      :: comps(:)
+character(len=max_char_len)                             :: cname
+integer(h5loc)                                          :: floc, gloc, cloc
+real(wp), allocatable                                   :: refs_R(:,:,:), refs_off(:,:)
+real(wp), allocatable                                   :: vort(:), cp(:)
+real(wp), allocatable                                   :: ll_data(:,:,:), ll_data_ave(:,:,:)
+real(wp), allocatable                                   :: vl_data(:,:,:), vl_data_ave(:,:,:)
+real(wp), allocatable                                   :: points(:,:)
+integer                                                 :: nelem
+integer                                                 :: n_comp , n_comp_tot  
+integer                                                 :: i_comp , id_comp , ax_coor , ref_id
+character(len=max_char_len), allocatable                :: all_components_names(:)
+character(len=max_char_len), allocatable                :: components_names_tmp(:)
+integer                                                 :: nelem_span , nelem_chor , n_sect , n_time
 
-real(wp), allocatable :: time(:)
-real(wp) :: t
-integer :: ires
+real(wp), allocatable                                   :: time(:)
+real(wp)                                                :: t
+integer                                                 :: ires
 
-! sectional loads: paramteric components -------------------
-real(wp) :: axis_dir(3) , axis_nod(3)
-real(wp) , allocatable :: sec_loads(:,:,:)
-real(wp) , allocatable :: sec_loads_ave(:,:,:)
-integer :: is
-integer, parameter :: n_loads = 4   ! F and moment around an axis
-integer, parameter :: n_ll_data = 9
-real(wp) , allocatable :: ref_mat(:,:) , off_mat(:,:)
-real(wp) , allocatable :: y_cen(:) , y_span(:)
-real(wp) , parameter   :: tol_y_cen = 1.0e-3_wp
-real(wp) , allocatable :: r_axis(:,:) , r_axis_bas(:,:)
+!> sectional loads: paramteric components -------------------
+real(wp)                                                :: axis_dir(3) , axis_nod(3)
+real(wp) , allocatable                                  :: sec_loads(:,:,:)
+real(wp) , allocatable                                  :: sec_loads_ave(:,:,:)
+integer                                                 :: is                                 
+integer, parameter                                      :: n_loads = 4   ! F and moment around an axis
+integer, parameter                                      :: n_ll_data = 9, n_vl_data = 9
+real(wp) , allocatable                                  :: ref_mat(:,:) , off_mat(:,:)
+real(wp) , allocatable                                  :: y_cen(:) , y_span(:)
+real(wp) , parameter                                    :: tol_y_cen = 1.0e-3_wp
+real(wp) , allocatable                                  :: r_axis(:,:) , r_axis_bas(:,:)
+real(wp)                                                :: F_bas(3) , F_bas1(3)
+real(wp)                                                :: M_bas(3)
+integer                                                 :: ie , ic , it , i1
+logical                                                 :: print_ll, print_vl
 
-real(wp) :: F_bas(3) , F_bas1(3)
-real(wp) :: M_bas(3)! , M_bas1(3)
-integer :: ie , ic , it , i1
-logical :: print_ll
-
-! sectional loads: box -------------------------------------
-character(len=max_char_len) :: comp_input
-integer :: n_box
-logical :: reshape_box
-!TODO: clean declarations
-real(wp) :: nCoordMaxBox
-real(wp) , allocatable :: box_coord(:,:) , box_coord_tmp(:,:)
-real(wp) :: vVec(3) , bVec(3) , wVec(3) , baseLen(2) , heigLen(2) , spanLen
-real(wp) :: nVec(3) , ref_node(3) ! , axis_mom(3)
-real(wp) :: nCoordMax , nCoordMin
-real(wp) :: nCoord , dnCoord
-real(wp) , allocatable :: nCoordSec(:)
-real(wp) , allocatable :: nCoordCen(:,:)
-real(wp) :: normalLateralFaces(3,4)
-real(wp) :: refPoiLateralFaces(3,4)
-real(wp) :: b1Vec(3) , b2Vec(3)
-type(t_box_secloads) , allocatable  :: box_secloads(:)
-real(wp) :: distance(4)
-real(wp) , parameter :: nCoord_relOff = 0.05_wp
+!> sectional loads: box -------------------------------------
+character(len=max_char_len)                             :: comp_input
+integer                                                 :: n_box
+logical                                                 :: reshape_box
+real(wp)                                                :: nCoordMaxBox
+real(wp) , allocatable                                  :: box_coord(:,:) , box_coord_tmp(:,:)
+real(wp)                                                :: vVec(3) , bVec(3) , wVec(3)  
+real(wp)                                                :: baseLen(2) , heigLen(2) , spanLen
+real(wp)                                                :: nVec(3) , ref_node(3) 
+real(wp)                                                :: nCoordMax , nCoordMin
+real(wp)                                                :: nCoord , dnCoord
+real(wp) , allocatable                                  :: nCoordSec(:)
+real(wp) , allocatable                                  :: nCoordCen(:,:)
+real(wp)                                                :: normalLateralFaces(3,4)
+real(wp)                                                :: refPoiLateralFaces(3,4)
+real(wp)                                                :: b1Vec(3) , b2Vec(3)
+type(t_box_secloads) , allocatable                      :: box_secloads(:)
+real(wp)                                                :: distance(4)
+real(wp) , parameter                                    :: nCoord_relOff = 0.05_wp
 ! "extra-param". TODO: check if they are called before #### box
-real(wp) :: nCoordVert(4)   ! TRI o QUAD elements
-integer  :: secVert(4)   ! TRI o QUAD elements
-real(wp) :: interSectPoints(3,2)
-real(wp) :: interSectAreas(2) , interSectCen(3,2)
-integer  :: nInterSect , index2
-real(wp) :: node1(3) , node2(3) , box_secloads_cen(3)
-integer  :: iSec1 , iSec2 , sec1_nVer , sec2_nVer
-integer  :: nNodeInt(2,2)
-integer  :: nver , iv
+real(wp)                                                :: nCoordVert(4)   ! TRI o QUAD elements
+integer                                                 :: secVert(4)   ! TRI o QUAD elements
+real(wp)                                                :: interSectPoints(3,2)
+real(wp)                                                :: interSectAreas(2) , interSectCen(3,2)
+integer                                                 :: nInterSect , index2
+real(wp)                                                :: node1(3) , node2(3) , box_secloads_cen(3)
+integer                                                 :: iSec1 , iSec2 , sec1_nVer , sec2_nVer
+integer                                                 :: nNodeInt(2,2)
+integer                                                 :: nver , iv
 
-character(len=max_char_len) :: filename
+character(len=max_char_len)                             :: filename
 
 character(len=*), parameter :: this_sub_name = 'post_sectional'
 
@@ -211,7 +212,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
   n_comp = countoption(sbprms,'Component')
   if ( n_comp .le. 0 ) then
     call warning(this_mod_name, this_sub_name, 'No component specified for &
-                 &sectional_loads analysis. Skipped analysis.')
+                &sectional_loads analysis. Skipped analysis.')
     return
   else if ( n_comp .ge. 2 ) then
     call warning(this_mod_name, this_sub_name, &
@@ -221,13 +222,13 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
       &component.')
   end if
 
-  ! check if components_names is allocated (it should alwasy be allocated)
+  !> check if components_names is allocated (it should alwasy be allocated)
   if ( .not. allocated(components_names) ) then
     call internal_error(this_mod_name,this_sub_name, &
                         'components_name not allocated.')
   end if
 
-  ! ######### *** Check if the component really exists *** ######### !
+  !------------ Check if the component really exists ---------- !
   call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
   call open_hdf5_group(floc,'Components',gloc)
   call read_hdf5(n_comp_tot,'NComponents',gloc)
@@ -236,16 +237,16 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
   do i_comp = 1 , n_comp_tot
     write(cname,'(A,I3.3)') 'Comp',i_comp
     call open_hdf5_group(gloc,trim(cname),cloc)
-    call read_hdf5(all_components_names(i_comp),'CompName',cloc)
+    call read_hdf5(all_components_names(i_comp),'CompName',cloc)    
     call close_hdf5_group(cloc)
   end do
   call close_hdf5_group(gloc)
 
   id_comp = -333
   do i_comp = 1 , n_comp_tot
-     if ( trim(components_names(1)) .eq. trim(all_components_names(i_comp)) ) then
-       id_comp = i_comp
-     end if
+      if ( trim(components_names(1)) .eq. trim(all_components_names(i_comp)) ) then
+        id_comp = i_comp
+      end if
   end do
   if ( id_comp .eq. -333 ) then ! component not found
     call printout('  Component not found. The available components are: ')
@@ -259,24 +260,23 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
 
   write(msg,*) '  Analysing component : ' , trim(components_names(1))//nl
   call printout(trim(msg))
-  ! ######### *** Check if the component really exists *** # DONE ## !
-
-  ! load only the first component just once -----------------
+  
+  !> load only the first component just once 
   call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
 
   allocate(components_names_tmp(1))
   components_names_tmp(1) = trim(components_names(1))
 
   call load_components_postpro(comps, points, nelem, floc, &
-                               components_names_tmp,  all_comp)
+                              components_names_tmp,  all_comp)
   call close_hdf5_file(floc)
 
   ! Prepare_geometry_postpro
   call prepare_geometry_postpro(comps)
 
   ! Read the axis for the computation of the sectional loads
-  axis_dir = getrealarray(sbprms,'AxisDir',3)
-  axis_nod = getrealarray(sbprms,'AxisNod',3)
+  axis_dir = getrealarray(sbprms,'axis_dir',3)
+  axis_nod = getrealarray(sbprms,'axis_nod',3)
 
   ! if a box is defined ---> use the box
   comp_input = trim(comps(1)%comp_input )
@@ -285,13 +285,24 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
   if (n_box .gt. 1) call error(this_sub_name, this_mod_name, 'More than one&
   & box defined for sectional loads')
 
-  !decide on printing lifting lines data
-  print_ll = getlogical(sbprms,'LiftingLineData')
+  !> decide on printing lifting lines data
+  print_ll = getlogical(sbprms,'lifting_line_data')
   if (trim(comps(1)%comp_el_type) .ne. 'l')  then
     print_ll = .false.
     call warning(this_sub_name, this_mod_name, 'Cannot output lifting &
-           &line data for a non lifting line component, output of lifting &
-           &line data skipped')
+          &line data for a non lifting line component, output of lifting &
+          &line data skipped')
+  endif
+
+  !> decide on printing corrected vortex lattice data
+  print_vl = getlogical(sbprms,'vortex_lattice_data')
+  
+  if (trim(comps(1)%comp_el_type) .eq. 'v' .and.  &
+    trim(comps(1)%aero_correction) .ne. 'true')  then
+    print_vl = .false.
+    call warning(this_sub_name, this_mod_name, 'Cannot output corrected &
+          &vortex lattice data for a non vortex lattice component, output of vortex &
+          &lattice data skipped')
   endif
 
 
@@ -308,7 +319,9 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
     nelem_chor = comps(id_comp)%parametric_nelems_chor
     n_sect = nelem_span
 
-
+    do i1 = 1, size(comps(id_comp)%loc_points, 2) 
+      comps(id_comp)%loc_points(:, i1) = matmul(comps(id_comp)%coupling_node_rot,comps(id_comp)%loc_points(:,i1))
+    end do
     ! ######################################################################
     ! Find the coordinates of the reference points in the local reference frame
 
@@ -319,6 +332,8 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
     !TODO: find y-coord is general enough for all the 'parametric' components
     allocate(y_cen(n_sect),y_span(n_sect))
     ie = 0
+    
+    ie = 0
     do is = 1 , n_sect
       ie = ie + 1
       y_cen(is) = &
@@ -327,13 +342,13 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
       y_span(is) = &
       abs ( comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver(1) )&
       - comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver(2) ) )
-
+      
       do ic = 2 , nelem_chor ! check
         ie = ie + 1
         if (abs( y_cen(is) - &
           sum(comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver))&
-             / real(comps(id_comp)%el(ie)%n_ver,wp) ) &
-           .gt. tol_y_cen ) then
+            / real(comps(id_comp)%el(ie)%n_ver,wp) ) &
+            .gt. tol_y_cen ) then
           call error(this_sub_name,this_mod_name,'Wrong section definition &
           &for component '//trim(comps(id_comp)%comp_name)//' for sectional&
           & loads analysis.')
@@ -345,8 +360,8 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
     !  ( with coord. y_cen )
     if ( abs(axis_dir(2)) .lt. 1e-6_wp ) then
       call error('dust_post','','Wrong definition of the axis in&
-           & sectional_loads analysis: abs(axis_dir(2)) .lt. 1e-6.&
-           & STOP')
+            & sectional_loads analysis: abs(axis_dir(2)) .lt. 1e-6.&
+            & STOP')
     end if
     allocate(r_axis(3,n_sect),r_axis_bas(3,n_sect))
     do is = 1 , n_sect
@@ -371,9 +386,13 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
     sec_loads = -333.0_wp ! initialisation for DEBUG
     allocate( time(n_time) ) ; time = -333.0_wp
     allocate( ref_mat(n_time,9) , off_mat(n_time,3) )
-    !if(print_ll) allocate(alpha(n_time,n_sect), vel_2d(n_time,n_sect), &
-    !                      vel_outplane(n_time,n_sect))
-    if(print_ll) allocate(ll_data(n_time,n_sect,n_ll_data))
+
+    if(print_ll) then  
+      allocate(ll_data(n_time,n_sect,n_ll_data))
+    elseif (print_vl) then  
+        allocate(vl_data(n_time,n_sect,n_vl_data))
+    endif 
+  
     ires = 0
     do it = an_start, an_end, an_step
       ires = ires + 1
@@ -386,17 +405,22 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
       call load_refs(floc,refs_R,refs_off)
       ! Move the points ---------------------------
       call update_points_postpro(comps, points, refs_R, refs_off, &
-                                 filen = trim(filename) )
+                                  filen = trim(filename) )
       ! Load the results --------------------------
       call load_res(floc, comps, vort, cp, t)
-      if(print_ll) call load_ll(floc, comps, ll_data(ires,:,:))
+      
+      if(print_ll) then  
+        call load_ll(floc, comps, ll_data(ires,:,:))
+      elseif(print_vl) then  
+        call load_vl(floc, comps, vl_data(ires,:,:))
+      endif 
 
       call close_hdf5_file(floc)
 
       ! from local coordinates to coordinates in the base ref.frame
       do is = 1 , n_sect
         r_axis_bas(:,is) = matmul( refs_R(:,:,ref_id) , r_axis(:,is) ) + &
-                           refs_off(:,ref_id)
+                          refs_off(:,ref_id)
       end do
 
       ! compute sectional loads. Loop over the panels of each section
@@ -409,16 +433,16 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
           F_bas1 = comps(id_comp)%el(ie)%dforce
           F_bas  = F_bas + F_bas1
           M_bas  = M_bas + cross( comps(id_comp)%el(ie)%cen &
-                         - r_axis_bas(:,is) , F_bas1 )      &
-                         + comps(id_comp)%el(ie)%dmom ! updated 2018-07-12
+                        - r_axis_bas(:,is) , F_bas1 )      &
+                        + comps(id_comp)%el(ie)%dmom ! updated 2018-07-12
         end do ! loop over chord
 
         ! From global to local coordinates of forces and moments
         sec_loads(ires,is,1:3) = matmul( &
-             transpose( refs_R(:,:, ref_id) ) , F_bas ) / y_span(is)
+            transpose( refs_R(:,:, ref_id) ) , F_bas ) / y_span(is)
         ! moment ( only the component around the <ax_coord> )
         M_bas = matmul( &
-             transpose( refs_R(:,:, ref_id) ) , M_bas )
+                transpose( refs_R(:,:, ref_id) ) , M_bas )
         sec_loads(ires,is,4) = M_bas(ax_coor) / y_span(is)
 
       end do ! loop over sections
@@ -433,58 +457,67 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
       allocate(sec_loads_ave(1,size(sec_loads,2),size(sec_loads,3)))
       sec_loads_ave(1,:,:) = sum(sec_loads, 1)/real(size(sec_loads,1),wp)
       if (print_ll) then
-        !allocate(alpha_ave(n_time,n_sect), vel_2d_ave(n_time,n_sect), &
-        !                  vel_outplane_ave(n_time,n_sect))
         allocate(ll_data_ave(1,size(ll_data,2),size(ll_data,3)))
         ll_data_ave(1,:,:) = sum(ll_data, 1)/real(size(ll_data,1),wp)
-        !alpha_ave(1,:) = sum(alpha, 1)/real(size(alpha,1),wp)
-        !vel_2d_ave(1,:) = sum(vel_2d, 1)/real(size(vel_2d,1),wp)
-        !vel_outplane_ave(1,:) = sum(vel_outplane, 1)/&
-        !                         real(size(vel_outplane,1),wp)
-      endif
+      elseif (print_vl) then
+        allocate(vl_data_ave(1,size(vl_data,2),size(vl_data,3)))
+        vl_data_ave(1,:,:) = sum(vl_data, 1)/real(size(vl_data,1),wp)
+      endif 
 
       select case(trim(out_frmt))
-       case('dat')
-        write(filename,'(A)') trim(basename)//'_'//trim(an_name)
-        call dat_out_sectional ( filename, components_names(1), y_cen, &
-                                 y_span, time(1:1), sec_loads_ave, ref_mat, &
-                                 off_mat, average )
-        if(print_ll) call dat_out_sectional_ll(filename, components_names(1),&
-                              y_cen, y_span, time(1:1), ll_data_ave, average)
-       case('tecplot')
-        write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt'
-        if (print_ll) then
-          call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
-                                  y_span, ll_data_ave )
-        else
-          call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
-                                                                     y_span )
-        endif
-      end select
+        case('dat')
+            write(filename,'(A)') trim(basename)//'_'//trim(an_name)
+            call dat_out_sectional ( filename, components_names(1), y_cen, &
+                                    y_span, time(1:1), sec_loads_ave, ref_mat, &
+                                    off_mat, average )
+          if(print_ll) then 
+            call dat_out_sectional_ll(filename, components_names(1), &
+                                    y_cen, y_span, time(1:1), ll_data_ave, average)
+          elseif(print_vl) then
+            call dat_out_sectional_vl(filename, components_names(1), &
+                                    y_cen, y_span, time(1:1), vl_data_ave, average)
+          endif 
+          
+        case('tecplot')
+          write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt'
+          if (print_ll) then
+            call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
+                                    y_span, ll_data_ave )
+          else
+            call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
+                                                                      y_span )
+          endif
+        end select
       deallocate(sec_loads_ave)
     else
       select case(trim(out_frmt))
-       case('dat')
-        write(filename,'(A)') trim(basename)//'_'//trim(an_name)
-        call dat_out_sectional ( filename, components_names(1), y_cen, &
-                                 y_span, time, sec_loads, &
-                                ref_mat, off_mat, average )
-        if(print_ll) call dat_out_sectional_ll (filename, components_names(1),&
-                                      y_cen, y_span, time, ll_data, average )
-       case('tecplot')
-        write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt'
-        if (print_ll) then
-          call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span,&
-                                   ll_data)
-        else
-          call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span )
-        endif
+        case('dat')
+          write(filename,'(A)') trim(basename)//'_'//trim(an_name)
+          call dat_out_sectional ( filename, components_names(1), y_cen, &
+                                  y_span, time, sec_loads, &
+                                  ref_mat, off_mat, average )
+          if(print_ll) then 
+            call dat_out_sectional_ll (filename, components_names(1),&
+                                        y_cen, y_span, time, ll_data, average )
+          elseif (print_vl) then 
+            call dat_out_sectional_vl (filename, components_names(1),&
+                                        y_cen, y_span, time, vl_data, average )
+          endif 
+        case('tecplot')
+          write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt'
+          if (print_ll) then
+            call tec_out_sectional (filename, time, sec_loads, y_cen, y_span,&
+                                    ll_data)
+          else
+            call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span )
+          endif
       end select
     endif
 
     deallocate(r_axis,r_axis_bas)
-    deallocate(y_cen,y_span)
-    deallocate(sec_loads,time,ref_mat,off_mat)
+    deallocate(y_cen, y_span)
+    deallocate(sec_loads, time, ref_mat, off_mat)
+
 
 
   case ( 'cgns' )
@@ -497,15 +530,15 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
     ! Read input for box and build the 8 nodes of the box -----------------------------
     call getsuboption(sbprms,'BoxSect',bxprms)
     allocate(box_coord(8,3),box_coord_tmp(8,3))
-    ref_node = getrealarray(bxprms,'refNode',3)
-    vVec = getrealarray(bxprms,'faceVec',3)
-    baseLen = getrealarray(bxprms,'faceBas',2)
-    heigLen = getrealarray(bxprms,'faceHei',2)
-    bVec = getrealarray(bxprms,'spanVec',3)
-    spanLen = getreal(bxprms,'spanLen')
-    n_sect = getint(bxprms,'numSect')
-    reshape_box = getlogical(bxprms,'reshapeBox')
-    nVec = getrealarray(sbprms,'AxisMom',3)
+    ref_node = getrealarray(bxprms,'ref_node',3)
+    vVec = getrealarray(bxprms,'face_vec',3)
+    baseLen = getrealarray(bxprms,'face_bas',2)
+    heigLen = getrealarray(bxprms,'face_hei',2)
+    bVec = getrealarray(bxprms,'span_vec',3)
+    spanLen = getreal(bxprms,'span_len')
+    n_sect = getint(bxprms,'num_sect')
+    reshape_box = getlogical(bxprms,'reshape_box')
+    nVec = getrealarray(sbprms,'axis_mom',3)
 
     ! Normalise
     vVec = vVec / norm2(vVec)
@@ -773,76 +806,76 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
                end if
              end do
 
-             ! Compute the area of the subelem with the minimum n.of points -
-             !  (since it could be only TRI or QUAD) and compute the area of
-             !  the othe elem as a difference.
-             if ( sec1_nVer .le. sec2_nVer ) then
-               if ( sec1_nVer .gt. 2 ) then
-                  call error(this_sub_name, this_mod_name, 'Generic sectional &
-                  & loads error')
-               end if
+              ! Compute the area of the subelem with the minimum n.of points -
+              !  (since it could be only TRI or QUAD) and compute the area of
+              !  the othe elem as a difference.
+              if ( sec1_nVer .le. sec2_nVer ) then
+                if ( sec1_nVer .gt. 2 ) then
+                    call error(this_sub_name, this_mod_name, 'Generic sectional &
+                    & loads error')
+                end if
 
-               interSectAreas(1) = 0.5_wp * norm2( &
+                interSectAreas(1) = 0.5_wp * norm2( &
                     cross( interSectPoints(:,2) - comps(id_comp)%loc_points(:, &
-                             comps(id_comp)%el(ie)%i_ver( nNodeInt(1,1) ) ) , &
-                           interSectPoints(:,1) - comps(id_comp)%loc_points(:, &
-                             comps(id_comp)%el(ie)%i_ver( nNodeInt(1,2) ) ) ) ) ! nNodes(2,iSec1) ) )
-               interSectAreas(2) = comps(id_comp)%el(ie)%area - interSectAreas(1)
+                            comps(id_comp)%el(ie)%i_ver( nNodeInt(1,1) ) ) , &
+                            interSectPoints(:,1) - comps(id_comp)%loc_points(:, &
+                            comps(id_comp)%el(ie)%i_ver( nNodeInt(1,2) ) ) ) ) ! nNodes(2,iSec1) ) )
+                interSectAreas(2) = comps(id_comp)%el(ie)%area - interSectAreas(1)
 
-               if ( sec1_nVer .eq. 1 ) then
-                 interSectCen(:,1) = ( interSectPoints(:,1) + interSectPoints(:,2) + &
-                      comps(id_comp)%loc_points(:, &
+                if ( sec1_nVer .eq. 1 ) then
+                  interSectCen(:,1) = ( interSectPoints(:,1) + interSectPoints(:,2) + &
+                        comps(id_comp)%loc_points(:, &
                             comps(id_comp)%el(ie)%i_ver(nNodeInt(1,1)) ) ) / 3.0_wp
-               elseif ( sec1_nVer .eq. 2 ) then
-                 interSectCen(:,1) = ( interSectPoints(:,1) + interSectPoints(:,2) + &
-                      comps(id_comp)%loc_points(:, &
+                elseif ( sec1_nVer .eq. 2 ) then
+                  interSectCen(:,1) = ( interSectPoints(:,1) + interSectPoints(:,2) + &
+                        comps(id_comp)%loc_points(:, &
                             comps(id_comp)%el(ie)%i_ver(nNodeInt(1,1)) ) + &
-                      comps(id_comp)%loc_points(:, &
+                        comps(id_comp)%loc_points(:, &
                             comps(id_comp)%el(ie)%i_ver(nNodeInt(1,2)) ) ) / 4.0_wp
-               else
-               end if
-               interSectCen(:,2) = ( comps(id_comp)%el(ie)%area * comps(id_comp)%el(ie)%cen - &
+                else
+                end if
+                interSectCen(:,2) = ( comps(id_comp)%el(ie)%area * comps(id_comp)%el(ie)%cen - &
                        interSectAreas(1) * interSectCen(:,1) ) / interSectAreas(2)
 
-             else
-               if ( sec2_nVer .gt. 2 ) then
-                  call error(this_sub_name, this_mod_name, 'Generic sectional &
-                  & loads error')
-               end if
+              else
+                if ( sec2_nVer .gt. 2 ) then
+                    call error(this_sub_name, this_mod_name, 'Generic sectional &
+                    & loads error')
+                end if
 
-               interSectAreas(2) = 0.5_wp * norm2( &
-                    cross( interSectPoints(:,2) - comps(id_comp)%loc_points(:, &
-                             comps(id_comp)%el(ie)%i_ver( nNodeInt(2,1) ) ) , &
-                           interSectPoints(:,1) - comps(id_comp)%loc_points(:, &
-                             comps(id_comp)%el(ie)%i_ver( nNodeInt(2,2) ) ) ) ) ! nNodes(2,iSec1) ) )
-               interSectAreas(1) = comps(id_comp)%el(ie)%area - interSectAreas(2)
+              interSectAreas(2) = 0.5_wp * norm2( &
+                      cross( interSectPoints(:,2) - comps(id_comp)%loc_points(:, &
+                            comps(id_comp)%el(ie)%i_ver( nNodeInt(2,1) ) ) , &
+                          interSectPoints(:,1) - comps(id_comp)%loc_points(:, &
+                            comps(id_comp)%el(ie)%i_ver( nNodeInt(2,2) ) ) ) ) ! nNodes(2,iSec1) ) )
+              interSectAreas(1) = comps(id_comp)%el(ie)%area - interSectAreas(2)
 
-               if ( sec2_nVer .eq. 1 ) then
-                 interSectCen(:,2) = ( interSectPoints(:,1) + interSectPoints(:,2) + &
-                      comps(id_comp)%loc_points(:, &
-                            comps(id_comp)%el(ie)%i_ver(nNodeInt(2,1)) ) ) / 3.0_wp
-               elseif ( sec2_nVer .eq. 2 ) then
-                 interSectCen(:,2) = ( interSectPoints(:,1) + interSectPoints(:,2) + &
-                      comps(id_comp)%loc_points(:, &
-                            comps(id_comp)%el(ie)%i_ver(nNodeInt(2,1)) ) + &
-                      comps(id_comp)%loc_points(:, &
-                            comps(id_comp)%el(ie)%i_ver(nNodeInt(2,2)) ) ) / 4.0_wp
-               else
-               end if
-               interSectCen(:,1) = ( comps(id_comp)%el(ie)%area * comps(id_comp)%el(ie)%cen - &
-                       interSectAreas(2) * interSectCen(:,2) ) / interSectAreas(1)
+              if ( sec2_nVer .eq. 1 ) then
+                interSectCen(:,2) = ( interSectPoints(:,1) + interSectPoints(:,2) + &
+                     comps(id_comp)%loc_points(:, &
+                           comps(id_comp)%el(ie)%i_ver(nNodeInt(2,1)) ) ) / 3.0_wp
+              elseif ( sec2_nVer .eq. 2 ) then
+                interSectCen(:,2) = ( interSectPoints(:,1) + interSectPoints(:,2) + &
+                     comps(id_comp)%loc_points(:, &
+                           comps(id_comp)%el(ie)%i_ver(nNodeInt(2,1)) ) + &
+                     comps(id_comp)%loc_points(:, &
+                           comps(id_comp)%el(ie)%i_ver(nNodeInt(2,2)) ) ) / 4.0_wp
+              else
+              end if
+              interSectCen(:,1) = ( comps(id_comp)%el(ie)%area * comps(id_comp)%el(ie)%cen - &
+                      interSectAreas(2) * interSectCen(:,2) ) / interSectAreas(1)
 
-             end if
+            end if
 
-             ! Update structures
-             box_secloads(isec1)%nelems = box_secloads(isec1)%nelems + 1
-             box_secloads(isec1)%elems(box_secloads(isec1)%nelems) = ie
-             box_secloads(isec1)%fracs(box_secloads(isec1)%nelems) = interSectAreas(1) / comps(id_comp)%el(ie)%area
-             box_secloads(isec1)%cen(:,box_secloads(isec1)%nelems) = interSectCen(:,1)
-             box_secloads(isec2)%nelems = box_secloads(isec2)%nelems + 1
-             box_secloads(isec2)%elems(box_secloads(isec2)%nelems) = ie
-             box_secloads(isec2)%fracs(box_secloads(isec2)%nelems) = interSectAreas(2) / comps(id_comp)%el(ie)%area
-             box_secloads(isec2)%cen(:,box_secloads(isec2)%nelems) = interSectCen(:,2)
+            ! Update structures
+            box_secloads(isec1)%nelems = box_secloads(isec1)%nelems + 1
+            box_secloads(isec1)%elems(box_secloads(isec1)%nelems) = ie
+            box_secloads(isec1)%fracs(box_secloads(isec1)%nelems) = interSectAreas(1) / comps(id_comp)%el(ie)%area
+            box_secloads(isec1)%cen(:,box_secloads(isec1)%nelems) = interSectCen(:,1)
+            box_secloads(isec2)%nelems = box_secloads(isec2)%nelems + 1
+            box_secloads(isec2)%elems(box_secloads(isec2)%nelems) = ie
+            box_secloads(isec2)%fracs(box_secloads(isec2)%nelems) = interSectAreas(2) / comps(id_comp)%el(ie)%area
+            box_secloads(isec2)%cen(:,box_secloads(isec2)%nelems) = interSectCen(:,2)
 
 
            end if
@@ -873,6 +906,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
     allocate( time(n_time) ) ; time = -333.0_wp
     allocate( ref_mat(n_time,9) , off_mat(n_time,3) )
     ires = 0
+    
     do it = an_start, an_end, an_step
 
       ires = ires + 1
@@ -890,13 +924,11 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
 
       call close_hdf5_file(floc)
 
-      !TODO: projection step to local frame
-      ! ...
       do is = 1 , n_sect
 
         ! from local coordinates to coordinates in the base ref.frame
         r_axis_bas(:,is) = matmul( refs_R(:,:,ref_id) , r_axis(:,is) ) + &
-                           refs_off(:,ref_id)
+                          refs_off(:,ref_id)
 
         ! force
         F_bas = 0.0_wp ; M_bas = 0.0_wp
@@ -904,7 +936,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
 
           !from local coordinates to coordinates in the base ref.frame
           box_secloads_cen = matmul( refs_R(:,:,ref_id) , &
-                                     box_secloads(is)%cen(:,ie) )
+                                    box_secloads(is)%cen(:,ie) )
 
           F_bas1 = comps(id_comp)%el( box_secloads(is)%elems(ie) )%dforce * &
                                       box_secloads(is)%fracs(ie)
@@ -912,17 +944,17 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
           !TODO: add moment (it requires axis computation)
           M_bas  = M_bas + cross( box_secloads_cen -          &
                                   r_axis_bas(:,is) , F_bas1 ) &
-                         + comps(id_comp)%el(                 &
-                             box_secloads(is)%elems(ie) )%dmom ! updated 2018-07-12
+                        + comps(id_comp)%el(                 &
+                            box_secloads(is)%elems(ie) )%dmom ! updated 2018-07-12
         end do
 
         ! From global to local coordinates of forces and moments
         sec_loads(ires,is,1:3) = matmul( &
-             transpose( refs_R(:,:, ref_id) ) , F_bas ) / y_span(is)
+            transpose( refs_R(:,:, ref_id) ) , F_bas ) / y_span(is)
         ! TODO: moment
         ! moment ( only the component around the <ax_coord> )
         M_bas = matmul( &
-             transpose( refs_R(:,:, ref_id) ) , M_bas )
+            transpose( refs_R(:,:, ref_id) ) , M_bas )
         sec_loads(ires,is,4) = M_bas(2) / y_span(is)
       end do
 
@@ -936,27 +968,27 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
       allocate(sec_loads_ave(1,size(sec_loads,2),size(sec_loads,3)))
       sec_loads_ave(1,:,:) = sum(sec_loads, 1)/real(size(sec_loads,1),wp)
       select case(trim(out_frmt))
-       case('dat')
-        write(filename,'(A)') trim(basename)//'_'//trim(an_name)
-        call dat_out_sectional ( filename, components_names(1), y_cen, &
-                                  y_span, time(1:1), &
-                          sec_loads_ave, ref_mat , off_mat, average )
-       case('tecplot')
-        write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt'
-        call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
-                                                                     y_span )
+        case('dat')
+          write(filename,'(A)') trim(basename)//'_'//trim(an_name)
+          call dat_out_sectional ( filename, components_names(1), y_cen, &
+                                    y_span, time(1:1), &
+                            sec_loads_ave, ref_mat , off_mat, average )
+        case('tecplot')
+          write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt'
+          call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
+                                                                      y_span )
       end select
       deallocate(sec_loads_ave)
     else
       select case(trim(out_frmt))
-       case('dat')
-        write(filename,'(A)') trim(basename)//'_'//trim(an_name)
-        call dat_out_sectional ( filename, components_names(1), y_cen, &
-                                 y_span, time, sec_loads, &
-                                 ref_mat, off_mat, average)
-       case('tecplot')
-        write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt'
-        call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span )
+        case('dat')
+          write(filename,'(A)') trim(basename)//'_'//trim(an_name)
+          call dat_out_sectional ( filename, components_names(1), y_cen, &
+                                y_span, time, sec_loads, &
+                                ref_mat, off_mat, average)
+        case('tecplot')
+          write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt'
+          call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span )
       end select
     endif
 

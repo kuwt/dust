@@ -129,7 +129,7 @@ type, abstract, extends(c_elem) :: c_pot_elem
   integer, allocatable :: i_ver(:)
 
   !> Element area
-  real(wp)             :: area
+  real(wp) :: area
 
   !> Element normal vector
   real(wp) :: nor(3)
@@ -156,33 +156,33 @@ type, abstract, extends(c_elem) :: c_pot_elem
   real(wp) :: ub(3)
 
   !> Vorticity induced velocity at the centre
-  real(wp)          :: uvort(3)
+  real(wp) :: uvort(3)
 
   !> Is the element moving during simulation?
-  logical :: moving
+  logical  :: moving
 
   !> Element neighbours global index (in the elements vector)
   type(t_pot_elem_p), allocatable :: neigh(:)
 
   !> Average pressure on the element
-  real(wp)              :: pres
+  real(wp)  :: pres
 
   !> Elementary force acting on the element (components in the base ref.sys.)
-  real(wp)              :: dforce(3)
+  real(wp)  :: dforce(3)
 
   !> Elementary force acting on the element (components in the base ref.sys.)
-  real(wp)              :: dmom(3)
-
+  real(wp)  :: dmom(3)
+  integer :: n_c, n_s
+  real(wp) :: dy
   !TODO: these three are used only by vortlatt and liftlin
   ! consider moving them there, but then change the implementation of
   ! create_strip_connectivity
   !> Previous element in a stripe
-  type(t_pot_elem_p)        :: stripe_1
-  !> Panel width (= strip width)
-  real(wp)              :: dy
+  type(t_pot_elem_p)  :: stripe_1
+  
   !> Element indices in the component%strip_elem array
   type(t_elem_p), allocatable :: stripe_elem(:)
-
+  
   !> Hinge motion
   ! Initialization to zero *** to do: restart??? ***
   !> Delta position, due to hinge motion of the element center
@@ -191,7 +191,7 @@ type, abstract, extends(c_elem) :: c_pot_elem
   !> Delta velocity, due to hinge motion of the element center, evaluated
   ! with finite difference method: dvel_h = ( dcen_h - dcen_h_old ) / dt
   real(wp) :: dvel_h(3) ! = 0.0_wp
-
+  real(wp) :: loc_ctr_pt(3)
   contains
 
   procedure(i_compute_pot)   , deferred, pass(this) :: compute_pot
@@ -250,16 +250,16 @@ end type c_expl_elem
 !! moving contribution is just added to the static one.
 abstract interface
   subroutine i_build_row(this, elems, linsys, ie, ista, iend)
-    import :: wp
-    import :: c_impl_elem
-    import :: t_impl_elem_p
-    import :: t_linsys
+    import                              :: wp
+    import                              :: c_impl_elem
+    import                              :: t_impl_elem_p
+    import                              :: t_linsys
     implicit none
-    class(c_impl_elem), intent(inout)  :: this
-    type(t_impl_elem_p), intent(in)    :: elems(:)
-    type(t_linsys), intent(inout) :: linsys
-    integer, intent(in)           :: ie
-    integer, intent(in)           :: ista, iend
+    class(c_impl_elem), intent(inout)   :: this
+    type(t_impl_elem_p), intent(in)     :: elems(:)
+    type(t_linsys), intent(inout)       :: linsys
+    integer, intent(in)                 :: ie
+    integer, intent(in)                 :: ista, iend
   end subroutine
 end interface
 
@@ -281,20 +281,19 @@ end interface
 !! The function operates only on the components from ista to iend, which
 !! should be the static ones ordered at the beginning of the array
 abstract interface
-  subroutine i_build_row_static(this, elems, expl_elems, linsys, &
-                                ie, ista, iend)
-    import :: wp
-    import :: c_impl_elem
-    import :: t_impl_elem_p
-    import :: t_expl_elem_p
-    import :: t_linsys
+  subroutine i_build_row_static(this, elems, expl_elems, linsys, ie, ista, iend)
+    import                              :: wp
+    import                              :: c_impl_elem
+    import                              :: t_impl_elem_p
+    import                              :: t_expl_elem_p
+    import                              :: t_linsys
     implicit none
-    class(c_impl_elem), intent(inout)  :: this
-    type(t_impl_elem_p), intent(in)    :: elems(:)
-    type(t_expl_elem_p), intent(in)    :: expl_elems(:)
-    type(t_linsys), intent(inout) :: linsys
-    integer, intent(in)           :: ie
-    integer, intent(in)           :: ista, iend
+    class(c_impl_elem), intent(inout)   :: this
+    type(t_impl_elem_p), intent(in)     :: elems(:)
+    type(t_expl_elem_p), intent(in)     :: expl_elems(:)
+    type(t_linsys), intent(inout)       :: linsys
+    integer, intent(in)                 :: ie
+    integer, intent(in)                 :: ista, iend
   end subroutine
 end interface
 
@@ -315,20 +314,19 @@ end interface
 !! The stationary part is updated once at the beginning of the simulation
 !! while the moving one is updated each timestep
 abstract interface
-  subroutine i_add_wake(this, wake_elems, impl_wake_ind, linsys, &
-                        ie, ista, iend)
-    import :: wp
-    import :: c_impl_elem
-    import :: t_pot_elem_p
-    import :: t_linsys
+  subroutine i_add_wake(this, wake_elems, impl_wake_ind, linsys, ie, ista, iend)
+    import                              :: wp
+    import                              :: c_impl_elem
+    import                              :: t_pot_elem_p
+    import                              :: t_linsys
     implicit none
-    class(c_impl_elem), intent(inout)  :: this
-    type(t_pot_elem_p), intent(in)    :: wake_elems(:)
-    integer, intent(in)           :: impl_wake_ind(:,:)
-    type(t_linsys), intent(inout) :: linsys
-    integer, intent(in)           :: ie
-    integer, intent(in)           :: ista
-    integer, intent(in)           :: iend
+    class(c_impl_elem), intent(inout)   :: this
+    type(t_pot_elem_p), intent(in)      :: wake_elems(:)
+    integer, intent(in)                 :: impl_wake_ind(:,:)
+    type(t_linsys), intent(inout)       :: linsys
+    integer, intent(in)                 :: ie
+    integer, intent(in)                 :: ista
+    integer, intent(in)                 :: iend
   end subroutine
 end interface
 
@@ -343,19 +341,18 @@ end interface
 !! and just retrieved, while the contribution due to the moving components
 !! is calculated and added
 abstract interface
-  subroutine i_add_expl(this, expl_elems, linsys, &
-                        ie, ista, iend)
-    import :: wp
-    import :: c_impl_elem
-    import :: t_expl_elem_p
-    import :: t_linsys
+  subroutine i_add_expl(this, expl_elems, linsys, ie, ista, iend)
+    import                              :: wp
+    import                              :: c_impl_elem
+    import                              :: t_expl_elem_p
+    import                              :: t_linsys
     implicit none
-    class(c_impl_elem), intent(inout)  :: this
-    type(t_expl_elem_p), intent(in)    :: expl_elems(:)
-    type(t_linsys), intent(inout) :: linsys
-    integer, intent(in)           :: ie
-    integer, intent(in)           :: ista
-    integer, intent(in)           :: iend
+    class(c_impl_elem), intent(inout)   :: this
+    type(t_expl_elem_p), intent(in)     :: expl_elems(:)
+    type(t_linsys), intent(inout)       :: linsys
+    integer, intent(in)                 :: ie
+    integer, intent(in)                 :: ista
+    integer, intent(in)                 :: iend
   end subroutine
 end interface
 
@@ -365,12 +362,12 @@ end interface
 !!
 abstract interface
   subroutine i_get_vort_vel(this, vort_elems)
-    import :: c_impl_elem
-    import :: t_vort_elem_p
-    import :: wp
+    import                              :: c_impl_elem
+    import                              :: t_vort_elem_p
+    import                              :: wp
     implicit none
-    class(c_impl_elem), intent(inout)  :: this
-    type(t_vort_elem_p), intent(in)    :: vort_elems(:)
+    class(c_impl_elem), intent(inout)   :: this
+    type(t_vort_elem_p), intent(in)     :: vort_elems(:)
   end subroutine
 end interface
 
@@ -384,13 +381,13 @@ end interface
 !! for an equation for the potential
 abstract interface
   subroutine i_compute_pot(this, A, b, pos,i,j)
-    import :: c_pot_elem , wp , t_linsys
+    import                            :: c_pot_elem, wp, t_linsys
     implicit none
-    class(c_pot_elem), intent(inout) :: this
-    real(wp), intent(out) :: A
-    real(wp), intent(out) :: b
-    real(wp), intent(in) :: pos(:)
-    integer , intent(in) :: i,j
+    class(c_pot_elem), intent(inout)  :: this
+    real(wp), intent(out)             :: A
+    real(wp), intent(out)             :: b
+    real(wp), intent(in)              :: pos(:)
+    integer , intent(in)              :: i, j
   end subroutine
 end interface
 
@@ -404,12 +401,13 @@ end interface
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 abstract interface
   subroutine i_compute_vel(this, pos, vel)
-    import :: c_elem , wp
+    import                    :: c_elem, wp
     implicit none
     class(c_elem), intent(in) :: this
-    real(wp), intent(in) :: pos(:)
-    real(wp), intent(out) :: vel(3)
+    real(wp), intent(in)      :: pos(:)
+    real(wp), intent(out)     :: vel(3)
   end subroutine
+
 end interface
 
 !----------------------------------------------------------------------
@@ -422,34 +420,36 @@ end interface
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 abstract interface
   subroutine i_compute_grad(this, pos, grad)
-    import :: c_elem , wp
+    import                    :: c_elem , wp
     implicit none
     class(c_elem), intent(in) :: this
-    real(wp), intent(in) :: pos(:)
-    real(wp), intent(out) :: grad(3,3)
+    real(wp), intent(in)      :: pos(:)
+    real(wp), intent(out)     :: grad(3,3)
   end subroutine
 end interface
 
 !----------------------------------------------------------------------
 
 !> Compute the psi induced by an aerodinamic element in a certain
-!! position
-!!
-!! The psi is the velocity induced by the singularities multiplied by
-!! 4*pi.
-!! The structure of the subroutine is already intended to be used to calculate
-!! the contribution to the linear system matrix and to the right hand side
-!! for an equation for the velocity.
+! position
+!
+! The psi is the velocity induced by the singularities multiplied by
+! 4*pi.
+! The structure of the subroutine is already intended to be used to calculate
+! the contribution to the linear system matrix and to the right hand side
+! for an equation for the velocity.
 abstract interface
   subroutine i_compute_psi(this, A, b, pos, nor,i,j)
-    import :: c_pot_elem , wp , t_linsys
+    import                            :: c_pot_elem, 
+    import                            :: wp 
+    import                            :: t_linsys
     implicit none
-    class(c_pot_elem), intent(inout) :: this
-    real(wp), intent(out) :: A
-    real(wp), intent(out) :: b
-    real(wp), intent(in) :: pos(:)
-    real(wp), intent(in) :: nor(:)
-    integer , intent(in) :: i,j
+    class(c_pot_elem), intent(inout)  :: this
+    real(wp), intent(out)             :: A
+    real(wp), intent(out)             :: b
+    real(wp), intent(in)              :: pos(:)
+    real(wp), intent(in)              :: nor(:)
+    integer , intent(in)              :: i, j
   end subroutine
 end interface
 
@@ -458,11 +458,10 @@ end interface
 !> Compute an approximation of the pressure acting on the acutal element
 abstract interface
   subroutine i_compute_pres (this, R_g)
-    import :: c_pot_elem , t_elem_p , wp
+    import                            :: c_pot_elem , t_elem_p , wp
     implicit none
-    class(c_pot_elem), intent(inout) :: this
-    real(wp)         , intent(in)    :: R_g(3,3)
-    !type(t_elem_p), intent(in)   :: elems(:)
+    class(c_pot_elem), intent(inout)  :: this
+    real(wp)         , intent(in)     :: R_g(3,3)
   end subroutine
 end interface
 
@@ -471,10 +470,9 @@ end interface
 !> Compute the elementary force acting on the actual element
 abstract interface
   subroutine i_compute_dforce (this)
-    import :: c_pot_elem , t_elem_p , wp
+    import                           :: c_pot_elem , t_elem_p , wp
     implicit none
     class(c_pot_elem), intent(inout) :: this
-    !type(t_elem_p), intent(in)   :: elems(:)
   end subroutine
 end interface
 
@@ -483,25 +481,25 @@ end interface
 !> Compute the geometrical quantities of the elemsnts
 abstract interface
   subroutine i_calc_geo_data (this,vert)
-    import :: c_pot_elem , t_elem_p , wp
+    import                           :: c_pot_elem, t_elem_p, wp
     implicit none
     class(c_pot_elem), intent(inout) :: this
-    real(wp), intent(in) :: vert(:,:)
+    real(wp), intent(in)             :: vert(:,:)
   end subroutine
 end interface
 
 !----------------------------------------------------------------------
 
 !> Get the bernoulli source for the pressure equation
-!!
-!! This interface is used to avoid the use of select types to get the
-!! bernoulli source field which is defined only on surface panels
+!
+! This interface is used to avoid the use of select types to get the
+! bernoulli source field which is defined only on surface panels
 abstract interface
   function i_get_bernoulli_source(this) result(source)
-    import :: c_impl_elem , wp
+    import                            :: c_impl_elem , wp
     implicit none
     class(c_impl_elem), intent(inout) :: this
-    real(wp) :: source
+    real(wp)                          :: source
   end function
 end interface
 

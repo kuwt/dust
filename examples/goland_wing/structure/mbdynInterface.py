@@ -51,13 +51,13 @@ class MBDynInterface:
 
   #> Methods ----------------------------------------------------
   #> initialize -------------------------------------------------
-  def initialize(self, path='.mbdyn/mbdyn.sock', \
-                       verbose=0, \
-                       nnodes=1, \
-                       accels=0, \
-                       forceType='Nodal', \
-                       dumpAuxFile=False, \
-                       dumpAuxFilen='./../nnodes.dat'):
+  def initialize(self,path='.mbdyn/mbdyn.sock', \
+                      verbose=0, \
+                      nnodes=1, \
+                      accels=0, \
+                      forceType='Nodal', \
+                      dumpAuxFile=False, \
+                      dumpAuxFilen='./../nnodes.dat'):
 
     #> Initialize communication
     self.socket = self.Socket( path=path, verbose=0, \

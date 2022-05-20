@@ -68,7 +68,7 @@ begin: control data;
   #air properties;
   default output: reference frames;
 	default orientation: orientation vector;
-  output results: netcdf, no text;
+  output results: netcdf, sync, no text;
 
 end: control data;
 

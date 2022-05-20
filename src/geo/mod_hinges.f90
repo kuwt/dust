@@ -52,7 +52,7 @@ use mod_param, only: &
   wp, max_char_len, pi
 
 use mod_math, only: &
-  cross
+  cross, sort_vector_real
 
 use mod_parse, only: &
   t_parse, getstr, getint, getreal, getrealarray, getlogical, getsuboption, &
@@ -87,6 +87,13 @@ type :: t_hinge_input
   real(wp) :: rotation_omega
   real(wp) :: rotation_phase
   integer, allocatable :: coupling_nodes(:)
+  real(wp) :: le1(2) 
+  real(wp) :: te1(2) 
+  real(wp) :: le2(2)
+  real(wp) :: te2(2)
+  real(wp) :: chord1, chord2
+  real(wp) :: csi1, csi2
+  real(wp) :: merge_tol
 end type t_hinge_input
 
 ! ---------------------------------------------------------------
@@ -220,9 +227,11 @@ type :: t_hinge
   ! read from mbdyn through preCICE
   type(t_hinge_conn) :: hin
 
+  character(len=max_char_len) ::  tag 
   !> Interpolated rotation vector of the hinge nodes, attached to the non-
   ! rotating part of the component
   real(wp), allocatable :: hin_rot(:,:)
+
 
   contains
 
@@ -781,32 +790,6 @@ subroutine build_connectivity_hin(this, rr_t, ind_h )
 end subroutine build_connectivity_hin
 
 ! ---------------------------------------------------------------
-!> Naif sort
-subroutine sort_vector_real( vec, nel, sor, ind )
-  real(wp), intent(inout) :: vec(:)
-  integer , intent(in) :: nel
-  real(wp), allocatable, intent(inout):: sor(:)
-  integer , allocatable, intent(inout):: ind(:)
-
-  real(wp):: maxv
-  integer :: i
-
-  !allocate(sor(nel));
-  sor = 0.0_wp
-  !allocate(ind(nel));
-  ind = 0
-
-  maxv = maxval( vec )
-  do i = 1, nel
-    sor(i) = minval( vec, 1 )
-    ind(i) = minloc( vec, 1 )
-    vec( ind(i) ) = maxv + 0.1_wp ! naif
-  end do
-
-
-end subroutine sort_vector_real
-
-! ---------------------------------------------------------------
 !> Compute actual configuration of the hinge nodes
 ! *** to do *** unpredictable (or better, wrong) behavior when
 ! restarting a simulation
@@ -1097,21 +1080,30 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
     !> Open hinge sub-parser
     call getsuboption(geo_prs, 'Hinge', hinge_prs)
 
-     hinges(i) % tag = getstr(hinge_prs, 'Hinge_Tag')
-     hinges(i) % nodes_input = getstr(hinge_prs, 'Hinge_Nodes_Input')
+     hinges(i)%tag = getstr(hinge_prs, 'Hinge_Tag')
+     hinges(i)%nodes_input = getstr(hinge_prs, 'hinge_nodes_input')
 
      if ( trim(hinges(i) % nodes_input) .eq. 'parametric' ) then
-       hinges(i) % node1 = getrealarray(hinge_prs, 'Node1', 3)
-       hinges(i) % node2 = getrealarray(hinge_prs, 'Node2', 3)
-       hinges(i) % n_nodes = getint(hinge_prs, 'N_Nodes')
-       hinges(i) % node_file = 'hinge with parametric input. If you read this &
-           &string, something probabily went wrong.'
+        hinges(i)%node1 = getrealarray(hinge_prs, 'node_1', 3)
+        hinges(i)%node2 = getrealarray(hinge_prs, 'node_2', 3)
+        hinges(i)%le1 = 0.0_wp
+        hinges(i)%le2 = 0.0_wp
+        hinges(i)%te1 = 0.0_wp
+        hinges(i)%te2 = 0.0_wp
+        hinges(i)%chord1 = 0.0_wp
+        hinges(i)%chord2 = 0.0_wp
+        hinges(i)%csi1 = 0.0_wp
+        hinges(i)%csi2 = 0.0_wp
+
+        hinges(i)%n_nodes = getint(hinge_prs, 'n_nodes')
+        hinges(i)%node_file = 'hinge with parametric input. If you read this &
+                              &string, something probabily went wrong.'
        allocate( hinges(i)%rr( 3, hinges(i)%n_nodes ) )
-       do j = 1, hinges(i)%n_nodes
-          hinges(i) % rr(:,j) = hinges(i) % node1 + &
-                              ( hinges(i) % node2 - hinges(i) % node1 ) * &
-                               dble(j-1)/dble(hinges(i)%n_nodes-1)
-       end do
+        do j = 1, hinges(i)%n_nodes
+            hinges(i)%rr(:,j) = hinges(i)%node1 + &
+                               (hinges(i)%node2 - hinges(i)%node1 ) * &
+                                  dble(j-1)/dble(hinges(i)%n_nodes-1)
+        end do
 
      elseif ( trim(hinges(i) % nodes_input) .eq. 'from_file' ) then
        ! *** to do *** fill dummy node1, node2, n_nodes fields
@@ -1126,13 +1118,13 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
 
      !> Hinge reference direction (zero rotation direction) and offset to
      ! avoid irregular behavior during hinge rotation
-     hinges(i) % ref_dir = getrealarray(hinge_prs, 'Hinge_Ref_Dir', 3)
-     hinges(i) % offset  = getreal(hinge_prs, 'Hinge_Offset')
-     hinges(i) % span_blending = getreal(hinge_prs, 'Hinge_Spanwise_Blending')
-
+     hinges(i)%ref_dir = getrealarray(hinge_prs, 'hinge_ref_dir', 3)
+     hinges(i)%offset  = getreal(hinge_prs, 'hinge_offset')
+     hinges(i)%span_blending = getreal(hinge_prs, 'hinge_spanwise_blending')
+     hinges(i)%merge_tol = getreal(hinge_prs,'hinge_merge_tol')
      !> Hinge input: function, amplitude
      !> Overwrite 'constant' rotation_input with 'function:const'
-     hinges(i) % rotation_input = getstr(hinge_prs,'Hinge_Rotation_Input')
+     hinges(i) % rotation_input = getstr(hinge_prs,'hinge_rotation_input')
      !> Overwrite old 'constant' input
      if ( trim( hinges(i)%rotation_input ) .eq. 'constant' ) then
        hinges(i)%rotation_input = 'function:const'
@@ -1151,9 +1143,9 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
             ( trim(hinges(i)%rotation_input) .eq. 'function:cos'   ) ) then
 
          call getsuboption(hinge_prs, 'Hinge_Rotation_Function', fun_prs)
-         hinges(i) % rotation_amplitude = getreal(fun_prs,'Amplitude')
-         hinges(i) % rotation_omega     = getreal(fun_prs,'Omega')
-         hinges(i) % rotation_phase     = getreal(fun_prs,'Phase')
+         hinges(i) % rotation_amplitude = getreal(fun_prs,'amplitude')
+         hinges(i) % rotation_omega     = getreal(fun_prs,'omega')
+         hinges(i) % rotation_phase     = getreal(fun_prs,'phase')
 
        elseif ( trim(hinges(i)%rotation_input) .eq. 'from_file' ) then
          write(*,*) ' Error in t_hinge%build_hinge(): rotation_input = from_file &
@@ -1163,11 +1155,11 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
 
          !> Read coupling options
          call getsuboption(hinge_prs, 'Hinge_Rotation_Coupling', coupling_prs)
-         hinge_node_subset = getstr(coupling_prs,'Coupling_Node_Subset')
+         hinge_node_subset = getstr(coupling_prs,'coupling_node_subset')
 
          if ( trim(hinge_node_subset) .eq. 'range' ) then
-           id_1 = getint(coupling_prs,'Coupling_Node_First')
-           id_2 = getint(coupling_prs,'Coupling_Node_Last' )
+           id_1 = getint(coupling_prs,'coupling_node_first')
+           id_2 = getint(coupling_prs,'coupling_node_last' )
            !write(*,*) 'id_1' , ID_1
            !write(*,*) 'id_2' , ID_2
            ! *** to do *** add some checks on node numbering ???
@@ -1245,56 +1237,58 @@ subroutine hinge_input_parser( geo_prs, hinge_prs, &
               'N. of hinges and rotating parts (e.g. aileron) of the component', &
               '0') ! default: no hinges -> n_hinges = 0
 
-  call geo_prs%CreateSubOption('Hinge', 'Parser for hinge input', &
+  call geo_prs%CreateSubOption('hinge', 'Parser for hinge input', &
                                 hinge_prs, multiple=.true. )
 
   call hinge_prs%CreateStringOption('Hinge_Tag','Name of the hinge')
-  call hinge_prs%CreateStringOption('Hinge_Nodes_Input', &
+  call hinge_prs%CreateStringOption('hinge_nodes_input', &
                               'Type of hinge nodes input: parametric or from_file.')
-  call hinge_prs%CreateIntOption('N_Nodes','N.hinge nodes')
-  call hinge_prs%CreateRealArrayOption('Node1', &
+  call hinge_prs%CreateIntOption('n_nodes','N.hinge nodes')
+  call hinge_prs%CreateRealArrayOption('node_1', &
       'First node of the hinge. Components in the local ref.frame of the component')
-  call hinge_prs%CreateRealArrayOption('Node2', &
+  call hinge_prs%CreateRealArrayOption('node_2', &
       'Second node of the hinge. Components in the local ref.frame of the component')
-  call hinge_prs%CreateRealArrayOption('Hinge_Ref_Dir', &
+  call hinge_prs%CreateRealArrayOption('hinge_ref_dir', &
       'Reference direction of the hinges, indicating zero-deflection direction in &
       &the local ref.frame of the component')
-  call hinge_prs%CreateRealOption('Hinge_Offset','Offset in the Ref_Dir needed for &
+  call hinge_prs%CreateRealOption('hinge_offset','Offset in the Ref_Dir needed for &
       &avoiding irregular behavior of the surface for large deflections')
-  call hinge_prs%CreateRealOption('Hinge_Spanwise_Blending', &
+  call hinge_prs%CreateRealOption('hinge_spanwise_blending', &
       'Blending in the spanwise direction needed for &
       &avoiding irregular behavior of the surface for large deflections','0.0')
+  call hinge_prs%CreateRealOption('hinge_merge_tol', & 
+      'Tolerance for adaptive hinge mesh in chord percentage', '0.01')
   !> Hinge_Rotation_Input
-  call hinge_prs%CreateStringOption('Hinge_Rotation_Input', &
+  call hinge_prs%CreateStringOption('hinge_rotation_input', &
       'Input type of the rotation: function, from_file, coupling')
   !> Hinge_Rotation_Input = function:...
-  call hinge_prs%CreateSubOption('Hinge_Rotation_Function', &
+  call hinge_prs%CreateSubOption('hinge_rotation_function', &
                 'Parser for hinge input w/ simple functions', fun_prs )
-  call fun_prs%CreateRealOption('Amplitude', &
+  call fun_prs%CreateRealOption('amplitude', &
       'Amplitude of the rotation, for constant, function:const, :sin, &
       &:cos Rotation_Input')
-  call fun_prs%CreateRealOption('Omega', &
+  call fun_prs%CreateRealOption('omega', &
       'Angular velocity of the rotation, for constant, function:const, &
       &:sin, :cos Rotation_Input', '0.0')
-  call fun_prs%CreateRealOption('Phase', &
+  call fun_prs%CreateRealOption('phase', &
       'Phase of the rotation, for constant, function:const, :sin, :cos &
       &Rotation_Input', '0.0')
   !> Hinge_Rotation_Input = from_file
-  call hinge_prs%CreateSubOption('Hinge_Rotation_File', &
+  call hinge_prs%CreateSubOption('hinge_rotation_file', &
                'Parser for hinge input from file', file_prs )
-  call file_prs%CreateStringOption('Filename', &
+  call file_prs%CreateStringOption('file_name', &
       'Name of the file containing the input of the hinge rotation')
   !> Hinge_Rotation_Input = coupling
-  call hinge_prs%CreateSubOption('Hinge_Rotation_Coupling', &
+  call hinge_prs%CreateSubOption('hinge_rotation_coupling', &
                'Parser for hinge input from coupling', coupling_prs )
-  call coupling_prs%CreateStringOption('Coupling_Node_Subset', &
+  call coupling_prs%CreateStringOption('coupling_node_subset', &
       'Optional. Define a subset of structural nodes to evaluate &
       &coupling: "range" or "from_file"')
-  call coupling_prs%CreateIntOption('Coupling_Node_First','If node subset &
+  call coupling_prs%CreateIntOption('coupling_node_first','If node subset &
       &is defined through "range" input: first id of the nodes')
-  call coupling_prs%CreateIntOption('Coupling_Node_Last','If node subset &
+  call coupling_prs%CreateIntOption('coupling_node_last','If node subset &
       &is defined through "range" input: last id of the nodes')
-  call coupling_prs%CreateStringOption('Coupling_Node_Filename', &
+  call coupling_prs%CreateStringOption('coupling_node_filename', &
       'File collecting the IDs of the coupling nodes for hinge coupling')
 
   ! *** to do ***

@@ -52,6 +52,9 @@ module mod_wake
 use mod_param, only: &
   wp, nl, pi, max_char_len
 
+use mod_math, only: &
+  cross
+
 use mod_sim_param, only: &
   sim_param
 
@@ -1053,13 +1056,13 @@ subroutine update_wake(wake, elems, octree)
         do iq = 1, wake%n_prt
           if (ip.ne.iq) then
             call wake%part_p(iq)%p%compute_stretch(wake%part_p(ip)%p%cen, &
-                  wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, str)
+                  wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, wake%part_p(ip)%p%r_Vortex, str)
             ! === VORTEX STRETCHING: AVOID NUMERICAL INSTABILITIES ? ===
             stretch = stretch + str/(4.0_wp*pi)
 
             if(sim_param%use_divfilt) then
               call wake%part_p(iq)%p%compute_rotu(wake%part_p(ip)%p%cen, &
-                    wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, ru)
+                    wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, wake%part_p(ip)%p%r_Vortex, ru)
               rotu = rotu + ru/(4.0_wp*pi)
 
             endif
@@ -1082,7 +1085,8 @@ subroutine update_wake(wake, elems, octree)
 
           if (ip.ne.iq) then
             call wake%part_p(iq)%p%compute_diffusion(wake%part_p(ip)%p%cen, &
-                  wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, df)
+                  wake%part_p(ip)%p%dir*wake%part_p(ip)%p%mag, &
+                  wake%part_p(ip)%p%r_Vortex, df)
             diff = diff + df*sim_param%nu_inf
           endif
 
@@ -1212,7 +1216,8 @@ subroutine complete_wake(wake, geo, elems, te)
   real(wp)                              :: dir(3), partvec(3), ave, alpha_p(3), alpha_p_n
   integer                               :: k, n_part
   real(wp)                              :: vel_in(3), vel_out(3), wind(3)
-
+  real(wp)                              :: area
+  
   ! flow separation variables
   integer                                :: i_comp , i_elem , n_elem
 
@@ -1373,7 +1378,9 @@ subroutine complete_wake(wake, geo, elems, te)
       pos_p = (points_end(:,p1)+points_end(:,p2)+ &
               wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
               wake%pan_w_points(:,p2,wake%nmax_pan+1) )/4.0_wp
-
+      ! A = 1/2 [()        
+      area = norm2(cross(points_end(:,p1)- wake%pan_w_points(:,p2,wake%nmax_pan+1),&
+                   points_end(:,p2)-wake%pan_w_points(:,p2,wake%nmax_pan+1)))
       !Add the particle (if it is in the box)
       if(all(pos_p .ge. wake%part_box_min) .and. &
           all(pos_p .le. wake%part_box_max)) then
@@ -1392,7 +1399,12 @@ subroutine complete_wake(wake, geo, elems, te)
             endif
 
             wake%wake_parts(ip)%cen = pos_p
-
+          if (sim_param%KVortexRad .ge. 1e-10_wp) then ! Variable vortex rad
+            wake%wake_parts(ip)%r_Vortex = sim_param%KVortexRad*sqrt(2.0_wp*area) ! k*radius of the circumscribed circle
+            else ! revert to sim_param vortex rad
+              wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
+            end if
+            wake%wake_parts(ip)%r_cutoff  = sim_param%CutoffRad
             wake%wake_parts(ip)%vel = 0.5_wp * &
                               ( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
                                 wake%pan_w_vel(:,p2,wake%nmax_pan+1) )

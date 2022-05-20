@@ -303,67 +303,67 @@ subroutine build_references(refs, reference_file)
 
 
   !Define all the parameters to be read
-  call ref_prs%CreateStringOption('Reference_Tag','Integer tag of reference frame',&
+  call ref_prs%CreateStringOption('reference_tag','Integer tag of reference frame',&
                multiple=.true.)
-  call ref_prs%CreateStringOption('Parent_Tag','Tag of the parent reference', &
+  call ref_prs%CreateStringOption('parent_tag','Tag of the parent reference', &
                multiple=.true.)
-  call ref_prs%CreateRealArrayOption('Origin','Origin of reference frame with&
+  call ref_prs%CreateRealArrayOption('origin','Origin of reference frame with&
                &respect to the parent', multiple=.true.)
-  call ref_prs%CreateRealArrayOption('Orientation','Orientation of reference &
+  call ref_prs%CreateRealArrayOption('orientation','Orientation of reference &
                &frame with respect to the parent', multiple=.true.)
-  call ref_prs%CreateLogicalOption('Moving','Is the reference moving', &
+  call ref_prs%CreateLogicalOption('moving','Is the reference moving', &
                multiple=.true.)
-  call ref_prs%CreateLogicalOption('Multiple','Is the reference multiple', &
+  call ref_prs%CreateLogicalOption('multiple','Is the reference multiple', &
                multiple=.true.)
 
   ! Motion sub-parser ---------------------------------------------
-  call ref_prs%CreateSubOption('Motion','Definition of the motion of a frame',sbprms, &
+  call ref_prs%CreateSubOption('motion','Definition of the motion of a frame',sbprms, &
                multiple=.true.)
 
   ! Pole motion sub-parser ----------------------------------------
-  call sbprms%CreateSubOption('Pole','Definition of the motion of the pole', &
+  call sbprms%CreateSubOption('pole','Definition of the motion of the pole', &
               sbprms_pol)
-  call sbprms_pol%CreateStringOption('Input','Input: velocity or position')
-  call sbprms_pol%CreateStringOption('Input_Type','from_file or &
+  call sbprms_pol%CreateStringOption('input','Input: velocity or position')
+  call sbprms_pol%CreateStringOption('input_type','from_file or &
                                                              &simple_function')
   ! TODO: add %CreateStrinArrayOption(...) to options/mod_parse.f90
-  call sbprms_pol%CreateIntArrayOption('Function','fun definition. &
+  call sbprms_pol%CreateIntArrayOption('function','fun definition. &
                                                         &0:constant,1:sin,...')
-  call sbprms_pol%CreateStringOption('File','file .dat containing the motion')
-  call sbprms_pol%CreateRealOption('Amplitude','Multiplicative factor &
+  call sbprms_pol%CreateStringOption('file','file .dat containing the motion')
+  call sbprms_pol%CreateRealOption('amplitude','Multiplicative factor &
                                             &for the motion, defult 1.0','1.0')
-  call sbprms_pol%CreateRealArrayOption('Vector','Relative amplitude of the &
+  call sbprms_pol%CreateRealArrayOption('vector','Relative amplitude of the &
                         &three coordinates, default 1 1 1','(/1.0, 1.0, 1.0/)')
-  call sbprms_pol%CreateRealArrayOption('Omega','Pulsation of the motion for &
+  call sbprms_pol%CreateRealArrayOption('omega','Pulsation of the motion for &
                           &each coordinate, default 1 1 1','(/1.0, 1.0, 1.0/)')
-  call sbprms_pol%CreateRealArrayOption('Phase','Phase of the motion for &
+  call sbprms_pol%CreateRealArrayOption('phase','Phase of the motion for &
                           &each coordinate, default 0 0 0','(/0.0, 0.0, 0.0/)')
-  call sbprms_pol%CreateRealArrayOption('Offset','Phase of the motion for &
+  call sbprms_pol%CreateRealArrayOption('offset','Phase of the motion for &
                           &each coordinate, default 0 0 0','(/0.0, 0.0, 0.0/)')
-  call sbprms_pol%CreateRealArrayOption('Position_0','Initial position &
+  call sbprms_pol%CreateRealArrayOption('position_0','Initial position &
                       &for each coordinate, default 0 0 0','(/0.0, 0.0, 0.0/)')
   ! End Pole motion sub-parser ----------------------------------------
 
   ! Rotation motion sub-parser ------------------------------------
-  call sbprms%CreateSubOption('Rotation','Definition of the rotation of &
+  call sbprms%CreateSubOption('rotation','Definition of the rotation of &
                               &the frame', sbprms_rot)
-  call sbprms_rot%CreateStringOption('Input','Input: velocity or position')
-  call sbprms_rot%CreateStringOption('Input_Type','from_file or &
+  call sbprms_rot%CreateStringOption('input','Input: velocity or position')
+  call sbprms_rot%CreateStringOption('input_type','from_file or &
                                                              &simple_function')
   ! TODO: add %CreateStrinArrayOption(...) to options/mod_parse.f90
-  call sbprms_rot%CreateIntOption('Function','fun definition.&
+  call sbprms_rot%CreateIntOption('function','fun definition.&
                                                     &0:constant,1:sin,...')
-  call sbprms_rot%CreateStringOption('File','file .dat containing the motion')
+  call sbprms_rot%CreateStringOption('file','file .dat containing the motion')
   call sbprms_rot%CreateRealArrayOption('Axis','axis of rotation')
-  call sbprms_rot%CreateRealOption('Amplitude','Multiplicative factor for &
+  call sbprms_rot%CreateRealOption('amplitude','Multiplicative factor for &
                                                   &the motion, default 1','1')
-  call sbprms_rot%CreateRealOption('Omega','Pulsation of the motion for &
+  call sbprms_rot%CreateRealOption('omega','Pulsation of the motion for &
                                           &each coordinate, default 1','1.0')
-  call sbprms_rot%CreateRealOption('Phase','Phase of the motion &
+  call sbprms_rot%CreateRealOption('phase','Phase of the motion &
                             &each coordinate, default 0','0.0')
-  call sbprms_rot%CreateRealOption('Offset','Offset of the motion &
+  call sbprms_rot%CreateRealOption('offset','Offset of the motion &
                         &for each coordinate, default 0','0.0')
-  call sbprms_rot%CreateRealOption('Psi_0','Initial position &
+  call sbprms_rot%CreateRealOption('psi_0','Initial position &
                         &for each coordinate, default 0','0.0')
   ! End Rotation motion sub-parser ------------------------------------
 
@@ -371,34 +371,34 @@ subroutine build_references(refs, reference_file)
   sbprms => null()
 
   ! Multiple sub-parser -------------------------------------------
-  call ref_prs%CreateSubOption('Multiplicity','Parameters for multiple frames',&
+  call ref_prs%CreateSubOption('multiplicity','Parameters for multiple frames',&
                 sbprms, multiple=.true.)
-  call sbprms%CreateStringOption('MultType','Kind of multiplicity')
-  call sbprms%CreateIntOption('N_Frames', 'Number of reference frames')
-  call sbprms%CreateIntOption('N_Blades', 'Number of reference repeated structures,&
+  call sbprms%CreateStringOption('mult_type','Kind of multiplicity')
+  call sbprms%CreateIntOption('n_frames', 'Number of reference frames')
+  call sbprms%CreateIntOption('n_blades', 'Number of reference repeated structures,&
                & blades or whatever')
-  call sbprms%CreateRealArrayOption('Rot_Axis','Axis of rotation in parent &
+  call sbprms%CreateRealArrayOption('rot_axis','Axis of rotation in parent &
                &reference frame')
-  call sbprms%CreateRealOption('Hub_Offset','Offset from the pole')
-  call sbprms%CreateRealOption('Rot_Rate','Rate of rotation around axis')
-  call sbprms%CreateLogicalOption('Transient','Starting transient, .t. or .f.','F')
-  call sbprms%CreateStringOption('Transient_Fun', &
+  call sbprms%CreateRealOption('hub_offset','Offset from the pole')
+  call sbprms%CreateRealOption('rot_rate','Rate of rotation around axis')
+  call sbprms%CreateLogicalOption('transient','Starting transient, .t. or .f.','F')
+  call sbprms%CreateStringOption('transient_fun', &
                                  'Linear or cosine (1-cosine) transient','linear')
-  call sbprms%CreateRealOption('Transient_Time','Time interval of the &
+  call sbprms%CreateRealOption('transient_time','Time interval of the &
                                &transient','1.0')
-  call sbprms%CreateRealOption('Init_Rot_Rate','Initial value of the angular velocity', &
+  call sbprms%CreateRealOption('init_rot_rate','Initial value of the angular velocity', &
                                '1.0')
-  call sbprms%CreateRealOption('Psi_0','Starting rotation angle')
-  call sbprms%CreateIntOption('N_Dofs', 'Number of dofs for each blade')
+  call sbprms%CreateRealOption('psi_0','Starting rotation angle')
+  call sbprms%CreateIntOption('n_dofs', 'Number of dofs for each blade')
   ! for complex rotor configurations ---------
-  call sbprms%CreateSubOption('Dof','Definition of a hinge dof',&
+  call sbprms%CreateSubOption('dof','Definition of a hinge dof',&
                  sbprms_hin,multiple=.true.)
-  call sbprms_hin%CreateStringOption('Hinge_Type','Char to define the rotation axis: &
+  call sbprms_hin%CreateStringOption('hinge_type','Char to define the rotation axis: &
                    & it can be Flap, Pitch, Lag')
-  call sbprms_hin%CreateRealArrayOption('Hinge_Offset','Position of the hinge')
+  call sbprms_hin%CreateRealArrayOption('hinge_offset','Position of the hinge')
   call sbprms_hin%CreateRealOption('Collective','Amplitude of the collective motion')
-  call sbprms_hin%CreateRealOption('Cyclic_Ampl','Amplitude of the cyclic motion')
-  call sbprms_hin%CreateRealOption('Cyclic_Phas','Phase of the cyclic motion')
+  call sbprms_hin%CreateRealOption('cyclic_ampl','Amplitude of the cyclic motion')
+  call sbprms_hin%CreateRealOption('cyclic_phas','Phase of the cyclic motion')
 
   ! End Multiple sub-parser -------------------------------------------
 
@@ -465,16 +465,16 @@ subroutine build_references(refs, reference_file)
     iref = iref+1
 
     refs(iref)%id = iref
-    refs(iref)%tag = getstr(ref_prs,'Reference_Tag')
-    refs(iref)%parent_tag = getstr(ref_prs,'Parent_Tag')
+    refs(iref)%tag = getstr(ref_prs,'reference_tag')
+    refs(iref)%parent_tag = getstr(ref_prs,'parent_tag')
     refs(iref)%n_chil = 0
 
-    refs(iref)%orig  = getrealarray(ref_prs,'Origin',3, olink=lnk)
+    refs(iref)%orig  = getrealarray(ref_prs,'origin',3, olink=lnk)
     call check_opt_consistency(lnk,next=.true.,next_opt='Orientation')
     refs(iref)%frame = reshape(getrealarray(ref_prs,'Orientation',9),(/3,3/))
     !allocated here, will be set in update_all_refs
 
-    refs(iref)%self_moving = getlogical(ref_prs,'Moving', olink=lnk)
+    refs(iref)%self_moving = getlogical(ref_prs,'moving', olink=lnk)
     refs(iref)%moving = .false. !standard, will be checked later
 
 
@@ -552,12 +552,12 @@ subroutine build_references(refs, reference_file)
               ! Read the integer id for the user defined functions 0:constant,1:sin
               allocate(pol_fun_int(3), pol_vec(3), pol_ome(3), &
                        pol_pha(3), pol_off(3))
-              pol_fun_int = getintarray(sbprms_pol,'Function',3)
-              pol_amp = getreal(sbprms_pol,'Amplitude')
-              pol_vec = getrealarray(sbprms_pol,'Vector',3)
-              pol_ome = getrealarray(sbprms_pol,'Omega',3)
-              pol_pha = getrealarray(sbprms_pol,'Phase',3)
-              pol_off = getrealarray(sbprms_pol,'Offset',3)
+              pol_fun_int = getintarray(sbprms_pol,'function',3)
+              pol_amp = getreal(sbprms_pol,'amplitude')
+              pol_vec = getrealarray(sbprms_pol,'vector',3)
+              pol_ome = getrealarray(sbprms_pol,'omega',3)
+              pol_pha = getrealarray(sbprms_pol,'phase',3)
+              pol_off = getrealarray(sbprms_pol,'offset',3)
 
               refs(iref)%pol_tim = sim_param%time_vec
 
@@ -611,17 +611,17 @@ subroutine build_references(refs, reference_file)
           !end if
 
           allocate(pol_pos0(3))
-          pol_pos0 = getrealarray(sbprms_pol,'Position_0',3)
+          pol_pos0 = getrealarray(sbprms_pol,'position_0',3)
 
           ! Read the integer id for the user defined functions 0:constant,1:sin
           allocate(pol_fun_int(3), pol_vec(3), pol_ome(3), &
                    pol_pha(3), pol_off(3))
-          pol_fun_int = getintarray(sbprms_pol,'Function',3)
-          pol_amp = getreal(sbprms_pol,'Amplitude')
-          pol_vec = getrealarray(sbprms_pol,'Vector',3)
-          pol_ome = getrealarray(sbprms_pol,'Omega',3)
-          pol_pha = getrealarray(sbprms_pol,'Phase',3)
-          pol_off = getrealarray(sbprms_pol,'Offset',3)
+          pol_fun_int = getintarray(sbprms_pol,'function',3)
+          pol_amp = getreal(sbprms_pol,'amplitude')
+          pol_vec = getrealarray(sbprms_pol,'vector',3)
+          pol_ome = getrealarray(sbprms_pol,'omega',3)
+          pol_pha = getrealarray(sbprms_pol,'phase',3)
+          pol_off = getrealarray(sbprms_pol,'offset',3)
 
           ! Input type : from_file , simple_function
           select case( trim(getstr(sbprms_pol,'Input_Type')) )
@@ -769,7 +769,7 @@ subroutine build_references(refs, reference_file)
           !end if
 
           refs(iref)%axis = getrealarray(sbprms_rot,'Axis',3)  ! %axis is not allocatable
-          rot_pos0 = getreal(sbprms_rot,'Psi_0')
+          rot_pos0 = getreal(sbprms_rot,'psi_0')
 
           ! Input type : from_file , simple_function
           select case( trim(getstr(sbprms_rot,'Input_Type')) )
@@ -819,11 +819,11 @@ subroutine build_references(refs, reference_file)
               allocate(refs(iref)%rot_tim(sim_param%n_timesteps))
 
               ! Read the integer id for the user defined functions 0:constant,1:sin
-              rot_fun_int = getint(sbprms_rot,'Function')
-              rot_amp = getreal(sbprms_rot,'Amplitude')
-              rot_ome = getreal(sbprms_rot,'Omega')
-              rot_pha = getreal(sbprms_rot,'Phase')
-              rot_off = getreal(sbprms_rot,'Offset')
+              rot_fun_int = getint(sbprms_rot,'function')
+              rot_amp = getreal(sbprms_rot,'amplitude')
+              rot_ome = getreal(sbprms_rot,'omega')
+              rot_pha = getreal(sbprms_rot,'phase')
+              rot_off = getreal(sbprms_rot,'offset')
 
               refs(iref)%rot_tim = sim_param%time_vec
 
@@ -909,7 +909,7 @@ subroutine build_references(refs, reference_file)
           !end if
 
           refs(iref)%axis = getrealarray(sbprms_rot,'Axis',3) ! %axis is not allocatable
-          !rot_pos0 = getreal(sbprms_rot,'Psi_0')
+          !rot_pos0 = getreal(sbprms_rot,'psi_0')
 
           ! Input type : from_file , simple_function
           select case( trim(getstr(sbprms_rot,'Input_Type')) )
@@ -969,11 +969,11 @@ subroutine build_references(refs, reference_file)
               allocate(refs(iref)%rot_tim(sim_param%n_timesteps))
 
               ! Read the integer id for the user defined functions 0:constant,1:sin
-              rot_fun_int = getint(sbprms_rot,'Function')
-              rot_amp = getreal(sbprms_rot,'Amplitude')
-              rot_ome = getreal(sbprms_rot,'Omega')
-              rot_pha = getreal(sbprms_rot,'Phase')
-              rot_off = getreal(sbprms_rot,'Offset')
+              rot_fun_int = getint(sbprms_rot,'function')
+              rot_amp = getreal(sbprms_rot,'amplitude')
+              rot_ome = getreal(sbprms_rot,'omega')
+              rot_pha = getreal(sbprms_rot,'phase')
+              rot_off = getreal(sbprms_rot,'offset')
 
               refs(iref)%rot_tim = sim_param%time_vec
 
@@ -1033,7 +1033,7 @@ subroutine build_references(refs, reference_file)
     sbprms_rot => null()
     ! Motion sub-parser ---------------------------------------------
 
-    refs(iref)%multiple = getlogical(ref_prs,'Multiple')
+    refs(iref)%multiple = getlogical(ref_prs,'multiple')
 
     if (refs(iref)%multiple) then
 
@@ -1045,7 +1045,7 @@ subroutine build_references(refs, reference_file)
        ! ++++++++++++++++++++++ Simple rotor ++++++++++++++++++++++++
        case('simple_rotor')
 
-        n_mult_refs = getint(sbprms,'N_Frames')
+        n_mult_refs = getint(sbprms,'n_frames')
         refs(iref)%n_mult = n_mult_refs
 
         !1) allocate a series of extra reference frames and move-alloc everything
@@ -1059,10 +1059,10 @@ subroutine build_references(refs, reference_file)
 
         !2) Read the inputs
 !       allocate( psi_0(n_mult_refs))     ! psi_0 *****
-        rot_axis = getrealarray(sbprms,'Rot_Axis',3)
-        rot_rate = getreal(sbprms,'Rot_Rate')
-        psi_0 = getreal(sbprms,'Psi_0')
-        hub_offset = getreal(sbprms,'Hub_Offset')
+        rot_axis = getrealarray(sbprms,'rot_axis',3)
+        rot_rate = getreal(sbprms,'rot_rate')
+        psi_0 = getreal(sbprms,'psi_0')
+        hub_offset = getreal(sbprms,'hub_offset')
 
 
         !3) for each new reference insert all the parameters
@@ -1116,9 +1116,9 @@ subroutine build_references(refs, reference_file)
        ! ++++++++++++++++++++++     Rotor    ++++++++++++++++++++++++
        case('rotor')
 
-         n_mult_blades = getint(sbprms,'N_Blades')
+         n_mult_blades = getint(sbprms,'n_blades')
          refs(iref)%n_mult = n_mult_blades
-         n_dofs   = getint(sbprms,'N_Dofs')
+         n_dofs   = getint(sbprms,'n_dofs')
 
          if ( n_dofs .lt. 0 ) then
            call warning(this_sub_name, this_mod_name, ' Warning in the input file&
@@ -1146,12 +1146,12 @@ subroutine build_references(refs, reference_file)
          call move_alloc(refs_temp, refs)
 
          !2) Read the inputs
-         rot_axis = getrealarray(sbprms,'Rot_Axis',3)
-         rot_rate = getreal(sbprms,'Rot_Rate')
-         transient_logical = getlogical(sbprms,'Transient')
-         transient_fun     = getstr( sbprms,'Transient_Fun' ) ; call LowCase(transient_fun)
-         transient_time    = getreal(sbprms,'Transient_Time')
-         init_rot_rate     = getreal(sbprms,'Init_Rot_Rate')
+         rot_axis = getrealarray(sbprms,'rot_axis',3)
+         rot_rate = getreal(sbprms,'rot_rate')
+         transient_logical = getlogical(sbprms,'transient')
+         transient_fun     = getstr( sbprms,'transient_fun' ) ; call LowCase(transient_fun)
+         transient_time    = getreal(sbprms,'transient_time')
+         init_rot_rate     = getreal(sbprms,'init_rot_rate')
          if ( transient_logical ) then
            if ( ( countoption(sbprms,'Transient_Time') .eq. 0 ) .or. &
                 ( countoption(sbprms,'Transient_Fun ') .eq. 0 ) ) then
@@ -1167,8 +1167,8 @@ subroutine build_references(refs, reference_file)
            end if
          end if
 
-         psi_0 = getreal(sbprms,'Psi_0')
-         hub_offset = getreal(sbprms,'Hub_Offset')
+         psi_0 = getreal(sbprms,'psi_0')
+         hub_offset = getreal(sbprms,'hub_offset')
 
          ! read and allocate some tmp arrays to describe the motion around the hinges
          if ( n_dofs .gt. 0 ) then
@@ -1179,11 +1179,11 @@ subroutine build_references(refs, reference_file)
            allocate(hinge_cyPh(n_dofs  )) ; hinge_cyPh = 0.0_wp
            do i_dof = 1 , n_dofs
              call getsuboption(sbprms,'Dof',sbprms_hin)
-             hinge_type(i_dof  ) = getstr(sbprms_hin,'Hinge_Type')
-             hinge_offs(i_dof,:) = getrealarray(sbprms_hin,'Hinge_Offset',3)
+             hinge_type(i_dof  ) = getstr(sbprms_hin,'hinge_type')
+             hinge_offs(i_dof,:) = getrealarray(sbprms_hin,'hinge_offset',3)
              hinge_coll(i_dof  ) = getreal(sbprms_hin,'Collective')
-             hinge_cyAm(i_dof  ) = getreal(sbprms_hin,'Cyclic_Ampl')
-             hinge_cyPh(i_dof  ) = getreal(sbprms_hin,'Cyclic_Phas')
+             hinge_cyAm(i_dof  ) = getreal(sbprms_hin,'cyclic_ampl')
+             hinge_cyPh(i_dof  ) = getreal(sbprms_hin,'cyclic_phas')
 
              ! from deg to rad
              hinge_coll(i_dof) = hinge_coll(i_dof) * pi / 180.0_wp
@@ -1830,37 +1830,37 @@ end subroutine check_input_from_file
 !  character(len=*), parameter :: this_sub_name = 'update_relative_initial_conditions'
 !
 !  !Define all the parameters to be read
-!  call ref_prs%CreateStringOption('Reference_Tag','Integer tag of reference frame',&
+!  call ref_prs%CreateStringOption('reference_tag','Integer tag of reference frame',&
 !               multiple=.true.)
-!  call ref_prs%CreateLogicalOption('Moving','Is the reference moving', &
+!  call ref_prs%CreateLogicalOption('moving','Is the reference moving', &
 !               multiple=.true.)
-!  call ref_prs%CreateLogicalOption('Multiple','Is the reference multiple', &
+!  call ref_prs%CreateLogicalOption('multiple','Is the reference multiple', &
 !               multiple=.true.)
 !
 !  ! Motion sub-parser ---------------------------------------------
-!  call ref_prs%CreateSubOption('Motion','Definition of the motion of a frame',sbprms, &
+!  call ref_prs%CreateSubOption('motion','Definition of the motion of a frame',sbprms, &
 !               multiple=.true.)
 !  ! Pole motion sub-parser ----------------------------------------
-!  call sbprms%CreateSubOption('Pole','Definition of the motion of the pole', &
+!  call sbprms%CreateSubOption('pole','Definition of the motion of the pole', &
 !              sbprms_pol)
-!  call sbprms_pol%CreateStringOption('Input','Input: velocity or position')
+!  call sbprms_pol%CreateStringOption('input','Input: velocity or position')
 !  ! End Pole motion sub-parser ----------------------------------------
 !  ! Rotation motion sub-parser ------------------------------------
-!  call sbprms%CreateSubOption('Rotation','Definition of the rotation of &
+!  call sbprms%CreateSubOption('rotation','Definition of the rotation of &
 !                              &the frame', sbprms_rot)
-!  call sbprms_rot%CreateStringOption('Input','Input: velocity or position')
+!  call sbprms_rot%CreateStringOption('input','Input: velocity or position')
 !  ! End Rotation motion sub-parser ------------------------------------
 !  ! End Motion sub-parser ---------------------------------------------
 !  sbprms => null()
 !
 !  ! Multiple sub-parser -------------------------------------------
-!  call ref_prs%CreateSubOption('Multiplicity','Parameters for multiple frames',&
+!  call ref_prs%CreateSubOption('multiplicity','Parameters for multiple frames',&
 !                sbprms, multiple=.true.)
-!  call sbprms%CreateStringOption('MultType','Kind of multiplicity')
-!  call sbprms%CreateIntOption('N_Frames', 'Number of reference frames')
-!  call sbprms%CreateIntOption('N_Blades', 'Number of reference repeated structures,&
+!  call sbprms%CreateStringOption('mult_type','Kind of multiplicity')
+!  call sbprms%CreateIntOption('n_frames', 'Number of reference frames')
+!  call sbprms%CreateIntOption('n_blades', 'Number of reference repeated structures,&
 !               & blades or whatever')
-!  call sbprms%CreateIntOption('N_Dofs', 'Number of dofs for each blade')
+!  call sbprms%CreateIntOption('n_dofs', 'Number of dofs for each blade')
 !  ! End Multiple sub-parser -------------------------------------------
 !
 !
@@ -1940,15 +1940,15 @@ end subroutine check_input_from_file
 !    call close_hdf5_group(ref_loc)
 !
 ! ! Multiplicity -----
-!    multiple = getlogical(ref_prs,'Multiple')
+!    multiple = getlogical(ref_prs,'multiple')
 !
 !    if ( multiple ) then ! loop over multiplicity
 !
 !      call getsuboption(ref_prs,'Multiplicity',sbprms)
 !
 !      multType = trim(getstr(sbprms,'MultType'))
-!      nBlades  = getint(sbprms,'N_Blades')
-!      nDofs    = getint(sbprms,'N_dofs')
+!      nBlades  = getint(sbprms,'n_blades')
+!      nDofs    = getint(sbprms,'n_dofs')
 !
 !      ! debug ----
 !      write(*,*) ' multType , nBlades , nDofs ' , trim(multType) , nBlades , nDofs

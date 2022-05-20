@@ -2,12 +2,12 @@
 basename = ./Output/test
 
 ! Geometry input -----------------
-GeometryFile = geo_input.h5 
-ReferenceFile = References.in 
+geometry_file = geo_input.h5 
+reference_file = References.in 
 
 ! Timings ---------------------
-tstart = 0.000000 
-tend = 1.0030000 
+tstart = 0.0 
+tend = 1.0 
 dt = 0.01
 dt_out = 0.01
 output_start = T 
@@ -20,44 +20,19 @@ u_inf = (/40, 0., 0./)
 ! Model parameters -------------------
 particles_box_min = (/  -9, -16, -4 /)
 particles_box_max = (/  23,  16,  4/)
-FMM = T
+fmm = T
 ! octree parameters--------------------
-BoxLength = 8
-NBox = (/4, 4 , 1/)
-OctreeOrigin = (/-9 , -16 , -4/)
-NOctreeLevels = 6
-MinOctreePart = 5
-MultipoleDegree = 2
-Vortstretch = T
-Diffusion = T
-! Wake parameters  -------------
-n_wake_panels = 3
+box_length = 8
+n_box = (/4, 4 , 1/)
+octree_origin = (/-9 , -16 , -4/)
+n_octree_levels = 6
+min_octree_part = 5
+multipole_degree = 2
+vortstretch = T
+diffusion = T
+! wake parameters  -------------
+n_wake_panels = 2
 n_wake_particles = 200000
 ! wake regularisation
-DivergenceFiltering = T
-FilterTimescale = 40
-RankineRad=0.03  
-VortexRad = 0.05 
-CutoffRad = 0.001
-! lifting lines solver-----------------
-LLtol = 1.0e-6
-LLdamp = 20
-LLReynoldsCorrections = F
-LLMaxIter = 400
+Kvortex_rad = 1 
 
-! --- Lifting Lines parameters ---
-!LLsolver = GammaMethod ! AlphaMethod !GammaMethod
-!!LLReynoldsCorrections = F
-!!LLReynoldsCorrectionsNfact = 0.2
-!LLmaxIter = 400
-!LLtol = 1.0 e -6
-!LLdamp = 20.0
-!!LLstallRegularisation = T
-!LLstallRegularisationNelems = 1
-!LLstallRegularizationsNiters = 1
-!!LLstallRegularizationAlphaStall = 15
-!LLartificialViscosity = 100000
-!!LLartificialViscosityAdaptive = T
-!!LLartificialViscosityAdaptive_Alpha = 15
-!!LLartificialViscosityAdaptive_dAlpha = 3
-!LLloadsAVL = T

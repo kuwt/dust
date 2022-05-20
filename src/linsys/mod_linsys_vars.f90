@@ -69,83 +69,82 @@ private
 !! for the aerodynamic elements doublets intensities
 type :: t_linsys
 
- !> Rank of the linear system
- integer :: rank
+  !> Rank of the linear system
+  integer :: rank
 
- !> Linear system matrix
- real(wp), allocatable :: A(:,:)
+  !> Linear system matrix
+  real(wp), allocatable :: A(:,:)
 
- !> Linear system right hand side
- real(wp), allocatable :: b(:)
+  !> Linear system right hand side
+  real(wp), allocatable :: b(:)
 
- !> Linear system matrix (for pressure integral equation)
- real(wp), allocatable :: A_pres(:,:)
+  !> Linear system matrix (for pressure integral equation)
+  real(wp), allocatable :: A_pres(:,:)
 
- !> Linear system right hand side (for pressure integral equation)
- real(wp), allocatable :: b_pres(:)
+  !> Linear system right hand side (for pressure integral equation)
+  real(wp), allocatable :: b_pres(:)
 
- !> LU solvers pivot permutation matrix (in vector form)
- integer, allocatable :: P(:)
- integer, allocatable :: P_pres(:)
+  !> LU solvers pivot permutation matrix (in vector form)
+  integer, allocatable :: P(:)
+  integer, allocatable :: P_pres(:)
 
- !> Static part of the right hand side
- !!
- !! The right hand side contains contributions from all the surface panels.
- !! The contributions from surface panels that do not actually move can be
- !! calculated just once, than multiplied for the freestream velocity and
- !! finally the contribution of the moving panels is added
- real(wp), allocatable :: b_static(:,:)
+  !> Static part of the right hand side
+  !!
+  !! The right hand side contains contributions from all the surface panels.
+  !! The contributions from surface panels that do not actually move can be
+  !! calculated just once, than multiplied for the freestream velocity and
+  !! finally the contribution of the moving panels is added
+  real(wp), allocatable :: b_static(:,:)
+  !> static part for integral equation (for pressure integral equation)
+  real(wp), allocatable :: b_static_pres(:,:) ! not strictly required
+  ! OSS -> b_static_pres = b_static(1:idSurfPan_static , 1:idSurfPan_static )
+  ! OSS    with idSurfPan_static = idSurfPan(1:nstatic_SurfPan)
 
- !> static part for integral equation (for pressure integral equation)
- real(wp), allocatable :: b_static_pres(:,:) ! not strictly required
- ! OSS -> b_static_pres = b_static(1:idSurfPan_static , 1:idSurfPan_static )
- ! OSS    with idSurfPan_static = idSurfPan(1:nstatic_SurfPan)
+  !> Static part of the lifting line contribution
+  !!
+  !! The contribution of the lifting line is similar to wake contribution,
+  !! however a part could be static on static and can be pre-computed
+  real(wp), allocatable :: L_static(:,:)
 
- !> Static part of the lifting line contribution
- !!
- !! The contribution of the lifting line is similar to wake contribution,
- !! however a part could be static on static and can be pre-computed
- real(wp), allocatable :: L_static(:,:)
+  !> Static part of the actuator disk contribution
+  !!
+  !! The contribution of the actuator disk is similar to wake contribution,
+  !! however a part could be static on static and can be pre-computed
+  !real(wp), allocatable :: D_static(:,:)
 
- !> Static part of the actuator disk contribution
- !!
- !! The contribution of the actuator disk is similar to wake contribution,
- !! however a part could be static on static and can be pre-computed
- !real(wp), allocatable :: D_static(:,:)
+  !> Result of the linear system solution (intensity of the panels doublets)
+  real(wp), allocatable :: res(:)
 
- !> Result of the linear system solution (intensity of the panels doublets)
- real(wp), allocatable :: res(:)
+  !> Result of the pressure linear system solution
+  real(wp), allocatable :: res_pres(:)
 
- !> Result of the pressure linear system solution
- real(wp), allocatable :: res_pres(:)
+  !> Results of the explicit part of the elements, has more than one column
+  !! since holds previous records for extrapolation
+  real(wp), allocatable :: res_expl(:,:)
 
- !> Results of the explicit part of the elements, has more than one column
- !! since holds previous records for extrapolation
- real(wp), allocatable :: res_expl(:,:)
+  !> Number of static and moving panels
+  integer :: nstatic, nmoving
 
- !> Number of static and moving panels
- integer :: nstatic, nmoving
+  !> Number of static and moving surface panels
+  integer :: nstatic_sp, nmoving_sp, n_sp
 
- !> Number of static and moving surface panels
- integer :: nstatic_sp, nmoving_sp, n_sp
+  !> Number of static and moving actuator disks
+  !integer :: nstatic_ad, nmoving_ad, n_ad
 
- !> Number of static and moving actuator disks
- !integer :: nstatic_ad, nmoving_ad, n_ad
+  !> Number of static and moving explicit elements
+  integer :: nstatic_expl, nmoving_expl
 
- !> Number of static and moving explicit elements
- integer :: nstatic_expl, nmoving_expl
+  !> Number of explicit elements
+  integer :: n_expl
 
- !> Number of explicit elements
- integer :: n_expl
+  !> Global id of surface panel elements ( copy of the structure in geo )
+  integer, allocatable :: idSurfPan(:)
 
+  !> Global id of surface panel elements ( copy of the structure in geo )
+  integer, allocatable :: idSurfPanG2L(:)
 
-
- !> Global id of surface panel elements ( copy of the structure in geo )
- integer, allocatable :: idSurfPan(:)
-
- !> Global id of surface panel elements ( copy of the structure in geo )
- integer, allocatable :: idSurfPanG2L(:)
-
+  !> Skip dynamic update
+  logical :: skip
 
 end type t_linsys
 

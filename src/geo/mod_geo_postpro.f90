@@ -76,8 +76,6 @@ use mod_cgns_io, only: &
 use mod_parametric_io, only: &
   read_mesh_parametric
 
-!use mod_aero_elements, only: &
-!  c_elem, t_elem_p
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
@@ -104,17 +102,17 @@ use mod_reference, only: &
   t_ref, build_references, update_all_references, destroy_references
 
 use mod_hdf5_io, only: &
-   h5loc, &
-   new_hdf5_file, &
-   open_hdf5_file, &
-   close_hdf5_file, &
-   new_hdf5_group, &
-   open_hdf5_group, &
-   close_hdf5_group, &
-   write_hdf5, &
-   read_hdf5, &
-   read_hdf5_al, &
-   check_dset_hdf5
+  h5loc, &
+  new_hdf5_file, &
+  open_hdf5_file, &
+  close_hdf5_file, &
+  new_hdf5_group, &
+  open_hdf5_group, &
+  close_hdf5_group, &
+  write_hdf5, &
+  read_hdf5, &
+  read_hdf5_al, &
+  check_dset_hdf5
 
 use mod_hinges, only: &
   initialize_hinge_config
@@ -146,58 +144,61 @@ contains
 !----------------------------------------------------------------------
 
 subroutine load_components_postpro(comps, points, nelem, floc, &
-             components_names, all_comp)
- type(t_geo_component), allocatable, intent(inout) :: comps(:)
- real(wp), allocatable, intent(out) :: points(:,:)
- integer, intent(out)               :: nelem
- !integer, allocatable, intent(out)  :: ep_conn(:,:)
- !character(len=*), intent(in) :: in_file
- integer(h5loc), intent(in) :: floc
- character(len=*), allocatable, intent(inout) :: components_names(:)
- logical, intent(in) :: all_comp
+                                    components_names, all_comp)
+  type(t_geo_component), allocatable, intent(inout) :: comps(:)
+  real(wp), allocatable, intent(out)                :: points(:,:)
+  integer, intent(out)                              :: nelem
+  integer(h5loc), intent(in)                        :: floc
+  character(len=*), allocatable, intent(inout)      :: components_names(:)
+  logical, intent(in)                               :: all_comp
 
- type(t_geo_component), allocatable :: comp_temp(:)
- integer :: i1 , i2, i3
- integer, allocatable :: ee(:,:)
- real(wp), allocatable :: rr(:,:)
- character(len=max_char_len) :: comp_el_type, comp_name, comp_name_stripped
- character(len=max_char_len) :: comp_input
- integer :: points_offset, n_vert! , elems_offset
- real(wp), allocatable :: points_tmp(:,:)
- character(len=max_char_len) :: ref_tag
- integer :: ref_id
- character(len=max_char_len) :: cname !, msg
- integer(h5loc) :: gloc, cloc , geo_loc
- integer :: n_comp, i_comp, n_comp_tot, i_comp_tot , i_comp_tmp
- integer :: parametric_nelems_span , parametric_nelems_chor
- real(wp) :: coupling_node_rot(3,3) = 0.0_wp
- !> Hinges
- integer(h5loc) :: hiloc, hloc
- integer :: ih, n_hinges
- real(wp):: rotation_amplitude
- character(len=2) :: hinge_id_str
+  type(t_geo_component), allocatable                :: comp_temp(:)
+  integer                                           :: i1 , i2, i3
+  integer, allocatable                              :: ee(:,:)
+  real(wp), allocatable                             :: rr(:,:)
+  character(len=max_char_len)                       :: comp_el_type, comp_name
+  character(len=max_char_len)                       :: comp_input, comp_name_stripped
+  integer                                           :: points_offset, n_vert
+  real(wp), allocatable                             :: points_tmp(:,:)
+  character(len=max_char_len)                       :: ref_tag
+  integer                                           :: ref_id
+  character(len=max_char_len)                       :: cname 
+  integer(h5loc)                                    :: gloc, cloc, geo_loc
+  integer                                           :: n_comp, i_comp, n_comp_tot 
+  integer                                           :: i_comp_tot, i_comp_tmp
+  integer                                           :: parametric_nelems_span , parametric_nelems_chor
+  real(wp)                                          :: coupling_node_rot(3,3) = 0.0_wp
+  
+  !> Hinges
+  integer(h5loc)                                    :: hiloc, hloc
+  integer                                           :: ih, n_hinges
+  real(wp)                                          :: rotation_amplitude
+  character(len=2)                                  :: hinge_id_str
 
- ! Some structure to handle multiple components
- character(len=max_char_len), allocatable :: components(:) , components_tmp(:)
- character(len=max_char_len) :: component_stripped
+  !> vl corrected 
+  character(len=5)                                  :: aero_table
 
- character(len=max_char_len) :: comp_coupling_str
+  !> Some structure to handle multiple components
+  character(len=max_char_len), allocatable          :: components(:) , components_tmp(:)
+  character(len=max_char_len)                       :: component_stripped
 
- character(len=*), parameter :: this_sub_name = 'load_components_postpro'
+  character(len=max_char_len)                       :: comp_coupling_str
+
+  character(len=*), parameter                       :: this_sub_name = 'load_components_postpro'
 
   ! Read all the components
-  call open_hdf5_group(floc,'Components',gloc)
+  call open_hdf5_group(floc,'Components', gloc)
   call read_hdf5(n_comp_tot,'NComponents',gloc)
 
   allocate(components(n_comp_tot))
   do i_comp_tot = 1 , n_comp_tot
     write(cname,'(A,I3.3)') 'Comp',i_comp_tot
-    call open_hdf5_group(gloc,trim(cname),cloc)
+    call open_hdf5_group(gloc, trim(cname),cloc)
     call read_hdf5(components(i_comp_tot),'CompName',cloc)
     call read_hdf5(comp_input,'CompInput',cloc)
     call close_hdf5_group(cloc)
   end do
-
+  
 
 ! RE-BUILD components_names() to host multiple components ++++++++++++++++++
 ! components_names: input for post-processing
@@ -257,13 +258,13 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
   ! to avoid Components that do not exist as an input in dust_post.in
   if ( .not. allocated(components_names) ) then
     call error(this_sub_name, this_mod_name, &
-                 'components_names .not. allocated. Something strange &
-                 &and unexpected happened. It could be a bug')
+                  'components_names .not. allocated. Something strange &
+                  &and unexpected happened. It could be a bug')
   end if
   if ( size(components_names) .le. 0 ) then
     call error(this_sub_name, this_mod_name, &
-                 'No component found corresponding to the requested one(s) &
-                 &for this analysis')
+                  'No component found corresponding to the requested one(s) &
+                  &for this analysis')
   end if
 
 !  allocate(comps(n_comp))
@@ -307,15 +308,19 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       call read_hdf5(comp_coupling_str,'Coupled',cloc)
       if ( trim(comp_coupling_str) .eq. 'true' ) then
         comps(i_comp)%coupling = .true.
+        call read_hdf5(coupling_node_rot,'CouplingNodeOrientation',cloc)
+        comps(i_comp)%coupling_node_rot = coupling_node_rot
       else
         comps(i_comp)%coupling = .false.
+        comps(i_comp)%coupling_node_rot(1,:) = (/ 1._wp, 0._wp, 0._wp/)
+        comps(i_comp)%coupling_node_rot(2,:) = (/ 0._wp, 1._wp, 0._wp/)
+        comps(i_comp)%coupling_node_rot(3,:) = (/ 0._wp, 0._wp, 1._wp/)
       end if
 
       ! Geometry --------------------------
       call open_hdf5_group(cloc,'Geometry',geo_loc)
       call read_hdf5_al(ee   ,'ee'   ,geo_loc)
       call read_hdf5_al(rr   ,'rr'   ,geo_loc)
-
 
       if ( trim(comps(i_comp)%comp_input) .eq. 'parametric' ) then
         call read_hdf5( parametric_nelems_span ,'parametric_nelems_span',geo_loc)
@@ -324,25 +329,11 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         comps(i_comp)%parametric_nelems_chor = parametric_nelems_chor
       end if
 
-
-      !!call read_hdf5_al(neigh,'neigh',geo_loc)
-      !! !element-specific reads
-      !!if ( comp_el_type(1:1) .eq. 'l' ) then
-      !!  call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc) ! (:)
-      !!  call read_hdf5_al(nelem_span_list   ,'nelem_span_list'   ,geo_loc) ! (:)
-      !!  call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc) ! (:,:)
-      !!  call read_hdf5_al(normalised_coord_e,'normalised_coord_e',geo_loc) ! (:,:)
-      !!  allocate(geo%components(i_comp)%airfoil_list(size(airfoil_list)))
-      !!  geo%components(i_comp)%airfoil_list = airfoil_list
-      !!  allocate(geo%components(i_comp)%nelem_span_list(size(nelem_span_list)))
-      !!  geo%components(i_comp)%nelem_span_list = nelem_span_list
-      !!  allocate(geo%components(i_comp)%i_airfoil_e( &
-      !!        size(i_airfoil_e,1),size(i_airfoil_e,2)) )
-      !!  geo%components(i_comp)%i_airfoil_e = i_airfoil_e
-      !!  allocate(geo%components(i_comp)%normalised_coord_e( &
-      !!        size(normalised_coord_e,1),size(normalised_coord_e,2)))
-      !!  geo%components(i_comp)%normalised_coord_e = normalised_coord_e
-      !!end if
+      if ( trim(comps(i_comp_tot)%comp_el_type) .eq. 'v' ) then
+        call read_hdf5(aero_table,  'aero_table', geo_loc)
+        comps(i_comp_tot)%aero_correction = trim(aero_table)
+      end if 
+  
       call close_hdf5_group(geo_loc)
 
       ! ======= CREATING ELEMENTS ======
@@ -357,7 +348,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       !store the read points into the local points
       allocate(comps(i_comp)%loc_points(3,size(rr,2)))
       comps(i_comp)%loc_points = rr
-
+      
       !Now for the moments the points are stored here without moving them,
       !will be moved later, consider not storing them here at all
       allocate(points_tmp(3,size(rr,2)+points_offset))
@@ -365,9 +356,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       points_tmp(:,points_offset+1:points_offset+size(rr,2)) = rr
       call move_alloc(points_tmp, points)
       allocate(comps(i_comp)%i_points(size(rr,2)))
-      comps(i_comp)%i_points = &
-                         (/((i3),i3=points_offset+1,points_offset+size(rr,2))/)
-
+      comps(i_comp)%i_points = (/((i3),i3=points_offset+1,points_offset+size(rr,2))/)
 
       ! --- treat the elements ---
 
@@ -375,45 +364,28 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       comps(i_comp)%nelems = size(ee,2)
       nelem = nelem + comps(i_comp)%nelems
       select case(trim(comps(i_comp)%comp_el_type))
-       case('p')
-        allocate(t_surfpan::comps(i_comp)%el(size(ee,2)))
-       case('v')
-        allocate(t_vortlatt::comps(i_comp)%el(size(ee,2)))
-       case('l')
-        allocate(t_liftlin::comps(i_comp)%el(size(ee,2)))
-       case('a')
-        allocate(t_actdisk::comps(i_comp)%el(size(ee,2)))
-       case default
-        call error(this_sub_name, this_mod_name, &
-                 'Unknown type of element: '//comps(i_comp)%comp_el_type)
+        case('p')
+          allocate(t_surfpan::comps(i_comp)%el(size(ee,2)))
+        case('v')
+          allocate(t_vortlatt::comps(i_comp)%el(size(ee,2)))
+        case('l')
+          allocate(t_liftlin::comps(i_comp)%el(size(ee,2)))
+        case('a')
+          allocate(t_actdisk::comps(i_comp)%el(size(ee,2)))
+        case default
+          call error(this_sub_name, this_mod_name, &
+                  'Unknown type of element: '//comps(i_comp)%comp_el_type)
       end select
 
-      !fill (some) of the elements fields
+      !> fill (some) of the elements fields
       do i2=1,size(ee,2)
 
-        !Component id
-        !comps(i_comp)%el(i2)%comp_id = i_comp
-
-        !vertices
+        !> vertices
         n_vert = count(ee(:,i2).ne.0)
         allocate(comps(i_comp)%el(i2)%i_ver(n_vert))
-        !allocate(geo%components(i_comp)%el(i2)%neigh(n_vert))
         comps(i_comp)%el(i2)%n_ver = n_vert
         comps(i_comp)%el(i2)%i_ver(1:n_vert) = &
                                               ee(1:n_vert,i2) + points_offset
-        !do i3=1,n_vert
-        !  if ( neigh(i3,i2) .ne. 0 ) then
-        !    geo%components(i_comp)%el(i2)%neigh(i3)%p => &
-        !                            geo%components(i_comp)%el(neigh(i3,i2))
-        !  else
-        !    ! do nothing, keep the neighbour pointer not associated
-        !    geo%components(i_comp)%el(i2)%neigh(i3)%p => null()
-        !  end if
-        !end do
-
-        !motion
-        !geo%components(i_comp)%el(i2)%moving = geo%components(i_comp)%moving
-
       enddo
 
       ! Update elems_offset for the next component
@@ -432,16 +404,18 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
 
         !> read input and fill component%hinge fields
         call read_hdf5( comps(i_comp)%hinge(ih)%nodes_input, &
-                                                         'Nodes_Input', hiloc)
+                                              'Nodes_Input', hiloc)
         call read_hdf5( comps(i_comp)%hinge(ih)%offset, &
-                                                         'Offset', hiloc)
+                                              'Offset', hiloc)
         call read_hdf5( comps(i_comp)%hinge(ih)%span_blending, &
                                               'Spanwise_Blending', hiloc)
         call read_hdf5( comps(i_comp)%hinge(ih)%ref_dir, &
-                                                        'Ref_Dir', hiloc)
+                                              'Ref_Dir', hiloc)
+        call read_hdf5( comps(i_comp)%hinge(ih)%tag, &
+                                              'Tag', hiloc)
         call read_hdf5_al( comps(i_comp)%hinge(ih)%ref%rr, 'rr', hiloc)
         comps(i_comp)%hinge(ih)%n_nodes = size( &
-           comps(i_comp)%hinge(ih)%ref%rr, 2)
+          comps(i_comp)%hinge(ih)%ref%rr, 2)
 
         call read_hdf5( comps(i_comp)%hinge(ih)%input_type, &
                                             'Hinge_Rotation_Input'    , hiloc)
@@ -464,7 +438,6 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         allocate( comps(i_comp)%hinge(ih)%act%rr( 3,comps(i_comp)%hinge(ih)%n_nodes ) )
         
         comps(i_comp)%hinge(ih)%act%rr = comps(i_comp)%hinge(ih)%ref%rr
-
 #if USE_PRECICE
         coupling_node_rot = comps(i_comp)%coupling_node_rot
 #else
@@ -473,6 +446,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         coupling_node_rot(3,:) = (/ 0._wp, 0._wp, 1._wp/)
 #endif
         call comps(i_comp)%hinge(ih)%build_connectivity( rr, coupling_node_rot)
+        call comps(i_comp)%hinge(ih)%build_connectivity_cen( rr, ee, coupling_node_rot)
 
       end do
 
@@ -489,19 +463,6 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
   enddo !i_comp
   call close_hdf5_group(gloc)
 
-  !generate the "global" connectivity
-  !allocate(ep_conn(4,nelem))
-  !ep_conn = 0
-  !ie_t = 0
-  !do i_comp = 1,n_comp
-  !  do ie = 1,comps(i_comp)%nelems
-  !  ie_t = ie_t + 1
-  !  ep_conn(1:comps(i_comp)%el(ie)%n_ver,ie_t) = comps(i_comp)%el(ie)%i_ver
-
-  !  enddo
-  !enddo
-
-
 end subroutine load_components_postpro
 
 !----------------------------------------------------------------------
@@ -509,63 +470,53 @@ end subroutine load_components_postpro
 !> Prepare the geometry allocating all the relevant fields for each
 !! kind of element
 subroutine prepare_geometry_postpro(comps)
- type(t_geo_component), intent(inout), target :: comps(:)
+  type(t_geo_component), intent(inout), target :: comps(:)
 
- integer :: i_comp, ie
- integer :: nsides
- class(c_pot_elem), pointer :: elem
- character(len=*), parameter :: this_sub_name = 'prepare_geometry_postpro'
+  integer                     :: i_comp, ie
+  integer                     :: nsides
+  class(c_pot_elem), pointer  :: elem
+  character(len=*), parameter :: this_sub_name = 'prepare_geometry_postpro'
 
 
- do i_comp = 1,size(comps)
-   do ie = 1,size(comps(i_comp)%el)
-     elem => comps(i_comp)%el(ie)
+  do i_comp = 1,size(comps)
+    do ie = 1,size(comps(i_comp)%el)
+      elem => comps(i_comp)%el(ie)
 
-     nsides = size(elem%i_ver)
+      nsides = size(elem%i_ver)
 
-     !Fields common to each element
-     allocate(elem%ver(3,nsides))
+      !Fields common to each element
+      allocate(elem%ver(3,nsides))
 
-     select type(elem)
-      class is(t_surfpan)
-       allocate(elem%verp(3,nsides))
-       allocate(elem%edge_vec(3,nsides))
-       allocate(elem%edge_len(nsides))
-       allocate(elem%edge_uni(3,nsides))
-       allocate(elem%cosTi(nsides))
-       allocate(elem%sinTi(nsides))
+      select type(elem)
+        class is(t_surfpan)
+          allocate(elem%verp(3,nsides))
+          allocate(elem%edge_vec(3,nsides))
+          allocate(elem%edge_len(nsides))
+          allocate(elem%edge_uni(3,nsides))
+          allocate(elem%cosTi(nsides))
+          allocate(elem%sinTi(nsides))
 
-      class is(t_vortlatt)
-       allocate(elem%edge_vec(3,nsides))
-       allocate(elem%edge_len(nsides))
-       allocate(elem%edge_uni(3,nsides))
+        class is(t_vortlatt)
+          allocate(elem%edge_vec(3,nsides))
+          allocate(elem%edge_len(nsides))
+          allocate(elem%edge_uni(3,nsides))
 
-      class is(t_liftlin)
-       allocate(elem%edge_vec(3,nsides))
-       allocate(elem%edge_len(nsides))
-       allocate(elem%edge_uni(3,nsides))
-     !!
-     !!  elem%csi_cen = 0.5_wp * sum(geo%components(i_comp)%normalised_coord_e(:,ie))
-     !!  elem%i_airfoil =  geo%components(i_comp)%i_airfoil_e(:,ie)
-     !!
-     !!
-     !!  ! elem%chord
-     !!  ! elem%csi_c       !! <- for interpolation of aerodynamic coefficients
-     !!  ! elem%airfoil(2)  !!
+        class is(t_liftlin)
+          allocate(elem%edge_vec(3,nsides))
+          allocate(elem%edge_len(nsides))
+          allocate(elem%edge_uni(3,nsides))
 
-     !!  ! elem%theta   <-- ???
-      class is(t_actdisk)
-       allocate(elem%edge_vec(3,nsides))
-       allocate(elem%edge_len(nsides))
-       allocate(elem%edge_uni(3,nsides))
+        class is(t_actdisk)
+          allocate(elem%edge_vec(3,nsides))
+          allocate(elem%edge_len(nsides))
+          allocate(elem%edge_uni(3,nsides))
 
-      class default
-       call error(this_sub_name, this_mod_name, 'Unknown element type')
-     end select
+        class default
+          call error(this_sub_name, this_mod_name, 'Unknown element type')
+      end select
 
-     !end associate
-   enddo
- enddo
+    enddo
+  enddo
 
 end subroutine prepare_geometry_postpro
 
@@ -595,43 +546,43 @@ subroutine calc_geo_data_postpro(elem,vert)
 
   select type(elem)
 
-   class default
+    class default
 
-    ! unit normal and area
-    if ( nsides .eq. 4 ) then
-      nor = cross( vert(:,3) - vert(:,1) , &
-                   vert(:,4) - vert(:,2)     )
-    else if ( nSides .eq. 3 ) then
-      nor = cross( vert(:,3) - vert(:,2) , &
-                   vert(:,1) - vert(:,2)     )
-    end if
+      ! unit normal and area
+      if ( nsides .eq. 4 ) then
+        nor = cross(vert(:,3) - vert(:,1) , &
+                    vert(:,4) - vert(:,2)     )
+      else if ( nSides .eq. 3 ) then
+        nor = cross(vert(:,3) - vert(:,2) , &
+                    vert(:,1) - vert(:,2)     )
+      end if
 
-    elem%area = 0.5_wp * norm2(nor)
-    elem%nor = nor / norm2(nor)
+      elem%area = 0.5_wp * norm2(nor)
+      elem%nor = nor / norm2(nor)
 
-    ! local tangent unit vector as in PANAIR
-    tanl = 0.5_wp * ( vert(:,nsides) + vert(:,1) ) - elem%cen
+      ! local tangent unit vector as in PANAIR
+      tanl = 0.5_wp * ( vert(:,nsides) + vert(:,1) ) - elem%cen
 
-    elem%tang(:,1) = tanl / norm2(tanl)
-    elem%tang(:,2) = cross( elem%nor, elem%tang(:,1)  )
+      elem%tang(:,1) = tanl / norm2(tanl)
+      elem%tang(:,2) = cross( elem%nor, elem%tang(:,1)  )
 
-   class is(t_actdisk)
+    class is(t_actdisk)
 
-    elem%area = 0.0_wp; elem%nor = 0.0_wp
-    do is = 1, nsides
-      nxt = 1+mod(is,nsides)
-      nor = cross(vert(:,is) - elem%cen,&
-                  vert(:,nxt) - elem%cen )
-      elem%area = elem%area + 0.5_wp * norm2(nor)
-      elem%nor = elem%nor + nor/norm2(nor)
-    enddo
-      elem%nor = elem%nor/real(nsides,wp)
+      elem%area = 0.0_wp; elem%nor = 0.0_wp
+      do is = 1, nsides
+        nxt = 1+mod(is,nsides)
+        nor = cross(vert(:,is) - elem%cen,&
+                    vert(:,nxt) - elem%cen )
+        elem%area = elem%area + 0.5_wp * norm2(nor)
+        elem%nor = elem%nor + nor/norm2(nor)
+      enddo
+        elem%nor = elem%nor/real(nsides,wp)
 
-    ! local tangent unit vector: aligned with first node, normal to n
-    tanl = (vert(:,1)-elem%cen)-sum((vert(:,1)-elem%cen)*elem%nor)*elem%nor
+      ! local tangent unit vector: aligned with first node, normal to n
+      tanl = (vert(:,1)-elem%cen)-sum((vert(:,1)-elem%cen)*elem%nor)*elem%nor
 
-    elem%tang(:,1) = tanl / norm2(tanl)
-    elem%tang(:,2) = cross( elem%nor, elem%tang(:,1)  )
+      elem%tang(:,1) = tanl / norm2(tanl)
+      elem%tang(:,2) = cross( elem%nor, elem%tang(:,1)  )
 
   end select
 
@@ -669,67 +620,54 @@ subroutine calc_geo_data_postpro(elem,vert)
 
 end subroutine calc_geo_data_postpro
 
-! in geo/mod_geo.f90 ---------------------------------------------------
-!
-!!> Calculate the local velocity on the panels to then enforce the
-!!! boundary condition
-!!!
-!subroutine calc_geo_vel(elem, G, f)
-! class(c_elem), intent(inout) :: elem
-! real(wp), intent(in) :: f(3), G(3,3)
-!
-!  if(.not.allocated(elem%ub)) allocate(elem%ub(3))
-!  elem%ub = f + matmul(G,elem%cen)
-!
-!end subroutine calc_geo_vel
-
 !----------------------------------------------------------------------
 
 function move_points(pp, R, of)  result(rot_pp)
- real(wp), intent(in) :: pp(:,:)
- real(wp), intent(in)    :: R(:,:)
- real(wp), intent(in)    :: of(:)
- real(wp) :: rot_pp(size(pp,1),size(pp,2))
+  real(wp), intent(in)    :: pp(:,:)
+  real(wp), intent(in)    :: R(:,:)
+  real(wp), intent(in)    :: of(:)
+  real(wp)                :: rot_pp(size(pp,1),size(pp,2))
 
   rot_pp = matmul(R,pp)
-  rot_pp(1,:) =rot_pp(1,:) + of(1)
-  rot_pp(2,:) =rot_pp(2,:) + of(2)
-  rot_pp(3,:) =rot_pp(3,:) + of(3)
+  rot_pp(1,:) = rot_pp(1,:) + of(1)
+  rot_pp(2,:) = rot_pp(2,:) + of(2)
+  rot_pp(3,:) = rot_pp(3,:) + of(3)
 
 end function move_points
 
 !----------------------------------------------------------------------
 subroutine update_points_postpro(comps, points, refs_R, refs_off, &
-                                 refs_G , refs_f, filen)
- type(t_geo_component), intent(inout) :: comps(:)
- real(wp), intent(inout) :: points(:,:)
- real(wp), intent(in)    :: refs_R(:,:,0:)
- real(wp), intent(in)    :: refs_off(:,0:)
- real(wp), optional , intent(in)    :: refs_G(:,:,0:)
- real(wp), optional , intent(in)    :: refs_f(:,0:)
+                                  refs_G , refs_f, filen)
+  type(t_geo_component), intent(inout)  :: comps(:)
+  real(wp), intent(inout)               :: points(:,:)
+  real(wp), intent(in)                  :: refs_R(:,:,0:)
+  real(wp), intent(in)                  :: refs_off(:,0:)
+  real(wp), optional , intent(in)       :: refs_G(:,:,0:)
+  real(wp), optional , intent(in)       :: refs_f(:,0:)
+
 #if USE_PRECICE
- real(wp), allocatable :: rr(:,:)
+  real(wp), allocatable                  :: rr(:,:)
 #endif
- character(len=*), optional, intent(in) :: filen
- character(max_char_len) :: cname
- integer(h5loc) :: floc, gloc, cloc, rloc
+  character(len=*), optional, intent(in) :: filen
+  character(max_char_len)                :: cname
+  integer(h5loc)                         :: floc, gloc, cloc, rloc
 
- real(wp) :: time_todo = 0.0_wp  ! *** to do *** pass time as an input
- integer(h5loc) :: hiloc, hloc
- real(wp), allocatable :: rr_hinge_contig(:,:)
- integer :: i_comp, ie, ih
- character(len=2) :: hinge_id_str
+  real(wp)                               :: time_todo = 0.0_wp  ! *** to do *** pass time as an input
+  integer(h5loc)                         :: hiloc, hloc
+  real(wp), allocatable                  :: rr_hinge_contig(:,:)
+  integer                                :: i_comp, ie, ih
+  character(len=2)                       :: hinge_id_str
 
 
- do i_comp = 1,size(comps)
-  associate(comp => comps(i_comp))
+  do i_comp = 1,size(comps)
+    associate(comp => comps(i_comp))
 #if USE_PRECICE
   if ( .not. comp%coupling ) then
 #endif
     !> Move points of a rigid component, not coupled with an external software
     points(:,comp%i_points) = move_points(comp%loc_points, &
-                             refs_R(:,:,comp%ref_id), &
-                             refs_off(:,comp%ref_id))
+                              refs_R(:,:,comp%ref_id), &
+                              refs_off(:,comp%ref_id))
 #if USE_PRECICE
   else
     !> Read points of a coupled component, from result files
@@ -752,7 +690,7 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
 #endif
 
 
-  !> Hinges ----------------------------------------------------------------
+  !> Hinges 
   !> Re-open and close result hdf5 file and groups
   call open_hdf5_file ( trim(filen), floc )
   call open_hdf5_group( floc, 'Components', gloc )
@@ -788,95 +726,91 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
   call close_hdf5_group(cloc)
   call close_hdf5_group(gloc)
   call close_hdf5_file(floc)
-  !> Hinges ----------------------------------------------------------------
+    !> Hinges 
+    do ie = 1,size(comp%el)
+      call calc_geo_data_postpro(comp%el(ie),points(:,comp%el(ie)%i_ver))
 
-  do ie = 1,size(comp%el)
-    call calc_geo_data_postpro(comp%el(ie),points(:,comp%el(ie)%i_ver))
+      if ( present(refs_G) .and. present(refs_f) ) then
+        !> Calculate the velocity of the centers to impose the boundary condition
+        call calc_geo_vel(comp%el(ie), refs_G(:,:,comp%ref_id) , &
+                                        refs_f(:,comp%ref_id) )
+      end if
+    enddo
 
-    if ( present(refs_G) .and. present(refs_f) ) then
-      !Calculate the velocity of the centers to impose the boundary condition
-      call calc_geo_vel(comp%el(ie), refs_G(:,:,comp%ref_id) , &
-                                       refs_f(:,comp%ref_id) )
-    end if
+    end associate
   enddo
-
-  end associate
- enddo
 
 end subroutine update_points_postpro
 
 !----------------------------------------------------------------------
 
 subroutine expand_actdisk_postpro(comps, points, points_exp, elems)
- type(t_geo_component), intent(in) :: comps(:)
- real(wp), intent(in) :: points(:,:)
- real(wp), allocatable, intent(out) :: points_exp(:,:)
- integer, allocatable, intent(out)  :: elems(:,:)
+  type(t_geo_component), intent(in)  :: comps(:)
+  real(wp), intent(in)               :: points(:,:)
+  real(wp), allocatable, intent(out) :: points_exp(:,:)
+  integer, allocatable, intent(out)  :: elems(:,:)
 
-
- real(wp), allocatable :: pt_tmp(:,:)
- integer, allocatable  :: ee_tmp(:,:)
- integer :: i_comp, ie, extra_offset, iv, ipt, ipt1!, ie_t, next
- integer :: start_pts, start_cen
+  real(wp), allocatable              :: pt_tmp(:,:)
+  integer, allocatable               :: ee_tmp(:,:)
+  integer                            :: i_comp, ie, extra_offset, iv, ipt, ipt1
+  integer                            :: start_pts, start_cen
 
   extra_offset = 0
   allocate(points_exp(3,0), elems(4,0))
   do i_comp = 1,size(comps)
     associate(cmp=>comps(i_comp))
     select type(el => cmp%el)
-     type is(t_actdisk)
-      !make space also for the centers
-      allocate(pt_tmp(3,size(points_exp,2) + &
-               size(cmp%loc_points,2) + cmp%nelems))
-      pt_tmp(:,1:size(points_exp,2)) = points_exp
-      start_pts = size(points_exp,2)
-      start_cen = size(points_exp,2) + size(cmp%i_points)
-      pt_tmp(:,start_pts+1 : start_cen) = points(:,cmp%i_points)
-      do ie = 1,cmp%nelems
-        pt_tmp(:,start_cen+ie) = el(ie)%cen
-      enddo
-      call move_alloc(pt_tmp, points_exp)
-      extra_offset = extra_offset + cmp%nelems
-
-      allocate(ee_tmp(4,size(elems,2)+size(cmp%i_points)))
-      ee_tmp(:,1:size(elems,2)) = elems
-      ee_tmp(:,size(elems,2)+1:size(ee_tmp,2)) = 0
-
-      ipt = 1
-      do ie = 1,cmp%nelems
-        ipt1 = ipt
-        do iv = 1,el(ie)%n_ver-1
-          ee_tmp(1,size(elems,2)+ipt) = start_pts+ipt
-          ee_tmp(2,size(elems,2)+ipt) = start_pts+ipt+1
-          ee_tmp(3,size(elems,2)+ipt) = start_cen+ie
-          ipt = ipt+1
+      type is(t_actdisk)
+        !> make space also for the centers
+        allocate(pt_tmp(3,size(points_exp,2) + &
+                  size(cmp%loc_points,2) + cmp%nelems))
+        pt_tmp(:,1:size(points_exp,2)) = points_exp
+        start_pts = size(points_exp,2)
+        start_cen = size(points_exp,2) + size(cmp%i_points)
+        pt_tmp(:,start_pts+1 : start_cen) = points(:,cmp%i_points)
+        do ie = 1,cmp%nelems
+          pt_tmp(:,start_cen+ie) = el(ie)%cen
         enddo
-        !last element
-          ee_tmp(1,size(elems,2)+ipt) = start_pts+ipt
-          ee_tmp(2,size(elems,2)+ipt) = start_pts+ipt1
-          ee_tmp(3,size(elems,2)+ipt) = start_cen+ie
-          ipt = ipt+1
-      enddo
-      call move_alloc(ee_tmp, elems)
+        call move_alloc(pt_tmp, points_exp)
+        extra_offset = extra_offset + cmp%nelems
 
-     class default
-      allocate(pt_tmp(3,size(points_exp,2)+size(cmp%loc_points,2)))
-      pt_tmp(:,1:size(points_exp,2)) = points_exp
-      pt_tmp(:,size(points_exp,2)+1:size(pt_tmp,2)) = points(:,cmp%i_points)
-      call move_alloc(pt_tmp, points_exp)
+        allocate(ee_tmp(4,size(elems,2)+size(cmp%i_points)))
+        ee_tmp(:,1:size(elems,2)) = elems
+        ee_tmp(:,size(elems,2)+1:size(ee_tmp,2)) = 0
 
-      allocate(ee_tmp(4,size(elems,2)+cmp%nelems))
-      ee_tmp(:,1:size(elems,2)) = elems
-      ee_tmp(:,size(elems,2)+1:size(ee_tmp,2)) = 0
-      do ie = 1,cmp%nelems
-        ee_tmp(1:el(ie)%n_ver,size(elems,2)+ie) =  &
-                                                el(ie)%i_ver+extra_offset
-      enddo
-      call move_alloc(ee_tmp, elems)
+        ipt = 1
+        do ie = 1,cmp%nelems
+          ipt1 = ipt
+          do iv = 1,el(ie)%n_ver-1
+            ee_tmp(1,size(elems,2)+ipt) = start_pts+ipt
+            ee_tmp(2,size(elems,2)+ipt) = start_pts+ipt+1
+            ee_tmp(3,size(elems,2)+ipt) = start_cen+ie
+            ipt = ipt+1
+          enddo
+          !> last element
+            ee_tmp(1,size(elems,2)+ipt) = start_pts+ipt
+            ee_tmp(2,size(elems,2)+ipt) = start_pts+ipt1
+            ee_tmp(3,size(elems,2)+ipt) = start_cen+ie
+            ipt = ipt+1
+        enddo
+        call move_alloc(ee_tmp, elems)
 
+      class default
+        allocate(pt_tmp(3,size(points_exp,2)+size(cmp%loc_points,2)))
+        pt_tmp(:,1:size(points_exp,2)) = points_exp
+        pt_tmp(:,size(points_exp,2)+1:size(pt_tmp,2)) = points(:,cmp%i_points)
+        call move_alloc(pt_tmp, points_exp)
 
+        allocate(ee_tmp(4,size(elems,2)+cmp%nelems))
+        ee_tmp(:,1:size(elems,2)) = elems
+        ee_tmp(:,size(elems,2)+1:size(ee_tmp,2)) = 0
+        do ie = 1,cmp%nelems
+          ee_tmp(1:el(ie)%n_ver,size(elems,2)+ie) =  &
+                                                  el(ie)%i_ver+extra_offset
+        enddo
+        call move_alloc(ee_tmp, elems)
 
-    end select
+      end select
     end associate
   enddo
 end subroutine

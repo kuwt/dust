@@ -1,18 +1,47 @@
 basename =     Postpro/test
 data_basename = Output/test
 
-Analysis = {
-  Name = vl
-  Type = Viz
+analysis = {
+  name = vl
+  type = Viz
 
-  Format = vtk !tecplot
+  format = vtk !tecplot
 
-  StartRes = 1
-  EndRes = 100
-  StepRes = 1
-  Wake = T
-  SeparateWake = T
-  Variable = Velocity
-  Variable = Vorticity
-  Variable = Pressure
+  start_res = 1
+  end_res = 100
+  step_res = 1
+  wake = T
+  separate_wake = T
+  variable = Velocity
+  variable = Vorticity
+  variable = Pressure
 }
+
+analysis = {
+  type = hinge_loads
+  name = hm
+
+  start_res = 1
+  end_res = 100
+  step_res = 1
+
+  format = dat
+  average = F
+  component = Wing
+  hinge_tag = Aileron_right
+}
+
+analysis = {
+  type = hinge_loads
+  name = hm
+
+  start_res = 1
+  end_res = 100
+  step_res = 1
+
+  format = dat
+  average = F
+  component = Wing
+  hinge_tag = Aileron_left
+}
+

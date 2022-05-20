@@ -1,5 +1,5 @@
-MeshFileType = parametric
-ElType = p
+mesh_file_type = parametric
+el_type = p
 
 mesh_symmetry = T
 symmetry_point   = (/0.0 , 0.0,  0.0/)
@@ -11,44 +11,40 @@ starting_point = (/0.0,0.0,0.0/)
 reference_chord_fraction = 0.25
 
 n_hinges = 2
-Hinge = {
-  Hinge_Tag = Aileron_right
-  Hinge_Nodes_Input = parametric      ! or from_file
-  Node1 = (/ 1.4178, 1.4557, 0.3473/)  ! In the local ref.frame
-  Node2 = (/ 2.4026  , 3.1615  , 0.6946/)
-  N_Nodes = 2
-  ! }
-  ! Hinge_Nodes_Input_From_File = {
-  !   Node_File = hinge_node.dat
-  ! }
-  Hinge_Ref_Dir = (/ 1.0, 0.0 , 0.0 /)
-  Hinge_Offset  = 0.1
-  Hinge_Spanwise_Blending = 0.01
-  Hinge_Rotation_Input = function:sin
-  Hinge_Rotation_Function = {
-    Amplitude = 30.0    ! deg
-    Omega     =  12.5   ! rad/sec
-    Phase     =  0.0    ! deg
+hinge = {
+  hinge_Tag = Aileron_right
+  hinge_nodes_input = parametric      ! or from_file
+  node_1 = (/ 1.4178, 1.4557, 0.3473/)  ! In the local ref.frame
+  node_2 = (/ 2.4026  , 3.1615  , 0.6946/)
+  n_nodes = 2
+
+  hinge_ref_dir = (/ 1.0, 0.0 , 0.0 /)
+  hinge_offset  = 0.1
+  hinge_spanwise_blending = 0.001
+  hinge_merge_tol = 0.15
+  hinge_rotation_input = function:sin
+  hinge_rotation_function = {
+    amplitude = 30.0    ! deg
+    omega     =  12.5   ! rad/sec
+    phase     =  0.0    ! deg
   }
 }
-Hinge = {
-  Hinge_Tag = Aileron_left
-  Hinge_Nodes_Input = parametric      
-  Node2 = (/ 1.4178, -1.4557, 0.3473/)  
-  Node1 = (/ 2.4026  , -3.1615  , 0.6946/)
-  N_Nodes = 2
-  ! }
-  ! Hinge_Nodes_Input_From_File = {
-  !   Node_File = hinge_node.dat
-  ! }
-  Hinge_Ref_Dir = (/ 1.0, 0.0 , 0.0 /)
-  Hinge_Offset  = 0.1
-  Hinge_Spanwise_Blending = 0.01
-  Hinge_Rotation_Input = function:sin
-  Hinge_Rotation_Function = {
-    Amplitude = -30.0    ! deg
-    Omega     =  12.5    ! rad/sec
-    Phase     =  0.0     ! deg
+hinge = {
+  hinge_Tag = Aileron_left
+  hinge_nodes_input = parametric      
+  node_2 = (/ 1.4178, -1.4557, 0.3473/)  
+  node_1 = (/ 2.4026  , -3.1615  , 0.6946/)
+  n_nodes = 2
+
+  hinge_ref_dir = (/ 1.0, 0.0 , 0.0 /)
+  hinge_offset  = 0.1
+  hinge_spanwise_blending = 0.001
+  hinge_merge_tol = 0.15
+  hinge_rotation_input = function:sin
+  hinge_rotation_function = {
+    amplitude = -30.0    ! deg
+    omega     =  12.5    ! rad/sec
+    phase     =  0.0     ! deg
   }
 }
 

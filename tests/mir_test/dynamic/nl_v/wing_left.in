@@ -1,5 +1,5 @@
-MeshFileType = parametric
-ElType = v
+mesh_file_type = parametric
+el_type = v
 AirfoilTableCorrection = T
 
 mesh_mirror = T

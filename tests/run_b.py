@@ -8,18 +8,18 @@ import math as mth
 import h5py
 
 pars = argparse.ArgumentParser()
-pars.add_argument("exe_path",help='path to the executables')
+#pars.add_argument("exe_path",help='path to the executables')
 pars.add_argument('-t','--tolerance', nargs='?', help='tolerance for the test',
                   required=False, default=1e-10, type=float)
 pars.add_argument('-r','--release', nargs='?', help='release to check with',
                   required=False, default='0.6.0')
 
 args = pars.parse_args()
-exe_path = args.exe_path
+exe_path = 'build/bin'
 exe_path = os.path.abspath(exe_path)
-pre    = exe_path+'/dust_pre'
-solver = exe_path+'/dust'
-post   = exe_path+'/dust_post'
+pre    = exe_path + '/dust_pre'
+solver = exe_path + '/dust'
+post   = exe_path + '/dust_post'
 tol = args.tolerance
 
 vers_dic ={'0.5.11':'0-5-11', '0.5.12':'0-5-12', '0.5.13':'0-5-13',
@@ -37,7 +37,7 @@ pwd = os.getcwd()
 sets_descr = ['Rotor with a cgns nacelle']
 
 #run the first set of simulations, set a
-os.chdir("./reg_test_b")
+os.chdir("./tests/reg_test_b")
 pre_ret = sbprc.call([pre])
 runs = ['dust_base.in']
 descr = ['basic configuration']

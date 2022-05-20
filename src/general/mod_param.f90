@@ -50,39 +50,31 @@
 
 module mod_param
 
-!----------------------------------------------------------------------
 
 implicit none
 
-!----------------------------------------------------------------------
 
 public :: wp, &
-          max_char_len , &
-          extended_char_len, &
-          nl, &
-          pi , &
-          eps, &
-          prev_tri , next_tri , &
-          prev_qua , next_qua, &
-          ascii_real
+         max_char_len , &
+         extended_char_len, &
+         nl, &
+         pi , &
+         eps, &
+         prev_tri , next_tri , &
+         prev_qua , next_qua, &
+         ascii_real
 
 private
 
 !----------------------------------------------------------------------
-
-!----------------------------------------------------------------------
 ! Select here the working precision wp
-!
 #if (DUST_PRECISION==1)
 ! single precision
 integer, parameter :: wp = selected_real_kind(6,35)
 #elif(DUST_PRECISION==2)
 ! double precision
 integer, parameter :: wp = selected_real_kind(12,307)
-!
 #endif /*DUST_PRECISION*/
-! quadruple precision
-!integer, parameter :: wp = selected_real_kind(30,307)
 !----------------------------------------------------------------------
 
 integer, parameter :: max_char_len = 255
@@ -104,26 +96,6 @@ integer, parameter :: next_tri(3) = (/ 2 , 3 , 1 /)
 integer, parameter :: prev_qua(4) = (/ 4 , 1 , 2 , 3 /)
 integer, parameter :: next_qua(4) = (/ 2 , 3 , 4 , 1 /)
 
-
 real(wp), parameter :: eps = 1.0e-10_wp
-
-!----------------------------------------------------------------------
-
-!type :: t_param_dict
-!
-! character(len=1) :: actdisk = 'a'
-!
-! character(len=1) :: liftlin = 'l'
-!
-! character(len=1) :: surfpan = 'p'
-!
-! character(len=1) :: vortpan = 'v'
-!
-!
-!end type t_param_dict
-!
-!type(t_param_dict) :: dict
-
-!----------------------------------------------------------------------
 
 end module mod_param

@@ -35,12 +35,14 @@ if (MKL_INCLUDE_DIRS AND MKL_LIBRARIES AND MKL_INTERFACE_LIBRARY AND
 endif()
 
 if(NOT BUILD_SHARED_LIBS)
-  set(INT_LIB "libmkl_intel_ilp64.a")
+  #set(INT_LIB "libmkl_intel_ilp64.a")
+  set(INT_LIB "libmkl_intel_lp64.a")
   set(SEQ_LIB "libmkl_sequential.a")
   set(THR_LIB "libmkl_intel_thread.a")
   set(COR_LIB "libmkl_core.a")
 else()
-  set(INT_LIB "mkl_intel_ilp64")
+  #set(INT_LIB "mkl_intel_ilp64")
+  set(INT_LIB "mkl_intel_lp64")
   set(SEQ_LIB "mkl_sequential")
   set(THR_LIB "mkl_intel_thread")
   set(COR_LIB "mkl_core")
@@ -49,25 +51,25 @@ endif()
 find_path(MKL_INCLUDE_DIR NAMES mkl.h HINTS $ENV{MKLROOT}/include)
 
 find_library(MKL_INTERFACE_LIBRARY
-             NAMES ${INT_LIB}
-             PATHS $ENV{MKLROOT}/lib
-                   $ENV{MKLROOT}/lib/intel64
-                   $ENV{INTEL}/mkl/lib/intel64
-             NO_DEFAULT_PATH)
+            NAMES ${INT_LIB}
+            PATHS $ENV{MKLROOT}/lib
+                  $ENV{MKLROOT}/lib/intel64
+                  $ENV{INTEL}/mkl/lib/intel64
+            NO_DEFAULT_PATH)
 
 find_library(MKL_SEQUENTIAL_LAYER_LIBRARY
-             NAMES ${SEQ_LIB}
-             PATHS $ENV{MKLROOT}/lib
-                   $ENV{MKLROOT}/lib/intel64
-                   $ENV{INTEL}/mkl/lib/intel64
-             NO_DEFAULT_PATH)
+            NAMES ${SEQ_LIB}
+            PATHS $ENV{MKLROOT}/lib
+                  $ENV{MKLROOT}/lib/intel64
+                  $ENV{INTEL}/mkl/lib/intel64
+            NO_DEFAULT_PATH)
 
 find_library(MKL_CORE_LIBRARY
-             NAMES ${COR_LIB}
-             PATHS $ENV{MKLROOT}/lib
-                   $ENV{MKLROOT}/lib/intel64
-                   $ENV{INTEL}/mkl/lib/intel64
-             NO_DEFAULT_PATH)
+            NAMES ${COR_LIB}
+            PATHS $ENV{MKLROOT}/lib
+                  $ENV{MKLROOT}/lib/intel64
+                  $ENV{INTEL}/mkl/lib/intel64
+            NO_DEFAULT_PATH)
 
 set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIR})
 set(MKL_LIBRARIES ${MKL_INTERFACE_LIBRARY} ${MKL_SEQUENTIAL_LAYER_LIBRARY} ${MKL_CORE_LIBRARY})
@@ -84,9 +86,10 @@ if (MKL_INCLUDE_DIR AND
       set(ABI "-m64")
     endif()
 
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DMKL_ILP64 ${ABI}")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMKL_ILP64 ${ABI}")
-
+    #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DMKL_ILP64 ${ABI}")
+    #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMKL_ILP64 ${ABI}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DMKL_LP64 ${ABI}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMKL_LP64 ${ABI}")
 else()
 
   set(MKL_INCLUDE_DIRS "")

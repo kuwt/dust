@@ -67,12 +67,12 @@ use mod_parse, only: &
   countoption
 
 use mod_hdf5_io, only: &
-   h5loc, &
-   open_hdf5_file, &
-   close_hdf5_file , &
-   open_hdf5_group, &
-   close_hdf5_group, &
-   read_hdf5
+  h5loc, &
+  open_hdf5_file, &
+  close_hdf5_file , &
+  open_hdf5_group, &
+  close_hdf5_group, &
+  read_hdf5
 
 use mod_stringtools, only: &
   LowCase
@@ -118,50 +118,49 @@ contains
 subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
                       out_frmt , components_names , all_comp , &
                       an_start , an_end , an_step )
- type(t_parse), pointer :: sbprms
- character(len=*) , intent(in) :: basename
- character(len=*) , intent(in) :: data_basename
- character(len=*) , intent(in) :: an_name
- integer          , intent(in) :: ia
- character(len=*) , intent(in) :: out_frmt
- character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
- logical , intent(inout) :: all_comp
- integer , intent(in) :: an_start , an_end , an_step
+  type(t_parse), pointer                                   :: sbprms
+  character(len=*) , intent(in)                            :: basename
+  character(len=*) , intent(in)                            :: data_basename
+  character(len=*) , intent(in)                            :: an_name
+  integer          , intent(in)                            :: ia
+  character(len=*) , intent(in)                            :: out_frmt
+  character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
+  logical , intent(inout)                                  :: all_comp
+  integer , intent(in)                                     :: an_start , an_end , an_step
 
- type(t_geo_component), allocatable :: comps(:)
- integer :: nstep
- real(wp), allocatable :: probe_vars(:,:,:)
- real(wp), allocatable :: time(:)
- character(len=max_char_len), allocatable :: probe_var_names(:)
- character(len=max_char_len), allocatable :: probe_loc_names(:)
- character(len=max_char_len) :: in_type , str_a , filename_in , var_name , vars_str
- integer :: n_probes , n_vars ! , n_vars_int
- real(wp), allocatable :: rr_probes(:,:)
- logical :: probe_vel , probe_p , probe_vort
- integer :: fid_out , i_var , nprint
- integer :: ie , ip , ic , it , ires
- integer(h5loc) :: floc , ploc
- character(len=max_char_len) :: filename
- real(wp), allocatable :: points(:,:)
- integer :: nelem
+  type(t_geo_component), allocatable                       :: comps(:)
+  integer                                                  :: nstep
+  real(wp), allocatable                                    :: probe_vars(:,:,:)
+  real(wp), allocatable                                    :: time(:)
+  character(len=max_char_len), allocatable                 :: probe_var_names(:)
+  character(len=max_char_len), allocatable                 :: probe_loc_names(:)
+  character(len=max_char_len)                              :: in_type , str_a , filename_in , var_name , vars_str
+  integer                                                  :: n_probes , n_vars 
+  real(wp), allocatable                                    :: rr_probes(:,:)
+  logical                                                  :: probe_vel , probe_p , probe_vort
+  integer                                                  :: fid_out , i_var , nprint
+  integer                                                  :: ie , ip , ic , it , ires
+  integer(h5loc)                                           :: floc , ploc
+  character(len=max_char_len)                              :: filename
+  real(wp), allocatable                                    :: points(:,:)
+  integer                                                  :: nelem
 
- real(wp) :: u_inf(3)
- real(wp) :: P_inf , rho
- real(wp) :: vel_probe(3) = 0.0_wp , vort_probe(3) = 0.0_wp
- real(wp) :: v(3) = 0.0_wp !, w(3) = 0.0_wp
- real(wp), allocatable , target :: sol(:)
- real(wp) :: pres_probe
- real(wp) :: t
+  real(wp)                                                 :: u_inf(3)
+  real(wp)                                                 :: P_inf , rho
+  real(wp)                                                 :: vel_probe(3) = 0.0_wp , vort_probe(3) = 0.0_wp
+  real(wp)                                                 :: v(3) = 0.0_wp
+  real(wp), allocatable , target                           :: sol(:)
+  real(wp)                                                 :: pres_probe
+  real(wp)                                                 :: t
 
- real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
- real(wp), allocatable :: vort(:), cp(:)!, vel(:), press(:)
+  real(wp), allocatable                                    :: refs_R(:,:,:), refs_off(:,:)
+  real(wp), allocatable                                    :: vort(:), cp(:)
 
- type(t_wake) :: wake
- type(t_elem_p), allocatable :: wake_elems(:)
- integer :: ivar, ierr
+  type(t_wake)                                             :: wake
+  type(t_elem_p), allocatable                              :: wake_elems(:)
+  integer                                                  :: ivar, ierr
 
- character(len=max_char_len), parameter :: &
-    this_sub_name = 'post_probes'
+  character(len=max_char_len), parameter                   :: this_sub_name = 'post_probes'
 
   write(msg,'(A,I0,A)') nl//'++++++++++ Analysis: ',ia,' probes'//nl
   call printout(trim(msg))
@@ -171,8 +170,8 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
   !   and deallocated in dust_post at the end of each analysis
   if ( allocated(components_names) ) then
     call warning(trim(this_sub_name), trim(this_mod_name), &
-       'All the components are used. <Components> input &
-       &is ignored, and deallocated.' )
+        'All the components are used. <Components> input &
+        &is ignored, and deallocated.' )
     deallocate(components_names)
   end if
   all_comp = .true.
@@ -180,27 +179,27 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
   ! Read probe coordinates: point_list or from_file
   in_type =  getstr(sbprms,'InputType')
   select case ( trim(in_type) )
-   case('point_list')
-    n_probes = countoption(sbprms,'Point')
-    allocate(rr_probes(3,n_probes))
-    do ip = 1 , n_probes
-      rr_probes(:,ip) = getrealarray(sbprms,'Point',3)
-    end do
-   case('from_file')
-    filename_in = getstr(sbprms,'File')   ! N probes and then their coordinates
-    fid_out = 21
-    open(unit=fid_out,file=trim(filename_in))
-    read(fid_out,*) n_probes
-    allocate(rr_probes(3,n_probes))
-    do ip = 1 , n_probes
-      read(fid_out,*) rr_probes(:,ip)
-    end do
-    close(fid_out)
-   case default
-    write(str_a,*) ia
-    call error('dust_post','','Unknown InputType: '//trim(in_type)//&
-               ' for analysis n.'//trim(str_a)//'.'//nl//&
-                'It must either "point_list" or "from_file".')
+    case('point_list')
+      n_probes = countoption(sbprms,'Point')
+      allocate(rr_probes(3,n_probes))
+      do ip = 1 , n_probes
+        rr_probes(:,ip) = getrealarray(sbprms,'point',3)
+      end do
+    case('from_file')
+      filename_in = getstr(sbprms,'file')   ! N probes and then their coordinates
+      fid_out = 21
+      open(unit=fid_out,file=trim(filename_in))
+      read(fid_out,*) n_probes
+      allocate(rr_probes(3,n_probes))
+      do ip = 1 , n_probes
+        read(fid_out,*) rr_probes(:,ip)
+      end do
+      close(fid_out)
+    case default
+      write(str_a,*) ia
+      call error('dust_post','','Unknown InputType: '//trim(in_type)//&
+                  ' for analysis n.'//trim(str_a)//'.'//nl//&
+                  'It must either "point_list" or "from_file".')
   end select
 
   ! Read variables to save : velocity | pressure | vorticity
@@ -211,25 +210,25 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
   if ( n_vars .eq. 0 ) then ! default: velocity | pressure | vorticity
     probe_vel = .true. ; probe_p = .true. ; probe_vort = .true.
   else
-   do i_var = 1 , n_vars
-    var_name = getstr(sbprms,'Variable') ; call LowCase(var_name)
-    select case(trim(var_name))
-     case ( 'velocity' ) ; probe_vel = .true.
-     case ( 'pressure' ) ; probe_p   = .true.
-     case ( 'vorticity') ; probe_vort= .true.
-     case ( 'cp'       )
-      write(str_a,*) ia
-      call error('dust_post','','Unknown Variable: '//trim(var_name)//&
-                 ' for analysis n.'//trim(str_a)//'.'//nl//&
-                  'Choose "velocity", "pressure", "vorticity".')
-     case ( 'all') ; probe_vel = .true. ; probe_p   = .true. ; probe_vort= .true.
-     case default
-      write(str_a,*) ia
-      call error('dust_post','','Unknown Variable: '//trim(var_name)//&
-                 ' for analysis n.'//trim(str_a)//'.'//nl//&
-                  'Choose "velocity", "pressure", "vorticity".')
-    end select
-   end do
+    do i_var = 1 , n_vars
+      var_name = getstr(sbprms,'variable') ; call LowCase(var_name)
+      select case(trim(var_name))
+        case ( 'velocity' ) ; probe_vel = .true.
+        case ( 'pressure' ) ; probe_p   = .true.
+        case ( 'vorticity') ; probe_vort= .true.
+        case ( 'cp'       )
+        write(str_a,*) ia
+        call error('dust_post','','Unknown Variable: '//trim(var_name)//&
+                    ' for analysis n.'//trim(str_a)//'.'//nl//&
+                    'Choose "velocity", "pressure", "vorticity".')
+        case ( 'all') ; probe_vel = .true. ; probe_p   = .true. ; probe_vort= .true.
+        case default
+        write(str_a,*) ia
+        call error('dust_post','','Unknown Variable: '//trim(var_name)//&
+                    ' for analysis n.'//trim(str_a)//'.'//nl//&
+                    'Choose "velocity", "pressure", "vorticity".')
+      end select
+    end do
   end if
 
   ! Find the number of fields to be plotted ( vec{vel} , p , vec{omega})
@@ -266,9 +265,9 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 
   do ip = 1,n_probes
     write(probe_loc_names(ip),'(A,F10.5,A,F10.5,A,F10.5)') &
-         'x=',rr_probes(1,ip), &
-         'y=',rr_probes(2,ip), &
-         'z=',rr_probes(3,ip)
+        'x=',rr_probes(1,ip), &
+        'y=',rr_probes(2,ip), &
+        'z=',rr_probes(3,ip)
   enddo
 
   !Allocate where the solution will be stored
@@ -279,9 +278,9 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 
   ! load the geo components just once
   call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
-  !TODO: here get the run id
+  !> TODO: here get the run id
   call load_components_postpro(comps, points, nelem,  floc, &
-                               components_names,  all_comp)
+                                components_names,  all_comp)
   call close_hdf5_file(floc)
 
   ! Prepare_geometry_postpro
@@ -291,65 +290,62 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
   allocate(sol(nelem)) ; sol = 0.0_wp
   ip = 0
   do ic = 1 , size(comps)
-   do ie = 1 , size(comps(ic)%el)
-    ip = ip + 1
-    comps(ic)%el(ie)%mag => sol(ip)
-   end do
+    do ie = 1 , size(comps(ic)%el)
+      ip = ip + 1
+      comps(ic)%el(ie)%mag => sol(ip)
+    end do
   end do
 
   !time history
   ires = 0
   do it =an_start, an_end, an_step
     ires = ires+1
+    ! ick and dirty copy and paste -------
+    ! Open the result file ----------------------
+    write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
+    call open_hdf5_file(trim(filename),floc)
 
-! ick and dirty copy and paste -------
+    ! Load u_inf --------------------------------
+    call open_hdf5_group(floc,'Parameters',ploc)
+    call read_hdf5(u_inf,'u_inf',ploc)
+    call read_hdf5(P_inf,'P_inf',ploc)
+    call read_hdf5(rho,'rho_inf',ploc)
+    call close_hdf5_group(ploc)
 
-   ! Open the result file ----------------------
-   write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
-   call open_hdf5_file(trim(filename),floc)
+    sim_param%u_inf = u_inf
+    sim_param%P_inf = P_inf
+    sim_param%rho_inf = rho
 
-   ! Load u_inf --------------------------------
-   call open_hdf5_group(floc,'Parameters',ploc)
-   call read_hdf5(u_inf,'u_inf',ploc)
-   call read_hdf5(P_inf,'P_inf',ploc)
-   call read_hdf5(rho,'rho_inf',ploc)
-   call close_hdf5_group(ploc)
-
-   sim_param%u_inf = u_inf
-   sim_param%P_inf = P_inf
-   sim_param%rho_inf = rho
-
-   ! Load the references and move the points ---
-   call load_refs(floc,refs_R,refs_off)
-   call update_points_postpro(comps, points, refs_R, refs_off, &
+    ! Load the references and move the points ---
+    call load_refs(floc,refs_R,refs_off)
+    call update_points_postpro(comps, points, refs_R, refs_off, &
                               filen = trim(filename) )
-   ! Load the results --------------------------
-   call load_res(floc, comps, vort, cp, t)
+    ! Load the results --------------------------
+    call load_res(floc, comps, vort, cp, t)
 
-   call load_wake_post(floc, wake, wake_elems)
-   call close_hdf5_file(floc)
+    call load_wake_post(floc, wake, wake_elems)
+    call close_hdf5_file(floc)
 
-   time(ires) = t
+    time(ires) = t
 
-   ! Compute velocity --------------------------
-   do ip = 1 , n_probes ! probes
+    ! Compute velocity --------------------------
+    do ip = 1 , n_probes ! probes
 
-    vel_probe = 0.0_wp ; pres_probe = 0.0_wp ; vort_probe = 0.0_wp
-    i_var = 1
-    if ( probe_vel .or. probe_p ) then
+      vel_probe = 0.0_wp ; pres_probe = 0.0_wp ; vort_probe = 0.0_wp
+      i_var = 1
+      if ( probe_vel .or. probe_p ) then
 
       ! compute velocity
       do ic = 1,size(comps)
 !$omp parallel do private(ie, v) reduction(+:vel_probe)
-       do ie = 1 , size( comps(ic)%el )
+        do ie = 1 , size( comps(ic)%el )
 
-        call comps(ic)%el(ie)%compute_vel( rr_probes(:,ip) , v )
-        vel_probe = vel_probe + v/(4*pi)
+          call comps(ic)%el(ie)%compute_vel( rr_probes(:,ip) , v )
+          vel_probe = vel_probe + v/(4*pi)
 
-       end do
+        end do
 !$omp end parallel do
       end do
-
 
 !$omp parallel do private( ie, v) reduction(+:vel_probe)
       do ie = 1, size(wake_elems)
@@ -385,10 +381,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
       i_var = i_var+3
     end if
 
-   end do  ! probes
-
-
-
+  end do  ! probes
 ! ick and dirty copy and paste -------
 
   end do
@@ -396,38 +389,37 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
   !Output the results in the correct format
   select case (trim(out_frmt))
 
-   case ('dat')
-    call new_file_unit(fid_out, ierr)
-    write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.dat'
-    open(unit=fid_out,file=trim(filename))
-    call dat_out_probes_header( fid_out , rr_probes , vars_str )
+    case ('dat')
+      call new_file_unit(fid_out, ierr)
+      write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.dat'
+      open(unit=fid_out,file=trim(filename))
+      call dat_out_probes_header( fid_out , rr_probes , vars_str )
 
-    do ires = 1, size(time)
-      write(fid_out,'('//ascii_real//')',advance='no') time(ires)
-      do ip = 1, n_probes
-        do ivar = 1, size(probe_vars,1)
-          write(fid_out,'('//ascii_real//')',advance='no') probe_vars(ivar,ires,ip)
-          write(fid_out,'(A)',advance='no') ' '
+      do ires = 1, size(time)
+        write(fid_out,'('//ascii_real//')',advance='no') time(ires)
+        do ip = 1, n_probes
+          do ivar = 1, size(probe_vars,1)
+            write(fid_out,'('//ascii_real//')',advance='no') probe_vars(ivar,ires,ip)
+            write(fid_out,'(A)',advance='no') ' '
+          enddo
         enddo
+        write(fid_out,*) ' '
       enddo
-      write(fid_out,*) ' '
-    enddo
-    close(fid_out)
+      close(fid_out)
 
-   case ('tecplot')
-    write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt'
-    call tec_out_probes(filename, time, probe_vars, probe_var_names, probe_loc_names)
-  case default
-    call error('dust_post','','Unknown format '//trim(out_frmt)//&
-               ' for probe output')
-  end select
-
+    case ('tecplot')
+      write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt'
+      call tec_out_probes(filename, time, probe_vars, probe_var_names, probe_loc_names)
+    case default
+      call error('dust_post','','Unknown format '//trim(out_frmt)//&
+                ' for probe output')
+    end select
 
   do ic = 1 , size(comps)
-   do ie = 1 , size(comps(ic)%el)
-    ip = ip + 1
-    comps(ic)%el(ie)%mag => null()
-   end do
+    do ie = 1 , size(comps(ic)%el)
+      ip = ip + 1
+      comps(ic)%el(ie)%mag => null()
+    end do
   end do
   deallocate(sol)
 

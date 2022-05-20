@@ -1,7 +1,12 @@
 <?xml version="1.0"?>
 
 <precice-configuration>
-
+<log>
+    <sink
+      filter="(%Severity% > error)"
+      format="\033[0;33m ◀ in progress ▶ %ColorizedSeverity% %Message%"
+      enabled="true" /></log>
+      
   <solver-interface dimensions="3">
 
     <!-- === Data =========================================== -->
@@ -64,7 +69,7 @@
     <!-- === Coupling scheme ================================ -->
     <coupling-scheme:serial-implicit>
       <participants first="MBDyn" second="dust" />
-      <max-time value="100.0" />
+      <max-time value="1.1" />
       <time-window-size value="-1" valid-digits="10" method="first-participant" />
       <exchange data="Position"        from="MBDyn" mesh="MBDynNodes" to="dust" />
       <exchange data="Rotation"        from="MBDyn" mesh="MBDynNodes" to="dust" />

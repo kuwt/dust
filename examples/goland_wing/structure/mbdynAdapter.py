@@ -88,10 +88,8 @@ class MBDynAdapter:
     self.p['mesh']['dim']    = np.size( self.mbd.data['Position']['data'], 1 )
     self.p['mesh']['node_id'] = self.interface.set_mesh_vertices( \
                     self.p['mesh']['id'], self.p['mesh']['nodes'] )
-   
-    #print( self.p['mesh']['node_id'] )
 
-    if ( self.debug ): # check ----------------------------------
+    if ( self.debug ): 
       for i in np.arange(self.mbd.socket.nnodes):
         print('  ', i,': ', self.p['mesh']['node_id'][i],' , ', \
                             self.p['mesh']['nodes'][i,:] )
@@ -99,8 +97,8 @@ class MBDynAdapter:
     #> === Initialize ===========================================
     self.dt_precice = self.interface.initialize()
     self.is_ongoing = self.interface.is_coupling_ongoing()
-    if ( self.debug ): # check ----------------------------------
-      print(' interface.is_coupling_ongoing(): ', self.is_ongoing )
+    if ( self.debug ): 
+      print(' interface.is_coupling_ongoing: \033[0;32m ▶ %s' % self.is_ongoing )
 
     #> === Initialize data ======================================
     cowid = precice.action_write_initial_data()
@@ -140,7 +138,7 @@ class MBDynAdapter:
       niter = niter + 1
       if (niter == 1):
         start = time.time()
-      print('\033[0;37m   Iteration ▶ ', niter)
+      print('\033[0m   Iteration ▶ ', niter)
       
       if ( self.interface.is_action_required( cowic ) ):
         pos_t = self.mbd.data['Position']['data'][:,:] 
@@ -217,11 +215,10 @@ class MBDynAdapter:
         t = t + dt
         niter = 0
         end = time.time()
-        print('\033[0;37m   Elapsed Time:', end - start, 'sec')
-        print('\033[0;33m -------------------------------------- ')
-        print('\033[0;33m ◀ Simulation Time ▶ ', t)
-        print('\033[0;33m -------------------------------------- ')
-
+        print('\033[0m   Elapsed Time:', round((end - start),8), 'sec')
+        print('\033[0;32m ------------------------------- ')
+        print('\033[0;32m ◀ Simulation Time ▶ ', round(t, 6))
+        print('\033[0;32m ------------------------------- \033[0m ')
             
     print(' before finalize() ')
     self.interface.finalize()

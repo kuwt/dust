@@ -5,8 +5,8 @@
     <sink
       filter="(%Severity% > error)"
       format="\033[0;33m ◀ in progress ▶ %ColorizedSeverity% %Message%"
-      enabled="true" /></log> 
-
+      enabled="true" /></log>
+      
   <solver-interface dimensions="3">
 
     <!-- === Data =========================================== -->

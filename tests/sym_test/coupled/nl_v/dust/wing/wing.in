@@ -1,16 +1,16 @@
 !> === Mesh and elements types ===
-MeshFileType = parametric
-ElType       = v
+mesh_file_type = parametric
+el_type       = v
 AirfoilTableCorrection = T
-!> === Coupled with external structural solver (T/F) ===
-Coupled      = T
-CouplingType = rbf
-CouplingNodeFile = ./wing/coupling_nodes_left.in 
+!> === coupled with external structural solver (T/F) ===
+coupled      = T
+coupling_type = rbf
+coupling_node_file = ./wing/coupling_nodes.in 
 
 !> === Geometry definition ===
 starting_point = (/0.0,0.0,0.0/)
 reference_chord_fraction = 0.25
-CouplingNodeOrientation = (/ 1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0 /)
+coupling_node_orientation = (/ 1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0 /)
 
 mesh_symmetry = T
 symmetry_point   = (/0.0 , 0.0,  0.0/)

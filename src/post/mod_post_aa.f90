@@ -61,13 +61,13 @@ use mod_parse, only: &
   countoption
 
 use mod_hdf5_io, only: &
-   h5loc, &
-   open_hdf5_file, &
-   close_hdf5_file, &
-   open_hdf5_group, &
-   close_hdf5_group, &
-   read_hdf5, &
-   read_hdf5_attr
+  h5loc, &
+  open_hdf5_file, &
+  close_hdf5_file, &
+  open_hdf5_group, &
+  close_hdf5_group, &
+  read_hdf5, &
+  read_hdf5_attr
 
 use mod_stringtools, only: &
   LowCase, isInList
@@ -102,40 +102,35 @@ contains
 ! ----------------------------------------------------------------------
 
 subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
-                     out_frmt, components_names, all_comp, an_start, an_end, &
-                     an_step, average )
- type(t_parse), pointer :: sbprms
- character(len=*) , intent(in) :: basename
- character(len=*) , intent(in) :: data_basename
- character(len=*) , intent(in) :: an_name
- integer          , intent(in) :: ia
- character(len=*) , intent(in) :: out_frmt
- character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
- logical , intent(in) :: all_comp
- integer , intent(in) :: an_start , an_end , an_step
- logical, intent(in) :: average
+                      out_frmt, components_names, all_comp, an_start, an_end, &
+                      an_step, average )
+  type(t_parse), pointer                                   :: sbprms
+  character(len=*) , intent(in)                            :: basename
+  character(len=*) , intent(in)                            :: data_basename
+  character(len=*) , intent(in)                            :: an_name
+  integer          , intent(in)                            :: ia
+  character(len=*) , intent(in)                            :: out_frmt
+  character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
+  logical , intent(in)                                     :: all_comp
+  integer , intent(in)                                     :: an_start , an_end , an_step
+  logical, intent(in)                                      :: average
 
- type(t_geo_component), allocatable :: comps(:)
- character(len=max_char_len) :: filename
- integer(h5loc) :: floc , ploc
- real(wp), allocatable :: points(:,:)
- integer :: nelem
-
- real(wp) :: time
-
- integer :: fid_out, fid_time
-
- integer :: i_comp, ie, ierr
-
- real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
- real(wp), allocatable :: refs_G(:,:,:), refs_f(:,:)
- real(wp), allocatable :: vort(:), press(:), surfvel(:,:)
-
- integer :: it, ires, imult
- real(wp) :: t
- logical :: mult, isopen
- character(len=max_char_len) :: comp_root, last_mult, compname
- character(len=*), parameter :: this_sub_name='post_aeroacoustics'
+  type(t_geo_component), allocatable  :: comps(:)
+  character(len=max_char_len)         :: filename
+  integer(h5loc)                      :: floc , ploc
+  real(wp), allocatable               :: points(:,:)
+  integer                             :: nelem
+  real(wp)                            :: time
+  integer                             :: fid_out, fid_time
+  integer                             :: i_comp, ie, ierr
+  real(wp), allocatable               :: refs_R(:,:,:), refs_off(:,:)
+  real(wp), allocatable               :: refs_G(:,:,:), refs_f(:,:)
+  real(wp), allocatable               :: vort(:), press(:), surfvel(:,:)
+  integer                             :: it, ires, imult
+  real(wp)                            :: t
+  logical                             :: mult, isopen
+  character(len=max_char_len)         :: comp_root, last_mult, compname
+  character(len=*), parameter         :: this_sub_name='post_aeroacoustics'
 
   write(msg,'(A,I0,A)') nl//'++++++++++ Analysis: ',ia,' aeroacoustics'//nl
   call printout(trim(msg))
@@ -144,7 +139,7 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
   call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
 
   call load_components_postpro(comps, points, nelem, floc, &
-                               components_names, all_comp)
+                                components_names, all_comp)
 
   call close_hdf5_file(floc)
 
@@ -183,7 +178,7 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
 
     ! Move the points
     call update_points_postpro(comps, points, refs_R, refs_off, refs_G, refs_f, &
-                               filen = trim(filename) )
+                                filen = trim(filename) )
 
     !Load the results
     call load_res(floc, comps, vort, press, t, surfvel)
@@ -205,7 +200,7 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
       endif
 
       if (.not. mult .or. &
-               (mult .and. (trim(comp_root) .ne. trim(last_mult) ))) then
+                (mult .and. (trim(comp_root) .ne. trim(last_mult) ))) then
         ! Output filename
         write(filename,'(A,I0,A)') trim(basename)//'_'//trim(an_name)//&
           '_'//trim(compname)//'-',it,'.dat'
@@ -227,9 +222,8 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
       do ie = 1,size(comp%el)
         !GFORTRAN BUG: the associate is much cleaner, but crashes gfortran 5.4
         !associate(el => comp%el(ie))
-        !call dat_out_aa( fid_out, el%cen, el%nor, el%ub, el%area, el%dforce )
         call dat_out_aa( fid_out, comp%el(ie)%cen, comp%el(ie)%nor, &
-           comp%el(ie)%ub, comp%el(ie)%area, comp%el(ie)%dforce )
+                comp%el(ie)%ub, comp%el(ie)%area, comp%el(ie)%dforce )
         !end associate
       enddo
     end associate
@@ -239,8 +233,6 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
       !close the file
       close(fid_out)
     endif
-
-
 
     deallocate(refs_R, refs_off, refs_G, refs_f)
 
@@ -266,15 +258,14 @@ end subroutine post_aeroacoustics
 ! ----------------------------------------------------------------------
 
 function is_multiple(comp_name, name_root, imult) result(ismult)
- character(len=*), intent(in) :: comp_name
- character(len=max_char_len), intent(out) :: name_root
- integer, intent(out) :: imult
- logical :: ismult
+  character(len=*), intent(in)             :: comp_name
+  character(len=max_char_len), intent(out) :: name_root
+  integer, intent(out)                     :: imult
+  logical                                  :: ismult
 
- character(len=*), parameter :: nums='0123456789'
- character(len=*), parameter :: underscore='_'
- integer :: strlen, check
-
+  character(len=*), parameter              :: nums='0123456789'
+  character(len=*), parameter              :: underscore='_'
+  integer                                  :: strlen, check
 
   ismult = .false.
   strlen = len_trim(comp_name)

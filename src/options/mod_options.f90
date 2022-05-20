@@ -80,7 +80,7 @@ use MOD_ISO_VARYING_STRING, only: &
   !scan         , &
   !trim         , &
   !verify       , &
-  !var_str      , &
+  var_str      , &
   !get          , &
   !put          , &
   !put_line     , &
@@ -251,8 +251,12 @@ function nameequals(this, name)
  !< incoming name, which is compared with the name of this option
  character(len=*),intent(in) :: name
  logical            :: nameequals
-
-  nameequals = stricmp(this%name, name)
+ 
+  !nameequals = stricmp(this%name, name)
+  
+  ! compatibility with legacy naming convention 
+  nameequals = stricmp(char(Replace(var_str(this%name),"_","",Every=.true.)), &
+                      &char(Replace(var_str(name),"_","",Every=.true.)))
 
 end function nameequals
 

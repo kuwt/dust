@@ -6,7 +6,6 @@ project(Dust)
 LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 #BUG in CMake 3.7.x a policy error in find OpenMP raises unwanted warings
-#unless..
 if(POLICY CMP0012)
   cmake_policy(SET CMP0012 NEW)
 endif()
@@ -46,7 +45,6 @@ ENDIF()
 
 
 # =========== COMPILER ========================
-#SET(CMAKE_Fortran_COMPILER "/home/matteo/LocalUtils/gcc/install/bin/gfortran")
 
 find_package(OpenMP)
 if (OPENMP_FOUND)
@@ -79,34 +77,21 @@ ELSE()
 ENDIF()
 
 
-#LIBRARIES
-# +++++++++++++++++++
-
-## Libraries --------
-#find_library(PTHREAD_LIB pthread)
-#if(NOT PTHREAD_LIB)
-#  message(FATAL_ERROR "pthread library not found")
-#endif()
-## -lgfortran ???
-#
-#link_directories(/home/davide/Software/BLAS/lapack-3.7.0/lib)
-#link_directories(/home/davide/Software/BLAS/xianyi-OpenBLAS-bcfc298/lib)
-
-# +++++++++++++++++++
-
 #> Lapack -------------------------------------------------------
 OPTION(DUST_MKL "Use MKL libraries instead of BLAS/LAPACK" OFF)
 IF (DUST_MKL)
 #  SET(BLA_VENDOR "Intel") #search only for intel libraries
   find_package(MKL REQUIRED)
   LIST(APPEND incldirs ${MKL_INCLUDE_DIRS}) 
-  LIST(APPEND linkedlibs ${MKL_LIBRARIES} pthread dl)
+  #LIST(APPEND linkedlibs ${MKL_LIBRARIES} pthread dl)
+  LIST(APPEND linkedlibs "-Wl,--start-group" ${MKL_LIBRARIES} "-Wl,--end-group" pthread dl)
   IF(CMAKE_Fortran_COMPILER_ID MATCHES "Intel") 
     set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -mkl")
     set(CMAKE_Fortran_FLAGS_PROFILE "${CMAKE_Fortran_FLAGS_PROFILE} -mkl")
     set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} -mkl")
   ENDIF() 
 ELSE()
+  SET(BLA_VENDOR "OpenBLAS")
   find_package(LAPACK REQUIRED)
   LIST(APPEND linkedlibs ${LAPACK_LIBRARIES})
 ENDIF()
@@ -141,8 +126,8 @@ execute_process(COMMAND
   OUTPUT_VARIABLE GIT_SHA1
   ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-configure_file("${PROJECT_SOURCE_DIR}/src/general/mod_version.f90.in" 
-               "${PROJECT_SOURCE_DIR}/src/general/mod_version.f90")
+configure_file( "${PROJECT_SOURCE_DIR}/src/general/mod_version.f90.in" 
+                "${PROJECT_SOURCE_DIR}/src/general/mod_version.f90")
 
 
 #add files
@@ -179,9 +164,7 @@ add_executable(dust_post  ${PROJECT_SOURCE_DIR}/src/dust_post.f90)
 add_dependencies(dust_post dustlib)
 target_link_libraries(dust_post  dustlib ${linkedlibs})
 
+# only for testing pipline! 
 install(TARGETS dust dust_pre dust_post DESTINATION bin)
 
-#add_executable(dust_potential_test  ${PROJECT_SOURCE_DIR}/src/dust_potential_test.f90)
-#add_dependencies(dust_potential_test dustlib)
-#target_link_libraries(dust_potential_test dustlib ${linkedlibs})
 

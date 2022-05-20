@@ -75,10 +75,10 @@ use mod_surfpan, only: &
   initialize_surfpan
 
 use mod_vortline, only: &
- initialize_vortline
+  initialize_vortline
 
 use mod_vortpart, only: &
- initialize_vortpart
+  initialize_vortpart
 
 use mod_parse, only: &
   t_parse, &
@@ -93,17 +93,17 @@ use mod_build_geo, only: &
 
 use mod_hdf5_io, only: &
   initialize_hdf5, destroy_hdf5, &
-   h5loc, &
-   new_hdf5_file, &
-   open_hdf5_file, &
-   close_hdf5_file, &
-   new_hdf5_group, &
-   open_hdf5_group, &
-   close_hdf5_group, &
-   write_hdf5, &
-   read_hdf5, &
-   read_hdf5_al, &
-   check_dset_hdf5
+  h5loc, &
+  new_hdf5_file, &
+  open_hdf5_file, &
+  close_hdf5_file, &
+  new_hdf5_group, &
+  open_hdf5_group, &
+  close_hdf5_group, &
+  write_hdf5, &
+  read_hdf5, &
+  read_hdf5_al, &
+  check_dset_hdf5
 
 use mod_stringtools, only: &
   LowCase, isInList, stricmp
@@ -142,7 +142,7 @@ use mod_post_flowfield, only: &
   post_flowfield
 
 use mod_post_integral, only: &
-  post_integral
+  post_integral, post_hinge_loads
 
 use mod_post_sectional, only: &
   post_sectional
@@ -153,24 +153,26 @@ use mod_post_aa, only: &
 implicit none
 
 !Input
-character(len=*), parameter :: input_file_name_def = 'dust_post.in'
-character(len=max_char_len) :: input_file_name
+character(len=*), parameter               :: input_file_name_def = 'dust_post.in'
+character(len=max_char_len)               :: input_file_name
 
 !Geometry parameters
-type(t_parse) :: prms
-type(t_parse), pointer :: sbprms , bxprms
-
-integer :: n_analyses, ia
-character(len=max_char_len) :: basename, data_basename
-character(len=max_char_len) :: an_name, an_type
-integer :: an_start, an_end, an_step
-integer :: n_comp, i_comp
-character(len=max_char_len), allocatable :: components_names(:)
-character(len=max_char_len), allocatable :: var_names(:)
-character(len=max_char_len) :: lowstr
-character(len=max_char_len) :: out_frmt
-logical :: all_comp
-logical :: average
+type(t_parse)                             :: prms
+type(t_parse), pointer                    :: sbprms , bxprms
+integer                                   :: n_analyses, ia             
+character(len=max_char_len)               :: basename, data_basename
+character(len=max_char_len)               :: an_name, an_type
+integer                                   :: an_start, an_end, an_step
+integer                                   :: n_comp, i_comp 
+integer                                   :: n_hinge, i_hinge
+character(len=max_char_len), allocatable  :: hinge_tag(:)
+character(len=max_char_len), allocatable  :: components_names(:)
+character(len=max_char_len), allocatable  :: var_names(:)
+character(len=max_char_len)               :: lowstr
+character(len=max_char_len)               :: out_frmt
+logical                                   :: all_comp
+logical                                   :: all_hinge
+logical                                   :: average
 
 call printout(nl//'>>>>>> DUST POSTPROCESSOR beginning >>>>>>'//nl)
 call initialize_hdf5()
@@ -183,81 +185,89 @@ else
   input_file_name = input_file_name_def
 endif
 
+call printout(nl//'Reading input parameters from file "'//&
+                trim(input_file_name)//'"'//nl)
+
 call prms%CreateStringOption('basename','Base name of the processed data')
 call prms%CreateStringOption('data_basename','Base name of the data to be &
                               &processed')
 
-call prms%CreateRealOption( 'FarFieldRatioDoublet', &
+call prms%CreateRealOption( 'far_field_ratio_doublet', &
       "Multiplier for far field threshold computation on doublet", '10.0')
-call prms%CreateRealOption( 'FarFieldRatioSource', &
+call prms%CreateRealOption( 'far_field_ratio_source', &
       "Multiplier for far field threshold computation on sources", '10.0')
-call prms%CreateRealOption( 'DoubletThreshold', &
+call prms%CreateRealOption( 'doublet_threshold', &
       "Thresold for considering the point in plane in doublets", '1.0e-6')
-call prms%CreateRealOption( 'RankineRad', &
+call prms%CreateRealOption( 'rankine_rad', &
       "Radius of Rankine correction for vortex induction near core", '0.1')
-call prms%CreateRealOption( 'VortexRad', &
+call prms%CreateRealOption( 'vortex_rad', &
       "Radius of vortex core, for particles", '0.1')
-call prms%CreateRealOption( 'CutoffRad', &
+call prms%CreateRealOption( 'cutoff_rad', &
       "Radius of complete cutoff  for vortex induction near core", '0.001')
 
-call prms%CreateSubOption('Analysis','Definition of the motion of a frame', &
+call prms%CreateSubOption('analysis','Definition of the motion of a frame', &
                           sbprms, multiple=.true.)
-call sbprms%CreateStringOption('Type','type of analysis')
-call sbprms%CreateStringOption('Name','specification of the analysis')
-call sbprms%CreateIntOption('StartRes', 'Starting result of the analysis')
-call sbprms%CreateIntOption('EndRes', 'Final result of the analysis')
-call sbprms%CreateIntOption('StepRes', 'Result stride of the analysis')
-call sbprms%CreateLogicalOption('Average', 'Perform time averaging','F')
-call sbprms%CreateLogicalOption('Wake', 'Output also the wake for &
+call sbprms%CreateStringOption('type','type of analysis')
+call sbprms%CreateStringOption('name','specification of the analysis')
+call sbprms%CreateIntOption('start_res', 'Starting result of the analysis')
+call sbprms%CreateIntOption('end_res', 'Final result of the analysis')
+call sbprms%CreateIntOption('step_res', 'Result stride of the analysis')
+call sbprms%CreateLogicalOption('average', 'Perform time averaging','F')
+call sbprms%CreateLogicalOption('wake', 'Output also the wake for &
                                 &visualization','T')
-call sbprms%CreateLogicalOption('SeparateWake', 'Output the wake in a separate &
+call sbprms%CreateLogicalOption('separate_wake', 'Output the wake in a separate &
                                 &way','F')
-call sbprms%CreateStringOption('Format','Output format')
-call sbprms%CreateStringOption('Component','Component to analyse', &
-                               multiple=.true.)
-call sbprms%CreateStringOption('Variable','Variables to be saved: velocity, pressure or&
+call sbprms%CreateStringOption('format','Output format')
+call sbprms%CreateStringOption('component','Component to analyse', &
+                              multiple=.true.)
+call sbprms%CreateStringOption('hinge_tag','Hinge to analyse', &
+                              multiple=.true.)                              
+call sbprms%CreateStringOption('variable','Variables to be saved: velocity, pressure or&
                               & vorticity', multiple=.true.)
 
 ! probe output -------------
 call sbprms%CreateStringOption('InputType','How to specify probe coordinates',&
                               multiple=.true.)
-call sbprms%CreateRealArrayOption('Point','Point coordinates in dust_post.in',&
+call sbprms%CreateRealArrayOption('point','Point coordinates in dust_post.in',&
                               multiple=.true.)
-call sbprms%CreateStringOption('File','File containing the coordinates of the probes',&
+call sbprms%CreateStringOption('file','File containing the coordinates of the probes',&
                               multiple=.true.)
 ! flow field output --------
-call sbprms%CreateIntArrayOption( 'Nxyz','number of points per coordinate',&
+call sbprms%CreateIntArrayOption( 'n_xyz','number of points per coordinate',&
                               multiple=.true.)
-call sbprms%CreateRealArrayOption('Minxyz','lower bounds of the box',&
+call sbprms%CreateRealArrayOption('min_xyz','lower bounds of the box',&
                               multiple=.true.)
-call sbprms%CreateRealArrayOption('Maxxyz','upper bounds of the box',&
+call sbprms%CreateRealArrayOption('max_xyz','upper bounds of the box',&
                               multiple=.true.)
 ! loads --------------------
-call sbprms%CreateStringOption('CompName','Components where loads are computed',&
+call sbprms%CreateStringOption('comp_name','Components where loads are computed',&
                               multiple=.true.)
-call sbprms%CreateStringOption('Reference_Tag','Reference frame where loads&
+call sbprms%CreateStringOption('reference_tag','Reference frame where loads&
                             & are computed',multiple=.true.)
 ! sectional loads ----------
-call sbprms%CreateRealArrayOption('AxisDir','Direction of the axis defined the reference&
+call sbprms%CreateRealArrayOption('axis_dir','Direction of the axis defined the reference&
                             & points for sectional loads analisys', multiple=.true.)
-call sbprms%CreateRealArrayOption('AxisNod','Node belonging to the axis used for sectional&
+call sbprms%CreateRealArrayOption('axis_nod','Node belonging to the axis used for sectional&
                             & loads analisys', multiple=.true.)
-call sbprms%CreateLogicalOption('LiftingLineData', 'Output lifting line data&
-                                 & alongside sectional loads','F')
+call sbprms%CreateLogicalOption('lifting_line_data', 'Output lifting line data&
+                            & alongside sectional loads','F')
+call sbprms%CreateLogicalOption('vortex_lattice_data', 'Output of corrected vortex lattice data&
+                            & alongside sectional loads','F')
+
 ! sectional loads: box -----
-call sbprms%CreateSubOption('BoxSect','Definition of the box for sectional loads', &
+call sbprms%CreateSubOption('box_sect','Definition of the box for sectional loads', &
                           bxprms)
-call bxprms%CreateRealArrayOption('refNode','reference node to build the box')
-call bxprms%CreateRealArrayOption('faceVec','vector identifying the direction of the base side &
-                           &of the sections')
-call bxprms%CreateRealArrayOption('faceBas','dimension along faceVec of the first and last sections')
-call bxprms%CreateRealArrayOption('faceHei','dimension orthogonal to faceVec of the first and last sections')
-call bxprms%CreateRealArrayOption('spanVec','vector defining the out-of plane direction of the box')
-call bxprms%CreateRealOption('spanLen','dimension along the spanVec direction')
-call bxprms%CreateIntOption('numSect','number of sections')
-call bxprms%CreateLogicalOption('reshapeBox','logical input to reshape the box if &
-                           &it is "too large"')
-call sbprms%CreateRealArrayOption('AxisMom','axis for the computation of the moment. Perpendicular to sections')
+call bxprms%CreateRealArrayOption('ref_node','reference node to build the box')
+call bxprms%CreateRealArrayOption('face_vec','vector identifying the direction of the base side &
+                          &of the sections')
+call bxprms%CreateRealArrayOption('face_bas','dimension along faceVec of the first and last sections')
+call bxprms%CreateRealArrayOption('face_hei','dimension orthogonal to faceVec of the first and last sections')
+call bxprms%CreateRealArrayOption('span_vec','vector defining the out-of plane direction of the box')
+call bxprms%CreateRealOption('span_len','dimension along the spanVec direction')
+call bxprms%CreateIntOption('num_sect','number of sections')
+call bxprms%CreateLogicalOption('reshape_box','logical input to reshape the box if &
+                          &it is "too large"')
+call sbprms%CreateRealArrayOption('axis_mom','axis for the computation of the moment. Perpendicular to sections')
 
 sbprms=>null()
 
@@ -267,48 +277,50 @@ call prms%read_options(input_file_name, printout_val=.false.)
 basename = getstr(prms,'basename')
 data_basename = getstr(prms,'data_basename')
 
-sim_param%FarFieldRatioDoublet  = getreal(prms, 'FarFieldRatioDoublet')
-sim_param%FarFieldRatioSource  = getreal(prms, 'FarFieldRatioSource')
-sim_param%DoubletThreshold   = getreal(prms, 'DoubletThreshold')
-sim_param%RankineRad = getreal(prms, 'RankineRad')
-sim_param%VortexRad = getreal(prms, 'VortexRad')
-sim_param%CutoffRad  = getreal(prms, 'CutoffRad')
+sim_param%FarFieldRatioDoublet  = getreal(prms, 'far_field_ratio_doublet')
+sim_param%FarFieldRatioSource  = getreal(prms, 'far_field_ratio_source')
+sim_param%DoubletThreshold   = getreal(prms, 'doublet_threshold')
+sim_param%RankineRad = getreal(prms, 'rankine_rad')
+sim_param%VortexRad = getreal(prms, 'vortex_rad')
+sim_param%CutoffRad  = getreal(prms, 'cutoff_rad')
 
-call initialize_doublet();
+call initialize_doublet()
 call initialize_surfpan()
 call initialize_vortline()
-call initialize_vortpart()
 
 n_analyses = countoption(prms,'Analysis')
 
-!Check that the basenames are valid
+!> Check that the basenames are valid
 call check_basename(trim(basename),'dust postprocessor')
 call check_basename(trim(data_basename),'dust postprocessor')
 
-!Cycle on all the analyses
-do ia = 1,n_analyses
+!> Cycle on all the analyses
+do ia = 1, n_analyses
 
-  !Get general parameter for the analysis
+  !> Get general parameter for the analysis
   call getsuboption(prms,'Analysis',sbprms)
-  an_type  = getstr(sbprms,'Type')
+  an_type  = getstr(sbprms,'type')
+  
   call LowCase(an_type)
-  an_name  = getstr(sbprms,'Name')
-  out_frmt = getstr(sbprms,'Format')
+  an_name  = getstr(sbprms,'name')
+  out_frmt = getstr(sbprms,'format')
+  
   call LowCase(out_frmt)
-  an_start = getint(sbprms,'StartRes')
-  an_end   = getint(sbprms,'EndRes')
-  an_step  = getint(sbprms,'StepRes')
-  average  = getlogical(sbprms, 'Average')
+  an_start = getint(sbprms,'start_res')
+  an_end   = getint(sbprms,'end_res')
+  an_step  = getint(sbprms,'step_res')
+  average  = getlogical(sbprms, 'average')
 
-  !Check if we are analysing all the components or just some
+  !> Check if we are analysing all the components or just some
   all_comp = .false.
   n_comp = countoption(sbprms, 'Component')
+
   if (n_comp .eq. 0)  then
     all_comp = .true.
   else
     allocate(components_names(n_comp))
     do i_comp = 1, n_comp
-      components_names(i_comp) = getstr(sbprms, 'Component')
+      components_names(i_comp) = getstr(sbprms, 'component')
     enddo
     call LowCase(components_names(1),lowstr)    ! char
     if(trim(lowstr) .eq. 'all') then
@@ -318,56 +330,73 @@ do ia = 1,n_analyses
     endif
   endif
 
-  !Fork the different kind of analyses
+  if (trim(an_type) .eq. 'hinge_loads') then 
+    all_hinge = .false. 
+    n_hinge = countoption(sbprms, 'HingeTag')
+    if (n_hinge .eq. 0)  then
+      all_hinge = .true.
+    else
+      allocate(hinge_tag(n_hinge))
+      do i_hinge = 1, n_hinge
+        hinge_tag(i_hinge) = getstr(sbprms, 'hinge_tag')
+      enddo
+      call LowCase(hinge_tag(1), lowstr)    ! char
+      if(trim(lowstr) .eq. 'all') then
+        all_hinge = .true.
+        n_hinge = 0
+        deallocate(hinge_tag)
+      endif
+    endif
+  endif 
+
+  !> Fork the different kind of analyses
   select case( trim(an_type) )
 
-   ! Integral Loads
-   case('integral_loads')
-  ! if ( trim(an_type) .eq. 'integral_loads' ) then
-
-    ! look in mod_post_integral
-    call post_integral( sbprms , basename , data_basename , an_name , ia , &
-                        out_frmt , components_names , all_comp , &
-                        an_start , an_end , an_step, average )
-
-   ! Visualizations
-   case('viz')
-
-    call post_viz( sbprms , basename , data_basename , an_name , ia , &
-                   out_frmt , components_names , all_comp , &
-                   an_start , an_end , an_step, average )
-
-   ! Domain probes
-   case('probes')
-
-    call post_probes( sbprms , basename , data_basename , an_name , ia , &
-                      out_frmt , components_names , all_comp , &
-                      an_start , an_end , an_step )
-
-   ! Flow Field
-   case('flow_field')
-
-    call post_flowfield ( sbprms , basename , data_basename , an_name , ia , &
-                          out_frmt , components_names , all_comp , &
-                          an_start , an_end , an_step, average)
-
-   ! Sectional Loads
-   case('sectional_loads')
-
-    call post_sectional ( sbprms , bxprms , basename , data_basename , an_name , ia , &
+    !> Integral Loads
+    case('integral_loads')
+      call post_integral( sbprms , basename , data_basename , an_name , ia , &
                           out_frmt , components_names , all_comp , &
                           an_start , an_end , an_step, average )
 
-   ! Aeroacoustics
-   case('aeroacoustics')
+    !> Hinge Moment
+    case('hinge_loads')
+      call post_hinge_loads( sbprms , basename , data_basename , an_name , ia , &
+                          out_frmt , components_names,  all_comp, hinge_tag, all_hinge,   &
+                          an_start , an_end , an_step, average )
 
-    call post_aeroacoustics ( sbprms, basename, data_basename, &
-                              an_name, ia, out_frmt, components_names, &
-                              all_comp, an_start, an_end, an_step, average )
-   case default
-! else
-    call error('dust_post','','Unknown type of analysis: '//trim(an_type))
-! end if
+    !> Visualizations
+    case('viz')
+      call post_viz( sbprms , basename , data_basename , an_name , ia , &
+                    out_frmt , components_names , all_comp , &
+                    an_start , an_end , an_step, average )
+
+    !> Domain probes
+    case('probes')
+      call post_probes( sbprms , basename , data_basename , an_name , ia , &
+                      out_frmt , components_names , all_comp , &
+                      an_start , an_end , an_step )
+
+    !> Flow Field
+    case('flow_field')
+      call post_flowfield ( sbprms , basename , data_basename , an_name , ia , &
+                          out_frmt , components_names , all_comp , &
+                          an_start , an_end , an_step, average)
+
+    !> Sectional Loads
+    case('sectional_loads')
+      call post_sectional ( sbprms , bxprms , basename , data_basename , an_name , ia , &
+                          out_frmt , components_names , all_comp , &
+                          an_start , an_end , an_step, average )
+
+    !> Aeroacoustics
+    case('aeroacoustics')
+      call post_aeroacoustics ( sbprms, basename, data_basename, &
+                                an_name, ia, out_frmt, components_names, &
+                                all_comp, an_start, an_end, an_step, average )
+
+    case default
+
+      call error('dust_post','','Unknown type of analysis: '//trim(an_type))
   end select
 
   if(allocated(var_names)) deallocate(var_names)
@@ -380,20 +409,6 @@ enddo !analysis
 call destroy_hdf5()
 call printout(nl//'<<<<<< DUST POSTPROCESSOR end       <<<<<<'//nl)
 
-!----------------------------------------------------------------------
-!----------------------------------------------------------------------
-! contains
-!----------------------------------------------------------------------
-!----------------------------------------------------------------------
-!
-! moved to ./post/mod_post_load.f90
-!
-! subroutine load_refs(floc, refs_R, refs_off, refs_G, refs_f, refs_tag)
-! subroutine load_res(floc, comps, vort, press, t)
-! subroutine load_wake_pan(floc, wpoints, wstart, wvort)
-! subroutine load_wake_ring(floc, wpoints, wconn, wvort)
-! subroutine load_wake_viz(floc, wpoints, welems, wvort)
-!
 !----------------------------------------------------------------------
 
 end program dust_post

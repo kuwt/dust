@@ -1,9 +1,9 @@
 
-MeshFile = ./robin-b.cgns
-MeshFileType = cgns 
-ElType = p
-ScalingFactor = 0.001
+mesh_file = ./robin-b.cgns
+mesh_file_type = cgns 
+el_type = p
+scaling_factor = 0.001
 
-TolSewing = 0.00001
-InnerProductTe = -0.5
+tol_se_wing = 0.00001
+inner_product_te = -0.5
 

@@ -106,19 +106,19 @@ use mod_handling, only: &
 !-----------------------------------------------------------------------
  !Interfaces
 
- interface write_hdf5
-  module procedure write_string_hdf5, &
-                   write_1d_string_hdf5, &
-                   write_2d_string_hdf5, &
-                   write_int_hdf5, &
-                   write_1d_int_hdf5, &
-                   write_2d_int_hdf5, &
-                   write_3d_int_hdf5, &
-                   write_real_hdf5, &
-                   write_1d_real_hdf5, &
-                   write_2d_real_hdf5, &
-                   write_3d_real_hdf5
- end interface
+   interface write_hdf5
+   module procedure write_string_hdf5, &
+                     write_1d_string_hdf5, &
+                     write_2d_string_hdf5, &
+                     write_int_hdf5, &
+                     write_1d_int_hdf5, &
+                     write_2d_int_hdf5, &
+                     write_3d_int_hdf5, &
+                     write_real_hdf5, &
+                     write_1d_real_hdf5, &
+                     write_2d_real_hdf5, &
+                     write_3d_real_hdf5
+   end interface
 
  interface write_hdf5_attr
   module procedure write_1d_int_hdf5_attr, &
@@ -241,15 +241,21 @@ contains
 subroutine new_hdf5_file(filename, file_id)
  character(len=*), intent(in) :: filename
  integer(HID_T), intent(out)   :: file_id
+ integer :: err_setting
 
  character(len=*), parameter :: &
     this_sub_name = 'new_hdf5_file'
  integer :: h5err
-
+  
+  err_setting = 0
+  call h5eset_auto_f(err_setting, h5err)
   call h5Fcreate_f (filename, H5F_ACC_TRUNC_F, file_id, h5err)
   if(h5err<0) call error(this_mod_name,this_sub_name, &
                           'Problems creating hdf5 file '//filename)
 
+  err_setting=1
+  call h5eset_auto_f(err_setting, h5err)
+  
 end subroutine new_hdf5_file
 
 !-----------------------------------------------------------------------
@@ -258,15 +264,20 @@ end subroutine new_hdf5_file
 subroutine open_hdf5_file(filename, file_id)
  character(len=*), intent(in) :: filename
  integer(HID_T), intent(out)   :: file_id
-
+ 
  character(len=*), parameter :: &
     this_sub_name = 'open_hdf5_file'
  integer :: h5err
-
+ integer :: err_setting
+ 
+  err_setting = 0
+  call h5eset_auto_f(err_setting, h5err)
   call h5Fopen_f (filename, H5F_ACC_RDWR_F, file_id, h5err)
   if(h5err<0) call error(this_mod_name,this_sub_name, &
                              'Problems opening hdf5 file '//filename)
-
+  err_setting=1
+  call h5eset_auto_f(err_setting, h5err)
+  
 end subroutine open_hdf5_file
 
 !-----------------------------------------------------------------------

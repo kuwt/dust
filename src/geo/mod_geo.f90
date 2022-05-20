@@ -74,9 +74,6 @@ use mod_cgns_io, only: &
 use mod_parametric_io, only: &
   read_mesh_parametric
 
-!use mod_aero_elements, only: &
-!  c_elem, t_elem_p
-
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p
@@ -86,6 +83,9 @@ use mod_surfpan, only: &
 
 use mod_vortlatt, only: &
   t_vortlatt
+
+use mod_stripe, only: &
+  t_stripe 
 
 use mod_liftlin, only: &
   t_liftlin, t_liftlin_p
@@ -100,8 +100,7 @@ use mod_math, only: &
   cross
 
 use mod_reference, only: &
-  t_ref, build_references, update_all_references, destroy_references   ! , &
-! update_relative_initial_conditions
+  t_ref, build_references, update_all_references, destroy_references  
 
 use mod_hinges, only: &
   t_hinge, initialize_hinge_config
@@ -152,102 +151,117 @@ private
 !! It also contains some temporary arrays employed during geometry generation
 type :: t_geo_component
 
- !> Element type
- character(len=max_char_len) :: comp_el_type
+  !> Element type
+  character(len=max_char_len) :: comp_el_type
 
- !> Name of the component
- character(len=max_char_len) :: comp_name
+  !> Name of the component
+  character(len=max_char_len) :: comp_name
 
- !> Type of input: basic, cgns, parametric
- character(len=max_char_len) :: comp_input
+  !> Type of input: basic, cgns, parametric
+  character(len=max_char_len) :: comp_input
 
- !> Coupling w/ external structural code: .true., .false.
- logical :: coupling
+  !> Coupling w/ external structural code: .true., .false.
+  logical :: coupling
 
- !> Coupling type: 'll', 'rigid', 'rbf'
- character(len=max_char_len) :: coupling_type
+  !> Coupling type: 'll', 'rigid', 'rbf'
+  character(len=max_char_len) :: coupling_type
 
- !> Coupling node: local coordinates (in the component local ref.frame)
- ! of the coupling node (why initilized?)
- real(wp) :: coupling_node(3) = 0.0_wp
+  !> Coupling node: local coordinates (in the component local ref.frame)
+  ! of the coupling node (why initilized?)
+  real(wp) :: coupling_node(3) = 0.0_wp
 
- !> Coupling node orientation: orientation of the coupling node, w.r.t.
- ! the local ref.rame of the geometrical component (why initialized?)
- real(wp) :: coupling_node_rot(3,3) = 0.0_wp
-
-#if USE_PRECICE
- type(t_precice_rbf) :: rbf
-#endif
-
- !> Id of the component (warning: not always defined)
- integer :: comp_id
-
- !> Number of elements of the component
- integer :: nelems
-
- !> Elements of the group
- !! The main memory allocation happens here, they will be pointed from
- !! somewhere else
- class(c_pot_elem), allocatable :: el(:)
-
- !> Global indexes of the points in the component
- integer, allocatable :: i_points(:)
+  !> Coupling node orientation: orientation of the coupling node, w.r.t.
+  ! the local ref.rame of the geometrical component (why initialized?)
+  real(wp) :: coupling_node_rot(3,3) = 0.0_wp
 
 #if USE_PRECICE
- !> Global PreCICE indices of the points for coupling
- integer, allocatable :: i_points_precice(:)
+  type(t_precice_rbf) :: rbf
 #endif
 
- !> Reference frame tag
- character(len=max_char_len) :: ref_tag
+  !> Id of the component (warning: not always defined)
+  integer :: comp_id
 
- ! Reference frame id
- integer :: ref_id
+  !> Number of elements of the component
+  integer :: nelems
 
- !> Points in local reference frame
- real(wp), allocatable :: loc_points(:,:)
+  !> Number of elements in chord
+  integer :: n_c
 
- !> Number of surface panels in the component
- integer :: nSurfPan
- !> Number of vortex rings in the component
- integer :: nVortRin
- !> Number of lifting line elements in the component
- integer :: nLiftLin
- !> Number of lifting line ele
- integer :: nActDisk
+  !> Number of elements in span
+  integer :: n_s
 
- !> Is the component moving?
- logical :: moving
 
- !> Arrays for lifting line components
- character(len=max_char_len), allocatable :: airfoil_list(:)
- !> Number of ll elements in each region. Size(nelem_span_list) = nRegions
- integer, allocatable :: nelem_span_list(:)
- !> Normalised coordinate of sections in each wing region.
- !! Size(...) = nRegions+1
- real(wp),allocatable :: normalised_coord_e(:,:)
- !> twist angle for flat elements
- real(wp),allocatable :: theta_e(:)
- !> Id of the airfoil elements (index in airfoil_list char array)
- integer ,allocatable :: i_airfoil_e(:,:)
+  !> Elements of the group
+  !! The main memory allocation happens here, they will be pointed from
+  !! somewhere else
+  class(c_pot_elem), allocatable :: el(:)
+
+  !> Global indexes of the points in the component
+  integer, allocatable :: i_points(:)
 
 #if USE_PRECICE
- !> Chord vector reference, required to assign the motion ot the
- ! TE of a deformable LL element, knowing the LE motion
- real(wp), allocatable :: c_ref_p(:,:)
- !> "Chord" vector reference, referred to the center of the elements
- real(wp), allocatable :: c_ref_c(:,:)
- !> x_ac offset for LL
- real(wp), allocatable :: xac(:)
+  !> Global PreCICE indices of the points for coupling
+  integer, allocatable :: i_points_precice(:)
+
+
+
 #endif
 
- !> Hinges
- integer :: n_hinges
- type(t_hinge), allocatable :: hinge(:)
+  !> Reference frame tag
+  character(len=max_char_len) :: ref_tag
+
+  ! Reference frame id
+  integer :: ref_id
+
+  !> Points in local reference frame
+  real(wp), allocatable :: loc_points(:,:) 
+  real(wp), allocatable :: loc_cen(:,:) 
+  real(wp), allocatable :: loc_ctr_pt(:,:) 
+  
+  !> Number of surface panels in the component
+  integer :: nSurfPan
+  !> Number of vortex rings in the component
+  integer :: nVortRin
+  !> Number of lifting line elements in the component
+  integer :: nLiftLin
+  !> Number of lifting line ele
+  integer :: nActDisk
+
+  !> Is the component moving?
+  logical :: moving
+
+  !> Arrays for lifting line components
+  character(len=max_char_len), allocatable :: airfoil_list(:)
+  !> Number of ll elements in each region. Size(nelem_span_list) = nRegions
+  integer, allocatable :: nelem_span_list(:)
+  !> Normalised coordinate of sections in each wing region.
+  !! Size(...) = nRegions+1
+  real(wp),allocatable :: normalised_coord_e(:,:)
+  !> twist angle for flat elements
+  real(wp),allocatable :: theta_e(:)
+  !> Id of the airfoil elements (index in airfoil_list char array)
+  integer ,allocatable :: i_airfoil_e(:,:)
+  character(len=5) :: aero_correction
+  real(wp), allocatable :: curv_ac(:,:)
+  type(t_stripe), allocatable :: stripe(:)
+
+#if USE_PRECICE
+  !> Chord vector reference, required to assign the motion ot the
+  ! TE of a deformable LL element, knowing the LE motion
+  real(wp), allocatable :: c_ref_p(:,:)
+  !> "Chord" vector reference, referred to the center of the elements
+  real(wp), allocatable :: c_ref_c(:,:)
+  !> x_ac offset for LL
+  real(wp), allocatable :: xac(:)
+#endif
+
+  !> Hinges
+  integer :: n_hinges
+  type(t_hinge), allocatable :: hinge(:)
 
 
- !> Dimensions of parametric elements only
- integer :: parametric_nelems_span , parametric_nelems_chor
+  !> Dimensions of parametric elements only
+  integer :: parametric_nelems_span , parametric_nelems_chor
 
 end type  t_geo_component
 
@@ -260,64 +274,54 @@ end type  t_geo_component
 !! frames and all the points of the mesh
 type :: t_geo
 
- !> Total number of implicit elements
- integer :: nelem_impl
+  !> Total number of implicit elements
+  integer :: nelem_impl
 
- !> Number of lifting line elements
- !integer :: nll
+  !> Number of explicit elements
+  integer :: nelem_expl
 
- !> Number of actuator disk elements
- !integer :: nad
+  !> Number of surface panel elements
+  integer :: nSurfPan
+  !> Number of vortex ring elements
+  integer :: nVortLatt
+  !> Number of lifting line elements
+  integer :: nLiftLin
+  !> Number of Actuator disk elements
+  integer :: nActDisk
 
- !> Number of explicit elements
- integer :: nelem_expl
+  ! Only for implicit elements (for slicing)
+  !> Global id of surface panel elements
+  integer, allocatable :: idSurfPan(:)
+  !> Global id of vortex ring elements
+  integer, allocatable :: idVortLatt(:)
+  !> Surfpan id of global surface panel elements (G2L: global to local)
+  integer, allocatable :: idSurfPanG2L(:)
 
- !> Number of surface panel elements
- integer :: nSurfPan
- !> Number of vortex ring elements
- integer :: nVortLatt
- !> Number of lifting line elements
- integer :: nLiftLin
- !> Number of Actuator disk elements
- integer :: nActDisk
+  !> Number of statical implicit elements
+  integer :: nstatic_impl
+  !> Number of moving implicit elements
+  integer :: nmoving_impl
 
- ! Only for implicit elements (for slicing)
- !> Global id of surface panel elements
- integer, allocatable :: idSurfPan(:)
- !> Global id of vortex ring elements
- integer, allocatable :: idVortLatt(:)
-!!> Global id of lifting line elements
-!integer, allocatable :: idLiftLin(:)
-!!> Global id of actuator disk elements
-!integer, allocatable :: idActDisk(:)
- !> Surfpan id of global surface panel elements (G2L: global to local)
- integer, allocatable :: idSurfPanG2L(:)
+  !> Number of statical surfpan elements (for slicing)
+  integer :: nstatic_SurfPan
 
- !> Number of statical implicit elements
- integer :: nstatic_impl
- !> Number of moving implicit elements
- integer :: nmoving_impl
+  !> Number of static or moving lifting lines
+  integer :: nstatic_expl, nmoving_expl
 
- !> Number of statical surfpan elements (for slicing)
- integer :: nstatic_SurfPan
+  !> All the components of the geometry
+  type(t_geo_component), allocatable :: components(:)
 
- !> Number of static or moving lifting lines
- integer :: nstatic_expl, nmoving_expl
-
- !> All the components of the geometry
- type(t_geo_component), allocatable :: components(:)
-
- !> Points (element vertexes)
- real(wp), allocatable :: points(:,:)
+  !> Points (element vertexes)
+  real(wp), allocatable :: points(:,:)
 
 #if USE_PRECICE
- !> Velocity of the points (element vertexes), to be used by
- ! coupled components
- real(wp), allocatable :: points_vel(:,:)
+  !> Velocity of the points (element vertexes), to be used by
+  ! coupled components
+  real(wp), allocatable :: points_vel(:,:)
 #endif
 
- !> All the reference frames of the geometry
- type(t_ref), allocatable :: refs(:)
+  !> All the reference frames of the geometry
+  type(t_ref), allocatable :: refs(:)
 
 end type t_geo
 
@@ -329,41 +333,37 @@ end type t_geo
 
 type t_tedge
 
- !> Global id of the elements at the TE
- !integer , allocatable :: e(:,:)
- type(t_pot_elem_p), allocatable :: e(:,:)
+  !> Global id of the elements at the TE
+  type(t_pot_elem_p), allocatable :: e(:,:)
 
- !> Global id of the nodes on the TE
- integer , allocatable :: i(:,:)
+  !> Global id of the nodes on the TE
+  integer , allocatable           :: i(:,:)
 
- !> Coordinates of the nodes of the TE
- !real(wp), allocatable :: rr(:,:)
+  !> TE id of the nodes of the TE elements
+  integer , allocatable           :: ii(:,:)
 
- !> TE id of the nodes of the TE elements
- integer , allocatable :: ii(:,:)
+  !> TE id of neighboring TE elements
+  integer , allocatable           :: neigh(:,:)
 
- !> TE id of neighboring TE elements
- integer , allocatable :: neigh(:,:)
+  !> Relative orientation of the neighboring TE elements
+  integer , allocatable           :: o(:,:)
 
- !> Relative orientation of the neighboring TE elements
- integer , allocatable :: o(:,:)
+  !> Unit vector at TE nodes
+  real(wp), allocatable           :: t(:,:)
+  real(wp), allocatable           :: t_hinged(:,:) ! considering hinge deflection
+  integer, allocatable            :: is_hinged(:)
 
- !> Unit vector at TE nodes
- real(wp), allocatable :: t(:,:)
- real(wp), allocatable :: t_hinged(:,:) ! considering hinge deflection
- integer, allocatable :: is_hinged(:)
+  !> Reference frame of the TE nodes
+  integer , allocatable           :: ref(:)
 
- !> Reference frame of the TE nodes
- integer , allocatable :: ref(:)
+  !> Component of the TE
+  integer , allocatable           :: icomp(:)
 
- !> Component of the TE
- integer , allocatable :: icomp(:)
-
- !> Individual scaling for each component
- real(wp), allocatable :: scaling(:)
-
+  !> Individual scaling for each component
+  real(wp), allocatable           :: scaling(:)
 
 end type t_tedge
+
 
 !----------------------------------------------------------------------
 
@@ -396,41 +396,42 @@ contains
 !!    moving elements after, and in the total elements surface panels
 !!    and vortex rings before, then lifting lines and finally actuator disks
 subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
-                      te, elems_impl, elems_expl, elems_ad, elems_ll, &
-                      elems_tot, airfoil_data, target_file, run_id)
- character(len=*), intent(in) :: geo_file_name
- character(len=*), intent(inout) :: ref_file_name
- character(len=*), intent(in) :: in_file_name
- type(t_geo), intent(out), target :: geo
- type(t_impl_elem_p), allocatable, intent(out) :: elems_impl(:)
- type(t_expl_elem_p), allocatable, intent(out) :: elems_expl(:)
- type(t_expl_elem_p), allocatable, intent(out) :: elems_ad(:)
- !type(t_expl_elem_p), allocatable, intent(out) :: elems_ll(:)
- type(t_liftlin_p), allocatable, intent(out) :: elems_ll(:)
- type(t_pot_elem_p),  allocatable, intent(out) :: elems_tot(:)
- type(t_tedge), intent(out) :: te
- type(t_aero_tab) , allocatable, intent(out) :: airfoil_data(:)
- character(len=*), intent(in) :: target_file
- integer, intent(in)              :: run_id(10)
+                      te, elems_impl, elems_expl, elems_ad, elems_ll, elems_corr, &
+                      elems_non_corr, elems_tot, airfoil_data, target_file, run_id)
+  character(len=*),    intent(in)                    :: geo_file_name
+  character(len=*),    intent(inout)                 :: ref_file_name
+  character(len=*),    intent(in)                    :: in_file_name
+  type(t_geo),         intent(out), target           :: geo
+  type(t_impl_elem_p), allocatable, intent(out)      :: elems_impl(:)
+  type(t_expl_elem_p), allocatable, intent(out)      :: elems_expl(:)
+  type(t_expl_elem_p), allocatable, intent(out)      :: elems_ad(:)
+  type(t_liftlin_p),   allocatable, intent(out)      :: elems_ll(:)
+  type(t_pot_elem_p),  allocatable, intent(out)      :: elems_tot(:)
+  type(t_pot_elem_p),  allocatable, intent(out)      :: elems_corr(:)
+  type(t_pot_elem_p),  allocatable, intent(out)      :: elems_non_corr(:)
+  
+  type(t_tedge), intent(out)                         :: te
+  type(t_aero_tab) , allocatable, intent(out)        :: airfoil_data(:)
+  character(len=*), intent(in)                       :: target_file
+  integer, intent(in)                                :: run_id(10)
+  real(wp)                                           :: tstart
+  real(wp), allocatable                              :: cen(:,:)
+  real(wp), allocatable                              :: ctr_pt(:,:)
 
- real(wp)                     :: tstart
-
- integer :: i, j, is, im,  i_comp, i_ll, i_ad, i_tot, i_expl, i_impl
- type(t_impl_elem_p), allocatable :: temp_static_i(:), temp_moving_i(:)
- type(t_expl_elem_p), allocatable :: temp_static_e(:), temp_moving_e(:)
- integer(h5loc) :: floc
-
- integer :: iSurfPan, iVortLatt
-
- character(len=max_char_len) :: msg
- character(len=*), parameter :: this_sub_name='create_geometry'
+  integer :: i, j, is, im,  i_comp, i_ll, i_ad
+  integer :: i_non_corr, i_corr, i_tot, i_expl, i_impl
+  type(t_impl_elem_p), allocatable :: temp_static_i(:), temp_moving_i(:)
+  type(t_expl_elem_p), allocatable :: temp_static_e(:), temp_moving_e(:)
+  integer(h5loc)                                     :: floc
+  integer                                            :: iSurfPan, iVortLatt
+  character(len=max_char_len)                        :: msg
+  character(len=*), parameter                        :: this_sub_name='create_geometry'
 
   tstart = sim_param%t0
 
-  !build the reference frames
-  !read which is the reference frame file, if default the main input file is
-  !employed
-  !reference_file = getstr(prms, 'ReferenceFile')
+  !> Build the reference frames
+  ! read which is the reference frame file, if default the main input file is
+  ! employed
   if (trim(ref_file_name) .eq. 'no_set') then
     ref_file_name = trim(in_file_name)
   endif
@@ -438,28 +439,18 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   call build_references(geo%refs, trim(ref_file_name))
 
 ! -----------------------------------------------------------------------------------------
-! The following lines were needed when the motion was defined w.r.t. the initial
-! time of the simulation, tstart, and not w.r.t. 0, as they are defined now
-!
-! ! If rstart_from_file, set the right initial conditions!
-! ! -> Correction needed for motion defined through its velocity
-! if ( sim_param%restart_from_file .and. sim_param%reset_time ) then
-!   call update_relative_initial_conditions(sim_param%restart_file, sim_param%ReferenceFile, geo%refs)
-! end if
-! -----------------------------------------------------------------------------------------
-
-  !Create the output geometry file (if it is not restarting with the same name)
+  !> Create the output geometry file (if it is not restarting with the same name)
   if(trim(geo_file_name).ne.trim(target_file)) then
     call new_hdf5_file(trim(target_file), floc)
     call write_hdf5_attr(run_id, 'run_id', floc)
     call close_hdf5_file(floc)
   endif
 
-  !Load the components from the file created by the preprocessor
+  !> Load the components from the file created by the preprocessor
   call check_preproc(geo_file_name)
   call load_components(geo, trim(geo_file_name), trim(target_file), te)
 
-  call import_aero_tab(geo,airfoil_data)
+  call import_aero_tab(geo, airfoil_data)
 
   ! Initialisation
   geo%nelem_impl   = 0
@@ -478,55 +469,55 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   do i_comp = 1,size(geo%components)
 
     select case(trim(geo%components(i_comp)%comp_el_type))
-     case('p')
-      if(geo%components(i_comp)%moving) then
-        geo%nmoving_impl = geo%nmoving_impl + geo%components(i_comp)%nelems
-      else
-        geo%nstatic_impl = geo%nstatic_impl + geo%components(i_comp)%nelems
-        geo%nstatic_SurfPan = geo%nstatic_SurfPan + geo%components(i_comp)%nelems
-      endif
-      geo%nSurfPan = geo%nSurfPan + geo%components(i_comp)%nelems
-      geo%nelem_impl = geo%nelem_impl + geo%components(i_comp)%nelems
+      case('p')
+        if(geo%components(i_comp)%moving) then
+          geo%nmoving_impl = geo%nmoving_impl + geo%components(i_comp)%nelems
+        else
+          geo%nstatic_impl = geo%nstatic_impl + geo%components(i_comp)%nelems
+          geo%nstatic_SurfPan = geo%nstatic_SurfPan + geo%components(i_comp)%nelems
+        endif
+        geo%nSurfPan = geo%nSurfPan + geo%components(i_comp)%nelems
+        geo%nelem_impl = geo%nelem_impl + geo%components(i_comp)%nelems
 
-     case('v')
-      if(geo%components(i_comp)%moving) then
-        geo%nmoving_impl = geo%nmoving_impl + geo%components(i_comp)%nelems
-      else
-        geo%nstatic_impl = geo%nstatic_impl + geo%components(i_comp)%nelems
-      endif
-      geo%nVortLatt = geo%nVortLatt + geo%components(i_comp)%nelems
-      geo%nelem_impl = geo%nelem_impl + geo%components(i_comp)%nelems
+      case('v')
+        if(geo%components(i_comp)%moving) then
+          geo%nmoving_impl = geo%nmoving_impl + geo%components(i_comp)%nelems
+        else
+          geo%nstatic_impl = geo%nstatic_impl + geo%components(i_comp)%nelems
+        endif
+        geo%nVortLatt = geo%nVortLatt + geo%components(i_comp)%nelems
+        geo%nelem_impl = geo%nelem_impl + geo%components(i_comp)%nelems
 
-     case('l')
-      if(geo%components(i_comp)%moving) then
-        geo%nmoving_expl = geo%nmoving_expl + geo%components(i_comp)%nelems
-      else
-        geo%nstatic_expl = geo%nstatic_expl + geo%components(i_comp)%nelems
-      endif
-      geo%nLiftLin = geo%nLiftLin + geo%components(i_comp)%nelems
-      geo%nelem_expl = geo%nelem_expl + geo%components(i_comp)%nelems
+      case('l')
+        if(geo%components(i_comp)%moving) then
+          geo%nmoving_expl = geo%nmoving_expl + geo%components(i_comp)%nelems
+        else
+          geo%nstatic_expl = geo%nstatic_expl + geo%components(i_comp)%nelems
+        endif
+        geo%nLiftLin = geo%nLiftLin + geo%components(i_comp)%nelems
+        geo%nelem_expl = geo%nelem_expl + geo%components(i_comp)%nelems
 
-     case('a')
-      if(geo%components(i_comp)%moving) then
-        geo%nmoving_expl = geo%nmoving_expl + geo%components(i_comp)%nelems
-      else
-        geo%nstatic_expl = geo%nstatic_expl + geo%components(i_comp)%nelems
-      endif
-      geo%nActDisk = geo%nActDisk + geo%components(i_comp)%nelems
-      geo%nelem_expl = geo%nelem_expl + geo%components(i_comp)%nelems
+      case('a')
+        if(geo%components(i_comp)%moving) then
+          geo%nmoving_expl = geo%nmoving_expl + geo%components(i_comp)%nelems
+        else
+          geo%nstatic_expl = geo%nstatic_expl + geo%components(i_comp)%nelems
+        endif
+        geo%nActDisk = geo%nActDisk + geo%components(i_comp)%nelems
+        geo%nelem_expl = geo%nelem_expl + geo%components(i_comp)%nelems
 
-     case default
-      call error (this_sub_name, this_mod_name, 'Unknow type of element: '&
+      case default
+        call error (this_sub_name, this_mod_name, 'Unknow type of element: '&
                   //trim(geo%components(i_comp)%comp_el_type))
     end select
 
   enddo
 
-  ! calculate the geometric quantities
-  ! already update the geometry for the first time to get the right
-  ! starting geometrical condition
+  !> Calculate the geometric quantities
+  !  already update the geometry for the first time to get the right
+  !  starting geometrical condition
   call prepare_geometry(geo)
-  call update_geometry(geo, te, tstart, update_static=.true.)
+  call update_geometry(geo, te, tstart, update_static=.true., time_cycle = .false. )
 
   if(sim_param%debug_level .ge. 3) then
     call printout(nl//' Geometry details:' )
@@ -556,9 +547,22 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
 
   !Create the vector of pointers to all the elements
   allocate(elems_impl(geo%nelem_impl), elems_expl(geo%nelem_expl),  &
-           elems_tot(geo%nelem_impl+geo%nelem_expl))
+            elems_tot(geo%nelem_impl+geo%nelem_expl))
   allocate(elems_ad(geo%nactdisk), elems_ll(geo%nLiftLin))
-  i_impl=0; i_expl=0; i_ad=0; i_ll=0; i_tot=0
+  i_impl=0; i_expl=0; i_ad=0; i_ll=0; i_non_corr = 0; i_corr = 0;  i_tot=0
+
+  !> First count the corrected elements 
+  do i_comp = 1,size(geo%components)
+    if (trim(geo%components(i_comp)%comp_el_type) .eq. 'v' .and. & 
+      trim(geo%components(i_comp)%aero_correction) .eq. 'true') then
+      do j = 1,size(geo%components(i_comp)%el)
+        i_corr = i_corr + 1
+      end do 
+    end if 
+  end do 
+  allocate(elems_corr(i_corr)) 
+  allocate(elems_non_corr(geo%nelem_impl+geo%nelem_expl - i_corr))
+  i_corr = 0 
   do i_comp = 1,size(geo%components)
 
     if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p' .or. &
@@ -573,14 +577,35 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
         end select
       enddo
 
+    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'v' .and. &
+            trim(geo%components(i_comp)%aero_correction) .eq. 'false') then
+      do j = 1,size(geo%components(i_comp)%el)
+        i_non_corr = i_non_corr + 1 
+        elems_non_corr(i_non_corr)%p => geo%components(i_comp)%el(j)
+      end do 
+
+    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'v' .and. &
+            trim(geo%components(i_comp)%aero_correction) .eq. 'true') then
+      do j = 1, size(geo%components(i_comp)%el)
+        i_corr = i_corr + 1 
+        elems_corr(i_corr)%p => geo%components(i_comp)%el(j) 
+      enddo
+    
+    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'p') then 
+      do j = 1,size(geo%components(i_comp)%el)
+        i_non_corr = i_non_corr + 1 
+        elems_non_corr(i_non_corr)%p => geo%components(i_comp)%el(j)
+      end do
+
     elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'l') then
 
       do j = 1,size(geo%components(i_comp)%el)
-        i_ll = i_ll+1
-        i_expl = i_expl+1
-        i_tot = i_tot+1
+        i_ll = i_ll + 1
+        i_expl = i_expl + 1
+        i_non_corr = i_non_corr + 1
+        i_tot = i_tot + 1
+        elems_non_corr(i_non_corr)%p => geo%components(i_comp)%el(j)
         elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
-        !select type(el => geo%components(i_comp)%el(j)); class is(c_expl_elem)
         select type(el => geo%components(i_comp)%el(j)); class is(t_liftlin)
           elems_ll(i_ll)%p => el
           elems_expl(i_expl)%p => el
@@ -590,9 +615,11 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
     elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'a') then
 
       do j = 1,size(geo%components(i_comp)%el)
-        i_ad = i_ad+1
-        i_expl = i_expl+1
-        i_tot = i_tot+1
+        i_ad = i_ad + 1
+        i_expl = i_expl + 1
+        i_non_corr = i_non_corr + 1
+        i_tot = i_tot + 1
+        elems_non_corr(i_non_corr)%p => geo%components(i_comp)%el(j)
         elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
         select type(el => geo%components(i_comp)%el(j)); class is(c_expl_elem)
           elems_ad(i_ad)%p => el
@@ -603,8 +630,8 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
     endif
   enddo
 
-  ! Sort implicit elements: first static, then moving -------
-  !fill in the two temporaries
+  !> Sort implicit elements: first static, then moving 
+  !  fill in the two temporaries
   allocate(temp_static_i(geo%nstatic_impl), temp_moving_i(geo%nmoving_impl))
   is = 0; im = 0;
   do i = 1,geo%nelem_impl
@@ -640,11 +667,11 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
     end select
     select type( el => elems_impl(i)%p ); class is(t_vortlatt)
       iVortLatt= iVortLatt + 1
-      geo%idVortLatt(iVortLatt) = el%id
+      geo%idVortLatt(iVortLatt) = el%id ! get from here the vortex lattice id
     end select
   end do
 
-  !Now re-order the explicit elements
+  !> Now re-order the explicit elements
   allocate(temp_static_e(geo%nstatic_expl), temp_moving_e(geo%nmoving_expl))
   is = 0; im = 0;
   do i = 1,geo%nelem_expl
@@ -662,117 +689,192 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   endif
   deallocate(temp_static_e, temp_moving_e)
 
-  !Update the indexing since we re-ordered the vector
+  !> Update the indexing since we re-ordered the vector
   do i = 1,geo%nelem_expl
     elems_expl(i)%p%id = i+geo%nelem_impl
   end do
 
   call create_strip_connectivity(geo)
 
-  ! Initialisation of the field surf_vel to zero (for surfpan only)
+  !> Initialisation of the field surf_vel to zero (for surfpan only)
   do i=1,geo%nelem_impl
     select type(el=>elems_impl(i)%p) ; class is(t_surfpan)
       el%surf_vel = 0.0_wp
-
-        call el%create_local_velocity_stencil( &    ! elems_tot, &
+        call el%create_local_velocity_stencil( &    
                 geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
-        ! chtls stencil
-        call el%create_chtls_stencil( &             ! elems_tot, &
+        !> chtls stencil
+        call el%create_chtls_stencil( &             
                 geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
     end select
   end do
+
+  !> Update connectivity matrix for cen and ac_stripe for  
+#if USE_PRECICE
+
+  do i_comp = 1, size(geo%components)
+    if ((geo%components(i_comp)%coupling) .and. (trim(geo%components(i_comp)%coupling_type) .eq. 'rbf')) then 
+      !> build connectivity for the panel center 
+      allocate(cen(3, size(geo%components(i_comp)%el))); cen = 0.0_wp 
+
+      do i = 1, size(geo%components(i_comp)%el) 
+        cen(:,i) = geo%components(i_comp)%el(i)%cen
+      end do 
+
+      call geo%components(i_comp)%rbf%build_connectivity(cen, geo%components(i_comp)%coupling_node_rot)
+      !> transfer index and weight matrix 
+      geo%components(i_comp)%rbf%cen%ind = geo%components(i_comp)%rbf%point%ind
+      geo%components(i_comp)%rbf%cen%wei = geo%components(i_comp)%rbf%point%wei
+      
+      !> store the read points into the local cen  
+      allocate(geo%components(i_comp)%loc_cen(3,size(cen,2)))
+      geo%components(i_comp)%loc_cen = cen 
+
+      !> cleanup 
+      deallocate(geo%components(i_comp)%rbf%point%ind, geo%components(i_comp)%rbf%point%wei)
+      deallocate(cen)
+
+      !> build connectivity for the stripe (vl_corrected) for velocity evaluation 
+      if (trim(geo%components(i_comp)%comp_el_type) .eq. 'v' .and. &
+          trim(geo%components(i_comp)%aero_correction) .eq. 'true') then 
+
+        allocate(ctr_pt(3, size(geo%components(i_comp)%stripe))); ctr_pt = 0.0_wp 
+          
+        do i = 1, size(geo%components(i_comp)%stripe) 
+          
+          ctr_pt(:,i) = geo%components(i_comp)%stripe(i)%ctr_pt
+          !> store the read points into the local control point          
+          geo%components(i_comp)%stripe(i)%loc_ctr_pt = ctr_pt(:,i)
+
+        end do       
+
+        call geo%components(i_comp)%rbf%build_connectivity(ctr_pt, geo%components(i_comp)%coupling_node_rot)
+        !> transfer index and weight matrix 
+        geo%components(i_comp)%rbf%ctr_pt%ind = geo%components(i_comp)%rbf%point%ind
+        geo%components(i_comp)%rbf%ctr_pt%wei = geo%components(i_comp)%rbf%point%wei 
+        
+        !> cleanup 
+        deallocate(geo%components(i_comp)%rbf%point%ind, geo%components(i_comp)%rbf%point%wei)
+        deallocate(ctr_pt) 
+      
+      !> build connectivity for lifting line control points for velocity evaluation 
+      elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'l') then 
+
+          allocate(ctr_pt(3, size(geo%components(i_comp)%el))); ctr_pt = 0.0_wp 
+
+          do i = 1, size(geo%components(i_comp)%el)
+            select type(el => geo%components(i_comp)%el(i))
+              type is(t_liftlin) 
+              ctr_pt(:,i) = el%cen + el%tang_cen * el%chord / 2.0_wp ! control point of lifting line 
+              !> store the read points into the local control point  
+              el%loc_ctr_pt = ctr_pt(:,i)
+            end select    
+          end do       
+
+          call geo%components(i_comp)%rbf%build_connectivity(ctr_pt, geo%components(i_comp)%coupling_node_rot)
+          !> transfer index and weight matrix 
+          geo%components(i_comp)%rbf%ctr_pt%ind = geo%components(i_comp)%rbf%point%ind
+          geo%components(i_comp)%rbf%ctr_pt%wei = geo%components(i_comp)%rbf%point%wei
+    
+          !> cleanup 
+          deallocate(geo%components(i_comp)%rbf%point%ind, geo%components(i_comp)%rbf%point%wei)
+          deallocate(ctr_pt)
+      endif 
+
+    endif 
+  end do 
+#endif 
 
 end subroutine create_geometry
 
 !----------------------------------------------------------------------
 
 !> Load the components mesh
-!!
-!! Here all the components from the geometry file are loaded.
-!! The components linked to multiple reference frames are multiplied and
-!! attached to their relative reference frames.
-!! The points and the elements are then genereated.
-!! Finally the trailing edge is created
+! 
+!  Here all the components from the geometry file are loaded.
+!  The components linked to multiple reference frames are multiplied and
+!  attached to their relative reference frames.
+!  The points and the elements are then genereated.
+!  Finally the trailing edge is created
 subroutine load_components(geo, in_file, out_file, te)
- type(t_geo), intent(inout),target :: geo
- character(len=*), intent(in) :: in_file
- character(len=*), intent(in) :: out_file
- type(t_tedge), intent(out) :: te
-
-
- integer :: i1, i2, i3
- integer, allocatable :: ee(:,:)
- real(wp), allocatable :: rr(:,:)
- character(len=max_char_len) :: comp_el_type, comp_name, comp_input
- integer :: points_offset, n_vert , elems_offset
- real(wp), allocatable :: points_tmp(:,:)
- character(len=max_char_len) :: ref_tag, ref_tag_m
- integer :: ref_id, iref
- character(len=max_char_len) :: msg, cname, cname_write
- integer(h5loc) :: floc, gloc, cloc , geo_loc , te_loc, cloc2
- integer(h5loc) :: floc_out, gloc_out
- integer :: n_comp, i_comp, n_comp_input, i_comp_input, n_comp_write
- integer :: n_mult, i_mult
- logical :: mult
-
- ! Connectivity and te structures
- integer , allocatable :: neigh(:,:)
- ! Lifting Line elements
- real(wp), allocatable :: normalised_coord_e(:,:), theta_e(:)
- integer                 , allocatable :: i_airfoil_e(:,:)
- character(max_char_len) , allocatable :: airfoil_list(:)
- integer                 , allocatable :: nelem_span_list(:)
- !> Coupling
- character(len=max_char_len) :: comp_coupling_str
- character(len=max_char_len) :: comp_coupling_type
- real(wp) :: comp_coupling_node(3)       = 0.0_wp    ! <- Initialization(?)
- real(wp) :: comp_coupling_node_rot(3,3) = 0.0_wp    ! <- Initialization(?)
- logical :: comp_coupling
+  type(t_geo), intent(inout),target     :: geo
+  character(len=*), intent(in)          :: in_file
+  character(len=*), intent(in)          :: out_file
+  type(t_tedge), intent(out)            :: te
+  integer                               :: i1, i2, i3
+  integer, allocatable                  :: ee(:,:)
+  real(wp), allocatable                 :: rr(:,:)
+  character(len=max_char_len)           :: comp_el_type, comp_name, comp_input
+  integer                               :: points_offset, n_vert , elems_offset
+  real(wp), allocatable                 :: points_tmp(:,:)
+  character(len=max_char_len)           :: ref_tag, ref_tag_m
+  integer                               :: ref_id, iref
+  character(len=max_char_len)           :: msg, cname, cname_write
+  integer(h5loc)                        :: floc, gloc, cloc , geo_loc , te_loc, cloc2
+  integer(h5loc)                        :: floc_out, gloc_out
+  integer                               :: n_comp, i_comp 
+  integer                               :: n_comp_input, i_comp_input, n_comp_write
+  integer                               :: n_mult, i_mult
+  logical                               :: mult
+  !> Connectivity and te structures
+  integer , allocatable                 :: neigh(:,:)
+  !> Aerotable correction for vl 
+  character(len=5)                      :: aero_table
+  real(wp), allocatable                 :: curv_ac(:,:)
+  !> Lifting Line elements
+  real(wp), allocatable                 :: normalised_coord_e(:,:), theta_e(:)
+  integer                 , allocatable :: i_airfoil_e(:,:)
+  character(max_char_len) , allocatable :: airfoil_list(:)
+  integer                 , allocatable :: nelem_span_list(:)
+  !> Coupling
+  character(len=max_char_len)           :: comp_coupling_str
+  character(len=max_char_len)           :: comp_coupling_type
+  real(wp) :: comp_coupling_node(3)       = 0.0_wp    ! <- Initialization(?)
+  real(wp) :: comp_coupling_node_rot(3,3) = 0.0_wp    ! <- Initialization(?)
+  logical :: comp_coupling
 #if USE_PRECICE
- real(wp), allocatable :: c_ref_p(:,:)
- real(wp), allocatable :: c_ref_c(:,:)
- real(wp), allocatable :: xac_p(:)
- real(wp), allocatable :: comp_coupling_nodes(:,:)
- !real(wp) :: coupling_node_rot(3,3)
- integer :: points_offset_precice, np_precice, np_precice_tot
- integer :: comp_ind
- integer, allocatable :: hinge_ind(:)
- integer, allocatable :: ind_coupling(:)
- integer :: n_nodes_coupling_hinges, n_nodes_coupling_hinge_1
+  real(wp), allocatable                 :: c_ref_p(:,:)
+  real(wp), allocatable                 :: c_ref_c(:,:)
+  real(wp), allocatable                 :: xac_p(:)
+  real(wp), allocatable                 :: comp_coupling_nodes(:,:)
+  integer                               :: points_offset_precice, np_precice, np_precice_tot
+  integer                               :: comp_ind
+  integer, allocatable                  :: hinge_ind(:)
+  integer, allocatable                  :: ind_coupling(:)
+  integer                               :: n_nodes_coupling_hinges
+  integer                               :: n_nodes_coupling_hinge_1
 #endif
- real(wp) :: coupling_node_rot(3,3) = 0.0_wp
- !> Hinges
- integer :: n_hinges, ih
- character(len=2) :: hinge_id_str
- integer(h5loc) :: hloc, hiloc, hloc2
- ! Parametric elements
- integer :: par_nelems_span , par_nelems_chor
- ! trailing edge ------
- integer , allocatable :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
- integer , allocatable :: neigh_te(:,:) , o_te(:,:)
- real(wp), allocatable :: t_te(:,:)
- real(wp) :: scale_te
- integer :: ne_te , nn_te
- ! tmp arrays --------
- type(t_pot_elem_p) , allocatable :: e_te_tmp(:,:)
- integer, allocatable  :: i_te_tmp(:,:) , ii_te_tmp(:,:)
- integer , allocatable :: neigh_te_tmp(:,:) , o_te_tmp(:,:)
- real(wp), allocatable :: t_te_tmp(:,:), t_hinged_te_tmp(:,:)
- integer , allocatable ::t_is_hinged_tmp(:)
- integer , allocatable :: ref_te_tmp(:)
- integer , allocatable :: icomp_te_tmp(:)
- real(wp), allocatable :: scale_te_tmp(:)
- ! # n. elements and nodes at TE ( of the prev. comps)
- integer :: ne_te_prev , nn_te_prev
- real(wp) :: trac, rad
- logical :: rewrite_geo
- logical :: is_hinge
- integer, allocatable :: ind_h(:)
+  real(wp)                              :: coupling_node_rot(3,3) = 0.0_wp
+  !> Hinges
+  integer                               :: n_hinges, ih
+  character(len=2)                      :: hinge_id_str
+  integer(h5loc)                        :: hloc, hiloc, hloc2
+  !> Parametric elements
+  integer                               :: par_nelems_span , par_nelems_chor
+  !> Trailing edge 
+  integer , allocatable                 :: e_te(:,:) , i_te(:,:) , ii_te(:,:)
+  integer , allocatable                 :: neigh_te(:,:) , o_te(:,:)
+  real(wp), allocatable                 :: t_te(:,:)
+  real(wp)                              :: scale_te
+  integer                               :: ne_te , nn_te
+  !> Tmp arrays
+  type(t_pot_elem_p) , allocatable      :: e_te_tmp(:,:)
+  integer, allocatable                  :: i_te_tmp(:,:), ii_te_tmp(:,:)
+  integer , allocatable                 :: neigh_te_tmp(:,:), o_te_tmp(:,:)
+  real(wp), allocatable                 :: t_te_tmp(:,:), t_hinged_te_tmp(:,:)
+  integer , allocatable                 :: t_is_hinged_tmp(:)
+  integer , allocatable                 :: ref_te_tmp(:)
+  integer , allocatable                 :: icomp_te_tmp(:)
+  real(wp), allocatable                 :: scale_te_tmp(:)
+  !> # n. elements and nodes at TE ( of the prev. comps)
+  integer                               :: ne_te_prev , nn_te_prev
+  real(wp)                              :: trac, rad
+  logical                               :: rewrite_geo
+  logical                               :: is_hinge
+  integer, allocatable                  :: ind_h(:)
+  character(len=*), parameter           :: this_sub_name = 'load_components'
 
- character(len=*), parameter :: this_sub_name = 'load_components'
-
-  !Re-write the geometry only if it is not restarting from a previous run
-  !with the same name
+  !>Re-write the geometry only if it is not restarting from a previous run
+  ! with the same name
   rewrite_geo = .true.
   if(trim(in_file).eq.trim(out_file)) rewrite_geo = .false.
 
@@ -781,12 +883,12 @@ subroutine load_components(geo, in_file, out_file, te)
   call open_hdf5_group(floc,'Components',gloc)
   call read_hdf5(n_comp,'NComponents',gloc)
 
-  ! First it is necessary to count how many actual components will
-  ! be present, including the multiples. Due to pointers pointing to
-  ! allocatables the components array cannot be expanded later
+  !> First it is necessary to count how many actual components will
+  !  be present, including the multiples. Due to pointers pointing to
+  !  allocatables the components array cannot be expanded later
   n_comp_input = n_comp
 
-  do i_comp_input = 1,n_comp_input
+  do i_comp_input = 1, n_comp_input
     write(cname,'(A,I3.3)') 'Comp',i_comp_input
     call open_hdf5_group(gloc,trim(cname),cloc)
     call read_hdf5(ref_tag,'RefTag',cloc)
@@ -801,7 +903,7 @@ subroutine load_components(geo, in_file, out_file, te)
     !if not found the reference
     if (ref_id .lt. 0) then
       write(msg,'(A,I2,A,A,A)') 'For component ',i_comp, &
-                   ' a reference with tag ',trim(ref_tag),' was not found'
+                    ' a reference with tag ',trim(ref_tag),' was not found'
       call error(this_sub_name, this_mod_name, msg)
     endif
     mult = .false.
@@ -814,10 +916,10 @@ subroutine load_components(geo, in_file, out_file, te)
     call close_hdf5_group(cloc)
   enddo
 
-  ! Allocate the components of the right full size
+  !> Allocate the components of the right full size
   allocate(geo%components(n_comp))
 
-  !Open and prepare the output file (if not restarting with the same name)
+  !> Open and prepare the output file (if not restarting with the same name)
   if(rewrite_geo) then
     call open_hdf5_file(trim(out_file),floc_out)
     call new_hdf5_group(floc_out,'Components',gloc_out)
@@ -825,8 +927,6 @@ subroutine load_components(geo, in_file, out_file, te)
   endif
 
   elems_offset = 0
-
-  !TODO check this
   n_comp_write = n_comp
 
 #if USE_PRECICE
@@ -844,23 +944,22 @@ subroutine load_components(geo, in_file, out_file, te)
 
     call read_hdf5(ref_tag,'RefTag',cloc)
 
-    !Look for the reference frame of the component
+    !> Look for the reference frame of the component
     ref_id = -1
     do iref = 0,ubound(geo%refs,1)
       if (trim(geo%refs(iref)%tag) .eq. trim(ref_tag)) then
-        !set id
+        ! set id
         ref_id = iref
       endif
     enddo
-    !if not found the reference
+    !> If not found the reference
     if (ref_id .lt. 0) then
       write(msg,'(A,I2,A,A,A)') 'For component ',i_comp, &
-                   ' a reference with tag ',trim(ref_tag),' was not found'
+                    ' a reference with tag ',trim(ref_tag),' was not found'
       call error(this_sub_name, this_mod_name, msg)
     endif
 
-
-    !Check if it is a multiple reference
+    !> Check if it is a multiple reference
     mult = .false.
     n_mult = 1
     mult = geo%refs(ref_id)%multiple
@@ -878,21 +977,11 @@ subroutine load_components(geo, in_file, out_file, te)
     comp_coupling = .false.
 #if USE_PRECICE
     if ( trim(comp_coupling_str) .eq. 'true' ) comp_coupling = .true.
-
-    if ( trim(comp_coupling_str) .eq. 'true' ) then
-      if ( ( comp_el_type(1:1) .ne. 'l' ) .and. &
-           ( trim(comp_coupling_type) .eq. 'll' ) ) then
-        call error (this_sub_name, this_mod_name, &
-           ' Coupled = T and CouplingType = ll for component <'//trim(comp_name)// &
-           '>, but it is not a LL element. So far, coupling is implemented &
-             &for lifting line elements only. Stop'//nl)
-      end if
-    end if
 #else
     if ( trim(comp_coupling_str) .eq. 'true' ) then
       call error (this_sub_name, this_mod_name, &
-         ' Coupled = T for component'//trim(comp_name)// &
-         ', but no coupled simulation is expected, since dust &
+          ' Coupled = T for component'//trim(comp_name)// &
+          ', but no coupled simulation is expected, since dust &
           &has been compiled without #USE_PRECICE option. Stop'//nl)
     endif
 #endif
@@ -901,8 +990,8 @@ subroutine load_components(geo, in_file, out_file, te)
     !> Multiple component and Coupling
     if ( mult .and. comp_coupling ) then
       call error (this_sub_name, this_mod_name, &
-         ' Coupled = T for "Muliple" component'//trim(comp_name)// &
-         ', but this is not allowed (at least so far). Stop'//nl)
+          ' Coupled = T for "Muliple" component'//trim(comp_name)// &
+          ', but this is not allowed (at least so far). Stop'//nl)
     end if
 
     !> Hinges
@@ -912,32 +1001,32 @@ subroutine load_components(geo, in_file, out_file, te)
     !> Multiple component and Hinges
     if ( mult .and. ( n_hinges .gt. 0 ) ) then
       call error (this_sub_name, this_mod_name, &
-         ' n_hinges .gt. 0 for "Multiple" component'//trim(comp_name)// &
-         ', but this is not allowed (so far, at least). Stop'//nl)
+          ' n_hinges .gt. 0 for "Multiple" component'//trim(comp_name)// &
+          ', but this is not allowed (so far, at least). Stop'//nl)
     end if
 
     if(mult) then
       n_mult = geo%refs(ref_id)%n_mult
     endif
 
-    !cycle on all the possible multiple references, if it is not multiple
-    !it will be passed just once
-    !TODO: consider wrapping in another subroutine
+    !> Cycle on all the possible multiple references, if it is not multiple
+    !  it will be passed just once
+    !  TODO: consider wrapping in another subroutine
     do i_mult = 1,n_mult
       ref_tag_m = ref_tag
-      !set the component id
+      !> set the component id
       geo%components(i_comp)%comp_id = i_comp
       if(mult)  then
-        !look again for the multiple reference
+        !> look again for the multiple reference
         write(ref_tag_m,'(A,I2.2)') trim(ref_tag)//'__',i_mult
         ref_id = -1
         do iref = 0,ubound(geo%refs,1)
           if (trim(geo%refs(iref)%tag) .eq. trim(ref_tag_m)) then
-            !set id
+            !> set id
             ref_id = iref
           endif
         enddo
-        !if not found the reference
+        !> If not found the reference
         if (ref_id .lt. 0) then
           write(msg,'(A,I2,A,A,A)') 'For component ',i_comp, &
                       ' a reference with tag ',trim(ref_tag_m),' was not found'
@@ -986,13 +1075,13 @@ subroutine load_components(geo, in_file, out_file, te)
       call read_hdf5_al(rr   ,'rr'   ,geo_loc)
       call read_hdf5_al(neigh,'neigh',geo_loc)
 
-      ! element-specific reads
+      !> element-specific reads
       if ( comp_el_type(1:1) .eq. 'l' ) then
 
-        call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc)!(:)
-        call read_hdf5_al(nelem_span_list   ,'nelem_span_list'   ,geo_loc)!(:)
-        call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)!(:,:)
-        call read_hdf5_al(normalised_coord_e,'normalised_coord_e',geo_loc)!(:,:)
+        call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc)
+        call read_hdf5_al(nelem_span_list   ,'nelem_span_list'   ,geo_loc)
+        call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
+        call read_hdf5_al(normalised_coord_e,'normalised_coord_e',geo_loc)
         call read_hdf5_al(theta_e,           'theta_e'           ,geo_loc)
 
         allocate(geo%components(i_comp)%airfoil_list(size(airfoil_list)))
@@ -1012,13 +1101,43 @@ subroutine load_components(geo, in_file, out_file, te)
         allocate(geo%components(i_comp)%theta_e(size(theta_e)))
         geo%components(i_comp)%theta_e = theta_e
 
+      elseif (comp_el_type(1:1) .eq. 'v') then
+        
+        !> Additional fields for vl corrections 
+        call read_hdf5(aero_table,  'aero_table',  geo_loc)
+
+        if (trim(aero_table) .eq. 'true') then 
+          
+          call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc)
+          call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
+          call read_hdf5_al(normalised_coord_e,'normalised_coord_e',geo_loc)
+          !call read_hdf5_al(curv_ac           ,'curv_ac'           ,geo_loc)
+
+          allocate(geo%components(i_comp)%airfoil_list(size(airfoil_list)))
+          geo%components(i_comp)%airfoil_list = airfoil_list
+          
+          allocate(geo%components(i_comp)%i_airfoil_e( &
+                size(i_airfoil_e,1),size(i_airfoil_e,2)) )
+          geo%components(i_comp)%i_airfoil_e = i_airfoil_e
+          
+          allocate(geo%components(i_comp)%normalised_coord_e( &
+                size(normalised_coord_e,1),size(normalised_coord_e,2)))
+          geo%components(i_comp)%normalised_coord_e = normalised_coord_e
+          
+          !allocate(geo%components(i_comp)%curv_ac( &
+          !          size(curv_ac,1),size(curv_ac,2)))
+          !geo%components(i_comp)%curv_ac = curv_ac
+          
+          geo%components(i_comp)%aero_correction = trim(aero_table)
+          sim_param%vl_correction = .true. 
+        endif
+
       else if (comp_el_type(1:1) .eq. 'a') then
         call read_hdf5(trac,'Traction',cloc)
         call read_hdf5(rad,'Radius',cloc)
       end if
 
-
-      !> Hinges ----------------------------------------------------------------
+      !> Hinges 
       geo%components(i_comp)%n_hinges = n_hinges
       allocate( geo%components(i_comp)%hinge(n_hinges) )
       do ih = 1, n_hinges
@@ -1027,12 +1146,13 @@ subroutine load_components(geo, in_file, out_file, te)
         write(hinge_id_str,'(I2.2)') ih
         call open_hdf5_group(hloc, 'Hinge_'//hinge_id_str, hiloc)
 
-        !> read input and fill component%hinge fields
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%nodes_input, 'Nodes_Input', hiloc)
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%offset, 'Offset', hiloc)
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%span_blending, 'Spanwise_Blending', hiloc)
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%ref_dir, 'Ref_Dir', hiloc)
-        call read_hdf5_al( geo%components(i_comp)%hinge(ih)%ref%rr, 'rr', hiloc)
+        !> Read input and fill component%hinge fields
+        call read_hdf5(geo%components(i_comp)%hinge(ih)%nodes_input,   'Nodes_Input', hiloc)
+        call read_hdf5(geo%components(i_comp)%hinge(ih)%offset,        'Offset', hiloc)
+        call read_hdf5(geo%components(i_comp)%hinge(ih)%span_blending, 'Spanwise_Blending', hiloc)
+        call read_hdf5(geo%components(i_comp)%hinge(ih)%ref_dir,       'Ref_Dir', hiloc)
+        call read_hdf5(geo%components(i_comp)%hinge(ih)%tag,           'Tag', hiloc)
+        call read_hdf5_al(geo%components(i_comp)%hinge(ih)%ref%rr,     'rr', hiloc)
 
         geo%components(i_comp)%hinge(ih)%n_nodes = size( geo%components(i_comp)%hinge(ih)%ref%rr, 2)
 
@@ -1064,7 +1184,7 @@ subroutine load_components(geo, in_file, out_file, te)
         call initialize_hinge_config( geo%components(i_comp)%hinge(ih)%act , &
                                       geo%components(i_comp)%hinge(ih) )
 
-        ! Allocate and initialize hinge node coords in the actual configuration
+        !> Allocate and initialize hinge node coords in the actual configuration
         allocate( geo%components(i_comp)%hinge(ih)%act%rr( &
                 3,geo%components(i_comp)%hinge(ih)%n_nodes ) )
 
@@ -1073,60 +1193,36 @@ subroutine load_components(geo, in_file, out_file, te)
                                       geo%components(i_comp)%hinge(ih)%ref%rr
         !> Build hinge connectivity and weights, for grid nodes
         call geo%components(i_comp)%hinge(ih)%build_connectivity( rr, coupling_node_rot )
-        ! and for cell centers
+        !> and for cell centers
         call geo%components(i_comp)%hinge(ih)%build_connectivity_cen( rr, ee, coupling_node_rot)
-
-        !> build_connectivity_hin() below, around l.1200 for 'rbf' coupling
-        ! if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
-        !   ! and between hinge nodes and other structural nodes
-        !   call geo%components(i_comp)%hinge(ih)%build_connectivity_hin( rr )
-        ! end if
 
       end do
 
 #if USE_PRECICE
-      !> PreCICE coupling ------------------------------------------------------
+      !> PreCICE coupling 
       if ( trim(comp_coupling_str) .eq. 'true' ) then
 
-        if ( ( trim(comp_coupling_type) .eq. 'll' ) .or. &
-             ( trim(comp_coupling_type) .eq. 'rigid' ) ) then
+        if (trim(comp_coupling_type) .eq. 'rigid' ) then
           call read_hdf5_al(c_ref_p, 'c_ref_p', geo_loc)
           call read_hdf5_al(c_ref_c, 'c_ref_c', geo_loc)
           allocate(geo%components(i_comp)%c_ref_p( size(c_ref_p,1) , &
-                                                   size(c_ref_p,2) ) )
+                                                    size(c_ref_p,2) ) )
           allocate(geo%components(i_comp)%c_ref_c( size(c_ref_c,1) , &
-                                                   size(c_ref_c,2) ) )
+                                                    size(c_ref_c,2) ) )
           geo%components(i_comp)%c_ref_p = c_ref_p
           geo%components(i_comp)%c_ref_c = c_ref_c
 
-          if ( trim(comp_coupling_type) .eq. 'll' ) then
-            call read_hdf5_al(xac_p  , 'x_ac_p' , geo_loc)
-            allocate( geo%components(i_comp)%xac( size(xac_p,1) ) )
-            geo%components(i_comp)%xac     = xac_p
-          end if
-          !> === PreCICE connectivity for LL ===
-          if ( trim(comp_coupling_type) .eq. 'll' ) then
-            ! For ll/beam coupling, only LE nodes are coupled with structural
-            ! nodes, while each TE node follows its LE node with a rigid motion
-            np_precice = size(rr,2)/2
-          elseif ( trim(comp_coupling_type) .eq. 'rigid' ) then
-            ! For rigid coupling, the motion of all the nodes of the components
-            ! is defined through the motion of the coupling_node
-            np_precice = 1
-          end if
+          !> For rigid coupling, the motion of all the nodes of the components
+          !  is defined through the motion of the coupling_node
+          np_precice = 1
+
           !> Allocate and fill i_points_precice array containing the
-          ! connectivity between dust with PreCICE nodes
+          !  connectivity between dust with PreCICE nodes
           allocate(geo%components(i_comp)%i_points_precice( np_precice ))
           geo%components(i_comp)%i_points_precice = &
-                           (/((i3),i3=points_offset_precice+1, &
+                          (/((i3),i3=points_offset_precice+1, &
                                       points_offset_precice+np_precice)/)
           points_offset_precice = points_offset_precice + np_precice
-
-          !> allocate dummy rbf structure
-          ! *** to do *** cleaner implementation of different kinds of coupling
-          ! allocate(geo%components(i_comp)%rbf%nodes(0,0))
-          ! allocate(geo%components(i_comp)%rbf%ind  (0,0))
-          ! allocate(geo%components(i_comp)%rbf%wei  (0,0))
 
         elseif ( trim(comp_coupling_type) .eq. 'rbf' ) then
 
@@ -1191,11 +1287,12 @@ subroutine load_components(geo, in_file, out_file, te)
           !             - here only allocated and itialized to a meaningless value,
           !             - to be updated at each timestep, with data read from precice,
           !               in t_precice%update_elems
-          allocate( geo%components(i_comp)%rbf%nodes(3, np_precice) , &
-                    geo%components(i_comp)%rbf%rrb  (3, np_precice) , &
+
+          allocate( geo%components(i_comp)%rbf%rrb  (3, np_precice) , &
                     geo%components(i_comp)%rbf%rrb_rot  (3, np_precice))
           geo%components(i_comp)%rbf%nodes = comp_coupling_nodes(:,ind_coupling)
           geo%components(i_comp)%rbf%rrb   = -333.3_wp
+          
 
 
         allocate(ind_h(n_nodes_coupling_hinges))
@@ -1210,7 +1307,6 @@ subroutine load_components(geo, in_file, out_file, te)
           end if
         end do  
 
-
           do ih = 1, n_hinges
             if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
 
@@ -1222,13 +1318,17 @@ subroutine load_components(geo, in_file, out_file, te)
 
               !> Connectivity between hinge nodes and other structural nodes
               call geo%components(i_comp)%hinge(ih)%build_connectivity_hin( &
-                  comp_coupling_nodes, ind_h) !&
-                  !geo%components(i_comp)%hinge(ih)%i_points_precice - points_offset_precice)
-
+                  comp_coupling_nodes, ind_h) 
             end if
           end do
+          
+          !> build connectivity for the rr nodes 
+          call geo%components(i_comp)%rbf%build_connectivity(rr, coupling_node_rot)        
 
-          call geo%components(i_comp)%rbf%build_connectivity( rr, ee, coupling_node_rot)
+          !> transfer index and weight matrix 
+          geo%components(i_comp)%rbf%nod%ind = geo%components(i_comp)%rbf%point%ind
+          geo%components(i_comp)%rbf%nod%wei = geo%components(i_comp)%rbf%point%wei         
+          deallocate(geo%components(i_comp)%rbf%point%ind, geo%components(i_comp)%rbf%point%wei)
 
           !> Update offset of precice/dust coupling nodes
           points_offset_precice = points_offset_precice + np_precice_tot
@@ -1237,7 +1337,7 @@ subroutine load_components(geo, in_file, out_file, te)
           allocate(geo%components(i_comp)%c_ref_c(0,0))
           allocate(geo%components(i_comp)%c_ref_p(0,0))
 
-          deallocate(ind_coupling, hinge_ind, ind_h)  !FIXME SIGABRT: Process abort signal.
+          deallocate(ind_coupling, hinge_ind, ind_h)  
 
         endif
       else
@@ -1247,8 +1347,8 @@ subroutine load_components(geo, in_file, out_file, te)
 #endif
 
 
-      ! for PARAMETRIC elements only:
-      ! parametric_nelems_span , parametric_nelems_chor
+      !> For PARAMETRIC elements only:
+      !  parametric_nelems_span , parametric_nelems_chor
       if ( trim(comp_input) .eq. 'parametric' ) then
         call read_hdf5(par_nelems_span,'parametric_nelems_span',geo_loc)
         call read_hdf5(par_nelems_chor,'parametric_nelems_chor',geo_loc)
@@ -1264,12 +1364,11 @@ subroutine load_components(geo, in_file, out_file, te)
         call open_hdf5_group(cloc,'Trailing_Edge',te_loc)
         call read_hdf5_al(    e_te,    'e_te',te_loc)
         call read_hdf5_al(    i_te,    'i_te',te_loc)
-        !call read_hdf5_al(   rr_te,   'rr_te',te_loc)
         call read_hdf5_al(   ii_te,   'ii_te',te_loc)
         call read_hdf5_al(neigh_te,'neigh_te',te_loc)
         call read_hdf5_al(    o_te,    'o_te',te_loc)
         call read_hdf5_al(    t_te,    't_te',te_loc)
-        !call read_hdf5_al(  ref_te,  'ref_te',te_loc)
+      
         if(check_dset_hdf5('scale_te',te_loc)) then
           call read_hdf5(scale_te, 'scale_te',te_loc)
         else
@@ -1278,12 +1377,12 @@ subroutine load_components(geo, in_file, out_file, te)
         call close_hdf5_group(te_loc)
       else
         allocate(e_te(0,0), i_te(2,0), ii_te(2,0), neigh_te(2,0), o_te(2,0),&
-                 t_te(3,0))
+                  t_te(3,0))
       endif
-      !Re-write all that was read in the new output file (cannot just copy
-      !the read file since the components order will be changed when emplying
-      !the multiple components). If it is restarting with the same name
-      !avoid write
+      ! Re-write all that was read in the new output file (cannot just copy
+      ! the read file since the components order will be changed when emplying
+      ! the multiple components). If it is restarting with the same name
+      ! avoid write
 
       write(cname_write,'(A,I3.3)') 'Comp',geo%components(i_comp)%comp_id
       if(rewrite_geo) then
@@ -1294,7 +1393,7 @@ subroutine load_components(geo, in_file, out_file, te)
         call write_hdf5(trim(geo%components(i_comp)%comp_name), &
                                                             'CompName',cloc2)
         call write_hdf5(trim(geo%components(i_comp)%comp_input),&
-                                                           'CompInput',cloc2)
+                                                            'CompInput',cloc2)
         if ( geo%components(i_comp)%coupling ) then
           call write_hdf5('true','Coupled',cloc2)
           call write_hdf5(trim(geo%components(i_comp)%coupling_type), &
@@ -1329,6 +1428,8 @@ subroutine load_components(geo, in_file, out_file, te)
           call write_hdf5(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
           call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
           call write_hdf5(theta_e           ,'theta_e'           ,geo_loc)
+        elseif (comp_el_type(1:1) .eq. 'v' ) then
+          call write_hdf5(trim(aero_table)  ,'aero_table'        ,geo_loc)          
 
         else if (comp_el_type(1:1) .eq. 'a') then
           call write_hdf5(trac,'Traction',cloc2)
@@ -1337,14 +1438,14 @@ subroutine load_components(geo, in_file, out_file, te)
         endif
 
         if ( trim(comp_input) .eq. 'parametric' ) then
-          !write HDF5 fields
+          !> Write HDF5 fields
           call write_hdf5(par_nelems_span,'parametric_nelems_span',geo_loc)
           call write_hdf5(par_nelems_chor,'parametric_nelems_chor',geo_loc)
         end if
 
         call close_hdf5_group(geo_loc)
 
-        !> Hinges -------------------------------------------------------------
+        !> Hinges
         call new_hdf5_group(cloc2, 'Hinges', hloc2)
         call write_hdf5(n_hinges, 'n_hinges', hloc2)
 
@@ -1353,32 +1454,31 @@ subroutine load_components(geo, in_file, out_file, te)
           write(hinge_id_str,'(I2.2)') ih
           call new_hdf5_group(hloc2, 'Hinge_'//hinge_id_str, hiloc)
 
-          !> read input and fill component%hinge fields
+          !> Read input and fill component%hinge fields
           call write_hdf5( geo%components(i_comp)%hinge(ih)%nodes_input, &
                                                             'Nodes_Input', hiloc)
           call write_hdf5( geo%components(i_comp)%hinge(ih)%offset, &
                                                             'Offset', hiloc)
           call write_hdf5( geo%components(i_comp)%hinge(ih)%span_blending, &
-                                                 'Spanwise_Blending', hiloc)
+                                                  'Spanwise_Blending', hiloc)
           call write_hdf5( geo%components(i_comp)%hinge(ih)%ref_dir, &
-                                                           'Ref_Dir', hiloc)
+                                                            'Ref_Dir', hiloc)
+          call write_hdf5( geo%components(i_comp)%hinge(ih)%tag, 'Tag', hiloc)
           call write_hdf5( geo%components(i_comp)%hinge(ih)%ref%rr, 'rr', hiloc)
 
           call write_hdf5( geo%components(i_comp)%hinge(ih)%input_type, &
-                                               'Hinge_Rotation_Input'    , hiloc)
+                                                'Hinge_Rotation_Input'    , hiloc)
           call write_hdf5( geo%components(i_comp)%hinge(ih)%f_ampl , &
-                                               'Hinge_Rotation_Amplitude', hiloc)
+                                                'Hinge_Rotation_Amplitude', hiloc)
           call write_hdf5( geo%components(i_comp)%hinge(ih)%f_omega, &
-                                                   'Hinge_Rotation_Omega', hiloc)
+                                                'Hinge_Rotation_Omega', hiloc)
           call write_hdf5( geo%components(i_comp)%hinge(ih)%f_phase, &
-                                                   'Hinge_Rotation_Phase', hiloc)
+                                                'Hinge_Rotation_Phase', hiloc)
           call close_hdf5_group(hiloc)
 
         end do
 
         call close_hdf5_group(hloc2)
-
-        !> Hinges -------------------------------------------------------------
 
         if( comp_el_type(1:1) .eq. 'p' .or. &
             comp_el_type(1:1) .eq. 'v' .or. &
@@ -1399,51 +1499,50 @@ subroutine load_components(geo, in_file, out_file, te)
 
       ! ======= CREATING ELEMENTS ======
 
-      ! --- treat the points ---
+      !> Treat the points 
       if(allocated(geo%points)) then
         points_offset = size(geo%points,2)
       else
         points_offset = 0
       endif
 
-      !store the read points into the local points
+      !> store the read points into the local points
       allocate(geo%components(i_comp)%loc_points(3,size(rr,2)))
       geo%components(i_comp)%loc_points = rr
 
 
-      !Now for the moments the points are stored here without moving them,
-      !will be moved later, consider not storing them here at all
+      !> Now for the moments the points are stored here without moving them,
+      !  will be moved later, consider not storing them here at all
       allocate(points_tmp(3,size(rr,2)+points_offset))
       if (points_offset .gt. 0) points_tmp(:,1:points_offset) = geo%points
       points_tmp(:,points_offset+1:points_offset+size(rr,2)) = rr
       call move_alloc(points_tmp, geo%points)
       allocate(geo%components(i_comp)%i_points(size(rr,2)))
       geo%components(i_comp)%i_points = &
-                         (/((i3),i3=points_offset+1,points_offset+size(rr,2))/)
+                        (/((i3),i3=points_offset+1,points_offset+size(rr,2))/)
 
 
-      ! --- treat the elements ---
-
+      !> Treat the elements 
       !allocate the elements of the component of the right kind
       geo%components(i_comp)%nelems = size(ee,2)
       select case(trim(geo%components(i_comp)%comp_el_type))
-       case('p')
-        allocate(t_surfpan::geo%components(i_comp)%el(size(ee,2)))
-       case('v')
-        allocate(t_vortlatt::geo%components(i_comp)%el(size(ee,2)))
-       case('l')
-        allocate(t_liftlin::geo%components(i_comp)%el(size(ee,2)))
-       case('a')
-        allocate(t_actdisk::geo%components(i_comp)%el(size(ee,2)))
-       case default
-        call error(this_sub_name, this_mod_name, &
-          'Unknown type of element: '//geo%components(i_comp)%comp_el_type)
+        case('p')
+          allocate(t_surfpan::geo%components(i_comp)%el(size(ee,2)))
+        case('v')
+          allocate(t_vortlatt::geo%components(i_comp)%el(size(ee,2)))
+        case('l')
+          allocate(t_liftlin::geo%components(i_comp)%el(size(ee,2)))
+        case('a')
+          allocate(t_actdisk::geo%components(i_comp)%el(size(ee,2)))
+        case default
+          call error(this_sub_name, this_mod_name, &
+            'Unknown type of element: '//geo%components(i_comp)%comp_el_type)
       end select
 
-      !fill (some) of the elements fields
+      !> fill (some) of the elements fields
       do i2=1,size(ee,2)
 
-        !vertices
+        !> vertices
         n_vert = count(ee(:,i2).ne.0)
         allocate(geo%components(i_comp)%el(i2)%i_ver(n_vert))
         allocate(geo%components(i_comp)%el(i2)%neigh(n_vert))
@@ -1455,12 +1554,12 @@ subroutine load_components(geo, in_file, out_file, te)
             geo%components(i_comp)%el(i2)%neigh(i3)%p => &
                                     geo%components(i_comp)%el(neigh(i3,i2))
           else
-            ! do nothing, keep the neighbour pointer not associated
+            !> Do nothing, keep the neighbour pointer not associated
             geo%components(i_comp)%el(i2)%neigh(i3)%p => null()
           end if
         end do
 
-        !motion
+        !> Motion
         geo%components(i_comp)%el(i2)%moving = geo%components(i_comp)%moving
 
       enddo
@@ -1470,9 +1569,8 @@ subroutine load_components(geo, in_file, out_file, te)
                                   geo%components(i_comp)%nSurfPan = size(ee,2)
       if(comp_el_type(1:1) .eq. 'v') &
                                   geo%components(i_comp)%nVortRin = size(ee,2)
-      ! TODO: add nLiftLin field ???
 
-      !If it is an actuator disk read the traction
+      !> If it is an actuator disk read the traction
       if(geo%components(i_comp)%comp_el_type(1:1) .eq. 'a') then
         select type (el=>geo%components(i_comp)%el)
         type is(t_actdisk)
@@ -1483,15 +1581,13 @@ subroutine load_components(geo, in_file, out_file, te)
         end select
       endif
 
-
-
-      ! Trailing Edge ------------
+      !> Trailing Edge 
       ne_te = 0; nn_te=0
       if(allocated(e_te)) ne_te = size(e_te,2)
       if(allocated(i_te)) nn_te = size(i_te,2)
       if (sim_param%debug_level .ge. 3) then
         write(msg,'(A,I0,A,I0)') ' Trailing edge: elements: ', &
-                                                       ne_te, ' nodes ', nn_te
+                                                        ne_te, ' nodes ', nn_te
         call printout(msg)
       endif
       if (.not.allocated(te%e) ) then ! it should be enough
@@ -1525,10 +1621,10 @@ subroutine load_components(geo, in_file, out_file, te)
           e_te_tmp(1,size(te%e,2)+i1)%p => null()
           e_te_tmp(2,size(te%e,2)+i1)%p => null()
           e_te_tmp(1,size(te%e,2)+i1)%p  => &
-                                       geo%components(i_comp)%el(e_te(1,i1))
+                                      geo%components(i_comp)%el(e_te(1,i1))
           if(e_te(2,i1) .gt. 0) then
             e_te_tmp(2,size(te%e,2)+i1)%p  => &
-                                       geo%components(i_comp)%el(e_te(2,i1))
+                                      geo%components(i_comp)%el(e_te(2,i1))
           endif
         enddo
         call move_alloc(e_te_tmp,te%e)
@@ -1537,10 +1633,7 @@ subroutine load_components(geo, in_file, out_file, te)
         i_te_tmp(:,             1:size(te%i,2)    ) = te%i
         i_te_tmp(:,size(te%i,2)+1:size(i_te_tmp,2)) = i_te + points_offset
         call move_alloc(i_te_tmp,te%i)
-        !allocate(rr_te_tmp(3,size(te%rr,2)+nn_te))
-        !rr_te_tmp(:,              1:size(te%rr,2)    ) = te%rr
-        !rr_te_tmp(:,size(te%rr,2)+1:size(rr_te_tmp,2)) = rr_te
-        !call move_alloc(rr_te_tmp,te%rr)
+      
         allocate(ii_te_tmp(2,size(te%ii,2)+ne_te))
         ii_te_tmp(:,              1:size(te%ii,2)    ) = te%ii
         ii_te_tmp(:,size(te%ii,2)+1:size(ii_te_tmp,2)) = ii_te + nn_te_prev
@@ -1586,10 +1679,9 @@ subroutine load_components(geo, in_file, out_file, te)
         allocate( scale_te_tmp(size(te%scaling)+nn_te))
         scale_te_tmp(1:size(te%scaling )    ) = te%scaling
         scale_te_tmp(size(te%scaling )+1:size( scale_te_tmp)) = &
-                                       scale_te*sim_param%first_panel_scaling
+                                        scale_te*sim_param%first_panel_scaling
         call move_alloc(scale_te_tmp,te%scaling )
       end if
-
 
       ! 2018-07-5. Deassociate neighboring elements through the TE
       if(trim(geo%components(i_comp)%comp_el_type) .eq. 'p') then
@@ -1608,13 +1700,11 @@ subroutine load_components(geo, in_file, out_file, te)
       endif
 
       deallocate(e_te, i_te, ii_te, neigh_te, o_te, t_te)
-      !:::::::::::::::::::::::::::::::::::::::::::::::::::
 
-
-      ! Update elems_offset for the next component
+      !> Update elems_offset for the next component
       elems_offset = elems_offset + size(ee,2)
 
-      !cleanup
+      !> Cleanup
       deallocate(ee,rr,neigh)
       i_comp = i_comp + 1
     enddo !i_mult
@@ -1624,8 +1714,8 @@ subroutine load_components(geo, in_file, out_file, te)
 
   enddo !i_comp
 
-  !update the total number of components
-  !call write_hdf5(i_comp-1,'NComponents',gloc)
+  !> Update the total number of components
+  !  call write_hdf5(i_comp-1,'NComponents',gloc)
   call close_hdf5_group(gloc)
   call close_hdf5_file(floc)
   if(rewrite_geo) then
@@ -1633,7 +1723,7 @@ subroutine load_components(geo, in_file, out_file, te)
     call close_hdf5_file(floc_out)
   endif
 
-  ! define comp_id for all the elems
+  !> Define comp_id for all the elems
   do i_comp = 1 , size(geo%components)
     do i1 = 1 , size(geo%components(i_comp)%el)
       geo%components(i_comp)%el(i1)%comp_id = i_comp
@@ -1650,78 +1740,77 @@ end subroutine load_components
 !----------------------------------------------------------------------
 
 subroutine import_aero_tab(geo,coeff)
- type(t_geo), intent(inout), target :: geo
- type(t_aero_tab) , allocatable , intent(inout) :: coeff(:)
+  type(t_geo), intent(inout), target             :: geo
+  type(t_aero_tab) , allocatable , intent(inout) :: coeff(:)
+  integer                                        :: n_tmp , n_tmp2
+  character(len=max_char_len) , allocatable      :: list_tmp(:)
+  character(len=max_char_len) , allocatable      :: list_tmp_tmp(:)
+  integer , allocatable                          :: i_airfoil_e_tmp (:,:)
+  integer                                        :: i_c, n_c, i_a, n_a, i_l
 
- integer :: n_tmp , n_tmp2
- character(len=max_char_len) , allocatable :: list_tmp(:)
- character(len=max_char_len) , allocatable :: list_tmp_tmp(:)
- integer , allocatable :: i_airfoil_e_tmp (:,:)
+  n_tmp = 30
+  allocate(list_tmp(n_tmp))  
 
- integer :: i_c, n_c, i_a, n_a, i_l
+  ! Count # of different airfoil
+  n_c = size(geo%components)
+  n_a = 0
+  do i_c = 1, n_c
 
- n_tmp = 30
- allocate(list_tmp(n_tmp))
+    if ( trim(geo%components(i_c)%comp_el_type) .eq. 'l' .or. &
+        (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
+        trim(geo%components(i_c)%aero_correction) .eq. 'true')) then 
 
- ! Count # of different airfoil
- n_c = size(geo%components)
- n_a = 0
- do i_c = 1 ,  n_c
-
-   if ( geo%components(i_c)%comp_el_type .eq. 'l' ) then
-
-     allocate( i_airfoil_e_tmp( &
+      allocate( i_airfoil_e_tmp( &
           size(geo%components(i_c)%i_airfoil_e,1), &
           size(geo%components(i_c)%i_airfoil_e,2) ) )
-     i_airfoil_e_tmp = 0
+      i_airfoil_e_tmp = 0
 
-     do i_a = 1 , size(geo%components(i_c)%airfoil_list)
+      do i_a = 1 , size(geo%components(i_c)%airfoil_list)
 
-       if (all( geo%components(i_c)%airfoil_list(i_a) .ne. &
-                                                       list_tmp(1:n_a))) then
-         ! new airfoil ----
-         n_a = n_a + 1
+        if (all( geo%components(i_c)%airfoil_list(i_a) .ne. &
+                                                      list_tmp(1:n_a))) then
+          ! new airfoil ----
+          n_a = n_a + 1
 
-         where (geo%components(i_c)%i_airfoil_e .eq. i_a) i_airfoil_e_tmp = n_a
+          where (geo%components(i_c)%i_airfoil_e .eq. i_a) i_airfoil_e_tmp = n_a
 
-         ! if n_a > n_tmp --> movalloc
-         if ( n_a .gt. n_tmp ) then
-           n_tmp2 = n_tmp + n_tmp
-           allocate(list_tmp_tmp(n_tmp2))
-           list_tmp_tmp(1:n_tmp) = list_tmp
-           deallocate(list_tmp)
-           call move_alloc(list_tmp_tmp,list_tmp)
-           n_tmp = n_tmp2
-         end if
+          ! if n_a > n_tmp --> movalloc
+          if ( n_a .gt. n_tmp ) then
+            n_tmp2 = n_tmp + n_tmp
+            allocate(list_tmp_tmp(n_tmp2))
+            list_tmp_tmp(1:n_tmp) = list_tmp
+            deallocate(list_tmp)
+            call move_alloc(list_tmp_tmp,list_tmp)
+            n_tmp = n_tmp2
+          end if
 
-         list_tmp(n_a) = geo%components(i_c)%airfoil_list(i_a)
+          list_tmp(n_a) = geo%components(i_c)%airfoil_list(i_a)
 
-       else
-         ! airfoil already used: find the element and replace the global index
-         do i_l = 1 , n_a
-           if ( geo%components(i_c)%airfoil_list(i_a) .eq. list_tmp(i_l) ) exit
-         end do
+        else
+          !> Airfoil already used: find the element and replace the global index
+          do i_l = 1 , n_a
+            if ( geo%components(i_c)%airfoil_list(i_a) .eq. list_tmp(i_l) ) exit
+          end do
 
-         where (geo%components(i_c)%i_airfoil_e .eq. i_a) i_airfoil_e_tmp = i_l
+          where (geo%components(i_c)%i_airfoil_e .eq. i_a) i_airfoil_e_tmp = i_l
 
-       end if
+        end if
 
+      end do
 
-     end do
+    geo%components(i_c)%i_airfoil_e = i_airfoil_e_tmp
 
-   geo%components(i_c)%i_airfoil_e = i_airfoil_e_tmp
+    deallocate(i_airfoil_e_tmp)
 
-   deallocate(i_airfoil_e_tmp)
+    end if
 
-   end if
+  end do
 
- end do
-
- ! Read tables and fill coeff structure
- allocate(coeff(n_a))
- do i_a = 1 , n_a
-   call read_c81_table( list_tmp(i_a) , coeff(i_a) )
- end do
+  !> Read tables and fill coeff structure
+  allocate(coeff(n_a))
+  do i_a = 1 , n_a
+    call read_c81_table( list_tmp(i_a) , coeff(i_a) )
+  end do
 
 
 end subroutine import_aero_tab
@@ -1729,31 +1818,31 @@ end subroutine import_aero_tab
 !----------------------------------------------------------------------
 
 !> Prepare the geometry allocating all the relevant fields for each
-!! kind of element
+!  kind of element
 subroutine prepare_geometry(geo)
   type(t_geo), intent(inout), target :: geo
-
-  integer :: i_comp, ie
-  integer :: nsides
-  class(c_pot_elem), pointer :: elem
-  character(len=*), parameter :: this_sub_name = 'prepare_geometry'
+  integer                            :: i_comp, ie
+  integer                            :: nsides
+  class(c_pot_elem), pointer         :: elem
+  character(len=*), parameter        :: this_sub_name = 'prepare_geometry'
 
   do i_comp = 1,size(geo%components)
 
     do ie = 1,size(geo%components(i_comp)%el)
+      
       elem => geo%components(i_comp)%el(ie)
 
       nsides = size(elem%i_ver)
 
-      !Fields common to each element
+      !> Fields common to each element
       allocate(elem%ver(3,nsides))
       allocate(elem%edge_vec(3,nsides))
       allocate(elem%edge_len(nsides))
       allocate(elem%edge_uni(3,nsides))
 
-      !type-specific fields
+      !> Type-specific fields
       select type(elem)
-        !Surface panel
+        !> Surface panel
         class is(t_surfpan)
           allocate(elem%verp(3,nsides))
           allocate(elem%cosTi(nsides))
@@ -1770,19 +1859,19 @@ subroutine prepare_geometry(geo)
           elem%twist     =  geo%components(i_comp)%theta_e(ie)
         class is(t_vortlatt)
 
+          
         class is(t_actdisk)
 
         class default
           call error(this_sub_name, this_mod_name, 'Unknown element type')
       end select
 
-     !> Position and velocity increment, due to hinge motion
-     elem%dcen_h     = 0.0_wp
-     elem%dcen_h_old = 0.0_wp
-     elem%dvel_h     = 0.0_wp
-
-   enddo
- enddo
+      !> Position and velocity increment, due to hinge motion
+      elem%dcen_h     = 0.0_wp
+      elem%dcen_h_old = 0.0_wp
+      elem%dvel_h     = 0.0_wp
+    enddo
+  enddo
 
 end subroutine prepare_geometry
 
@@ -1793,51 +1882,40 @@ end subroutine prepare_geometry
 !! The subroutine calculates all the relevant geometrical quantities of a
 !! panel element (vortex ring or surface panel)
 subroutine calc_geo_data_pan(elem,vert)
- class(c_pot_elem), intent(inout) :: elem
- real(wp), intent(in) :: vert(:,:)
-
- integer :: nsides, is
- real(wp):: nor(3), tanl(3)
+  class(c_pot_elem), intent(inout) :: elem
+  real(wp), intent(in)             :: vert(:,:)
+  integer                          :: nsides, is
+  real(wp)                         :: nor(3), tanl(3)
 
   nsides = size(vert,2)
 
   elem%n_ver = nsides
 
-  ! vertices
+  !> Vertices
   elem%ver = vert
 
-  ! center
+  !> Center
   elem%cen =  sum ( vert,2 ) / real(nsides,wp)
-  !write(*,*) 'elem%cen da mod_geo: ', elem%cen
-
-
-  ! unit normal and area
+  
+  !> Unit normal and area
   if ( nsides .eq. 4 ) then
-    nor = cross( vert(:,3) - vert(:,1) , &
-                 vert(:,4) - vert(:,2)     )
+    nor = cross(vert(:,3) - vert(:,1) , &
+                vert(:,4) - vert(:,2)     )
   else if ( nSides .eq. 3 ) then
-    nor = cross( vert(:,3) - vert(:,2) , &
-                 vert(:,1) - vert(:,2)     )
+    nor = cross(vert(:,3) - vert(:,2) , &
+                vert(:,1) - vert(:,2)     )
   end if
 
   elem%area = 0.5_wp * norm2(nor)
   elem%nor = nor / norm2(nor)
 
-  ! local tangent unit vector as in PANAIR
+  !> Local tangent unit vector as in PANAIR
   tanl = 0.5_wp * ( vert(:,nsides) + vert(:,1) ) - elem%cen
 
   elem%tang(:,1) = tanl / norm2(tanl)
   elem%tang(:,2) = cross( elem%nor, elem%tang(:,1)  )
 
-! >>>>> USELESS LOOP: did we forget something?? Realised on 2018.11.14
-!  select type(elem)
-!  type is(t_surfpan)
-!  do is = 1 , nsides
-!  end do
-!  end select
-! <<<<< USELESS LOOP: did we forget something??
-
-  ! vector connecting two consecutive vertices:
+  !> Vector connecting two consecutive vertices:
   ! edge_vec(:,1) =  ver(:,2) - ver(:,1)
   if ( nsides .eq. 3 ) then
     do is = 1 , nsides
@@ -1849,68 +1927,64 @@ subroutine calc_geo_data_pan(elem,vert)
     end do
   end if
 
-  ! edge: edge_len(:)
+  !> Edge: edge_len(:)
   do is = 1 , nsides
     elem%edge_len(is) = norm2(elem%edge_vec(:,is))
   end do
 
-  ! unit vector
+  !> Unit vector
   do is = 1 , nSides
     elem%edge_uni(:,is) = elem%edge_vec(:,is) / elem%edge_len(is)
   end do
 
-  !surface panels own fields
+  !> Surface panels own fields
   select type(elem)
   type is(t_surfpan)
     do is = 1 , nsides
-      ! cosTi , sinTi
+      !> cosTi , sinTi
       elem%cosTi(is) = sum( elem%edge_uni(:,is) * elem%tang(:,1) )
       elem%sinTi(is) = sum( elem%edge_uni(:,is) * elem%tang(:,2) )
-      ! projection of the vertices on the mean plane
+      !> Projection of the vertices on the mean plane
       elem%verp(:,is) = vert(:,is) - elem%nor * &
                       sum( (vert(:,is) - elem%cen ) * elem%nor )
     end do
   end select
 
-  ! initialise %dforce
+  !> Initialise %dforce
   elem%dforce = 0.0_wp
 
-  ! initialise %dmom
+  !> Initialise %dmom
   elem%dmom   = 0.0_wp
-
-
 
 end subroutine calc_geo_data_pan
 
-!----------------------------------------------------------------------
 
 !> Calculate the geometrical quantities of a lifting line element
 !!
 !! The subroutine calculates all the relevant geometrical quantities of a
 !! lifting line element
 subroutine calc_geo_data_ll(elem,vert)
- class(c_pot_elem), intent(inout) :: elem
- real(wp), intent(in) :: vert(:,:)
-
- integer :: is, nsides
- real(wp):: nor(3), tanl(3)
+  class(c_pot_elem), intent(inout) :: elem
+  real(wp), intent(in) :: vert(:,:)
+  integer :: is, nsides
+  real(wp):: nor(3), tanl(3)
 
   nsides = size(vert,2)
 
   elem%n_ver = nsides
 
-  ! vertices
+  !> Vertices
   elem%ver = vert
 
-  ! center, for the lifting line is the mid-point
+  !> Center, for the lifting line is the mid-point
   elem%cen =  sum ( vert(:,1:2),2 ) / 2.0_wp
-  ! unit normal and area
+  !> Unit normal and area
   if ( nsides .eq. 4 ) then
-    nor = cross( vert(:,3) - vert(:,1) , &
-                 vert(:,4) - vert(:,2)     )
+    nor = cross(vert(:,3) - vert(:,1) , &
+                vert(:,4) - vert(:,2)     )
   else if ( nSides .eq. 3 ) then
-    nor = cross( vert(:,3) - vert(:,2) , &
-                 vert(:,1) - vert(:,2)     )
+    nor = cross(vert(:,3) - vert(:,2) , &
+                vert(:,1) - vert(:,2)     )
   end if
 
   elem%area = 0.5_wp * norm2(nor)
@@ -1923,8 +1997,8 @@ subroutine calc_geo_data_ll(elem,vert)
   elem%tang(:,2) = cross( elem%nor, elem%tang(:,1)  )
 
 
-  ! vector connecting two consecutive vertices:
-  ! edge_vec(:,1) =  ver(:,2) - ver(:,1)
+  !> Vector connecting two consecutive vertices:
+  !> edge_vec(:,1) =  ver(:,2) - ver(:,1)
   if ( nsides .eq. 3 ) then
     do is = 1 , nsides
       elem%edge_vec(:,is) = vert(:,next_tri(is)) - vert(:,is)
@@ -1935,57 +2009,55 @@ subroutine calc_geo_data_ll(elem,vert)
     end do
   end if
 
-  ! edge: edge_len(:)
+  !> Edge: edge_len(:)
   do is = 1 , nsides
     elem%edge_len(is) = norm2(elem%edge_vec(:,is))
   end do
 
-  ! unit vector
+  !> Unit vector
   do is = 1 , nSides
     elem%edge_uni(:,is) = elem%edge_vec(:,is) / elem%edge_len(is)
   end do
 
   ! ll-specific fields
   select type(elem)
-  type is(t_liftlin)
-  elem%tang_cen = elem%edge_uni(:,2) - elem%edge_uni(:,4)
-  elem%tang_cen = elem%tang_cen / norm2(elem%tang_cen)
+    type is(t_liftlin)
+    elem%tang_cen = elem%edge_uni(:,2) - elem%edge_uni(:,4)
+    elem%tang_cen = elem%tang_cen / norm2(elem%tang_cen)
 
-  elem%bnorm_cen = cross(elem%tang_cen, elem%nor)
-  elem%bnorm_cen = elem%bnorm_cen / norm2(elem%bnorm_cen)
-  elem%chord = sum(elem%edge_len((/2,4/)))*0.5_wp
+    elem%bnorm_cen = cross(elem%tang_cen, elem%nor)
+    elem%bnorm_cen = elem%bnorm_cen / norm2(elem%bnorm_cen)
+    elem%chord = sum(elem%edge_len((/2,4/)))*0.5_wp
   end select
 
-  ! initialise %dforce
+  !> Initialise %dforce
   elem%dforce = 0.0_wp
 
-  ! initialise %dmom
+  !> Initialise %dmom
   elem%dmom   = 0.0_wp
 
 end subroutine calc_geo_data_ll
 
-!----------------------------------------------------------------------
 
 !> Calculate the geometrical quantities of an actuator disk
 !!
 !! The subroutine calculates all the relevant geometrical quantities of an
 !! actuator disk
 subroutine calc_geo_data_ad(elem,vert)
- class(c_pot_elem), intent(inout) :: elem
- real(wp), intent(in) :: vert(:,:)
-
- integer :: nsides, is
- real(wp):: nor(3), tanl(3)
- integer :: nxt
+  class(c_pot_elem), intent(inout)  :: elem
+  real(wp), intent(in)              :: vert(:,:)
+  integer                           :: nsides, is
+  real(wp)                          :: nor(3), tanl(3)
+  integer                           :: nxt
 
   nsides = size(vert,2)
 
   elem%n_ver = nsides
 
-  ! vertices
+  !> Vertices
   elem%ver = vert
 
-  ! center, for the lifting line is the mid-point
+  !> Center, for the lifting line is the mid-point
   elem%cen =  sum ( vert,2 ) / real(nsides,wp)
 
   elem%area = 0.0_wp; elem%nor = 0.0_wp
@@ -1998,66 +2070,61 @@ subroutine calc_geo_data_ad(elem,vert)
   enddo
     elem%nor = elem%nor/real(nsides,wp)
 
-  ! local tangent unit vector: aligned with first node, normal to n
+  !> Local tangent unit vector: aligned with first node, normal to n
   tanl = (vert(:,1)-elem%cen)-sum((vert(:,1)-elem%cen)*elem%nor)*elem%nor
 
   elem%tang(:,1) = tanl / norm2(tanl)
   elem%tang(:,2) = cross( elem%nor, elem%tang(:,1)  )
 
-  ! vector connecting two consecutive vertices:
+  !> Vector connecting two consecutive vertices:
   do is = 1 , nsides
     nxt = 1+mod(is,nsides)
     elem%edge_vec(:,is) = vert(:,nxt) - vert(:,is)
   end do
 
-  ! edge: edge_len(:)
+  !> Edge: edge_len(:)
   do is = 1 , nsides
     elem%edge_len(is) = norm2(elem%edge_vec(:,is))
   end do
 
-  ! unit vector
+  !> Unit vector
   do is = 1 , nsides
     elem%edge_uni(:,is) = elem%edge_vec(:,is) / elem%edge_len(is)
   end do
 
-  ! initialise %dforce
+  !> Initialise %dforce
   elem%dforce = 0.0_wp
 
-  ! initialise %dmom
+  !> Initialise %dmom
   elem%dmom   = 0.0_wp
 
 end subroutine calc_geo_data_ad
 
-!----------------------------------------------------------------------
-
 !> Calculate the local velocity on the panels to then enforce the
 !! boundary condition
-!!
 subroutine calc_geo_vel(elem, G, f)
- class(c_pot_elem), intent(inout) :: elem
- real(wp), intent(in) :: f(3), G(3,3)
+  class(c_pot_elem), intent(inout)  :: elem
+  real(wp), intent(in)              :: f(3), G(3,3)
 
   elem%ub = f + matmul(G,elem%cen)
 
 end subroutine calc_geo_vel
 
-!----------------------------------------------------------------------
-
 !> Calculate velocity of a point whose coordinate is rr
 !! boundary condition
 !!
 subroutine calc_node_vel( r, G, f, v)
- real(wp), intent(in) :: r(3)
- real(wp), intent(in) :: f(3), G(3,3)
- real(wp), intent(out):: v(3)
+  real(wp), intent(in)  :: r(3)
+  real(wp), intent(in)  :: f(3), G(3,3)
+  real(wp), intent(out) :: v(3)
 
- v = f + matmul(G,r)
+  v = f + matmul(G,r)
 
 end subroutine calc_node_vel
 
 !----------------------------------------------------------------------
 
-! Updatad node-element connectivity ( ee array )
+!> Updatad node-element connectivity ( ee array )
 ! It is assumed that nodes and elements are sorted as follows
 !
 !  1-----5-----9-----13----17----21   <--- LE
@@ -2074,108 +2141,194 @@ end subroutine calc_node_vel
 !                                , ...
 !                              23,19,20,24
 subroutine create_strip_connectivity(geo)
- type(t_geo),  target, intent(inout) :: geo
+  type(t_geo),  target, intent(inout)  :: geo
+  real(wp)                             :: h2
+  integer                              :: io_te , io_tip
+  integer                              :: n_el , ie_ind
+  integer                              :: i_comp , i_el
+  integer                              :: i_c , i_s , n_s , n_c , i_c2, n_pan, i
+  real(wp)                             :: nor(3), tanl(3)
+  character(len=*), parameter          :: this_sub_name = 'create_strip_connectivity'
 
- real(wp) :: h2
-
- integer :: io_te , io_tip
- integer :: n_el , ie_ind
- integer :: i_comp , i_el
-
- integer :: i_c , i_s , n_s , n_c , i_c2
- character(len=*), parameter :: this_sub_name = 'create_strip_connectivity'
-
- do i_comp = 1 , size(geo%components)
-  associate(comp => geo%components(i_comp))
-
-  ! connectivity built for lifting surface only
-  if ( ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'v' .or. &
-         geo%components(i_comp)%comp_el_type(1:1) .eq. 'l' )  ) then
-
-    n_el = size(comp%el)
-
-    ! Some checks added: the first element must be at the LE,
-    ! the last at the TE
-    if ( associated(comp%el(  1 )%neigh(1)%p)) then
-      call error(this_sub_name, this_mod_name, &
-                'First element must be at the LE')
-    end if
-    if ( associated(comp%el(n_el)%neigh(3)%p) ) then
-      call error(this_sub_name, this_mod_name, &
-                 'Last element must be at the TE')
-    end if
-
-    ! initialisation
-    io_tip = 1 ; io_te = 0 ; n_s = 0
-    do i_el = 1 , n_el
-
-     ie_ind = comp%el(i_el)%id
-
-     if ( .not. associated(comp%el(i_el)%neigh(1)%p) ) then
-       comp%el(i_el)%stripe_1%p => null()
-       n_s = n_s + 1
-     else
-       comp%el(i_el)%stripe_1%p => comp%el(i_el)%neigh(1)%p
-     end if
-
-     comp%el(i_el)%dy = sum( cross( comp%el(i_el)%edge_uni(:,2) ,    &
-                                    comp%el(i_el)%edge_vec(:,3)  ) * &
-                             comp%el(i_el)%nor )
-
-     h2 = sum( cross( comp%el(i_el)%edge_uni(:,2) ,                        &
-                      comp%el(i_el)%ver(:,1) - comp%el(i_el)%ver(:,3) ) * &
-               comp%el(i_el)%nor )
-
-     if ( abs( h2 - comp%el(i_el)%dy ) .gt. 1.0e-4_wp .and. &
-          sim_param%debug_level .ge. 7) then
-       call warning(this_sub_name, this_mod_name, 'non parallel stripe edges (rough check)')
-     end if
-
-    end do
-
-    ! allocate and fill comp%strip_elem array
-    if ( mod(n_el,n_s) .ne. 0 ) then
-      call error(this_sub_name, this_mod_name, ' The number of elements of&
-         & a parametric element is not an exact multiple of the number of&
-         & spanwise stripes. There is something wrong in the geometry input&
-         & file')
-    end if
-    n_c = n_el / n_s  ! integer division to find number of chord panels
-
-    do i_s = 1 , n_s
-      do i_c = 1 , n_c
-        allocate( comp%el(i_c+(i_s-1)*n_c)%stripe_elem(i_c) )
-        do i_c2 = 1 , i_c
-          comp%el(i_c+(i_s-1)*n_c)%stripe_elem(i_c2)%p => &
-                                        comp%el(i_c2+(i_s-1)*n_c)
-        end do
+  do i_comp = 1 , size(geo%components)
+    associate(comp => geo%components(i_comp))
+      
+    !> Connectivity built for lifting surface only
+    if ( ( geo%components(i_comp)%comp_el_type(1:1) .eq. 'v' .or. &
+            geo%components(i_comp)%comp_el_type(1:1) .eq. 'l' )  ) then
+      
+      
+      n_el = size(comp%el)
+            
+      !> Some checks added: the first element must be at the LE,
+      !  the last at the TE
+      if ( associated(comp%el(  1 )%neigh(1)%p)) then
+        call error(this_sub_name, this_mod_name, &
+                  'First element must be at the LE')
+      end if
+      if ( associated(comp%el(n_el)%neigh(3)%p) ) then
+        call error(this_sub_name, this_mod_name, &
+                  'Last element must be at the TE')
+      end if
+    
+      !> Initialisation
+      io_tip = 1 ; io_te = 0 ; n_s = 0
+      do i_el = 1 , n_el
+        ie_ind = comp%el(i_el)%id
+        if ( .not. associated(comp%el(i_el)%neigh(1)%p) ) then
+          comp%el(i_el)%stripe_1%p => null()
+          n_s = n_s + 1
+        else
+          comp%el(i_el)%stripe_1%p => comp%el(i_el)%neigh(1)%p
+        end if
+      
+        comp%el(i_el)%dy = sum( cross( comp%el(i_el)%edge_uni(:,2) ,    &
+                                      comp%el(i_el)%edge_vec(:,3)  ) * &
+                                comp%el(i_el)%nor )
+      
+        h2 = sum( cross( comp%el(i_el)%edge_uni(:,2) ,                        &
+                        comp%el(i_el)%ver(:,1) - comp%el(i_el)%ver(:,3) ) * &
+                  comp%el(i_el)%nor )
+      
+        if ( abs( h2 - comp%el(i_el)%dy ) .gt. 1.0e-4_wp .and. &
+            sim_param%debug_level .ge. 7) then
+          call warning(this_sub_name, this_mod_name, 'non parallel stripe edges (rough check)')
+        end if
+      
       end do
-    end do
+    
+      !> Allocate and fill comp%strip_elem array
+      if ( mod(n_el,n_s) .ne. 0 ) then
+        call error(this_sub_name, this_mod_name, ' The number of elements of&
+            & a parametric element is not an exact multiple of the number of&
+            & spanwise stripes. There is something wrong in the geometry input&
+            & file')
+      end if
+      n_c = n_el / n_s  ! integer division to find number of chord panels
+      
+      allocate(comp%stripe(n_s))
+      do i_s = 1, n_s
+        allocate(comp%stripe(i_s)%panels(n_c))
+        comp%stripe(i_s)%area = 0.0_wp
+        allocate(comp%stripe(i_s)%ver(3,4))
+        comp%stripe(i_s)%ver = 0.0_wp 
+        allocate(comp%stripe(i_s)%edge_vec(3,4))
+        comp%stripe(i_s)%edge_vec = 0.0_wp
+        allocate(comp%stripe(i_s)%edge_len(4))
+        comp%stripe(i_s)%edge_len = 0.0_wp
+        allocate(comp%stripe(i_s)%edge_uni(3,4))
+        comp%stripe(i_s)%edge_uni = 0.0_wp
+        
+        
+        do i_c = 1, n_c
+          comp%stripe(i_s)%panels(i_c)%p => comp%el(i_c+(i_s-1)*n_c)
+          comp%stripe(i_s)%area = comp%stripe(i_s)%area + comp%el(i_c+(i_s-1)*n_c)%area
+        end do   
+          
+          if (trim(comp%comp_el_type) .eq. 'v' .and. &
+              trim(comp%aero_correction) .eq. 'true') then
 
-  end if
+            comp%stripe(i_s)%n_ver = 4 ! hardcoded, but stripe should be always a quadrilateral element
+            comp%stripe(i_s)%csi_cen = 0.5_wp * sum(comp%normalised_coord_e(:,i_s))  
+            comp%stripe(i_s)%i_airfoil =  comp%i_airfoil_e(:,i_s)
+            
+            !> stripe verteces 
+            comp%stripe(i_s)%ver(:,1) = comp%el(1+(i_s-1)*n_c)%ver(:,1) 
+            comp%stripe(i_s)%ver(:,2) = comp%el(1+(i_s-1)*n_c)%ver(:,2)
+            comp%stripe(i_s)%ver(:,3) = comp%el(n_c+(i_s-1)*n_c)%ver(:,3)
+            comp%stripe(i_s)%ver(:,4) = comp%el(n_c+(i_s-1)*n_c)%ver(:,4) 
 
-  end associate
- end do
+            ! > get the control point as the point at 0.5 c of the chord (!)
+            ! It is updated at every timestep to account for curvature
+            comp%stripe(i_s)%cen = sum(comp%stripe(i_s)%ver(:,1:2),2)/2.0_wp 
+            
+            nor = cross(comp%stripe(i_s)%ver(:,3) - comp%stripe(i_s)%ver(:,1),&
+                        comp%stripe(i_s)%ver(:,4) - comp%stripe(i_s)%ver(:,2))
+            
+            comp%stripe(i_s)%nor = nor/norm2(nor) 
+            
+            tanl = 0.5_wp * ( comp%stripe(i_s)%ver(:,4) + comp%stripe(i_s)%ver(:,4) ) - &
+                            comp%stripe(i_s)%cen
+            
+            comp%stripe(i_s)%tang(:,1) = tanl / norm2(tanl)
+            comp%stripe(i_s)%tang(:,2) = cross(comp%stripe(i_s)%nor, comp%stripe(i_s)%tang(:,1))
+            
+            !> Vector connecting two consecutive vertices:
+            do i = 1, 4
+              comp%stripe(i_s)%edge_vec(:,i) = comp%stripe(i_s)%ver(:,next_qua(i)) - comp%stripe(i_s)%ver(:,i)
+            end do
 
+            !> Edge: edge_len(:)
+            do i = 1, 4
+              comp%stripe(i_s)%edge_len(i) = norm2(comp%stripe(i_s)%edge_vec(:,i))
+            end do
+          
+            !> Unit vector
+            do i = 1,4
+              comp%stripe(i_s)%edge_uni(:,i) = comp%stripe(i_s)%edge_vec(:,i) / comp%stripe(i_s)%edge_len(i)
+            end do
+            
+            comp%stripe(i_s)%tang_cen = comp%stripe(i_s)%edge_uni(:,2) - comp%stripe(i_s)%edge_uni(:,4)
+            comp%stripe(i_s)%tang_cen = comp%stripe(i_s)%tang_cen / norm2(comp%stripe(i_s)%tang_cen)
+  
+            comp%stripe(i_s)%bnorm_cen = cross(comp%stripe(i_s)%tang_cen, comp%stripe(i_s)%nor)
+            comp%stripe(i_s)%bnorm_cen = comp%stripe(i_s)%bnorm_cen / norm2(comp%stripe(i_s)%bnorm_cen)
+            comp%stripe(i_s)%chord = sum(comp%stripe(i_s)%edge_len((/2,4/)))*0.5_wp
+            
+            n_pan = size(comp%stripe(i_s)%panels)
+            comp%stripe(i_s)%area = 0.0_wp 
+            do i = 1, n_pan
+              comp%stripe(i_s)%area = comp%stripe(i_s)%area + comp%stripe(i_s)%panels(i)%p%area 
+            end do
+
+            comp%stripe(i_s)%ctr_pt = comp%stripe(i_s)%cen -  & 
+                                      comp%stripe(i_s)%tang_cen * comp%stripe(i_s)%chord / 2.0_wp
+            
+            !comp%stripe(i_s)%curv_ac = sum(comp%curv_ac(:,i_s))/2 
+            !> Update velocity 
+
+            call calc_node_vel(comp%stripe(i_s)%ctr_pt, geo%refs(comp%ref_id)%G_g, &
+                                geo%refs(comp%ref_id)%f_g, comp%stripe(i_s)%ub)
+            
+          endif    
+          
+      end do 
+
+      do i_s = 1 , n_s
+        do i_c = 1 , n_c
+          allocate( comp%el(i_c+(i_s-1)*n_c)%stripe_elem(i_c) )
+          do i_c2 = 1 , i_c
+            comp%el(i_c+(i_s - 1)*n_c)%stripe_elem(i_c2)%p => &
+                                          comp%el(i_c2+(i_s-1)*n_c)
+            comp%el(i_c+(i_s - 1)*n_c)%n_c = n_c
+            comp%el(i_c+(i_s - 1)*n_c)%n_s = n_s
+          end do
+        end do
+        
+      end do
+    
+    end if    
+    end associate
+  end do
+  
+  
 
 end subroutine create_strip_connectivity
 
-!----------------------------------------------------------------------
 
 function move_points(pp, R, of)  result(rot_pp)
- real(wp), intent(in) :: pp(:,:)
- real(wp), intent(in)    :: R(:,:)
- real(wp), intent(in)    :: of(:)
- real(wp) :: rot_pp(size(pp,1),size(pp,2))
+  real(wp), intent(in)    :: pp(:,:)
+  real(wp), intent(in)    :: R(:,:)
+  real(wp), intent(in)    :: of(:)
+  real(wp)                :: rot_pp(size(pp,1),size(pp,2))
 
   rot_pp = matmul(R,pp)
-  rot_pp(1,:) =rot_pp(1,:) + of(1)
-  rot_pp(2,:) =rot_pp(2,:) + of(2)
-  rot_pp(3,:) =rot_pp(3,:) + of(3)
+  rot_pp(1,:) = rot_pp(1,:) + of(1)
+  rot_pp(2,:) = rot_pp(2,:) + of(2)
+  rot_pp(3,:) = rot_pp(3,:) + of(3)
 
 end function move_points
 
-!----------------------------------------------------------------------
 
 !> Update all the geometry
 !!
@@ -2185,148 +2338,157 @@ end function move_points
 !! updated.
 !!
 !! Also the velocity of the centerpoint of the elements is calculated
-subroutine update_geometry(geo, te, t, update_static)
- type(t_geo), intent(inout) :: geo
- type(t_tedge), intent(inout) ::te
- real(wp), intent(in) :: t
- logical, intent(in) :: update_static
+subroutine update_geometry(geo, te, t, update_static, time_cycle)
+  type(t_geo), intent(inout) :: geo
+  type(t_tedge), intent(inout) ::te
+  real(wp), intent(in) :: t
+  logical, intent(in) :: update_static
+  logical, intent(in) :: time_cycle
 
- real(wp), allocatable :: rr_hinge_contig(:,:)
- integer :: i_comp, ie, ih
+  real(wp), allocatable :: rr_hinge_contig(:,:)
+  integer :: i_comp, ie, ih
 
- !update all the references
- call update_all_references(geo%refs,t)
+  !> Update all the references
+  call update_all_references(geo%refs,t)
 
-do i_comp = 1,size(geo%components)
-  associate(comp => geo%components(i_comp))
+  do i_comp = 1,size(geo%components)
+    associate(comp => geo%components(i_comp))
 
-    ! Update only rigid components, or update at first timestep
-    ! *** to do *** quite a dirty implementation
-    if ( ( .not. comp%coupling ) .or. update_static ) then
+      !> Update only rigid components, or update at first timestep
+      ! *** to do *** quite a dirty implementation
+      if ( ( .not. comp%coupling ) .or. update_static ) then
 
-      if (comp%moving .or. update_static) then
+        if (comp%moving .or. update_static) then
 
-        !> store %nor at previous time step, for moving, used few lines
-        ! below to evaluate unit normal time derivative dn_dt
-        if ( .not. update_static ) then
-          do ie = 1 , size(comp%el)
-            comp%el(ie)%nor_old = comp%el(ie)%nor
-          end do
-        end if
+          !> store %nor at previous time step, for moving, used few lines
+          ! below to evaluate unit normal time derivative dn_dt
+          if ( .not. update_static ) then
+            do ie = 1 , size(comp%el)
+              comp%el(ie)%nor_old = comp%el(ie)%nor
+            end do
+          end if
 
-        !> Move points of the component
-        geo%points(:,comp%i_points) = move_points(comp%loc_points, &
-                             geo%refs(comp%ref_id)%R_g, &
-                             geo%refs(comp%ref_id)%of_g)
+          !> Move points of the component
+          geo%points(:,comp%i_points) = move_points(comp%loc_points, &
+                                        geo%refs(comp%ref_id)%R_g, &
+                                        geo%refs(comp%ref_id)%of_g)
 
-        !> Update geometrical data of the elements, after geometry motion
-        do ie = 1,size(comp%el)
-          call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
-        enddo
-
-        !> Unit normal vector time derivative, dn_dt
-        ! set %nor_old = %nor for static elements and first time step,
-        ! this if statement completes the if statement found few lines
-        ! above, avoiding initialization issues (dirty implementation?)
-        if ( update_static ) then
+          !> Update geometrical data of the elements, after geometry motion
           do ie = 1,size(comp%el)
-            comp%el(ie)%nor_old = comp%el(ie)%nor
+            call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
+          enddo
+
+          !> Unit normal vector time derivative, dn_dt
+          ! set %nor_old = %nor for static elements and first time step,
+          ! this if statement completes the if statement found few lines
+          ! above, avoiding initialization issues (dirty implementation?)
+          if ( update_static ) then
+            do ie = 1,size(comp%el)
+              comp%el(ie)%nor_old = comp%el(ie)%nor
+            end do
+          end if
+
+          do ie = 1 , size(comp%el)
+            comp%el(ie)%dn_dt = (comp%el(ie)%nor - comp%el(ie)%nor_old)/sim_param % dt
           end do
+
+          !> Calculate the velocity of the centers to assing b.c.
+          do ie = 1,size(comp%el)
+            call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &
+                                          geo%refs(comp%ref_id)%f_g)
+          enddo
+          !> Update stripe velocity 
+          if (time_cycle .and. & 
+              trim(comp%comp_el_type) .eq. 'v' .and. &
+              trim(comp%aero_correction) .eq. 'true') then
+              
+            do ie = 1, size(comp%stripe)              
+              call calc_node_vel(comp%stripe(ie)%ctr_pt, geo%refs(comp%ref_id)%G_g, &
+                                geo%refs(comp%ref_id)%f_g, comp%stripe(ie)%ub)
+            end do  
+          endif 
         end if
 
-        do ie = 1 , size(comp%el)
-          comp%el(ie)%dn_dt = (comp%el(ie)%nor - comp%el(ie)%nor_old)/sim_param % dt
+      elseif ( comp%coupling .or. update_static ) then
+
+        do ie = 1,size(comp%el)
+
+          comp%el(ie)%dn_dt = (comp%el(ie)%nor - comp%el(ie)%nor_old)/sim_param%dt
         end do
 
-        !> Calculate the velocity of the centers to assing b.c.
-        do ie = 1,size(comp%el)
-          call calc_geo_vel(comp%el(ie), geo%refs(comp%ref_id)%G_g, &
-                                        geo%refs(comp%ref_id)%f_g)
-        enddo
+      end if  ! if ( .not. comp%coupling )
+
+    !> Hinges
+    !> Get trailing edge direction to be rotated for hinge deflection
+      
+    do ih = 1, comp%n_hinges
+      !> Update:
+      ! - hinge node coordinates, act%rr
+      ! - hinge node orientation (unit vectors h,v,n)
+      ! - hinge rotation angle, theta
+      ! for non-coupled components only (so far)
+      if ( .not. comp%coupling ) then
+        
+        !> hinge nodes, points and orientation
+        call comp%hinge(ih)%update_hinge_nodes( geo%refs(comp%ref_id)%R_g, &
+                                                geo%refs(comp%ref_id)%of_g )
+        !> hinge rotation, theta
+        call comp%hinge(ih)%update_theta( t )
+        
+        !> Allocating contiguous array to pass to %hinge_deflection procedure
+        allocate(rr_hinge_contig(3,size(comp%i_points)))
+        rr_hinge_contig = geo%points(:, comp%i_points)
+
+        call comp%hinge(ih)%hinge_deflection(comp%i_points, rr_hinge_contig,  t, te%i, te%t_hinged )
+        geo%points(:, comp%i_points) = rr_hinge_contig
+              deallocate(rr_hinge_contig)
+
+      else
+
+        !> Updated in mod_precice/update_elems
 
       end if
 
-    elseif ( comp%coupling .or. update_static ) then
 
+    end do
+
+    ! *** to do ***
+    ! Update surface velocity, considering both hinges with prescribed motion
+    ! and those coupled with the structural components
+    ! *** to do ***
+    if ( comp%n_hinges .gt. 0 ) then
+      !> Then update geometrical data, position and velocity of the elem centers
       do ie = 1,size(comp%el)
 
-        comp%el(ie)%dn_dt = (comp%el(ie)%nor - comp%el(ie)%nor_old)/sim_param % dt
+        !> Save dcen_h at previous timestep
+        comp%el(ie)%dcen_h_old = comp%el(ie)%dcen_h
+
+        !> Save the position of the centre, before hinge rotation
+        comp%el(ie)%dcen_h = comp%el(ie)%cen
+
+        !> Update new position of the centers, taking into account hinge motions
+        call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
+
+        !> Evaluate dcen_h, delta position due to hinge motion
+        comp%el(ie)%dcen_h = comp%el(ie)%cen - comp%el(ie)%dcen_h
+
+        !> Evaluate dvel_h, delta velocity due to hinge motion, with first
+        ! order finite difference
+        comp%el(ie)%dvel_h = ( comp%el(ie)%dcen_h - comp%el(ie)%dcen_h_old ) / &
+                                                                  sim_param % dt
+        !> Update on-body velocity
+        comp%el(ie)%ub = comp%el(ie)%ub + comp%el(ie)%dvel_h
+
+        !> Update time derivative of the unit normal vector
+        comp%el(ie)%dn_dt = comp%el(ie)%dn_dt + &
+                            ( comp%el(ie)%nor - comp%el(ie)%nor_old ) / &
+                                                                sim_param % dt
       end do
-
-  end if  ! if ( .not. comp%coupling )
-
-  !> Hinges -----------------------------------------------------------
-
-  !> Get trailing edge direction to be rotated for hinge deflection
-  
-  do ih = 1, comp%n_hinges
-    !> Update:
-    ! - hinge node coordinates, act%rr
-    ! - hinge node orientation (unit vectors h,v,n)
-    ! - hinge rotation angle, theta
-    ! for non-coupled components only (so far)
-    if ( .not. comp%coupling ) then
-
-      !> hinge nodes, points and orientation
-      call comp%hinge(ih)%update_hinge_nodes( geo%refs(comp%ref_id)%R_g, &
-                                              geo%refs(comp%ref_id)%of_g )
-      !> hinge rotation, theta
-      call comp%hinge(ih)%update_theta( t )
-
-      !> Allocating contiguous array to pass to %hinge_deflection procedure
-      allocate(rr_hinge_contig(3,size(comp%i_points)))
-      rr_hinge_contig = geo%points(:, comp%i_points)
-      
-      call comp%hinge(ih)%hinge_deflection(comp%i_points, rr_hinge_contig,  t, te%i, te%t_hinged )
-      geo%points(:, comp%i_points) = rr_hinge_contig
-            deallocate(rr_hinge_contig)
-
-    else
-
-      !> Updated in mod_precice/update_elems
 
     end if
 
-    
-  end do
-
-  ! *** to do ***
-  ! Update surface velocity, considering both hinges with prescribed motion
-  ! and those coupled with the structural components
-  ! *** to do ***
-  if ( comp%n_hinges .gt. 0 ) then
-    !> Then update geometrical data, position and velocity of the elem centers
-    do ie = 1,size(comp%el)
-
-      !> Save dcen_h at previous timestep
-      comp%el(ie)%dcen_h_old = comp%el(ie)%dcen_h
-
-      !> Save the position of the centre, before hinge rotation
-      comp%el(ie)%dcen_h = comp%el(ie)%cen
-
-      !> Update new position of the centers, taking into account hinge motions
-      call comp%el(ie)%calc_geo_data(geo%points(:,comp%el(ie)%i_ver))
-
-      !> Evaluate dcen_h, delta position due to hinge motion
-      comp%el(ie)%dcen_h = comp%el(ie)%cen - comp%el(ie)%dcen_h
-
-      !> Evaluate dvel_h, delta velocity due to hinge motion, with first
-      ! order finite difference
-      comp%el(ie)%dvel_h = ( comp%el(ie)%dcen_h - comp%el(ie)%dcen_h_old ) / &
-                                                                 sim_param % dt
-      !> Update on-body velocity
-      comp%el(ie)%ub = comp%el(ie)%ub + comp%el(ie)%dvel_h
-
-      !> Update time derivative of the unit normal vector
-      comp%el(ie)%dn_dt = comp%el(ie)%dn_dt + &
-                        ( comp%el(ie)%nor - comp%el(ie)%nor_old ) / &
-                                                                sim_param % dt
-    end do
-  end if
-  !> Hinges -----------------------------------------------------------
-
-  end associate
- enddo
+    end associate
+  enddo
 
 
 end subroutine update_geometry
@@ -2340,13 +2502,12 @@ end subroutine update_geometry
 !! vector of pointers alongside the geometry in destroy_geometry,
 !! however gcc 4.8 gives a SIGSEGV and needs and explicit deallocation
 subroutine destroy_elements_geo(geo)
- type(t_geo), intent(inout) :: geo
+  type(t_geo), intent(inout) :: geo
+  integer                    :: ic
 
- integer :: ic
-
- do ic=1,size(geo%components)
-   if(allocated(geo%components(ic)%el)) deallocate(geo%components(ic)%el)
- enddo
+  do ic=1,size(geo%components)
+    if(allocated(geo%components(ic)%el)) deallocate(geo%components(ic)%el)
+  enddo
 
 end subroutine destroy_elements_geo
 
@@ -2359,38 +2520,26 @@ end subroutine destroy_elements_geo
 !! vector of pointers alongside the geometry in destroy_geometry,
 !! however gcc 4.8 gives a SIGSEGV and needs and explicit deallocation
 subroutine destroy_elements_comps(components)
- type(t_geo_component), intent(inout) :: components(:)
+  type(t_geo_component), intent(inout) :: components(:)
+  integer                              :: ic
 
- integer :: ic
-
- do ic=1,size(components)
-   if(allocated(components(ic)%el)) deallocate(components(ic)%el)
- enddo
+  do ic=1,size(components)
+    if(allocated(components(ic)%el)) deallocate(components(ic)%el)
+  enddo
 
 end subroutine destroy_elements_comps
 
-!----------------------------------------------------------------------
-
 !> Destroy all the contents of a geometry type
-!!
+!
 subroutine destroy_geometry(geo, elems)
- type(t_geo), intent(out) :: geo
- type(t_pot_elem_p), allocatable, intent(out) :: elems(:)
+  type(t_geo), intent(out)                     :: geo
+  type(t_pot_elem_p), allocatable, intent(out) :: elems(:)
+  integer                                      :: i
+  call destroy_references(geo%refs)
 
- integer :: i
- call destroy_references(geo%refs)
-
- !dummy to avoid warnings
- i = size(elems)
-
+  !> Dummy to avoid warnings
+  i = size(elems)
 
 end subroutine destroy_geometry
-
-!----------------------------------------------------------------------
-
-
-
-
-!----------------------------------------------------------------------
 
 end module mod_geometry

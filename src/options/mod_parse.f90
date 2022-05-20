@@ -115,7 +115,7 @@ use MOD_Options, only: &
     StringOption, SubOption
 
 use MOD_StringTools, only: &
-  LowCase!, use_escape_codes!, set_formatting, clear_formatting
+  LowCase, stricmp!, use_escape_codes!, set_formatting, clear_formatting
 
 use mod_param, only: &
   wp, max_char_len, nl
@@ -398,7 +398,7 @@ end subroutine CreateIntFromStringOption
 !!
 !! Only calls the general prms\%createoption routine.
 subroutine CreateLogicalOption(this, name, description, value, multiple)
- class(t_parse),intent(inout)      :: this          !< class(t_parse)
+ class(t_parse),intent(inout)         :: this        !< class(t_parse)
  character(len=*),intent(in)          :: name        !< option name
  character(len=*),intent(in)          :: description !< option description
  character(len=*),intent(in),optional :: value       !< option value
@@ -649,9 +649,11 @@ subroutine read_options(this, filename, printout_val)
 
   !call info(this_sub_name, this_mod_name, &
   !                  'Reading parameters from file "'//trim(filename)//'":')
-  call printout(nl//nl//'Reading input parameters from file "'//&
+  if (this%printout_val) then 
+    call printout(nl//'Reading input parameters from file "'//&
                 trim(filename)//'"')
-
+  endif 
+  
   ! Open parameter file for reading
   iniUnit= 100 !getfreeunit()
   open(unit=iniUnit,file=trim(filename),status='old',action='read', &
@@ -688,19 +690,20 @@ subroutine read_options(this, filename, printout_val)
     ! Replace brackets
     aStr=Replace(aStr,"(/"," ",Every=.true.)
     aStr=Replace(aStr,"/)"," ",Every=.true.)
-    ! Lower case
-    call LowCase(char(aStr),HelpStr)
+    
+    HelpStr = char(aStr)        
+
     ! If something remaind, this should be an option
     if (LEN_TRIM(HelpStr).gt.2) then
       ! read the option
-      if (.not.actually_reading%read_option(HelpStr, sub_option, prev_read)) then
+      if (.not. actually_reading%read_option(HelpStr, sub_option, prev_read)) then
         if (firstWarn) then
           firstWarn=.false.
-          !=!write(UNIT_StdOut,'(100("!"))')
-          !=!write(UNIT_StdOut, *) "warning: The following options in file "&
-          !=                                //trim(filename)//" are unknown!"
+          !write(UNIT_StdOut, *) "WARNING: The following options in file "&
+          !                              //trim(filename)//" are unknown!"
+          !write(UNIT_StdOut,*) "   ", trim(HelpStr)                              
         end if
-        !=!write(UNIT_StdOut,*) "   ", trim(HelpStr)
+        ! write(UNIT_StdOut,*) "   ", trim(HelpStr)
       end if
 
       if (associated(sub_option)) then
@@ -769,6 +772,13 @@ function read_option(this, line, sub_option, prev_read) result(found)
   if (i==0) return
   name = line(1:i-1)
   rest = line(i+1:)
+
+  ! compatibility with legacy naming convention
+  if(name .eq. "CompName" .or. name .eq. "GeometryFile" .or. name .eq. "MeshFileType" &
+    & .or. name .eq. "Reference_Tag" .or. name .eq. "StartRes") then
+    call printout(nl//'WARNING: the input file is using legacy syntax, which will be &
+            & deprecated in the next release. Please update this file.'//nl)
+  end if
 
   !default, we have not found a sub-option
   sub_option => null()

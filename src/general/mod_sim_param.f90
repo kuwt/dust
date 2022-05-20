@@ -54,8 +54,8 @@ use mod_param, only: &
   wp, max_char_len
 
 use mod_hdf5_io, only: &
-   h5loc, &
-   write_hdf5_attr
+  h5loc, &
+  write_hdf5_attr
 
 use mod_parse, only: &
   t_parse, &
@@ -143,26 +143,29 @@ type t_sim_param
   real(wp) :: RankineRad
   !> Vortex Radius for vortex particles
   real(wp) :: VortexRad
+  !> Vortex Radius coefficient for vortex particles
+  !> if too low or negative reverts to original behaviour (VortexRad)
+  real(wp) :: KVortexRad  
   !> Complete cutoff radius
   real(wp) :: CutoffRad
   !> use the vortex stretching or not
   logical :: use_vs
-    !> use the vortex stretching from elements
-    logical :: vs_elems
-    !> use the divergence filtering
-    logical :: use_divfilt
-      !> time scale of the divergence filter
-      real(wp) :: filt_eta
+  !> use the vortex stretching from elements
+  logical :: vs_elems
+  !> use the divergence filtering
+  logical :: use_divfilt
+  !> time scale of the divergence filter
+  real(wp) :: filt_eta
   !> use the vorticity diffusion or not
   logical :: use_vd
   !> use turbulent viscosity or not
   logical :: use_tv
   !> use the penetration avoidance
   logical :: use_pa
-    !> check radius for penetration avoidance
-    real(wp) :: pa_rad_mult
-    !> element impact radius for penetration avoidance
-    real(wp) :: pa_elrad_mult
+  !> check radius for penetration avoidance
+  real(wp) :: pa_rad_mult
+  !> element impact radius for penetration avoidance
+  real(wp) :: pa_elrad_mult
   !> simulate viscosity effects or not
   logical :: use_ve
 
@@ -198,6 +201,7 @@ type t_sim_param
   !> Use AVL expression for inviscid load computation ( ~ VL )
   logical  :: llLoadsAVL
 
+  
   !FMM parameters
   !> Employing the FMM method
   logical :: use_fmm
@@ -249,10 +253,10 @@ type t_sim_param
   character(len=max_char_len) :: ReferenceFile
   !> Restart from file
   logical :: restart_from_file
-    !> Restart file
-    character(len=max_char_len) :: restart_file
-    !> Reset the time after restart
-    logical :: reset_time
+  !> Restart file
+  character(len=max_char_len) :: restart_file
+  !> Reset the time after restart
+  logical :: reset_time
 
   !Variable wind
   !> Gust
@@ -268,8 +272,16 @@ type t_sim_param
   real(wp) :: gust_gradient
   real(wp) :: gust_time
 
-contains
+  !> Vl correction 
+  logical   :: vl_correction = .false. 
+  real(wp)  :: vl_tol
+  real(wp)  :: vl_relax
+  integer   :: vl_maxiter
+  integer   :: vl_startstep
+  logical   :: vl_dynstall = .false.
+  logical   :: rel_aitken  = .false. 
 
+contains
   procedure, pass(this) :: save_param => save_sim_param
 end type t_sim_param
 
@@ -279,10 +291,9 @@ type(t_sim_param) :: sim_param
 contains
 !----------------------------------------------------------------------
 
-
 subroutine save_sim_param(this, loc)
- class(t_sim_param) :: this
- integer(h5loc), intent(in) :: loc
+  class(t_sim_param) :: this
+  integer(h5loc), intent(in) :: loc
 
   call write_hdf5_attr(this%t0, 't0', loc)
   call write_hdf5_attr(this%dt, 'dt', loc)
@@ -313,6 +324,7 @@ subroutine save_sim_param(this, loc)
   call write_hdf5_attr(this%DoubletThreshold, 'DoubletThreshold', loc)
   call write_hdf5_attr(this%RankineRad, 'RankineRad', loc)
   call write_hdf5_attr(this%VortexRad, 'VortexRad', loc)
+  call write_hdf5_attr(this%KVortexRad, 'KVortexRad', loc)
   call write_hdf5_attr(this%CutoffRad, 'CutoffRad', loc)
   call write_hdf5_attr(this%use_vs, 'Vortstretch', loc)
   if(this%use_vs) then

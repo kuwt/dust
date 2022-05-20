@@ -114,62 +114,62 @@ contains
 ! ----------------------------------------------------------------------
 
 subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
-                     out_frmt , components_names , all_comp , &
-                     an_start , an_end , an_step, average )
- type(t_parse), pointer :: sbprms
- character(len=*) , intent(in) :: basename
- character(len=*) , intent(in) :: data_basename
- character(len=*) , intent(in) :: an_name
- integer          , intent(in) :: ia
- character(len=*) , intent(in) :: out_frmt
- character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
- logical , intent(in) :: all_comp
- integer , intent(in) :: an_start , an_end , an_step
- logical, intent(in) :: average
+                      out_frmt , components_names , all_comp , &
+                      an_start , an_end , an_step, average )
+  type(t_parse), pointer :: sbprms
+  character(len=*) , intent(in) :: basename
+  character(len=*) , intent(in) :: data_basename
+  character(len=*) , intent(in) :: an_name
+  integer          , intent(in) :: ia
+  character(len=*) , intent(in) :: out_frmt
+  character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
+  logical , intent(in) :: all_comp
+  integer , intent(in) :: an_start , an_end , an_step
+  logical, intent(in) :: average
 
- type(t_geo_component), allocatable :: comps(:)
- character(len=max_char_len) :: filename
- integer(h5loc) :: floc , ploc
- logical :: out_vort, out_vort_vec, out_vel, out_cp, out_press , out_wake, out_surfvel
- logical :: out_turbvisc
- logical :: separate_wake
- integer :: n_var , i_var
- character(len=max_char_len), allocatable :: var_names(:)
- real(wp), allocatable :: points(:,:), points_exp(:,:) , wpoints(:,:)
- real(wp), allocatable :: vppoints(:,:), vpvort(:), vpvort_v(:,:), vpturbvisc(:)
- integer , allocatable :: elems(:,:) , welems(:,:)
- integer :: nelem , nelem_w, nelem_vp
+  type(t_geo_component), allocatable :: comps(:)
+  character(len=max_char_len) :: filename
+  integer(h5loc) :: floc , ploc
+  logical :: out_vort, out_vort_vec, out_vel, out_cp, out_press , out_wake, out_surfvel, out_vrad
+  logical :: out_turbvisc
+  logical :: separate_wake
+  integer :: n_var , i_var
+  character(len=max_char_len), allocatable :: var_names(:)
+  real(wp), allocatable :: points(:,:), points_exp(:,:) , wpoints(:,:)
+  real(wp), allocatable :: vppoints(:,:), vpvort(:), vpvort_v(:,:), vpturbvisc(:), v_rad(:)
+  integer , allocatable :: elems(:,:) , welems(:,:)
+  integer :: nelem , nelem_w, nelem_vp
 
- real(wp), allocatable :: points_ave(:,:)
+  real(wp), allocatable :: points_ave(:,:)
 
- real(wp) :: u_inf(3)
- real(wp) :: P_inf , rho
+  real(wp) :: u_inf(3)
+  real(wp) :: P_inf , rho
 
- real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
- real(wp), allocatable :: vort(:), cp(:), vel(:), press(:), surfvel(:,:)
- real(wp), allocatable :: wvort(:)
+  real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
+  real(wp), allocatable :: vort(:), cp(:), vel(:), press(:), surfvel(:,:)
+  real(wp), allocatable :: wvort(:)
 
- type(t_output_var), allocatable :: out_vars(:), ave_out_vars(:)
- type(t_output_var), allocatable :: out_vars_w(:), out_vars_vp(:)
- integer :: nprint , nprint_w, nelem_out
+  type(t_output_var), allocatable :: out_vars(:), ave_out_vars(:)
+  type(t_output_var), allocatable :: out_vars_w(:), out_vars_vp(:)
+  integer :: nprint , nprint_w, nelem_out
 
- integer :: it, ires
- real(wp) :: t
- character(len=*), parameter :: this_sub_name='post_viz'
+  integer :: it, ires
+  real(wp) :: t
+  character(len=*), parameter :: this_sub_name='post_viz'
 
   write(msg,'(A,I0,A)') nl//'++++++++++ Analysis: ',ia,' visualization'//nl
   call printout(trim(msg))
 
   ! Print the wake or not
-  out_wake = getlogical(sbprms,'Wake')
-  separate_wake = getlogical(sbprms,'SeparateWake')
+  out_wake = getlogical(sbprms,'wake')
+  separate_wake = getlogical(sbprms,'separate_wake')
 
   !Check which variables to analyse
   out_vort = .false.; out_vel = .false.; out_press =.false.; out_cp = .false.
   n_var = countoption(sbprms, 'Variable')
   allocate(var_names(n_var))
   do i_var = 1, n_var
-    var_names(i_var) = getstr(sbprms, 'Variable') ; call LowCase(var_names(i_var))
+    var_names(i_var) = getstr(sbprms, 'variable') ; call LowCase(var_names(i_var))
   enddo
   out_vort = isInList('vorticity',var_names) ! Always lower case string in the code !
   out_vort_vec = isInList('vorticity_vector',var_names) ! Always lower case string in the code !
@@ -178,6 +178,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   out_press= isInList('pressure' ,var_names)
   out_cp   = isInList('cp'       ,var_names)
   out_turbvisc = isInList('turbulent_viscosity',var_names)
+  out_vrad = isInList('vortex_rad',var_names)
   nprint = 0; nprint_w = 0
   if(out_vort)  nprint = nprint+1
   if(out_vort_vec)  nprint = nprint+1
@@ -186,6 +187,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   if(out_vel)   nprint = nprint+1  !<--- *** TODO ***
   if(out_press) nprint = nprint+1  !<--- *** TODO ***
   if(out_turbvisc) nprint = nprint+1
+  if(out_vrad) nprint = nprint+1
   allocate(out_vars(nprint))
   if(average) allocate(ave_out_vars(nprint))
   !for the wake
@@ -305,9 +307,9 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
 
         if(out_turbvisc) then
           call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort, &
-                           vpvort_v, vpturbvisc)
+                            vpvort_v, v_rad, vpturbvisc)
         else
-          call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort, vpvort_v)
+          call load_wake_viz(floc, wpoints, welems, wvort, vppoints, vpvort, vpvort_v, v_rad)
         endif
         nelem_w = size(welems,2)
         nelem_vp = size(vppoints,2)
@@ -315,77 +317,86 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
         i_var = 1
         if(out_vort) then
           call add_output_var(out_vars_w(i_var), wvort, &
-                 'Singularity_Intensity',.false.)
+                  'Singularity_Intensity',.false.)
           call add_output_var(out_vars_vp(i_var), vpvort, &
-                 'Singularity_Intensity',.false.)
+                  'Singularity_Intensity',.false.)
           i_var = i_var +1
         endif
         if(out_cp) then
           call add_output_var(out_vars_w(i_var), cp, &
-                 'Cp',.true.)
+                  'Cp',.true.)
           call add_output_var(out_vars_vp(i_var), cp, &
-                 'Cp',.true.)
+                  'Cp',.true.)
           i_var = i_var +1
         endif
         if(out_surfvel) then
           call add_output_var(out_vars_w(i_var), surfvel, &
-                 'Surface_Velocity',.true.)
+                  'Surface_Velocity',.true.)
           call add_output_var(out_vars_vp(i_var), surfvel, &
-                 'Surface_Velocity',.true.)
+                  'Surface_Velocity',.true.)
           i_var = i_var +1
         endif
         if(out_vel) then
           call add_output_var(out_vars_w(i_var), vel, &
-                 'Velocity',.true.)
+                  'Velocity',.true.)
           call add_output_var(out_vars_vp(i_var), vel, &
-                 'Velocity',.true.)
+                  'Velocity',.true.)
           i_var = i_var +1
         endif
         if(out_press) then
           call add_output_var(out_vars_w(i_var), press, &
-                 'Pressure',.true.)
+                  'Pressure',.true.)
           call add_output_var(out_vars_vp(i_var), press, &
-                 'Pressure',.true.)
+                  'Pressure',.true.)
           i_var = i_var +1
         endif
         if(out_turbvisc) then
           call add_output_var(out_vars_w(i_var), vpturbvisc, &
-                 'Turbulent_Viscosity',.true.)
+                  'Turbulent_Viscosity',.true.)
           call add_output_var(out_vars_vp(i_var), vpturbvisc, &
-                 'Turbulent_Viscosity',.false.)
+                  'Turbulent_Viscosity',.false.)
           call add_output_var(out_vars(i_var), vpturbvisc, &
-                 'Turbulent_Viscosity',.true.)
+                  'Turbulent_Viscosity',.true.)
           i_var = i_var +1
         endif
         if(out_vort_vec) then
           call add_output_var(out_vars_vp(i_var), vpvort_v, &
-                 'Vorticity',.false.)
+                  'Vorticity',.false.)
           call add_output_var(out_vars_w(i_var), vpvort_v, &
-                 'Vorticity',.true.)
+                  'Vorticity',.true.)
           call add_output_var(out_vars(i_var), vpvort_v, &
-                 'Vorticity',.true.)
+                  ' Vorticity',.true.)
           i_var = i_var +1
         endif
-
+        if(out_vrad) then
+          call add_output_var(out_vars_vp(i_var), v_rad, &
+                  'VortexRad',.false.)
+          call add_output_var(out_vars_w(i_var), v_rad, &
+                  'VortexRad',.true.)
+          call add_output_var(out_vars(i_var), v_rad, &
+                  'VortexRad',.true.)
+          i_var = i_var +1
+        endif
+        
         !Output the results (with wake)
         select case (trim(out_frmt))
-         case ('tecplot')
-          filename = trim(filename)//'.plt'
-          call  tec_out_viz(filename, t, &
-                       points_exp, elems, out_vars, &
-                       w_rr=wpoints, w_ee=welems, w_vars=out_vars_w, &
-                       vp_rr=vppoints, vp_vars=out_vars_vp)
-         case ('vtk')
-          filename = trim(filename)//'.vtu'
-          call  vtk_out_viz(filename, &
-                       points_exp, elems, out_vars, &
-                       w_rr=wpoints, w_ee=welems, w_vars=out_vars_w, &
-                       vp_rr=vppoints, vp_vars=out_vars_vp, &
-                       separate_wake = separate_wake)
-         case default
-           call error('dust_post','','Unknown format '//trim(out_frmt)//&
+          case ('tecplot')
+            filename = trim(filename)//'.plt'
+            call  tec_out_viz(filename, t, &
+                      points_exp, elems, out_vars, &
+                      w_rr=wpoints, w_ee=welems, w_vars=out_vars_w, &
+                      vp_rr=vppoints, vp_vars=out_vars_vp)
+          case ('vtk')
+            filename = trim(filename)//'.vtu'
+            call  vtk_out_viz(filename, &
+                        points_exp, elems, out_vars, &
+                      w_rr=wpoints, w_ee=welems, w_vars=out_vars_w, &
+                      vp_rr=vppoints, vp_vars=out_vars_vp, &
+                      separate_wake = separate_wake)
+          case default
+            call error('dust_post','','Unknown format '//trim(out_frmt)//&
                       ' for visualization output')
-         end select
+        end select
 
         deallocate (wpoints, welems,  wvort)
         call clear_output_vars(out_vars_w)
@@ -395,18 +406,18 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
 
         !Output the results (without wake)
         select case (trim(out_frmt))
-         case ('tecplot')
-          filename = trim(filename)//'.plt'
-          call  tec_out_viz(filename, t, &
-                       points_exp, elems, out_vars)
-         case ('vtk')
-          filename = trim(filename)//'.vtu'
-          call  vtk_out_viz(filename, &
-                       points_exp, elems, out_vars)
-         case default
-           call error('dust_post','','Unknown format '//trim(out_frmt)//&
-                      ' for visualization output')
-         end select
+          case ('tecplot')
+            filename = trim(filename)//'.plt'
+            call  tec_out_viz(filename, t, &
+                          points_exp, elems, out_vars)
+          case ('vtk')
+            filename = trim(filename)//'.vtu'
+            call  vtk_out_viz(filename, &
+                          points_exp, elems, out_vars)
+          case default
+            call error('dust_post','','Unknown format '//trim(out_frmt)//&
+                        ' for visualization output')
+        end select
 
       endif !output wake
 
@@ -432,17 +443,17 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave'
     !Output the results (without wake)
     select case (trim(out_frmt))
-     case ('tecplot')
-      filename = trim(filename)//'.plt'
-      call  tec_out_viz(filename, t, &
-                   points_ave, elems, ave_out_vars)
-     case ('vtk')
-      filename = trim(filename)//'.vtu'
-      call  vtk_out_viz(filename, &
-                   points_ave, elems, ave_out_vars)
-     case default
-       call error('dust_post','','Unknown format '//trim(out_frmt)//&
-                  ' for visualization output')
+      case ('tecplot')
+        filename = trim(filename)//'.plt'
+        call  tec_out_viz(filename, t, &
+                    points_ave, elems, ave_out_vars)
+      case ('vtk')
+        filename = trim(filename)//'.vtu'
+        call  vtk_out_viz(filename, &
+                    points_ave, elems, ave_out_vars)
+      case default
+        call error('dust_post','','Unknown format '//trim(out_frmt)//&
+                    ' for visualization output')
     end select
     call clear_output_vars(ave_out_vars)
     deallocate(ave_out_vars)
@@ -451,7 +462,6 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   deallocate(points)
   call destroy_elements(comps)
   deallocate(comps)
-  !deallocate(var_names)
   deallocate(out_vars)
   if(out_wake) deallocate(out_vars_w, out_vars_vp)
 
