@@ -498,7 +498,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       !> first leading edge region 
       if (ia .eq. 1) then 
         delta_x(ia) = csi_hinge(ia)
-        point_region(ia) = floor(nelem_chord*delta_x(ia))
+        point_region(ia) = floor(real(nelem_chord,wp)*delta_x(ia))
         allocate(csi_adim(point_region(ia) + 1)); csi_adim = 0.0_wp
         call define_division(type_chord, point_region(ia), csi_adim)
         chord_fraction(1:point_region(ia) + 1) = delta_x(ia)*csi_adim 
@@ -520,7 +520,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       else 
         delta_x_no_off(ia) = csi_hinge(ia) - csi_hinge(ia-1) 
         delta_x(ia) = delta_x(ia - 1) + delta_x_no_off(ia) 
-        point_region(ia) = floor(nelem_chord*delta_x_no_off(ia)) 
+        point_region(ia) = floor(real(nelem_chord,wp)*delta_x_no_off(ia)) 
         
         allocate(csi_adim(point_region(ia) + 1)); csi_adim = 0.0_wp
         call define_division(type_chord, point_region(ia), csi_adim)

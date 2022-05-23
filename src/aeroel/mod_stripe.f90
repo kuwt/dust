@@ -176,25 +176,19 @@ module mod_stripe
 
     real(wp)                         :: diff
     real(wp)                         :: mach, reynolds, wind(3)
-    real(wp)                         :: alpha, alpha_2d, alcl0
-    real(wp),    allocatable         :: al0(:)
+    real(wp)                         :: alpha, alpha_2d
     real(wp),    allocatable         :: aero_coeff(:)
-    real(wp)                         :: up(3), unorm, corr_fact, dcl_da, cl0, cl10
-    real(wp)                         :: dforce(3), mag_inv, mag_visc 
+    real(wp)                         :: up(3), unorm, dcl_da, cl0, cl10
+    real(wp)                         :: mag_inv
     integer                          :: i_c, n_pan, id_pan
-    real(wp)                         :: cl_inv, cl_visc, e_l(3)
-    real(wp)                         :: rel_fct, rhs_diff    
-    integer                          :: id_a, i_a
-    integer                          :: imach, nmach
-    real(wp)                         :: machend, mach1, mach2
-    integer                          :: irey, nRe, i_Re
-    real(wp)                         :: reyn1, reyn2, al0_Re
+    real(wp)                         :: cl_inv, cl_visc
+    real(wp)                         :: rel_fct, rhs_diff
     
     !> Dynamic stall
-    real(wp)                         :: thicc = 0.12 !> get as input? 
+    !real(wp)                         :: thicc = 0.12 !> get as input? 
                                         !(should be the last 2 digits of NACA profile)
-    real(wp)                         :: alpha_ref, K1, dAlpha_dt
-    real(wp)                         :: rad_break, rad_dyn, M1, M2, g1, g2, g2_max
+    !real(wp)                         :: alpha_ref, K1, dAlpha_dt
+    !real(wp)                         :: rad_break, rad_dyn, M1, M2, g1, g2, g2_max
   
 
     !> Relaxation factor

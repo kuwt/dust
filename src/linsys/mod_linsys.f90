@@ -353,9 +353,7 @@ subroutine solve_linsys(linsys)
   type(t_linsys), intent(inout) :: linsys
   integer                       :: INFO
   !logical, optional, intent(in) :: vl_correction
-  real                          :: t0, t1
   character(len=max_char_len)   :: msg
-  character(len=max_char_len)  :: message
   character(len=*), parameter   :: this_sub_name = 'solve_linsys'
 
   if (.not. linsys%skip) then
@@ -437,7 +435,6 @@ subroutine solve_linsys(linsys)
     call dgetrf(linsys%nmoving,linsys%nmoving, &
                 linsys%A(linsys%nstatic+1:linsys%rank,linsys%nstatic+1:linsys%rank), &
                 linsys%nmoving,linsys%P(linsys%nstatic+1:linsys%rank),info)
-    t1 = dust_time()
 #endif /*DUST_PRECISION*/
 
     if ( info .ne. 0 ) then

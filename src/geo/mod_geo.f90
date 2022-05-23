@@ -242,7 +242,7 @@ type :: t_geo_component
   !> Id of the airfoil elements (index in airfoil_list char array)
   integer ,allocatable :: i_airfoil_e(:,:)
   character(len=5) :: aero_correction
-  real(wp), allocatable :: curv_ac(:,:)
+  !real(wp), allocatable :: curv_ac(:,:)
   type(t_stripe), allocatable :: stripe(:)
 
 #if USE_PRECICE
@@ -819,7 +819,7 @@ subroutine load_components(geo, in_file, out_file, te)
   integer , allocatable                 :: neigh(:,:)
   !> Aerotable correction for vl 
   character(len=5)                      :: aero_table
-  real(wp), allocatable                 :: curv_ac(:,:)
+  !real(wp), allocatable                 :: curv_ac(:,:)
   !> Lifting Line elements
   real(wp), allocatable                 :: normalised_coord_e(:,:), theta_e(:)
   integer                 , allocatable :: i_airfoil_e(:,:)
@@ -2535,7 +2535,7 @@ subroutine destroy_geometry(geo, elems)
   type(t_geo), intent(out)                     :: geo
   type(t_pot_elem_p), allocatable, intent(out) :: elems(:)
   integer                                      :: i
-  call destroy_references(geo%refs)
+  !call destroy_references(geo%refs)
 
   !> Dummy to avoid warnings
   i = size(elems)

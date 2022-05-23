@@ -178,8 +178,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
 
   real(wp)                              :: w1 , w2
   integer                               :: i , i1 , i2, j
-  integer                                   :: iAirfoil, nAirfoils
-  character(len=max_char_len), allocatable  :: airfoil_table_list(:) 
+  integer                                   :: iAirfoil, nAirfoils 
   real(wp) , allocatable :: airfoil_list_actual_s(:)
   integer,  allocatable, intent(out), optional :: i_airfoil_e(:,:)
   real(wp), allocatable, intent(out), optional :: normalised_coord_e(:,:)

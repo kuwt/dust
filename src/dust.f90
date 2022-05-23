@@ -216,14 +216,13 @@ real(wp), allocatable             :: nor_SurfPan_old(:,:)
 real(wp), allocatable             :: al_kernel(:,:), al_v(:)
 
 !> VL viscous correction
-integer                           :: i_el, i_c, i_s, i, sel, i_p, jj, i_c2, i_s2
-integer                           :: it_vl, id_pan
+integer                           :: i_el, i_c, i_s, i, sel, i_p, i_c2, i_s2
+integer                           :: it_vl
 real(wp)                          :: tol, diff, max_diff 
-real(wp)                          :: d_cd(3), vel(3), v(3), x0(3), wind(3)
-real(wp), allocatable             :: res_tmp(:)
+real(wp)                          :: d_cd(3), vel(3), v(3)
 !> relaxation 
 real(wp), allocatable             :: residual_vl(:), residual_vl_old(:), residual_vl_delta(:)
-real(wp)                          :: rel_aitken, rel_fct 
+real(wp)                          :: rel_aitken
 
 !> octree parameters
 type(t_octree)                    :: octree
@@ -370,7 +369,7 @@ call prms%CreateIntOption('vl_start_step', &
                           &'Step in which the VL correction start', '0')
 call prms%CreateLogicalOption('vl_dynstall', 'Dynamic stall on corrected VL', 'F')
 call prms%CreateLogicalOption('aitken_relaxation', 'Employ aitken acceleration method during &   
-                              the fixed point iteration', 'T')  
+                              &the fixed point iteration', 'T')  
 
 !> Octree and multipole data 
 call prms%CreateLogicalOption('fmm','Employ fast multipole method?','T')
@@ -969,7 +968,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
       deallocate(residual_vl, residual_vl_old, residual_vl_delta)
       if(it_vl .eq. sim_param%vl_maxiter) then
         call warning('dust','dust','max iteration reached for non linear vl:&
-                    increase VLmaxiter!') 
+                    &increase VLmaxiter!') 
         write(message,*) 'Last iteration error: ', max_diff
         call printout(message)
       endif
@@ -1178,7 +1177,7 @@ call destroy_wake(wake)
 call destroy_octree(octree)
 call destroy_linsys(linsys)
 call destroy_elements(geo)
-call destroy_geometry(geo, elems_tot)
+!call destroy_geometry(geo, elems_tot)
 call destroy_hdf5()
 
 t22 = dust_time()
