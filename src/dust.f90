@@ -237,11 +237,6 @@ type(t_octree)                    :: octree
 #endif
 
 
-#if USE_PRECICE
-  !> Initialize PreCICE 
-  call precice%initialize()
-#endif
-
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
 
 t00 = dust_time()
@@ -427,6 +422,11 @@ call prms%CreateRealArrayOption('gust_perturbation_direction','Gust perturbation
 call prms%CreateRealOption('gust_gradient','Gust gradient')
 call prms%CreateRealOption('gust_start_time','Gust starting time','0.0')
 
+!> preCICE
+#if USE_PRECICE
+call prms%CreateStringOption('precice_config','PreCICE configuration file','./../precice-config.xml')
+#endif
+
 !> Get the parameters and print them out
 call printout(nl//'====== Input parameters: ======')
 call check_file_exists(input_file_name,'dust main')
@@ -451,6 +451,13 @@ else
 endif
 
 sim_param%basename_debug = basename_debug
+
+#if USE_PRECICE
+!> Initialize PreCICE 
+! Do it here because it needs to read precice_config path from dust.in
+call precice%initialize()
+#endif
+
 
 !> Parameters Initializations 
 call initialize_doublet()
@@ -1354,7 +1361,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
       end if
     end if
   end if
-  write(*,*) ' sim_param%llSolver : ' , trim(sim_param%llSolver)
+  !write(*,*) ' sim_param%llSolver : ' , trim(sim_param%llSolver)
   !> VL correction 
   sim_param%vl_tol                        = getreal(prms, 'vl_tol')
   sim_param%vl_relax                      = getreal(prms, 'vl_relax')
@@ -1428,7 +1435,12 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     sim_param%gust_time                   = getreal(prms,'gust_start_time')
     sim_param%gust_gradient               = getreal(prms,'gust_gradient')
   end if
-
+  
+  !> PreCICE
+#if USE_PRECICE
+    sim_param%precice_config              = getstr(prms,'precice_config')
+#endif
+  
   !> Manage restart
   sim_param%restart_from_file             = getlogical(prms,'restart_from_file')
   if (sim_param%restart_from_file) then

@@ -48,13 +48,13 @@
 module mod_precice
 
 use mod_param, only: &
-  wp, pi
+  wp, pi, nl
 
 use mod_sim_param, only: &
   sim_param
 
 use mod_handling, only: &
-  error
+  error, printout
 
 use mod_math, only: &
   cross, rotation_vector_combination
@@ -148,12 +148,12 @@ contains
 subroutine initialize(this)
   class(t_precice), intent(inout) :: this
   logical :: exists
-
-  write(*,*) ' Using PreCICE '
+  
+  call printout(nl//'Using PreCICE')
 
   ! *** to do *** read %config_file_name as an input
   !> Default input for dust in a preCICE coupled simulation TODO: read as input? 
-  this%config_file_name = './../precice-config.xml'
+  this%config_file_name = sim_param%precice_config
   this%solver_name = 'dust'
   this%  mesh_name = 'dust_mesh'
   this%comm_rank = 0
@@ -162,8 +162,8 @@ subroutine initialize(this)
   inquire(file=trim(this%config_file_name), exist=exists)
   if (.not. exists) then
     call error('initialize', 'mod_precice', 'Precice configuration file "'&
-              &//trim(this%config_file_name)//'" not found. If this is not a coupled &
-              &simulation, please compile DUST setting WITH_PRECICE=NO')
+              &//trim(this%config_file_name)//'" not found.'//nl//'If this is not a coupled &
+              &simulation, please compile DUST using WITH_PRECICE=NO')
   end if
   
   !> Initialize PreCICE participant and mesh
