@@ -834,7 +834,6 @@ subroutine load_components(geo, in_file, out_file, te)
 #if USE_PRECICE
   real(wp), allocatable                 :: c_ref_p(:,:)
   real(wp), allocatable                 :: c_ref_c(:,:)
-  real(wp), allocatable                 :: xac_p(:)
   real(wp), allocatable                 :: comp_coupling_nodes(:,:)
   integer                               :: points_offset_precice, np_precice, np_precice_tot
   integer                               :: comp_ind

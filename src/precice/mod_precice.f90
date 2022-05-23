@@ -351,8 +351,6 @@ subroutine update_force( this, geo, elems )
   type(t_geo)       , intent(inout) :: geo
   type(t_pot_elem_p), intent(in)    :: elems(:)
   real(wp) :: n_rot(3), chord(3), chord_rot(3)
-  real(wp) ::   ell(3),   off(3),   off_rot(3)
-  real(wp) :: radius_1(3), radius_2(3)
   real(wp) :: theta
   real(wp) :: eps = 1.0e-9_wp
 
@@ -1249,7 +1247,7 @@ subroutine update_near_field_wake( this, geo, wake, te )
   real(wp) :: eps = 1.0e-9_wp
 
   integer :: icomp
-  integer :: ip, ir, i_point, p1, p2, j, j_rot, iw, i
+  integer :: ip, ir, p1, p2, j, j_rot, iw, i
 
   ! Find rotation and angular velocity field id
   j_rot = 0
