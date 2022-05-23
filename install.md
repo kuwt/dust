@@ -1,15 +1,28 @@
+# Binary packages
+Pre-compiled binary packages are available for Ubuntu 20.04 and 22.04. They include only the standalone DUST version, without the preCICE-MBDyn coupling.
 
-## REQUIREMENTS:
+For Ubuntu 20.04 (focal) you can download and install DUST as follows:
 
-to build dust are required:
-- A Fortran compiler
-- CMake
-- A Lapack/BLAS implementation
-- An HDF5 library
-- A CGNS library
+  ```bash
+    wget https://LINK
+    sudo apt install ./dust_0.7.0b-1_amd64_focal.deb
+  ```
+For other versions of Ubuntu, just replace ```focal``` with the codename of your version (for example ```jammy``` for Ubuntu 22.04) in the name of the package in the commands above.
+# Build DUST from source
+If you need the coupled preCICE-MBDyn version of DUST, or if you wish to develop the software, you have to build it from source.
+## Requirements:
+
+To build DUST
+- a Fortran compiler
+- CMake 
+- a Lapack/BLAS implementation
+- an HDF5 library
+- a CGNS library
+
+are required.
 
 A Fortran compiler, CMake and a Lapack implementation can be found pre-packed 
-in most linux distributions.
+in most Linux distributions.
 
 ## Ubuntu 20.04
 
