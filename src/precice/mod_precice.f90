@@ -147,6 +147,7 @@ contains
 !>
 subroutine initialize(this)
   class(t_precice), intent(inout) :: this
+  logical :: exists
 
   write(*,*) ' Using PreCICE '
 
@@ -157,7 +158,14 @@ subroutine initialize(this)
   this%  mesh_name = 'dust_mesh'
   this%comm_rank = 0
   this%comm_size = 1
-
+  
+  inquire(file=trim(this%config_file_name), exist=exists)
+  if (.not. exists) then
+    call error('initialize', 'mod_precice', 'Precice configuration file "'&
+              &//trim(this%config_file_name)//'" not found. If this is not a coupled &
+              &simulation, please compile DUST setting WITH_PRECICE=NO')
+  end if
+  
   !> Initialize PreCICE participant and mesh
   call precicef_create( this%solver_name, &
                         this%config_file_name, &
