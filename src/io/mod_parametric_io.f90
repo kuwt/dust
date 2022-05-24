@@ -477,18 +477,13 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     enddo
     
     !> cast all the adimensional location into a single vector  
-    allocate(csi_hinge_not_unique(2)); csi_hinge_not_unique = 0.0_wp 
+    allocate(csi_hinge_not_unique(2*size(hinges))); csi_hinge_not_unique = 0.0_wp 
     do ih = 1, size(hinges)
-      csi_hinge_not_unique(1) = hinges(ih)%csi1
-      csi_hinge_not_unique(2) = hinges(ih)%csi2      
-      merge_tol = hinges(ih)%merge_tol
-      call unique(csi_hinge_not_unique, csi_hinge, merge_tol)
-      if (ih .gt. 1) then
-        csi_hinge = csi_hinge - 0.1_wp 
-        csi_hinge_not_unique = csi_hinge
-      endif
-    end do 
-    
+      csi_hinge_not_unique(ih) = hinges(ih)%csi1
+      csi_hinge_not_unique(ih+2) = hinges(ih)%csi2      
+    enddo
+    !> delete doubled nodes or merge them in single one if the distance is lower the 1% the chord lenght 
+    call unique(csi_hinge_not_unique, csi_hinge, merge_tol)   
 
     allocate(point_region(size(csi_hinge) + 1))
     allocate(delta_x(size(csi_hinge) + 1)); delta_x = 0.0_wp
