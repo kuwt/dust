@@ -236,9 +236,12 @@ subroutine vtk_print_piece_header(fu, offset, npoints, ncells, nquad, ntria, &
     buffer =  '   <CellData Scalars="scalars">'//lf;
     write(fu) trim(buffer)
     do i_v = 1,size(out_vars)
-      if(ncells.ne.size(out_vars(i_v)%var,2) .and. .not. out_vars(i_v)%skip) &
-        call internal_error(this_sub_name, this_mod_name, 'Nuber of output &
-        &variables different from number of cells')
+      if(.not. out_vars(i_v)%skip) then
+        if(ncells.ne.size(out_vars(i_v)%var,2)) then
+          call internal_error(this_sub_name, this_mod_name, 'Nuber of output &
+                              &variables different from number of cells')
+        end if
+      end if
       if(out_vars(i_v)%vector) then
         write(ostr,'(I0)') offset
         buffer = '    <DataArray type="Float32" Name="'//trim(out_vars(i_v)%var_name)//'" &

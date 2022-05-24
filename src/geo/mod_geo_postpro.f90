@@ -329,9 +329,9 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
         comps(i_comp)%parametric_nelems_chor = parametric_nelems_chor
       end if
 
-      if ( trim(comps(i_comp_tot)%comp_el_type) .eq. 'v' ) then
+      if ( trim(comps(i_comp)%comp_el_type) .eq. 'v' ) then
         call read_hdf5(aero_table,  'aero_table', geo_loc)
-        comps(i_comp_tot)%aero_correction = trim(aero_table)
+        comps(i_comp)%aero_correction = trim(aero_table)
       end if 
   
       call close_hdf5_group(geo_loc)
