@@ -126,7 +126,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   real(wp), allocatable                     :: csi_hinge_not_unique(:), csi_hinge(:)
   real(wp), allocatable                     :: delta_x(:), delta_x_no_off(:), csi_adim(:) 
   integer, allocatable                      :: point_region(:)
-  real(wp)                                  :: merge_tol 
+  real(wp)                                  :: merge_tol = 0.0_wp
   !> Regions  
   integer , allocatable, intent(out)        :: nelem_span_list(:)
   real(wp), allocatable                     :: span_list(:) 
@@ -339,6 +339,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   ! get chordwise division
   allocate(chord_fraction(nelem_chord+1))
   type_chord = getstr(pmesh_prs,'type_chord')
+
   !> build adaptive mesh for hinged case   
   if (n_hinges .ge. 1) then 
     !> allocate surface points for the component 
@@ -378,7 +379,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       end do 
       chord_list(nRegions+1:1:-1) = chord_list
     else 
-
+    
       do iRegion = 1, nRegions
         !> leading edge and trailing edge points in wind axis  
         rrv_le(1, iRegion + 1) = ac_line(1, iRegion + 1) - chord_list(iRegion + 1)*ref_chord_fraction 
@@ -388,12 +389,22 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       end do 
     
     endif 
+    
+    !> add ref_point (starting_point) to rrv and ac_line 
+    rrv_le(1,:)   = ref_point(1) + rrv_le(1,:) 
+    rrv_te(1,:)   = ref_point(1) + rrv_te(1,:) 
+    ac_line(1,:)  = ref_point(1) + ac_line(1,:) 
+    rrv_le(2,:)   = ref_point(2) + rrv_le(2,:) 
+    rrv_te(2,:)   = ref_point(2) + rrv_te(2,:) 
+    ac_line(2,:)  = ref_point(2) + ac_line(2,:) 
+
     do iRegion = 1, nRegions
       do ih = 1, n_hinges
-        if (mesh_mirror .or. mesh_symmetry) then 
+        if (mesh_mirror .or. mesh_symmetry ) then 
 
           if ((hinges(ih)%node2(2) .le. ac_line(2, iRegion + 1)) .and. & 
               (hinges(ih)%node2(2) .ge. ac_line(2, iRegion))) then 
+
               !> interpolate at hinge station to get the leading edge point
               call linear_interp((/ rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
                                   (/rrv_le(2, iRegion), rrv_le(2, iRegion + 1)/), & 
@@ -408,6 +419,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
               hinges(ih)%chord2 = abs(hinges(ih)%le2(1) - hinges(ih)%te2(1))
               !> hinge node adimensional location along chord
               hinges(ih)%csi2 = (hinges(ih)%node2(1) - hinges(ih)%le2(1)) / hinges(ih)%chord2 
+              
 
           endif    
 
@@ -481,10 +493,14 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     do ih = 1, size(hinges)
       csi_hinge_not_unique(ih) = hinges(ih)%csi1
       csi_hinge_not_unique(ih+2) = hinges(ih)%csi2      
+      merge_tol = merge_tol + hinges(ih)%merge_tol 
     enddo
-    !> delete doubled nodes or merge them in single one if the distance is lower the 1% the chord lenght 
-    call unique(csi_hinge_not_unique, csi_hinge, merge_tol)   
+    !> take average and avoid numerical issues
+    merge_tol = merge_tol/real(size(hinges)) + 1e-16_wp
 
+    !> delete doubled nodes or merge them in single one if the distance is lower the 1% the chord lenght 
+    call unique(csi_hinge_not_unique, csi_hinge, 1e-16_wp)  
+    
     allocate(point_region(size(csi_hinge) + 1))
     allocate(delta_x(size(csi_hinge) + 1)); delta_x = 0.0_wp
     allocate(delta_x_no_off(size(csi_hinge) + 1)); delta_x_no_off = 0.0_wp ! maybe useless 
