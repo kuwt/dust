@@ -48,13 +48,13 @@
 module mod_precice
 
 use mod_param, only: &
-  wp, pi
+  wp, pi, nl
 
 use mod_sim_param, only: &
   sim_param
 
 use mod_handling, only: &
-  error
+  error, printout
 
 use mod_math, only: &
   cross, rotation_vector_combination
@@ -147,17 +147,25 @@ contains
 !>
 subroutine initialize(this)
   class(t_precice), intent(inout) :: this
-
-  write(*,*) ' Using PreCICE '
+  logical :: exists
+  
+  call printout(nl//'Using PreCICE')
 
   ! *** to do *** read %config_file_name as an input
   !> Default input for dust in a preCICE coupled simulation TODO: read as input? 
-  this%config_file_name = './../precice-config.xml'
+  this%config_file_name = sim_param%precice_config
   this%solver_name = 'dust'
   this%  mesh_name = 'dust_mesh'
   this%comm_rank = 0
   this%comm_size = 1
-
+  
+  inquire(file=trim(this%config_file_name), exist=exists)
+  if (.not. exists) then
+    call error('initialize', 'mod_precice', 'Precice configuration file "'&
+              &//trim(this%config_file_name)//'" not found.'//nl//'If this is not a coupled &
+              &simulation, please compile DUST using WITH_PRECICE=NO')
+  end if
+  
   !> Initialize PreCICE participant and mesh
   call precicef_create( this%solver_name, &
                         this%config_file_name, &
@@ -351,8 +359,6 @@ subroutine update_force( this, geo, elems )
   type(t_geo)       , intent(inout) :: geo
   type(t_pot_elem_p), intent(in)    :: elems(:)
   real(wp) :: n_rot(3), chord(3), chord_rot(3)
-  real(wp) ::   ell(3),   off(3),   off_rot(3)
-  real(wp) :: radius_1(3), radius_2(3)
   real(wp) :: theta
   real(wp) :: eps = 1.0e-9_wp
 
@@ -1249,7 +1255,7 @@ subroutine update_near_field_wake( this, geo, wake, te )
   real(wp) :: eps = 1.0e-9_wp
 
   integer :: icomp
-  integer :: ip, ir, i_point, p1, p2, j, j_rot, iw, i
+  integer :: ip, ir, p1, p2, j, j_rot, iw, i
 
   ! Find rotation and angular velocity field id
   j_rot = 0

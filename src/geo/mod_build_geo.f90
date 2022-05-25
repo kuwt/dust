@@ -173,7 +173,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   character(len=max_char_len)  :: comp_el_type
   character                    :: ElType
   character(len=max_char_len)  :: mesh_file_type
-  real(wp), allocatable        :: curv_ac(:,:)
   !> Hinge 
   integer                      :: n_hinges
   type(t_parse), pointer       :: hinge_prs
@@ -771,7 +770,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call read_mesh_parametric(trim(mesh_file), ee, rr, &
                               npoints_chord_tot, nelems_span, hinges, n_hinges, mesh_mirror, mesh_symmetry,&
                               nelem_span_list, airfoil_list, i_airfoil_e, normalised_coord_e, &
-                              aero_table)!, curv_ac)  
+                              aero_table)  
 
       !> Write additional fields for vl correction
       if (aero_table) then 

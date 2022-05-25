@@ -65,5 +65,5 @@ private
 ! Version handling
 
 character(len=*), parameter :: git_sha1="@GIT_SHA1@"
-character(len=*), parameter :: version ='0.6.1-development'
+character(len=*), parameter :: version ='@GIT_VERS@-@GIT_BRAN@'
 end module mod_version

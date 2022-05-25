@@ -1465,7 +1465,7 @@ end subroutine build_references
 !----------------------------------------------------------------------
 
 subroutine destroy_references(refs)
- type(t_ref), allocatable, intent(out)   :: refs(:)
+ type(t_ref), allocatable, intent(in)   :: refs(:)
 
  integer :: i
 

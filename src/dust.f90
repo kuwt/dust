@@ -216,14 +216,15 @@ real(wp), allocatable             :: nor_SurfPan_old(:,:)
 real(wp), allocatable             :: al_kernel(:,:), al_v(:)
 
 !> VL viscous correction
-integer                           :: i_el, i_c, i_s, i, sel, i_p, jj, i_c2, i_s2
-integer                           :: it_vl, id_pan
+integer                           :: i_el, i_c, i_s, i, sel, i_p, i_c2, i_s2
+integer                           :: it_vl
 real(wp)                          :: tol, diff, max_diff 
-real(wp)                          :: d_cd(3), vel(3), v(3), x0(3), wind(3)
-real(wp), allocatable             :: res_tmp(:)
+real(wp)                          :: d_cd(3), vel(3), v(3), a_v, area_stripe, dforce_stripe(3), e_d(3), e_l(3)
+real(wp)                          :: nor(3), tang_cen(3), u_v, q_inf
+
 !> relaxation 
 real(wp), allocatable             :: residual_vl(:), residual_vl_old(:), residual_vl_delta(:)
-real(wp)                          :: rel_aitken, rel_fct 
+real(wp)                          :: rel_aitken
 
 !> octree parameters
 type(t_octree)                    :: octree
@@ -237,11 +238,6 @@ type(t_octree)                    :: octree
   real(wp)                        :: sum_force(3)
 #endif
 
-
-#if USE_PRECICE
-  !> Initialize PreCICE 
-  call precice%initialize()
-#endif
 
 call printout(nl//'>>>>>> DUST beginning >>>>>>'//nl)
 
@@ -370,7 +366,7 @@ call prms%CreateIntOption('vl_start_step', &
                           &'Step in which the VL correction start', '0')
 call prms%CreateLogicalOption('vl_dynstall', 'Dynamic stall on corrected VL', 'F')
 call prms%CreateLogicalOption('aitken_relaxation', 'Employ aitken acceleration method during &   
-                              the fixed point iteration', 'T')  
+                              &the fixed point iteration', 'T')  
 
 !> Octree and multipole data 
 call prms%CreateLogicalOption('fmm','Employ fast multipole method?','T')
@@ -428,6 +424,11 @@ call prms%CreateRealArrayOption('gust_perturbation_direction','Gust perturbation
 call prms%CreateRealOption('gust_gradient','Gust gradient')
 call prms%CreateRealOption('gust_start_time','Gust starting time','0.0')
 
+!> preCICE
+#if USE_PRECICE
+call prms%CreateStringOption('precice_config','PreCICE configuration file','./../precice-config.xml')
+#endif
+
 !> Get the parameters and print them out
 call printout(nl//'====== Input parameters: ======')
 call check_file_exists(input_file_name,'dust main')
@@ -452,6 +453,13 @@ else
 endif
 
 sim_param%basename_debug = basename_debug
+
+#if USE_PRECICE
+!> Initialize PreCICE 
+! Do it here because it needs to read precice_config path from dust.in
+call precice%initialize()
+#endif
+
 
 !> Parameters Initializations 
 call initialize_doublet()
@@ -948,28 +956,37 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           call solve_linsys(linsys)     
         endif
 
-        it_vl = it_vl + 1
-
+        it_vl = it_vl + 1 
+        
         !$omp parallel do private(i_el)
         do i_el = 1 , sel      
           elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
         enddo 
         !$omp end parallel do 
 
-        do i_el = 1, sel 
-          select type(el => elems(i_el)%p)        
+        do i_el = 1, size(elems_non_corr)
+          select type(el => elems_non_corr(i_el)%p)        
+            class is(t_vortlatt)   
+              !> compute dforce using AVL formula with prandtl glauert 
+              call el%compute_dforce_jukowski(.true.) 
+          end select            
+        end do
+        do i_el = 1, size(elems_corr)
+          select type(el => elems_corr(i_el)%p)
             class is(t_vortlatt)   
               !> compute dforce using AVL formula without prandtl glauert correction since it is 
               !  already contained in the .c81 table 
               call el%compute_dforce_jukowski(.false.) 
-          end select            
-        end do
+          end select
+        end do 
+
+
       end do !(while)
 
       deallocate(residual_vl, residual_vl_old, residual_vl_delta)
       if(it_vl .eq. sim_param%vl_maxiter) then
         call warning('dust','dust','max iteration reached for non linear vl:&
-                    increase VLmaxiter!') 
+                    &increase VLmaxiter!') 
         write(message,*) 'Last iteration error: ', max_diff
         call printout(message)
       endif
@@ -980,14 +997,19 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
 
           do i_s = 1, size(geo%components(i_c)%stripe) 
-            d_cd =  0.5_wp * sim_param%rho_inf *  & 
-                    geo%components(i_c)%stripe(i_s)%vel_2d**2.0_wp *      &                 
-                    geo%components(i_c)%stripe(i_s)%cd * &
-                    (geo%components(i_c)%stripe(i_s)%tang_cen * &
-                    cos(geo%components(i_c)%stripe(i_s)%alpha*pi/180.0_wp) + & 
-                    (geo%components(i_c)%stripe(i_s)%nor) * &
-                    sin(geo%components(i_c)%stripe(i_s)%alpha*pi/180.0_wp ))
+            
+            nor = geo%components(i_c)%stripe(i_s)%nor
+            tang_cen = geo%components(i_c)%stripe(i_s)%tang_cen
+            a_v = geo%components(i_c)%stripe(i_s)%alpha*pi/180.0_wp
+            area_stripe = geo%components(i_c)%stripe(i_s)%area 
+            u_v = geo%components(i_c)%stripe(i_s)%vel_2d
+            q_inf = 0.5_wp*sim_param%rho_inf * u_v ** 2.0_wp * area_stripe
 
+            d_cd =  0.5_wp * sim_param%rho_inf * u_v**2.0_wp * &                 
+                    geo%components(i_c)%stripe(i_s)%cd * &
+                    (tang_cen * cos(a_v) + nor * sin(a_v))
+
+            dforce_stripe = 0.0_wp  
             do i_p = 1, size(geo%components(i_c)%stripe(i_s)%panels)
               geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce = &
                           geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce + &
@@ -997,7 +1019,20 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                           sum(geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce * &
                               geo%components(i_c)%stripe(i_s)%panels(i_p)%p%nor)/ & 
                               geo%components(i_c)%stripe(i_s)%panels(i_p)%p%area 
+              
+              dforce_stripe = dforce_stripe + &
+                              geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce
             end do
+
+            !> update cl and cd            
+            e_l = nor * cos(a_v) - tang_cen * sin(a_v)
+            e_d = nor * sin(a_v) + tang_cen * cos(a_v)
+            e_l = e_l / norm2(e_l)
+            e_d = e_d / norm2(e_d)
+
+            geo%components(i_c)%stripe(i_s)%aero_coeff(1) = dot(dforce_stripe,e_l) / q_inf 
+            geo%components(i_c)%stripe(i_s)%aero_coeff(2) = dot(dforce_stripe,e_d) / q_inf
+            
           end do
         end if 
       end do         
@@ -1010,7 +1045,6 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     endif
   end if 
 
-!write(*,*) 'dforce_post_vc   ', elems(11)%p%dforce
   ! Explicit elements:
   ! - liftlin: _pres and _dforce computed in solve_liftin()
   ! - actdisk: avg delta_pressure and force computed here,
@@ -1178,7 +1212,7 @@ call destroy_wake(wake)
 call destroy_octree(octree)
 call destroy_linsys(linsys)
 call destroy_elements(geo)
-call destroy_geometry(geo, elems_tot)
+!call destroy_geometry(geo, elems_tot)
 call destroy_hdf5()
 
 t22 = dust_time()
@@ -1355,7 +1389,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
       end if
     end if
   end if
-  write(*,*) ' sim_param%llSolver : ' , trim(sim_param%llSolver)
+  !write(*,*) ' sim_param%llSolver : ' , trim(sim_param%llSolver)
   !> VL correction 
   sim_param%vl_tol                        = getreal(prms, 'vl_tol')
   sim_param%vl_relax                      = getreal(prms, 'vl_relax')
@@ -1429,7 +1463,12 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     sim_param%gust_time                   = getreal(prms,'gust_start_time')
     sim_param%gust_gradient               = getreal(prms,'gust_gradient')
   end if
-
+  
+  !> PreCICE
+#if USE_PRECICE
+    sim_param%precice_config              = getstr(prms,'precice_config')
+#endif
+  
   !> Manage restart
   sim_param%restart_from_file             = getlogical(prms,'restart_from_file')
   if (sim_param%restart_from_file) then

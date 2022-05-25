@@ -527,8 +527,7 @@ subroutine load_wake_viz(floc, wpoints, welems, wvort, vppoints,  vpvort, &
 
   allocate(welems(4,size(welems_pan,2)+size(welems_rin,2)))
   welems(:,1:size(welems_pan,2)) = welems_pan
-  welems(1:3,size(welems_pan,2)+1:size(welems,2)) = welems_rin(1:3,:) + &
-                                                    size(wpoints_pan,2)
+  welems(1:3,size(welems_pan,2)+1:size(welems,2)) = welems_rin(1:3,:)
   welems(4,size(welems_pan,2)+1:size(welems,2)) = 0
   deallocate(welems_pan, welems_rin)
 

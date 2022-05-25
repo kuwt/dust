@@ -52,11 +52,11 @@ Designed from scratch to deliver mid-fidelity aerodynamics analysis at workstati
 
 ### Transient Maneuver
 
-<img src="/uploads/80fb401b59239a9e0f2348e33bb8b3e3/gif_1_.gif" alt="Vid" width="700px"/>
+<img src="/uploads/cf45d9be5bdb66582172fc14f9bbb6a6/XV15_Rolling_Maneuver.gif" alt="Vid" width="520px"/>
 
 ### Aeroelastic Simulation
 
-<img src="/uploads/b8a3d697608fdd1bd29869ae9bdfa20a/gif.gif" alt="Vid" width="700px"/>
+<img src="/uploads/957eb38af65f103c39c712a6f2facc08/Goland_Wing_Flutter.gif" alt="Vid" width="520px"/>
 
 
 ## Documentation

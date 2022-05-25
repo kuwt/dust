@@ -120,9 +120,8 @@ subroutine build_connectivity(this, aero_coord, coupling_node_rot)
   real(wp), allocatable               :: diff_all(:,:), diff_all_transpose(:,:) 
   real(wp), allocatable               :: dist_all(:), mat_dist_all(:,:), wei_v(:), Wnorm(:,:)
   integer , allocatable               :: ind_v(:)
-  real(wp)                            :: cen(3)
-  integer                             :: np, ns, ne, n
-  integer                             :: ip, is, ie
+  integer                             :: np, ns
+  integer                             :: ip, is
 
   !> Number of surface points
   np = size(aero_coord,2)

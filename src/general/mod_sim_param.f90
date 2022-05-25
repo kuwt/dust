@@ -280,7 +280,12 @@ type t_sim_param
   integer   :: vl_startstep
   logical   :: vl_dynstall = .false.
   logical   :: rel_aitken  = .false. 
-
+  
+  !> PreCICE
+#if USE_PRECICE
+  character(len=max_char_len) :: precice_config
+#endif
+  
 contains
   procedure, pass(this) :: save_param => save_sim_param
 end type t_sim_param

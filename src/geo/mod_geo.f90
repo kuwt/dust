@@ -242,7 +242,7 @@ type :: t_geo_component
   !> Id of the airfoil elements (index in airfoil_list char array)
   integer ,allocatable :: i_airfoil_e(:,:)
   character(len=5) :: aero_correction
-  real(wp), allocatable :: curv_ac(:,:)
+  !real(wp), allocatable :: curv_ac(:,:)
   type(t_stripe), allocatable :: stripe(:)
 
 #if USE_PRECICE
@@ -563,71 +563,63 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   allocate(elems_corr(i_corr)) 
   allocate(elems_non_corr(geo%nelem_impl+geo%nelem_expl - i_corr))
   i_corr = 0 
+
   do i_comp = 1,size(geo%components)
 
-    if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p' .or. &
-        trim(geo%components(i_comp)%comp_el_type) .eq. 'v') then
-
+    if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p') then ! panels, implicit and not corrected
       do j = 1,size(geo%components(i_comp)%el)
-        i_impl = i_impl+1
         i_tot = i_tot+1
         elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
+        i_impl = i_impl+1
         select type(el => geo%components(i_comp)%el(j)); class is(c_impl_elem)
-        elems_impl(i_impl)%p => el
+          elems_impl(i_impl)%p => el
         end select
-      enddo
-
-    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'v' .and. &
-            trim(geo%components(i_comp)%aero_correction) .eq. 'false') then
-      do j = 1,size(geo%components(i_comp)%el)
         i_non_corr = i_non_corr + 1 
         elems_non_corr(i_non_corr)%p => geo%components(i_comp)%el(j)
-      end do 
-
-    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'v' .and. &
-            trim(geo%components(i_comp)%aero_correction) .eq. 'true') then
-      do j = 1, size(geo%components(i_comp)%el)
-        i_corr = i_corr + 1 
-        elems_corr(i_corr)%p => geo%components(i_comp)%el(j) 
       enddo
-    
-    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'p') then 
+    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'v') then ! vortex lattice, implicit, can be corrected or not
       do j = 1,size(geo%components(i_comp)%el)
-        i_non_corr = i_non_corr + 1 
-        elems_non_corr(i_non_corr)%p => geo%components(i_comp)%el(j)
-      end do
-
-    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'l') then
-
-      do j = 1,size(geo%components(i_comp)%el)
-        i_ll = i_ll + 1
-        i_expl = i_expl + 1
-        i_non_corr = i_non_corr + 1
-        i_tot = i_tot + 1
-        elems_non_corr(i_non_corr)%p => geo%components(i_comp)%el(j)
+        i_tot = i_tot+1
         elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
+        i_impl = i_impl+1
+        select type(el => geo%components(i_comp)%el(j)); class is(c_impl_elem)
+          elems_impl(i_impl)%p => el
+        end select
+        if (trim(geo%components(i_comp)%aero_correction) .eq. 'false') then ! not corrected
+          i_non_corr = i_non_corr + 1 
+          elems_non_corr(i_non_corr)%p => geo%components(i_comp)%el(j)
+        elseif (trim(geo%components(i_comp)%aero_correction) .eq. 'true') then ! corrected
+          i_corr = i_corr + 1 
+          elems_corr(i_corr)%p => geo%components(i_comp)%el(j) 
+        end if
+      end do
+    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'l') then ! lifting line, explicit, not corrected
+      do j = 1,size(geo%components(i_comp)%el)
+        i_tot = i_tot + 1
+        elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
+        i_expl = i_expl + 1
+        i_ll = i_ll + 1
         select type(el => geo%components(i_comp)%el(j)); class is(t_liftlin)
           elems_ll(i_ll)%p => el
           elems_expl(i_expl)%p => el
         end select
-      enddo
-
-    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'a') then
-
-      do j = 1,size(geo%components(i_comp)%el)
-        i_ad = i_ad + 1
-        i_expl = i_expl + 1
         i_non_corr = i_non_corr + 1
-        i_tot = i_tot + 1
         elems_non_corr(i_non_corr)%p => geo%components(i_comp)%el(j)
+      enddo
+    elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'a') then ! actuator disk, explicit, not corrected
+      do j = 1,size(geo%components(i_comp)%el)
+        i_tot = i_tot + 1
         elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
+        i_expl = i_expl + 1
+        i_ad = i_ad + 1
         select type(el => geo%components(i_comp)%el(j)); class is(c_expl_elem)
           elems_ad(i_ad)%p => el
           elems_expl(i_expl)%p => el
         end select
+        i_non_corr = i_non_corr + 1
+        elems_non_corr(i_non_corr)%p => geo%components(i_comp)%el(j)
       enddo
-
-    endif
+    end if
   enddo
 
   !> Sort implicit elements: first static, then moving 
@@ -819,7 +811,7 @@ subroutine load_components(geo, in_file, out_file, te)
   integer , allocatable                 :: neigh(:,:)
   !> Aerotable correction for vl 
   character(len=5)                      :: aero_table
-  real(wp), allocatable                 :: curv_ac(:,:)
+  !real(wp), allocatable                 :: curv_ac(:,:)
   !> Lifting Line elements
   real(wp), allocatable                 :: normalised_coord_e(:,:), theta_e(:)
   integer                 , allocatable :: i_airfoil_e(:,:)
@@ -834,7 +826,6 @@ subroutine load_components(geo, in_file, out_file, te)
 #if USE_PRECICE
   real(wp), allocatable                 :: c_ref_p(:,:)
   real(wp), allocatable                 :: c_ref_c(:,:)
-  real(wp), allocatable                 :: xac_p(:)
   real(wp), allocatable                 :: comp_coupling_nodes(:,:)
   integer                               :: points_offset_precice, np_precice, np_precice_tot
   integer                               :: comp_ind
@@ -2535,7 +2526,7 @@ subroutine destroy_geometry(geo, elems)
   type(t_geo), intent(out)                     :: geo
   type(t_pot_elem_p), allocatable, intent(out) :: elems(:)
   integer                                      :: i
-  call destroy_references(geo%refs)
+  !call destroy_references(geo%refs)
 
   !> Dummy to avoid warnings
   i = size(elems)
