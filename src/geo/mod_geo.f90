@@ -588,7 +588,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
         if (trim(geo%components(i_comp)%aero_correction) .eq. 'false') then ! not corrected
           i_non_corr = i_non_corr + 1 
           elems_non_corr(i_non_corr)%p => geo%components(i_comp)%el(j)
-        else ! corrected
+        elseif (trim(geo%components(i_comp)%aero_correction) .eq. 'true') then ! corrected
           i_corr = i_corr + 1 
           elems_corr(i_corr)%p => geo%components(i_comp)%el(j) 
         end if
