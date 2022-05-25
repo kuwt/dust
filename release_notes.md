@@ -1,3 +1,7 @@
+#### 0.7.1-b
+
+- Fixed some bugs
+
 #### 0.7.0-b
 
 - Added non linear vortex lattice element with .c81 table correction
