@@ -843,19 +843,19 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     !$omp parallel do private(i_el)
       do i_el = 1 , sel      
         select type(el => elems(i_el)%p)        
-          class is(t_vortlatt)          
+          class is(t_vortlatt)    
+            ! compute vel at 1/4 chord (some approx, see the comments in the fcn)      
             call el%get_vel_ctr_pt( elems_tot, (/ wake%pan_p, wake%rin_p/), wake%vort_p)
-            !> compute dforce using AVL formula
         end select
       end do 
     !$omp end parallel do
+
     do i_el = 1 , sel      
       select type(el => elems(i_el)%p)        
-        class is(t_vortlatt)          
+        class is(t_vortlatt)         
+          !> compute dforce using AVL formula 
           call el%compute_dforce_jukowski(.true.) 
-        ! update the pressure field, p = df.n / area
-          ! compute vel at 1/4 chord (some approx, see the comments in the fcn)
-          ! update the pressure field, p = df.n / area
+          !> update the pressure field, p = df.n / area
           el%pres = sum(el%dforce * el%nor)/el%area
       end select
     end do
@@ -898,7 +898,8 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                 call geo%components(i_c)%stripe(i_s)%calc_geo_data(geo%components(i_c)%stripe(i_s)%ver) 
               end do 
               !$omp end parallel do 
-              !> calc induced velocity from all components: vel_w
+
+              !> calc induced velocity from all non corrected components: vel_w
               !$omp parallel do private(i_s)
               do  i_s = 1, size(geo%components(i_c)%stripe)
                 call geo%components(i_c)%stripe(i_s)%get_vel_ctr_pt(elems_non_corr, (/ wake%pan_p, wake%rin_p /), wake%vort_p)
@@ -938,13 +939,13 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
                           trim(basename_debug)//'b_'//trim(frmt)//'_it_'//trim(frmt_vl)//'.dat' )
         endif
 
-        !> relaxation factor 
-        residual_vl_delta = residual_vl - residual_vl_old 
-        if (sim_param%rel_aitken .and. it_vl .gt. 2) then 
+        !> relaxation factor with  
+        residual_vl_delta = residual_vl - residual_vl_old         
+        if (sim_param%rel_aitken .and. it_vl .gt. 2) then !> aitken acceleration
           rel_aitken = -rel_aitken* dot(residual_vl_old, residual_vl_delta) / &
                                     dot(residual_vl_delta, residual_vl_delta)
           linsys%b = linsys%b + rel_aitken*residual_vl 
-        else
+        else !> constant relaxation 
           linsys%b = linsys%b + sim_param%vl_relax*residual_vl 
           rel_aitken = -sim_param%vl_relax* dot(residual_vl_old, residual_vl_delta) / & 
                                             dot(residual_vl_delta, residual_vl_delta)
@@ -958,6 +959,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
 
         it_vl = it_vl + 1 
         
+        !> update unsteady term 
         !$omp parallel do private(i_el)
         do i_el = 1 , sel      
           elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
@@ -967,7 +969,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         do i_el = 1, size(elems_non_corr)
           select type(el => elems_non_corr(i_el)%p)        
             class is(t_vortlatt)   
-              !> compute dforce using AVL formula with prandtl glauert 
+              !> compute dforce using AVL formula with prandtl glauert for non corrected vl  
               call el%compute_dforce_jukowski(.true.) 
           end select            
         end do
@@ -979,7 +981,6 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               call el%compute_dforce_jukowski(.false.) 
           end select
         end do 
-
 
       end do !(while)
 
@@ -998,12 +999,12 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
 
           do i_s = 1, size(geo%components(i_c)%stripe) 
             
-            nor = geo%components(i_c)%stripe(i_s)%nor
-            tang_cen = geo%components(i_c)%stripe(i_s)%tang_cen
-            a_v = geo%components(i_c)%stripe(i_s)%alpha*pi/180.0_wp
+            nor         = geo%components(i_c)%stripe(i_s)%nor
+            tang_cen    = geo%components(i_c)%stripe(i_s)%tang_cen
+            a_v         = geo%components(i_c)%stripe(i_s)%alpha*pi/180.0_wp
             area_stripe = geo%components(i_c)%stripe(i_s)%area 
-            u_v = geo%components(i_c)%stripe(i_s)%vel_2d
-            q_inf = 0.5_wp*sim_param%rho_inf * u_v ** 2.0_wp * area_stripe
+            u_v         = geo%components(i_c)%stripe(i_s)%vel_2d
+            q_inf       = 0.5_wp*sim_param%rho_inf * u_v ** 2.0_wp * area_stripe
 
             d_cd =  0.5_wp * sim_param%rho_inf * u_v**2.0_wp * &                 
                     geo%components(i_c)%stripe(i_s)%cd * &

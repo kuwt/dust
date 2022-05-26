@@ -315,7 +315,7 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
     itave = itave + 1
 
     ! Show timing, since this analysis is quite slow
-    write(*,'(A,I0,A,I0)') ' it : ' , it , ' / ' , &
+    write(*,'(A,I0,A,I0)') ' it : ' , itave , ' / ' , &
       ( an_end - an_start + 1 ) / an_step
 
     ! Open the result file ----------------------
@@ -366,18 +366,18 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
             do ic = 1,size(comps) ! Loop on components
               do ie = 1 , size( comps(ic)%el ) ! Loop on elems of the comp
                 call comps(ic)%el(ie)%compute_vel( (/xbox(ix), ybox(iy), zbox(iz)/), v)
-                vel_probe = vel_probe + v/(4*pi)
+                vel_probe = vel_probe + v
               end do
             end do
 
             !> wake
             do ie = 1, size(wake_elems)
               call wake_elems(ie)%p%compute_vel((/ xbox(ix), ybox(iy), zbox(iz)/), v)
-              vel_probe = vel_probe + v/(4*pi)
+              vel_probe = vel_probe + v
             enddo
 
             !> + u_inf
-            vel_probe = vel_probe + variable_wind((/ xbox(ix) , ybox(iy) , zbox(iz) /), t)
+            vel_probe = vel_probe/(4*pi) + variable_wind((/ xbox(ix) , ybox(iy) , zbox(iz) /), t)
           end if
 
           if ( probe_vel ) then
