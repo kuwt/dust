@@ -912,8 +912,8 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
               !> calc velocity induced by stripe component: vel 
               vel = 0.0_wp
               do i_c2 = 1, size(geo%components)
-                if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &
-                    trim(geo%components(i_c)%aero_correction) .eq. 'true') then 
+                if (trim(geo%components(i_c2)%comp_el_type) .eq. 'v' .and. &
+                    trim(geo%components(i_c2)%aero_correction) .eq. 'true') then 
                   do i_s2 = 1, size(geo%components(i_c2)%stripe)
                     call geo%components(i_c2)%stripe(i_s2)%compute_vel_stripe(geo%components(i_c)%stripe(i_s)%cen , v)
                     vel = vel + v         
@@ -958,7 +958,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         endif
 
         it_vl = it_vl + 1 
-        
+        !write(*,*) 'it_vl', it_vl
         !> update unsteady term 
         !$omp parallel do private(i_el)
         do i_el = 1 , sel      

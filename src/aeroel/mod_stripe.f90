@@ -319,7 +319,7 @@ module mod_stripe
   end subroutine get_vel_ctr_pt_stripe
 
   subroutine compute_vel_stripe(this, pos, vel)
-    class(t_stripe),    intent(inout)    :: this
+    class(t_stripe),    intent(inout) :: this
     real(wp),           intent(in)    :: pos(:)
     real(wp),           intent(out)   :: vel(3) 
     
