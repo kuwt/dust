@@ -496,10 +496,10 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       merge_tol = merge_tol + hinges(ih)%merge_tol 
     enddo
     !> take average and avoid numerical issues
-    merge_tol = merge_tol/real(size(hinges)) + 1e-16_wp
+    merge_tol = merge_tol/real(size(hinges),wp) + 1e-16_wp
 
     !> delete doubled nodes or merge them in single one if the distance is lower the 1% the chord lenght 
-    call unique(csi_hinge_not_unique, csi_hinge, 1e-16_wp)  
+    call unique(csi_hinge_not_unique, csi_hinge, merge_tol)  
     
     allocate(point_region(size(csi_hinge) + 1))
     allocate(delta_x(size(csi_hinge) + 1)); delta_x = 0.0_wp

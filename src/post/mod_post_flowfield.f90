@@ -98,6 +98,10 @@ use mod_post_load, only: &
 
 use mod_wind, only: &
   variable_wind
+  
+use mod_aeroel, only: &
+  c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
+  t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p  
 
 implicit none
 
@@ -126,32 +130,35 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
   integer , intent(in)                                     :: an_start , an_end , an_step
   logical, intent(in)                                      :: average
 
-  type(t_geo_component), allocatable                       :: comps(:)
+  type(t_geo_component), allocatable                       :: comps(:), comps_old(:)
   integer , parameter                                      :: n_max_vars = 3 !vel,p,vort, ! TODO: 4 with cp
   character(len=max_char_len), allocatable                 :: var_names(:)
   integer , allocatable                                    :: vars_n(:)
   integer                                                  :: i_var , n_vars
-  logical                                                  :: probe_vel , probe_p , probe_vort
+  logical                                                  :: probe_vel , probe_p , probe_vort, probe_cp
   real(wp)                                                 :: u_inf(3)
   real(wp)                                                 :: P_inf , rho
   real(wp)                                                 :: vel_probe(3) = 0.0_wp 
   real(wp)                                                 :: vort_probe(3) = 0.0_wp
   real(wp)                                                 :: pres_probe
+  real(wp)                                                 :: pot_probe, pot_probe_old
   real(wp)                                                 :: v(3) = 0.0_wp
+  real(wp)                                                 :: phi = 0.0_wp
 
   real(wp), allocatable , target                           :: sol(:)
   integer(h5loc)                                           :: floc , ploc
-  real(wp), allocatable                                    :: points(:,:)
+  real(wp), allocatable                                    :: points(:,:), points_old(:,:)
   integer                                                  :: nelem
 
   real(wp), allocatable                                    :: refs_R(:,:,:), refs_off(:,:)
   real(wp), allocatable                                    :: refs_G(:,:,:), refs_f(:,:)
   real(wp), allocatable                                    :: vort(:), cp(:)
+  real(wp), allocatable                                    :: vort_old(:), cp_old(:) ! TODO needed?
 
-  type(t_wake)                                             :: wake
-  type(t_elem_p), allocatable                              :: wake_elems(:)
+  type(t_wake)                                             :: wake, wake_old
+  type(t_elem_p), allocatable                              :: wake_elems(:), wake_elems_old(:)
 
-  real(wp)                                                 :: t
+  real(wp)                                                 :: t, t_old
 
   integer                                                  :: nxyz(3)
   real(wp)                                                 :: minxyz(3), maxxyz(3)
@@ -164,6 +171,9 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
   integer                                                  :: i_var_v , i_var_p , i_var_w
 
   integer                                                  :: ip , ipp, ic , ie , i1 , it, itave
+  
+  logical                                                  :: ex
+  real(wp)                                                 :: dummy 
 
   character(len=max_char_len)                              :: str_a, var_name
   character(len=max_char_len)                              :: filename
@@ -184,8 +194,7 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
   all_comp = .true.
 
   ! Read variables to save : velocity | pressure | vorticity
-  ! TODO: add Cp
-  probe_vel = .false. ; probe_p = .false. ; probe_vort = .false.
+  probe_vel = .false. ; probe_p = .false. ; probe_vort = .false. ; probe_cp = .false.
   n_vars = countoption(sbprms,'Variable')
 
   if ( n_vars .eq. 0 ) then ! default: velocity | pressure | vorticity
@@ -198,12 +207,8 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
         case ( 'velocity' ) ; probe_vel = .true.
         case ( 'pressure' ) ; probe_p   = .true.
         case ( 'vorticity') ; probe_vort= .true.
-        case ( 'cp'       )
-        write(str_a,*) ia
-        call error('dust_post','','Unknown Variable: '//trim(var_name)//&
-                    ' for analysis n.'//trim(str_a)//'.'//nl//&
-                    'Choose "velocity", "pressure", "vorticity".')
-        case ( 'all') ; probe_vel = .true. ; probe_p   = .true. ; probe_vort= .true.
+        case ( 'cp'       ) ; probe_cp = .true. ! TODO behaviour of probe cp with 'all'?
+        case ( 'all') ; probe_vel = .true. ; probe_p   = .true. ; probe_vort= .true. ; probe_cp = .false.
         case default
           write(str_a,*) ia
           call error('dust_post','','Unknown Variable: '//trim(var_name)//&
@@ -212,6 +217,8 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
       end select
     end do
   end if
+
+  if (probe_cp) probe_p = .true. ! if pressure coefficient is requested, compute pressure and adimens.
 
   ! load the geo components just once
   call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
@@ -279,7 +286,11 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
   if ( probe_p   ) then
     allocate(box_p   (product(nxyz)  ))
     i_var = i_var + 1
-    var_names(i_var) = 'pressure'
+    if (probe_cp) then
+      var_names(i_var) = 'cp'
+    else
+      var_names(i_var) = 'pressure'
+    end if  
     vars_n(i_var) = 1
     i_var_p = i_var_v + 1
   end if
@@ -290,14 +301,6 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
     vars_n(i_var) = 3
     i_var_w = i_var_p + 3
   end if
-  !TODO: cp
-  ! if ( probe_cp  ) then
-  !   allocate(box_cp  (product(nxyz)  ))
-  !   i_var = i_var + 1
-  !   var_names(i_var) = 'cp'
-  !   vars_n(i_var) = 1
-  !   i_var_cp = i_var_w + 1
-  ! end if
 
   ! Allocate and fill vars array, for output +++++++++++++++++
   !  sum(vars_n): # of scalar fields to be plotted
@@ -315,7 +318,7 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
     itave = itave + 1
 
     ! Show timing, since this analysis is quite slow
-    write(*,'(A,I0,A,I0)') ' it : ' , it , ' / ' , &
+    write(*,'(A,I0,A,I0)') ' it : ' , itave , ' / ' , &
       ( an_end - an_start + 1 ) / an_step
 
     ! Open the result file ----------------------
@@ -347,9 +350,31 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
     ! Load the wake -----------------------------
     call load_wake_post(floc, wake, wake_elems)
     call close_hdf5_file(floc)
+    
+    if (probe_p) then ! load also previous timestep for unsteady contribution
+      ! Open the result file ----------------------
+      write(filename,'(A,I4.4,A)') trim(data_basename)// &
+                                          '_res_',it-1,'.h5'
+      inquire(file=filename, exist=ex)
+      if (.not. ex) then
+        call error(this_mod_name,this_sub_name,'Output data '//filename//&
+                  &' from the previous step is not available, cannot compute&
+                  & unsteady contribution to pressure.')
+      end if                                    
+      call open_hdf5_file(trim(filename),floc)
+      call load_refs(floc,refs_R,refs_off)
+        
+      call update_points_postpro(comps_old, points_old, refs_R, refs_off, &
+                                filen = trim(filename) )
+      ! Load the results --------------------------
+      call load_res(floc, comps_old, vort_old, cp_old, t_old)
+
+      call load_wake_post(floc, wake_old, wake_elems_old)
+      call close_hdf5_file(floc)
+    end if
 
   !> Compute fields to be plotted +++++++++++++++++++++++++++++
-!$omp parallel do collapse(3) private(iz,iy,ix,vel_probe, pres_probe, vort_probe, ic, ie, v, ipp)
+!$omp parallel do collapse(3) private(iz,iy,ix,vel_probe, pres_probe, vort_probe, ic, ie, v, ipp, pot_probe, phi)
     ! Loop over the nodes of the box
     do iz = 1 , size(zbox)  ! z-coord
       do iy = 1 , size(ybox)  ! y-coord
@@ -360,24 +385,24 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
           if ( probe_vel .or. probe_p ) then
 
             ! Compute velocity
-            vel_probe = 0.0_wp ; pres_probe = 0.0_wp ; vort_probe = 0.0_wp
+            vel_probe = 0.0_wp ; pres_probe = 0.0_wp ; vort_probe = 0.0_wp ; pot_probe = 0
 
             ! body
             do ic = 1,size(comps) ! Loop on components
               do ie = 1 , size( comps(ic)%el ) ! Loop on elems of the comp
                 call comps(ic)%el(ie)%compute_vel( (/xbox(ix), ybox(iy), zbox(iz)/), v)
-                vel_probe = vel_probe + v/(4*pi)
+                vel_probe = vel_probe + v
               end do
             end do
 
             !> wake
             do ie = 1, size(wake_elems)
               call wake_elems(ie)%p%compute_vel((/ xbox(ix), ybox(iy), zbox(iz)/), v)
-              vel_probe = vel_probe + v/(4*pi)
+              vel_probe = vel_probe + v
             enddo
 
             !> + u_inf
-            vel_probe = vel_probe + variable_wind((/ xbox(ix) , ybox(iy) , zbox(iz) /), t)
+            vel_probe = vel_probe/(4*pi) + variable_wind((/ xbox(ix) , ybox(iy) , zbox(iz) /), t)
           end if
 
           if ( probe_vel ) then
@@ -387,11 +412,53 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
           if ( probe_p ) then
             ! Bernoulli equation
             ! rho * dphi/dt + P + 0.5*rho*V^2 = P_infty + 0.5*rho*V_infty^2
-            !TODO: add:
-            ! - add the unsteady term: -rho*dphi/dt
+
             !WIND TODO
-            pres_probe = P_inf + 0.5_wp*rho*norm2(u_inf)**2 - 0.5_wp*rho*norm2(vel_probe)**2
-            vars(i_var_v+1,ipp) = pres_probe
+            
+            ! compute current phi
+            do ic = 1,size(comps)
+              do ie = 1 , size( comps(ic)%el )
+                call comps(ic)%el(ie)%compute_pot(phi, dummy, (/xbox(ix), ybox(iy), zbox(iz)/), 1, 2)
+                pot_probe = pot_probe + phi
+              end do
+            end do
+            
+            do ie = 1, size(wake_elems)
+              select type(el => wake_elems(ie)%p)
+                class is (c_pot_elem)
+                  call el%compute_pot(phi, dummy, (/xbox(ix), ybox(iy), zbox(iz)/), 1, 2)
+                  pot_probe = pot_probe + phi
+              end select  
+            enddo
+          
+            ! compute previous phi
+            do ic = 1,size(comps_old)
+              do ie = 1 , size( comps_old(ic)%el )
+                call comps_old(ic)%el(ie)%compute_pot(phi, dummy, (/xbox(ix), ybox(iy), zbox(iz)/), 1, 2)
+                pot_probe_old = pot_probe_old + phi
+              end do
+            end do
+            
+            do ie = 1, size(wake_elems_old)
+              select type(el => wake_elems_old(ie)%p)
+                class is (c_pot_elem)
+                  call el%compute_pot(phi, dummy, (/xbox(ix), ybox(iy), zbox(iz)/), 1, 2)
+                  pot_probe_old = pot_probe_old + phi
+              end select  
+            enddo
+            
+            pres_probe = P_inf + 0.5_wp*rho*norm2(u_inf)**2 - 0.5_wp*rho*norm2(vel_probe)**2-&
+                  & rho*(pot_probe-pot_probe_old)/(t-t_old)
+                  
+            if (probe_cp) then ! output pressure coefficient
+              if (norm2(u_inf) .gt. 1e-6) then
+                vars(i_var_v+1,ipp) = (pres_probe - P_inf)/(0.5_wp*rho*norm2(u_inf)**2)
+              else ! todo add u_ref
+                call error(this_mod_name,this_sub_name,'Pressure coefficient requested, but u_inf =0')
+              end if
+            else ! output pressure
+              vars(i_var_v+1,ipp) = pres_probe
+            end if  
           end if
 
           if ( probe_vort ) then
@@ -508,8 +575,11 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
 
   !TODO: move deallocate(comps) outside this routine.
   ! Check if partial deallocation or nullification is needed.
+  ! TODO deallocate points?
   call destroy_elements(comps)
   deallocate(comps,components_names)
+  call destroy_elements(comps_old)
+  deallocate(comps_old)
 
   write(msg,'(A,I0,A)') nl//'++++++++++ Flowfield done'//nl
   call printout(trim(msg))

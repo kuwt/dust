@@ -42,11 +42,11 @@
 % Author: Alessandro Cocco 
 %=========================================================================
 
-function sec_data = sec_load(file_out)
-    % This matlab function parse the sectional loads file for lifting line and 
-    % corrected vortex lattice element. 
+function sec_data = sec_load(file_out, short_data)
+    % This matlab function parse the sectional loads. 
     % The input is the same as the one required in the filed "basename" in the 
     % dust_post.in file. 
+    % If short_data is true,  then the parsed fields are Fx, Fy, Fz, Mo. 
     % The output is a data structure of the form: 
     %   sec_data.<field>.time     => simulation time 
     %                   .value    => value matrix n_time x m_sec 
@@ -56,7 +56,15 @@ function sec_data = sec_load(file_out)
     %                                <field> are extracted 
     % For further details regarding the <field> please see the input manual. 
     
-    field = {'vel_outplane_isolated';
+    
+    if short_data
+        field = {'Mo';
+        'Fz';
+        'Fy';
+        'Fx';
+        };
+    else
+        field = {'vel_outplane_isolated';
         'vel_outplane';
         'vel_2d_isolated';
         'vel_2d';
@@ -69,6 +77,9 @@ function sec_data = sec_load(file_out)
         'Cd';
         'alpha_isolated';
         'alpha'};
+    end
+        
+    
 
     % name file
     sec_data = struct('n_time',[],'n_sec',[], 'sec',[], 'l_sec',[],'vel_outplane',[],...
@@ -150,6 +161,7 @@ function sec_data = parse_file_sectional(file, field, sec_data)
         end
     end
 end
+
 
 
 

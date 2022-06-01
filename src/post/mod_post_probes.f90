@@ -128,7 +128,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
   logical , intent(inout)                                  :: all_comp
   integer , intent(in)                                     :: an_start , an_end , an_step
 
-  type(t_geo_component), allocatable                       :: comps(:)
+  type(t_geo_component), allocatable                       :: comps(:), comps_old(:)
   integer                                                  :: nstep
   real(wp), allocatable                                    :: probe_vars(:,:,:)
   real(wp), allocatable                                    :: time(:)
@@ -137,28 +137,31 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
   character(len=max_char_len)                              :: in_type , str_a , filename_in , var_name , vars_str
   integer                                                  :: n_probes , n_vars 
   real(wp), allocatable                                    :: rr_probes(:,:)
-  logical                                                  :: probe_vel , probe_p , probe_vort
+  logical                                                  :: probe_vel , probe_p , probe_vort, probe_cp
   integer                                                  :: fid_out , i_var , nprint
-  integer                                                  :: ie , ip , ic , it , ires
+  integer                                                  :: ie , ip , ic , it , ires, it_old
   integer(h5loc)                                           :: floc , ploc
   character(len=max_char_len)                              :: filename
-  real(wp), allocatable                                    :: points(:,:)
+  real(wp), allocatable                                    :: points(:,:), points_old(:,:)
   integer                                                  :: nelem
 
   real(wp)                                                 :: u_inf(3)
   real(wp)                                                 :: P_inf , rho
   real(wp)                                                 :: vel_probe(3) = 0.0_wp , vort_probe(3) = 0.0_wp
-  real(wp)                                                 :: v(3) = 0.0_wp
+  real(wp)                                                 :: v(3) = 0.0_wp, phi = 0.0_wp
   real(wp), allocatable , target                           :: sol(:)
-  real(wp)                                                 :: pres_probe
-  real(wp)                                                 :: t
+  real(wp)                                                 :: pres_probe, pot_probe = 0.0_wp, pot_probe_old = 0.0_wp
+  real(wp)                                                 :: t, t_old
 
   real(wp), allocatable                                    :: refs_R(:,:,:), refs_off(:,:)
-  real(wp), allocatable                                    :: vort(:), cp(:)
+  real(wp), allocatable                                    :: vort(:), cp(:), vort_old(:), cp_old(:)
 
-  type(t_wake)                                             :: wake
-  type(t_elem_p), allocatable                              :: wake_elems(:)
+  type(t_wake)                                             :: wake, wake_old
+  type(t_elem_p), allocatable                              :: wake_elems(:), wake_elems_old(:)
   integer                                                  :: ivar, ierr
+  
+  logical                                                  :: ex
+  real(wp)                                                 :: dummy
 
   character(len=max_char_len), parameter                   :: this_sub_name = 'post_probes'
 
@@ -204,7 +207,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 
   ! Read variables to save : velocity | pressure | vorticity
   ! TODO: add Cp
-  probe_vel = .false. ; probe_p = .false. ; probe_vort = .false.
+  probe_vel = .false. ; probe_p = .false. ; probe_vort = .false. ; probe_cp = .false.
   n_vars = countoption(sbprms,'Variable')
 
   if ( n_vars .eq. 0 ) then ! default: velocity | pressure | vorticity
@@ -216,11 +219,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
         case ( 'velocity' ) ; probe_vel = .true.
         case ( 'pressure' ) ; probe_p   = .true.
         case ( 'vorticity') ; probe_vort= .true.
-        case ( 'cp'       )
-        write(str_a,*) ia
-        call error('dust_post','','Unknown Variable: '//trim(var_name)//&
-                    ' for analysis n.'//trim(str_a)//'.'//nl//&
-                    'Choose "velocity", "pressure", "vorticity".')
+        case ( 'cp'       ) ; probe_cp = .true.
         case ( 'all') ; probe_vel = .true. ; probe_p   = .true. ; probe_vort= .true.
         case default
         write(str_a,*) ia
@@ -230,7 +229,9 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
       end select
     end do
   end if
-
+  
+  if (probe_cp) probe_p = .true. ! if pressure coefficient is requested, compute pressure and adimens.
+  
   ! Find the number of fields to be plotted ( vec{vel} , p , vec{omega})
   nprint = 0
   if(probe_vel)  nprint = nprint+3
@@ -249,7 +250,11 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
     i_var = i_var + 3
   endif
   if(probe_p) then
-    probe_var_names(i_var) = 'p'
+    if(probe_cp) then
+      probe_var_names(i_var) = 'cp'
+    else
+      probe_var_names(i_var) = 'p'
+    end if
     i_var = i_var + 1
   endif
   if(probe_vort) then
@@ -286,7 +291,17 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
   ! Prepare_geometry_postpro
   call prepare_geometry_postpro(comps)
 
+  if (probe_p) then ! geo for previous timestep (should be the same, but to avoid issues with allocatables...)
+    call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
+    !> TODO: here get the run id
+    call load_components_postpro(comps_old, points_old, nelem,  floc, &
+                                components_names,  all_comp)  
+    call close_hdf5_file(floc)
+    call prepare_geometry_postpro(comps_old)    
+  end if
+  
   ! Allocate and point to sol
+  ! TODO why?
   allocate(sol(nelem)) ; sol = 0.0_wp
   ip = 0
   do ic = 1 , size(comps)
@@ -298,13 +313,47 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 
   !time history
   ires = 0
+  !it_old = -1
   do it =an_start, an_end, an_step
     ires = ires+1
-    ! ick and dirty copy and paste -------
     ! Open the result file ----------------------
+    if (probe_p) then ! load previous result for unsteady contribution
+      ! check with wake allocation between steps
+      !if (it .eq. it_old+1) then ! do not reload and update, use data from previous iteration
+      !  comps_old = comps
+      !  points_old = points
+      !  wake_old = wake
+      !  wake_elems_old = wake_elems
+      !  vort_old = vort
+      !  cp_old = cp
+      !  t_old = t
+      !else 
+      
+      ! load and update previous timestep
+        write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it-1,'.h5'
+        inquire(file=filename, exist=ex)
+        if (.not. ex) then
+          call error(this_mod_name,this_sub_name,'Output data '//filename//&
+                    &' from the previous step is not available, cannot compute&
+                    & unsteady contribution to pressure.')
+        end if
+        call open_hdf5_file(trim(filename),floc)
+        ! Load the references and move the points ---
+        call load_refs(floc,refs_R,refs_off)
+        
+        call update_points_postpro(comps_old, points_old, refs_R, refs_off, &
+                                filen = trim(filename) )
+        ! Load the results --------------------------
+        call load_res(floc, comps_old, vort_old, cp_old, t_old)
+
+        call load_wake_post(floc, wake_old, wake_elems_old)
+        call close_hdf5_file(floc)
+      !end if
+    end if    
+    
     write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
     call open_hdf5_file(trim(filename),floc)
-
+    
     ! Load u_inf --------------------------------
     call open_hdf5_group(floc,'Parameters',ploc)
     call read_hdf5(u_inf,'u_inf',ploc)
@@ -327,11 +376,12 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
     call close_hdf5_file(floc)
 
     time(ires) = t
-
+    
     ! Compute velocity --------------------------
     do ip = 1 , n_probes ! probes
 
       vel_probe = 0.0_wp ; pres_probe = 0.0_wp ; vort_probe = 0.0_wp
+      pot_probe = 0.0_wp ; pot_probe_old = 0.0_wp
       i_var = 1
       if ( probe_vel .or. probe_p ) then
 
@@ -339,7 +389,6 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
       do ic = 1,size(comps)
 !$omp parallel do private(ie, v) reduction(+:vel_probe)
         do ie = 1 , size( comps(ic)%el )
-
           call comps(ic)%el(ie)%compute_vel( rr_probes(:,ip) , v )
           vel_probe = vel_probe + v/(4*pi)
 
@@ -366,11 +415,59 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
     if ( probe_p ) then
       ! Bernoulli equation
       ! rho * dphi/dt + P + 0.5*rho*V^2 = P_infty + 0.5*rho*V_infty^2
-      !TODO: add:
-      ! - add the unsteady term: -rho*dphi/dt
-      pres_probe = P_inf + 0.5_wp*rho*norm2(u_inf)**2 - 0.5_wp*rho*norm2(vel_probe)**2
+  
+      ! compute current phi
+      do ic = 1,size(comps)
+!$omp parallel do private(ie, phi) reduction(+:pot_probe)
+        do ie = 1 , size( comps(ic)%el )
+          call comps(ic)%el(ie)%compute_pot(phi, dummy, rr_probes(:,ip), 1, 2)
+          pot_probe = pot_probe + phi
+        end do
+!$omp end parallel do
+      end do
+      
+! TODO check parallel with select type
+!$omp parallel do private( ie, phi) reduction(+:pot_probe)
+      do ie = 1, size(wake_elems)
+        select type(el => wake_elems(ie)%p)
+          class is (c_pot_elem)
+            call el%compute_pot(phi, dummy, rr_probes(:,ip), 1, 2)
+            pot_probe = pot_probe + phi
+        end select  
+      enddo
+!$omp end parallel do
+    
+      ! compute previous phi
+      do ic = 1,size(comps_old)
+!$omp parallel do private(ie, phi) reduction(+:pot_probe_old)
+        do ie = 1 , size( comps_old(ic)%el )
+          call comps_old(ic)%el(ie)%compute_pot(phi, dummy, rr_probes(:,ip), 1, 2)
+          pot_probe_old = pot_probe_old + phi
+        end do
+!$omp end parallel do
+      end do
+!$omp parallel do private( ie, phi) reduction(+:pot_probe_old)
+      do ie = 1, size(wake_elems_old)
+        select type(el => wake_elems_old(ie)%p)
+          class is (c_pot_elem)
+            call el%compute_pot(phi, dummy, rr_probes(:,ip), 1, 2)
+            pot_probe_old = pot_probe_old + phi
+        end select  
+      enddo
+!$omp end parallel do
 
-      probe_vars(i_var, ires, ip) = pres_probe
+      pres_probe = P_inf + 0.5_wp*rho*norm2(u_inf)**2 - 0.5_wp*rho*norm2(vel_probe)**2 -&
+                  & rho*(pot_probe-pot_probe_old)/(t-t_old)
+
+      if (probe_cp) then ! output pressure coefficient
+        if (norm2(u_inf) .gt. 1e-6) then
+          probe_vars(i_var, ires, ip) = (pres_probe - P_inf)/(0.5_wp*rho*norm2(u_inf)**2)
+        else ! todo add u_ref
+          call error(this_mod_name,this_sub_name,'Pressure coefficient requested, but u_inf =0')
+        end if
+      else ! output pressure
+        probe_vars(i_var, ires, ip) = pres_probe
+      end if
       i_var = i_var+1
     end if
 
@@ -382,8 +479,10 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
     end if
 
   end do  ! probes
-! ick and dirty copy and paste -------
-
+  
+    !it_old = it
+    
+    ! TODO check if wake needs to be destroyed/deallocated between iterations
   end do
 
   !Output the results in the correct format
@@ -429,6 +528,8 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 
   call destroy_elements(comps)
   deallocate(comps, points,components_names)
+  call destroy_elements(comps_old)
+  deallocate(comps_old, points_old)
 
 
   write(msg,'(A,I0,A)') nl//'++++++++++ Probes done'//nl
