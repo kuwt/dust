@@ -1080,7 +1080,7 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
     !> Open hinge sub-parser
     call getsuboption(geo_prs, 'Hinge', hinge_prs)
 
-     hinges(i)%tag = getstr(hinge_prs, 'Hinge_Tag')
+     hinges(i)%tag = getstr(hinge_prs, 'hinge_tag')
      hinges(i)%nodes_input = getstr(hinge_prs, 'hinge_nodes_input')
 
      if ( trim(hinges(i) % nodes_input) .eq. 'parametric' ) then
@@ -1240,7 +1240,7 @@ subroutine hinge_input_parser( geo_prs, hinge_prs, &
   call geo_prs%CreateSubOption('hinge', 'Parser for hinge input', &
                                 hinge_prs, multiple=.true. )
 
-  call hinge_prs%CreateStringOption('Hinge_Tag','Name of the hinge')
+  call hinge_prs%CreateStringOption('hinge_tag','Name of the hinge')
   call hinge_prs%CreateStringOption('hinge_nodes_input', &
                               'Type of hinge nodes input: parametric or from_file.')
   call hinge_prs%CreateIntOption('n_nodes','N.hinge nodes')

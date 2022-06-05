@@ -195,7 +195,7 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
 
   ! Read variables to save : velocity | pressure | vorticity
   probe_vel = .false. ; probe_p = .false. ; probe_vort = .false. ; probe_cp = .false.
-  n_vars = countoption(sbprms,'Variable')
+  n_vars = countoption(sbprms,'variable')
 
   if ( n_vars .eq. 0 ) then ! default: velocity | pressure | vorticity
     probe_vel = .true. ; probe_p = .true. ; probe_vort = .true.

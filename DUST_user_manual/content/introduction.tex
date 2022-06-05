@@ -33,6 +33,7 @@ The files are simple text files, without any requirement on the extension, howev
 An example of text input file is presented in file \ref{file:example}. input files employ loosely a Fortran syntax, and comprise of a series of keyword assignments.
 The required keyword can generally be inserted in any order inside the input file, and should be written according to the following rules:
 \begin{itemize}
+\item Keywords use the snake_case naming convention
 \item All the parameters assignments are written with an equal sign, i.e. keyword = value, for any kind of value.
 \item Extra spaces and blank lines are ignored
 \item Comments are introduced with an exclamation mark "!", and can be introduced at the beginning of a line, or after a valid keyword assignment.
@@ -45,21 +46,21 @@ The required keyword can generally be inserted in any order inside the input fil
 
 \begin{inputfile}[frame=single, caption={example input file}, label={file:example}]
 ! comments are introduced with an exclamation mark as in Fortran
-ExampleString   = a_string
-ExampleInteger  = 59
-ExampleReal     = 67.84 !all comments even inline are ignored
-ExampleLogical  = T     !as well as all the extra spaces.
+example_string   = a_string
+example_integer  = 59
+example_real     = 67.84 !all comments even inline are ignored
+example_logical  = T     !as well as all the extra spaces.
 
 !empty lines are ignored
-ExampleArray = (/ 0.5, 2.3e-3, 5.67329/)
+example_array = (/ 0.5, 2.3e-3, 5.67329/)
 
-ExampleMultiple = 1.3
-ExampleMultiple = 7.2 !some keywords can have multiple values
+example_multiple = 1.3
+example_multiple = 7.2 !some keywords can have multiple values
 
 !some keyword can require to be grouped inside another grouping keyword
-ExampleGrouping = {
-	GroupedVarInt = 5 !indenting can be helpful, but is not required
-    GroupedVarLogical = F
+example_grouping = {
+	grouped_var_int = 5 !indenting can be helpful, but is not required
+    grouped_var_logical = F
 }
 \end{inputfile}
 

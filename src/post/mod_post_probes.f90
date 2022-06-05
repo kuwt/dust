@@ -180,10 +180,10 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
   all_comp = .true.
 
   ! Read probe coordinates: point_list or from_file
-  in_type =  getstr(sbprms,'InputType')
+  in_type =  getstr(sbprms,'input_type')
   select case ( trim(in_type) )
     case('point_list')
-      n_probes = countoption(sbprms,'Point')
+      n_probes = countoption(sbprms,'point')
       allocate(rr_probes(3,n_probes))
       do ip = 1 , n_probes
         rr_probes(:,ip) = getrealarray(sbprms,'point',3)
@@ -208,7 +208,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
   ! Read variables to save : velocity | pressure | vorticity
   ! TODO: add Cp
   probe_vel = .false. ; probe_p = .false. ; probe_vort = .false. ; probe_cp = .false.
-  n_vars = countoption(sbprms,'Variable')
+  n_vars = countoption(sbprms,'variable')
 
   if ( n_vars .eq. 0 ) then ! default: velocity | pressure | vorticity
     probe_vel = .true. ; probe_p = .true. ; probe_vort = .true.

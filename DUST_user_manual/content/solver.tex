@@ -74,6 +74,7 @@ far_field_ratio_source = 10.0
 doublet_threshold = 1.0e-6
 rankine_rad = 0.1
 vortex_rad = 0.1
+k_vortex_rad = 1.0
 cutoff_rad = 0.001
 
 ! --- additional models to use ---
@@ -117,8 +118,8 @@ ll_tol = 1.0e-6
 ll_damp = 5.0
 ll_stall_regularisation = T
 ll_stall_regularisation_nelems = 1
-LLstallRegularizationsNiters = 1
-LLstallRegularizationAlphaStall = 15
+LLstallRegularisationsNiters = 1
+ll_stall_regularisation_alpha_stall = 15
 ll_artificial_viscosity = 0.0
 ll_artificial_viscosity_adaptive = F
 ll_artificial_viscosity_adaptive_alpha = 15
@@ -344,7 +345,11 @@ Parameter which sets the radius under which the Rankine approximation of vortexe
 
 \item \param{vortex_rad}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.1 \textit{type:} real.
 
-Parameter which sets the radius of the vortex particles.
+Parameter which uniformly sets the radius of the vortex particles, only used if \param{k_vortex_rad} is disabled.
+
+\item \param{k_vortex_rad}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 1.0 \textit{type:} real.
+
+Coefficient for the automatic computation of the radius of each vortex particle; set a negative number to disable the feature and revert to uniform vortex radius. 
 
 \item \param{cutoff_rad}: \textit{required:} no. \textit{multiple:} no. \textit{default:} 0.001 \textit{type:} real. 
 

@@ -161,7 +161,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   ! Global parameters
   call pmesh_prs%CreateStringOption('el_type', &
                 'element type (temporary) p panel v vortex ring');
-  call pmesh_prs%CreateLogicalOption('AirfoilTableCorrection', &
+  call pmesh_prs%CreateLogicalOption('airfoil_table_correction', &
                 'include presence of aerodynamic .c81 for corrections', &
                 'F', &
                 multiple=.false.);
@@ -226,7 +226,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
   nSections = countoption(pmesh_prs, 'chord')
   nRegions  = countoption(pmesh_prs, 'span')
-  aero_table = getlogical(pmesh_prs, 'AirfoilTableCorrection')
+  aero_table = getlogical(pmesh_prs, 'airfoil_table_correction')
   ! Check that nSections = nRegion + 1
   if ( nSections .ne. nRegions + 1 ) then
     call error(this_sub_name, this_mod_name, 'Unconsistent input: &

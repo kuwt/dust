@@ -166,7 +166,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
 
   !Check which variables to analyse
   out_vort = .false.; out_vel = .false.; out_press =.false.; out_cp = .false.
-  n_var = countoption(sbprms, 'Variable')
+  n_var = countoption(sbprms, 'variable')
   allocate(var_names(n_var))
   do i_var = 1, n_var
     var_names(i_var) = getstr(sbprms, 'variable') ; call LowCase(var_names(i_var))

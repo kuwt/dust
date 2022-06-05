@@ -37,6 +37,12 @@ The DUST component input card is enriched of the following parameters:
    orientation of the node for rigid coupling. This array contains the local components (in the local reference frame of the geometrical           component) of the unit vectors of the coupling node reference frame. In the \opt{rbf} frame indicates the rotation matrix from the structural component to the DUST component reference frame. 
    
 \end{itemize}
+In the DUST solver input file, a new keyword is added:
+\begin{itemize}
+    \item \param{precice_config} \textit{required:} no. \textit{default:} ./../precice-config.xml. \textit{type:} string.
+    
+    Path of the preCICE XML configuration file.
+\end{itemize}
 \subsection{preCICE XML}
 preCICE needs to be configured at runtime via an \texttt{xml} file, typically named \texttt{precice-config.xml}. Here, you specify which solvers participate in the coupled simulation, which coupling data values they exchange, which fixed-point acceleration and many other things.
 

@@ -395,11 +395,11 @@ format = dat
 
 variable = Velocity
 
-InputType = point_list
+input_type = point_list
 point = (/0.0, 1.0, 2.0/)
 point = (/1.0, 0.0, -2.0/)
 
-!InputType = from_file
+!input_type = from_file
 !file = point_list.dat
 
 }
@@ -432,17 +432,17 @@ format of the processed results, can be \opt{dat} for formatted ascii files outp
 
 \item \param{variable}: \textit{required:} at least one for each \param{analysis}. \textit{multiple:} yes.
 
-variable to output in the processed result. More than one variable can be generated in the same analysis. At the moment only \opt{Velocity} is implemented.
+variable to output in the processed result. More than one variable can be generated in the same analysis. At the moment \opt{Velocity}, \opt{Pressure} and \opt{cp} are implemented.
 
-\item \param{InputType}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
+\item \param{input_type}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
 
 The way the probing points are specified, \opt{point\_list} for a series of points specified directly in the input file, \opt{from\_file} to load the list of points from a formatted ascii file.
 
-\item \param{point}: \textit{required:} at least one if \param{InputType} is \opt{point\_list} \textit{multiple:} yes.
+\item \param{point}: \textit{required:} at least one if \param{input_type} is \opt{point\_list} \textit{multiple:} yes.
 
 Position of the probing point.
 
-\item \param{file}: \textit{required:} yes if \param{InputType} is \opt{from\_file} \textit{multiple:} no.
+\item \param{file}: \textit{required:} yes if \param{input_type} is \opt{from\_file} \textit{multiple:} no.
 
 Location and name of the file containing the list of probing points.
 
@@ -533,7 +533,7 @@ average the results in the given time span, only one averaged result will be pri
 
 \item \param{variable}: \textit{required:} at least one for each \param{analysis}. \textit{multiple:} yes.
 
-variable to output in the processed result. More than one variable can be generated in the same analysis. At the moment only \opt{Velocity} is implemented.
+variable to output in the processed result. More than one variable can be generated in the same analysis. At the moment \opt{Velocity}, \opt{Pressure} and \opt{cp} are implemented.
 
 \item \param{n_xyz}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no.
 

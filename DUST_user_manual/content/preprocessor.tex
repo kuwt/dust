@@ -586,7 +586,7 @@ el_type = v
 scaling_factor = 1.0
 offset = (/0.0, 0.0, 0.0/)
 
-AirfoilTableCorrection = T
+airfoil_table_correction = T
 
 mesh_symmetry = F
 symmetry_point  = (/0.0, 0.0, 0.0/)
@@ -666,7 +666,7 @@ offset and scaling are applied in the following order:
 \end{equation*}
 
 
-\item \param{AirfoilTableCorrection}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} logical.
+\item \param{airfoil_table_correction}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} logical.
 
 Require the viscous correction for \opt{v} elements by introducing the c81 aerodynamic tables. (Still experimental) 
 
@@ -731,7 +731,7 @@ Angle of twist, in degrees, of the airfoil section.
 
 airfoil of the section. There are different ways to define an airfoil. It can be defined by the user as a series of points, and so \param{airfoil} must be the path to a .dat file (the extension is mandatory) containing the two dimensional coordinates of an airfoil; the file must have in the first line an integer representing the number of points provided, followed by the coordinates of each point on separate lines. It can also be an analytical NACA profile, and so must be provided as a NACAXXXX string (at the moment only 4 digits and some 5 digits are implemented). 
 
-In case of lifting lines or when \param{AirfoilTableCorrection} is true on the vortex lattice, to mark the difference the \param{airfoil\_table} must be employed, and it refers to the path to the corresponding c81 lookup table. 
+In case of lifting lines or when \param{airfoil_table_correction} is true on the vortex lattice, to mark the difference the \param{airfoil\_table} must be employed, and it refers to the path to the corresponding c81 lookup table. 
 
 Optionally in the \param{airfoil} or \param{airfoil\_table} parameter it is possible to specify the option \opt{interp}. In this case the airfoil (airfoil section, mean line, section defined from file or c81 lookup table according to the type of elements) in the section will be linearly interpolated among the pair of explicitly specified airfoils in which the section is contained. 
 
@@ -935,7 +935,7 @@ reference_chord_fraction = 0.25
 
 n_hinges = 2
 hinge = {
-  Hinge_Tag = Aileron_right
+  hinge_tag = Aileron_right
   hinge_nodes_input = parametric      ! or from_file
   node_1 = (/ 1.4178, 1.4557, 0.3473/)  ! In the local ref.frame
   node_2 = (/ 2.4026  , 3.1615  , 0.6946/)
@@ -955,7 +955,7 @@ hinge = {
   }
 
 hinge = {
-  Hinge_Tag = Aileron_left
+  hinge_tag = Aileron_left
   hinge_nodes_input = parametric      
   node_2 = (/ 1.4178, -1.4557, 0.3473/)  
   node_1 = (/ 2.4026  , -3.1615  , 0.6946/)
@@ -1131,7 +1131,7 @@ point = {
   airfoil = NACA2412
   chord = 1.0
   twist = 5.0
-  SectionNormal = yAxis
+  section_normal = yAxis
 }
 point = {
   Id = 2
@@ -1139,7 +1139,7 @@ point = {
   airfoil = NACA2412
   chord = 0.4
   twist = 0.0
-  SectionNormal = yAxis
+  section_normal = yAxis
 }
 point = {
   Id = 3
@@ -1147,7 +1147,7 @@ point = {
   airfoil = NACA2412
   chord = 0.3
   twist = 0.0
-  SectionNormal = referenceLine ! (default)
+  section_normal = referenceLine ! (default)
 }
 point = {
   Id = 4
@@ -1155,7 +1155,7 @@ point = {
   airfoil = NACA2412
   chord = 0.3
   twist = 0.0
-  SectionNormal = referenceLine ! (default)
+  section_normal = referenceLine ! (default)
 }
 point = {
   Id = 5
@@ -1163,8 +1163,8 @@ point = {
   airfoil = NACA2412
   chord = 0.4
   twist = 0.0
-  SectionNormal = yAxisNeg
-  FlipSection = T
+  section_normal = yAxisNeg
+  flip_section = T
 }
 point = {
   Id = 6
@@ -1172,25 +1172,25 @@ point = {
   airfoil = NACA2412
   chord = 1.0
   twist = 5.0
-  SectionNormal = yAxisNeg
-  FlipSection = T
+  section_normal = yAxisNeg
+  flip_section = T
 }
 
 ! === Lines ===
 Line = {
   type = Straight
-  EndPoints = (/ 1 , 2 /)
+  end_points = (/ 1 , 2 /)
   Nelems = 5
 }
 Line = {
   type = Spline
-  EndPoints = (/ 2 , 5 /)
+  end_points = (/ 2 , 5 /)
   Nelems = 10
   ! see documentation for optional inputs
 }
 Line = {
   type = Straight
-  EndPoints = (/ 5 , 6 /)
+  end_points = (/ 5 , 6 /)
   Nelems = 5
 }
 
@@ -1206,7 +1206,7 @@ Line = {
 \begin{figure}[h!]
 \centering
 \includegraphics[width=.70\textwidth]{pointwise_3_component_flip}
-    \caption{Pointwise definition of a component: section parameters (\param{airfoil}, \param{chord}, \param{twist}, \param{SectionNormal}) at \param{point}s of the reference line and the number \param{Nelems} of elements along the reference line for each \param{Line}. The parameter \param{FlipSection} can be set to \param{.true.} in order to flip the $y$-coordinate of the airfoil, in the section reference frame: the comparison between the goemetry with \param{FlipSection} equal to \param{F} or \param{T}  at \param{point} with \param{Id} = 5, 6 is shown in the picture for a non-symmetrical airfoil.}
+    \caption{Pointwise definition of a component: section parameters (\param{airfoil}, \param{chord}, \param{twist}, \param{section_normal}) at \param{point}s of the reference line and the number \param{Nelems} of elements along the reference line for each \param{Line}. The parameter \param{flip_section} can be set to \param{.true.} in order to flip the $y$-coordinate of the airfoil, in the section reference frame: the comparison between the goemetry with \param{flip_section} equal to \param{F} or \param{T}  at \param{point} with \param{Id} = 5, 6 is shown in the picture for a non-symmetrical airfoil.}
 \label{fig:pointwise_component}
 \end{figure}
 
@@ -1290,15 +1290,15 @@ A list of \param{point} groups follows. These points are used to describe the re
 
     Angle of twist, in degrees, of the airfoil section. rotation around the vector that is normal to the plane of the section.
 
-\item \param{SectionNormal} \textit{required}: no, \textit{multiple}: no , \textit{default}: \param{referenceLine} , \textit{type}: string.
+\item \param{section_normal} \textit{required}: no, \textit{multiple}: no , \textit{default}: \param{referenceLine} , \textit{type}: string.
 
     String to define the plane of the section. It can be: \param{referenceLine}, for sections perpendicular to the reference line; \param{yAxis}, \param{yAxisNeg} for sections perpendicular to the $y$-axis or $-y$-axis of the component local reference frame; \param{vector}, to define a generic vector. 
 
-\item \param{SectionNormalVector} \textit{required}: only if \param{SectionNormal = vector}, \textit{multiple}: no, \textit{type}: real array, length 3.
+\item \param{section_normal_vector} \textit{required}: only if \param{section_normal = vector}, \textit{multiple}: no, \textit{type}: real array, length 3.
 
-    Components of the normal vector of the section, if \param{SectionNormal = vector}.
+    Components of the normal vector of the section, if \param{section_normal = vector}.
 
-\item \param{FlipSection} \textit{required}: no, \textit{multiple}: no, \textit{default}: \param{F} , \textit{type}: logical.
+\item \param{flip_section} \textit{required}: no, \textit{multiple}: no, \textit{default}: \param{F} , \textit{type}: logical.
 
    Flip the $y$ coordinates in the section reference frame. Meant to help the pointwise definition of close wing configurations.
 
@@ -1311,7 +1311,7 @@ A list of \param{Line} groups follows. These lines are used to build the referen
 
     Line type. It can be: \param{Straight} for straight lines, \param{Spline} for Hermitian splines.
 
-\item \param{EndPoints}  \textit{required}: yes, \textit{multiple}: no, \textit{type}: integer array, lenght 2.
+\item \param{end_points}  \textit{required}: yes, \textit{multiple}: no, \textit{type}: integer array, lenght 2.
 
     \param{Id} numbers of the beginning and ending \param{point}s of the line. For \param{Straight} lines, this two numbers must be consecutive. For \param{Spline}s the spline is built using these ones as the first and last points and all the points with \param{Id} in between as interior points, so that they must exist in the point list.
 
@@ -1323,11 +1323,11 @@ A list of \param{Line} groups follows. These lines are used to build the referen
 
     type of refinement of the elements in the spanwise direction. As for the chordwise direction, the options are \opt{uniform} for a uniform distribution, \opt{cosine} for a cosine refinement both inboard and outboard, and \opt{cosineIB} and \opt{cosineOB} for half cosine refinement only inboard or outboard. 
   
-\item \param{TangentVec1} \textit{required}: if \param{Line\%type = Spline} and \param{Line\%EndPoints(1) = 1}, \textit{multiple}: no, \textit{type}: real array, length 3. 
+\item \param{tangent_vec_1} \textit{required}: if \param{Line\%type = Spline} and \param{Line\%end_points(1) = 1}, \textit{multiple}: no, \textit{type}: real array, length 3. 
 
     Tangent vector at the first point of a \param{Spline}. This is an optional input for \param{Spline}. If this field is not present, the spline inherits the tangent vector from the neighboring line (that must be a \param{Straight} line).
 
-\item \param{TangentVec2} \textit{required}: if \param{Line\%type = Spline} and \param{Line\%EndPoints(2)} is the last point of the reference line, \textit{multiple}: no, \textit{type}: real array, length 3. 
+\item \param{tangent_vec_2} \textit{required}: if \param{Line\%type = Spline} and \param{Line\%end_points(2)} is the last point of the reference line, \textit{multiple}: no, \textit{type}: real array, length 3. 
 
     Tangent vector at the last point of a \param{Spline}. This is an optional input for \param{Spline}. If this field is not present, the spline inherits the tangent vector from the neighboring line (that must be a \param{Straight} line).
 
@@ -1369,7 +1369,7 @@ So far, the code has the following limitations:
     
     \item it is not possible to join two consecutive \param{Spline}s lines. So far, \param{Spline}s are meant to join \param{Straight} lines or to be the first or last line. However a single spline can be used to join an arbitrary number of points. 
     
-    \item it is not possible to define the first or last line as a \param{Spline}, without providing the tangent vector at the free end, i.e. the \param{TangentVec1} must be provided to the first line, \param{TangentVec2} to the last line. Spline routines have the capability to treat free ends, with second derivative equal to zero, but some modifications in the pointwise definition of a component are still needed to allow for free ends.
+    \item it is not possible to define the first or last line as a \param{Spline}, without providing the tangent vector at the free end, i.e. the \param{tangent_vec_1} must be provided to the first line, \param{tangent_vec_2} to the last line. Spline routines have the capability to treat free ends, with second derivative equal to zero, but some modifications in the pointwise definition of a component are still needed to allow for free ends.
     
 \end{itemize}
 

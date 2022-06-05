@@ -174,7 +174,8 @@ else: # Perform substitution
                         regexp_old = re.compile(r"(?i)\b"+old+r"\b")
                         regexp_new = re.compile(r"(?i)\b"+new+r"\b")
                     # only change line for .in file or in CreateOption for source file
-                    modify_source_line = args.source and ('%Create' in line or '=get' in line.replace(' ',''))
+                    modify_source_line = args.source and ('%Create' in line or '=get' in line.replace(' ','') or\
+                    'countoption' in line or 'check_opt_consistency' in line)
                     if not args.source or (args.source and modify_source_line):
                        if args.invert: # inverse behaviour, replace new key with old
                            #line = line.replace(new, old)

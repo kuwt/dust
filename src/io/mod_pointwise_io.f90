@@ -201,7 +201,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   type_chord  = getstr(pmesh_prs,'type_chord')
   ElType = trim(getstr(pmesh_prs,'ElType'))
   ref_chord_fraction = getreal(pmesh_prs,'reference_chord_fraction')
-  aero_table = getlogical(pmesh_prs, 'AirfoilTableCorrection')
+  aero_table = getlogical(pmesh_prs, 'airfoil_table_correction')
   
   !> Read points and lines
   call read_points ( 'p' , pmesh_prs , point_prs , points )
@@ -1374,7 +1374,7 @@ subroutine read_points ( eltype , pmesh_prs , point_prs , points )
   integer :: nPoints , i 
 
   ! === Read point groups ===
-  nPoints = countoption(pmesh_prs,'Point') ; allocate( points(nPoints) )
+  nPoints = countoption(pmesh_prs,'point') ; allocate( points(nPoints) )
 
   ! loop over Point groups
   do i = 1 , nPoints
@@ -1392,13 +1392,13 @@ subroutine read_points ( eltype , pmesh_prs , point_prs , points )
     end if
     points(i) % chord       = getreal(     point_prs, 'chord')
     points(i) % theta       = getreal(     point_prs, 'twist')
-    points(i) % sec_nor_str = getstr(      point_prs, 'SectionNormal')
+    points(i) % sec_nor_str = getstr(      point_prs, 'section_normal')
     if ( trim(points(i)%sec_nor_str) .eq. 'vector' ) then
-      points(i) % sec_nor = getrealarray(  point_prs, 'SectionNormalVector',3)
+      points(i) % sec_nor = getrealarray(  point_prs, 'section_normal_vector',3)
     end if
     !> flipSection for 'p' or 'v'
     if ( ( eltype .eq. 'p' ) .or. ( eltype .eq. 'v' ) .or. ( eltype .eq. 'l' ) ) then
-      points(i) % flip_sec  = getlogical(  point_prs, 'FlipSection', 'F' )
+      points(i) % flip_sec  = getlogical(  point_prs, 'flip_section', 'F' )
     else
       points(i) % flip_sec    = .false.
     end if
@@ -1428,7 +1428,7 @@ subroutine read_lines ( pmesh_prs , line_prs , lines  , nelems_span_tot)
     call getsuboption( pmesh_prs , 'Line' , line_prs )
 
     lines(i) % l_type     = getstr(      line_prs , 'type'   )
-    lines(i) % end_points = getintarray( line_prs , 'EndPoints' , 2 )
+    lines(i) % end_points = getintarray( line_prs , 'end_points' , 2 )
     lines(i) % nelems     = getint(      line_prs , 'Nelems' )
     lines(i) % type_span  = getstr(      line_prs , 'type_span')
 
@@ -1445,22 +1445,22 @@ subroutine read_lines ( pmesh_prs , line_prs , lines  , nelems_span_tot)
     if ( trim(lines(i)%l_type) .eq.'Spline' ) then
 
       !> allocate tangent vec1 if specified as an input
-      if ( countoption( line_prs , 'TangentVec1' ) .eq. 0 ) then
+      if ( countoption( line_prs , 'tangent_vec_1' ) .eq. 0 ) then
         ! do nothing: tan vec must be inherited
-      elseif ( countoption( line_prs , 'TangentVec1' ) .eq. 1 ) then
+      elseif ( countoption( line_prs , 'tangent_vec_1' ) .eq. 1 ) then
         allocate(lines(i)%t_vec1(3))
-        lines(i)%t_vec1 = getrealarray(line_prs , 'TangentVec1' , 3 )
+        lines(i)%t_vec1 = getrealarray(line_prs , 'tangent_vec_1' , 3 )
       else
         write(*,*) ' Error in read_lines(). Provided more than one &
                     &TangentVec1 as an input. Stop' ; stop
       end if
 
       !> allocate tangent vec2 if specified as an input
-      if ( countoption( line_prs , 'TangentVec2' ) .eq. 0 ) then
+      if ( countoption( line_prs , 'tangent_vec_2' ) .eq. 0 ) then
         ! do nothing: tan vec must be inherited
-      elseif ( countoption( line_prs , 'TangentVec2' ) .eq. 1 ) then
+      elseif ( countoption( line_prs , 'tangent_vec_2' ) .eq. 1 ) then
         allocate(lines(i)%t_vec2(3))
-        lines(i)%t_vec2 = getrealarray(line_prs , 'TangentVec2' , 3 )
+        lines(i)%t_vec2 = getrealarray(line_prs , 'tangent_vec_2' , 3 )
       else
         write(*,*) ' Error in read_lines(). Provided more than one &
                     &TangentVec2 as an input. Stop' ; stop
@@ -1504,7 +1504,7 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
                   '0.0',&
                   multiple=.false.)
 
-    call pmesh_prs%CreateLogicalOption('AirfoilTableCorrection', &
+    call pmesh_prs%CreateLogicalOption('airfoil_table_correction', &
                   'include presence of aerodynamic .c81 for corrections', &
                   'F', &
                   multiple=.false.)
@@ -1534,13 +1534,13 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
   endif
   call point_prs%CreateRealOption(      'chord', 'section chord' )
   call point_prs%CreateRealOption(      'twist', 'section twist angle' )
-  call point_prs%CreateStringOption('SectionNormal', &
+  call point_prs%CreateStringOption('section_normal', &
                 'normal vector (str) of the plane section containing the airfoil &
                 &points', 'referenceLine' ) ! default y-axis
-  call point_prs%CreateRealArrayOption('SectionNormalVector', &
+  call point_prs%CreateRealArrayOption('section_normal_vector', &
                 'normal vector of the plane section containing the airfoil' )
   if ( ( eltype .eq. 'p' ) .or. ( eltype .eq. 'v' ) .or. ( eltype .eq. 'l' ) ) then
-    call point_prs%CreateLogicalOption('FlipSection', &
+    call point_prs%CreateLogicalOption('flip_section', &
                   'flip section definition, e.g. for box wing configurations' , &
                   'F')
   end if
@@ -1551,7 +1551,7 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
   ! --- line group ---
   call line_prs%CreateStringOption(       'type', &
                 'type of the line connecting points: Straight or Spline' )
-  call line_prs%CreateIntArrayOption('EndPoints', &
+  call line_prs%CreateIntArrayOption('end_points', &
                 'list of point id.s belonging to the line' )
   call line_prs%CreateIntOption(        'Nelems', &
                 'n. spanwise elems of the line section' )
@@ -1566,9 +1566,9 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
   ! straight lines: useles input -> tan vec computed
   ! spline lines  : either assigned or inherited from neighbouring lines
   !
-  call line_prs%CreateRealArrayOption('TangentVec1' , &
+  call line_prs%CreateRealArrayOption('tangent_vec_1' , &
                 'assign tangent vector to the line at its first point' )
-  call line_prs%CreateRealArrayOption('TangentVec2' , &
+  call line_prs%CreateRealArrayOption('tangent_vec_2' , &
                 'assign tangent vector to the line at its first point' )
 
 
