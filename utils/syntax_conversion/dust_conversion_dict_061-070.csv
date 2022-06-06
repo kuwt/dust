@@ -102,6 +102,7 @@ Motion,motion
 Pole,pole
 Input,input
 Input_Type,input_type
+InputType,input_type
 Function,function
 File,file
 Amplitude,amplitude
@@ -193,10 +194,11 @@ ScalingFactor,scaling_factor
 Rev_Length,rev_length
 Rev_Radius,rev_radius
 Rev_Nose_Radius,rev_nose_radius
-Rev_Nelem_long,rev_nelem_long
-Rev_Nelem_rev,rev_nelem_rev
+Rev_Nelem_Long,rev_nelem_long
+Rev_Nelem_Rev,rev_nelem_rev
 n_hinges,n_hinges
 Hinge,hinge
+Hinge_Tag,hinge_tag
 Hinge_Nodes_Input,hinge_nodes_input
 N_Nodes,n_nodes
 Node1,node_1
@@ -227,3 +229,10 @@ sweep,sweep
 dihed,dihed
 nelem_span,nelem_span
 type_span,type_span
+AirfoilTableCorrection,airfoil_table_correction
+SectionNormal,section_normal
+FlipSection,flip_section
+EndPoints,end_points
+SectionNormalVector,section_normal_vector
+TangentVec1,tangent_vec_1
+TangentVec2,tangent_vec_2

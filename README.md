@@ -1,4 +1,3 @@
-
 # <img src="/uploads/3b37882713af00af40ea54104817261a/dust_logo.png" width="50"> DUST Aerodynamic Solver 
 
 [![](https://img.shields.io/badge/website-blue.svg)](https://www.dust-project.org/)
@@ -99,6 +98,9 @@ Please see the [installation guidelines](install.md)
 * A. Zanotti, A. Savino, M. Palazzi, M. Tugnoli, and V. Muscarello. <i>Mid-Fidelity Numerical Approach to Tiltrotor Aerodynamics</i>. In 47th European Rotorcraft Forum, Glasgow, UK, September 2021. <a href="https://re.public.polimi.it/retrieve/handle/11311/1184736/655321/ZANOA05-21.pdf"><b>[PDF]</b></a><br><br>
 
 * A. Savino, A. Cocco, A. Zanoni, A. Zanotti, and V. Muscarello. <i>A Coupled Multibody-Mid Fidelity Aerodynamic Tool for the Simulation of Tiltrotor Manoeuvres</i>. In 47th European Rotorcraft Forum, Glasgow, UK, September 2021. <a href="https://re.public.polimi.it/retrieve/handle/11311/1183864/653034/SAVIA01-21.pdf"><b>[PDF]</b></a><br><br>
+
+* A. Savino, A. Cocco, A. Zanoni, A. De Gaspari, A. Zanotti, J. Cardoso, D. Carvalhais and V. Muscarello. <i>Design and Optimization of Innovative Tiltrotor Wing Control Surfaces Through Coupled Multibody-Mid-Fidelity Aerodynamics Simulations</i>. In the Vertical Flight Society’s 78th Annual Forum Technology Display, Ft. Worth, Texas, USA, May 2022. 
+
 
 </details>
 </p>

@@ -408,26 +408,26 @@ subroutine build_references(refs, reference_file)
 
   !Get the number of reference frames and check that all the required params
   !are actually present
-  n_refs = countoption(ref_prs,'Reference_Tag')
+  n_refs = countoption(ref_prs,'reference_tag')
   n_refs_input = n_refs
 
-  n_in = countoption(ref_prs,'Parent_Tag')
+  n_in = countoption(ref_prs,'parent_tag')
   if(n_in .ne. n_refs_input) call error(this_sub_name, this_mod_name, &
    'Inconsistent number of Reference_Tag and Parent_Tag inputs in reference&
    & frames. Forgot a "Parent_tag = ..." ?')
-  n_in = countoption(ref_prs,'Origin')
+  n_in = countoption(ref_prs,'origin')
   if(n_in .ne. n_refs_input) call error(this_sub_name, this_mod_name, &
    'Inconsistent number of Reference_Tag and Origin  inputs in reference&
    & frames. Forgot a "Origin = ..." ?')
-  n_in = countoption(ref_prs,'Orientation')
+  n_in = countoption(ref_prs,'orientation')
   if(n_in .ne. n_refs_input) call error(this_sub_name, this_mod_name, &
    'Inconsistent number of Reference_Tag and Orientation inputs in reference&
    & frames. Forgot a "Orientation = ..." ?')
-  n_in = countoption(ref_prs,'Moving')
+  n_in = countoption(ref_prs,'moving')
   if(n_in .ne. n_refs_input) call error(this_sub_name, this_mod_name, &
    'Inconsistent number of Reference_Tag and Moving inputs in reference&
    & frames. Forgot a "Moving = ..." ?')
-  n_in = countoption(ref_prs,'Multiple')
+  n_in = countoption(ref_prs,'multiple')
   if(n_in .ne. n_refs_input) call error(this_sub_name, this_mod_name, &
    'Inconsistent number of Reference_Tag and Multiple inputs in reference&
    & frames. Forgot a "Multiple = ..." ?')
@@ -470,7 +470,7 @@ subroutine build_references(refs, reference_file)
     refs(iref)%n_chil = 0
 
     refs(iref)%orig  = getrealarray(ref_prs,'origin',3, olink=lnk)
-    call check_opt_consistency(lnk,next=.true.,next_opt='Orientation')
+    call check_opt_consistency(lnk,next=.true.,next_opt='orientation')
     refs(iref)%frame = reshape(getrealarray(ref_prs,'Orientation',9),(/3,3/))
     !allocated here, will be set in update_all_refs
 
@@ -481,7 +481,7 @@ subroutine build_references(refs, reference_file)
     if (refs(iref)%self_moving) then
 
       n_mov = n_mov + 1
-      call check_opt_consistency(lnk, next=.true., next_opt='Motion')
+      call check_opt_consistency(lnk, next=.true., next_opt='motion')
       call getsuboption(ref_prs,'Motion',sbprms)
       call getsuboption(sbprms,'Pole',sbprms_pol)
 
@@ -489,7 +489,7 @@ subroutine build_references(refs, reference_file)
 
         case('position')
 
-          if ( countoption(sbprms_pol,'Input_Type') .eq. 0 ) then
+          if ( countoption(sbprms_pol,'input_type') .eq. 0 ) then
             write(ref_tag_str,'(I5)') refs(iref)%tag
             call error(this_sub_name, this_mod_name, '"Input" field not defined &
                   &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
@@ -499,7 +499,7 @@ subroutine build_references(refs, reference_file)
           select case( trim(getstr(sbprms_pol,'Input_Type')) )
 
             case('from_file')
-              if ( countoption(sbprms_pol,'File') .eq. 0 ) then
+              if ( countoption(sbprms_pol,'file') .eq. 0 ) then
                 write(ref_tag_str,'(I5)') refs(iref)%tag
                 call error(this_sub_name, this_mod_name, '"File" field not defined &
                       &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
@@ -539,7 +539,7 @@ subroutine build_references(refs, reference_file)
               end do
 
             case('simple_function')
-              if ( countoption(sbprms_pol,'Function') .eq. 0 ) then
+              if ( countoption(sbprms_pol,'function') .eq. 0 ) then
                 write(ref_tag_str,'(A)') refs(iref)%tag
                 call error(this_sub_name, this_mod_name, '"Function" field not defined &
                   &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
@@ -599,12 +599,12 @@ subroutine build_references(refs, reference_file)
 
         case('velocity')
 
-          if ( countoption(sbprms_pol,'Input_Type') .eq. 0 ) then
+          if ( countoption(sbprms_pol,'input_type') .eq. 0 ) then
             write(ref_tag_str,'(I5)') refs(iref)%tag
             call error(this_sub_name, this_mod_name, '"Input" field not defined &
                   &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
           end if
-          !if ( countoption(sbprms_pol,'Position_0') .eq. 0 ) then
+          !if ( countoption(sbprms_pol,'position_0') .eq. 0 ) then
           !  write(ref_tag_str,'(I5)') refs(iref)%tag
           !  call error(this_sub_name, this_mod_name, '"Position_0" field not defined &
           !        &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
@@ -627,7 +627,7 @@ subroutine build_references(refs, reference_file)
           select case( trim(getstr(sbprms_pol,'Input_Type')) )
 
             case('from_file')
-              if ( countoption(sbprms_pol,'File') .eq. 0 ) then
+              if ( countoption(sbprms_pol,'file') .eq. 0 ) then
                 write(ref_tag_str,'(I5)') refs(iref)%tag
                 call error(this_sub_name, this_mod_name, '"File" field not defined &
                       &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
@@ -658,7 +658,7 @@ subroutine build_references(refs, reference_file)
               end do
 
             case('simple_function')
-              if ( countoption(sbprms_pol,'Function') .eq. 0 ) then
+              if ( countoption(sbprms_pol,'function') .eq. 0 ) then
                 write(ref_tag_str,'(I5)') refs(iref)%tag
                 call error(this_sub_name, this_mod_name, '"Function" field not defined &
                   &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
@@ -752,7 +752,7 @@ subroutine build_references(refs, reference_file)
 
         case('velocity')
 
-          if ( countoption(sbprms_rot,'Input_Type') .eq. 0 ) then
+          if ( countoption(sbprms_rot,'input_type') .eq. 0 ) then
             write(ref_tag_str,'(A)') trim(refs(iref)%tag)
             call error(this_sub_name, this_mod_name, '"Input" field not defined &
                   &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
@@ -762,7 +762,7 @@ subroutine build_references(refs, reference_file)
             call error(this_sub_name, this_mod_name, '"Axis" field not defined &
                   &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
           end if
-          !if ( countoption(sbprms_rot,'Psi_0') .eq. 0 ) then
+          !if ( countoption(sbprms_rot,'psi_0') .eq. 0 ) then
           !  write(ref_tag_str,'(A)') trim(refs(iref)%tag)
           !  call error(this_sub_name, this_mod_name, '"Psi_0" field not defined &
           !        &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
@@ -775,7 +775,7 @@ subroutine build_references(refs, reference_file)
           select case( trim(getstr(sbprms_rot,'Input_Type')) )
 
             case('from_file')
-              if ( countoption(sbprms_rot,'File') .eq. 0 ) then
+              if ( countoption(sbprms_rot,'file') .eq. 0 ) then
                 write(ref_tag_str,'(I5)') refs(iref)%tag
                 call error(this_sub_name, this_mod_name, '"File" field not defined &
                       &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
@@ -808,7 +808,7 @@ subroutine build_references(refs, reference_file)
               end do
 
             case('simple_function')
-              if ( countoption(sbprms_rot,'Function') .eq. 0 ) then
+              if ( countoption(sbprms_rot,'function') .eq. 0 ) then
                 write(ref_tag_str,'(I5)') refs(iref)%tag
                 call error(this_sub_name, this_mod_name, '"Function" field not defined &
                   &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
@@ -892,7 +892,7 @@ subroutine build_references(refs, reference_file)
 
         case('position')
 
-          if ( countoption(sbprms_rot,'Input_Type') .eq. 0 ) then
+          if ( countoption(sbprms_rot,'input_type') .eq. 0 ) then
             write(ref_tag_str,'(A)') trim(refs(iref)%tag)
             call error(this_sub_name, this_mod_name, '"Input" field not defined &
                   &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
@@ -902,7 +902,7 @@ subroutine build_references(refs, reference_file)
             call error(this_sub_name, this_mod_name, '"Axis" field not defined &
                   &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
           end if
-          !if ( countoption(sbprms_rot,'Psi_0') .eq. 0 ) then
+          !if ( countoption(sbprms_rot,'psi_0') .eq. 0 ) then
           !  write(ref_tag_str,'(A)') trim(refs(iref)%tag)
           !  call error(this_sub_name, this_mod_name, '"Psi_0" field not defined &
           !        &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
@@ -915,7 +915,7 @@ subroutine build_references(refs, reference_file)
           select case( trim(getstr(sbprms_rot,'Input_Type')) )
 
             case('from_file')
-              if ( countoption(sbprms_rot,'File') .eq. 0 ) then
+              if ( countoption(sbprms_rot,'file') .eq. 0 ) then
                 write(ref_tag_str,'(I5)') refs(iref)%tag
                 call error(this_sub_name, this_mod_name, '"File" field not defined &
                       &in Motion={Pole={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
@@ -957,7 +957,7 @@ subroutine build_references(refs, reference_file)
               end do
 
             case('simple_function')
-              if ( countoption(sbprms_rot,'Function') .eq. 0 ) then
+              if ( countoption(sbprms_rot,'function') .eq. 0 ) then
                 write(ref_tag_str,'(A)') refs(iref)%tag
                 call error(this_sub_name, this_mod_name, '"Function" field not defined &
                   &in Motion={Rotation={ for Ref.Frame with Reference_Tag'//trim(ref_tag_str))
@@ -1126,7 +1126,7 @@ subroutine build_references(refs, reference_file)
            n_dofs = 0
          end if
          ! check if countoption(Dof) .eq. N_Dofs
-         count_dofs = countoption(sbprms,'Dof')
+         count_dofs = countoption(sbprms,'dof')
          if ( count_dofs .ne. n_dofs ) then
            write(*,*) " number of degrees of freedom specified: " , count_dofs
            write(*,*) " number of degrees of freedom declared:" , n_dofs
@@ -1153,7 +1153,7 @@ subroutine build_references(refs, reference_file)
          transient_time    = getreal(sbprms,'transient_time')
          init_rot_rate     = getreal(sbprms,'init_rot_rate')
          if ( transient_logical ) then
-           if ( ( countoption(sbprms,'Transient_Time') .eq. 0 ) .or. &
+           if ( ( countoption(sbprms,'transient_time') .eq. 0 ) .or. &
                 ( countoption(sbprms,'Transient_Fun ') .eq. 0 ) ) then
              call error(this_sub_name, this_mod_name, '"Transient" set as .TRUE.,&
                    & but no "Transient_Time or Transient_Fun is defined. Stop')
@@ -1412,10 +1412,10 @@ subroutine build_references(refs, reference_file)
 
   enddo
 
-  n_in = countoption(ref_prs,'Motion')
+  n_in = countoption(ref_prs,'motion')
   if(n_in .ne. n_mov) call error(this_sub_name, this_mod_name, &
    'Inconsistent number of Motion sections and Moving=T references')
-  n_in = countoption(ref_prs,'Multiplicity')
+  n_in = countoption(ref_prs,'multiplicity')
   if(n_in .ne. n_mult) call error(this_sub_name, this_mod_name, &
    'Inconsistent number of Multiplicity sections and Multiple=T references')
 
@@ -1871,7 +1871,7 @@ end subroutine check_input_from_file
 !  write(*,*) ' shape(refs) : ' , shape(refs)
 !  ! debug -----
 !
-!  nref_ref_in = countoption(ref_prs,'Reference_Tag')
+!  nref_ref_in = countoption(ref_prs,'reference_tag')
 !
 !  ! open restart file to read the relative initial conditions
 !  call open_hdf5_file(trim(restart_file), floc)

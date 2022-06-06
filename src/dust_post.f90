@@ -226,7 +226,7 @@ call sbprms%CreateStringOption('variable','Variables to be saved: velocity, pres
                               & vorticity', multiple=.true.)
 
 ! probe output -------------
-call sbprms%CreateStringOption('InputType','How to specify probe coordinates',&
+call sbprms%CreateStringOption('input_type','How to specify probe coordinates',&
                               multiple=.true.)
 call sbprms%CreateRealArrayOption('point','Point coordinates in dust_post.in',&
                               multiple=.true.)
@@ -288,7 +288,7 @@ call initialize_doublet()
 call initialize_surfpan()
 call initialize_vortline()
 
-n_analyses = countoption(prms,'Analysis')
+n_analyses = countoption(prms,'analysis')
 
 !> Check that the basenames are valid
 call check_basename(trim(basename),'dust postprocessor')
@@ -313,7 +313,7 @@ do ia = 1, n_analyses
 
   !> Check if we are analysing all the components or just some
   all_comp = .false.
-  n_comp = countoption(sbprms, 'Component')
+  n_comp = countoption(sbprms, 'component')
 
   if (n_comp .eq. 0)  then
     all_comp = .true.
@@ -332,7 +332,7 @@ do ia = 1, n_analyses
 
   if (trim(an_type) .eq. 'hinge_loads') then 
     all_hinge = .false. 
-    n_hinge = countoption(sbprms, 'HingeTag')
+    n_hinge = countoption(sbprms, 'hinge_tag')
     if (n_hinge .eq. 0)  then
       all_hinge = .true.
     else

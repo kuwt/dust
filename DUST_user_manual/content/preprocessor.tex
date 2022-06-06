@@ -755,8 +755,7 @@ offset and scaling are applied in the following order:
 \end{equation*}
 
 
-\item \param{airfoil\_table\_correction}: \textit{required:} no. 
-\textit{multiple:} no. \textit{type:} logical.
+\item \param{airfoil_table_correction}: \textit{required:} yes. \textit{multiple:} no. \textit{type:} logical.
 
 Require the viscous correction for \opt{v} elements by introducing the c81 aerodynamic tables. (Still experimental) 
 
@@ -1528,7 +1527,7 @@ describe the reference line of the component. The parameters of a
     the vector that is normal to the plane of the section.
 
 \item \param{section\_normal} \textit{required}: no, \textit{multiple}: no , 
-\textit{default}: \param{referenceLine} , \textit{type}: string.
+\textit{default}: \param{reference_line} , \textit{type}: string.
 
     String to define the plane of the section. It can be: \param{reference_line}, 
     for sections perpendicular to the reference line; \param{y_axis}, 

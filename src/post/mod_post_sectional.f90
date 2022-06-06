@@ -209,7 +209,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
   ! Some warnings and errors -------------------------------
   ! WARNING: sectional loads are computed for one components only
   !  at time. If no component is specified --> return
-  n_comp = countoption(sbprms,'Component')
+  n_comp = countoption(sbprms,'component')
   if ( n_comp .le. 0 ) then
     call warning(this_mod_name, this_sub_name, 'No component specified for &
                 &sectional_loads analysis. Skipped analysis.')
@@ -280,7 +280,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
 
   ! if a box is defined ---> use the box
   comp_input = trim(comps(1)%comp_input )
-  n_box = countoption(sbprms,'BoxSect')
+  n_box = countoption(sbprms,'box_sect')
   if ( n_box .eq. 1 ) comp_input = 'cgns'
   if (n_box .gt. 1) call error(this_sub_name, this_mod_name, 'More than one&
   & box defined for sectional loads')

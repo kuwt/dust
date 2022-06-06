@@ -1379,8 +1379,8 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   !> The user is required to set _Alpha and _dAlpha for ll adaptive regularisation
   if (trim(sim_param%llSolver) .eq. 'AlphaMethod') then
     if (sim_param%llArtificialViscosityAdaptive) then
-      if ((countoption(prms,'LLartificialViscosityAdaptive_Alpha')  .eq. 0) .or. &
-          (countoption(prms,'LLartificialViscosityAdaptive_dAlpha') .eq. 0)) then
+      if ((countoption(prms,'ll_artificial_viscosity_adaptive_alpha')  .eq. 0) .or. &
+          (countoption(prms,'ll_artificial_viscosity_adaptive_dalpha') .eq. 0)) then
         call error('dust','init_sim_param','LLartificialViscosityAdaptive_Alpha or&
           & LLartificialViscosity_dAlpha not set as an input, while LLartificialViscosityAdaptive&
           & is set equal to T. Set these parameters [deg].')
@@ -1424,7 +1424,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
 
     if(sim_param%use_pr) then
       sim_param%part_redist_ratio         = getreal(prms,'particles_redistribution_ratio')
-      if ( countoption(prms,'OctreeLevelSolid') .gt. 0 ) then
+      if ( countoption(prms,'octree_level_solid') .gt. 0 ) then
         sim_param%lvl_solid               = getint(prms, 'octree_level_solid')
       else
         sim_param%lvl_solid               = max(sim_param%NOctreeLevels-2,1)
@@ -1448,13 +1448,13 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     sim_param%GustType                    = getstr(prms,'gust_type')
     sim_param%gust_origin                 = getrealarray(prms, 'gust_origin',3)
 
-    if(countoption(prms,'GustFrontDirection') .gt. 0) then
+    if(countoption(prms,'gust_front_direction') .gt. 0) then
       sim_param%gust_front_direction      = getrealarray(prms, 'gust_front_direction',3)
     else
       sim_param%gust_front_direction      = sim_param%u_inf
     end if
     
-    if(countoption(prms,'GustFrontSpeed') .gt. 0) then
+    if(countoption(prms,'gust_front_speed') .gt. 0) then
       sim_param%gust_front_speed          = getreal(prms, 'gust_front_speed')
     else
       sim_param%gust_front_speed          = norm2(sim_param%u_inf)

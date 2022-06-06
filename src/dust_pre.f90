@@ -125,9 +125,9 @@ call prms%CreateStringOption('file_name','Preprocessor output file')
 call check_file_exists(input_file_name,'dust preprocessor')
 call prms%read_options(input_file_name, printout_val=.false.)
 
-n_name          = countoption(prms, 'CompName')
-n_geo           = countoption(prms, 'GeoFile')
-n_tag           = countoption(prms, 'RefTag')
+n_name          = countoption(prms, 'comp_name')
+n_geo           = countoption(prms, 'geo_file')
+n_tag           = countoption(prms, 'ref_tag')
 tol_sew         = getreal(prms, 'tol_se_wing')
 inner_prod_thr  = getreal(prms, 'inner_product_te')
 
@@ -142,8 +142,8 @@ allocate(comp_names(n_geo), geo_files(n_geo), ref_tags(n_geo))
 do i=1,n_geo
   comp_names(i) = getstr(prms, 'comp_name')
   geo_files(i)  = getstr(prms, 'geo_file', olink=lnk)
-  call check_opt_consistency(lnk, prev=.true., prev_opt='CompName')
-  call check_opt_consistency(lnk, next=.true., next_opt='RefTag')
+  call check_opt_consistency(lnk, prev=.true., prev_opt='comp_name')
+  call check_opt_consistency(lnk, next=.true., next_opt='ref_tag')
   ref_tags(i)   = getstr(prms, 'ref_tag')
 enddo
 

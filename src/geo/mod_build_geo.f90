@@ -413,7 +413,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     coupling_type = getstr(geo_prs, 'coupling_type')
     coupling_node = getrealarray(geo_prs, 'coupling_node', 3)
     
-    if ( countoption(geo_prs, 'CouplingNodeFile') .ne. 0 ) &
+    if ( countoption(geo_prs, 'coupling_node_file') .ne. 0 ) &
         coupling_node_file = getstr(geo_prs, 'coupling_node_file')
     
     coupling_node_rot = reshape( &
@@ -469,7 +469,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   !> Parameters for gap sewing and edge identification
   !> TolSewing
-  i_count = countoption(geo_prs,'TolSewing')
+  i_count = countoption(geo_prs,'tol_se_wing')
   
   if ( i_count .eq. 1 ) then
     tol_sewing = getreal(geo_prs,'tol_se_wing')
@@ -484,7 +484,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   end if
 
   !> InnerProductTe
-  i_count = countoption(geo_prs,'InnerProductTe')
+  i_count = countoption(geo_prs,'inner_product_te')
 
   if ( i_count .eq. 1 ) then
     inner_product_threshold = getreal(geo_prs,'inner_product_te')
@@ -499,14 +499,14 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   end if
 
   !> Trailing edge projection
-  i_count = countoption(geo_prs,'ProjTe')
+  i_count = countoption(geo_prs,'proj_te')
   te_proj_logical = .false.
   if ( i_count .eq. 1 ) then
     te_proj_logical = getlogical(geo_prs,'proj_te')
   end if
 
   if ( te_proj_logical ) then
-    i_count = countoption(geo_prs,'ProjTeDir' )
+    i_count = countoption(geo_prs,'proj_te_dir' )
     if ( i_count .eq. 1 ) then
       te_proj_dir  = getstr(geo_prs, 'proj_te_dir')
     elseif ( i_count .lt. 1 ) then
@@ -529,7 +529,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   end if
 
   if ( te_proj_logical ) then
-    i_count = countoption(geo_prs,'ProjTeVector' )
+    i_count = countoption(geo_prs,'proj_te_vector' )
     if ( i_count .eq. 1 ) then
       te_proj_vec  = getrealarray(geo_prs, 'proj_te_vector',3)
     elseif ( i_count .lt. 1 ) then
@@ -635,7 +635,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     mesh_file = getstr(geo_prs,'mesh_file')
 
     ! Check the selection of mesh sections
-    nSections = countoption(geo_prs, 'SectionName')
+    nSections = countoption(geo_prs, 'section_name')
 
     allocate(sectionNamesCGNS(nSections))
 
@@ -690,7 +690,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
   case('revolution')
 
-      if ( countoption(geo_prs,'MeshFile') .lt. 1 ) then
+      if ( countoption(geo_prs,'mesh_file') .lt. 1 ) then
 
         !> Size of the body of revolution
         trac        = getreal(geo_prs, 'rev_nose_radius');
