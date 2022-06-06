@@ -60,13 +60,14 @@ Designed from scratch to deliver mid-fidelity aerodynamics analysis at workstati
 
 ## Documentation
 
-In the doc folder can be found a **[quick_start.pdf](doc/quick_start.pdf)** containing a description of the provided examples.
+In the doc folder can be found a **[quick_start.pdf](doc/quick_start.pdf)** containing a description of the provided examples and the more detailed **[DUST_user_manual.pdf](doc/DUST_user_manual.pdf)** which includes all DUST input keywords
 
 
 
 ## Installation
 
-Please see the [installation guidelines](install.md)
+Please see the [installation guidelines](install.md) 
+
 
 ## Publications
 <p>
