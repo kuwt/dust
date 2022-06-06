@@ -2009,7 +2009,7 @@ subroutine avoid_collision_2(elems, wake, part, vel_in, vel_out)
   ! Thickness of the "surface blocks"
   ! ( now, HARDCODED. TODO: read as an input: same order of dimension of the blob radius )
   !blthick = 0.05_wp
-  blthick = sim_param%VortexRad
+  blthick = part%r_Vortex ! sim_param%VortexRad
 
   !tolerance for the minimum wall distance
   ! ( now, HARDCODED. TODO: read as an input: same order of dimension of the blob radius )
