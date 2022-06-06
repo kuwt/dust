@@ -1,13 +1,13 @@
 # Binary packages
-Pre-compiled binary packages are available for Ubuntu 20.04 and 22.04. They include only the standalone DUST version, without the preCICE-MBDyn coupling.
+Pre-compiled binary packages are available for Ubuntu 20.04 (focal) and 22.04 (jammy). They include only the standalone DUST version, without the preCICE-MBDyn coupling.
 
-For Ubuntu 20.04 (focal) you can download and install DUST as follows:
-
+For Ubuntu, you can download and install DUST as follows:
+- Download the related package from the [release page](https://gitlab.com/dust_project/dust_dev/-/releases/)
+- Move to the directory where you download the package and run
   ```bash
-    wget https://LINK
     sudo apt install ./dust_0.7.0b-1_amd64_focal.deb
   ```
-For other versions of Ubuntu, just replace ```focal``` with the codename of your version (for example ```jammy``` for Ubuntu 22.04) in the name of the package in the commands above.
+Change `focal` to `jammy` in the line above according to your version.
 # Build DUST from source
 If you need the coupled preCICE-MBDyn version of DUST, or if you wish to develop the software, you have to build it from source.
 ## Requirements:
