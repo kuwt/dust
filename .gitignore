@@ -19,3 +19,14 @@ build/
 *.h5
 !test/
 .vscode
+*.aux
+*.dvi
+*.hst
+*.log
+*.toc
+*.ver 
+*.pdf 
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+
