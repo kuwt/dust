@@ -5,7 +5,7 @@ For Ubuntu, you can download and install DUST as follows:
 - Download the related package from the [release page](https://gitlab.com/dust_project/dust_dev/-/releases/)
 - Move to the directory where you download the package and run
   ```bash
-    sudo apt install ./dust_0.7.0b-1_amd64_focal.deb
+    sudo apt install ./dust_0.7.2b-1_amd64_focal.deb
   ```
 Change `focal` to `jammy` in the line above according to your version.
 # Build DUST from source
