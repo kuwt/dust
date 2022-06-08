@@ -1,7 +1,5 @@
 # <img src="/uploads/3b37882713af00af40ea54104817261a/dust_logo.png" width="50"> DUST Aerodynamic Solver 
 
-[![](https://img.shields.io/badge/website-blue.svg)](https://www.dust-project.org/)
-
 <!-- <img src="/uploads/a9c9b0254c955cb0d5b681b6695feb66/Goland_miniatura_1_.PNG" width="200"> -->
 <img src="/uploads/e47649c3db0892bc6bb09673607eabe2/complete_model_dark_web.png" width="700">
 
