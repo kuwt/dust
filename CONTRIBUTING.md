@@ -9,16 +9,12 @@ you, to create a better solution for you, for us and for all the users.
 For suggestions and discussions you can simply reach out to the [developers contributors](contributors.md).
 
 If you are using the code and you stumble upon a bug, we will try to 
-address the issue as soon as possible! Please file a bug report by
-simply describing with as much detail as possible the problem in an
-email directed to:
-
-<incoming+dust-group-dust-5749750-issue-@incoming.gitlab.com>
+address the issue as soon as possible! Please open an issue. 
 
 If you want to code some features yourself, add some functionalities or
 simply mess with the code, you are encouraged to fork the official 
-repository <https://gitlab.com/dust_group/dust> and play around with it.
-
+repository <https://public.gitlab.polimi.it/DAER/dust> and play around with it. 
+When you are ready with your modification and feature, open a merge request! 
 
 If you want to keep your code up to date with the official repository,
 remember to mirror your fork with respect to the original repository.

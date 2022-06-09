@@ -1,3 +1,8 @@
+#### 0.7.2-b
+- Added unsteady contribution to pressure in flowfield and probe postprocessing
+- Added ubuntu precompiled packages 
+- Fixed some bugs
+
 #### 0.7.1-b
 
 - Fixed some bugs

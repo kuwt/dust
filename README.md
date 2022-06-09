@@ -123,7 +123,7 @@ If you are using the aeroelastic version of DUST coupled to the multibody softwa
 
 ## Contributors
 
-Please see the [contributiors](contributors.md)
+Please see the [contributors](contributors.md)
 
 ## License
 
