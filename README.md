@@ -43,6 +43,8 @@ Choose the fidelity level: from single dimensional lifting line to fully three d
 
 Choose the Fast Multipole optimized particle wake to simulate complex interactions among wakes and with solid bodies with exceptional robustness. 
 
+![rotor_test_dark](/uploads/ab32a47dd8342d1c6a8330ee99e7b461/rotor_test_dark.gif)
+
 ### Designed for Performance 
 
 Designed from scratch to deliver mid-fidelity aerodynamics analysis at workstation level, with no requirements for cluster level resources. 
