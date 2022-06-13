@@ -64,6 +64,15 @@ in most Linux distributions.
   - **$CMAKE_BUILD_TYPE** can be **Release** or **Debug**
   - **$WITH_PRECICE** can be **YES** or **NO**
 
+- If you want to compile with intel MKL libraries first:
+  ```bash
+    source /opt/intel/oneapi/setvars.sh
+  ```
+  then: 
+  ```bash
+  $ cmake -DDUST_MKL=YES ../ 
+  ``` 
+  
 - Build DUST:
 
   ```bash
