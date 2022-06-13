@@ -1164,7 +1164,7 @@ subroutine read_airfoil (filen , discr , ElType , nelems_chord , csi_half, rr, c
   real(wp) , allocatable :: csi(:)
   real(wp) , allocatable :: st_geo(:) , s_geo(:)
   real(wp) :: ds_geo
-
+  real(wp), allocatable :: rr_tmp(:,:)
   integer :: fid, ierr
   integer :: i1 , i2
 
@@ -1199,6 +1199,7 @@ subroutine read_airfoil (filen , discr , ElType , nelems_chord , csi_half, rr, c
   s_geo = st_geo / st_geo(np_geo)
 
   allocate(rr(2,nelems_chord_tot)) ; rr = 0.0_wp
+  allocate(rr_tmp(2,nelems_chord_tot)); rr_tmp = 0.0_wp
   rr(:,1) = rr_geo(:,1)
   rr(:,nelems_chord_tot) = rr_geo(:,np_geo)
   do i1 = 2 , nelems_chord_tot - 1
@@ -1211,11 +1212,15 @@ subroutine read_airfoil (filen , discr , ElType , nelems_chord , csi_half, rr, c
       end if
     end do
   end do
-
+  
+  rr_tmp = rr 
   !> resort rr (first pressure side then suction side)
   if ( ElType .eq. 'p' ) then
     rr = rr(:, size(rr(1,:)):1:-1)
   endif 
+  !> fix trailing edge 
+  rr(:,1) = rr_tmp(:,1)
+  rr(:,size(rr,2)) = rr_tmp(:,size(rr,2)) 
 
   !> get position of aerodynamic center 
   csi_ac = 0.75_wp ! control point for vl corrected
