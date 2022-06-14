@@ -41,22 +41,22 @@
 % 
 % Author: Alessandro Cocco 
 %=========================================================================
+%
+% This matlab function parse the sectional loads. 
+% The input is the same as the one required in the filed "basename" in the 
+% dust_post.in file. 
+% If short_data is true,  then the parsed fields are Fx, Fy, Fz, Mo. 
+% The output is a data structure of the form: 
+%   sec_data.<field>.time     => simulation time 
+%                   .value    => value matrix n_time x m_sec 
+%                   .X        => position from global to local 
+%                   .R        => rotation from global to local 
+%   sec_data.sec              => position of the section from which the 
+%                                <field> are extracted 
+% For further details regarding the <field> please see the input manual. 
 
 function sec_data = sec_load(file_out, short_data)
-    % This matlab function parse the sectional loads. 
-    % The input is the same as the one required in the filed "basename" in the 
-    % dust_post.in file. 
-    % If short_data is true,  then the parsed fields are Fx, Fy, Fz, Mo. 
-    % The output is a data structure of the form: 
-    %   sec_data.<field>.time     => simulation time 
-    %                   .value    => value matrix n_time x m_sec 
-    %                   .X        => position from global to local 
-    %                   .R        => rotation from global to local 
-    %   sec_data.sec              => position of the section from which the 
-    %                                <field> are extracted 
-    % For further details regarding the <field> please see the input manual. 
-    
-    
+        
     if short_data
         field = {'Mo';
         'Fz';
