@@ -1216,11 +1216,14 @@ subroutine read_airfoil (filen , discr , ElType , nelems_chord , csi_half, rr, c
   rr_tmp = rr 
   !> resort rr (first pressure side then suction side)
   if ( ElType .eq. 'p' ) then
+    
     rr = rr(:, size(rr(1,:)):1:-1)
+    !> fix trailing edge 
+    rr(:,1) = rr_tmp(:,1)
+    rr(:,size(rr,2)) = rr_tmp(:,size(rr,2))     
   endif 
-  !> fix trailing edge 
-  rr(:,1) = rr_tmp(:,1)
-  rr(:,size(rr,2)) = rr_tmp(:,size(rr,2)) 
+  !> cleanup
+  deallocate(rr_tmp)
 
   !> get position of aerodynamic center 
   csi_ac = 0.75_wp ! control point for vl corrected
