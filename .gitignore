@@ -29,4 +29,6 @@ build/
 *.fdb_latexmk
 *.fls
 *.synctex.gz
-
+CMakeCache.txt
+CMakeFiles/ 
+*.dat 

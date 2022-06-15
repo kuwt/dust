@@ -83,7 +83,7 @@ contains
 subroutine read_mesh_parametric(mesh_file,ee,rr, &
                     npoints_chord_tot, nelem_span_tot, hinges, n_hinges, mesh_mirror, mesh_symmetry, &
                     nelem_span_list, airfoil_list_actual, i_airfoil_e, normalised_coord_e, & 
-                    aero_table_out, curv_ac)
+                    aero_table_out)! curv_ac)
 
   character(len=*), intent(in)              :: mesh_file
   integer  , allocatable, intent(out)       :: ee(:,:)
@@ -98,7 +98,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   logical                                   :: twist_linear_interp
   logical, intent(out), optional            :: aero_table_out
   logical                                   :: aero_table
-  real(wp), allocatable, intent(out), optional :: curv_ac(:,:)
+  !real(wp), allocatable, intent(out), optional :: curv_ac(:,:)
   real(wp), allocatable                     :: curv_ac_section1(:), curv_ac_section2(:) 
   real(wp)                                  :: curv_ac_section
   integer                                   :: nelem_chord, nelem_chord_tot 
@@ -908,7 +908,7 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   if ( airfoil(len_trim(airfoil)-3 : len_trim(airfoil)) .eq. '.dat' ) then
 
     call check_file_exists(airfoil, this_sub_name, this_mod_name)
-    call read_airfoil ( airfoil , trim(type_chord) , ElType , nelem_chord , chord_fraction, point_list, curv_ac )
+    call read_airfoil ( airfoil , ElType , nelem_chord , chord_fraction, point_list, curv_ac )
 
   else if ( airfoil(1:4) .eq. 'NACA' ) then
     if ( len_trim(airfoil) .eq. 8 ) then      ! NACA 4-digit -------
@@ -1147,10 +1147,9 @@ endsubroutine naca5digits
 
 !-------------------------------------------------------------------------------
 
-subroutine read_airfoil (filen , discr , ElType , nelems_chord , csi_half, rr, curv_ac )
+subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, curv_ac )
 
   character(len=*), intent(in) :: filen
-  character(len=*), intent(in) :: discr
   character(len=*), intent(in) :: ElType
   integer         , intent(in) :: nelems_chord
   real(wp)        , allocatable , intent(out) :: rr(:,:)
@@ -1160,6 +1159,8 @@ subroutine read_airfoil (filen , discr , ElType , nelems_chord , csi_half, rr, c
 
   integer :: nelems_chord_tot
   real(wp) , allocatable :: rr_geo(:,:)
+  real(wp) , allocatable :: rr_up(:,:), rr_low(:,:), rr_pan(:,:)
+  real(wp) , allocatable :: y_mean(:,:)
   integer :: np_geo
   real(wp) , allocatable :: csi(:)
   real(wp) , allocatable :: st_geo(:) , s_geo(:)
@@ -1178,62 +1179,74 @@ subroutine read_airfoil (filen , discr , ElType , nelems_chord , csi_half, rr, c
   end do
   close(fid)
 
-  if ( ElType .eq. 'p' ) then
-    nelems_chord_tot = 2*nelems_chord+1
-    allocate(csi(nelems_chord_tot))
-    csi(             1  :nelems_chord + 1) =  -0.5_wp * csi_half(nelems_chord+1:1:-1)
-    csi(nelems_chord+2:2*nelems_chord+1) = 0.5_wp * csi_half(2:nelems_chord + 1)
-    csi = csi(nelems_chord_tot:1:-1) + 0.5_wp
-  elseif ( ElType .eq. 'v' ) then
-    nelems_chord_tot = nelems_chord+1
-    allocate(csi(nelems_chord_tot))
-    csi = -csi_half(nelems_chord+1:1:-1) + 1.0_wp
-  end if
+  nelems_chord_tot = 2*nelems_chord+1
+  allocate(csi(nelems_chord_tot))
+  csi(             1  :nelems_chord + 1) =  -0.5_wp * csi_half(nelems_chord+1:1:-1)
+  csi(nelems_chord+2:2*nelems_chord+1) = 0.5_wp * csi_half(2:nelems_chord + 1)
+  csi = csi(nelems_chord_tot:1:-1) + 0.5_wp
 
   allocate(st_geo(np_geo),s_geo(np_geo))
   st_geo = 0.0_wp ; s_geo = 0.0_wp
 
   do i1 = 2 , np_geo
-    st_geo(i1) = st_geo(i1-1) + norm2(rr_geo(:,i1)-rr_geo(:,i1-1))
+    st_geo(i1) = st_geo(i1-1) + abs(rr_geo(1,i1)-rr_geo(1,i1-1))
   end do
   s_geo = st_geo / st_geo(np_geo)
 
-  allocate(rr(2,nelems_chord_tot)) ; rr = 0.0_wp
+  allocate(rr_pan(2,nelems_chord_tot)); rr_pan = 0.0_wp
   allocate(rr_tmp(2,nelems_chord_tot)); rr_tmp = 0.0_wp
-  rr(:,1) = rr_geo(:,1)
-  rr(:,nelems_chord_tot) = rr_geo(:,np_geo)
+  rr_pan(:,1) = rr_geo(:,1)
+  rr_pan(:,nelems_chord_tot) = rr_geo(:,np_geo)
   do i1 = 2 , nelems_chord_tot - 1
     do i2 = 2 , np_geo
       if ( csi(i1) .lt. s_geo(i2) ) then
         ds_geo = s_geo(i2)-s_geo(i2-1)
-        rr(:,i1) = (csi(i1)-s_geo(i2-1))/ds_geo * rr_geo(:,i2) + &
+        rr_pan(:,i1) = (csi(i1)-s_geo(i2-1))/ds_geo * rr_geo(:,i2) + &
                    (s_geo(i2)-csi(i1)  )/ds_geo * rr_geo(:,i2-1)
         exit
       end if
     end do
   end do
   
-  rr_tmp = rr 
+  rr_tmp = rr_pan 
   !> resort rr (first pressure side then suction side)
-  if ( ElType .eq. 'p' ) then
-    
-    rr = rr(:, size(rr(1,:)):1:-1)
-    !> fix trailing edge 
-    rr(:,1) = rr_tmp(:,1)
-    rr(:,size(rr,2)) = rr_tmp(:,size(rr,2))     
+  rr_pan = rr_pan(:, size(rr_pan(1,:)):1:-1)
+  !> fix trailing edge 
+  rr_pan(:,1) = rr_tmp(:,1)
+  rr_pan(:,size(rr_pan,2)) = rr_tmp(:,size(rr_pan,2))     
+
+  if  ( ElType .eq. 'v' ) then 
+    allocate(rr_up(2,nelems_chord+1));    rr_up = 0.0_wp
+    allocate(rr_low(2,nelems_chord+1));   rr_low = 0.0_wp
+    allocate(y_mean(1,nelems_chord+1));   y_mean = 0.0_wp
+    allocate(rr(2,nelems_chord+1));       rr = 0.0_wp
+    ! split suction and lower side
+    rr_up = rr_pan(:,nelems_chord+1:2*nelems_chord+1)
+    rr_low = rr_pan(:,1:nelems_chord+1)
+    ! y-coordinates of the mean line
+    y_mean(1,:) = (rr_up(2,:) + rr_low(2,:))/2.0_wp
+    rr(1,:) = rr_up(1,:)
+    rr(2,:) = y_mean(1,:)
+
+  elseif ( ElType .eq. 'p' ) then
+    allocate(rr(2,nelems_chord_tot));       rr = 0.0_wp 
+    rr = rr_pan
   endif 
-  !> cleanup
-  deallocate(rr_tmp)
 
   !> get position of aerodynamic center 
   csi_ac = 0.75_wp ! control point for vl corrected
-  if ( ElType .eq. 'v' ) then
+  if ( ElType .eq. 'v' ) then    
     call linear_interp(rr_geo(2,:) , rr_geo(1,:) , csi_ac , curv_ac)
   else  
     curv_ac = 0.0_wp
   endif 
-
   
+  !> cleanup
+  if (allocated(rr_tmp)) deallocate(rr_tmp)
+  if (allocated(rr_up)) deallocate(rr_up)
+  if (allocated(rr_low)) deallocate(rr_low)
+  if (allocated(y_mean)) deallocate(y_mean)
+
 end subroutine read_airfoil
 
 !-------------------------------------------------------------------------------
