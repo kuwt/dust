@@ -295,7 +295,7 @@ call prms%CreateRealOption('a_inf', "Speed of sound", '340.0')        ! m/s   fo
 call prms%CreateRealOption('mu_inf', "Dynamic viscosity", '0.000018') ! kg/ms
 
 !> Wake 
-call prms%CreateIntOption('n_wake_panels', 'number of wake panels','4')
+call prms%CreateIntOption('n_wake_panels', 'number of wake panels','1')
 call prms%CreateIntOption('n_wake_particles', 'number of wake particles', '10000')
 call prms%CreateRealArrayOption('particles_box_min', 'min coordinates of the &
                                 &particles bounding box', '(/-10.0, -10.0, -10.0/)')
