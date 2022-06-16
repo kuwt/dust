@@ -1169,69 +1169,96 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, curv_ac )
   integer :: fid, ierr
   integer :: i1 , i2
 
-  ! Read coordinates
+      ! Read coordinates
   call new_file_unit(fid, ierr)
   open(unit=fid,file=trim(adjustl(filen)) )
   read(fid,*) np_geo
   allocate(rr_geo(2,np_geo))
+  allocate(st_geo(np_geo),s_geo(np_geo))
+  st_geo = 0.0_wp ; s_geo = 0.0_wp
+
   do i1 = 1 , np_geo
     read(fid,*) rr_geo(:,i1)
   end do
   close(fid)
-
-  nelems_chord_tot = 2*nelems_chord+1
-  allocate(csi(nelems_chord_tot))
-  csi(             1  :nelems_chord + 1) =  -0.5_wp * csi_half(nelems_chord+1:1:-1)
-  csi(nelems_chord+2:2*nelems_chord+1) = 0.5_wp * csi_half(2:nelems_chord + 1)
-  csi = csi(nelems_chord_tot:1:-1) + 0.5_wp
-
-  allocate(st_geo(np_geo),s_geo(np_geo))
-  st_geo = 0.0_wp ; s_geo = 0.0_wp
 
   do i1 = 2 , np_geo
     st_geo(i1) = st_geo(i1-1) + abs(rr_geo(1,i1)-rr_geo(1,i1-1))
   end do
   s_geo = st_geo / st_geo(np_geo)
 
-  allocate(rr_pan(2,nelems_chord_tot)); rr_pan = 0.0_wp
-  allocate(rr_tmp(2,nelems_chord_tot)); rr_tmp = 0.0_wp
-  rr_pan(:,1) = rr_geo(:,1)
-  rr_pan(:,nelems_chord_tot) = rr_geo(:,np_geo)
-  do i1 = 2 , nelems_chord_tot - 1
-    do i2 = 2 , np_geo
-      if ( csi(i1) .lt. s_geo(i2) ) then
-        ds_geo = s_geo(i2)-s_geo(i2-1)
-        rr_pan(:,i1) = (csi(i1)-s_geo(i2-1))/ds_geo * rr_geo(:,i2) + &
-                   (s_geo(i2)-csi(i1)  )/ds_geo * rr_geo(:,i2-1)
-        exit
-      end if
+  ! condition to evaluate if the airfoil.dat input contains only the mean line 
+  ! coordinates (for VL), or all the section points. (necessary for retrocompatibility)
+  if ((rr_geo(1,size(rr_geo(1,:))) - rr_geo(1,1)) .le. 0.5_wp) then
+
+    nelems_chord_tot = 2*nelems_chord+1
+    allocate(csi(nelems_chord_tot))
+    csi(             1  :nelems_chord + 1) =  -0.5_wp * csi_half(nelems_chord+1:1:-1)
+    csi(nelems_chord+2:2*nelems_chord+1) = 0.5_wp * csi_half(2:nelems_chord + 1)
+    csi = csi(nelems_chord_tot:1:-1) + 0.5_wp
+
+    allocate(rr_pan(2,nelems_chord_tot)); rr_pan = 0.0_wp
+    allocate(rr_tmp(2,nelems_chord_tot)); rr_tmp = 0.0_wp
+    rr_pan(:,1) = rr_geo(:,1)
+    rr_pan(:,nelems_chord_tot) = rr_geo(:,np_geo)
+    do i1 = 2 , nelems_chord_tot - 1
+      do i2 = 2 , np_geo
+        if ( csi(i1) .lt. s_geo(i2) ) then
+          ds_geo = s_geo(i2)-s_geo(i2-1)
+          rr_pan(:,i1) = (csi(i1)-s_geo(i2-1))/ds_geo * rr_geo(:,i2) + &
+                    (s_geo(i2)-csi(i1)  )/ds_geo * rr_geo(:,i2-1)
+          exit
+        end if
+      end do
     end do
-  end do
+    
+    rr_tmp = rr_pan 
+    !> resort rr (first pressure side then suction side)
+    rr_pan = rr_pan(:, size(rr_pan(1,:)):1:-1)
+    !> fix trailing edge 
+    rr_pan(:,1) = rr_tmp(:,1)
+    rr_pan(:,size(rr_pan,2)) = rr_tmp(:,size(rr_pan,2))     
+
+    if  ( ElType .eq. 'v' ) then 
+      allocate(rr_up(2,nelems_chord+1));    rr_up = 0.0_wp
+      allocate(rr_low(2,nelems_chord+1));   rr_low = 0.0_wp
+      allocate(y_mean(1,nelems_chord+1));   y_mean = 0.0_wp
+      allocate(rr(2,nelems_chord+1));       rr = 0.0_wp
+      ! split suction and lower side
+      rr_up = rr_pan(:,nelems_chord+1:2*nelems_chord+1)
+      rr_low = rr_pan(:,1:nelems_chord+1)
+      ! y-coordinates of the mean line
+      y_mean(1,:) = (rr_up(2,:) + rr_low(2,:))/2.0_wp
+      rr(1,:) = rr_up(1,:)
+      rr(2,:) = y_mean(1,:)
+
+    elseif ( ElType .eq. 'p' ) then
+      allocate(rr(2,nelems_chord_tot));       rr = 0.0_wp 
+      rr = rr_pan
+    endif 
+
+  else
+
+    nelems_chord_tot = nelems_chord+1
+    allocate(csi(nelems_chord_tot))
+    csi = -csi_half(nelems_chord+1:1:-1) + 1.0_wp
   
-  rr_tmp = rr_pan 
-  !> resort rr (first pressure side then suction side)
-  rr_pan = rr_pan(:, size(rr_pan(1,:)):1:-1)
-  !> fix trailing edge 
-  rr_pan(:,1) = rr_tmp(:,1)
-  rr_pan(:,size(rr_pan,2)) = rr_tmp(:,size(rr_pan,2))     
+    allocate(rr(2,nelems_chord_tot)) ; rr = 0.0_wp
+    allocate(rr_tmp(2,nelems_chord_tot)); rr_tmp = 0.0_wp
+    rr(:,1) = rr_geo(:,1)
+    rr(:,nelems_chord_tot) = rr_geo(:,np_geo)
+    do i1 = 2 , nelems_chord_tot - 1
+      do i2 = 2 , np_geo
+        if ( csi(i1) .lt. s_geo(i2) ) then
+          ds_geo = s_geo(i2)-s_geo(i2-1)
+          rr(:,i1) = (csi(i1)-s_geo(i2-1))/ds_geo * rr_geo(:,i2) + &
+                     (s_geo(i2)-csi(i1)  )/ds_geo * rr_geo(:,i2-1)
+          exit
+        end if
+      end do
+    end do
 
-  if  ( ElType .eq. 'v' ) then 
-    allocate(rr_up(2,nelems_chord+1));    rr_up = 0.0_wp
-    allocate(rr_low(2,nelems_chord+1));   rr_low = 0.0_wp
-    allocate(y_mean(1,nelems_chord+1));   y_mean = 0.0_wp
-    allocate(rr(2,nelems_chord+1));       rr = 0.0_wp
-    ! split suction and lower side
-    rr_up = rr_pan(:,nelems_chord+1:2*nelems_chord+1)
-    rr_low = rr_pan(:,1:nelems_chord+1)
-    ! y-coordinates of the mean line
-    y_mean(1,:) = (rr_up(2,:) + rr_low(2,:))/2.0_wp
-    rr(1,:) = rr_up(1,:)
-    rr(2,:) = y_mean(1,:)
-
-  elseif ( ElType .eq. 'p' ) then
-    allocate(rr(2,nelems_chord_tot));       rr = 0.0_wp 
-    rr = rr_pan
-  endif 
+  endif
 
   !> get position of aerodynamic center 
   csi_ac = 0.75_wp ! control point for vl corrected
@@ -1240,7 +1267,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, curv_ac )
   else  
     curv_ac = 0.0_wp
   endif 
-  
+
   !> cleanup
   if (allocated(rr_tmp)) deallocate(rr_tmp)
   if (allocated(rr_up)) deallocate(rr_up)
