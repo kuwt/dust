@@ -354,7 +354,7 @@ call prms%CreateRealOption('ll_artificial_viscosity_adaptive_alpha', &
 call prms%CreateRealOption('ll_artificial_viscosity_adaptive_dalpha', &
                           &'Adaptive Artificial Viscosity algorithm, reference AOA [deg]')
 call prms%CreateLogicalOption('ll_loads_avl', &
-                          &'Use AVL expression for inviscid load computation','T')
+                          &'Use AVL expression for inviscid load computation','F')
 
 !> VL correction parameter 
 call prms%CreateRealOption('vl_relax', 'Relaxation factor for rhs update','0.3')

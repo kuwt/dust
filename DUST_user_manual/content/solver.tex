@@ -131,15 +131,15 @@ ll_artificial_viscosity = 0.0
 ll_artificial_viscosity_adaptive = F
 ll_artificial_viscosity_adaptive_alpha = 15
 ll_artificial_viscosity_adaptive_dalpha = 3
-ll_loads_avl = T
+ll_loads_avl = F
 
 ! --- Vortex Lattice Correction ---
-vl_tol = 1.0e-5
-vl_relax = 0.1
+vl_tol = 1.0e-4
+vl_relax = 0.3
 vl_maxiter = 100
 vl_start_step = 0
 vl_dynstall = F
-relax_aitken = F 
+aitken_relaxation = T 
 
 \end{inputfile}
 
@@ -737,10 +737,10 @@ Number of LL iterations between two regularisation processes.
 Stall angle [deg] used as a threshold for regularisation process. 
 
 \item \param{ll_loads_avl}: \textit{required:} no. \textit{multiple:} no. 
-\textit{default:} True. \textit{type:} logical.
+\textit{default:} F. \textit{type:} logical.
 
 Use AVL expression for the inviscid load contributions of LL elements, 
-in the same way of load computation used for VL elements.
+in the same way of load computation used for VL elements. 
 
 \item \param{ll_artificial_viscosity}: \textit{required:} no. 
 \textit{multiple:} no. \textit{default:} 0.0. \textit{type:} real.
@@ -780,11 +780,11 @@ Tolerance for the absolute error on lift coefficient in fixed point
 iteration for corrected vortex lattice.
 
 \item \param{vl_relax}: \textit{required:} no. \textit{multiple:} no. 
-\textit{default:} 0.1 \textit{type:} real. 
+\textit{default:} 0.3 \textit{type:} real. 
 Constant relaxation factor for rhs update
 
 \item \param{aitken_relaxation}: \textit{required:} no. \textit{multiple:} no. 
-\textit{default:} F \textit{type:} logical. 
+\textit{default:} T \textit{type:} logical. 
 Activate the Aitken acceleration and stabilization method involved during the 
 vortex lattice fixed point iteration. 
 The initial relaxation is the one specified in \opt{vl_relax}. 
