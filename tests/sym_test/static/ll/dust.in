@@ -27,3 +27,4 @@ penetration_avoidance = T
 
 ! wake parameters  -------------
 n_wake_panels = 2
+ll_loads_avl = T
