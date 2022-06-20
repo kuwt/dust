@@ -82,9 +82,9 @@ function sec_data = sec_load(file_out, short_data)
     
 
     % name file
-    sec_data = struct('n_time',[],'n_sec',[], 'sec',[], 'l_sec',[],'vel_outplane',[],...
-        'vel_outplane_isolated',[],'vel_2d_isolated',[],'vel_2d',[],'Mo',[],'Fx',[],...
-        'Fy',[],'Fz',[],'Cm',[],'Cl',[],'Cd',[],'alpha_isolated',[],'alpha',[]);
+    sec_data = struct('n_time',[],'n_sec',[],'sec',[],'l_sec',[],'chord',[], ...
+        'vel_outplane',[], 'vel_outplane_isolated',[],'vel_2d_isolated',[],'vel_2d',[], ...
+        'Mo',[],'Fx',[],'Fy',[],'Fz',[],'Cm',[],'Cl',[],'Cd',[],'alpha_isolated',[],'alpha',[]);
 
     for i = 1:numel(field)
         file = [file_out '_' field{i} '.dat'];
@@ -117,7 +117,7 @@ function sec_data = parse_file_sectional(file, field, sec_data)
         it = it + 1;
     
         if it == 2
-            line_2 = textscan(line_new, '# n_sec : %d ; n_time : %d. Next lines: y_cen , y_span');
+            line_2 = textscan(line_new, '# n_sec : %d ; n_time : %d. Next lines: y_cen , y_span, chord');
             sec_data.n_sec = line_2{1};
             sec_data.n_time = line_2{2};
         end
@@ -131,8 +131,14 @@ function sec_data = parse_file_sectional(file, field, sec_data)
             line_4 = textscan(line_new,[repmat('%n',[1, sec_data.n_sec])]);
             sec_data.l_sec = cell2mat(line_4(1:end));
         end
+
+        if it == 5
+            line_5 = textscan(line_new,[repmat('%n',[1, sec_data.n_sec])]);
+            sec_data.chord = cell2mat(line_5(1:end));
+        end
+
     
-        if it > 5
+        if it > 6
             while skip_line || ~feof(fid)
     
                 if ~skip_line
@@ -143,20 +149,20 @@ function sec_data = parse_file_sectional(file, field, sec_data)
     
                 if any(strcmpi(field,long_field))
                     line = textscan(line, repmat('%n',[1, 1 + sec_data.n_sec + 9 + 3]));
-                    sec_data.(field).time(it-5,1) = line{1};
-                    sec_data.(field).value(it-5,:) = cell2mat(line(2:end-12));
-                    sec_data.(field).R(:,:,it-5) = reshape(cell2mat(line(end-11:end-3)),3,3);
-                    sec_data.(field).X(:,:,it-5) = line(end-2:end);
+                    sec_data.(field).time(it-6,1) = line{1};
+                    sec_data.(field).value(it-6,:) = cell2mat(line(2:end-12));
+                    sec_data.(field).R(:,:,it-6) = reshape(cell2mat(line(end-11:end-3)),3,3);
+                    sec_data.(field).X(:,:,it-6) = line(end-2:end);
                     it = it + 1;
                 else
                     line = textscan(line, repmat('%n',[1, sec_data.n_sec + 1]));
-                    sec_data.(field).time(it-5,1) = line{1};
-                    sec_data.(field).value(it-5,:) = cell2mat(line(2:end));
+                    sec_data.(field).time(it-6,1) = line{1};
+                    sec_data.(field).value(it-6,:) = cell2mat(line(2:end));
                     it = it + 1;
                 end
     
             end
-        elseif it > 5 + sec_data.n_time
+        elseif it > 6 + sec_data.n_time
             break
         end
     end

@@ -1231,13 +1231,14 @@ end subroutine tec_out_probes
 
 !---------------------------------------------------------------------
 
-subroutine tec_out_sectional(out_filename, time, vars, span, span_size, &
+subroutine tec_out_sectional(out_filename, time, vars, span, span_size, chord, &
                              ll_vars)
  character(len=*), intent(in) :: out_filename
  real(wp), intent(in) :: time(:)
  real(wp), intent(in) :: vars(:,:,:)
  real(wp), intent(in) :: span(:)
  real(wp), intent(in) :: span_size(:)
+ real(wp), intent(in) :: chord(:)
  real(wp), intent(in), optional :: ll_vars(:,:,:)
  character(len=*), parameter :: var_names(4) = (/ 'Fx' , 'Fy' , 'Fz' , 'Mo' /)
  character(len=21) :: ll_var_names(9)
@@ -1287,6 +1288,8 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size, &
   call put_tec_string('t',fu)
   call put_tec_string('span',fu)
   call put_tec_string('span size',fu)
+  call put_tec_string('chord',fu)
+  
   do iv = 1,nvars
     call put_tec_string(trim(var_names(iv)),fu)
   enddo
@@ -1371,6 +1374,8 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size, &
   write(fu) dble(maxval( span ))
   write(fu) dble(minval( span_size ))
   write(fu) dble(maxval( span_size ))
+  write(fu) dble(minval( chord ))
+  write(fu) dble(maxval( chord ))
   do iv = 1,nvars
     write(fu) dble(minval( vars(:,:,iv) ))
     write(fu) dble(maxval( vars(:,:,iv) ))
@@ -1396,6 +1401,11 @@ subroutine tec_out_sectional(out_filename, time, vars, span, span_size, &
   do j = 1, nsec
     do i = 1, timelen
       write(fu) real(span_size(j), d_size)
+    enddo
+  enddo
+  do j = 1, nsec
+    do i = 1, timelen
+      write(fu) real(chord(j), d_size)
     enddo
   enddo
   do iv = 1,nvars

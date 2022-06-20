@@ -927,21 +927,23 @@ The second line contains the number of sections \param{n\_sec} in which the
 structural component is divided and the number of time steps \param{n\_time}
 of the analysis. As an example, the output file for a 10-section blade reads
 \begin{inputfile}[frame=single]
- 2: # n_sec : 10 ; n_time : 100. Next lines: y_cen , y_span
+ 2: # n_sec : 10 ; n_time : 100. Next lines: y_cen , y_span, chord
 \end{inputfile}
-The second line also introduce the content of lines 3 and 4. Line 3 contains 
-the spanwise coordinate \param{y\_cen} of the centre of the sections, while 
-line 4 contains the spanwise dimension \param{y\_span} of the section. As an 
-example, if the the blade length is 0.6 and it is divided in 10 uniform sections, 
+The second line also introduce the content of lines 3, 4 and 5. Line 3 contains 
+the spanwise coordinate \param{y\_cen} of the centre of the sections, 
+line 4 contains the spanwise dimension \param{y\_span} of the section, and 
+line 5 contains the  chord dimension \param{chord} of the section. As an 
+example, if the the blade length is 0.6 and it is divided in 10 uniform sections with chord 0.05, 
 the output file reads
 \begin{inputfile}[frame=single]
  3:  0.30000E-001  0.90000E-001  0.15000E+000  0.21000E+000 ...
  4:  0.60000E-001  0.60000E-001  0.60000E-001  0.60000E-001 ...
+ 5:  0.50000E-001  0.50000E-001  0.50000E-001  0.50000E-001 ...
 \end{inputfile}
-The fifth line is another header file containing the fields and their 
+The sixth line is another header file containing the fields and their 
 dimension collected in the next \param{n\_time} lines.
 \begin{inputfile}[frame=single]
- 5: # t , sec(n_sec) , ref_mat(9) , ref_off(3) 
+ 6: # t , sec(n_sec) , ref_mat(9) , ref_off(3) 
 \end{inputfile}
 The first field is the time. The sectional loads of the \param{n\_sec} 
 sections follow. The last 12 lines contains the (first-column) unrolled 
@@ -954,7 +956,7 @@ global reference frame from those expressed in the local reference frame,
 As an example, the lines collecting the fields described above of the 
 first and the last of the 100 timesteps of the analysis reads
 \begin{inputfile}[frame=single]
-  6: 0.000000E+000  0.966615E+002  0.966615E+002  0.966615E+002  0.966615E+002
+  7: 0.000000E+000  0.966615E+002  0.966615E+002  0.966615E+002  0.966615E+002
      0.966615E+002  0.966615E+002  0.966615E+002  0.966615E+002  0.966615E+002
      0.966615E+002  0.100000E+001  0.000000E+000  0.000000E+000  0.000000E+000
      0.100000E+001  0.000000E+000  0.000000E+000  0.000000E+000  0.100000E+001

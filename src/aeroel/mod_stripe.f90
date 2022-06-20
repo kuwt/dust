@@ -266,7 +266,6 @@ module mod_stripe
       id_pan = this%panels(i_c)%p%id
       !> Update of the rhs
       residual(id_pan) =  rhs_diff*linsys%b(id_pan) 
-      !linsys%b(id_pan) =  (1 + rel_fct*rhs_diff)*linsys%b(id_pan)        
     end do 
     
 

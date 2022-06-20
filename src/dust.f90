@@ -958,7 +958,6 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         endif
 
         it_vl = it_vl + 1 
-        !write(*,*) 'it_vl', it_vl
         !> update unsteady term 
         !$omp parallel do private(i_el)
         do i_el = 1 , sel      
@@ -991,7 +990,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         write(message,*) 'Last iteration error: ', max_diff
         call printout(message)
       endif
-        
+      
       !> Viscous and pressure drag correction 
       do i_c = 1, size(geo%components)
         if (trim(geo%components(i_c)%comp_el_type) .eq. 'v' .and. &

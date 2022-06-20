@@ -160,7 +160,7 @@ integer                                                 :: is
 integer, parameter                                      :: n_loads = 4   ! F and moment around an axis
 integer, parameter                                      :: n_ll_data = 9, n_vl_data = 9
 real(wp) , allocatable                                  :: ref_mat(:,:) , off_mat(:,:)
-real(wp) , allocatable                                  :: y_cen(:) , y_span(:)
+real(wp) , allocatable                                  :: y_cen(:) , y_span(:), chord(:)
 real(wp) , parameter                                    :: tol_y_cen = 1.0e-3_wp
 real(wp) , allocatable                                  :: r_axis(:,:) , r_axis_bas(:,:)
 real(wp)                                                :: F_bas(3) , F_bas1(3)
@@ -196,7 +196,7 @@ integer                                                 :: nInterSect , index2
 real(wp)                                                :: node1(3) , node2(3) , box_secloads_cen(3)
 integer                                                 :: iSec1 , iSec2 , sec1_nVer , sec2_nVer
 integer                                                 :: nNodeInt(2,2)
-integer                                                 :: nver , iv
+integer                                                 :: nver , iv, chord_start, chord_end, ii
 
 character(len=max_char_len)                             :: filename
 
@@ -322,6 +322,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
     do i1 = 1, size(comps(id_comp)%loc_points, 2) 
       comps(id_comp)%loc_points(:, i1) = matmul(comps(id_comp)%coupling_node_rot,comps(id_comp)%loc_points(:,i1))
     end do
+    
     ! ######################################################################
     ! Find the coordinates of the reference points in the local reference frame
 
@@ -330,19 +331,28 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
     ! panel in chord. Then the distance between the <ax_coor> of the centre
     ! of the other panels and y_cen is checked
     !TODO: find y-coord is general enough for all the 'parametric' components
-    allocate(y_cen(n_sect),y_span(n_sect))
+    allocate(y_cen(n_sect),y_span(n_sect),chord(n_sect))
     ie = 0
-    
-    ie = 0
+    chord_start = 0
+    chord_end = 0
+    ii = 0
     do is = 1 , n_sect
+      
       ie = ie + 1
+      ii = ii + 1
+      chord_start = (ii-1)*(nelem_chor + 1) + 1
+      chord_end = ii*(nelem_chor + 1) 
       y_cen(is) = &
       sum(comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver)) / &
                   real(comps(id_comp)%el(ie)%n_ver,wp)
       y_span(is) = &
       abs ( comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver(1) )&
       - comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver(2) ) )
-      
+      !> local chord as projection of the profile on x-z plane
+      chord(is) = sqrt((abs(minval(comps(id_comp)%loc_points(ax_coor - 1,chord_start:chord_end))) + & 
+                        abs(maxval(comps(id_comp)%loc_points(ax_coor - 1,chord_start:chord_end))))**2 + &
+                        (abs(minval(comps(id_comp)%loc_points(ax_coor + 1,chord_start:chord_end))) + & 
+                        abs(maxval(comps(id_comp)%loc_points(ax_coor + 1,chord_start:chord_end))))**2)
       do ic = 2 , nelem_chor ! check
         ie = ie + 1
         if (abs( y_cen(is) - &
@@ -468,24 +478,24 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
         case('dat')
             write(filename,'(A)') trim(basename)//'_'//trim(an_name)
             call dat_out_sectional ( filename, components_names(1), y_cen, &
-                                    y_span, time(1:1), sec_loads_ave, ref_mat, &
+                                    y_span, chord, time(1:1), sec_loads_ave, ref_mat, &
                                     off_mat, average )
           if(print_ll) then 
             call dat_out_sectional_ll(filename, components_names(1), &
-                                    y_cen, y_span, time(1:1), ll_data_ave, average)
+                                    y_cen, y_span, chord, time(1:1), ll_data_ave, average)
           elseif(print_vl) then
             call dat_out_sectional_vl(filename, components_names(1), &
-                                    y_cen, y_span, time(1:1), vl_data_ave, average)
+                                    y_cen, y_span, chord, time(1:1), vl_data_ave, average)
           endif 
           
         case('tecplot')
           write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt'
           if (print_ll) then
             call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
-                                    y_span, ll_data_ave )
+                                    y_span, chord, ll_data_ave )
           else
             call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
-                                                                      y_span )
+                                                                      y_span, chord )
           endif
         end select
       deallocate(sec_loads_ave)
@@ -494,22 +504,22 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
         case('dat')
           write(filename,'(A)') trim(basename)//'_'//trim(an_name)
           call dat_out_sectional ( filename, components_names(1), y_cen, &
-                                  y_span, time, sec_loads, &
+                                  y_span, chord, time, sec_loads, &
                                   ref_mat, off_mat, average )
           if(print_ll) then 
             call dat_out_sectional_ll (filename, components_names(1),&
-                                        y_cen, y_span, time, ll_data, average )
+                                        y_cen, y_span, chord, time, ll_data, average )
           elseif (print_vl) then 
             call dat_out_sectional_vl (filename, components_names(1),&
-                                        y_cen, y_span, time, vl_data, average )
+                                        y_cen, y_span, chord, time, vl_data, average )
           endif 
         case('tecplot')
           write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt'
           if (print_ll) then
-            call tec_out_sectional (filename, time, sec_loads, y_cen, y_span,&
+            call tec_out_sectional (filename, time, sec_loads, y_cen, y_span, chord, &
                                     ll_data)
           else
-            call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span )
+            call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span, chord)
           endif
       end select
     endif
@@ -971,12 +981,12 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
         case('dat')
           write(filename,'(A)') trim(basename)//'_'//trim(an_name)
           call dat_out_sectional ( filename, components_names(1), y_cen, &
-                                    y_span, time(1:1), &
+                                    y_span, chord, time(1:1), &
                             sec_loads_ave, ref_mat , off_mat, average )
         case('tecplot')
           write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt'
           call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
-                                                                      y_span )
+                                                                      y_span , chord)
       end select
       deallocate(sec_loads_ave)
     else
@@ -984,11 +994,11 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
         case('dat')
           write(filename,'(A)') trim(basename)//'_'//trim(an_name)
           call dat_out_sectional ( filename, components_names(1), y_cen, &
-                                y_span, time, sec_loads, &
+                                y_span, chord, time, sec_loads, &
                                 ref_mat, off_mat, average)
         case('tecplot')
           write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt'
-          call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span )
+          call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span, chord)
       end select
     endif
 

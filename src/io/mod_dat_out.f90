@@ -187,12 +187,13 @@ end subroutine dat_out_probes_header
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_sectional (basename, compname, y_cen, y_span, time, &
+subroutine dat_out_sectional (basename, compname, y_cen, y_span, chord, time, &
                               sec_loads, ref_mat, off_mat, average )
   character(len=*) , intent(in) :: basename
   character(len=*) , intent(in) :: compname
   real(wp) , intent(in) :: y_cen(:)
   real(wp) , intent(in) :: y_span(:)
+  real(wp) , intent(in) :: chord(:)
   real(wp) , intent(in) :: time(:)
   real(wp) , intent(in) :: sec_loads(:,:,:)
   real(wp) , intent(in) :: ref_mat(:,:)
@@ -238,10 +239,11 @@ subroutine dat_out_sectional (basename, compname, y_cen, y_span, time, &
     ! Header -----------
     write(fid,'(A)') '# Sectional load '//trim(load_str(i1))//&
                     &' of component: '//trim(compname)
-    write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(sec_loads,2) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
+    write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(sec_loads,2) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span, chord'
     write(nnum,'(I0)') size(y_cen)
     write(fid,'('//trim(nnum)//ascii_real//')') y_cen
     write(fid,'('//trim(nnum)//ascii_real//')') y_span
+    write(fid,'('//trim(nnum)//ascii_real//')') chord
 
     if(average) then
       write(fid,'(A)') '#sec(n_sec)'
@@ -265,12 +267,13 @@ end subroutine dat_out_sectional
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_sectional_ll (basename, compname, y_cen, y_span, time, &
+subroutine dat_out_sectional_ll (basename, compname, y_cen, y_span, chord, time, &
                                 ll_sec, average )
   character(len=*) , intent(in) :: basename
   character(len=*) , intent(in) :: compname
   real(wp) , intent(in)         :: y_cen(:)
   real(wp) , intent(in)         :: y_span(:)
+  real(wp) , intent(in)         :: chord(:)  
   real(wp) , intent(in)         :: time(:)
   real(wp) , intent(in)         :: ll_sec(:,:,:)
   logical,   intent(in)         :: average
@@ -326,11 +329,11 @@ subroutine dat_out_sectional_ll (basename, compname, y_cen, y_span, time, &
     !> Header 
     write(fid,'(A)') '# Sectional '//trim(description_str(il))//&
                     &' of component: '//trim(compname)
-    write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(y_cen) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
+    write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(y_cen) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span, chord'
     write(nnum,'(I0)') size(y_cen)
     write(fid,'('//trim(nnum)//ascii_real//')') y_cen
     write(fid,'('//trim(nnum)//ascii_real//')') y_span
-
+    write(fid,'('//trim(nnum)//ascii_real//')') chord 
     if(average) then
       write(fid,'(A)') '# '//trim(load_str(il))//'(n_sec)'
       write(nnum,'(I0)') size(y_cen)
@@ -349,13 +352,15 @@ subroutine dat_out_sectional_ll (basename, compname, y_cen, y_span, time, &
 end subroutine dat_out_sectional_ll
 
 
-subroutine dat_out_sectional_vl (basename, compname, y_cen, y_span, time, &
+subroutine dat_out_sectional_vl (basename, compname, y_cen, y_span, chord, time, &
   vl_sec, average )
 
   character(len=*) , intent(in) :: basename
   character(len=*) , intent(in) :: compname
   real(wp) , intent(in)         :: y_cen(:)
   real(wp) , intent(in)         :: y_span(:)
+  real(wp) , intent(in)         :: chord(:)
+  
   real(wp) , intent(in)         :: time(:)
   real(wp) , intent(in)         :: vl_sec(:,:,:)
   logical,   intent(in)         :: average
@@ -411,11 +416,12 @@ subroutine dat_out_sectional_vl (basename, compname, y_cen, y_span, time, &
     ! Header -----------
     write(fid,'(A)') '# Sectional '//trim(description_str(il))//&
     &' of component: '//trim(compname)
-    write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(y_cen) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
+    write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(y_cen) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span, chord'
     write(nnum,'(I0)') size(y_cen)
     write(fid,'('//trim(nnum)//ascii_real//')') y_cen
     write(fid,'('//trim(nnum)//ascii_real//')') y_span
-
+    write(fid,'('//trim(nnum)//ascii_real//')') chord
+    
     if(average) then
       write(fid,'(A)') '# '//trim(load_str(il))//'(n_sec)'
       write(nnum,'(I0)') size(y_cen)
