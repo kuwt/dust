@@ -12,19 +12,22 @@ Change `focal` to `jammy` in the line above according to your version.
 If you need the coupled preCICE-MBDyn version of DUST, or if you wish to develop the software, you have to build it from source.
 ## Requirements:
 
-To build DUST
+To build DUST are required:
+
 - a Fortran compiler
 - CMake 
 - a Lapack/BLAS implementation
 - an HDF5 library
+<br/>supported and tested versions: <ins>1.10</ins> , <ins> 1.12</ins><br/>
 - a CGNS library
+<br/>supported and tested versions: <ins>3.4.0</ins> , <ins>4.3.0</ins><br/>
 
-are required.
+
 
 A Fortran compiler, CMake and a Lapack implementation can be found pre-packed 
 in most Linux distributions.
 
-## Ubuntu 20.04
+## Ubuntu 20.04 or above
 
 <details>
   <summary markdown="span">Compilers</summary>
