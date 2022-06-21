@@ -460,7 +460,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
                   & rho*(pot_probe-pot_probe_old)/(t-t_old)
 
       if (probe_cp) then ! output pressure coefficient
-        if (norm2(u_inf) .gt. 1e-6) then
+        if (norm2(u_inf) .gt. 1e-6_wp) then
           probe_vars(i_var, ires, ip) = (pres_probe - P_inf)/(0.5_wp*rho*norm2(u_inf)**2)
         else ! todo add u_ref
           call error(this_mod_name,this_sub_name,'Pressure coefficient requested, but u_inf =0')

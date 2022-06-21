@@ -83,7 +83,7 @@ contains
 subroutine read_mesh_parametric(mesh_file,ee,rr, &
                     npoints_chord_tot, nelem_span_tot, hinges, n_hinges, mesh_mirror, mesh_symmetry, &
                     nelem_span_list, airfoil_list_actual, i_airfoil_e, normalised_coord_e, & 
-                    aero_table_out, thickness)
+                    aero_table_out, thickness_out)
 
   character(len=*), intent(in)              :: mesh_file
   integer  , allocatable, intent(out)       :: ee(:,:)
@@ -98,7 +98,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   logical                                   :: twist_linear_interp
   logical, intent(out), optional            :: aero_table_out
   logical                                   :: aero_table
-  real(wp), allocatable, intent(out), optional :: thickness(:,:)
+  real(wp), allocatable, intent(out), optional :: thickness_out(:,:)
+  real(wp), allocatable                     ::  thickness(:,:)
   real(wp), allocatable                     :: thickness_section1(:), thickness_section2(:) 
   real(wp)                                  :: thickness_section
   integer                                   :: nelem_chord, nelem_chord_tot 
@@ -295,6 +296,10 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   allocate(twist_list  (nSections))  ; twist_list = 0.0_wp
   allocate(airfoil_list(nSections))
   allocate(airfoil_table_list(nSections))
+
+  allocate(thickness_out(2,nelem_span_tot)); thickness_out = 0.0_wp
+  allocate(thickness(2,nelem_span_tot)); thickness = 0.0_wp
+  
   allocate(thickness_section1(nRegions)); thickness_section1 = 0.0_wp
   allocate(thickness_section2(nRegions)); thickness_section2 = 0.0_wp
 
@@ -855,8 +860,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
         thickness(2,iSpan) = thickness_section1(iAirfoil)*(1.0_wp - normalised_coord_e(2,iSpan)) + &
                               thickness_section2(iAirfoil)*normalised_coord_e(2,iSpan)
 
-        
-
         if ( iSpan .ne. ista ) then 
           normalised_coord_e(1,iSpan) = normalised_coord_e(2,iSpan-1)          
         end if
@@ -870,9 +873,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
   ! optional output ----
   npoints_chord_tot = npoint_chord_tot
-
   if (present(aero_table_out)) then
     aero_table_out = aero_table
+    thickness_out = thickness
   end if
   ! optional output ----
 
@@ -892,7 +895,7 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   integer, intent(in)                     :: nelem_chord
   character, intent(in)                   :: ElType
   character(len=*) , intent(in)           :: airfoil
-  real(wp),   intent(out)                 :: thickness
+  real(wp),  intent(out)                 :: thickness
   real(wp), allocatable                   :: points_mean_line(:,:)
   real(wp)                                :: twist_rad
   character(len=*), parameter :: this_sub_name='define_section'
@@ -1417,7 +1420,7 @@ subroutine define_thickness(rr_geo, thickness)
           vec_intersect_low(2,i) = m_3*(x_mid_point(i) - x_coor(i)) + y_low_interp(i)
       end if
     else  
-      mat_up(1,:) = 1/(-m_1 + m_2)*(/1, -1/)
+      mat_up(1,:) = 1/(-m_1 + m_2)*(/1.0_wp, -1.0_wp/)
       mat_up(2,:) = 1/(-m_1 + m_2)*(/m_2, -m_1/)
 
       vec_up(1) = y_mid_point(i) - m_1*x_mid_point(i)
@@ -1425,7 +1428,7 @@ subroutine define_thickness(rr_geo, thickness)
 
       vec_intersect_up(:,i) = matmul(mat_up, vec_up)
 
-      mat_low(1,:) = 1/(-m_1 + m_3)*(/1, -1/)
+      mat_low(1,:) = 1/(-m_1 + m_3)*(/1.0_wp, -1.0_wp/)
       mat_low(2,:) = 1/(-m_1 + m_3)*(/m_3, -m_1/)
 
       vec_low(1) = y_mid_point(i) - m_1*x_mid_point(i)

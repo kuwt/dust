@@ -395,7 +395,7 @@ module mod_stripe
     real(wp)                       :: cos_lambda 
   
     n_pan = size(this%panels)
-  
+    
     this%ver(:,1) = this%panels(1)%p%ver(:,1)
     this%ver(:,2) = this%panels(1)%p%ver(:,2)
     this%ver(:,3) = this%panels(n_pan)%p%ver(:,3)
