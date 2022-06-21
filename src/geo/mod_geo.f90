@@ -242,7 +242,8 @@ type :: t_geo_component
   !> Id of the airfoil elements (index in airfoil_list char array)
   integer ,allocatable :: i_airfoil_e(:,:)
   character(len=5) :: aero_correction
-  !real(wp), allocatable :: curv_ac(:,:)
+  !> airfoil thickness for dynamic stall 
+  real(wp), allocatable :: thickness(:,:)
   type(t_stripe), allocatable :: stripe(:)
 
 #if USE_PRECICE
@@ -811,7 +812,7 @@ subroutine load_components(geo, in_file, out_file, te)
   integer , allocatable                 :: neigh(:,:)
   !> Aerotable correction for vl 
   character(len=5)                      :: aero_table
-  !real(wp), allocatable                 :: curv_ac(:,:)
+  real(wp), allocatable                 :: thickness(:,:)
   !> Lifting Line elements
   real(wp), allocatable                 :: normalised_coord_e(:,:), theta_e(:)
   integer                 , allocatable :: i_airfoil_e(:,:)
@@ -1102,7 +1103,7 @@ subroutine load_components(geo, in_file, out_file, te)
           call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc)
           call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
           call read_hdf5_al(normalised_coord_e,'normalised_coord_e',geo_loc)
-          !call read_hdf5_al(curv_ac           ,'curv_ac'           ,geo_loc)
+          call read_hdf5_al(thickness          ,'thickness'       ,geo_loc)
 
           allocate(geo%components(i_comp)%airfoil_list(size(airfoil_list)))
           geo%components(i_comp)%airfoil_list = airfoil_list
@@ -1115,9 +1116,9 @@ subroutine load_components(geo, in_file, out_file, te)
                 size(normalised_coord_e,1),size(normalised_coord_e,2)))
           geo%components(i_comp)%normalised_coord_e = normalised_coord_e
           
-          !allocate(geo%components(i_comp)%curv_ac( &
-          !          size(curv_ac,1),size(curv_ac,2)))
-          !geo%components(i_comp)%curv_ac = curv_ac
+          allocate(geo%components(i_comp)%thickness( &
+                    size(thickness,1),size(thickness,2)))
+          geo%components(i_comp)%thickness = thickness
           
           geo%components(i_comp)%aero_correction = trim(aero_table)
           sim_param%vl_correction = .true. 
@@ -2275,7 +2276,7 @@ subroutine create_strip_connectivity(geo)
             comp%stripe(i_s)%ctr_pt = comp%stripe(i_s)%cen -  & 
                                       comp%stripe(i_s)%tang_cen * comp%stripe(i_s)%chord / 2.0_wp
             
-            !comp%stripe(i_s)%curv_ac = sum(comp%curv_ac(:,i_s))/2 
+            comp%stripe(i_s)%thickness = sum(comp%thickness(:,i_s))/2 
             !> Update velocity 
 
             call calc_node_vel(comp%stripe(i_s)%ctr_pt, geo%refs(comp%ref_id)%G_g, &

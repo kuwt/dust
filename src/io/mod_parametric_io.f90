@@ -83,7 +83,7 @@ contains
 subroutine read_mesh_parametric(mesh_file,ee,rr, &
                     npoints_chord_tot, nelem_span_tot, hinges, n_hinges, mesh_mirror, mesh_symmetry, &
                     nelem_span_list, airfoil_list_actual, i_airfoil_e, normalised_coord_e, & 
-                    aero_table_out)! curv_ac)
+                    aero_table_out, thickness)
 
   character(len=*), intent(in)              :: mesh_file
   integer  , allocatable, intent(out)       :: ee(:,:)
@@ -98,9 +98,9 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   logical                                   :: twist_linear_interp
   logical, intent(out), optional            :: aero_table_out
   logical                                   :: aero_table
-  !real(wp), allocatable, intent(out), optional :: curv_ac(:,:)
-  real(wp), allocatable                     :: curv_ac_section1(:), curv_ac_section2(:) 
-  real(wp)                                  :: curv_ac_section
+  real(wp), allocatable, intent(out), optional :: thickness(:,:)
+  real(wp), allocatable                     :: thickness_section1(:), thickness_section2(:) 
+  real(wp)                                  :: thickness_section
   integer                                   :: nelem_chord, nelem_chord_tot 
   integer                                   :: npoint_chord_tot, npoint_span_tot
   integer                                   :: nRegions, nSections
@@ -295,8 +295,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   allocate(twist_list  (nSections))  ; twist_list = 0.0_wp
   allocate(airfoil_list(nSections))
   allocate(airfoil_table_list(nSections))
-  allocate(curv_ac_section1(nRegions)); curv_ac_section1 = 0.0_wp
-  allocate(curv_ac_section2(nRegions)); curv_ac_section2 = 0.0_wp
+  allocate(thickness_section1(nRegions)); thickness_section1 = 0.0_wp
+  allocate(thickness_section2(nRegions)); thickness_section2 = 0.0_wp
 
   do iSection= 1, nSections
     chord_list(iSection)   = getreal(pmesh_prs,'chord')
@@ -576,14 +576,14 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
     if ( iRegion .gt. 1 ) then  ! first section = last section of the previous region
       rrSection1 = rrSection2
-      curv_ac_section1(iRegion) = curv_ac_section2(iRegion-1)      
+      thickness_section1(iRegion) = thickness_section2(iRegion-1)      
 
     else   ! first section                      ! build points
       !write(*,*) 'chord_fraction' , chord_fraction
       call define_section(chord_list(iRegion), trim(adjustl(airfoil_list(iRegion))), &
                           twist_list(iRegion), ElType, nelem_chord,              &
                           type_chord , chord_fraction, ref_chord_fraction,       &
-                          ref_point, xySection1, curv_ac_section)
+                          ref_point, xySection1, thickness_section)
 
       rrSection1(1,:) = xySection1(1,:) + ref_point(1)
       rrSection1(2,:) = 0.0_wp          + ref_point(2)     ! <--- read from region structure
@@ -591,7 +591,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       
       ! Update rr
       rr(:,ista:iend) = rrSection1
-      curv_ac_section1(iRegion) = curv_ac_section
+      thickness_section1(iRegion) = thickness_section
 
     end if
 
@@ -604,8 +604,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       call define_section( chord_list(iRegion+1), trim(adjustl(airfoil_list(iRegion+1))), &
                             twist_list(iRegion+1), ElType, nelem_chord,                    &
                             type_chord , chord_fraction, ref_chord_fraction,               &
-                            ref_point, xySection2, curv_ac_section)
-      curv_ac_section2(iRegion) = curv_ac_section ! second section 
+                            ref_point, xySection2, thickness_section)
+      thickness_section2(iRegion) = thickness_section ! second section 
 
     else ! interpolation
 
@@ -621,7 +621,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       call define_section( 1.0_wp , trim(adjustl(airfoil_list(iSec))), &
                             0.0_wp , ElType, nelem_chord,               &
                             type_chord , chord_fraction, 0.0_wp,        &
-                            ref_point, xyAirfoil2, curv_ac_section)
+                            ref_point, xyAirfoil2, thickness_section)
 
       ! Compute the coordinates xySection2(), after removing the offset
       if ( .not. allocated(xySection2) ) &
@@ -776,10 +776,10 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
       end if
 
-    end do ! iReagion 
+    end do ! iRegion 
 
 
-  enddo ! iReagion 
+  enddo ! iRegion 
   
   ! lots of deallocation missing causing memory leakage 
   if ( allocated(xySection1) ) deallocate(xySection1)
@@ -846,14 +846,14 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
                                       (rr(2,(iend +1)*npoint_chord_tot) - rr(2,ista*2))
         !> curvature interpolation 
         !> inboard
-        !if (iSpan .eq. ista) then 
-        !  curv_ac(1,iSpan) = curv_ac_section1(iAirfoil) 
-        !else          
-        !  curv_ac(1,iSpan) = curv_ac(2,iSpan - 1)
-        !endif 
+        if (iSpan .eq. ista) then 
+          thickness(1,iSpan) = thickness_section1(iAirfoil) 
+        else          
+          thickness(1,iSpan) = thickness(2,iSpan - 1)
+        endif 
         !> outboard
-        !curv_ac(2,iSpan) = curv_ac_section1(iAirfoil)*(1.0_wp - normalised_coord_e(2,iSpan)) + &
-        !                      curv_ac_section2(iAirfoil)*normalised_coord_e(2,iSpan)
+        thickness(2,iSpan) = thickness_section1(iAirfoil)*(1.0_wp - normalised_coord_e(2,iSpan)) + &
+                              thickness_section2(iAirfoil)*normalised_coord_e(2,iSpan)
 
         
 
@@ -882,7 +882,7 @@ end subroutine read_mesh_parametric
 
 subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
                           type_chord , chord_fraction, reference_chord_fraction,&
-                          reference_point, point_list, curv_ac)
+                          reference_point, point_list, thickness)
 
   real(wp), allocatable , intent(out)     :: point_list(:,:)
   real(wp), intent(in)                    :: reference_point(:) 
@@ -892,7 +892,7 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   integer, intent(in)                     :: nelem_chord
   character, intent(in)                   :: ElType
   character(len=*) , intent(in)           :: airfoil
-  real(wp),   intent(out)                 :: curv_ac
+  real(wp),   intent(out)                 :: thickness
   real(wp), allocatable                   :: points_mean_line(:,:)
   real(wp)                                :: twist_rad
   character(len=*), parameter :: this_sub_name='define_section'
@@ -908,12 +908,12 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   if ( airfoil(len_trim(airfoil)-3 : len_trim(airfoil)) .eq. '.dat' ) then
 
     call check_file_exists(airfoil, this_sub_name, this_mod_name)
-    call read_airfoil ( airfoil , ElType , nelem_chord , chord_fraction, point_list, curv_ac )
+    call read_airfoil ( airfoil , ElType , nelem_chord , chord_fraction, point_list, thickness)
 
   else if ( airfoil(1:4) .eq. 'NACA' ) then
     if ( len_trim(airfoil) .eq. 8 ) then      ! NACA 4-digit -------
       call naca4digits(airfoil(5:8), nelem_chord, chord_fraction, &
-                        points_mean_line , point_list, curv_ac)
+                        points_mean_line , point_list, thickness)
 
       if ( ElType .eq. 'v' ) then
         deallocate(point_list)
@@ -923,7 +923,7 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
 
     elseif ( len_trim(airfoil) .eq. 9 ) then
       call naca5digits(airfoil(5:9), nelem_chord, chord_fraction, &
-                        points_mean_line , point_list, curv_ac)
+                        points_mean_line , point_list, thickness)
 
       if ( ElType .eq. 'v' ) then
         deallocate(point_list)
@@ -948,19 +948,19 @@ subroutine define_section(chord, airfoil, twist, ElType, nelem_chord, &
   point_list = matmul( reshape( (/ cos(twist_rad),-sin(twist_rad) , &
                                   sin(twist_rad), cos(twist_rad) /) , (/2,2/) ) , &
                                                                     point_list )
-  curv_ac = curv_ac * chord 
+  thickness = thickness * chord 
 
 end subroutine define_section
 
 !-------------------------------------------------------------------------------
 
 subroutine naca4digits(airfoil_name, nelem_chord,&
-                      chord_fraction, points_mean_line , points, curv_ac)
+                      chord_fraction, points_mean_line , points, thick)
   character(len=*), intent(in) :: airfoil_name
   integer , intent(in)  :: nelem_chord
   real(wp), intent(in)  :: chord_fraction(:)
   real(wp), allocatable , intent(out) :: points_mean_line(:,:), points(:,:)
-  real(wp), intent(out) :: curv_ac 
+  real(wp), intent(out) :: thick 
   real(wp), allocatable :: points_upper(:,:), points_lower(:,:)
 
   integer :: mm, pp, ss, iPoint
@@ -1020,15 +1020,16 @@ subroutine naca4digits(airfoil_name, nelem_chord,&
 
   enddo
 
-  xac = 0.75_wp !> control point 
-  curv_ac = 0.0_wp
-  if (p>0) then
-    if (xac <= p) then
-      curv_ac = m/p**2 * (2.0_wp*p*xac - xac**2)
-    else
-      curv_ac = m/(1.0_wp-p)**2 * (1.0_wp-2.0_wp*p + 2.0_wp*p*xac - xac**2)
-    endif
-  endif
+  thick = s
+  !xac = 0.75_wp !> control point 
+  !curv_ac = 0.0_wp
+  !if (p>0) then
+  !  if (xac <= p) then
+  !    curv_ac = m/p**2 * (2.0_wp*p*xac - xac**2)
+  !  else
+  !    curv_ac = m/(1.0_wp-p)**2 * (1.0_wp-2.0_wp*p + 2.0_wp*p*xac - xac**2)
+  !  endif
+  !endif
 
   if ( allocated(points) ) deallocate(points)
   allocate(points(2,2*nelem_chord+1))
@@ -1040,12 +1041,12 @@ endsubroutine naca4digits
 !----------------------------------------------------------------------
 
 subroutine naca5digits(airfoil_name, nelem_chord,&
-                        chord_fraction, points_mean_line , points, curv_ac)
+                        chord_fraction, points_mean_line , points, thick)
   character(len=*), intent(in)          :: airfoil_name
   integer , intent(in)                  :: nelem_chord
   real(wp), intent(in)                  :: chord_fraction(:)
   real(wp), allocatable , intent(out)   :: points_mean_line(:,:), points(:,:)
-  real(wp),               intent(out)   :: curv_ac
+  real(wp),               intent(out)   :: thick
   real(wp), allocatable                 :: points_upper(:,:), points_lower(:,:)
   integer :: ss, iPoint, L, Q, P
   real(wp) :: s, xa, xac, ml, theta, thickness, mult, r, k1
@@ -1130,12 +1131,13 @@ subroutine naca5digits(airfoil_name, nelem_chord,&
 
   enddo
 
-  xac = 0.75_wp ! control point for vl corrected
-  if (xa <= r) then
-    curv_ac = mult*k1/6.0_wp*(xac**3 -3.0_wp*r*xac**2+r**2*(3.0_wp-r)*xac)
-  else
-    curv_ac = mult*k1*r**3/6.0_wp*(1-xac)
-  endif
+  thick = s 
+  !xac = 0.75_wp ! control point for vl corrected
+  !if (xa <= r) then
+  !  curv_ac = mult*k1/6.0_wp*(xac**3 -3.0_wp*r*xac**2+r**2*(3.0_wp-r)*xac)
+  !else
+  !  curv_ac = mult*k1*r**3/6.0_wp*(1-xac)
+  !endif
 
   if ( allocated(points) ) deallocate(points)
   allocate(points(2,2*nelem_chord+1))
@@ -1147,13 +1149,13 @@ endsubroutine naca5digits
 
 !-------------------------------------------------------------------------------
 
-subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, curv_ac )
+subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness )
 
   character(len=*), intent(in) :: filen
   character(len=*), intent(in) :: ElType
   integer         , intent(in) :: nelems_chord
   real(wp)        , allocatable , intent(out) :: rr(:,:)
-  real(wp) , intent(out)                      :: curv_ac
+  real(wp) , intent(out)                      :: thickness
   real(wp)                                    :: csi_ac 
   real(wp),         intent(in) :: csi_half(:)
 
@@ -1193,7 +1195,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, curv_ac )
 
     nelems_chord_tot = 2*nelems_chord+1
     allocate(csi(nelems_chord_tot))
-    csi(             1  :nelems_chord + 1) =  -0.5_wp * csi_half(nelems_chord+1:1:-1)
+    csi(1  :nelems_chord + 1) =  -0.5_wp * csi_half(nelems_chord+1:1:-1)
     csi(nelems_chord+2:2*nelems_chord+1) = 0.5_wp * csi_half(2:nelems_chord + 1)
     csi = csi(nelems_chord_tot:1:-1) + 0.5_wp
 
@@ -1231,7 +1233,7 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, curv_ac )
       y_mean(1,:) = (rr_up(2,:) + rr_low(2,:))/2.0_wp
       rr(1,:) = rr_up(1,:)
       rr(2,:) = y_mean(1,:)
-
+      
     elseif ( ElType .eq. 'p' ) then
       allocate(rr(2,nelems_chord_tot));       rr = 0.0_wp 
       rr = rr_pan
@@ -1259,14 +1261,15 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, curv_ac )
     end do
 
   endif
-
-  !> get position of aerodynamic center 
-  csi_ac = 0.75_wp ! control point for vl corrected
-  if ( ElType .eq. 'v' ) then    
-    call linear_interp(rr_geo(2,:) , rr_geo(1,:) , csi_ac , curv_ac)
-  else  
-    curv_ac = 0.0_wp
-  endif 
+  !> calculate thickness for dynstall 
+  call define_thickness(rr_geo, thickness)
+  !!> get position of aerodynamic center 
+  !csi_ac = 0.75_wp ! control point for vl corrected
+  !if ( ElType .eq. 'v' ) then    
+  !  call linear_interp(rr_geo(2,:), rr_geo(1,:), csi_ac, curv_ac)
+  !else  
+  !  curv_ac = 0.0_wp
+  !endif 
 
   !> cleanup
   if (allocated(rr_tmp)) deallocate(rr_tmp)
@@ -1311,6 +1314,135 @@ subroutine define_division(type_mesh, nelem, division)
   end select
 
 end subroutine define_division
+
+!-------------------------------------------------------------------------------
+subroutine define_thickness(rr_geo, thickness)
+  real(wp), intent(out) :: thickness
+  real(wp), intent(inout) :: rr_geo(:,:)
+
+  real(wp), allocatable :: y_up_interp(:), y_low_interp(:), rr_geo_tmp(:,:)
+  real(wp), allocatable :: x_coor(:), x_geo_shift(:) 
+  real(wp), allocatable :: mean_line(:), curv_per(:)
+  real(wp), allocatable :: curv(:), ds(:), m_up(:), m_low(:)
+  real(wp), allocatable :: x_mid_point(:), y_mid_point(:)
+  real(wp), allocatable :: vec_intersect_up(:,:), vec_intersect_low(:,:), thick_vec(:)
+  real(wp), allocatable :: rr_up(:,:), rr_low(:,:)
+  real(wp)              :: m_1, m_2, m_3
+  real(wp)              :: mat_up(2,2), mat_low(2,2)
+  real(wp)              :: vec_up(2), vec_low(2)
+  integer               :: i, id_change, len_up, len_low
+
+  allocate(rr_geo_tmp(size(rr_geo,1),2))
+  rr_geo_tmp = rr_geo 
+  call unique(rr_geo_tmp(1,:), x_coor, 1e-10_wp)
+  allocate(y_up_interp(size(x_coor))); y_up_interp = 0.0_wp
+  allocate(y_low_interp(size(x_coor))); y_low_interp = 0.0_wp
+
+  !> split upper and lower part
+  allocate(x_geo_shift(size(rr_geo,2)-1)); x_geo_shift = 0.0_wp 
+  do i = 1,size(rr_geo,2) - 1
+    x_geo_shift(i) = rr_geo(1,i+1) - rr_geo(1,i)
+  end do 
+
+  !> get id where the sign change 
+  do i = 1, size(x_geo_shift) -1
+    if (x_geo_shift(i) .lt. 0.0_wp .and. x_geo_shift(i+1) .gt. 0.0_wp) then 
+      id_change = i 
+    endif
+  enddo 
+  len_low = id_change + 1 
+  len_up = size(rr_geo,2)-id_change + 1
+
+  allocate(rr_low(2,len_low)); rr_low = 0.0_wp
+  allocate(rr_up(2,len_up)); rr_up = 0.0_wp
+  
+  rr_low = rr_geo(:,1:len_low)
+  rr_up = rr_geo(:,len_low:size(rr_geo,2))
+  
+  do i = 1, size(x_coor) 
+    call linear_interp(rr_up(2,:), rr_up(1,:), x_coor(i), y_up_interp(i))
+    call linear_interp(rr_low(2,len_low:1:-1), rr_low(1,len_low:1:-1), x_coor(i), y_low_interp(i))
+  enddo 
+  
+  !> evaluate mean line
+  allocate(mean_line(size(y_up_interp))); mean_line = 0.0_wp
+  mean_line = (y_up_interp + y_low_interp)/2
+  !> length of each mean line segment
+  allocate(ds(size(mean_line)-1));    ds = 0.0_wp 
+  !> curvature of mean line, up and lower side
+  allocate(curv(size(mean_line)-1));  curv = 0.0_wp 
+  allocate(m_up(size(mean_line)-1));  m_up = 0.0_wp 
+  allocate(m_low(size(mean_line)-1)); m_low = 0.0_wp 
+  !> mid point 
+  allocate(x_mid_point(size(mean_line)-1)); x_mid_point = 0.0_wp 
+  allocate(y_mid_point(size(mean_line)-1)); y_mid_point = 0.0_wp 
+
+  do i = 1, (size(mean_line)-1)
+    ds(i) = x_coor(i+1)-x_coor(i)
+    !> calculate the derivative 
+    curv(i) = (mean_line(i+1) - mean_line(i))/ds(i)
+    m_up(i) = (y_up_interp(i+1) - y_up_interp(i))/ds(i)
+    m_low(i) = (y_low_interp(i+1) - y_low_interp(i))/ds(i)
+    !> calculate mid point 
+    y_mid_point(i) = (mean_line(i+1)+mean_line(i))/2
+    x_mid_point(i) = (x_coor(i+1) + x_coor(i))/2
+  end do
+
+  !> take the perpendicular
+  allocate(curv_per(size(mean_line)-1)); curv_per = 0.0_wp
+  curv_per = -1/curv
+
+  !> calculate the intersection between perpendicular lines and airfoil 
+  allocate(vec_intersect_up(2,(size(mean_line)-1)));  vec_intersect_up = 0.0_wp
+  allocate(vec_intersect_low(2,(size(mean_line)-1))); vec_intersect_low = 0.0_wp
+  allocate(thick_vec(size(mean_line)-1)); thick_vec = 0.0_wp
+
+  do i = 1, size(mean_line)-1
+    m_1 = curv_per(i) 
+    m_2 = m_up(i) 
+    m_3 = m_low(i) 
+
+    !> check infinity
+    if (abs(m_1) .gt. 1e+16_wp) then
+      if (abs(m_2) .gt. 1e+16_wp) then
+          vec_intersect_up(1,i) = x_mid_point(i)
+          vec_intersect_up(2,i) = y_mid_point(i)
+      elseif (abs(m_3) .gt. 1e+16_wp) then
+          vec_intersect_low(1,i) = x_mid_point(i)
+          vec_intersect_low(2,i) = y_mid_point(i)
+      else           
+          vec_intersect_up(1,i) = x_mid_point(i)
+          vec_intersect_up(2,i) = m_2*(x_mid_point(i) - x_coor(i)) + y_up_interp(i)
+          vec_intersect_low(1,i) = x_mid_point(i)
+          vec_intersect_low(2,i) = m_3*(x_mid_point(i) - x_coor(i)) + y_low_interp(i)
+      end if
+    else  
+      mat_up(1,:) = 1/(-m_1 + m_2)*(/1, -1/)
+      mat_up(2,:) = 1/(-m_1 + m_2)*(/m_2, -m_1/)
+
+      vec_up(1) = y_mid_point(i) - m_1*x_mid_point(i)
+      vec_up(2) = y_up_interp(i) - m_2*x_coor(i)
+
+      vec_intersect_up(:,i) = matmul(mat_up, vec_up)
+
+      mat_low(1,:) = 1/(-m_1 + m_3)*(/1, -1/)
+      mat_low(2,:) = 1/(-m_1 + m_3)*(/m_3, -m_1/)
+
+      vec_low(1) = y_mid_point(i) - m_1*x_mid_point(i)
+      vec_low(2) = y_low_interp(i) - m_3*x_coor(i)
+
+      vec_intersect_low(:,i) = matmul(mat_low, vec_low)
+    end if
+    !> calculate length of each segment 
+    thick_vec(i) = sqrt((vec_intersect_low(1,i)-vec_intersect_up(1,i))**2 + &
+                    (vec_intersect_low(2,i)-vec_intersect_up(2,i))**2)    
+  end do
+
+  !> finally the max value is the airfoil thickness 
+  thickness = maxval(thick_vec) 
+  
+
+end subroutine define_thickness
 
 !-------------------------------------------------------------------------------
 

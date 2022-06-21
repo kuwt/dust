@@ -131,8 +131,8 @@ module mod_stripe
     real(wp) :: vel_ctr_pt(3)
     real(wp) :: aero_coeff(3) 
     real(wp) :: mag_inv
-    !> Stripe 'curvature'
-    real(wp) :: curv_ac 
+    !> Stripe thickness
+    real(wp) :: thickness 
     !> Sweep angle 
     real(wp) :: d_2pi_coslambda
     !> Iteration counter (workound)
@@ -185,10 +185,8 @@ module mod_stripe
     real(wp)                         :: rel_fct, rhs_diff
     
     !> Dynamic stall
-    !real(wp)                         :: thicc = 0.12 !> get as input? 
-                                        !(should be the last 2 digits of NACA profile)
-    !real(wp)                         :: alpha_ref, K1, dAlpha_dt
-    !real(wp)                         :: rad_break, rad_dyn, M1, M2, g1, g2, g2_max
+    real(wp)                         :: alpha_ref, K1, dAlpha_dt
+    real(wp)                         :: rad_break, rad_dyn, M1, M2, g1, g2, g2_max
   
 
     !> Relaxation factor
@@ -241,10 +239,34 @@ module mod_stripe
     alpha_2d = mag_inv / ( dcl_da/2.0_wp* this%chord * unorm ) 
     
     alpha = (alpha - alpha_2d) * 180.0_wp/pi  
-    
+
+    !> dynamic stall
+    if(sim_param%vl_dynstall) then    
+      dAlpha_dt = ((alpha - this%alpha_old)/sim_param%dt)* pi/180.0_wp
+      rad_break = 0.06_wp + 1.5_wp*(0.6_wp - this%thickness/this%chord)
+      rad_dyn = sqrt(abs(this%chord * dAlpha_dt/(2.0_wp*unorm)))
+
+      ! dynamic stall lift
+      M1 = 0.4_wp + 5.0_wp*(0.6_wp - this%thickness/this%chord)
+      M2 = 0.9_wp + 2.5_wp*(0.6_wp - this%thickness/this%chord)
+      g2_max = 1.4_wp - 6.0_wp*(0.6_wp - this%thickness/this%chord)
+      g2 = min(g2_max,max(0.0_wp, (mach-M2)/(M1-M2)))
+      g1 = g2/2.0_wp
+      K1 = 0.75_wp + sign(0.25_wp,dAlpha_dt)
+
+      if(rad_dyn .LE. rad_break) then
+              alpha_ref = alpha - K1*g1*rad_dyn*sign(1.0_wp,dAlpha_dt)*180_wp/pi
+      else
+              alpha_ref = alpha - K1*(g1*rad_break + g2*(rad_dyn-rad_break))*sign(1.0_wp,dAlpha_dt)*180_wp/pi
+      end if
+      
+    else
+      alpha_ref = alpha
+    end if ! dynstall
+
     !> Interpolation of the aerodynamic coefficents 
     call interp_aero_coeff ( airfoil_data,  this%csi_cen, this%i_airfoil , &
-                        (/alpha, mach, reynolds/), aero_coeff, dcl_da )
+                        (/alpha_ref, mach, reynolds/), aero_coeff, dcl_da )
         
     !> Aerodynamic coefficients from c81 table  
     this%cl_visc = aero_coeff(1)

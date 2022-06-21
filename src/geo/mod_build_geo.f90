@@ -208,6 +208,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   real(wp), allocatable                    :: normalised_coord_e(:,:)
   real(wp)                                 :: trac, radius, length
   logical                                  :: aero_table
+  real(wp), allocatable                    :: thickness(:,:)
   !> Section names for CGNS
   integer                                  :: nSections, iSection
   character(len=max_char_len), allocatable :: sectionNamesCGNS(:)
@@ -770,7 +771,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call read_mesh_parametric(trim(mesh_file), ee, rr, &
                               npoints_chord_tot, nelems_span, hinges, n_hinges, mesh_mirror, mesh_symmetry,&
                               nelem_span_list, airfoil_list, i_airfoil_e, normalised_coord_e, &
-                              aero_table)  
+                              aero_table, thickness)  
 
       !> Write additional fields for vl correction
       if (aero_table) then 
@@ -788,6 +789,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
         call write_hdf5(i_airfoil_e,        'i_airfoil_e',        geo_loc)
         call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)
         call write_hdf5('true',             'aero_table',         geo_loc)        
+        call write_hdf5(thickness,          'thickness',         geo_loc)
       else
         call write_hdf5('false',            'aero_table',         geo_loc)
       endif
@@ -963,13 +965,14 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call read_mesh_pointwise(trim(mesh_file), ee, rr, &
                               npoints_chord_tot, nelems_span, &
                               airfoil_list, i_airfoil_e, normalised_coord_e, &
-                              aero_table)  
+                              aero_table, thickness)  
       !> Write additional fields for vl correction
       if (aero_table) then 
         call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)
         call write_hdf5(i_airfoil_e,        'i_airfoil_e',        geo_loc)
         call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)        
         call write_hdf5('true',             'aero_table',         geo_loc)
+        call write_hdf5(thickness,          'thickness',         geo_loc)        
       else
         call write_hdf5('false',            'aero_table',         geo_loc)
       endif

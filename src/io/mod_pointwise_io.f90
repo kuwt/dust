@@ -135,7 +135,7 @@ contains
 subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
                               npoints_chord_tot , nelem_span_tot, &
                               airfoil_list_actual, i_airfoil_e, normalised_coord_e, & 
-                              aero_table_out) !, curv_ac)
+                              aero_table_out, thickness)
 
 
   character(len=*), intent(in)          :: mesh_file
@@ -154,8 +154,8 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   real(wp)                              :: ref_chord_fraction
 
   real(wp), allocatable                 :: chord_fraction(:)
-  !real(wp), allocatable, intent(out), optional :: curv_ac(:,:) 
-  real(wp)                              :: curv_ac_section                             
+  real(wp), allocatable, intent(out), optional :: thickness(:,:) 
+  real(wp)                              :: thickness_section                             
   !> Point and line structures
   type(t_point) , allocatable           :: points(:)
   type(t_line ) , allocatable           :: lines(:)
@@ -274,13 +274,13 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   allocate(chord_fraction(nelem_chord+1))
   call define_division(type_chord, nelem_chord, chord_fraction)
 
-  !allocate(curv_ac(2,size(points))); curv_ac = 0.0_wp
+  allocate(thickness(2,size(points))); thickness = 0.0_wp
   !> first point
   call define_section( points(1)%chord , trim(adjustl(points(1)%airfoil)) , &
                       points(1)%theta , ElType , nelem_chord             , &
                       type_chord , chord_fraction , ref_chord_fraction   , &
-                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(1)%xy, curv_ac_section)
-  !curv_ac(1,1) = curv_ac_section 
+                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(1)%xy, thickness_section)
+  thickness(1,1) = thickness_section 
   if ( points(1)%flip_sec ) call flip_section( ElType , points(1)%xy )
 
   !> last point
@@ -289,8 +289,8 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
                       points(i)%theta , ElType , nelem_chord             , &
                       type_chord , chord_fraction , ref_chord_fraction   , &
-                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy, curv_ac_section)
-  !curv_ac(1,i) = curv_ac_section 
+                      (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy, thickness_section)
+  thickness(1,i) = thickness_section 
   if ( points(i)%flip_sec ) call flip_section( ElType , points(i)%xy ) 
 
   do i = 2 , size(points)-1
@@ -300,8 +300,8 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
       call define_section( points(i)%chord , trim(adjustl(points(i)%airfoil)) , &
                           points(i)%theta , ElType , nelem_chord             , &
                           type_chord , chord_fraction , ref_chord_fraction   , &
-                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy, curv_ac_section )
-      !curv_ac(1,i) = curv_ac_section
+                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy, thickness_section )
+      thickness(1,i) = thickness_section
       if ( points(i)%flip_sec ) call flip_section( ElType , points(i)%xy   )
 
     else ! points of the section must be interpolated
@@ -327,11 +327,11 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
     call define_section( 1.0_wp , trim(adjustl(points(i1)%airfoil)) , &
                           0.0_wp , ElType , nelem_chord              , &
                           type_chord , chord_fraction , 0.0_wp       , &
-                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy1, curv_ac_section )
+                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy1, thickness_section )
     call define_section( 1.0_wp , trim(adjustl(points(i2)%airfoil)) , &
                           0.0_wp , ElType , nelem_chord              , &
                           type_chord , chord_fraction , 0.0_wp       , &
-                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy2, curv_ac_section )
+                          (/ 0.0_wp , 0.0_wp , 0.0_wp /) , xy2, thickness_section )
 
     if ( points(i1)%flip_sec ) call flip_section( ElType , xy1 )
     if ( points(i2)%flip_sec ) call flip_section( ElType , xy2 )
