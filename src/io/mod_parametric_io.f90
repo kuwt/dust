@@ -83,7 +83,7 @@ contains
 subroutine read_mesh_parametric(mesh_file,ee,rr, &
                     npoints_chord_tot, nelem_span_tot, hinges, n_hinges, mesh_mirror, mesh_symmetry, &
                     nelem_span_list, airfoil_list_actual, i_airfoil_e, normalised_coord_e, & 
-                    aero_table_out, thickness_out)
+                    aero_table_out, thickness)
 
   character(len=*), intent(in)              :: mesh_file
   integer  , allocatable, intent(out)       :: ee(:,:)
@@ -98,8 +98,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   logical                                   :: twist_linear_interp
   logical, intent(out), optional            :: aero_table_out
   logical                                   :: aero_table
-  real(wp), allocatable, intent(out), optional :: thickness_out(:,:)
-  real(wp), allocatable                     ::  thickness(:,:)
+  !real(wp), allocatable, intent(out), optional :: thickness_out(:,:)
+  real(wp), allocatable , intent(out), optional                    ::  thickness(:,:)
   real(wp), allocatable                     :: thickness_section1(:), thickness_section2(:) 
   real(wp)                                  :: thickness_section
   integer                                   :: nelem_chord, nelem_chord_tot 
@@ -297,8 +297,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   allocate(airfoil_list(nSections))
   allocate(airfoil_table_list(nSections))
 
-  allocate(thickness_out(2,nelem_span_tot)); thickness_out = 0.0_wp
-  allocate(thickness(2,nelem_span_tot)); thickness = 0.0_wp
+  !allocate(thickness_out(2,nelem_span_tot)); thickness_out = 0.0_wp
+  
   
   allocate(thickness_section1(nRegions)); thickness_section1 = 0.0_wp
   allocate(thickness_section2(nRegions)); thickness_section2 = 0.0_wp
@@ -798,7 +798,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     
     allocate(normalised_coord_e(2,nelem_span_tot))
     normalised_coord_e = 0.0_wp
-  
+    allocate(thickness(2,nelem_span_tot)); 
+    thickness = 0.0_wp
       !> Check airfoil_list()
     if ( trim(airfoil_table_list(1)) .eq. 'interp' ) then
       call error(this_sub_name, this_mod_name, 'The first "airfoil"&
@@ -875,7 +876,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   npoints_chord_tot = npoint_chord_tot
   if (present(aero_table_out)) then
     aero_table_out = aero_table
-    thickness_out = thickness
+    !thickness_out = thickness
   end if
   ! optional output ----
 

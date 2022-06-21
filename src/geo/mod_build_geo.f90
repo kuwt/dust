@@ -778,11 +778,11 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
 
         if ( mesh_symmetry ) then
           call symmetry_update_vl_lists( nelem_span_list , &
-                i_airfoil_e , normalised_coord_e )
+                i_airfoil_e , normalised_coord_e, thickness)
         end if
         if ( mesh_mirror ) then
           call mirror_update_vl_lists( nelem_span_list , &
-                  i_airfoil_e , normalised_coord_e )
+                  i_airfoil_e , normalised_coord_e, thickness )
         end if
   
         call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)
@@ -2422,15 +2422,18 @@ end subroutine mirror_update_ll_lists
 !----------------------------------------------------------------------
 !> Updates lifting lines fields in case of symmetry
 subroutine symmetry_update_vl_lists ( nelem_span_list , &
-                       i_airfoil_e , normalised_coord_e )
+                       i_airfoil_e , normalised_coord_e , thickness)
 
   integer , allocatable , intent(inout) :: nelem_span_list(:)
   integer , allocatable , intent(inout) :: i_airfoil_e(:,:)
   real(wp), allocatable , intent(inout) :: normalised_coord_e(:,:)
+  real(wp), allocatable , intent(inout) :: thickness(:,:)
 
   integer , allocatable :: nelem_span_list_tmp(:)
   integer , allocatable :: i_airfoil_e_tmp(:,:)
   real(wp), allocatable :: normalised_coord_e_tmp(:,:)
+  real(wp), allocatable :: thickness_tmp(:,:)
+  
   integer :: nelem_span_section
   integer :: nelems
   integer :: npts   ! nelem + 1
@@ -2464,11 +2467,19 @@ subroutine symmetry_update_vl_lists ( nelem_span_list , &
     normalised_coord_e_tmp( 1:2 , siz-i+1 ) = 1.0_wp - normalised_coord_e( 2:1:-1 , i )
   end do
 
+  allocate(thickness_tmp( 2, nelems ))
+  siz = size(thickness,2)
+  do i = 1 , siz
+    thickness_tmp( 1:2 , siz+i   ) = thickness( 1:2    , i )
+    thickness_tmp( 1:2 , siz-i+1 ) = thickness( 2:1:-1 , i )
+  end do
 
   ! Move_alloc to the original arrays -------------------------
   call move_alloc(    nelem_span_list_tmp ,     nelem_span_list )
   call move_alloc(        i_airfoil_e_tmp ,         i_airfoil_e )
   call move_alloc( normalised_coord_e_tmp ,  normalised_coord_e )
+  call move_alloc( thickness_tmp ,  thickness )
+  
   
 
 end subroutine symmetry_update_vl_lists
@@ -2477,16 +2488,17 @@ end subroutine symmetry_update_vl_lists
 
 !> Updates lifting lines fields in case of mirroring
 subroutine mirror_update_vl_lists ( nelem_span_list , &
-  i_airfoil_e , normalised_coord_e )
+  i_airfoil_e , normalised_coord_e, thickness)
 
   integer , allocatable , intent(inout) :: nelem_span_list(:)
   integer , allocatable , intent(inout) :: i_airfoil_e(:,:)
   real(wp), allocatable , intent(inout) :: normalised_coord_e(:,:)
-
+  real(wp), allocatable , intent(inout) :: thickness(:,:)
 
   integer , allocatable :: nelem_span_list_tmp(:)
   integer , allocatable :: i_airfoil_e_tmp(:,:)
   real(wp), allocatable :: normalised_coord_e_tmp(:,:)
+  real(wp), allocatable :: thickness_tmp(:,:) 
 
   integer :: nelem_span_section
   integer :: nelem
@@ -2518,12 +2530,17 @@ subroutine mirror_update_vl_lists ( nelem_span_list , &
     normalised_coord_e_tmp( 1:2 , siz-i+1 ) = 1.0_wp - normalised_coord_e( 2:1:-1 , i )
   end do
 
+  allocate(thickness_tmp( 2, size(thickness,2) ))
+  do i = 1 , siz
+    thickness_tmp( 1:2 , siz-i+1 ) = thickness( 2:1:-1 , i )
+  end do
   
   ! Move_alloc to the original arrays -------------------------
   call move_alloc(    nelem_span_list_tmp ,     nelem_span_list )
   call move_alloc(        i_airfoil_e_tmp ,         i_airfoil_e )
   call move_alloc( normalised_coord_e_tmp ,  normalised_coord_e )
-  
+  call move_alloc( thickness_tmp ,  thickness )
+
 end subroutine mirror_update_vl_lists
 
 

@@ -2223,7 +2223,7 @@ subroutine create_strip_connectivity(geo)
             comp%stripe(i_s)%n_ver = 4 ! hardcoded, but stripe should be always a quadrilateral element
             comp%stripe(i_s)%csi_cen = 0.5_wp * sum(comp%normalised_coord_e(:,i_s))  
             comp%stripe(i_s)%i_airfoil =  comp%i_airfoil_e(:,i_s)
-            
+            comp%stripe(i_s)%thickness = 0.5_wp * sum(comp%thickness(:,i_s))
             !> stripe verteces 
             comp%stripe(i_s)%ver(:,1) = comp%el(1+(i_s-1)*n_c)%ver(:,1) 
             comp%stripe(i_s)%ver(:,2) = comp%el(1+(i_s-1)*n_c)%ver(:,2)
@@ -2276,7 +2276,7 @@ subroutine create_strip_connectivity(geo)
             comp%stripe(i_s)%ctr_pt = comp%stripe(i_s)%cen -  & 
                                       comp%stripe(i_s)%tang_cen * comp%stripe(i_s)%chord / 2.0_wp
             
-            comp%stripe(i_s)%thickness = sum(comp%thickness(:,i_s))/2 
+            
             !> Update velocity 
 
             call calc_node_vel(comp%stripe(i_s)%ctr_pt, geo%refs(comp%ref_id)%G_g, &
