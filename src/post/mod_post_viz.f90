@@ -61,22 +61,15 @@ use mod_parse, only: &
   countoption
 
 use mod_hdf5_io, only: &
-!  initialize_hdf5, destroy_hdf5, &
-   h5loc, &
-!  new_hdf5_file, &
-   open_hdf5_file, &
-   close_hdf5_file, & ! , &
-!  new_hdf5_group, &
-   open_hdf5_group, &
-   close_hdf5_group, &
-!  write_hdf5, &
-   read_hdf5
-!  read_hdf5_al, &
-!  check_dset_hdf5
+  h5loc, &
+  open_hdf5_file, &
+  close_hdf5_file, & 
+  open_hdf5_group, &
+  close_hdf5_group, &
+  read_hdf5
 
 use mod_stringtools, only: &
   LowCase, isInList
-! LowCase, isInList, stricmp
 
 use mod_geometry, only: &
   t_geo, t_geo_component, destroy_elements
@@ -86,10 +79,10 @@ use mod_geo_postpro, only: &
   expand_actdisk_postpro
 
 use mod_tecplot_out, only: &
-  tec_out_viz ! , tec_out_probes, tec_out_box, tec_out_loads
+  tec_out_viz
 
 use mod_vtk_out, only: &
-  vtk_out_viz ! , vtr_write
+  vtk_out_viz
 
 use mod_post_load, only: &
   load_refs, load_res, load_wake_viz , check_if_components_exist

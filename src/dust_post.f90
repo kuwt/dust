@@ -147,6 +147,9 @@ use mod_post_integral, only: &
 use mod_post_sectional, only: &
   post_sectional
 
+use mod_post_chordwise, only: & 
+  post_chordwise 
+
 use mod_post_aa, only: &
   post_aeroacoustics
 
@@ -253,6 +256,12 @@ call sbprms%CreateLogicalOption('lifting_line_data', 'Output lifting line data&
                             & alongside sectional loads','F')
 call sbprms%CreateLogicalOption('vortex_lattice_data', 'Output of corrected vortex lattice data&
                             & alongside sectional loads','F')
+! chordwise loads
+call sbprms%CreateIntOption('n_station','Number of stations where the loads are extracted' &
+                            , multiple=.true.)
+call sbprms%CreateRealArrayOption('span_station','Spanwise coordinates in the component reference frame&
+                            & where the are extracted', multiple=.true.)
+
 
 ! sectional loads: box -----
 call sbprms%CreateSubOption('box_sect','Definition of the box for sectional loads', &
@@ -387,6 +396,12 @@ do ia = 1, n_analyses
       call post_sectional ( sbprms , bxprms , basename , data_basename , an_name , ia , &
                           out_frmt , components_names , all_comp , &
                           an_start , an_end , an_step, average )
+
+    !> Chordwise Loads 
+    case('chordwise_loads') 
+      call post_chordwise (sbprms, basename, data_basename, an_name, ia, &
+                            out_frmt, components_names, all_comp, &
+                            an_start, an_end, an_step, average)
 
     !> Aeroacoustics
     case('aeroacoustics')

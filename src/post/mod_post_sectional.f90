@@ -114,7 +114,7 @@ character(len=max_char_len) :: msg
 contains
 
 ! ----------------------------------------------------------------------
-!TODO:
+!TODO (to be tested):
 ! - parametric components aligned with y-axis
 ! - tol_y_cen is hard-coded. write tol_y_cen as an input
 ! - preCICE coupled components 
@@ -373,7 +373,8 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
             & sectional_loads analysis: abs(axis_dir(2)) .lt. 1e-6.&
             & STOP')
     end if
-    allocate(r_axis(3,n_sect),r_axis_bas(3,n_sect))
+
+    allocate(r_axis(3,n_sect), r_axis_bas(3,n_sect))
     do is = 1 , n_sect
       r_axis(:,is) = axis_nod + &
               ( y_cen(is) - axis_nod(ax_coor) )/axis_dir(ax_coor) * axis_dir
