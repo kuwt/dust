@@ -83,8 +83,8 @@ module mod_post_chordwise
   use mod_post_load, only: &
     load_refs, load_res, load_ll, load_vl
 
-  !use mod_dat_out, only: &
-  !  dat_out_chordwise
+  use mod_dat_out, only: &
+    dat_out_chordwise
 
   use mod_tecplot_out, only: &
     tec_out_sectional
@@ -151,16 +151,21 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
   integer                                                 :: n_station 
   real(wp), allocatable                                   :: span_station(:)
   real(wp), allocatable                                   :: y_cen_tras(:) 
-  integer, allocatable                                    :: id_minus(:), id_plus(:) 
-  real(wp), allocatable                                   :: nor(:,:), tang(:,:) 
+  integer,  allocatable                                   :: id_minus(:), id_plus(:) 
   real(wp)                                                :: u_inf(3), P_inf, rho 
   !> field to interpolate  
-  real(wp), allocatable                                   :: force_minus(:),  force_plus(:) 
-  real(wp), allocatable                                   :: tang_minus(:),   tang_plus(:) 
-  real(wp), allocatable                                   :: nor_minus(:),    nor_plus(:) 
-  real(wp), allocatable                                   :: cen_minus(:),    cen_plus(:) 
-  real(wp)                                                :: pres_minus,     pres_plus 
-  real(wp)                                                :: cp_minus,       cp_plus 
+  real(wp)                                                :: force_minus(3) = 0.0_wp
+  real(wp)                                                :: force_plus(3)  = 0.0_wp 
+  real(wp)                                                :: tang_minus(3)  = 0.0_wp   
+  real(wp)                                                :: tang_plus(3)   = 0.0_wp
+  real(wp)                                                :: nor_minus(3)   = 0.0_wp   
+  real(wp)                                                :: nor_plus(3)    = 0.0_wp
+  real(wp)                                                :: cen_minus(3)   = 0.0_wp   
+  real(wp)                                                :: cen_plus(3)    = 0.0_wp
+  real(wp)                                                :: pres_minus     = 0.0_wp     
+  real(wp)                                                :: pres_plus      = 0.0_wp
+  real(wp)                                                :: cp_minus       = 0.0_wp
+  real(wp)                                                :: cp_plus        = 0.0_wp
   !> interpolated field
   real(wp), allocatable                                   :: force_int(:,:,:,:)   
   real(wp), allocatable                                   :: tang_int(:,:,:,:)    
@@ -184,14 +189,14 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
   n_comp = countoption(sbprms,'component')
   if ( n_comp .le. 0 ) then
     call warning(this_mod_name, this_sub_name, 'No component specified for &
-                &chordwise_loads analysis. Skipped analysis.')
+                              &chordwise_loads analysis. Skipped analysis.')
     return
   else if ( n_comp .ge. 2 ) then
     call warning(this_mod_name, this_sub_name, &
         'More than one component specified &
-      &for ''chordwise_loads'' analysis: just the first one is considered. &
-      &Please run another ''chordwise_analysis'' if you need it on more than &
-      &component.')
+        &for ''chordwise_loads'' analysis: just the first one is considered. &
+        &Please run another ''chordwise_analysis'' if you need it on more than &
+        &component.')
   end if
 
   !> check if components_names is allocated (it should alwasy be allocated)
@@ -266,7 +271,8 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
     n_sect = nelem_span
 
     do i1 = 1, size(comps(id_comp)%loc_points, 2) 
-      comps(id_comp)%loc_points(:, i1) = matmul(comps(id_comp)%coupling_node_rot,comps(id_comp)%loc_points(:,i1))
+      comps(id_comp)%loc_points(:, i1) = &
+      matmul(comps(id_comp)%coupling_node_rot,comps(id_comp)%loc_points(:,i1))
     end do
     
     allocate(y_cen(n_sect),y_span(n_sect))
@@ -304,7 +310,6 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
       enddo     
     enddo  
 
-
     ! Find the coordinate of the reference points on the axis --------------
     !  ( with coord. y_cen )
     if ( abs(axis_dir(2)) .lt. 1e-6_wp ) then
@@ -322,23 +327,7 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
 
     n_time = (an_end-an_start)/an_step + 1 ! int general eger division
     allocate( time(n_time) ) ; time = -333.0_wp
-    allocate( nor(n_time,3), tang(n_time,3) )
-
     ires = 0
-
-    allocate(force_minus(3)); force_minus = 0.0_wp
-    allocate(tang_minus(3));  tang_minus = 0.0_wp
-    allocate(nor_minus(3));   nor_minus = 0.0_wp
-    allocate(cen_minus(3));   cen_minus = 0.0_wp 
-    pres_minus = 0.0_wp
-    cp_minus = 0.0_wp 
-
-    allocate(force_plus(3)); force_plus = 0.0_wp
-    allocate(tang_plus(3));  tang_plus = 0.0_wp
-    allocate(nor_plus(3));   nor_plus = 0.0_wp
-    allocate(cen_plus(3));   cen_plus = 0.0_wp 
-    pres_plus = 0.0_wp
-    cp_plus = 0.0_wp 
 
     allocate(force_int(n_time,n_station,nelem_chor,3)); force_int = 0.0_wp 
     allocate(tang_int(n_time,n_station,nelem_chor,3));  tang_int = 0.0_wp 
@@ -458,14 +447,8 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
     if(average) then 
       !> todo
     else 
-      select case(trim(out_frmt))
-      case('dat')
-        write(filename,'(A)') trim(basename)//'_'//trim(an_name)
-      case('tecplot')
-        write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
-      end select 
     endif 
-
+  
 
   case('pointwise')
     call error(this_sub_name,this_mod_name, 'case pointwise not implemented so far')
@@ -474,6 +457,16 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
   case default
     call error(this_sub_name,this_mod_name, 'type not known')   
   end select 
-
+  select case(trim(out_frmt))
+    case('dat')
+      write(filename,'(A)') trim(basename)//'_'//trim(an_name)
+      call dat_out_chordwise (basename, components_names(1), time, &
+                        force_int, tang_int, nor_int, cen_int, pres_int, & 
+                        cp_int, average, n_station)
+    case('tecplot')
+      write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
+  end select 
+    
+  
 end subroutine 
 end module 
