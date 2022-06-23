@@ -110,11 +110,11 @@ subroutine linear_interp_vector(val_vec , t_vec , t , val)
 
   ! Check if t \in [ minval(t_vec) , maxval(t_vec) ]
   if ( t .lt. minval(t_vec) ) then
-    call error(this_sub_name, this_mod_name, 'x value requested to be &
+    call warning(this_sub_name, this_mod_name, 'x value requested to be &
           &interpolated is lower than the minimum of the interpolation data')
   end if
   if ( t .gt. maxval(t_vec) ) then
-    call error(this_sub_name, this_mod_name, 'x value requested to be &
+    call warning(this_sub_name, this_mod_name, 'x value requested to be &
           &interpolated is higher than the maximum of the interpolation data')
   end if
 
@@ -153,11 +153,11 @@ subroutine linear_interp_array( val_arr , t_vec , t , val )
 
   ! Check if t \in [ minval(t_vec) , maxval(t_vec) ]
   if ( t .lt. minval(t_vec) ) then
-    call error(this_sub_name, this_mod_name, 'x value requested to be &
+    call warning(this_sub_name, this_mod_name, 'x value requested to be &
           &interpolated is lower than the minimum of the interpolation data')
   end if
   if ( t .gt. maxval(t_vec) ) then
-    call error(this_sub_name, this_mod_name, 'x value requested to be &
+    call warning(this_sub_name, this_mod_name, 'x value requested to be &
           &interpolated is higher than the maximum of the interpolation data')
   end if
 
