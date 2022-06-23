@@ -75,8 +75,9 @@ function chord_data = chordwise_load(file_out,n_station)
     for j = 1:n_station
         for i = 1:numel(field)
             file = [file_out '_' num2str(j) '_' field{i} '.dat'];
-            chord_data(j) = parse_file_chordwise(file, field{i}, chord_data_station);
+            chord_data_station = parse_file_chordwise(file, field{i}, chord_data_station);
         end
+        chord_data(j) = chord_data_station; 
     end
 
 end
@@ -101,7 +102,7 @@ function chord_data_station = parse_file_chordwise(file, field, chord_data_stati
         it = it + 1;
 
         if it == 2
-            line_2 = textscan(line_new, ' # spanwise_location:    %f      ; chord_length:  %f    ');
+            line_2 = textscan(line_new, ' # spanwise_location: %f ; chord_length:  %f    ');
             chord_data_station.spanwise_locatation = line_2{1};
             chord_data_station.chord_length = line_2{2};
         end

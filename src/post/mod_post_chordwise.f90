@@ -279,6 +279,12 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
       comps(id_comp)%loc_points(:, i1) = &
       matmul(comps(id_comp)%coupling_node_rot,comps(id_comp)%loc_points(:,i1))
     end do
+
+    do i1 = 1, size(comps(id_comp)%el) 
+      comps(id_comp)%el(i1)%cen = &
+      matmul(comps(id_comp)%coupling_node_rot,comps(id_comp)%el(i1)%cen)
+    end do
+
     
     allocate(y_cen(n_sect),y_span(n_sect),chord(n_sect))
     ie = 0
@@ -293,6 +299,9 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
       y_cen(is) = &
               sum(comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver)) / &
               real(comps(id_comp)%el(ie)%n_ver,wp)
+      y_span(is) = &
+              abs ( comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver(1) )&
+              - comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver(2) ) )
       !> local chord as projection of the profile on x-z plane
       chord(is) = sqrt((abs(minval(comps(id_comp)%loc_points(ax_coor - 1,chord_start:chord_end))) + & 
               abs(maxval(comps(id_comp)%loc_points(ax_coor - 1,chord_start:chord_end))))**2 + &
@@ -324,8 +333,13 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
         if (y_cen_tras(is) .le. 0.0_wp .and. y_cen_tras(is + 1) .ge. 0.0_wp)  then 
           id_minus(ista) = is
           id_plus(ista) = is + 1
+        elseif (y_cen_tras(is) .le. 0.0_wp .and. y_cen_tras(is + 1) .le. 0.0_wp)  then
+          id_minus(ista) = is - 1
+          id_plus(ista) = is
+          
         endif
       enddo
+      
       chord_minus = chord(id_minus(ista))
       chord_plus = chord(id_plus(ista)) 
       call linear_interp((/chord_minus, chord_plus/), & 
@@ -394,8 +408,10 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
           ipan_minus = ipan_minus + 1  
           !> 4d matrix: time, station, chord, [x, y, z] 
           force_minus = comps(id_comp)%el(ipan_minus)%dforce
-          tang_minus = comps(id_comp)%el(ipan_minus)%tang(:,1)
-          nor_minus = comps(id_comp)%el(ipan_minus)%nor
+          tang_minus = comps(id_comp)%el(ipan_minus)%tang(:,2)/&
+                        norm2(comps(id_comp)%el(ipan_minus)%tang(:,2))
+          nor_minus = comps(id_comp)%el(ipan_minus)%nor/&
+                        norm2(comps(id_comp)%el(ipan_minus)%nor)
           cen_minus = comps(id_comp)%el(ipan_minus)%cen 
           !> 3d matrix: time, station, chord(pres) 
           pres_minus = comps(id_comp)%el(ipan_minus)%pres 
@@ -405,8 +421,11 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
           ipan_plus = ipan_plus + 1 
           !> 4d matrix: time, station, chord, [x, y, z] 
           force_plus = comps(id_comp)%el(ipan_plus)%dforce
-          tang_plus = comps(id_comp)%el(ipan_plus)%tang(:,1)
-          nor_plus = comps(id_comp)%el(ipan_plus)%nor
+          tang_plus = comps(id_comp)%el(ipan_plus)%tang(:,2)/&
+                      norm2(comps(id_comp)%el(ipan_plus)%tang(:,2))
+          nor_plus = comps(id_comp)%el(ipan_plus)%nor/&
+                      norm2(comps(id_comp)%el(ipan_plus)%nor)
+          cen_plus = comps(id_comp)%el(ipan_plus)%cen 
           !> 3d matrix: time, station, chord(pres) 
           pres_plus = comps(id_comp)%el(ipan_plus)%pres 
           cp_plus  = (pres_plus - P_inf)/& 
@@ -431,7 +450,8 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
           nor_plus = matmul(transpose( refs_R(:,:, ref_id)), &
                                                   nor_plus)                                                   
           cen_plus = matmul(transpose(refs_R(:,:, ref_id)), &
-                                                  cen_plus)           
+                                                  cen_plus) 
+                                                            
           !> interpolate  
           do idir = 1,3
             call linear_interp((/force_minus(idir), force_plus(idir)/), & 
