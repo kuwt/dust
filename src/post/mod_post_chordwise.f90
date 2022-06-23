@@ -87,7 +87,7 @@ module mod_post_chordwise
     dat_out_chordwise
 
   use mod_tecplot_out, only: &
-    tec_out_sectional
+    tec_out_chordwise
 
   use mod_math, only: &
     cross, linear_interp 
@@ -513,6 +513,9 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
                         cp_ave, average, n_station, span_station, chord_int)
         case('tecplot')
           write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt' 
+          call tec_out_chordwise(filename, time(1:1), &
+                              force_ave, tang_ave, nor_ave, cen_ave, pres_ave, & 
+                              cp_ave, n_station, span_station, chord_int)
       end select 
     else 
       select case(trim(out_frmt))
@@ -523,6 +526,9 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
                         cp_int, average, n_station, span_station, chord_int)
         case('tecplot')
           write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
+          call tec_out_chordwise(filename, time, &
+                              force_int, tang_int, nor_int, cen_int, pres_int, & 
+                              cp_int, n_station, span_station, chord_int)
       end select 
     endif 
   

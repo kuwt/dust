@@ -493,8 +493,11 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
           write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt'
           if (print_ll) then
             call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
-                                    y_span, chord, ll_data_ave )
-          else
+                                    y_span, chord, ll_data_ave)
+          elseif (print_vl) then
+            call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
+                                    y_span, chord, vl_data_ave)
+          else 
             call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
                                                                       y_span, chord )
           endif
@@ -519,6 +522,9 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
           if (print_ll) then
             call tec_out_sectional (filename, time, sec_loads, y_cen, y_span, chord, &
                                     ll_data)
+          elseif (print_vl) then 
+            call tec_out_sectional (filename, time, sec_loads, y_cen, y_span, chord, &
+                                    vl_data)
           else
             call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span, chord)
           endif
