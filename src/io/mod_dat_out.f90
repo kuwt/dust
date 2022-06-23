@@ -458,8 +458,7 @@ subroutine dat_out_chordwise (basename, compname, time, &
   logical,  intent(in)          :: average
   integer,  intent(in)          :: n_station 
   real(wp), intent(in)          :: station(:) 
-  real(wp), intent(in)          :: chord_length(:)
-  
+  real(wp), intent(in)          :: chord_length(:)  
   
   character(len=8)              :: nnum
   character(len=max_char_len)   :: filename

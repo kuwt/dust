@@ -353,9 +353,9 @@ and the origin in $(0.0,-1.0,0.0)$, these lines read
      0.000000E+000 -0.100000E+001  0.000000E+000
 \end{inputfile}
 
-\subsection{hinge Loads}
+\subsection{Hinge Loads}
 
-hinge loads allows to obtain the time history of the load acting to one control 
+Hinge loads allows to obtain the time history of the load acting to one control 
 surface along the hinge axis reference frame as defined in figure~\ref{fig:hingeref}. 
 
 An example \param{analysis} group for hinge loads is:
@@ -1043,6 +1043,161 @@ are set to \param{T} the following quantities are printed:
 \label{fig:ll_output}
 \end{figure}
 
+\subsection{Chordwise Loads} 
+Chordwise loads allow to obtain the distribution of the forces, pressure and the geometrical
+quantities along the chord at a specific spanwise section of a parametric component. 
+
+Warning: at the moment, the chordwise load card is implemented only for parametric components. 
+
+An example \param{analysis} group for chordwise loads on parametric components:
+
+\begin{inputfile}[frame=single, caption={dust\_post.in for chordwise load 
+  on parametric components}, label={file:dust_post.in_chordwise_param}]
+!--- Data Names ---
+data_basename = ./Output/sim_results
+basename =     ./Postpro/postpro_output
+
+analysis = {
+
+  type = chordwise_loads
+  name = cl01
+  start_res = 1
+  end_res = 100
+  step_res = 1
+  format = dat
+  average = F
+  
+  component = wing
+  n_station  = 2
+  span_station = (/1., 1.5/) 
+  axis_nod = (/ 0.0, 0.0, 0.0 /)
+  axis_dir = (/ 0.0, 0.1, 0.0 /)
+
+}
+\end{inputfile}
+
+\begin{itemize}
+\item \param{type}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
+
+type of the analysis, \opt{chordwise\_loads} for chordwise loads
+
+\item \param{name}: \textit{required:} one for each \param{analysis}. \textit{multiple:} no
+
+name of the analysis, will be appended as a suffix to \param{basename}
+
+\item \param{start_res}: \textit{required:} one for each \param{analysis}. 
+\textit{multiple:} no
+
+First result in the time series of the solver results to analyse.
+
+\item \param{end_res}: \textit{required:} one for each \param{analysis}. 
+\textit{multiple:} no
+
+Last result in the time series of the solver results to analyse.
+
+\item \param{step_res}: \textit{required:} one for each \param{analysis}. 
+\textit{multiple:} no
+
+Stride to employ when loading the time series of the solver results. 
+
+\item \param{format}: \textit{required:} one for each \param{analysis}. 
+\textit{multiple:} no
+
+format of the processed results, can be \opt{dat} for formatted ascii files 
+output or \opt{tecplot} for tecplot plt files
+
+\item \param{average}: \textit{required:} no. \textit{multiple:} no. 
+\textit{default:} False
+
+average the results in the given time span.
+
+\item \param{component}: \textit{required:} one for each \param{analysis}. 
+\textit{multiple:} no.
+
+component (parametrically generated) to analyse. Only one component can be 
+enabled for each analysis. 
+
+\item \param{axis_nod}: \textit{required:} one for each \param{analysis}. 
+\textit{multiple:} no.
+
+Coordinates of the node from which to start the line around which to calculate 
+the distribution of moment along the span.
+
+\item \param{axis_dir}: \textit{required:} one for each \param{analysis}. 
+\textit{multiple:} no.
+
+Direction of the line (starting from \param{axis_nod}) around which to calculate 
+the distribution of moment along the span.
+
+\item \param{n\_station}: \textit{required:} no. \textit{multiple:} no. 
+\textit{Default:} 1
+
+Number of stations where the loads are extracted 
+
+\item \param{span\_station}: \textit{required:} no. \textit{multiple:} no. 
+\textit{Default:} (/0./)
+
+Spanwise coordinates in the component reference frame (in wind axis) where they are extracted
+The vector dimension must be the same as \param{n\_station}
+
+\end{itemize}
+
+\subsubsection{Output .dat file}
+
+The output file containing chordwise loads in \param{.dat} format has 
+the following structure. The first line is a header specifying the 
+structural component. As an example,
+\begin{inputfile}[frame=single]
+  1: # Chordwise load of component: wing
+\end{inputfile}
+The second line contains the spanwise location and the chord length evaluated at the first requested
+time step \param{start\_res}.  
+\begin{inputfile}[frame=single]
+  2: # spanwise_location:    1.00; chord_length:  0.40     
+\end{inputfile}
+The third line contains the number of chordwise section \param{n\_chord} in which the 
+structural component is divided and the number of time steps \param{n\_time}
+of the analysis. As an example, the output file for a 10-section blade reads
+\begin{inputfile}[frame=single]
+ 3: # n_sec : 10 ; n_time : 100. Next lines: x_chord , z_chord
+\end{inputfile}
+The third line also introduce the content of lines 4 and 5. Line 4 contains 
+the chordwise coordinate \param{x\_chord} of the centre of the panels, 
+line 4 contains the thickness dimension \param{z\_chord} of the profile, taken at \param{start\_res}.
+As an example, if the the chord length is 0.4 and it is divided in 10 uniform sections with chord 0.05, 
+the output file reads
+\begin{inputfile}[frame=single]
+ 3:  0.130E+000  0.900E-001  0.500E-001 ...
+ 4: -0.257E-002 -0.711E-002 -0.103E-001 ...
+\end{inputfile}
+The fifth line is another header file containing the fields and their 
+dimension collected in the next \param{n\_time} lines.
+\begin{inputfile}[frame=single]
+  6: # t, n\_chord
+\end{inputfile}
+The first field is the time. The chordwise loads of the \param{n\_chord} 
+sections follow. 
+
+The files generated by sectional loads contain, as sectional quantity:
+\begin{itemize}
+  \item \texttt{Pres}: Panel pressure for 3D panels, or delta pressure for vortex lattice or 
+                      lifting  line. 
+  \item \texttt{Cp}: Panel pressure coefficient for 3D panels, or delta pressure 
+                    coefficent for vortex lattice or lifting line. The implemented formulation is 
+                    \begin{equation}
+                      C_p = \dfrac{P - P_\infty}{\dfrac{1}{2} \rho_\infty U_\infty^2}
+                    \end{equation}
+                    Where $P_\infty$ is equal to \param{P\_inf}, $\rho_\infty$ is equal to \param{rho\_inf} and 
+                    and $U_\infty$ is equal to the norm of \param{u\_inf} or \param{u\_ref} if \param{u\_inf} is zero. 
+  \item \texttt{dFx}: Panel force per unit length in chordwise direction
+  \item \texttt{dFz}: Panel force per unit length in flapwise direction
+  \item \texttt{dNx}: Panel local normal in chordwise direction
+  \item \texttt{dNz}: Panel local normal in flapwise direction
+  \item \texttt{dTx}: Panel local tangent in chordwise direction
+  \item \texttt{dTz}: Panel local tangent in flapwise direction
+  \item \texttt{x\_cen}: Panel center chordwise coordinate
+  \item \texttt{z\_cen}: Panel center flapwise coordinate
+\end{itemize}
 
 
 \subsection{Aeroacoustics}

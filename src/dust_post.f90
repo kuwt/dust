@@ -260,7 +260,7 @@ call sbprms%CreateLogicalOption('vortex_lattice_data', 'Output of corrected vort
 call sbprms%CreateIntOption('n_station','Number of stations where the loads are extracted' &
                             , multiple=.true.)
 call sbprms%CreateRealArrayOption('span_station','Spanwise coordinates in the component reference frame&
-                            & where the are extracted', multiple=.true.)
+                            & where they are extracted', multiple=.true.)
 
 
 ! sectional loads: box -----
