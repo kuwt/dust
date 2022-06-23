@@ -102,7 +102,7 @@ function chord_data_station = parse_file_chordwise(file, field, chord_data_stati
         it = it + 1;
 
         if it == 2
-            line_2 = textscan(line_new, ' # spanwise_location: %f ; chord_length:  %f    ');
+            line_2 = textscan(line_new, '# spanwise_location: %5.3f ; chord_length: %5.3f');
             chord_data_station.spanwise_locatation = line_2{1};
             chord_data_station.chord_length = line_2{2};
         end

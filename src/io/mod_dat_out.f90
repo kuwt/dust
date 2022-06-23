@@ -504,19 +504,14 @@ subroutine dat_out_chordwise (basename, compname, time, &
       open(unit=fid,file=trim(filename))
       ! Header -----------
       write(fid,'(A)') '# Chordwise load of component: '//trim(compname)
-      write(fid,*) '# spanwise_location: ', station(ista), '; chord_length:',  chord_length(ista)
+      write(fid,'(A,F5.3,A,F5.3)') '# spanwise_location: ', station(ista), ' ; chord_length: ',  &
+                                    chord_length(ista)
       write(fid,'(A,I0,A,I0,A)') '# n_chord : ' ,size(cen_int,3) , ' ; n_time : ' , nt ,& 
                                 & '. Next lines: x_chord , z_chord'
       write(nnum,'(I0)') size(cen_int,3)
       write(fid,'('//trim(nnum)//ascii_real//')') cen_int(1,ista,:,1)
       write(fid,'('//trim(nnum)//ascii_real//')') cen_int(1,ista,:,3)
     
-      if(average) then
-        !> TODO 
-        ! write(fid,'(A)') '#chordwise(n_chord)'
-        ! write(nnum,'(I0)') size(cen_int,3)
-        ! write(fid,'('//trim(nnum)//ascii_real//')') sec_loads(1,:,i1)
-      else
       select case(trim(load_str(icase)))
         case('Pres')
           write(fid,'(A)') '# t, Pres'
@@ -589,7 +584,6 @@ subroutine dat_out_chordwise (basename, compname, time, &
             write(fid,'('//trim(nnum)//ascii_real//')') time(it), cen_int(it,ista,:,3)      
           end do
         end select
-      endif
       close(fid)
     end do 
   end do

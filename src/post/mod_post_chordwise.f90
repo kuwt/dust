@@ -178,7 +178,14 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
   real(wp), allocatable                                   :: pres_int(:,:,:)      
   real(wp), allocatable                                   :: cp_int(:,:,:)      
   real(wp), allocatable                                   :: chord_int(:)
-
+  !> average field 
+  real(wp), allocatable                                   :: force_ave(:,:,:,:)   
+  real(wp), allocatable                                   :: tang_ave(:,:,:,:)    
+  real(wp), allocatable                                   :: nor_ave(:,:,:,:)    
+  real(wp), allocatable                                   :: cen_ave(:,:,:,:) 
+  real(wp), allocatable                                   :: pres_ave(:,:,:)      
+  real(wp), allocatable                                   :: cp_ave(:,:,:)      
+  
   character(len=max_char_len)                             :: filename
   character(len=max_char_len)                             :: comp_input
 
@@ -478,18 +485,45 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
           
         end do ! loop over chord
         
-          
-        
-
       end do ! loop over sections
 
       time(ires) = t
 
-    end do 
+    end do ! loop over time steps
 
     if(average) then 
-      !> todo
+      allocate(force_ave(1,n_station,nelem_chor,3)); force_ave = 0.0_wp 
+      allocate(tang_ave(1,n_station,nelem_chor,3));  tang_ave = 0.0_wp 
+      allocate(nor_ave(1,n_station,nelem_chor,3));   nor_ave = 0.0_wp 
+      allocate(cen_ave(1,n_station,nelem_chor,3));   cen_ave = 0.0_wp 
+      allocate(pres_ave(1,n_station,nelem_chor));    pres_ave = 0.0_wp 
+      allocate(cp_ave(1,n_station,nelem_chor));      cp_ave = 0.0_wp 
+
+      force_ave(1,:,:,:) = sum(force_int,1)/real(size(force_int,1),wp)
+      tang_ave(1,:,:,:)  = sum(tang_int,1)/real(size(tang_int,1),wp)
+      nor_ave(1,:,:,:)   = sum(nor_int,1)/real(size(nor_int,1),wp)
+      cen_ave(1,:,:,:)   = sum(cen_int,1)/real(size(cen_int,1),wp)
+      pres_ave(1,:,:)    = sum(pres_int,1)/real(size(pres_int,1),wp)
+      cp_ave(1,:,:)      = sum(cp_int,1)/real(size(cp_int,1),wp)
+      select case(trim(out_frmt))
+        case('dat')
+          write(filename,'(A)') trim(basename)//'_'//trim(an_name)
+          call dat_out_chordwise (basename, components_names(1), time(1:1), &
+                        force_ave, tang_ave, nor_ave, cen_ave, pres_ave, & 
+                        cp_ave, average, n_station, span_station, chord_int)
+        case('tecplot')
+          write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt' 
+      end select 
     else 
+      select case(trim(out_frmt))
+        case('dat')
+          write(filename,'(A)') trim(basename)//'_'//trim(an_name)
+          call dat_out_chordwise (basename, components_names(1), time, &
+                        force_int, tang_int, nor_int, cen_int, pres_int, & 
+                        cp_int, average, n_station, span_station, chord_int)
+        case('tecplot')
+          write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
+      end select 
     endif 
   
 
@@ -500,15 +534,7 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
   case default
     call error(this_sub_name,this_mod_name, 'type not known')   
   end select 
-  select case(trim(out_frmt))
-    case('dat')
-      write(filename,'(A)') trim(basename)//'_'//trim(an_name)
-      call dat_out_chordwise (basename, components_names(1), time, &
-                        force_int, tang_int, nor_int, cen_int, pres_int, & 
-                        cp_int, average, n_station, span_station, chord_int)
-    case('tecplot')
-      write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
-  end select 
+  
     
   
 end subroutine 
