@@ -445,10 +445,9 @@ end subroutine dat_out_sectional_vl
 !---------------------------------------------------------------------
 subroutine dat_out_chordwise (basename, compname, time, &
                               force_int, tang_int, nor_int, cen_int, pres_int, & 
-                              cp_int, average, n_station)
+                              cp_int, average, n_station, station, chord_length)
   character(len=*) , intent(in) :: basename
   character(len=*) , intent(in) :: compname
-  !real(wp), intent(in)          :: chord(:)
   real(wp), intent(in)          :: time(:)
   real(wp), intent(in)          :: force_int(:,:,:,:)
   real(wp), intent(in)          :: tang_int(:,:,:,:)
@@ -457,14 +456,16 @@ subroutine dat_out_chordwise (basename, compname, time, &
   real(wp), intent(in)          :: pres_int(:,:,:)
   real(wp), intent(in)          :: cp_int(:,:,:)
   logical,  intent(in)          :: average
-  integer                       :: n_station 
+  integer,  intent(in)          :: n_station 
+  real(wp), intent(in)          :: station(:) 
+  real(wp), intent(in)          :: chord_length(:)
   
   
   character(len=8)              :: nnum
   character(len=max_char_len)   :: filename
-  integer                       :: it , nt , fid , i1, ista, icase
-  character(len=4)             :: load_str(8)
-  character(len=max_char_len)   :: description_str(8)
+  integer                       :: it, ista, icase, nt, fid 
+  character(len=5)              :: load_str(10)
+  character(len=max_char_len)   :: description_str(10)
 
   load_str(1) = 'Pres' 
   load_str(2) = 'Cp'
@@ -474,6 +475,8 @@ subroutine dat_out_chordwise (basename, compname, time, &
   load_str(6) = 'dNz'
   load_str(7) = 'dTx'
   load_str(8) = 'dTz' 
+  load_str(9) = 'x_cen'
+  load_str(10) = 'z_cen'
   
   description_str(1) = 'Panel pressure'
   description_str(2) = 'Panel coefficient of pressure'
@@ -483,13 +486,15 @@ subroutine dat_out_chordwise (basename, compname, time, &
   description_str(6) = 'Panel local normal in flapwise direction'
   description_str(7) = 'Panel local tangent in chordwise direction'
   description_str(8) = 'Panel local tangent in flapwise direction'
+  description_str(9) = 'Panel center chordwise coordinate'
+  description_str(10) = 'Panel center flapwise coordinate'
   
 
   nt = size(time)
 
   ! Print out .dat files
   fid = 21
-  do icase = 1, 8
+  do icase = 1, 10
     do ista = 1, n_station 
       if(average) then
         write(filename,'(A,I0,A)') trim(basename)//'_', ista, '_'//trim(load_str(icase))//'_ave.dat'
@@ -500,6 +505,7 @@ subroutine dat_out_chordwise (basename, compname, time, &
       open(unit=fid,file=trim(filename))
       ! Header -----------
       write(fid,'(A)') '# Chordwise load of component: '//trim(compname)
+      write(fid,*) '# spanwise_location: ', station(ista), '; chord_length:',  chord_length(ista)
       write(fid,'(A,I0,A,I0,A)') '# n_chord : ' ,size(cen_int,3) , ' ; n_time : ' , nt ,& 
                                 & '. Next lines: x_chord , z_chord'
       write(nnum,'(I0)') size(cen_int,3)
@@ -568,6 +574,20 @@ subroutine dat_out_chordwise (basename, compname, time, &
           do it = 1 , nt
             write(nnum,'(I0)') 1+size(cen_int,3)
             write(fid,'('//trim(nnum)//ascii_real//')') time(it), tang_int(it,ista,:,3)            
+          end do
+        case('x_cen')
+          write(fid,'(A)') '# t, x_cen'
+          ! Dump data --------
+          do it = 1 , nt
+            write(nnum,'(I0)') 1+size(cen_int,3)
+            write(fid,'('//trim(nnum)//ascii_real//')') time(it), cen_int(it,ista,:,1)      
+          end do
+        case('z_cen')
+          write(fid,'(A)') '# t, z_cen'
+          ! Dump data --------
+          do it = 1 , nt
+            write(nnum,'(I0)') 1+size(cen_int,3)
+            write(fid,'('//trim(nnum)//ascii_real//')') time(it), cen_int(it,ista,:,3)      
           end do
         end select
       endif

@@ -146,11 +146,13 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
   real(wp), allocatable                                   :: y_cen(:) , y_span(:)
   real(wp), parameter                                     :: tol_y_cen = 1.0e-3_wp
   
-  integer                                                 :: ie , ic , it , i1, ista, idir
+  integer                                                 :: ie , ic , it , i1, ista, idir, ii
   integer                                                 :: ipan_minus, ipan_plus 
   integer                                                 :: n_station 
   real(wp), allocatable                                   :: span_station(:)
   real(wp), allocatable                                   :: y_cen_tras(:) 
+  real(wp), allocatable                                   :: chord(:) 
+  real(wp)                                                :: chord_start, chord_end
   integer,  allocatable                                   :: id_minus(:), id_plus(:) 
   real(wp)                                                :: u_inf(3), P_inf, rho 
   !> field to interpolate  
@@ -166,6 +168,8 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
   real(wp)                                                :: pres_plus      = 0.0_wp
   real(wp)                                                :: cp_minus       = 0.0_wp
   real(wp)                                                :: cp_plus        = 0.0_wp
+  real(wp)                                                :: chord_minus    = 0.0_wp
+  real(wp)                                                :: chord_plus     = 0.0_wp
   !> interpolated field
   real(wp), allocatable                                   :: force_int(:,:,:,:)   
   real(wp), allocatable                                   :: tang_int(:,:,:,:)    
@@ -173,6 +177,7 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
   real(wp), allocatable                                   :: cen_int(:,:,:,:) 
   real(wp), allocatable                                   :: pres_int(:,:,:)      
   real(wp), allocatable                                   :: cp_int(:,:,:)      
+  real(wp), allocatable                                   :: chord_int(:)
 
   character(len=max_char_len)                             :: filename
   character(len=max_char_len)                             :: comp_input
@@ -275,13 +280,25 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
       matmul(comps(id_comp)%coupling_node_rot,comps(id_comp)%loc_points(:,i1))
     end do
     
-    allocate(y_cen(n_sect),y_span(n_sect))
+    allocate(y_cen(n_sect),y_span(n_sect),chord(n_sect))
     ie = 0
+    chord_start = 0
+    chord_end = 0
+    ii = 0
     do is = 1 , n_sect
       ie = ie + 1
+      ii = ii + 1
+      chord_start = (ii-1)*(nelem_chor + 1) + 1
+      chord_end = ii*(nelem_chor + 1) 
       y_cen(is) = &
               sum(comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver)) / &
               real(comps(id_comp)%el(ie)%n_ver,wp)
+      !> local chord as projection of the profile on x-z plane
+      chord(is) = sqrt((abs(minval(comps(id_comp)%loc_points(ax_coor - 1,chord_start:chord_end))) + & 
+              abs(maxval(comps(id_comp)%loc_points(ax_coor - 1,chord_start:chord_end))))**2 + &
+              (abs(minval(comps(id_comp)%loc_points(ax_coor + 1,chord_start:chord_end))) + & 
+              abs(maxval(comps(id_comp)%loc_points(ax_coor + 1,chord_start:chord_end))))**2)
+
       do ic = 2 , nelem_chor ! check
         ie = ie + 1
         if (abs( y_cen(is) - &
@@ -298,6 +315,7 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
     allocate(id_minus(n_station))
     allocate(id_plus(n_station))
     allocate(y_cen_tras(n_sect)) 
+    allocate(chord_int(n_station)) 
     do ista = 1, n_station
       !> translate centers on reference station  
       y_cen_tras = y_cen - span_station(ista) 
@@ -307,9 +325,14 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
           id_minus(ista) = is
           id_plus(ista) = is + 1
         endif
-      enddo     
+      enddo
+      chord_minus = chord(id_minus(ista))
+      chord_plus = chord(id_plus(ista)) 
+      call linear_interp((/chord_minus, chord_plus/), & 
+                          (/y_cen(id_minus(ista)), y_cen(id_plus(ista))/),& 
+                          span_station(ista), chord_int(ista))  
     enddo  
-
+    
     ! Find the coordinate of the reference points on the axis --------------
     !  ( with coord. y_cen )
     if ( abs(axis_dir(2)) .lt. 1e-6_wp ) then
@@ -462,7 +485,7 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
       write(filename,'(A)') trim(basename)//'_'//trim(an_name)
       call dat_out_chordwise (basename, components_names(1), time, &
                         force_int, tang_int, nor_int, cen_int, pres_int, & 
-                        cp_int, average, n_station)
+                        cp_int, average, n_station, span_station, chord_int)
     case('tecplot')
       write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt' 
   end select 
