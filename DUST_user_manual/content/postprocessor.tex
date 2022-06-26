@@ -40,7 +40,7 @@ The different possible analysis that can be performed on the results are:
 \end{itemize}
 
 
-\section{input file}
+\section{Input file}
 \label{sec:Post_InputFile}
 
 The input file of the postprocessor contains first all the information 
@@ -231,9 +231,17 @@ When used in visualizations, \param{wake} must be False.
 \textit{multiple:} yes.
 
 variable to output in the processed result. More than one variable can be generated 
-in the same analysis. At the moment \opt{vorticity}, \opt{pressure} and 
-\opt{surface\_velocity} are implemented.
-
+in the same analysis. At the moment are implemented the following variables are implemented: 
+\begin{itemize}
+  \item \opt{vorticity}
+  \item \opt{vorticity\_vector}
+  \item \opt{velocity}
+  \item \opt{surface\_velocity}
+  \item \opt{pressure}
+  \item \opt{cp}
+  \item \opt{turbulent\_viscosity}
+  \item \opt{vortex\_rad}
+\end{itemize} 
 Note that that even if the keyword \opt{vorticity} is employed, the printed result 
 is labelled \opt{singularity\_intensity} since it represent the intensity of the 
 surface/point solution on the different elements. The keyword is likely to 
