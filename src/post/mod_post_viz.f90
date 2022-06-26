@@ -123,14 +123,14 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   type(t_geo_component), allocatable                        :: comps(:)
   character(len=max_char_len)                               :: filename
   integer(h5loc)                                            :: floc , ploc
-  logical                                                   :: out_vort, out_vort_vec, out_vel, out_cp, out_press, 
+  logical                                                   :: out_vort, out_vort_vec, out_vel, out_cp, out_press
   logical                                                   :: out_wake, out_surfvel, out_vrad
   logical                                                   :: out_turbvisc
   logical                                                   :: separate_wake
   integer                                                   :: n_var , i_var
   character(len=max_char_len), allocatable                  :: var_names(:)
   real(wp), allocatable                                     :: points(:,:), points_exp(:,:) , wpoints(:,:)
-  real(wp), allocatable                                     :: vppoints(:,:), vpvort(:), 
+  real(wp), allocatable                                     :: vppoints(:,:), vpvort(:)
   real(wp), allocatable                                     :: vpvort_v(:,:), vpturbvisc(:), v_rad(:)
   integer , allocatable                                     :: elems(:,:) , welems(:,:)
   integer                                                   :: nelem , nelem_w, nelem_vp
