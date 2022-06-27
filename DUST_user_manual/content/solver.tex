@@ -797,10 +797,18 @@ Max number of iteration for correction of vortex lattice
 \textit{default:} 1 \textit{type:} integer. 
 Time step to start correcting the vortex lattice element
 
-\item \param{vl_dynstall}: \textit{required:} no. \textit{multiple:} no. \textit{default:} F \textit{type:} logical. 
+\item \param{vl_dynstall}: \textit{required:} no. \textit{multiple:} no. 
+\textit{default:} F \textit{type:} logical. 
 Activate Boeing\footnote{\url{https://apps.dtic.mil/sti/pdfs/AD0767240.pdf}} 
-dynamic stall on the corrected \param{v} element.  
+dynamic stall on the corrected \param{v} element.  (Still experimental)
 
+\item \param{vl_average}: \textit{required:} no. \textit{multiple:} no. 
+\textit{default:} F \textit{type:} logical. 
+Average the solution between the iteration: this may further stabilize the solution in stalled conditions
+
+\item \param{vl_average_iter}: \textit{required:} no. \textit{multiple:} no. 
+\textit{default:} 10 \textit{type:} integer. 
+Number of iteration on which the average is computed. 
 
 \end{itemize}
 

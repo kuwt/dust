@@ -278,9 +278,11 @@ type t_sim_param
   real(wp)  :: vl_relax
   integer   :: vl_maxiter
   integer   :: vl_startstep
+  integer   :: vl_iter_ave 
   logical   :: vl_dynstall = .false.
   logical   :: rel_aitken  = .false. 
-  
+  logical   :: vl_ave      = .false.
+
   !> PreCICE
 #if USE_PRECICE
   character(len=max_char_len) :: precice_config

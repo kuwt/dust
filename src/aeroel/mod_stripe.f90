@@ -227,7 +227,7 @@ module mod_stripe
     
     cl0 = aero_coeff(1)
     call interp_aero_coeff ( airfoil_data,  this%csi_cen, this%i_airfoil , &
-                        (/8.0_wp, mach, reynolds/), aero_coeff)
+                        (/8.0_wp*sqrt(1-mach**2), mach, reynolds/), aero_coeff)
     
     cl10 = aero_coeff(1)
 

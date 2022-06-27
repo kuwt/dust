@@ -217,13 +217,13 @@ real(wp), allocatable             :: al_kernel(:,:), al_v(:)
 
 !> VL viscous correction
 integer                           :: i_el, i_c, i_s, i, sel, i_p, i_c2, i_s2
-integer                           :: it_vl
+integer                           :: it_vl, it_stall
 real(wp)                          :: tol, diff, max_diff 
 real(wp)                          :: d_cd(3), vel(3), v(3), a_v, area_stripe, dforce_stripe(3), e_d(3), e_l(3)
 real(wp)                          :: nor(3), tang_cen(3), u_v, q_inf
 
 !> relaxation 
-real(wp), allocatable             :: residual_vl(:), residual_vl_old(:), residual_vl_delta(:)
+real(wp), allocatable             :: residual_vl(:), residual_vl_old(:), residual_vl_delta(:), gamma_tmp(:)
 real(wp)                          :: rel_aitken
 
 !> octree parameters
@@ -367,6 +367,8 @@ call prms%CreateIntOption('vl_start_step', &
 call prms%CreateLogicalOption('vl_dynstall', 'Dynamic stall on corrected VL', 'F')
 call prms%CreateLogicalOption('aitken_relaxation', 'Employ aitken acceleration method during &   
                               &the fixed point iteration', 'T')  
+call prms%CreateLogicalOption('vl_average', 'Average panel intensity between the last iterations', 'F')  
+call prms%CreateIntOption('vl_average_iter', 'Number of iterations to average', '10')  
 
 !> Octree and multipole data 
 call prms%CreateLogicalOption('fmm','Employ fast multipole method?','T')
@@ -866,7 +868,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     tol = sim_param%vl_tol
     diff = 1.0_wp 
     it_vl = 0
-    
+    it_stall = 0
     max_diff = tol + 1e-6_wp
     linsys%skip = .true.
     t0 = dust_time()
@@ -880,7 +882,8 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
       allocate(residual_vl(size(linsys%b)));        residual_vl = 0.0_wp
       allocate(residual_vl_old(size(linsys%b)));    residual_vl_old = 0.0_wp  
       allocate(residual_vl_delta(size(linsys%b)));  residual_vl_delta = 0.0_wp
-      
+      allocate(gamma_tmp(size(linsys%b)));          gamma_tmp = 0.0_wp
+
       do while (max_diff .gt. tol .and. it_vl .lt. sim_param%vl_maxiter)
         
         max_diff = 0.0_wp
@@ -958,6 +961,19 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         endif
 
         it_vl = it_vl + 1 
+
+        !> average intensity for stall condition       
+        if (sim_param%vl_ave) then   
+          if (it_vl .gt. sim_param%vl_maxiter - sim_param%vl_iter_ave) then
+            it_stall = it_stall + 1
+            gamma_tmp = gamma_tmp + linsys%res  
+          endif    
+
+          if (it_vl .eq. sim_param%vl_maxiter) then 
+            linsys%res = gamma_tmp / it_stall 
+          endif 
+        endif 
+
         !> update unsteady term 
         !$omp parallel do private(i_el)
         do i_el = 1 , sel      
@@ -983,7 +999,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
 
       end do !(while)
 
-      deallocate(residual_vl, residual_vl_old, residual_vl_delta)
+      deallocate(residual_vl, residual_vl_old, residual_vl_delta, gamma_tmp)
       if(it_vl .eq. sim_param%vl_maxiter) then
         call warning('dust','dust','max iteration reached for non linear vl:&
                     &increase VLmaxiter!') 
@@ -1396,6 +1412,9 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%vl_maxiter                    = getint(prms, 'vl_maxiter')
   sim_param%vl_startstep                  = getint(prms, 'vl_start_step')
   sim_param%rel_aitken                    = getlogical(prms, 'aitken_relaxation')
+  sim_param%vl_ave                        = getlogical(prms,'vl_average')
+  sim_param%vl_iter_ave                   = getint(prms,'vl_average_iteration') 
+  
   !>  VL Dynamic stall
   sim_param%vl_dynstall                   = getlogical(prms, 'vl_dynstall')  
   
