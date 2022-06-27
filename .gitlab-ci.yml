@@ -78,7 +78,7 @@ test_mirror_static_components:
     - python tests/mir_test/static/run_mir_static_ll.py -t $TOL
     - python tests/mir_test/static/run_mir_static_v.py -t $TOL
     - python tests/mir_test/static/run_mir_static_p.py -t $TOL
-    - python tests/mir_test/static/run_mir_static_nl_v.py -t $TOL
+    #- python tests/mir_test/static/run_mir_static_nl_v.py -t $TOL
   needs:
     - "build_dust_alone"
   #artifacts:
@@ -92,7 +92,7 @@ test_mirror_dynamic_components:
     - python tests/mir_test/dynamic/run_mir_dynamic_ll.py -t $TOL
     - python tests/mir_test/dynamic/run_mir_dynamic_v.py -t $TOL
     - python tests/mir_test/dynamic/run_mir_dynamic_p.py -t $TOL
-    - python tests/mir_test/dynamic/run_mir_dynamic_nl_v.py -t $TOL
+    #- python tests/mir_test/dynamic/run_mir_dynamic_nl_v.py -t $TOL
   needs:
     - "build_dust_alone"
     - "test_mirror_static_components" 
@@ -103,7 +103,7 @@ test_symmetry_static_components:
     - python tests/sym_test/static/run_sym_static_ll.py -t $TOL
     - python tests/sym_test/static/run_sym_static_v.py -t $TOL
     - python tests/sym_test/static/run_sym_static_p.py -t $TOL
-    - python tests/sym_test/static/run_sym_static_nl_v.py -t $TOL
+    #- python tests/sym_test/static/run_sym_static_nl_v.py -t $TOL
   needs:
     - "build_dust_alone"
   #artifacts:
@@ -118,7 +118,7 @@ test_symmetry_dynamic_components:
     - python tests/sym_test/dynamic/run_sym_dynamic_ll.py -t $TOL
     - python tests/sym_test/dynamic/run_sym_dynamic_v.py -t $TOL
     - python tests/sym_test/dynamic/run_sym_dynamic_p.py -t $TOL
-    - python tests/sym_test/dynamic/run_sym_dynamic_nl_v.py -t $TOL
+    #- python tests/sym_test/dynamic/run_sym_dynamic_nl_v.py -t $TOL
   needs:
     - "build_dust_alone"
     - "test_symmetry_static_components"
