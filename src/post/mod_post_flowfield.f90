@@ -579,7 +579,7 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
   call destroy_elements(comps)
   deallocate(comps,components_names)
   call destroy_elements(comps_old)
-  deallocate(comps_old)
+  if (allocated(comps_old))  deallocate(comps_old)
 
   write(msg,'(A,I0,A)') nl//'++++++++++ Flowfield done'//nl
   call printout(trim(msg))
