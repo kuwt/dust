@@ -1413,7 +1413,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%vl_startstep                  = getint(prms, 'vl_start_step')
   sim_param%rel_aitken                    = getlogical(prms, 'aitken_relaxation')
   sim_param%vl_ave                        = getlogical(prms,'vl_average')
-  sim_param%vl_iter_ave                   = getint(prms,'vl_average_iteration') 
+  sim_param%vl_iter_ave                   = getint(prms,'vl_average_iter') 
   
   !>  VL Dynamic stall
   sim_param%vl_dynstall                   = getlogical(prms, 'vl_dynstall')  
