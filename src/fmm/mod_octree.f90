@@ -1280,7 +1280,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
             if(sim_param%use_vd) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
                   %compute_diffusion(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex ,str)
-              stretch = stretch +str*(sim_param%nu_inf+octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc)!turbvisc)
+              stretch = stretch +str*(sim_param%nu_inf + octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc)!turbvisc)
             endif
           enddo
         endif
