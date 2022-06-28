@@ -1158,7 +1158,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
   !for all the leaves apply the local expansion and then local interactions
   t0 = dust_time()
 !$omp parallel do private(lv, ip, ie, vel, pos, m, i, j, k, ipp, Rnorm2, &
-!$omp& v, stretch, str, grad, alpha, dir, velv, stretchv, ave_ros, turbvisc, &
+!$omp& v, stretch, str, grad, alpha, dir, velv, stretchv, ave_ros, &
 !$omp& grad_elem, stretch_elem, iln, rotuv, rotu, ru) schedule(dynamic)
   do lv = 1, octree%nleaves
     !I am on a leaf, cycle on all the particles inside the leaf
@@ -1222,12 +1222,12 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       if(octree%leaves(lv)%p%npart .gt. 0) then
         ave_ros = ave_ros/real(octree%leaves(lv)%p%npart,wp)
       endif
-      if(sim_param%use_tv) then
-        turbvisc = (0.11_wp*sim_param%VortexRad)**2 * &
-                   sqrt(2.0_wp*ave_ros)
-      else
-        turbvisc = 0.0_wp
-      endif
+      !if(sim_param%use_tv) then
+      !  turbvisc = (0.11_wp*sim_param%VortexRad)**2 * &
+      !             sqrt(2.0_wp*ave_ros)
+      !else
+      !  turbvisc = 0.0_wp
+      !endif
 
     endif
 
@@ -1242,7 +1242,16 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
       alpha = octree%leaves(lv)%p%cell_parts(ip)%p%mag * &
               octree%leaves(lv)%p%cell_parts(ip)%p%dir
       dir = octree%leaves(lv)%p%cell_parts(ip)%p%dir
-      octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc = turbvisc
+      if(sim_param%use_tv) then
+        !turbvisc = (0.11_wp*sim_param%VortexRad)**2 * &
+        !           sqrt(2.0_wp*ave_ros)
+        octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc = &
+                      (0.11_wp*octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex)**2 * &
+                      sqrt(2.0_wp*ave_ros)
+      else
+        octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc = 0.0_wp
+      endif
+      !octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc = ! turbvisc
 
 
       !then interact with all the neighbouring cell particles
@@ -1271,7 +1280,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
             if(sim_param%use_vd) then
               call octree%leaves(lv)%p%neighbours(i,j,k)%p%cell_parts(ipp)%p&
                   %compute_diffusion(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex ,str)
-              stretch = stretch +str*(sim_param%nu_inf+turbvisc)
+              stretch = stretch +str*(sim_param%nu_inf+octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc)!turbvisc)
             endif
           enddo
         endif
@@ -1302,7 +1311,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
          if(sim_param%use_vd) then
            call octree%leaves(lv)%p%leaf_neigh(iln)%p%cell_parts(ipp)%p&
               %compute_diffusion(pos, alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, str)
-           stretch = stretch +str*(sim_param%nu_inf+turbvisc)
+           stretch = stretch +str*(sim_param%nu_inf+octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc)!turbvisc)
          endif
        enddo
       enddo
@@ -1332,7 +1341,7 @@ subroutine apply_multipole(part,octree, elem, wpan, wrin, wvort)
             call octree%leaves(lv)%p%cell_parts(ipp)%p%compute_diffusion(pos, &
                      !                             alpha, str)
                      alpha, octree%leaves(lv)%p%cell_parts(ip)%p%r_Vortex, str)
-            stretch = stretch + str*(sim_param%nu_inf+turbvisc)
+            stretch = stretch + str*(sim_param%nu_inf+octree%leaves(lv)%p%cell_parts(ip)%p%turbvisc)!turbvisc)
           endif
 
         endif

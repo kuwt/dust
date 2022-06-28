@@ -231,7 +231,7 @@ module mod_stripe
     
     cl10 = aero_coeff(1)
 
-    dcl_da = (cl10-cl0)/8.0_wp*180.0_wp/pi  ! make dcl_da more robust
+    dcl_da = (cl10-cl0)/(8.0_wp*sqrt(1-mach**2))*180.0_wp/pi  ! make dcl_da more robust
     
     alpha = atan2(dot(up, this%nor), dot(up,this%tang_cen))
     
