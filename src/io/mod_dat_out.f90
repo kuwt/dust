@@ -184,7 +184,7 @@ subroutine dat_out_probes_header ( fid , rr_probes , vars_str, nt )
 
   write(istr,'(I0)') n_probes
   write(fid,'(A,I0)') '# n_time: ', nt
-  write(fid,*) '#    t     '//trim(istr)//'( '//trim(vars_str)//' )'
+  write(fid,'(A,A,A,A,A)') '#    t     '//trim(istr)//' ('//trim(vars_str)//' )'
 
 end subroutine dat_out_probes_header
 
