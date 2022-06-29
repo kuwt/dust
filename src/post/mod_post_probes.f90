@@ -530,7 +530,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
   deallocate(comps, points,components_names)
   call destroy_elements(comps_old)
   if (allocated(comps_old)) deallocate(comps_old)
-  if (allocated(points_old)) deallocate(comps_old)
+  if (allocated(points_old)) deallocate(points_old)
 
   write(msg,'(A,I0,A)') nl//'++++++++++ Probes done'//nl
   call printout(trim(msg))
