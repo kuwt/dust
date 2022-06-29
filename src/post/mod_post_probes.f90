@@ -218,14 +218,14 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
       select case(trim(var_name))
         case ( 'velocity' ) ; probe_vel = .true.
         case ( 'pressure' ) ; probe_p   = .true.
-        case ( 'vorticity') ; probe_vort= .true.
+        !case ( 'vorticity') ; probe_vort= .true.
         case ( 'cp'       ) ; probe_cp = .true.
-        case ( 'all') ; probe_vel = .true. ; probe_p   = .true. ; probe_vort= .true.
+        case ( 'all') ; probe_vel = .true. ; probe_p   = .true. ; !probe_vort= .true.
         case default
         write(str_a,*) ia
         call error('dust_post','','Unknown Variable: '//trim(var_name)//&
                     ' for analysis n.'//trim(str_a)//'.'//nl//&
-                    'Choose "velocity", "pressure", "vorticity".')
+                    'Choose "velocity", "pressure" .') !, "vorticity".')
       end select
     end do
   end if
@@ -236,7 +236,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
   nprint = 0
   if(probe_vel)  nprint = nprint+3
   if(probe_p)    nprint = nprint+1
-  if(probe_vort) nprint = nprint+3
+  if(probe_cp)   nprint = nprint+1
 
   ! Write .dat file header
   allocate(probe_var_names(nprint))
@@ -250,19 +250,18 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
     i_var = i_var + 3
   endif
   if(probe_p) then
-    if(probe_cp) then
-      probe_var_names(i_var) = 'cp'
-    else
-      probe_var_names(i_var) = 'p'
-    end if
+    probe_var_names(i_var) = 'p'
     i_var = i_var + 1
-  endif
-  if(probe_vort) then
-    probe_var_names(i_var)     = 'omx'
-    probe_var_names(i_var + 1) = 'omy'
-    probe_var_names(i_var + 2) = 'omz'
-    i_var = i_var + 3
-  endif
+  endif 
+  if(probe_cp) then
+    probe_var_names(i_var) = 'cp'
+  end if
+  !if(probe_vort) then
+  !  probe_var_names(i_var)     = 'omx'
+  !  probe_var_names(i_var + 1) = 'omy'
+  !  probe_var_names(i_var + 2) = 'omz'
+  !  i_var = i_var + 3
+  !endif
   vars_str = ''
   do i_var = 1,size(probe_var_names)
     vars_str = trim(vars_str)//'  '//trim(probe_var_names(i_var))
@@ -412,7 +411,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
     endif
 
     ! compute pressure
-    if ( probe_p ) then
+    if ( probe_p .or. probe_cp ) then
       ! Bernoulli equation
       ! rho * dphi/dt + P + 0.5*rho*V^2 = P_infty + 0.5*rho*V_infty^2
   
@@ -459,24 +458,26 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
       pres_probe = P_inf + 0.5_wp*rho*norm2(u_inf)**2 - 0.5_wp*rho*norm2(vel_probe)**2 -&
                   & rho*(pot_probe-pot_probe_old)/(t-t_old)
 
-      if (probe_cp) then ! output pressure coefficient
+      if (probe_p) then ! output pressure coefficient
+        probe_vars(i_var, ires, ip) = pres_probe
+        i_var = i_var + 1
+      endif 
+      
+      if (probe_cp) then 
         if (norm2(u_inf) .gt. 1e-6_wp) then
           probe_vars(i_var, ires, ip) = (pres_probe - P_inf)/(0.5_wp*rho*norm2(u_inf)**2)
         else ! todo add u_ref
           call error(this_mod_name,this_sub_name,'Pressure coefficient requested, but u_inf =0')
         end if
-      else ! output pressure
-        probe_vars(i_var, ires, ip) = pres_probe
       end if
-      i_var = i_var+1
     end if
 
     ! compute vorticity
-    if ( probe_vort ) then
-      vort_probe = 0.0_wp
-      probe_vars(i_var:i_var+2, ires, ip) = vort_probe
-      i_var = i_var+3
-    end if
+    !if ( probe_vort ) then
+    !  vort_probe = 0.0_wp
+    !  probe_vars(i_var:i_var+2, ires, ip) = vort_probe
+    !  i_var = i_var+3
+    !end if
 
   end do  ! probes
   
@@ -492,7 +493,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
       call new_file_unit(fid_out, ierr)
       write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.dat'
       open(unit=fid_out,file=trim(filename))
-      call dat_out_probes_header( fid_out , rr_probes , vars_str, nstep)
+      call dat_out_probes_header( fid_out , rr_probes , vars_str, nstep )
 
       do ires = 1, size(time)
         write(fid_out,'('//ascii_real//')',advance='no') time(ires)
@@ -530,7 +531,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
   deallocate(comps, points,components_names)
   call destroy_elements(comps_old)
   if (allocated(comps_old)) deallocate(comps_old)
-  if (allocated(points_old)) deallocate(comps_old)
+  if (allocated(points_old)) deallocate(points_old)
 
   write(msg,'(A,I0,A)') nl//'++++++++++ Probes done'//nl
   call printout(trim(msg))
