@@ -492,7 +492,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
       call new_file_unit(fid_out, ierr)
       write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.dat'
       open(unit=fid_out,file=trim(filename))
-      call dat_out_probes_header( fid_out , rr_probes , vars_str, nstep)
+      call dat_out_probes_header( fid_out , rr_probes , vars_str )
 
       do ires = 1, size(time)
         write(fid_out,'('//ascii_real//')',advance='no') time(ires)
