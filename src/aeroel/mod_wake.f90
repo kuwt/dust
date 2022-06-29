@@ -2055,7 +2055,6 @@ subroutine avoid_collision_2(elems, wake, part, vel_in, vel_out)
             dt_part = min(max((dist1_nor)/(-normvel),0.0_wp), sim_param%dt)
             !if it is lower than the timestep (i.e. the particles hits the surface
             !within next step) start the correction
-
             !Get the position at the time in which the particle hits the
             !surface plane
             pos2  = part%cen+relvel*dt_part

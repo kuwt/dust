@@ -236,7 +236,12 @@ module mod_stripe
     alpha = atan2(dot(up, this%nor), dot(up,this%tang_cen))
     
     !> "2D correction" of the induced angle
-    alpha_2d = mag_inv / ( dcl_da/2.0_wp* this%chord * unorm ) 
+    ! check on dcl_da value
+    if (dcl_da .gt. 7.5_wp .or. dcl_da .lt. 5.0_wp) then
+      alpha_2d = mag_inv / ( pi* this%chord * unorm )
+    else
+      alpha_2d = mag_inv / ( dcl_da/2.0_wp* this%chord * unorm ) 
+    endif 
     
     alpha = (alpha - alpha_2d) * 180.0_wp/pi  
 
