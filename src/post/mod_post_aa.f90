@@ -119,7 +119,7 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
   character(len=max_char_len)         :: filename
   integer(h5loc)                      :: floc , ploc
   real(wp), allocatable               :: points(:,:)
-  integer                             :: nelem
+  integer                             :: nelem, n_time
   real(wp)                            :: time
   integer                             :: fid_out, fid_time
   integer                             :: i_comp, ie, ierr
@@ -159,6 +159,7 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
 
   ! Time loop
   ires = 0
+  n_time = (an_end-an_start)/an_step + 1 ! int general eger division 
   do it = an_start, an_end, an_step
     ires = ires+1
 
@@ -203,7 +204,7 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
                 (mult .and. (trim(comp_root) .ne. trim(last_mult) ))) then
         ! Output filename
         write(filename,'(A,I0,A)') trim(basename)//'_'//trim(an_name)//&
-          '_'//trim(compname)//'-',it,'.dat'
+                '-',it,'.dat'
         ! check if the file unit is still open from a previous file
         last_mult = trim(compname)
         inquire(unit=fid_out, opened=isopen)
