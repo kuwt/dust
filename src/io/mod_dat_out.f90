@@ -158,10 +158,11 @@ end subroutine dat_out_aa
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_probes_header ( fid , rr_probes , vars_str )
-  integer , intent(in) :: fid
-  real(wp), intent(in) :: rr_probes(:,:)
+subroutine dat_out_probes_header ( fid , rr_probes , vars_str, nt )
+  integer , intent(in)         :: fid
+  real(wp), intent(in)         :: rr_probes(:,:)
   character(len=*), intent(in) :: vars_str
+  integer                      :: nt
 
   character(len=max_char_len) :: istr
   integer :: n_probes , ic
@@ -182,6 +183,7 @@ subroutine dat_out_probes_header ( fid , rr_probes , vars_str )
   end do
 
   write(istr,'(I0)') n_probes
+  write(fid,'(A,I0)') '# n_time: ', nt
   write(fid,*) '#    t     '//trim(istr)//'( '//trim(vars_str)//' )'
 
 end subroutine dat_out_probes_header
