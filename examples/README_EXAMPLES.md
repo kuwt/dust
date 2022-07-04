@@ -28,5 +28,6 @@ into the single examples folders, then run in sequence :
 To run the coupled examples, run:
 - ./run.sh
 
+The run file executes the main python script located inside the structure folder. Make sure you have added adapter folder to your Python path.
 
 

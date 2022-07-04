@@ -32,3 +32,4 @@ build/
 CMakeCache.txt
 CMakeFiles/ 
 *.dat 
+__pycache__

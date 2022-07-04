@@ -39,11 +39,9 @@ class MBDynAdapter:
              'type':'scalar/vector', 'io':'read/write' }
   
     #> Use MBDyn interface, containing info about MBDyn-mbc_py
-
     self.mbd = mbdInterface
         
     # All the data that can be exchanged with MBDyn
-    # TODO#1: move in MBDyn interface
     fieldlist = [ 'Position', 'Velocity', 'Rotation', \
                   'AngularVelocity', 'Force', 'Moment' ]
     typelist  = [ 'vector', 'vector', 'vector', \
@@ -78,7 +76,6 @@ class MBDynAdapter:
 
     #> === Mesh =================================================
     #> Nodes: set_mesh_vertices
-    # PreCICE communication
     self.p['mesh']['nodes'] = self.mbd.refConfigNodes()
     # old: initial configuration as the reference configuration
     self.p['mesh']['nnodes'] = np.size( self.mbd.data['Position']['data'], 0 )
@@ -143,7 +140,7 @@ class MBDynAdapter:
         rot_t = self.mbd.data['Rotation']['data'][:,:] 
         ome_t = self.mbd.data['AngularVelocity']['data'][:,:]
         self.interface.mark_action_fulfilled( cowic )
-   
+
       #> Set MBDyn nodal values of forces and moments
       for i in np.arange(n):
         self.mbd.nodal.n_f[i*nd:(i+1)*nd] = self.mbd.data['Force' ]['data'][i,:] 
@@ -154,7 +151,7 @@ class MBDynAdapter:
       #> === Communication with MBDyn ===========================
       if ( self.mbd.nodal.send(False) ):
         break
-     
+
       # Receive data from MBDyn
       if ( self.mbd.nodal.recv() ):
         print('**** break, after nodal.recv() ****'); break
@@ -223,7 +220,5 @@ class MBDynAdapter:
     
     #> ~~~ PreCICE coupling between mbdyn and aero solver ~~~~~~~~~~~   
     self.mbd.nodal.destroy()
-
-        
 
 
