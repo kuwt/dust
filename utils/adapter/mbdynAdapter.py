@@ -65,8 +65,6 @@ class MBDynAdapter:
 
     #> === Fields ===============================================
     # get_data_id
-    # TODO#2: improve it, after having redefined the fields that can
-    # be used for communications (see TODO#1)
     for i in np.arange( len(fieldlist) ):
       fieldn = fieldlist[i]
       if ( self.interface.has_data( fieldn, self.p['mesh']['id'] ) ):
@@ -80,7 +78,6 @@ class MBDynAdapter:
 
     #> === Mesh =================================================
     #> Nodes: set_mesh_vertices
-    # new: read from file the reference configuration needed for
     # PreCICE communication
     self.p['mesh']['nodes'] = self.mbd.refConfigNodes()
     # old: initial configuration as the reference configuration

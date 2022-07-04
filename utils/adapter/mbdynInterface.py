@@ -111,9 +111,6 @@ class MBDynInterface:
   def refConfigNodes(self, filen='./refConfigNodes.in'):
     rr = np.loadtxt( fname = filen )
 
-    # loadtxt import a (1,n) array as a vector (with len(rr.shape)=1),
-    # but an array is needed. If only one node is defined, save rr in
-    # a (1,3) array
     if ( len(rr.shape) == 1 ):
       rr = rr.reshape( 1,3 )
 
