@@ -1275,7 +1275,7 @@ selected components will be included in the output file.
 \end{itemize}
 
 \subsubsection{Output .dat file}
-
+For each DUST component is generated a corresponding \param{.dat} file.
 The output file containing aeroacustics data in \param{.dat} format has 
 the following structure. The first line is a header specifying the 
 analysis.
@@ -1287,17 +1287,16 @@ The second and third lines contain the current simulation time.
   2: # Time
   3: 0.000000000000000E+000   
 \end{inputfile}
-The fourth line is a header file containing the fields and their dimension collected in the nextlines 
-\todo{insert the number of the following lines as field for parsing}.
-As an example, the output file for a 10-section blade reads
+The fourth line is a header file containing the fields and their dimension collected in the nextlines.
 \begin{inputfile}[frame=single]
  4: # Element Center (3), Element Normal (3), Element Center Velocity (3), 
       Element Area (1), Force Acting on Element (3)
 \end{inputfile}
-As an example, the lines collecting the fields described above of two components where the first one has 100 elements, reads:
+In the case of a rotor/propeller component, each blade is labelled with Comp___ .
+As an example, with a 3 blade propeller/rotor, reads:
 \begin{inputfile}[frame=single]
   5: Comp 000
     ...
-  106: Comp 002
+  ..: Comp 001
     ...
 \end{inputfile}
