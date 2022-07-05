@@ -1350,7 +1350,7 @@ subroutine update_near_field_wake( this, geo, wake, te )
                      ( 1.0_wp - cos(theta) ) * sum( wake%pan_gen_dir(:,ip)*n_rot ) * n_rot
           end if
 
-          vel_te = geo%points_vel(:, wake%pan_gen_icomp(ip))
+          vel_te = geo%points_vel(:, iw)
           wind = variable_wind(geo%points(:,wake%pan_gen_icomp),sim_param%time)
         
           if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then

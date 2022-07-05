@@ -197,14 +197,18 @@ module mod_stripe
     
     !> Stipe total velocity 
     wind = variable_wind(this%cen, sim_param%time)
-
+    
     this%vel_2d_isolated = norm2((wind-this%ub) - this%bnorm_cen*dot(this%bnorm_cen, (wind - this%ub)))
     
     this%vel_outplane_isolated = dot(this%bnorm_cen, (wind-this%ub))
     
     this%alpha_isolated = atan2(dot((wind-this%ub), this%nor), & 
                               dot((wind-this%ub), this%tang_cen))*180.0_wp/pi
-    
+    !write(*,*) 'i_s        ', i_s
+    !write(*,*) 'this%vel  ', this%vel
+    !write(*,*) 'wind      ', wind
+    !write(*,*) 'this%ub   ', this%ub
+    !write(*,*) 'this%vel_w', this%vel_w
     this%vel = this%vel + wind - this%ub + this%vel_w
 
     this%vel_outplane = dot(this%bnorm_cen,this%vel)
@@ -213,7 +217,7 @@ module mod_stripe
     up = this%nor*dot(this%nor,this%vel) + this%tang_cen*dot(this%tang_cen,this%vel)
     unorm = norm2(up)      ! velocity w/o induced velocity
     this%vel_2d = unorm
-
+    
     mag_inv = this%mag_inv 
     !> Local Mach number 
     mach = unorm / sim_param%a_inf
@@ -320,7 +324,7 @@ module mod_stripe
     integer :: j
   
     ! Initialisation to zero
-    this%vel = 0.0_wp
+    this%vel_w = 0.0_wp
     ! Control point at 1/4-fraction of the chord (with curvature)
     x0 = this%cen  
     !=== Compute the velocity from all the elements ===
@@ -338,7 +342,7 @@ module mod_stripe
       call vort_elems(j)%p%compute_vel(x0,v)
       this%vel_w = this%vel_w + v
     enddo
-  
+
     !> induced velocity on stripe center 
     this%vel_w = this%vel_w/(4.0_wp * pi)
   
@@ -367,7 +371,7 @@ module mod_stripe
         mag = mag + this%panels(i)%p%mag
       end if
     end do 
-
+    !write(*,*) 'this%mag_inv', this%mag_inv
     this%mag_inv = mag
     
     vel = vdou*this%mag_inv 

@@ -489,9 +489,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
     if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
       
       dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
-      
-      
-      
+
       wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                   dist*wake%pan_gen_scaling(ip)* &
                   norm2(wind-vel_te)* &
