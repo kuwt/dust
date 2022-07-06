@@ -64,8 +64,7 @@ use mod_handling, only: &
 use mod_geometry, only: &
   t_geo, t_tedge, calc_geo_data_pan, calc_node_vel
 
-!use mod_aero_elements, only: &
-!  c_elem, t_elem_p
+
 
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
@@ -881,7 +880,6 @@ subroutine update_wake(wake, elems, octree)
     else if ( .not. associated(wake%pan_gen_elems(2,iw)%p) ) then
       wake%wake_panels(iw,1)%mag  = wake%pan_gen_elems(1,iw)%p%mag
     end if
-
   enddo
 
   !==> Panels: Update wake points position ==
@@ -1045,7 +1043,7 @@ subroutine update_wake(wake, elems, octree)
 
       call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
 
-      wake%part_p(ip)%p%vel     =  vel_p
+      wake%part_p(ip)%p%vel =  vel_p
 
       !if using vortex stretching, calculate it now
       if(sim_param%use_vs) then
@@ -1567,13 +1565,13 @@ subroutine compute_vel_from_all(elems, wake, pos, vel)
   real(wp)                        :: v(3)
 
   vel = 0.0_wp
-
+  
   !calculate the influence of the solid bodies
   do ie=1,size(elems)
     call elems(ie)%p%compute_vel(pos, v)
     vel = vel + v/(4*pi)
   enddo
-
+!
   ! calculate the influence of the wake panels
   do ie=1,size(wake%pan_p)
     call wake%pan_p(ie)%p%compute_vel(pos, v)
@@ -1585,14 +1583,14 @@ subroutine compute_vel_from_all(elems, wake, pos, vel)
     call wake%rin_p(ie)%p%compute_vel(pos, v)
     vel = vel + v/(4*pi)
   enddo
-
+!
   !calculate the influence of the end vortex
   !TODO: check what happens when it is not active
   do ie=1,size(wake%end_vorts)
     call wake%end_vorts(ie)%compute_vel(pos, v)
     vel = vel + v/(4*pi)
   enddo
-
+!
   !calculate the influence of particles
   do ie=1,size(wake%part_p)
     call wake%part_p(ie)%p%compute_vel(pos, v)

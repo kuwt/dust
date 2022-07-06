@@ -2239,7 +2239,7 @@ subroutine create_strip_connectivity(geo)
             
             comp%stripe(i_s)%nor = nor/norm2(nor) 
             
-            tanl = 0.5_wp * ( comp%stripe(i_s)%ver(:,4) + comp%stripe(i_s)%ver(:,4) ) - &
+            tanl = 0.5_wp * ( comp%stripe(i_s)%ver(:,4) + comp%stripe(i_s)%ver(:,1) ) - &
                             comp%stripe(i_s)%cen
             
             comp%stripe(i_s)%tang(:,1) = tanl / norm2(tanl)
@@ -2259,7 +2259,14 @@ subroutine create_strip_connectivity(geo)
             do i = 1,4
               comp%stripe(i_s)%edge_uni(:,i) = comp%stripe(i_s)%edge_vec(:,i) / comp%stripe(i_s)%edge_len(i)
             end do
-            
+
+            !> Area 
+            n_pan = size(comp%stripe(i_s)%panels)
+            comp%stripe(i_s)%area = 0.0_wp 
+            do i = 1, n_pan
+              comp%stripe(i_s)%area = comp%stripe(i_s)%area + comp%stripe(i_s)%panels(i)%p%area 
+            end do
+
             comp%stripe(i_s)%tang_cen = comp%stripe(i_s)%edge_uni(:,2) - comp%stripe(i_s)%edge_uni(:,4)
             comp%stripe(i_s)%tang_cen = comp%stripe(i_s)%tang_cen / norm2(comp%stripe(i_s)%tang_cen)
   
@@ -2267,18 +2274,10 @@ subroutine create_strip_connectivity(geo)
             comp%stripe(i_s)%bnorm_cen = comp%stripe(i_s)%bnorm_cen / norm2(comp%stripe(i_s)%bnorm_cen)
             comp%stripe(i_s)%chord = sum(comp%stripe(i_s)%edge_len((/2,4/)))*0.5_wp
             
-            n_pan = size(comp%stripe(i_s)%panels)
-            comp%stripe(i_s)%area = 0.0_wp 
-            do i = 1, n_pan
-              comp%stripe(i_s)%area = comp%stripe(i_s)%area + comp%stripe(i_s)%panels(i)%p%area 
-            end do
-
-            comp%stripe(i_s)%ctr_pt = comp%stripe(i_s)%cen -  & 
+            comp%stripe(i_s)%ctr_pt = comp%stripe(i_s)%cen +  & 
                                       comp%stripe(i_s)%tang_cen * comp%stripe(i_s)%chord / 2.0_wp
             
-            
             !> Update velocity 
-
             call calc_node_vel(comp%stripe(i_s)%ctr_pt, geo%refs(comp%ref_id)%G_g, &
                                 geo%refs(comp%ref_id)%f_g, comp%stripe(i_s)%ub)
             
