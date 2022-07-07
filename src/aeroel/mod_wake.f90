@@ -269,6 +269,13 @@ type :: t_wake
   !> Are the rings full? (and so need to produce particles...)
   logical :: full_rings=.false.
 
+#if USE_PRECICE  
+  !> In order to correctly build the wake we need to esplicitly store
+  ! the end points of the last step...
+  real(wp), allocatable :: old_second_row(:,:)
+  !> ... but not within precice iterations
+  logical :: update_old_second_row
+#endif
 end type
 
 !module variables to share among the different subroutines
@@ -553,6 +560,11 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   wake%last_pan_idou = 0.0_wp
 
   wake%full_panels = .false.
+
+#if USE_PRECICE
+  allocate(wake%old_second_row(3,wake%n_pan_points)) ! check for memory leak
+  wake%update_old_second_row = .true. ! set to false inside precice iters
+#endif
 
 end subroutine initialize_wake
 
@@ -841,7 +853,9 @@ end subroutine prepare_wake
 
 !----------------------------------------------------------------------
 
-!> Update the position and the intensities of the wake panels
+!> Update the position and the intensities of the wake panels 
+!  Brings them to the next time step
+!  Only updates the "old" panels, ie not the first two, and existing particles
 !!
 !! Note: at this subroutine is passed the whole array of elements,
 !! comprising both the implicit panels and the explicit (ll)
@@ -888,6 +902,12 @@ subroutine update_wake(wake, elems, octree)
   allocate(point_old(size(wake%pan_w_points,1),size(wake%pan_w_points,2), &
                                               size(wake%pan_w_points,3)))
   point_old = wake%pan_w_points
+
+#if USE_PRECICE
+  ! pan_w_points is overwritten at every precice iteration, the actual old
+  ! points have been saved to old_second_row (the old first row is useless)
+  point_old(:,:,2) = wake%old_second_row
+#endif
 
   !calculate the velocities at the old positions of the points and then
   !update the positions (from the third row of points: the first is the
@@ -1199,7 +1219,9 @@ end subroutine update_wake
 !----------------------------------------------------------------------
 
 !> Prepare the first row of panels to be inserted inside the linear system
-!!
+!! Completes the updating to the next time step begun in update_wake
+!! first and second row are updated to the next step and new particles are
+!! created if necessary; they will appear at the save_date in the next time step
 subroutine complete_wake(wake, geo, elems, te)
   type(t_wake), target, intent(inout)   :: wake
   type(t_geo), intent(in)               :: geo
@@ -1220,6 +1242,9 @@ subroutine complete_wake(wake, geo, elems, te)
   character(len=max_char_len)            :: msg
   character(len=*), parameter            :: this_sub_name='prepare_wake'
 
+#if USE_PRECICE
+  ! first and second row of the wake are already taken care of by update_near_field_wake
+#else
   !==> Panels: update the first rows of panels
 
   !first row  of new points comes from geometry
@@ -1274,6 +1299,7 @@ subroutine complete_wake(wake, geo, elems, te)
                                                                       (/3,4/)))
     enddo
   enddo
+#endif
 
   !==> Particles: update the position and intensity in time, avoid penetration
   !               and chech if remain into the boundaries

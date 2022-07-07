@@ -611,10 +611,50 @@ end if
   precice_convergence = .true.
   write(*,*) ' is coupling ongoing: ', precice%is_ongoing
   write(*,*) ' dt_precice         : ', precice%dt_precice
+  
+  !> Before entering the time cycle we need to actually initialize the
+  ! position of the elements, so we have to query mbdyn
+  !> Read data from structural solver
+  do i = 1, size(precice%fields)
+    if ( trim(precice%fields(i)%fio) .eq. 'read' ) then
+      if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
+        call precicef_read_bsdata( precice%fields(i)%fid, &
+                                  precice%mesh%nnodes  , &
+                                  precice%mesh%node_ids, &
+                                  precice%fields(i)%fdata(1,:) )
+      elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
+          call precicef_read_bvdata( precice%fields(i)%fid, &
+                                    precice%mesh%nnodes  , &
+                                    precice%mesh%node_ids, &
+                                    precice%fields(i)%fdata )
+      endif
+    end if
+  end do
+
+  !> Update dust geometry ( elems and first wake panels )
+  call precice%update_elems( geo, elems_tot, te )
+
+  !> Update geo_data()
+  do i_el = 1, size(elems_tot)
+    call elems_tot(i_el)%p%calc_geo_data( &
+                          geo%points(:,elems_tot(i_el)%p%i_ver) )
+  end do
+
+  !> Update near-field wake
+  call precice%update_near_field_wake( geo, wake, te )
+  
+  !> Store the second row of the wake
+  wake%old_second_row = wake%pan_w_points(:,:,2)
 #endif
 
 
 !=========================== Time Cycle ==============================
+!> General overview:
+!> - build and solve systems
+!> - compute loads
+!> - save data
+!> - update and prepare for next step
+
 call printout(nl//'////////// Performing Computations //////////')
 time = sim_param%t0
 sim_param%time_old = sim_param%t0 + 1
@@ -635,7 +675,7 @@ else
   res_old = 0.0_wp
 end if
 
-!> Start time cycle 
+!===========> Start time cycle 
 t11 = dust_time()
 it = 0
 #if USE_PRECICE
@@ -1105,9 +1145,12 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
       end if
     end do
 
+    !===========> precice convergence check
+    ! if not converging skip everything and goto end of time cycle to repeat step
+    ! if converged continue to the update section
     call precicef_action_required( precice%read_it_checkp, bool )
-
-    if ( bool .eq. 1 ) then ! timestep not converged
+    if ( bool .eq. 1 ) then 
+      !> timestep not converged
       !> Reload checkpoint state
       do j = 1, size(precice%fields)
         if ( trim(precice%fields(j)%fio) .eq. 'write' ) then
@@ -1115,8 +1158,10 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         end if
       end do
       call precicef_mark_action_fulfilled( precice%read_it_checkp )
-    else ! timestep converged
+    else ! else contains everything down to the end of the time cycle (l. 1310)
+      !> timestep converged
       precice_convergence = .true.
+      
       !> Finalize timestep
       ! Do the same actions as a simulation w/o coupling
       ! *** to do *** check if something special is needed
@@ -1134,8 +1179,62 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     ! Free vortices will be introduced in prepare_wake(), some lines below
     if(sim_param%use_ve) call viscosity_effects( geo , elems , te )
 
-    !> Treat the wake: this needs to be done after output, 
-    !                  in practice the update is for the next iteration)
+    !> Wake update comes next, but it's for the next step, so if the 
+    ! simulation is coupled we need to query mbdyn again for the updated
+    ! positions
+    ! TODO check if this is what is actually done
+#if USE_PRECICE
+
+!    call precicef_action_required( precice%write_it_checkp , bool )
+!    if ( bool .eq. 1 ) then ! Save old state
+!      !> Save old state: forces and moments
+!      do j = 1, size(precice%fields)
+!        if ( trim(precice%fields(j)%fio) .eq. 'write' ) then
+!          precice%fields(j)%cdata = precice%fields(j)%fdata
+!        end if
+!      end do
+!      !> PreCICE action fulfilled
+!      call precicef_mark_action_fulfilled( precice%write_it_checkp )
+!    end if
+!
+    !> Read data from structural solver
+    do i = 1, size(precice%fields)
+      if ( trim(precice%fields(i)%fio) .eq. 'read' ) then
+        if ( trim(precice%fields(i)%ftype) .eq. 'scalar' ) then
+          call precicef_read_bsdata( precice%fields(i)%fid, &
+                                    precice%mesh%nnodes  , &
+                                    precice%mesh%node_ids, &
+                                    precice%fields(i)%fdata(1,:) )
+        elseif ( trim(precice%fields(i)%ftype) .eq. 'vector' ) then
+            call precicef_read_bvdata( precice%fields(i)%fid, &
+                                      precice%mesh%nnodes  , &
+                                      precice%mesh%node_ids, &
+                                      precice%fields(i)%fdata )
+        endif
+      end if
+    end do
+
+    !> Update dust geometry ( elems and first wake panels )
+    call precice%update_elems( geo, elems_tot, te )
+
+    !> Update geo_data()
+    do i_el = 1, size(elems_tot)
+      call elems_tot(i_el)%p%calc_geo_data( &
+                            geo%points(:,elems_tot(i_el)%p%i_ver) )
+    end do
+
+    !> Update near-field wake
+    call precice%update_near_field_wake( geo, wake, te )
+
+    !> Update dt--> mbdyn should take care of the dt and send it to precice (TODO)
+#endif
+
+
+    !> Treat the wake: this needs to be done after output
+    !  in practice the update is for the next iteration;
+    !  this means that in the following routines the wake points are already
+    !  updated to the next step, so we can immediatelt
+    !  add the new particles if needed
   
     t0 = dust_time()
     if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
@@ -1205,12 +1304,16 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
       ! with external softwares through PRECICE.
       ! #if .not. USE_PRECICE, it-update occurs at the beginning of the time loop,
       ! approximately at l.615.
-      ! Is there a reasone why it-update should occur in two different places of the
+      ! Is there a reason why it-update should occur in two different places of the
       ! time loop (at the begin w/o precice, at the end w/ precice)?
+      
+      !> Precice iters are done, so we can store the old points
+      wake%update_old_second_row = .true.
+      
       !> Update n. time step
       it = it + 1
     endif ! End of the if statement that check whether the timestep
-          ! has converged or not
+          ! has converged or not (l. 1115)
 #endif
 
   enddo !> while do 

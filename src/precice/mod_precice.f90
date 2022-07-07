@@ -1257,6 +1257,12 @@ subroutine update_near_field_wake( this, geo, wake, te )
   integer :: icomp
   integer :: ip, ir, p1, p2, j, j_rot, iw, i
 
+  ! Store old wake points to use in complete_wake
+  if (wake%update_old_second_row) then
+    wake%old_second_row = wake%pan_w_points(:,:,2)
+    wake%update_old_second_row = .false.
+  end if
+
   ! Find rotation and angular velocity field id
   j_rot = 0
   do j = 1, size(this%fields)
