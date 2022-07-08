@@ -898,8 +898,12 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           !> compute dforce using AVL formula 
           call el%compute_dforce_jukowski(.true.) 
           !> update the pressure field, p = df.n / area
+
           el%pres = sum(el%dforce * el%nor)/el%area
-      end select
+          write(*,*) 'i_el     ', i_el
+          write(*,*) 'el%dforce ', el%dforce
+          write(*,*) 'el%nor   ', el%nor
+        end select
     end do
   end if 
   
@@ -1257,6 +1261,18 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
             nor_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) = el%nor   ! el%surf_vel
       end select
     end do
+
+#if USE_PRECICE
+    !> Update geo_data()
+do i_el = 1, size(elems_tot)
+  call elems_tot(i_el)%p%calc_geo_data( &
+                        geo%points(:,elems_tot(i_el)%p%i_ver) )
+end do
+
+!> Update near-field wake
+call precice%update_near_field_wake( geo, wake, te )
+#endif
+
     t0 = dust_time()
     !> update geometry 
     if(it .lt. nstep) then

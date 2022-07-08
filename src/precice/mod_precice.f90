@@ -759,6 +759,7 @@ subroutine update_elems( this, geo, elems, te )
         !  quantities, w/o considering rotations of the hinges
         do i = 1, size(comp%i_points)
 
+
           ip = comp%i_points(i)
           
           do iw = 1, size(comp%rbf%nod%ind,1)
@@ -803,7 +804,6 @@ subroutine update_elems( this, geo, elems, te )
           end do
 
         end do
-
 
         !> Center of panel 
         !> Reset, before accumulation, only nodes belonging to the component
@@ -1302,14 +1302,14 @@ subroutine update_near_field_wake( this, geo, wake, te )
 
         if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-             dist*wake%pan_gen_scaling(ip)* &
-             norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &
-             real(sim_param%ndt_update_wake,wp)
+              dist*wake%pan_gen_scaling(ip)* &
+              norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &
+              real(sim_param%ndt_update_wake,wp)
         else
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-             dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
-             sim_param%min_vel_at_te*sim_param%dt * &
-             real(sim_param%ndt_update_wake,wp)
+              dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
+              sim_param%min_vel_at_te*sim_param%dt * &
+              real(sim_param%ndt_update_wake,wp)
         end if
 
       elseif (trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) &
