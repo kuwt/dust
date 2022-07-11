@@ -923,7 +923,7 @@ subroutine update_wake(wake, elems, octree)
       pos_p = point_old(:,iw,ipan-1)
       vel_p = 0.0_wp
 
-      !! for OUTPUT only -----
+      ! for OUTPUT only -----
       call wake_movement%get_vel(elems, wake, pos_p, hcas_vel, vel_p)
 
       !update the position in time
@@ -1591,13 +1591,13 @@ subroutine compute_vel_from_all(elems, wake, pos, vel)
   real(wp)                        :: v(3)
 
   vel = 0.0_wp
-  
+
   !calculate the influence of the solid bodies
   do ie=1,size(elems)
     call elems(ie)%p%compute_vel(pos, v)
     vel = vel + v/(4*pi)
   enddo
-!
+
   ! calculate the influence of the wake panels
   do ie=1,size(wake%pan_p)
     call wake%pan_p(ie)%p%compute_vel(pos, v)
@@ -1609,14 +1609,13 @@ subroutine compute_vel_from_all(elems, wake, pos, vel)
     call wake%rin_p(ie)%p%compute_vel(pos, v)
     vel = vel + v/(4*pi)
   enddo
-!
+
   !calculate the influence of the end vortex
-  !TODO: check what happens when it is not active
   do ie=1,size(wake%end_vorts)
     call wake%end_vorts(ie)%compute_vel(pos, v)
     vel = vel + v/(4*pi)
   enddo
-!
+
   !calculate the influence of particles
   do ie=1,size(wake%part_p)
     call wake%part_p(ie)%p%compute_vel(pos, v)

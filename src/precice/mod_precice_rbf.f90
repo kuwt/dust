@@ -140,9 +140,9 @@ subroutine build_connectivity(this, aero_coord, coupling_node_rot)
   allocate(Wnorm(3,3)); Wnorm = 0.0_wp
 
   !> anisotropy matrix: section is rigid chordwise
-  Wnorm(1,1) = 0.001_wp
-  Wnorm(2,2) = 1.0_wp
-  Wnorm(3,3) = 0.001_wp
+  Wnorm(1,1) = 1e-3_wp
+  Wnorm(2,2) = 1e+0_wp
+  Wnorm(3,3) = 1e-3_wp
 
   !> From beam ref. sys to Dust ref. sys
   Wnorm = matmul(transpose(coupling_node_rot),(matmul(Wnorm,coupling_node_rot)))

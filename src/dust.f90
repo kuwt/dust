@@ -900,9 +900,6 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           !> update the pressure field, p = df.n / area
 
           el%pres = sum(el%dforce * el%nor)/el%area
-          write(*,*) 'i_el     ', i_el
-          write(*,*) 'el%dforce ', el%dforce
-          write(*,*) 'el%nor   ', el%nor
         end select
     end do
   end if 
@@ -1189,18 +1186,6 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     ! TODO check if this is what is actually done
 #if USE_PRECICE
 
-!    call precicef_action_required( precice%write_it_checkp , bool )
-!    if ( bool .eq. 1 ) then ! Save old state
-!      !> Save old state: forces and moments
-!      do j = 1, size(precice%fields)
-!        if ( trim(precice%fields(j)%fio) .eq. 'write' ) then
-!          precice%fields(j)%cdata = precice%fields(j)%fdata
-!        end if
-!      end do
-!      !> PreCICE action fulfilled
-!      call precicef_mark_action_fulfilled( precice%write_it_checkp )
-!    end if
-!
     !> Read data from structural solver
     do i = 1, size(precice%fields)
       if ( trim(precice%fields(i)%fio) .eq. 'read' ) then
@@ -1218,17 +1203,8 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
       end if
     end do
 
-    !> Update dust geometry ( elems and first wake panels )
+    !> Update dust geometry
     call precice%update_elems( geo, elems_tot, te )
-
-    !> Update geo_data()
-    do i_el = 1, size(elems_tot)
-      call elems_tot(i_el)%p%calc_geo_data( &
-                            geo%points(:,elems_tot(i_el)%p%i_ver) )
-    end do
-
-    !> Update near-field wake
-    call precice%update_near_field_wake( geo, wake, te )
 
     !> Update dt--> mbdyn should take care of the dt and send it to precice (TODO)
 #endif
