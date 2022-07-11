@@ -66,6 +66,9 @@ use mod_parse, only: &
   getstr, getlogical, getreal, getint, &
   ignoredParameters, finalizeParameters, &
   countoption, getsuboption, t_link, check_opt_consistency
+  
+use mod_sim_param, only: &
+  create_param_pre  
 
 use mod_build_geo, only: &
   build_geometry
@@ -115,12 +118,7 @@ endif
 call printout(nl//'Reading input parameters from file "'//&
                 trim(input_file_name)//'"'//nl)
                 
-call prms%CreateStringOption('comp_name','Component Name', multiple=.true.)
-call prms%CreateStringOption('geo_file','Geometry definition files', multiple=.true.)
-call prms%CreateStringOption('ref_tag','Reference Tag of the component', multiple=.true.)
-call prms%CreateRealOption('tol_se_wing','Global parameter for closing gaps','0.001')
-call prms%CreateRealOption('inner_product_te','Global parameter for edge identification','-0.5')
-call prms%CreateStringOption('file_name','Preprocessor output file')
+call create_param_pre(prms)                
 
 call check_file_exists(input_file_name,'dust preprocessor')
 call prms%read_options(input_file_name, printout_val=.false.)

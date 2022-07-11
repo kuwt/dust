@@ -52,7 +52,7 @@ use mod_param, only: &
   wp, nl, max_char_len, extended_char_len , pi
 
 use mod_sim_param, only: &
-  sim_param
+  sim_param, create_param_post
 
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime, new_file_unit, &
@@ -191,94 +191,7 @@ endif
 call printout(nl//'Reading input parameters from file "'//&
                 trim(input_file_name)//'"'//nl)
 
-call prms%CreateStringOption('basename','Base name of the processed data')
-call prms%CreateStringOption('data_basename','Base name of the data to be &
-                              &processed')
-
-call prms%CreateRealOption( 'far_field_ratio_doublet', &
-      "Multiplier for far field threshold computation on doublet", '10.0')
-call prms%CreateRealOption( 'far_field_ratio_source', &
-      "Multiplier for far field threshold computation on sources", '10.0')
-call prms%CreateRealOption( 'doublet_threshold', &
-      "Thresold for considering the point in plane in doublets", '1.0e-6')
-call prms%CreateRealOption( 'rankine_rad', &
-      "Radius of Rankine correction for vortex induction near core", '0.1')
-call prms%CreateRealOption( 'vortex_rad', &
-      "Radius of vortex core, for particles", '0.1')
-call prms%CreateRealOption( 'cutoff_rad', &
-      "Radius of complete cutoff  for vortex induction near core", '0.001')
-
-call prms%CreateSubOption('analysis','Definition of the motion of a frame', &
-                          sbprms, multiple=.true.)
-call sbprms%CreateStringOption('type','type of analysis')
-call sbprms%CreateStringOption('name','specification of the analysis')
-call sbprms%CreateIntOption('start_res', 'Starting result of the analysis')
-call sbprms%CreateIntOption('end_res', 'Final result of the analysis')
-call sbprms%CreateIntOption('step_res', 'Result stride of the analysis')
-call sbprms%CreateLogicalOption('average', 'Perform time averaging','F')
-call sbprms%CreateLogicalOption('wake', 'Output also the wake for &
-                                &visualization','T')
-call sbprms%CreateLogicalOption('separate_wake', 'Output the wake in a separate &
-                                &way','F')
-call sbprms%CreateStringOption('format','Output format')
-call sbprms%CreateStringOption('component','Component to analyse', &
-                              multiple=.true.)
-call sbprms%CreateStringOption('hinge_tag','Hinge to analyse', &
-                              multiple=.true.)                              
-call sbprms%CreateStringOption('variable','Variables to be saved: velocity, pressure or&
-                              & vorticity', multiple=.true.)
-
-! probe output -------------
-call sbprms%CreateStringOption('input_type','How to specify probe coordinates',&
-                              multiple=.true.)
-call sbprms%CreateRealArrayOption('point','Point coordinates in dust_post.in',&
-                              multiple=.true.)
-call sbprms%CreateStringOption('file','File containing the coordinates of the probes',&
-                              multiple=.true.)
-! flow field output --------
-call sbprms%CreateIntArrayOption( 'n_xyz','number of points per coordinate',&
-                              multiple=.true.)
-call sbprms%CreateRealArrayOption('min_xyz','lower bounds of the box',&
-                              multiple=.true.)
-call sbprms%CreateRealArrayOption('max_xyz','upper bounds of the box',&
-                              multiple=.true.)
-! loads --------------------
-call sbprms%CreateStringOption('comp_name','Components where loads are computed',&
-                              multiple=.true.)
-call sbprms%CreateStringOption('reference_tag','Reference frame where loads&
-                            & are computed',multiple=.true.)
-! sectional loads ----------
-call sbprms%CreateRealArrayOption('axis_dir','Direction of the axis defined the reference&
-                            & points for sectional loads analisys', multiple=.true.)
-call sbprms%CreateRealArrayOption('axis_nod','Node belonging to the axis used for sectional&
-                            & loads analisys', multiple=.true.)
-call sbprms%CreateLogicalOption('lifting_line_data', 'Output lifting line data&
-                            & alongside sectional loads','F')
-call sbprms%CreateLogicalOption('vortex_lattice_data', 'Output of corrected vortex lattice data&
-                            & alongside sectional loads','F')
-! chordwise loads
-call sbprms%CreateIntOption('n_station','Number of stations where the loads are extracted' &
-                            , multiple=.true.)
-call sbprms%CreateRealArrayOption('span_station','Spanwise coordinates in the component reference frame&
-                            & where they are extracted', multiple=.true.)
-
-
-! sectional loads: box -----
-call sbprms%CreateSubOption('box_sect','Definition of the box for sectional loads', &
-                          bxprms)
-call bxprms%CreateRealArrayOption('ref_node','reference node to build the box')
-call bxprms%CreateRealArrayOption('face_vec','vector identifying the direction of the base side &
-                          &of the sections')
-call bxprms%CreateRealArrayOption('face_bas','dimension along faceVec of the first and last sections')
-call bxprms%CreateRealArrayOption('face_hei','dimension orthogonal to faceVec of the first and last sections')
-call bxprms%CreateRealArrayOption('span_vec','vector defining the out-of plane direction of the box')
-call bxprms%CreateRealOption('span_len','dimension along the spanVec direction')
-call bxprms%CreateIntOption('num_sect','number of sections')
-call bxprms%CreateLogicalOption('reshape_box','logical input to reshape the box if &
-                          &it is "too large"')
-call sbprms%CreateRealArrayOption('axis_mom','axis for the computation of the moment. Perpendicular to sections')
-
-sbprms=>null()
+call create_param_post(prms, sbprms , bxprms)
 
 call check_file_exists(input_file_name, 'dust postprocessor')
 call prms%read_options(input_file_name, printout_val=.false.)
