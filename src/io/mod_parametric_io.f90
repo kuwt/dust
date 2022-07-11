@@ -346,7 +346,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   type_chord = getstr(pmesh_prs,'type_chord')
 
   !> build adaptive mesh for hinged case   
-  if (n_hinges .ge. 1) then 
+  if (n_hinges .ge. 1 ) then 
+    
     !> allocate surface points for the component 
     allocate(rrv_le(2,nSections));  rrv_le = 0.0_wp 
     allocate(rrv_te(2,nSections));  rrv_te = 0.0_wp
@@ -405,7 +406,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
     do iRegion = 1, nRegions
       do ih = 1, n_hinges
-        if (mesh_mirror .or. mesh_symmetry ) then 
+        if (mesh_mirror .or. mesh_symmetry .and. hinges(ih)%adaptive_mesh ) then 
 
           if ((hinges(ih)%node2(2) .le. ac_line(2, iRegion + 1)) .and. & 
               (hinges(ih)%node2(2) .ge. ac_line(2, iRegion))) then 
@@ -445,7 +446,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
               !> hinge node adimensional location along chord
               hinges(ih)%csi1 = (hinges(ih)%node1(1) - hinges(ih)%le1(1)) / hinges(ih)%chord1 
           endif 
-        else
+        elseif ( hinges(ih)%adaptive_mesh) then
           if ((hinges(ih)%node1(2) .ge. ac_line(2, iRegion)) .and. & 
               (hinges(ih)%node1(2) .le. ac_line(2, iRegion + 1))) then 
               

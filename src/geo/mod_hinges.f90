@@ -94,6 +94,7 @@ type :: t_hinge_input
   real(wp) :: chord1, chord2
   real(wp) :: csi1, csi2
   real(wp) :: merge_tol
+  logical  :: adaptive_mesh
 end type t_hinge_input
 
 ! ---------------------------------------------------------------
@@ -1122,6 +1123,7 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
      hinges(i)%offset  = getreal(hinge_prs, 'hinge_offset')
      hinges(i)%span_blending = getreal(hinge_prs, 'hinge_spanwise_blending')
      hinges(i)%merge_tol = getreal(hinge_prs,'hinge_merge_tol')
+     hinges(i)%adaptive_mesh = getlogical(hinge_prs,'hinge_adaptive_mesh')
      !> Hinge input: function, amplitude
      !> Overwrite 'constant' rotation_input with 'function:const'
      hinges(i) % rotation_input = getstr(hinge_prs,'hinge_rotation_input')
@@ -1258,6 +1260,8 @@ subroutine hinge_input_parser( geo_prs, hinge_prs, &
       &avoiding irregular behavior of the surface for large deflections','0.0')
   call hinge_prs%CreateRealOption('hinge_merge_tol', & 
       'Tolerance for adaptive hinge mesh in chord percentage', '0.01')
+  call hinge_prs%CreateLogicalOption('hinge_adaptive_mesh', & 
+      'Enable for adaptive hinge mesh', 'T')
   !> Hinge_Rotation_Input
   call hinge_prs%CreateStringOption('hinge_rotation_input', &
       'Input type of the rotation: function, from_file, coupling')

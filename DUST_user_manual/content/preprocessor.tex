@@ -1147,6 +1147,7 @@ hinge = {
   ! }
   hinge_ref_dir = (/ 1.0, 0.0 , 0.0 /)
   hinge_offset  = 0.1
+  hinge_adaptive_mesh = T
   hinge_merge_tol = 0.01
   hinge_spanwise_blending = 0.01
   hinge_rotation_input = function:sin
@@ -1201,7 +1202,10 @@ All the detailed parameters of the Hinged surfaces input file are:
     \item \param{hinge\_ref\_dir} \textit{required:} yes. \textit{multiple:} no. \textit{type:} real array, length 3. 
     
     Reference direction of the hinges, indicating zero-deflection direction in the local reference frame of the component.
+    \item \param{hinge\_adaptive\_mesh} \textit{required:} no. \textit{multiple:} no. \textit{type:} logical. \textit{default:} T
     
+    Enable adaptive hinge mesh refinement. 
+
     \item \param{hinge\_merge\_tol} \textit{required:} no. \textit{multiple:} no. \textit{type:} real. \textit{default:} 0.01
     
     Tolerance for adaptive hinge mesh in chord adimensional length. 
