@@ -273,13 +273,13 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
   real(wp), allocatable :: rot_wei(:,:)   , ble_wei(:,:)
   real(wp), allocatable :: rot_span_wei(:), ble_span_wei(:)
 
-  integer , allocatable :: rot_p2h(:,:)   ! *** to do *** improve the actual inefficient
-  real(wp), allocatable :: rot_w2h(:,:)   ! and memory intensive implementation
-  integer , allocatable :: rot_i2h(:)     ! Look for ***** in this routine
+  integer , allocatable :: rot_p2h(:,:)   
+  real(wp), allocatable :: rot_w2h(:,:)   
+  integer , allocatable :: rot_i2h(:)     
   real(wp), allocatable :: rot_s2h(:,:)
-  integer , allocatable :: ble_p2h(:,:)   ! *** to do *** improve the actual inefficient
-  real(wp), allocatable :: ble_w2h(:,:)   ! and memory intensive implementation
-  integer , allocatable :: ble_i2h(:)     ! Look for ***** in this routine
+  integer , allocatable :: ble_p2h(:,:)   
+  real(wp), allocatable :: ble_w2h(:,:)   
+  integer , allocatable :: ble_i2h(:)     
   real(wp), allocatable :: ble_s2h(:,:)
 
   integer :: nrot, nble
@@ -352,7 +352,7 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
   ! Loop over all the surface points
   do ib = 1, nb
 
-    if ((rrb(2,ib) .gt. this%ref%rr(2,1)) .and. (rrb(2,ib) .lt. this%ref%rr(2,nh))) then
+    if ((rrb(2,ib) .ge. (this%ref%rr(2,1)-1e-10_wp)) .and. (rrb(2,ib) .le. (this%ref%rr(2,nh)+1e-10_wp))) then
 
       wei_hinge = (rrb(2,ib) - this%ref%rr(2,1)) / (this%ref%rr(2,nh)- this%ref%rr(2,1))
       x_hinge = this%ref%rr(1,1) + wei_hinge*(this%ref%rr(1,nh)- this%ref%rr(1,1))
@@ -537,7 +537,7 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
   ! Rotation matrix, build with the local ortonormal ref.frame of
   ! the first hinge node
 
-  !!! DUST ALONE !!!!
+  !for not coupled hinge
   Rot(1,:) = this % ref % v(:,1)
   Rot(2,:) = this % ref % h(:,1)
   Rot(3,:) = this % ref % n(:,1)
@@ -1081,110 +1081,110 @@ subroutine build_hinges( geo_prs, n_hinges, hinges )
     !> Open hinge sub-parser
     call getsuboption(geo_prs, 'Hinge', hinge_prs)
 
-     hinges(i)%tag = getstr(hinge_prs, 'hinge_tag')
-     hinges(i)%nodes_input = getstr(hinge_prs, 'hinge_nodes_input')
+    hinges(i)%tag = getstr(hinge_prs, 'hinge_tag')
+    hinges(i)%nodes_input = getstr(hinge_prs, 'hinge_nodes_input')
 
-     if ( trim(hinges(i) % nodes_input) .eq. 'parametric' ) then
-        hinges(i)%node1 = getrealarray(hinge_prs, 'node_1', 3)
-        hinges(i)%node2 = getrealarray(hinge_prs, 'node_2', 3)
-        hinges(i)%le1 = 0.0_wp
-        hinges(i)%le2 = 0.0_wp
-        hinges(i)%te1 = 0.0_wp
-        hinges(i)%te2 = 0.0_wp
-        hinges(i)%chord1 = 0.0_wp
-        hinges(i)%chord2 = 0.0_wp
-        hinges(i)%csi1 = 0.0_wp
-        hinges(i)%csi2 = 0.0_wp
+    if ( trim(hinges(i) % nodes_input) .eq. 'parametric' ) then
+      hinges(i)%node1 = getrealarray(hinge_prs, 'node_1', 3)
+      hinges(i)%node2 = getrealarray(hinge_prs, 'node_2', 3)
+      hinges(i)%le1 = 0.0_wp
+      hinges(i)%le2 = 0.0_wp
+      hinges(i)%te1 = 0.0_wp
+      hinges(i)%te2 = 0.0_wp
+      hinges(i)%chord1 = 0.0_wp
+      hinges(i)%chord2 = 0.0_wp
+      hinges(i)%csi1 = 0.0_wp
+      hinges(i)%csi2 = 0.0_wp
 
-        hinges(i)%n_nodes = getint(hinge_prs, 'n_nodes')
-        hinges(i)%node_file = 'hinge with parametric input. If you read this &
-                              &string, something probabily went wrong.'
-       allocate( hinges(i)%rr( 3, hinges(i)%n_nodes ) )
-        do j = 1, hinges(i)%n_nodes
-            hinges(i)%rr(:,j) = hinges(i)%node1 + &
-                               (hinges(i)%node2 - hinges(i)%node1 ) * &
-                                  dble(j-1)/dble(hinges(i)%n_nodes-1)
-        end do
+      hinges(i)%n_nodes = getint(hinge_prs, 'n_nodes')
+      hinges(i)%node_file = 'hinge with parametric input. If you read this &
+                            &string, something probabily went wrong.'
+    allocate( hinges(i)%rr( 3, hinges(i)%n_nodes ) )
+      do j = 1, hinges(i)%n_nodes
+          hinges(i)%rr(:,j) = hinges(i)%node1 + &
+                             (hinges(i)%node2 - hinges(i)%node1 ) * &
+                                dble(j-1)/dble(hinges(i)%n_nodes-1)
+      end do
 
-     elseif ( trim(hinges(i) % nodes_input) .eq. 'from_file' ) then
-       ! *** to do *** fill dummy node1, node2, n_nodes fields
-       hinges(i) % node_file = getstr(hinge_prs,'Node_File')
-       call read_hinge_nodes( hinges(i)%node_file, &
+    elseif ( trim(hinges(i) % nodes_input) .eq. 'from_file' ) then
+      ! *** to do *** fill dummy node1, node2, n_nodes fields
+      hinges(i) % node_file = getstr(hinge_prs,'Node_File')
+      call read_hinge_nodes( hinges(i)%node_file, &
                               hinges(i)%n_nodes  , &
                               hinges(i)%rr )
-     else
-       ! *** to do *** use error message handling
-       write(*,*) ' Wrong Hinge_Nodes_Input input. Stop '; stop
-     end if
+    else
+      ! *** to do *** use error message handling
+      write(*,*) ' Wrong Hinge_Nodes_Input input. Stop '; stop
+    end if
 
-     !> Hinge reference direction (zero rotation direction) and offset to
-     ! avoid irregular behavior during hinge rotation
-     hinges(i)%ref_dir = getrealarray(hinge_prs, 'hinge_ref_dir', 3)
-     hinges(i)%offset  = getreal(hinge_prs, 'hinge_offset')
-     hinges(i)%span_blending = getreal(hinge_prs, 'hinge_spanwise_blending')
-     hinges(i)%merge_tol = getreal(hinge_prs,'hinge_merge_tol')
-     hinges(i)%adaptive_mesh = getlogical(hinge_prs,'hinge_adaptive_mesh')
-     !> Hinge input: function, amplitude
-     !> Overwrite 'constant' rotation_input with 'function:const'
-     hinges(i) % rotation_input = getstr(hinge_prs,'hinge_rotation_input')
-     !> Overwrite old 'constant' input
-     if ( trim( hinges(i)%rotation_input ) .eq. 'constant' ) then
-       hinges(i)%rotation_input = 'function:const'
-     end if
-     if ( ( trim(hinges(i)%rotation_input) .ne. 'function:const' ) .and. &
+    !> Hinge reference direction (zero rotation direction) and offset to
+    ! avoid irregular behavior during hinge rotation
+    hinges(i)%ref_dir = getrealarray(hinge_prs, 'hinge_ref_dir', 3)
+    hinges(i)%offset  = getreal(hinge_prs, 'hinge_offset')
+    hinges(i)%span_blending = getreal(hinge_prs, 'hinge_spanwise_blending')
+    hinges(i)%merge_tol = getreal(hinge_prs,'hinge_merge_tol')
+    hinges(i)%adaptive_mesh = getlogical(hinge_prs,'hinge_adaptive_mesh')
+    !> Hinge input: function, amplitude
+    !> Overwrite 'constant' rotation_input with 'function:const'
+    hinges(i) % rotation_input = getstr(hinge_prs,'hinge_rotation_input')
+    !> Overwrite old 'constant' input
+    if ( trim( hinges(i)%rotation_input ) .eq. 'constant' ) then
+      hinges(i)%rotation_input = 'function:const'
+    end if
+    if ( ( trim(hinges(i)%rotation_input) .ne. 'function:const' ) .and. &
           ( trim(hinges(i)%rotation_input) .ne. 'function:sin'   ) .and. &
           ( trim(hinges(i)%rotation_input) .ne. 'function:cos'   ) .and. &
           ( trim(hinges(i)%rotation_input) .ne. 'from_file'      ) .and. &
           ( trim(hinges(i)%rotation_input) .ne. 'coupling'       ) ) then
             write(*,*) ' Error in t_hinge%build_hinge(): rotation_input = &
-           & $ '//trim(hinges(i)%rotation_input)// &
+          & $ '//trim(hinges(i)%rotation_input)// &
                     &'not known.'; stop
-     else
-       if ( ( trim(hinges(i)%rotation_input) .eq. 'function:const' ) .or. &
+    else
+      if ( ( trim(hinges(i)%rotation_input) .eq. 'function:const' ) .or. &
             ( trim(hinges(i)%rotation_input) .eq. 'function:sin'   ) .or. &
             ( trim(hinges(i)%rotation_input) .eq. 'function:cos'   ) ) then
 
-         call getsuboption(hinge_prs, 'Hinge_Rotation_Function', fun_prs)
-         hinges(i) % rotation_amplitude = getreal(fun_prs,'amplitude')
-         hinges(i) % rotation_omega     = getreal(fun_prs,'omega')
-         hinges(i) % rotation_phase     = getreal(fun_prs,'phase')
+        call getsuboption(hinge_prs, 'Hinge_Rotation_Function', fun_prs)
+        hinges(i) % rotation_amplitude = getreal(fun_prs,'amplitude')
+        hinges(i) % rotation_omega     = getreal(fun_prs,'omega')
+        hinges(i) % rotation_phase     = getreal(fun_prs,'phase')
 
-       elseif ( trim(hinges(i)%rotation_input) .eq. 'from_file' ) then
-         write(*,*) ' Error in t_hinge%build_hinge(): rotation_input = from_file &
+      elseif ( trim(hinges(i)%rotation_input) .eq. 'from_file' ) then
+        write(*,*) ' Error in t_hinge%build_hinge(): rotation_input = from_file &
                     &not implemented yet.'; stop
 
-       elseif ( trim(hinges(i)%rotation_input) .eq. 'coupling' ) then
+      elseif ( trim(hinges(i)%rotation_input) .eq. 'coupling' ) then
 
-         !> Read coupling options
-         call getsuboption(hinge_prs, 'Hinge_Rotation_Coupling', coupling_prs)
-         hinge_node_subset = getstr(coupling_prs,'coupling_node_subset')
+        !> Read coupling options
+        call getsuboption(hinge_prs, 'Hinge_Rotation_Coupling', coupling_prs)
+        hinge_node_subset = getstr(coupling_prs,'coupling_node_subset')
 
-         if ( trim(hinge_node_subset) .eq. 'range' ) then
-           id_1 = getint(coupling_prs,'coupling_node_first')
-           id_2 = getint(coupling_prs,'coupling_node_last' )
-           !write(*,*) 'id_1' , ID_1
-           !write(*,*) 'id_2' , ID_2
+        if ( trim(hinge_node_subset) .eq. 'range' ) then
+          id_1 = getint(coupling_prs,'coupling_node_first')
+          id_2 = getint(coupling_prs,'coupling_node_last' )
+          !write(*,*) 'id_1' , ID_1
+          !write(*,*) 'id_2' , ID_2
            ! *** to do *** add some checks on node numbering ???
 
-           allocate( hinges(i) % coupling_nodes( id_2-id_1+1 ) )
-           do j = id_1, id_2; hinges(i)%coupling_nodes(j-id_1+1) = j; end do
+          allocate( hinges(i) % coupling_nodes( id_2-id_1+1 ) )
+          do j = id_1, id_2; hinges(i)%coupling_nodes(j-id_1+1) = j; end do
 
-         elseif ( trim(hinge_node_subset) .eq. 'from_file' ) then
+        elseif ( trim(hinge_node_subset) .eq. 'from_file' ) then
            ! *** to do ***
-           write(*,*) ' Coupling_Node_Subset = from_file, not implemented yet. Stop'
-           stop
-         else
-           write(*,*) ' Coupling_Node_Subset must be = "range" or "from_file", but it &
+          write(*,*) ' Coupling_Node_Subset = from_file, not implemented yet. Stop'
+          stop
+        else
+          write(*,*) ' Coupling_Node_Subset must be = "range" or "from_file", but it &
                       &is = '// trim(hinge_node_subset)//'. Stop.'; stop
-         end if
+        end if
 
-         !> Set "default" values of the function: inputs
-         hinges(i) % rotation_amplitude = 1.0_wp
-         hinges(i) % rotation_omega     = 0.0_wp
-         hinges(i) % rotation_phase     = 0.0_wp
+        !> Set "default" values of the function: inputs
+        hinges(i) % rotation_amplitude = 1.0_wp
+        hinges(i) % rotation_omega     = 0.0_wp
+        hinges(i) % rotation_phase     = 0.0_wp
 
-       end if
-     end if
+      end if
+    end if
 
   end do
 
@@ -1279,12 +1279,12 @@ subroutine hinge_input_parser( geo_prs, hinge_prs, &
       &Rotation_Input', '0.0')
   !> Hinge_Rotation_Input = from_file
   call hinge_prs%CreateSubOption('hinge_rotation_file', &
-               'Parser for hinge input from file', file_prs )
+              'Parser for hinge input from file', file_prs )
   call file_prs%CreateStringOption('file_name', &
       'Name of the file containing the input of the hinge rotation')
   !> Hinge_Rotation_Input = coupling
   call hinge_prs%CreateSubOption('hinge_rotation_coupling', &
-               'Parser for hinge input from coupling', coupling_prs )
+              'Parser for hinge input from coupling', coupling_prs )
   call coupling_prs%CreateStringOption('coupling_node_subset', &
       'Optional. Define a subset of structural nodes to evaluate &
       &coupling: "range" or "from_file"')
