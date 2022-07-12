@@ -352,7 +352,7 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
   ! Loop over all the surface points
   do ib = 1, nb
 
-    if ((rrb(2,ib) .ge. (this%ref%rr(2,1)-1e-10_wp)) .and. (rrb(2,ib) .le. (this%ref%rr(2,nh)+1e-10_wp))) then
+    if ((rrb(2,ib) .ge. (this%ref%rr(2,1)-1e-3_wp)) .and. (rrb(2,ib) .le. (this%ref%rr(2,nh)+1e-3_wp))) then
 
       wei_hinge = (rrb(2,ib) - this%ref%rr(2,1)) / (this%ref%rr(2,nh)- this%ref%rr(2,1))
       x_hinge = this%ref%rr(1,1) + wei_hinge*(this%ref%rr(1,nh)- this%ref%rr(1,1))
