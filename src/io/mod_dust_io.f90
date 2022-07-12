@@ -112,7 +112,7 @@ use mod_parse, only: &
 
 implicit none
 
-public :: save_status, load_solution, load_time
+public :: save_status, load_solution
 
 private
 
@@ -508,21 +508,6 @@ subroutine check_ref(gloc, floc, ref)
   call close_hdf5_group(refs_gloc)
 
 end subroutine check_ref
-
-!----------------------------------------------------------------------
-
-!> Load the time value from a result file
-subroutine load_time(filename, time)
-  character(len=*), intent(in) :: filename
-  real(wp), intent(out)        :: time
-
-  integer(h5loc)               :: floc
-
-  call open_hdf5_file(filename, floc)
-  call read_hdf5(time,'time',floc)
-  call close_hdf5_file(floc)
-
-end subroutine load_time
 
 !----------------------------------------------------------------------
 

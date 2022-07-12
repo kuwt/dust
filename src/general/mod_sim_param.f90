@@ -53,9 +53,11 @@ module mod_sim_param
 use mod_param, only: &
   wp, max_char_len
 
+use mod_handling, only: &
+  error, warning, printout
+  
 use mod_hdf5_io, only: &
-  h5loc, &
-  write_hdf5_attr
+  h5loc, write_hdf5_attr, open_hdf5_file, close_hdf5_file, read_hdf5
 
 use mod_parse, only: &
   t_parse, &
@@ -66,7 +68,7 @@ use mod_parse, only: &
 implicit none
 
 public :: t_sim_param, sim_param, create_param_main, create_param_pre, &
-          create_param_post
+          create_param_post, init_sim_param
 
 private
 
@@ -589,6 +591,282 @@ subroutine create_param_post(prms, sbprms, bxprms)
 
 end subroutine create_param_post
 
+!> Initialize all the parameters reading them from the the input file
+subroutine init_sim_param(sim_param, prms, nout, output_start)
+  class(t_sim_param)      :: sim_param
+  type(t_parse)           :: prms
+  integer, intent(inout)  :: nout
+  logical, intent(inout)  :: output_start
+  
+  !> Timing
+  sim_param%t0                  = getreal(prms, 'tstart')
+  sim_param%tend                = getreal(prms, 'tend')
+  sim_param%dt_out              = getreal(prms,'dt_out')
+  sim_param%debug_level         = getint(prms, 'debug_level')
+  sim_param%output_detailed_geo = getlogical(prms, 'output_detailed_geo')
+  sim_param%ndt_update_wake     = getint(prms, 'ndt_update_wake')
+  
+  !> Reference environment values
+  sim_param%P_inf               = getreal(prms,'P_inf')
+  sim_param%rho_inf             = getreal(prms,'rho_inf')
+  sim_param%a_inf               = getreal(prms,'a_inf')
+  sim_param%mu_inf              = getreal(prms,'mu_inf')
+  sim_param%nu_inf              = sim_param%mu_inf/sim_param%rho_inf
+  sim_param%u_inf               = getrealarray(prms, 'u_inf', 3)
+  !> Check on reference velocity
+  if ( countoption(prms,'u_ref') .gt. 0 ) then
+    sim_param%u_ref = getreal(prms, 'u_ref')
+  else
+    sim_param%u_ref = norm2(sim_param%u_inf)
+    if (sim_param%u_ref .le. 0.0_wp) then
+      call error('dust','dust','No reference velocity u_ref provided but &
+      &zero free stream velocity. Provide a non-zero reference velocity. &
+      &Stopping now before producing invalid results')
+    endif
+  end if
+  
+  !> Wake parameters
+  sim_param%n_wake_panels         = getint(prms, 'n_wake_panels')
+  sim_param%n_wake_particles      = getint(prms, 'n_wake_particles')
+  sim_param%particles_box_min     = getrealarray(prms, 'particles_box_min',3)
+  sim_param%particles_box_max     = getrealarray(prms, 'particles_box_max',3)
+  sim_param%rigid_wake            = getlogical(prms, 'rigid_wake')
+  sim_param%rigid_wake_vel        = sim_param%u_inf   !> initialisation
+  !> Check on wake panels
+  if(sim_param%n_wake_panels .lt. 1) then
+    sim_param%n_wake_panels = 1
+    call warning('dust','dust','imposed a number of wake panels rows &
+                &LOWER THAN 1. At least one row of panels is mandatory, &
+                &the simulation will proceed with "n_wake_panels = 1"')
+  endif
+  if ( sim_param%rigid_wake ) then
+    if ( countoption(prms,'rigid_wake_vel') .eq. 1 ) then
+      sim_param%rigid_wake_vel    = getrealarray(prms, 'rigid_wake_vel',3)
+    else if ( countoption(prms,'rigid_wake_vel') .le. 0 ) then
+      call warning('dust','dust','no rigid_wake_vel parameter set, &
+            &with rigid_wake = T; rigid_wake_vel = u_inf')
+      sim_param%rigid_wake_vel    = sim_param%u_inf
+    end if
+  end if
+
+  !> Trailing edge 
+  sim_param%join_te               = getlogical(prms, 'join_te')
+  if (sim_param%join_te) sim_param%join_te_factor=getreal(prms,'join_te_factor')
+
+  !> Names
+  sim_param%basename              = getstr(prms, 'basename')
+  sim_param%GeometryFile          = getstr(prms, 'geometry_file')
+  sim_param%ReferenceFile         = getstr(prms, 'reference_file')
+
+  !> Method parameters
+  sim_param%FarFieldRatioDoublet  = getreal(prms, 'far_field_ratio_doublet')
+  sim_param%FarFieldRatioSource   = getreal(prms, 'far_field_ratio_source')
+  sim_param%DoubletThreshold      = getreal(prms, 'doublet_threshold')
+  sim_param%RankineRad            = getreal(prms, 'rankine_rad')
+  sim_param%VortexRad             = getreal(prms, 'vortex_rad')
+  sim_param%KVortexRad             = getreal(prms, 'k_vortex_rad')
+  sim_param%CutoffRad             = getreal(prms, 'cutoff_rad')
+  sim_param%first_panel_scaling   = getreal(prms, 'implicit_panel_scale')
+  sim_param%min_vel_at_te         = getreal(prms, 'implicit_panel_min_vel')
+  sim_param%use_vs                = getlogical(prms, 'vortstretch')
+  sim_param%vs_elems              = getlogical(prms, 'vortstretch_from_elems')
+  sim_param%use_vd                = getlogical(prms, 'diffusion')
+  sim_param%use_tv                = getlogical(prms, 'turbulent_viscosity')
+  sim_param%use_ve                = getlogical(prms, 'viscosity_effects')
+  sim_param%use_pa                = getlogical(prms, 'penetration_avoidance')
+  !> Check on penetration avoidance 
+  if(sim_param%use_pa) then
+    sim_param%pa_rad_mult = getreal(prms, 'penetration_avoidance_check_radius')
+    sim_param%pa_elrad_mult = getreal(prms,'penetration_avoidance_element_radius')
+  endif
+
+  !> Lifting line elements
+  sim_param%llSolver                        = getstr(    prms, 'll_solver')
+  sim_param%llReynoldsCorrections           = getlogical(prms, 'll_reynolds_corrections')
+  sim_param%llReynoldsCorrectionsNfact      = getreal(   prms, 'll_reynolds_corrections_nfact')
+  sim_param%llMaxIter                       = getint(    prms, 'll_max_iter'            )
+  sim_param%llTol                           = getreal(   prms, 'll_tol'                )
+  sim_param%llDamp                          = getreal(   prms, 'll_damp'               )
+  sim_param%llStallRegularisation           = getlogical(prms, 'll_stall_regularisation')
+  sim_param%llStallRegularisationNelems     = getint(    prms, 'll_stall_regularisation_nelems')
+  sim_param%llStallRegularisationNiters     = getint(    prms, 'll_stall_regularisation_niters')
+  sim_param%llStallRegularisationAlphaStall = getreal(   prms, 'll_stall_regularisation_alpha_stall')
+  sim_param%llArtificialViscosity           = getreal(   prms, 'll_artificial_viscosity')
+  sim_param%llArtificialViscosityAdaptive   = getlogical(prms, 'll_artificial_viscosity_adaptive')
+  sim_param%llLoadsAVL                      = getlogical(prms, 'll_loads_avl')
+  !> check LL inputs
+  if ((trim(sim_param%llSolver) .ne. 'GammaMethod') .and. &
+      (trim(sim_param%llSolver) .ne. 'AlphaMethod')) then
+    write(*,*) ' sim_param%llSolver : ' , trim(sim_param%llSolver)
+    call warning('dust','init_sim_param',' Wrong string for LLsolver. &
+                &This parameter is set equal to "GammaMethod" (default) &
+                &in init_sim_param() routine.')
+    sim_param%llSolver = 'GammaMethod'
+  end if
+
+  if ( trim(sim_param%llSolver) .eq. 'GammaMethod' ) then
+    if ( sim_param%llArtificialViscosity .gt. 0.0_wp ) then
+      call warning('dust','init_sim_param','LLartificialViscoisty set as an input, &
+          & different from zero, but ll regularisation available only if&
+          & LLsolver = AlphaMethod. LLartificialViscosity = 0.0')
+      sim_param%llArtificialViscosity = 0.0_wp
+      sim_param%llArtificialViscosityAdaptive = .false.
+      sim_param%llArtificialViscosityAdaptive_Alpha  = 0.0_wp
+      sim_param%llArtificialViscosityAdaptive_dAlpha = 0.0_wp
+    end if
+    if ( sim_param%llArtificialViscosityAdaptive ) then
+      call warning('dust','init_sim_param','LLartificialViscosityAdaptive set&
+          & as an input, but ll adaptive regularisation available only if&
+          & LLsolver = AlphaMethod')
+    end if
+  end if
+
+  !> The user is required to set _Alpha and _dAlpha for ll adaptive regularisation
+  if (trim(sim_param%llSolver) .eq. 'AlphaMethod') then
+    if (sim_param%llArtificialViscosityAdaptive) then
+      if ((countoption(prms,'ll_artificial_viscosity_adaptive_alpha')  .eq. 0) .or. &
+          (countoption(prms,'ll_artificial_viscosity_adaptive_dalpha') .eq. 0)) then
+        call error('dust','init_sim_param','LLartificialViscosityAdaptive_Alpha or&
+          & LLartificialViscosity_dAlpha not set as an input, while LLartificialViscosityAdaptive&
+          & is set equal to T. Set these parameters [deg].')
+      else
+        sim_param%llArtificialViscosityAdaptive_Alpha = getreal(prms,'ll_artificial_viscosity_adaptive_alpha')
+        sim_param%llArtificialViscosityAdaptive_dAlpha= getreal(prms,'ll_artificial_viscosity_adaptive_dalpha')
+      end if
+    end if
+  end if
+  !write(*,*) ' sim_param%llSolver : ' , trim(sim_param%llSolver)
+  !> VL correction 
+  sim_param%vl_tol                        = getreal(prms, 'vl_tol')
+  sim_param%vl_relax                      = getreal(prms, 'vl_relax')
+  sim_param%vl_maxiter                    = getint(prms, 'vl_maxiter')
+  sim_param%vl_startstep                  = getint(prms, 'vl_start_step')
+  sim_param%rel_aitken                    = getlogical(prms, 'aitken_relaxation')
+  sim_param%vl_ave                        = getlogical(prms,'vl_average')
+  sim_param%vl_iter_ave                   = getint(prms,'vl_average_iter') 
+  
+  !>  VL Dynamic stall
+  sim_param%vl_dynstall                   = getlogical(prms, 'vl_dynstall')  
+  
+  !> Octree and FMM parameters
+  sim_param%use_fmm                       = getlogical(prms, 'fmm')
+
+  if(sim_param%use_fmm) then
+    sim_param%use_fmm_pan                 = getlogical(prms, 'fmm_panels')
+    sim_param%BoxLength                   = getreal(prms, 'box_length')
+    sim_param%NBox                        = getintarray(prms, 'n_box',3)
+    sim_param%OctreeOrigin                = getrealarray(prms, 'octree_origin',3)
+    sim_param%NOctreeLevels               = getint(prms, 'n_octree_levels')
+    sim_param%MinOctreePart               = getint(prms, 'min_octree_part')
+    sim_param%MultipoleDegree             = getint(prms,'multipole_degree')
+    sim_param%use_dyn_layers              = getlogical(prms,'dyn_layers')
+
+    if(sim_param%use_dyn_layers) then
+      sim_param%NMaxOctreeLevels          = getint(prms, 'nmax_octree_levels')
+      sim_param%LeavesTimeRatio           = getreal(prms, 'leaves_time_ratio')
+    else
+      sim_param%NMaxOctreeLevels          = sim_param%NOctreeLevels
+    endif
+
+    sim_param%use_pr                      = getlogical(prms, 'particles_redistribution')
+
+    if(sim_param%use_pr) then
+      sim_param%part_redist_ratio         = getreal(prms,'particles_redistribution_ratio')
+      if ( countoption(prms,'octree_level_solid') .gt. 0 ) then
+        sim_param%lvl_solid               = getint(prms, 'octree_level_solid')
+      else
+        sim_param%lvl_solid               = max(sim_param%NOctreeLevels-2,1)
+      endif
+    endif
+  else
+    sim_param%use_fmm_pan = .false.
+  endif
+
+  !> HCAS
+  sim_param%hcas                          = getlogical(prms,'HCAS')
+  if(sim_param%hcas) then
+    sim_param%hcas_time                   = getreal(prms,'HCAS_time')
+    sim_param%hcas_vel                    = getrealarray(prms,'HCAS_velocity',3)
+  endif
+
+  !> Variable_wind
+  sim_param%use_gust                      = getlogical(prms, 'gust')
+
+  if(sim_param%use_gust) then
+    sim_param%GustType                    = getstr(prms,'gust_type')
+    sim_param%gust_origin                 = getrealarray(prms, 'gust_origin',3)
+
+    if(countoption(prms,'gust_front_direction') .gt. 0) then
+      sim_param%gust_front_direction      = getrealarray(prms, 'gust_front_direction',3)
+    else
+      sim_param%gust_front_direction      = sim_param%u_inf
+    end if
+    
+    if(countoption(prms,'gust_front_speed') .gt. 0) then
+      sim_param%gust_front_speed          = getreal(prms, 'gust_front_speed')
+    else
+      sim_param%gust_front_speed          = norm2(sim_param%u_inf)
+    end if
+    sim_param%gust_u_des                  = getreal(prms,'gust_u_des')
+    sim_param%gust_perturb_direction      = getrealarray(prms,'gust_perturbation_direction',3)
+    sim_param%gust_time                   = getreal(prms,'gust_start_time')
+    sim_param%gust_gradient               = getreal(prms,'gust_gradient')
+  end if
+  
+  !> PreCICE
+#if USE_PRECICE
+    sim_param%precice_config              = getstr(prms,'precice_config')
+#endif
+  
+  !> Manage restart
+  sim_param%restart_from_file             = getlogical(prms,'restart_from_file')
+  if (sim_param%restart_from_file) then
+
+    sim_param%reset_time                  = getlogical(prms,'reset_time')
+    sim_param%restart_file                = getstr(prms,'restart_file')
+    
+    !> Removing leading "./" if present to avoid issues when restarting
+    if(sim_param%basename(1:2) .eq. './') sim_param%basename = sim_param%basename(3:)
+    
+    if(sim_param%restart_file(1:2) .eq. './') sim_param%restart_file = sim_param%restart_file(3:)
+    
+    call printout('RESTART: restarting from file: '//trim(sim_param%restart_file))
+    sim_param%GeometryFile = sim_param%restart_file(1:len(trim(sim_param%restart_file))-11) //'geo.h5'
+
+    !restarting the same simulation, advance the numbers
+    if(sim_param%restart_file(1:len(trim(sim_param%restart_file))-12).eq. &
+                                                trim(sim_param%basename)) then
+    read(sim_param%restart_file(len(trim(sim_param%restart_file))-6:len(trim(sim_param%restart_file))-3),*) nout
+      call printout('Identified restart from the same simulation, keeping the&
+                    & previous output numbering')
+      !> avoid rewriting the same timestep
+      output_start = .false.
+    endif
+    if(.not. sim_param%reset_time) call load_time(sim_param%restart_file, sim_param%t0)
+  endif
+
+  !> Check the number of timesteps
+  if(CountOption(prms,'dt') .gt. 0) then
+    if( CountOption(prms,'timesteps') .gt. 0) then
+      call error('init_sim_param','dust','Both number of timesteps and dt are&
+      & set, but only one of the two can be specified')
+    else
+      !> get dt and compute number of timesteps
+      sim_param%dt     = getreal(prms, 'dt')
+      sim_param%n_timesteps = ceiling((sim_param%tend-sim_param%t0)/sim_param%dt) + 1
+                              !(+1 for the zero time step)
+    endif
+  else
+    !> get number of steps, compute dt
+    sim_param%n_timesteps = getint(prms, 'timesteps')
+    sim_param%dt =  (sim_param%tend-sim_param%t0)/&
+                      real(sim_param%n_timesteps,wp)
+    sim_param%n_timesteps = sim_param%n_timesteps + 1
+                            !add one for the first step
+  endif
+
+end subroutine init_sim_param
+
 
 subroutine save_sim_param(this, loc)
   class(t_sim_param) :: this
@@ -677,5 +955,20 @@ subroutine save_sim_param(this, loc)
   endif
 
 end subroutine save_sim_param
+
+!----------------------------------------------------------------------
+! moved here from mod_dust_io
+!> Load the time value from a result file
+subroutine load_time(filename, time)
+  character(len=*), intent(in) :: filename
+  real(wp), intent(out)        :: time
+
+  integer(h5loc)               :: floc
+
+  call open_hdf5_file(filename, floc)
+  call read_hdf5(time,'time',floc)
+  call close_hdf5_file(floc)
+
+end subroutine load_time
 
 end module mod_sim_param
