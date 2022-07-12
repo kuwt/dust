@@ -406,10 +406,10 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
     do iRegion = 1, nRegions
       do ih = 1, n_hinges
-        if (mesh_mirror .or. mesh_symmetry .and. hinges(ih)%adaptive_mesh ) then 
+        if ((mesh_mirror .or. mesh_symmetry) .and. hinges(ih)%adaptive_mesh ) then 
 
-          if ((hinges(ih)%node2(2) .le. ac_line(2, iRegion + 1)) .and. & 
-              (hinges(ih)%node2(2) .ge. ac_line(2, iRegion))) then 
+          if ((hinges(ih)%node2(2) .le. ac_line(2, iRegion + 1) - hinges(ih)%merge_tol) .and. & 
+              (hinges(ih)%node2(2) .ge. ac_line(2, iRegion) + hinges(ih)%merge_tol)) then 
 
               !> interpolate at hinge station to get the leading edge point
               call linear_interp((/ rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
@@ -429,8 +429,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
           endif    
 
-          if ((hinges(ih)%node1(2) .le. ac_line(2, iRegion + 1)) .and. & 
-              (hinges(ih)%node1(2) .ge. ac_line(2, iRegion))) then 
+          if ((hinges(ih)%node1(2) .le. ac_line(2, iRegion + 1)- hinges(ih)%merge_tol) .and. & 
+              (hinges(ih)%node1(2) .ge. ac_line(2, iRegion)+ hinges(ih)%merge_tol)) then 
               !> interpolate at hinge station to get the leading edge point
               call linear_interp((/rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
                                 (/ rrv_le(2, iRegion), rrv_le(2, iRegion + 1)/), & 
@@ -447,8 +447,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
               hinges(ih)%csi1 = (hinges(ih)%node1(1) - hinges(ih)%le1(1)) / hinges(ih)%chord1 
           endif 
         elseif ( hinges(ih)%adaptive_mesh) then
-          if ((hinges(ih)%node1(2) .ge. ac_line(2, iRegion)) .and. & 
-              (hinges(ih)%node1(2) .le. ac_line(2, iRegion + 1))) then 
+          if ((hinges(ih)%node1(2) .ge. ac_line(2, iRegion)+ hinges(ih)%merge_tol) .and. & 
+              (hinges(ih)%node1(2) .le. ac_line(2, iRegion + 1) - hinges(ih)%merge_tol)) then 
               
               !> interpolate at hinge station to get the leading edge point
               call linear_interp((/ rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
@@ -468,8 +468,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
               hinges(ih)%csi1 = (hinges(ih)%node1(1) - hinges(ih)%le1(1)) / hinges(ih)%chord1 
           endif    
 
-          if ((hinges(ih)%node2(2) .ge. ac_line(2, iRegion)) .and. & 
-                  (hinges(ih)%node2(2) .le. ac_line(2, iRegion + 1))) then 
+          if ((hinges(ih)%node2(2) .ge. ac_line(2, iRegion)+ hinges(ih)%merge_tol) .and. & 
+                  (hinges(ih)%node2(2) .le. ac_line(2, iRegion + 1)-hinges(ih)%merge_tol)) then 
               !> interpolate at hinge station to get the leading edge point
               call linear_interp((/ rrv_le(1, iRegion), rrv_le(1, iRegion + 1)/), &
                                 (/rrv_le(2, iRegion), rrv_le(2, iRegion + 1)/), & 
