@@ -23,20 +23,20 @@ class MBDynAdapter:
 
 
   def __init__(self, mbdInterface, \
-               config_file_name = './../precice-config.xml' ):
+              config_file_name = './../precice-config.xml'):
 
     self.debug = True
 
     #> Initialize PreCICE participant dictionary, p for participant
     self.p = { \
-               'name':'MBDyn', \
-               'mesh':{ \
-                  'name':'MBDynNodes', 'id':[], 'node_ids':[], \
-                  'nodes':[], 'nnodes':[], 'dim':[] }, \
-               'fields':{}  \
-             }
+              'name':'MBDyn', \
+              'mesh':{ \
+              'name':'MBDynNodes', 'id':[], 'node_ids':[], \
+              'nodes':[], 'nnodes':[], 'dim':[] }, \
+              'fields':{}  \
+              }
     field_dict = { 'name':'field_name', 'id':[], 'data':[],
-             'type':'scalar/vector', 'io':'read/write' }
+              'type':'scalar/vector', 'io':'read/write' }
   
     #> Use MBDyn interface, containing info about MBDyn-mbc_py
     self.mbd = mbdInterface
@@ -48,7 +48,7 @@ class MBDynAdapter:
                   'vector', 'vector', 'vector'  ]
     iolist    = [ 'write', 'write', 'write', 'write', 'read', \
                   'read' ]
-     
+    
     #> === PreCICE interface ====================================
     comm_rank = 0; comm_size = 1   
     
@@ -73,10 +73,11 @@ class MBDynAdapter:
         field['type'] = self.mbd.data[fieldn]['type']
         field['io']   = self.mbd.data[fieldn]['io']
         self.p['fields'][field['name']] = field
-
+    
     #> === Mesh =================================================
     #> Nodes: set_mesh_vertices
-    self.p['mesh']['nodes'] = self.mbd.refConfigNodes()
+    self.p['mesh']['nodes'] = self.mbd.rr 
+    
     # old: initial configuration as the reference configuration
     self.p['mesh']['nnodes'] = np.size( self.mbd.data['Position']['data'], 0 )
     self.p['mesh']['dim']    = np.size( self.mbd.data['Position']['data'], 1 )
@@ -87,9 +88,11 @@ class MBDynAdapter:
       for i in np.arange(self.mbd.socket.nnodes):
         print('  ', i,': ', self.p['mesh']['node_id'][i],' , ', \
                             self.p['mesh']['nodes'][i,:] )
-
+    
     #> === Initialize ===========================================
+    
     self.dt_precice = self.interface.initialize()
+    
     self.is_ongoing = self.interface.is_coupling_ongoing()
     if ( self.debug ): 
       print(' interface.is_coupling_ongoing: \033[0;32m ▶ %s' % self.is_ongoing )
@@ -117,7 +120,7 @@ class MBDynAdapter:
   def runPreCICE(self, dt_set):
 
     n = self.mbd.socket.nnodes; nd = 3
-
+    
     cowic = precice.action_write_iteration_checkpoint()
     coric = precice.action_read_iteration_checkpoint()
 

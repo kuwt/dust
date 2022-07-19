@@ -113,5 +113,5 @@ class MBDynInterface:
 
     if ( len(rr.shape) == 1 ):
       rr = rr.reshape( 1,3 )
-
+    self.rr = rr 
     return rr

@@ -48,7 +48,7 @@
 module mod_precice
 
 use mod_param, only: &
-  wp, pi, nl
+  wp, pi, nl, max_char_len
 
 use mod_sim_param, only: &
   sim_param
@@ -84,7 +84,7 @@ private
 public :: t_precice
 
 !> Parameters
-integer, parameter :: precice_mcl = 50 ! precice_max_char_len
+integer, parameter :: precice_mcl = max_char_len
 
 !> PreCICE mesh -------------------------------------------------
 type :: t_precice_mesh
