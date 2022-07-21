@@ -169,6 +169,8 @@ subroutine save_status(geo, wake, it, time, run_id)
   call write_hdf5(sim_param%u_inf,'u_inf', ploc)
   call write_hdf5(sim_param%P_inf,'P_inf', ploc)
   call write_hdf5(sim_param%rho_inf,'rho_inf', ploc)
+  call write_hdf5(sim_param%mu_inf,'mu_inf', ploc)
+  
   call close_hdf5_group(ploc)
 
   ! 1) %%%%% Component solution:

@@ -1282,21 +1282,20 @@ analysis.
 \begin{inputfile}[frame=single]
   1: # Aeroacoustic Data
 \end{inputfile}
-The second and third lines contain the current simulation time.  
+The second and third lines contain the current simulation time and parameters .  
 \begin{inputfile}[frame=single]
-  2: # Time
-  3: 0.000000000000000E+000   
+  2: # Time, free stream: Pressure, density, sound speed, dynamic viscosity, flow velocity 
+  3: 0.000000000000000E+000   ... -0.280000000000000E+002
 \end{inputfile}
-The fourth line is a header file containing the fields and their dimension collected in the nextlines.
+The fourth line is a header file containing the fields collected in the nextlines.
 \begin{inputfile}[frame=single]
- 4: # Element Center (3), Element Normal (3), Element Center Velocity (3), 
-      Element Area (1), Force Acting on Element (3)
+  4: # cx, cy, cz, nx, ny, nz, area, pressure, rho*ux, rho*uy, rho*uz
 \end{inputfile}
 In the case of a rotor/propeller component, each blade is labelled with Comp___ .
 As an example, with a 3 blade propeller/rotor, reads:
 \begin{inputfile}[frame=single]
   5: Comp 000
-    ...
-  ..: Comp 001
-    ...
+      ...
+     Comp 001
+      ...
 \end{inputfile}
