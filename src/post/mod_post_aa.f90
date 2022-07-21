@@ -121,6 +121,8 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
   real(wp), allocatable               :: points(:,:)
   integer                             :: nelem, n_time
   real(wp)                            :: time
+  real(wp)                            :: p_inf, a_inf, rho_inf, mu_inf
+  real(wp)                            :: u_inf(3)
   integer                             :: fid_out, fid_time
   integer                             :: i_comp, ie, ierr
   real(wp), allocatable               :: refs_R(:,:,:), refs_off(:,:)
@@ -170,6 +172,11 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
     ! Load free-stream parameters
     call open_hdf5_group(floc,'Parameters',ploc)
     call read_hdf5(time,'time',floc)
+    call read_hdf5(rho_inf, 'rho_inf', ploc)
+    call read_hdf5(mu_inf, 'rho_inf', ploc)
+    call read_hdf5(u_inf, 'u_inf', ploc)
+
+
     call close_hdf5_group(ploc)
 
     write(fid_time, '('//ascii_real//')') time
@@ -214,18 +221,15 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
         open(unit=fid_out,file=trim(filename))
 
         !write the header here
-        call dat_out_aa_header( fid_out, time )
+        call dat_out_aa_header( fid_out, time, p_inf, rho_inf, a_inf, mu_inf, u_inf)
       endif
 
       !write(fid_out, '(A,I3.3)') trim(compname)//' ',imult
       write(fid_out, '(A,I3.3)') 'Comp ',imult
       !cycle on elements
       do ie = 1,size(comp%el)
-        !GFORTRAN BUG: the associate is much cleaner, but crashes gfortran 5.4
-        !associate(el => comp%el(ie))
         call dat_out_aa( fid_out, comp%el(ie)%cen, comp%el(ie)%nor, &
-                comp%el(ie)%ub, comp%el(ie)%area, comp%el(ie)%dforce )
-        !end associate
+                comp%el(ie)%ub, comp%el(ie)%area, comp%el(ie)%pres, rho_inf)
       enddo
     end associate
     enddo

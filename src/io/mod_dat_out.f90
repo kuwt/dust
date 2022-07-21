@@ -131,28 +131,28 @@ end subroutine dat_out_hinge_header
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_aa_header ( fid , t)
+subroutine dat_out_aa_header ( fid , t, p_inf, rho_inf, a_inf, mu_inf, u_inf)
   integer , intent(in) :: fid
   real(wp), intent(in) :: t
+  real(wp), intent(in) :: p_inf, rho_inf, a_inf, mu_inf
+  real(wp), intent(in) :: u_inf(3)
 
   write(fid,'(A)') '# Aeroacoustic Data'
 
-  write(fid,'(A)') '# Time'
-  write(fid,'('//ascii_real//')') t
+  write(fid,'(A)') '# Time, free stream: Pressure, density, sound speed, dynamic viscosity, flow velocity'
+  write(fid,'(8'//ascii_real//')') t, p_inf, rho_inf, a_inf, mu_inf, u_inf
 
-  write(fid,'(A)') '# Element Center (3), Element Normal (3), &
-                &Element Center Velocity (3), Element Area (1), &
-                &Force Acting on Element (3)'
-
+  write(fid,'(A)') '# cx, cy, cz, nx, ny, nz, area, pressure, rho*ux, rho*uy, rho*uz'
+  
 end subroutine dat_out_aa_header
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_aa ( fid , cen, n, vel, area, f)
+subroutine dat_out_aa ( fid , cen, n, vel, area, pres, rho_inf)
   integer , intent(in) :: fid
-  real(wp), intent(in) :: cen(3), n(3), vel(3), area, f(3)
+  real(wp), intent(in) :: cen(3), n(3), vel(3), area, pres, rho_inf
 
-  write(fid,'(13'//ascii_real//')') cen, n, vel, area, f
+  write(fid,'(13'//ascii_real//')') cen, n, area, pres, vel*rho_inf
 
 end subroutine dat_out_aa
 
