@@ -31,16 +31,16 @@ class MBDynAdapter:
     self.p = { \
               'name':'MBDyn', \
               'mesh':{ \
-              'name':'MBDynNodes', 'id':[], 'node_ids':[], \
-              'nodes':[], 'nnodes':[], 'dim':[] }, \
+                  'name':'MBDynNodes', 'id':[], 'node_ids':[], \
+                  'nodes':[], 'nnodes':[], 'dim':[] }, \
               'fields':{}  \
               }
     field_dict = { 'name':'field_name', 'id':[], 'data':[],
-              'type':'scalar/vector', 'io':'read/write' }
+                'type':'scalar/vector', 'io':'read/write' }
   
     #> Use MBDyn interface, containing info about MBDyn-mbc_py
     self.mbd = mbdInterface
-        
+
     # All the data that can be exchanged with MBDyn
     fieldlist = [ 'Position', 'Velocity', 'Rotation', \
                   'AngularVelocity', 'Force', 'Moment' ]
@@ -83,7 +83,8 @@ class MBDynAdapter:
     self.p['mesh']['dim']    = np.size( self.mbd.data['Position']['data'], 1 )
     self.p['mesh']['node_id'] = self.interface.set_mesh_vertices( \
                     self.p['mesh']['id'], self.p['mesh']['nodes'] )
-
+    
+    print('self.mbd.socket.nnodes',self.mbd.socket.nnodes)
     if ( self.debug ): 
       for i in np.arange(self.mbd.socket.nnodes):
         print('  ', i,': ', self.p['mesh']['node_id'][i],' , ', \

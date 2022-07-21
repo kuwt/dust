@@ -30,11 +30,11 @@ class MBDynInterface:
   class Socket:
     """ Class containing the socket parameters """
     """ for comm between MBDyn and mbc_py      """
-    def __init__(self, \
-                 path="", host="", port=0, \
-                 timeout=-1, verbose=0, data_and_next=1, \
-                 refnode=0, nnodes=1, labels = 0, rot=0x100, \
-                 accels=0 ):
+    def __init__( self, \
+                  path="", host="", port=0, \
+                  timeout=-1, verbose=0, data_and_next=1, \
+                  refnode=0, nnodes=1, labels = 0, rot=0x100, \
+                  accels=0 ):
       self.path          = path
       self.host          = host          
       self.port          = port          
@@ -60,8 +60,8 @@ class MBDynInterface:
                       dumpAuxFilen='./../nnodes.dat'):
 
     #> Initialize communication
-    self.socket = self.Socket( path=path, verbose=0, \
-                               nnodes=nnodes, accels=accels )
+    self.socket = self.Socket(path=path, verbose=0, \
+                              nnodes=nnodes, accels=accels )
 
     if ( forceType == 'Nodal' ):
       self.nodal = mbcNodal(self.socket.path, \
