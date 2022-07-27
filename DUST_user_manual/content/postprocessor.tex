@@ -1275,27 +1275,21 @@ selected components will be included in the output file.
 \end{itemize}
 
 \subsubsection{Output .dat file}
-For each DUST component is generated a corresponding \param{.dat} file.
 The output file containing aeroacustics data in \param{.dat} format has 
 the following structure. The first line is a header specifying the 
 analysis.
 \begin{inputfile}[frame=single]
   1: # Aeroacoustic Data
 \end{inputfile}
-The second and third lines contain the current simulation time and parameters .  
+The second and third lines contain the current simulation time and parameters; 
+\param{Element} indicates the total number of elements considered, that is the number of the following lines. 
 \begin{inputfile}[frame=single]
-  2: # Time, free stream: Pressure, density, sound speed, dynamic viscosity, flow velocity 
-  3: 0.000000000000000E+000   ... -0.280000000000000E+002
+  2: # Time, free stream: Element, Pressure, density, sound speed, 
+        dynamic viscosity, flow velocity 
+  3: 10  0.000000000000000E+000   ... -0.280000000000000E+002
 \end{inputfile}
 The fourth line is a header file containing the fields collected in the nextlines.
 \begin{inputfile}[frame=single]
-  4: # cx, cy, cz, nx, ny, nz, area, pressure, rho*ux, rho*uy, rho*uz
+  4: # cx, cy, cz, nx, ny, nz, area, rho, pressure, rhoux, rhouy, rhouz, svx, svy, svz
 \end{inputfile}
-In the case of a rotor/propeller component, each blade is labelled with Comp___ .
-As an example, with a 3 blade propeller/rotor, reads:
-\begin{inputfile}[frame=single]
-  5: Comp 000
-      ...
-     Comp 001
-      ...
-\end{inputfile}
+\param{svx}, \param{svy} and \param{svz} represents the grid velocity, the velocity of the centers of each element.
