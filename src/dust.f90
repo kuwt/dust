@@ -177,6 +177,7 @@ real(wp)                          :: time_no_out, time_no_out_debug
 logical                           :: time_2_out, time_2_debug_out
 logical                           :: output_start
 real(wp)                          :: dt_debug_out
+logical                           :: already_solv_restart
 
 !> Main variables
 !> All the implicit elements, sorted first static then moving
@@ -400,7 +401,7 @@ endif
 if (sim_param%restart_from_file) then
   call load_solution(sim_param%restart_file, geo%components, geo%refs)
   call load_wake(sim_param%restart_file, wake, elems_tot)
-
+  already_solv_restart = .true.
 else ! Set to zero the intensity of all the singularities
 
   do i_el = 1 , size(elems)      ! implicit elements (vr, sp)
@@ -415,6 +416,7 @@ else ! Set to zero the intensity of all the singularities
       elems_ll(i_el)%p%Gamma_old = 0.0_wp
     end do
   endif
+  already_solv_restart = .false.
 endif
 
 t22 = dust_time()
@@ -496,13 +498,7 @@ allocate(surf_vel_SurfPan_old(geo%nSurfpan,3)) ; surf_vel_SurfPan_old = 0.0_wp
 allocate(     nor_SurfPan_old(geo%nSurfpan,3)) ;      nor_SurfPan_old = 0.0_wp
 
 allocate(res_old(size(elems)))
-if ( sim_param % restart_from_file ) then
-  do i_el = 1 , size(elems)
-    res_old(i_el) = elems(i_el)%p%mag
-  end do
-else
-  res_old = 0.0_wp
-end if
+res_old = 0.0_wp
 
 !===========> Start time cycle 
 t11 = dust_time()
@@ -540,7 +536,17 @@ it = 1
     if ( mod( it-1, sim_param%ndt_update_wake ) .eq. 0 ) then
       call prepare_wake(wake, elems_tot, octree)
     end if
-
+    
+    if(already_solv_restart) then
+    ! prepare_wake zeros uvort for ALL elems_tot, so it has to be computed again for a restart.
+    ! TODO check unwanted behaviour of prepare_wake and limit its access to elems_tot 
+      do i_el = 1 , size(elems)
+        select type( el => elems(i_el)%p ) ; type is (t_surfpan)
+          call el%get_vort_vel(wake%vort_p)
+        end select
+      end do
+    end if
+    
     call update_liftlin(elems_ll,linsys)
     call update_actdisk(elems_ad,linsys)
 
@@ -599,7 +605,11 @@ it = 1
 
     !> Calculate the normal velocity derivative for the pressure equation
     call press_normvel_der(geo, elems, surf_vel_SurfPan_old)
-
+  
+  !> If the simulation is restarted the solution part can be skipped 
+  ! since it's loaded from the restart file
+  if(.not. already_solv_restart) then
+    
     !>-------------- Assemble the system ------
     t0 = dust_time()
     sel = size(elems) ! total number of elements
@@ -639,6 +649,7 @@ it = 1
     sel = size(elems)
 
     !> compute dGamma_dt for unsteady contribution
+
 !$omp parallel do private(i_el)
     do i_el = 1 , sel
       elems(i_el)%p%didou_dt = (linsys%res(i_el) - res_old(i_el)) / sim_param%dt
@@ -651,12 +662,11 @@ if(sim_param%debug_level .ge. 1) then
 endif
 
 !debug print of the results
-if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
+if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
                       call debug_printout_result(linsys, basename_debug, it)
 
   !------ Update the explicit part ------  % v-----implicit elems: p,v
   if ( size(elems_ll) .gt. 0 ) then
-
     if ( trim(sim_param%llSolver) .eq. 'GammaMethod' ) then ! Gamma-method
       if (sim_param%time .gt. sim_param%time_old)  then
         do i_el = 1, size(elems_ll)
@@ -840,7 +850,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
           endif    
 
           if (it_vl .eq. sim_param%vl_maxiter) then 
-            linsys%res = gamma_tmp / it_stall 
+            linsys%res = gamma_tmp / real(it_stall,wp)
           endif 
         endif 
 
@@ -1003,6 +1013,11 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
       nout = nout+1
       call save_status(geo, wake, nout, time, run_id)
     endif
+  
+  !> if the simulation has been restarted it should jump here because
+  ! the solution comes from the restart file
+  endif ! already solved because restarted
+  already_solv_restart = .false.
 
     !> Viscous Effects and Flow Separations 
     ! some computation of surface quantities and vorticity to be released.
@@ -1044,12 +1059,11 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
     !  this means that in the following routines the wake points are already
     !  updated to the next step, so we can immediatelt
     !  add the new particles if needed
-  
+    
     t0 = dust_time()
     if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
       call update_wake(wake, elems_tot, octree)
     end if
-  
     t1 = dust_time()
 
     !> debug message

@@ -1099,7 +1099,7 @@ subroutine load_components(geo, in_file, out_file, te)
         call read_hdf5(aero_table,  'aero_table',  geo_loc)
 
         if (trim(aero_table) .eq. 'true') then 
-          
+
           call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc)
           call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
           call read_hdf5_al(normalised_coord_e,'normalised_coord_e',geo_loc)
@@ -1422,7 +1422,12 @@ subroutine load_components(geo, in_file, out_file, te)
           call write_hdf5(theta_e           ,'theta_e'           ,geo_loc)
         elseif (comp_el_type(1:1) .eq. 'v' ) then
           call write_hdf5(trim(aero_table)  ,'aero_table'        ,geo_loc)          
-
+          if (trim(aero_table) .eq. 'true') then
+            call write_hdf5(airfoil_list      ,'airfoil_list'      ,geo_loc)
+            call write_hdf5(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
+            call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
+            call write_hdf5(thickness          ,'thickness'       ,geo_loc)
+          endif
         else if (comp_el_type(1:1) .eq. 'a') then
           call write_hdf5(trac,'Traction',cloc2)
           call write_hdf5(rad,'Radius',cloc2)

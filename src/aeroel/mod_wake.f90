@@ -591,7 +591,7 @@ subroutine load_wake(filename, wake, elems)
 
   integer(h5loc)                        :: floc, gloc
   real(wp), allocatable                 :: wpoints(:,:,:), wvels(:,:,:), wvort(:,:)
-  real(wp), allocatable                 :: vppoints(:,:), vpvort(:,:) , vpvels(:,:)
+  real(wp), allocatable                 :: vppoints(:,:), vpvort(:,:) , vpvels(:,:), vprad(:)
   integer, allocatable                  :: start_points(:,:)
   integer, allocatable                  :: conn_pe(:)
   integer                               :: ipan, iw, p1, p2, ipt
@@ -701,6 +701,7 @@ subroutine load_wake(filename, wake, elems)
   end if
   call read_hdf5_al(vpvort,'WakeVort',gloc)
   call read_hdf5(wake%last_pan_idou,'LastPanIdou',gloc)
+  call read_hdf5_al(vprad,'VortexRad',gloc)
   call close_hdf5_group(gloc)
 
   if(size(vpvort,2) .gt. wake%nmax_prt) call error(this_sub_name, &
@@ -734,6 +735,7 @@ subroutine load_wake(filename, wake, elems)
     wake%wake_parts(ip)%cen = vppoints(:,ip)
     wake%wake_parts(ip)%vel = vpvels(:,ip)
     wake%wake_parts(ip)%mag = norm2(vpvort(:,ip))
+    wake%wake_parts(ip)%r_Vortex = vprad(ip)
     if(wake%wake_parts(ip)%mag .gt. 1.0e-13_wp) then
       wake%wake_parts(ip)%dir = vpvort(:,ip)/wake%wake_parts(ip)%mag
     else
@@ -744,7 +746,7 @@ subroutine load_wake(filename, wake, elems)
     if(.not.sim_param%use_fmm_pan) wake%vort_p(ip)%p => wake%wake_parts(ip)
   enddo
 
-  deallocate(vppoints, vpvort, vpvels)
+  deallocate(vppoints, vpvort, vpvels, vprad)
 
   call close_hdf5_file(floc)
 
@@ -753,7 +755,7 @@ subroutine load_wake(filename, wake, elems)
   !If the wake is full, attach the end vortex
   if (wake%full_panels) then
     do iw = 1,wake%n_pan_stripes
-      wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag
+      wake%end_vorts(iw)%mag => wake%last_pan_idou(iw)
       p1 = wake%i_start_points(1,iw)
       p2 = wake%i_start_points(2,iw)
       call wake%end_vorts(iw)%calc_geo_data( &
@@ -1243,7 +1245,7 @@ subroutine complete_wake(wake, geo, elems, te)
   character(len=*), parameter            :: this_sub_name='prepare_wake'
 
 #if USE_PRECICE
-  ! first and second row of the wake are already taken care of by update_near_field_wake
+  ! first and second row of the wake were already taken care of by update_near_field_wake
 #else
   !==> Panels: update the first rows of panels
 
