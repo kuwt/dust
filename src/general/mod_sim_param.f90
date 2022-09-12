@@ -132,8 +132,10 @@ type t_sim_param
   real(wp) :: particles_box_max(3)
   !> Join close trailing edges
   logical :: join_te
-    !> All trailing edges closer than join_te_factor will be joined
-    real(wp) :: join_te_factor
+  !> All trailing edges closer than join_te_factor will be joined
+  real(wp) :: join_te_factor
+  !> Wake refinement with subparticles
+  logical :: refine_wake  
 
   !Method parameters
   !> Multiplier for far field threshold computation on doublet
@@ -322,8 +324,8 @@ subroutine create_param_main(prms)
   call prms%CreateStringOption('reference_file','Reference frames file','no_set')
   
   !> Output
-  call prms%CreateStringOption('basename','oputput basename','./')
-  call prms%CreateStringOption('basename_debug','oputput basename for debug','./')
+  call prms%CreateStringOption('basename','output basename','./')
+  call prms%CreateStringOption('basename_debug','output basename for debug','./')
   call prms%CreateLogicalOption('output_start', "output values at starting &
                                                             & iteration", 'F')
   call prms%CreateLogicalOption('output_detailed_geo', "output at each &
@@ -356,6 +358,7 @@ subroutine create_param_main(prms)
   call prms%CreateRealArrayOption('rigid_wake_vel', "rigid wake velocity" )
   call prms%CreateLogicalOption('join_te','join trailing edge','F')
   call prms%CreateRealOption('join_te_factor', "join the trailing edges when closer than factor*te element size",'1.0' )
+  call prms%CreateLogicalOption('refine_wake','refined wake with subparticles','T')
   
   !> Regularisation 
   call prms%CreateRealOption('far_field_ratio_doublet', &
@@ -632,6 +635,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%particles_box_max     = getrealarray(prms, 'particles_box_max',3)
   sim_param%rigid_wake            = getlogical(prms, 'rigid_wake')
   sim_param%rigid_wake_vel        = sim_param%u_inf   !> initialisation
+  sim_param%refine_wake            = getlogical(prms, 'refine_wake')
   !> Check on wake panels
   if(sim_param%n_wake_panels .lt. 1) then
     sim_param%n_wake_panels = 1

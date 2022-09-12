@@ -268,6 +268,9 @@ type :: t_wake
 
   !> Are the rings full? (and so need to produce particles...)
   logical :: full_rings=.false.
+  
+  !> Employ wake refinement
+  logical :: refine_wake
 
 #if USE_PRECICE  
   !> In order to correctly build the wake we need to esplicitly store
@@ -560,6 +563,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   wake%last_pan_idou = 0.0_wp
 
   wake%full_panels = .false.
+  wake%refine_wake = sim_param%refine_wake
 
 #if USE_PRECICE
   allocate(wake%old_second_row(3,wake%n_pan_points)) ! check for memory leak
@@ -1237,7 +1241,8 @@ subroutine complete_wake(wake, geo, elems, te)
   integer                               :: k, n_part
   real(wp)                              :: vel_in(3), vel_out(3), wind(3)
   real(wp)                              :: area
-  
+  real(wp)                              :: min_side, max_side, chord_side_len, span_side_len, step_span, step_chord
+  integer                               :: n_span, n_chord, k_division, ic
   ! flow separation variables
   integer                                :: i_comp , i_elem , n_elem
 
@@ -1362,6 +1367,7 @@ subroutine complete_wake(wake, geo, elems, te)
       partvec = 0.0_wp
       !Left side
       dir = wake%pan_w_points(:,p1,wake%nmax_pan+1)-points_end(:,p1)
+      chord_side_len = norm2(dir)
       if (wake%pan_neigh(1,iw) .gt. 0) then
         ave = wake%end_pan_idou(iw) - &
               real(wake%pan_neigh_o(1,iw),wp)* &
@@ -1394,10 +1400,90 @@ subroutine complete_wake(wake, geo, elems, te)
 
       !End side
       dir = points_end(:,p1) - points_end(:,p2)
+      span_side_len = norm2(dir)
       ave = wake%end_pan_idou(iw)-wake%last_pan_idou(iw)
       wake%last_pan_idou(iw) = wake%end_pan_idou(iw)
       partvec = partvec + dir*ave
 
+    if (wake%refine_wake) then
+      k_division = 1 ! TODO optimize tessellation
+      if ( chord_side_len .ge. span_side_len) then
+          ! chord side is longer
+          max_side = chord_side_len
+          min_side = span_side_len
+          n_chord = ceiling(max_side/(real(k_division,wp)*min_side))
+          n_span = k_division
+          step_chord = max_side/real(n_chord,wp)
+          step_span = min_side/real(n_span,wp)
+
+      else
+          ! span side is longer
+          max_side = span_side_len
+          min_side = chord_side_len
+          n_chord = k_division
+          n_span = ceiling(max_side/(real(k_division,wp)*min_side))
+          step_chord = min_side/real(n_chord,wp)
+          step_span = max_side/real(n_span,wp)
+          
+      end if
+
+      do ic = 1, n_chord
+        do is = 1, n_span
+          ! find centre of the subpanel by starting from top left of the panel and
+          ! move half steps chord- and span-wise
+          pos_p = wake%pan_w_points(:,p1,wake%nmax_pan+1)+& ! top left corner
+                 (real(ic,wp)-0.5_wp)/real(n_chord,wp)*& ! move chordwise
+                 (points_end(:,p1)-wake%pan_w_points(:,p1,wake%nmax_pan+1))+& 
+                 (real(is,wp)-0.5_wp)/real(n_span,wp)*& ! move spanwise
+                 (wake%pan_w_points(:,p2,wake%nmax_pan+1)-wake%pan_w_points(:,p1,wake%nmax_pan+1)) 
+
+          area = step_chord*step_span ! TODO refine it
+
+                   
+          !Add the particle (if it is in the box)
+          if(all(pos_p .ge. wake%part_box_min) .and. &
+              all(pos_p .le. wake%part_box_max)) then
+    
+            do ip = k, size(wake%wake_parts)
+              if (wake%wake_parts(ip)%free) then
+                wake%wake_parts(ip)%free = .false.
+                k = ip+1
+                wake%n_prt = wake%n_prt+1
+                ! mag of the particle is 1/n_subpart * mag_panel
+                wake%wake_parts(ip)%mag = norm2(partvec)/real(n_span*n_chord,wp) ! TODO generalize n_subpart
+    
+                if(norm2(partvec) .gt. 1.0e-13_wp) then
+                  wake%wake_parts(ip)%dir = partvec/norm2(partvec)
+                else
+                  wake%wake_parts(ip)%dir = partvec
+                endif
+    
+                wake%wake_parts(ip)%cen = pos_p
+              if (sim_param%KVortexRad .ge. 1e-10_wp) then ! Variable vortex rad
+                wake%wake_parts(ip)%r_Vortex = sim_param%KVortexRad*sqrt(2.0_wp*area) ! k*radius of the circumscribed circle
+                else ! revert to sim_param vortex rad
+                  wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
+                end if
+                wake%wake_parts(ip)%r_cutoff  = sim_param%CutoffRad
+                wake%wake_parts(ip)%vel = 0.5_wp * &
+                                  ( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
+                                    wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
+                exit
+              endif
+            enddo
+      
+            if (ip .gt. wake%nmax_prt) then
+              write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
+                wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
+                &restarting with a higher number of maximum wake particles'
+      
+              call error(this_sub_name, this_mod_name, trim(msg))
+            endif !max number of particles
+          endif !inside the box
+        enddo !is
+      enddo !ic
+      
+    else !classical behaviour
       !Calculate the center
       pos_p = (points_end(:,p1)+points_end(:,p2)+ &
               wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
@@ -1444,7 +1530,8 @@ subroutine complete_wake(wake, geo, elems, te)
           call error(this_sub_name, this_mod_name, trim(msg))
         endif !max number of particles
       endif !inside the box
-
+      
+    endif !refine_wake
     enddo !iw
   endif !full wake
 
