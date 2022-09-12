@@ -140,7 +140,7 @@ subroutine dat_out_aa_header ( fid , num_el, t, p_inf, rho_inf, a_inf, mu_inf, u
 
   write(fid,'(A)') '# Aeroacoustic Data'
 
-  write(fid,'(A)') '# Time, free stream: Element, Pressure, density, sound speed, dynamic viscosity, flow velocity'
+  write(fid,'(A)') '# Element, Time, Pressure, Density, Sound speed, Dynamic viscosity, Flow velocity'
   write(fid,'(I0,8'//ascii_real//')') num_el, t, p_inf, rho_inf, a_inf, mu_inf, u_inf
 
   write(fid,'(A)') '# cx, cy, cz, nx, ny, nz, area, rho, pressure, rhoux, rhouy, rhouz, svx, svy, svz'

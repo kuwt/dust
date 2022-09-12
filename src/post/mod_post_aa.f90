@@ -175,7 +175,8 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
     call read_hdf5(rho_inf, 'rho_inf', ploc)
     call read_hdf5(mu_inf, 'mu_inf', ploc)
     call read_hdf5(u_inf, 'u_inf', ploc)
-
+    call read_hdf5(a_inf, 'a_inf', ploc)
+    call read_hdf5(p_inf, 'p_inf', ploc)   
 
     call close_hdf5_group(ploc)
 

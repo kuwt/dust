@@ -813,7 +813,7 @@ if (sim_param%debug_level .ge. 20.and.time_2_debug_out) &
         endif
 
         !> relaxation factor with  
-        residual_vl_delta = residual_vl - residual_vl_old         
+        residual_vl_delta = residual_vl - residual_vl_old          
         if (sim_param%rel_aitken .and. it_vl .gt. 2) then !> aitken acceleration
           rel_aitken = -rel_aitken* dot(residual_vl_old, residual_vl_delta) / &
                                     dot(residual_vl_delta, residual_vl_delta)
