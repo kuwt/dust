@@ -272,6 +272,9 @@ type :: t_wake
   !> Employ wake refinement
   logical :: refine_wake
 
+  !> Employ wake refinement
+  integer :: k_refine
+
 #if USE_PRECICE  
   !> In order to correctly build the wake we need to esplicitly store
   ! the end points of the last step...
@@ -564,7 +567,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
 
   wake%full_panels = .false.
   wake%refine_wake = sim_param%refine_wake
-
+  wake%k_refine = sim_param%k_refine
 #if USE_PRECICE
   allocate(wake%old_second_row(3,wake%n_pan_points)) ! check for memory leak
   wake%update_old_second_row = .true. ! set to false inside precice iters
@@ -1242,7 +1245,7 @@ subroutine complete_wake(wake, geo, elems, te)
   real(wp)                              :: vel_in(3), vel_out(3), wind(3)
   real(wp)                              :: area
   real(wp)                              :: min_side, max_side, chord_side_len, span_side_len, step_span, step_chord
-  integer                               :: n_span, n_chord, k_division, ic
+  integer                               :: n_span, n_chord, ic
   ! flow separation variables
   integer                                :: i_comp , i_elem , n_elem
 
@@ -1406,13 +1409,13 @@ subroutine complete_wake(wake, geo, elems, te)
       partvec = partvec + dir*ave
 
     if (wake%refine_wake) then
-      k_division = 1 ! TODO optimize tessellation
+      
       if ( chord_side_len .ge. span_side_len) then
           ! chord side is longer
           max_side = chord_side_len
           min_side = span_side_len
-          n_chord = ceiling(max_side/(real(k_division,wp)*min_side))
-          n_span = k_division
+          n_chord = ceiling(max_side/(min_side/real(wake%k_refine,wp)))
+          n_span = wake%k_refine
           step_chord = max_side/real(n_chord,wp)
           step_span = min_side/real(n_span,wp)
 
@@ -1420,8 +1423,8 @@ subroutine complete_wake(wake, geo, elems, te)
           ! span side is longer
           max_side = span_side_len
           min_side = chord_side_len
-          n_chord = k_division
-          n_span = ceiling(max_side/(real(k_division,wp)*min_side))
+          n_chord = wake%k_refine
+          n_span = ceiling(max_side/(min_side/real(wake%k_refine,wp)))
           step_chord = min_side/real(n_chord,wp)
           step_span = max_side/real(n_span,wp)
           
@@ -1432,14 +1435,13 @@ subroutine complete_wake(wake, geo, elems, te)
           ! find centre of the subpanel by starting from top left of the panel and
           ! move half steps chord- and span-wise
           pos_p = wake%pan_w_points(:,p1,wake%nmax_pan+1)+& ! top left corner
-                 (real(ic,wp)-0.5_wp)/real(n_chord,wp)*& ! move chordwise
-                 (points_end(:,p1)-wake%pan_w_points(:,p1,wake%nmax_pan+1))+& 
-                 (real(is,wp)-0.5_wp)/real(n_span,wp)*& ! move spanwise
-                 (wake%pan_w_points(:,p2,wake%nmax_pan+1)-wake%pan_w_points(:,p1,wake%nmax_pan+1)) 
+                  (real(ic,wp)-0.5_wp)/real(n_chord,wp)*& ! move chordwise
+                  (points_end(:,p1)-wake%pan_w_points(:,p1,wake%nmax_pan+1))+& 
+                  (real(is,wp)-0.5_wp)/real(n_span,wp)*& ! move spanwise
+                  (wake%pan_w_points(:,p2,wake%nmax_pan+1)-wake%pan_w_points(:,p1,wake%nmax_pan+1)) 
 
           area = step_chord*step_span ! TODO refine it
 
-                   
           !Add the particle (if it is in the box)
           if(all(pos_p .ge. wake%part_box_min) .and. &
               all(pos_p .le. wake%part_box_max)) then

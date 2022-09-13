@@ -136,6 +136,8 @@ type t_sim_param
   real(wp) :: join_te_factor
   !> Wake refinement with subparticles
   logical :: refine_wake  
+  !> k_refine
+  integer :: k_refine
 
   !Method parameters
   !> Multiplier for far field threshold computation on doublet
@@ -359,7 +361,8 @@ subroutine create_param_main(prms)
   call prms%CreateLogicalOption('join_te','join trailing edge','F')
   call prms%CreateRealOption('join_te_factor', "join the trailing edges when closer than factor*te element size",'1.0' )
   call prms%CreateLogicalOption('refine_wake','refined wake with subparticles','T')
-  
+  call prms%CreateIntOption('k_refine','refine factor for wake subdivision with subparticles','1') 
+
   !> Regularisation 
   call prms%CreateRealOption('far_field_ratio_doublet', &
         "Multiplier for far field threshold computation on doublet", '10.0')
@@ -635,7 +638,9 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%particles_box_max     = getrealarray(prms, 'particles_box_max',3)
   sim_param%rigid_wake            = getlogical(prms, 'rigid_wake')
   sim_param%rigid_wake_vel        = sim_param%u_inf   !> initialisation
-  sim_param%refine_wake            = getlogical(prms, 'refine_wake')
+  sim_param%refine_wake           = getlogical(prms,  'refine_wake')
+  sim_param%k_refine              = getint(prms,      'k_refine') 
+
   !> Check on wake panels
   if(sim_param%n_wake_panels .lt. 1) then
     sim_param%n_wake_panels = 1
