@@ -138,6 +138,8 @@ type t_sim_param
   logical :: refine_wake  
   !> k_refine
   integer :: k_refine
+  !> Wake interpolation
+  logical :: interpolate_wake
 
   !Method parameters
   !> Multiplier for far field threshold computation on doublet
@@ -360,8 +362,9 @@ subroutine create_param_main(prms)
   call prms%CreateRealArrayOption('rigid_wake_vel', "rigid wake velocity" )
   call prms%CreateLogicalOption('join_te','join trailing edge','F')
   call prms%CreateRealOption('join_te_factor', "join the trailing edges when closer than factor*te element size",'1.0' )
-  call prms%CreateLogicalOption('refine_wake','refined wake with subparticles','T')
+  call prms%CreateLogicalOption('refine_wake','refined wake with subparticles','F')
   call prms%CreateIntOption('k_refine','refine factor for wake subdivision with subparticles','1') 
+  call prms%CreateLogicalOption('interpolate_wake','interpolate wake subparticles','F')
 
   !> Regularisation 
   call prms%CreateRealOption('far_field_ratio_doublet', &
@@ -640,6 +643,14 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
   sim_param%rigid_wake_vel        = sim_param%u_inf   !> initialisation
   sim_param%refine_wake           = getlogical(prms,  'refine_wake')
   sim_param%k_refine              = getint(prms,      'k_refine') 
+  sim_param%interpolate_wake      = getlogical(prms,  'interpolate_wake')
+
+  !> Check on wake refinement
+  if (sim_param%interpolate_wake .and. .not. sim_param%refine_wake) then
+        !call warning('dust', 'dust', 'Wake interpolation is selected, but wake refinement &
+        !           is not, overriding refinement to True. ')
+        sim_param%refine_wake = .true.
+  endif
 
   !> Check on wake panels
   if(sim_param%n_wake_panels .lt. 1) then
