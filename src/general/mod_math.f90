@@ -57,7 +57,7 @@ use mod_handling, only: &
 implicit none
 
 public :: dot, cross , linear_interp , compute_qr, &
-          rotation_vector_combination, sort_vector_real, unique
+          rotation_vector_combination, sort_vector_real, unique, infinite_plate_spline
 
 private
 
@@ -373,6 +373,87 @@ subroutine unique(vec, vec_unique, tol)
 
 end subroutine unique  
 
+! ----------------------------------------------------------------------
+! RBF interpolation weight matrix for 2D structures (plates)
+subroutine infinite_plate_spline(pos_interp, pos_ref, W)
+  real(wp), intent(in)                  :: pos_interp(:,:) ! positions to be interpolated into
+  real(wp), intent(in)                  :: pos_ref(:,:) ! positions of the reference points
+  real(wp), allocatable, intent(inout)  :: W(:,:) ! weight matrix
+  
+  integer                               :: n_r, n_i, i, j
+  real(wp), allocatable                 :: R_r(:,:), R_i(:,:), Z_r(:,:), Z_ir(:,:), Y_r(:,:)
+  real(wp), allocatable                 :: ipiv(:), work(:), eye(:,:)
+  integer                               :: info                     
+  real(wp)                              :: nrm                   
+  
+  n_r = size(pos_ref,2)
+  n_i = size(pos_interp,2)
+
+  allocate(R_r(n_r,4))
+  allocate(R_i(n_i,4))
+  ! matrixes R [1|x|y|z]
+  R_r(:,1) = 1.0_wp
+  R_r(:,2:4) = transpose(pos_ref)
+  R_i(:,1) = 1.0_wp
+  R_i(:,2:4) = transpose(pos_interp) 
+
+  allocate(Z_r(n_r,n_r))
+  do i=1,n_r
+    do j=1,n_r
+      if (i .eq. j) then
+        Z_r(i,j) = 0.0_wp
+      else
+        nrm = norm2(pos_ref(:,i)-pos_ref(:,j))
+        Z_r(i,j) = nrm**2*log(nrm)
+      endif
+    enddo
+  enddo
+  allocate(Z_ir(n_i,n_r))
+  do i=1,n_i
+    do j=1,n_r
+      nrm = norm2(pos_interp(:,i)-pos_ref(:,j))
+      if (nrm .le. 1e-10_wp) then
+        Z_ir(i,j) = 0.0_wp
+      else
+        Z_ir(i,j) = nrm**2*log(nrm)
+      endif
+    enddo
+  enddo  
+
+  ! inverse matrix (NB the inverse is overwritten into Z_r)
+  allocate(ipiv(n_r))
+  allocate(work(n_r))
+  call dgetrf(n_r,n_r,Z_r,n_r,ipiv,info)
+  call dgetri(n_r,Z_r,n_r,ipiv,work,n_r,info)
+  deallocate(ipiv, work)
+ 
+  allocate(Y_r(4,4))  
+  
+  ! inverse matrix (NB the inverse is overwritten into Y_r)
+  Y_r = matmul(transpose(R_r),matmul(Z_r,R_r))
+  Y_r = Y_r + 1e-6_wp
+  allocate(ipiv(4))
+  allocate(work(4))
+  call dgetrf(4,4,Y_r,4,ipiv,info)
+  call dgetri(4,Y_r,4,ipiv,work,n_r,info)
+  deallocate(ipiv, work) 
+
+  allocate(eye(n_r,n_r))
+  eye = 0.0_wp
+  do i = 1, n_r
+    eye(i,i)  =  1.0_wp
+  end do
+
+  allocate(W(n_i,n_r))
+  W = matmul((matmul(R_i,matmul(Y_r,transpose(R_r))) + &
+         matmul(Z_ir,(eye-matmul(Z_r,matmul(R_r,matmul(Y_r,transpose(R_r))))))),Z_r)
+
+  deallocate( R_i)
+  deallocate(R_r)
+  deallocate(Z_r, Z_ir)
+  deallocate(Y_r, eye)
+  
+end subroutine infinite_plate_spline
 ! ----------------------------------------------------------------------
 
 end module mod_math

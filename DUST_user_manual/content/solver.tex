@@ -74,6 +74,8 @@ rigid_wake = F
 rigid_wake_vel = (/1.0, 0.0, 0.0/)
 join_te = F
 join_te_factor = 1.0
+refine_wake = T
+k_refine = 1
 
 ! --- model parameters ---
 far_field_ratio_doublet = 10.0
@@ -663,6 +665,15 @@ necessary to keep the track of the connectivity.
 Ratio between the time spent in the particle to particle computations in the 
 leaves of the octree with respect to the rest of the fast multipole computations 
 that triggers the increase of the octree levels.
+
+\item \param{refine_wake}: \textit{required:} no. 
+\textit{multiple:} no. \textit{type:} logical. \textit{default:} T. 
+
+Allow splitting the wake panel into subparticles with a division that is sub-multiple of the shortest panel edge.   
+
+\item \param{k_refine}: \textit{required:} no. \textit{multiple:} no. \textit{type:} integer. \textit{default:} 1. 
+
+Number of subdivision of the shortest panel edge if \param{refine_wake} is T. 
 
 \item \param{ll_solver}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} \opt{GammaMethod}. \textit{type:} string.
