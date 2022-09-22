@@ -352,10 +352,11 @@ subroutine unique(vec, vec_unique, tol)
   nel = size(vec)
 
   call sort_vector_real(vec, nel, vec_sort, ind)
-  
+
   i = 1;   j = 2;   u = 1
 
   allocate(vec_tmp(nel)); vec_tmp = 0.0_wp 
+
   vec_tmp(1) = vec_sort(1)
   do while (j .le. nel)
     if (abs(vec_sort(j) - vec_sort(i)) .le. tol) then  
@@ -367,7 +368,7 @@ subroutine unique(vec, vec_unique, tol)
       j = j + 1   
     endif 
   enddo
-
+  deallocate(vec_sort)
   allocate(vec_unique(u)); vec_unique = 0.0_wp 
   vec_unique = vec_tmp(1:u) 
 
