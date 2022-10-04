@@ -304,9 +304,9 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
   allocate( rrb_wei(3,nb) );
   !rotate the hinge nodes (from coupling_nodes file) to recover the value
   !of the component.in input
-  
-  this%ref%rr(:,1) = matmul( (coupling_node_rot),this%ref%rr(:,1))
-  this%ref%rr(:,2) = matmul( (coupling_node_rot),this%ref%rr(:,2))
+  do ih = 1, nh 
+    this%ref%rr(:,ih) = matmul( (coupling_node_rot),this%ref%rr(:,ih))
+  end do 
   !rotate the dust mesh points in dust reference
   do ib = 1, nb
     rrb(:,ib) =  matmul( (coupling_node_rot), loc_points(:,ib))
@@ -351,9 +351,9 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
 
   ! Loop over all the surface points
   do ib = 1, nb
-
+    !> wind axis conditions
     if ((rrb(2,ib) .ge. (this%ref%rr(2,1)-1e-3_wp)) .and. (rrb(2,ib) .le. (this%ref%rr(2,nh)+1e-3_wp))) then
-
+      
       wei_hinge = (rrb(2,ib) - this%ref%rr(2,1)) / (this%ref%rr(2,nh)- this%ref%rr(2,1))
       x_hinge = this%ref%rr(1,1) + wei_hinge*(this%ref%rr(1,nh)- this%ref%rr(1,1))
       z_hinge = this%ref%rr(3,1) + wei_hinge*(this%ref%rr(3,nh)- this%ref%rr(3,1))
@@ -365,7 +365,6 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
 
         do ih = 1, nh
           dist_all(ih) = abs( rrb_wei(2,ib) - rrh(2,ih) )
-
         end do
 
         !> Weights in chordwise direction
