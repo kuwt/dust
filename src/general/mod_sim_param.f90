@@ -419,7 +419,7 @@ subroutine create_param_main(prms)
   call prms%CreateIntOption('vl_maxiter', &
                             &'Maximum number of iteration in VL algorithm', '100')
   call prms%CreateRealOption('vl_tol', 'Tolerance for the absolute error on lift coefficient in &
-                            &fixed point iteration for VL','1.0e-4' )
+                            &fixed point iteration for VL','1.0e-3' )
   call prms%CreateIntOption('vl_start_step', &
                             &'Step in which the VL correction start', '0')
   call prms%CreateLogicalOption('vl_dynstall', 'Dynamic stall on corrected VL', 'F')

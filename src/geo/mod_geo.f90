@@ -566,7 +566,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   i_corr = 0 
 
   do i_comp = 1,size(geo%components)
-
+    
     if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p') then ! panels, implicit and not corrected
       do j = 1,size(geo%components(i_comp)%el)
         i_tot = i_tot+1
@@ -579,6 +579,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
         elems_non_corr(i_non_corr)%p => geo%components(i_comp)%el(j)
       enddo
     elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'v') then ! vortex lattice, implicit, can be corrected or not
+
       do j = 1,size(geo%components(i_comp)%el)
         i_tot = i_tot+1
         elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
@@ -1122,6 +1123,8 @@ subroutine load_components(geo, in_file, out_file, te)
           
           geo%components(i_comp)%aero_correction = trim(aero_table)
           sim_param%vl_correction = .true. 
+        else
+          geo%components(i_comp)%aero_correction = 'false'
         endif
 
       else if (comp_el_type(1:1) .eq. 'a') then
