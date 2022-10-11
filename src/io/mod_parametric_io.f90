@@ -1245,8 +1245,9 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
       ! split suction and lower side
       rr_up = rr_pan(:,nelems_chord+1:2*nelems_chord+1)
       rr_low = rr_pan(:,1:nelems_chord+1)
+
       ! y-coordinates of the mean line
-      y_mean(1,:) = (rr_up(2,:) + rr_low(2,:))/2.0_wp
+      y_mean(1,:) = (rr_up(2,:) + rr_low(2,size(rr_low(1,:)):1:-1))/2.0_wp
       rr(1,:) = rr_up(1,:)
       rr(2,:) = y_mean(1,:)
       
