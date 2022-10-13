@@ -55,7 +55,7 @@ use mod_param, only: &
   wp, nl, pi, max_char_len
 
 use mod_math, only: &
-  cross, infinite_plate_spline
+  cross, infinite_plate_spline, tessellate
 
 use mod_sim_param, only: &
   sim_param
@@ -65,8 +65,6 @@ use mod_handling, only: &
 
 use mod_geometry, only: &
   t_geo, t_tedge, calc_geo_data_pan, calc_node_vel
-
-
 
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
@@ -276,6 +274,9 @@ type :: t_wake
 
   !> Wake refinement factor
   integer :: k_refine
+  
+  !> Wake refinement tolerance
+  real(wp) :: tol_refine
   
   !> Employ wake refinement
   logical :: interpolate_wake
@@ -573,6 +574,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   wake%full_panels = .false.
   wake%refine_wake = sim_param%refine_wake
   wake%k_refine = sim_param%k_refine
+  wake%tol_refine = sim_param%tol_refine
   wake%interpolate_wake = sim_param%interpolate_wake
 #if USE_PRECICE
   allocate(wake%old_second_row(3,wake%n_pan_points)) ! check for memory leak
@@ -1255,13 +1257,14 @@ subroutine complete_wake(wake, geo, elems, te)
   
   integer                               :: iwc, isp, n_sbprt, n_max_pan_comp, n_max_sbprt_comp, pan_count, sbprt_count
   real(wp), allocatable                 :: cen_parent(:,:), dir_parent(:,:), mag_parent(:)
-  real(wp), allocatable                 :: cen_sbprt(:,:), area_sbprt(:), mag_sbprt(:), dir_sbprt(:,:)
+  real(wp), allocatable                 :: cen_sbprt(:,:), area_sbprt(:), mag_sbprt(:), dir_sbprt(:,:), rad_sbprt(:)
   real(wp), allocatable                 :: W(:,:), w_i(:)
+  real(wp)                              :: vertices(3,4)
   ! flow separation variables
-  integer                                :: i_comp , i_elem , n_elem
+  integer                               :: i_comp , i_elem , n_elem
 
-  character(len=max_char_len)            :: msg
-  character(len=*), parameter            :: this_sub_name='prepare_wake'
+  character(len=max_char_len)           :: msg
+  character(len=*), parameter           :: this_sub_name='prepare_wake'
 
 #if USE_PRECICE
   ! first and second row of the wake were already taken care of by update_near_field_wake
@@ -1374,403 +1377,468 @@ subroutine complete_wake(wake, geo, elems, te)
 
   !==> Particles: if the panel wake is at the end, create a particle
   if(wake%full_panels) then
-    if(wake%interpolate_wake) then ! TODO crosscheck interp_parts .and. refine_wake
-    ! WAKE INTERPOLATION
-    ! general idea:
-    ! - for each wake panel collect data on cen and mag
-    ! - for each wake panel, determine division in subparts
-    ! - RBF interpolation
-    ! - particle creation and insertion
-    !
-    ! The previous wake row is also considered
-    ! Ghost panels are also considered, ie points outside the wake where there is no vorticity (approx) TODO check validity
-    !
-    ! The process is done on a component based loop, with the index iwc resetting after each component
+!    if(wake%interpolate_wake) then ! TODO crosscheck interp_parts .and. refine_wake
+!    ! WAKE INTERPOLATION
+!    ! general idea:
+!    ! - for each wake panel collect data on cen and mag
+!    ! - for each wake panel, determine division in subparts
+!    ! - RBF interpolation
+!    ! - particle creation and insertion
+!    !
+!    ! The previous wake row is also considered
+!    ! Ghost panels are also considered, ie points outside the wake where there is no vorticity (approx) TODO check validity
+!    !
+!    ! The process is done on a component based loop, with the index iwc resetting after each component
     
-    !TODO consider moving to a separate subroutine and/or make dedicated sub for left+right+end side computations
-      k = 1
-      n_sbprt = 0 ! number of subparticles to insert
-      n_max_pan_comp = 0 ! number of wake panels in the biggest component, for allocation
-      n_max_sbprt_comp = 0 ! number of subparts from the biggest component, for allocation
-      pan_count = 0 ! aux counter
-      sbprt_count = 0 ! aux counter
-      ! cycle all panels to find n_sbprt
-      do iw = 1,wake%n_pan_stripes
-        p1 = wake%i_start_points(1,iw)
-        p2 = wake%i_start_points(2,iw)
-        !Left side
-        dir = wake%pan_w_points(:,p1,wake%nmax_pan+1)-points_end(:,p1)
-        chord_side_len = norm2(dir)
-        !End side
-        dir = points_end(:,p1) - points_end(:,p2)
-        span_side_len = norm2(dir)
+!    !TODO consider moving to a separate subroutine and/or make dedicated sub for left+right+end side computations
+!      k = 1
+!      n_sbprt = 0 ! number of subparticles to insert
+!      n_max_pan_comp = 0 ! number of wake panels in the biggest component, for allocation
+!      n_max_sbprt_comp = 0 ! number of subparts from the biggest component, for allocation
+!      pan_count = 0 ! aux counter
+!      sbprt_count = 0 ! aux counter
+!      ! cycle all panels to find n_sbprt
+!      do iw = 1,wake%n_pan_stripes
+!        p1 = wake%i_start_points(1,iw)
+!        p2 = wake%i_start_points(2,iw)
+!        !Left side
+!        dir = wake%pan_w_points(:,p1,wake%nmax_pan+1)-points_end(:,p1)
+!        chord_side_len = norm2(dir)
+!        !End side
+!        dir = points_end(:,p1) - points_end(:,p2)
+!        span_side_len = norm2(dir)
         
-        max_side = max(chord_side_len, span_side_len)
-        min_side = min(chord_side_len, span_side_len)
-        n_chord = ceiling(max_side/(min_side/real(wake%k_refine,wp)))
-        n_span = wake%k_refine 
-        n_sbprt = n_sbprt + n_chord*n_span
+!        max_side = max(chord_side_len, span_side_len)
+!        min_side = min(chord_side_len, span_side_len)
+!        n_chord = ceiling(max_side/(min_side/real(wake%k_refine,wp)))
+!        n_span = wake%k_refine 
+!        n_sbprt = n_sbprt + n_chord*n_span
         
-        if (wake%pan_neigh(1,iw) .gt. 0) then ! increase counters
-          pan_count = pan_count+1
-          sbprt_count = sbprt_count + n_chord*n_span
-        else ! increase, check max and reset
-          pan_count = pan_count+1
-          sbprt_count = sbprt_count + n_chord*n_span
-          n_max_pan_comp = max(n_max_pan_comp, pan_count)
-          n_max_sbprt_comp = max(n_max_sbprt_comp, sbprt_count)
-          pan_count = 0
-          sbprt_count = 0
-        endif
-      enddo
+!        if (wake%pan_neigh(1,iw) .gt. 0) then ! increase counters
+!          pan_count = pan_count+1
+!          sbprt_count = sbprt_count + n_chord*n_span
+!        else ! increase, check max and reset
+!          pan_count = pan_count+1
+!          sbprt_count = sbprt_count + n_chord*n_span
+!          n_max_pan_comp = max(n_max_pan_comp, pan_count)
+!          n_max_sbprt_comp = max(n_max_sbprt_comp, sbprt_count)
+!          pan_count = 0
+!          sbprt_count = 0
+!        endif
+!      enddo
       
-      ! the following quantities are accumulated only within one component, then particles are generated
-      ! and the cycle repeats for the next component. Since we don't want to keep track of components, we
-      ! allocate for the max size, ie for the biggest component
-      allocate(cen_sbprt(3,n_max_sbprt_comp)) ! TODO take max
-      allocate(area_sbprt(n_max_sbprt_comp))
-      allocate(mag_sbprt(n_max_sbprt_comp))
-      allocate(dir_sbprt(3,n_max_sbprt_comp))
-      ! +2 accounts for ghost panels
-      ! *2 because we also take the previous row of panels
-      allocate(cen_parent(3,(n_max_pan_comp+2)*2)) 
-      allocate(mag_parent((n_max_pan_comp+2)*2))
-      allocate(dir_parent(3,(n_max_pan_comp+2)*2))
+!      ! the following quantities are accumulated only within one component, then particles are generated
+!      ! and the cycle repeats for the next component. Since we don't want to keep track of components, we
+!      ! allocate for the max size, ie for the biggest component
+!      allocate(cen_sbprt(3,n_max_sbprt_comp)) ! TODO take max
+!      allocate(area_sbprt(n_max_sbprt_comp))
+!      allocate(mag_sbprt(n_max_sbprt_comp))
+!      allocate(dir_sbprt(3,n_max_sbprt_comp))
+!      ! +2 accounts for ghost panels
+!      ! *2 because we also take the previous row of panels
+!      allocate(cen_parent(3,(n_max_pan_comp+2)*2)) 
+!      allocate(mag_parent((n_max_pan_comp+2)*2))
+!      allocate(dir_parent(3,(n_max_pan_comp+2)*2))
       
-      ! cycle again all panels to compute ave and dir, cen and cen_ref
-      iw = 1 ! global parent panel index
+!      ! cycle again all panels to compute ave and dir, cen and cen_ref
+!      iw = 1 ! global parent panel index
       
-      do while (iw .lt. wake%n_pan_stripes)
-        iwc = 1 ! local component parent panel index
-        isp = 0 ! subparts index
+!      do while (iw .lt. wake%n_pan_stripes)
+!        iwc = 1 ! local component parent panel index
+!        isp = 0 ! subparts index
         
-        ! ghost and first panel
-        p1 = wake%i_start_points(1,iw)
-        p2 = wake%i_start_points(2,iw)     
-        partvec = 0.0_wp
-        !Left side
-        dir = wake%pan_w_points(:,p1,wake%nmax_pan+1)-points_end(:,p1)
-        chord_side_len = norm2(dir)
-        if (wake%pan_neigh(1,iw) .gt. 0) then
-          ave = wake%end_pan_idou(iw) - &
-                real(wake%pan_neigh_o(1,iw),wp)* &
-                wake%end_pan_idou(wake%pan_neigh(1,iw))
-          ave = ave/2.0_wp
-        else !has no fixed neighbour
-          if(sim_param%join_te) then
-            ave = get_joined_intensity(wake, iw, 1)
-          else
-            ave = wake%end_pan_idou(iw)
-          endif
-        endif
-        partvec = partvec + dir*ave
+!        ! ghost and first panel
+!        p1 = wake%i_start_points(1,iw)
+!        p2 = wake%i_start_points(2,iw)     
+!        partvec = 0.0_wp
+!        !Left side
+!        dir = wake%pan_w_points(:,p1,wake%nmax_pan+1)-points_end(:,p1)
+!        chord_side_len = norm2(dir)
+!        if (wake%pan_neigh(1,iw) .gt. 0) then
+!          ave = wake%end_pan_idou(iw) - &
+!                real(wake%pan_neigh_o(1,iw),wp)* &
+!                wake%end_pan_idou(wake%pan_neigh(1,iw))
+!          ave = ave/2.0_wp
+!        else !has no fixed neighbour
+!          if(sim_param%join_te) then
+!            ave = get_joined_intensity(wake, iw, 1)
+!          else
+!            ave = wake%end_pan_idou(iw)
+!          endif
+!        endif
+!        partvec = partvec + dir*ave
   
-        !Right side
-        dir = -wake%pan_w_points(:,p2,wake%nmax_pan+1)+points_end(:,p2)
-        if (wake%pan_neigh(2,iw) .gt. 0) then
-          ave = wake%end_pan_idou(iw) - &
-                real(wake%pan_neigh_o(2,iw),wp)* &
-                wake%end_pan_idou(wake%pan_neigh(2,iw))
-          ave = ave/2.0_wp
-        else
-          if(sim_param%join_te) then
-            ave = get_joined_intensity(wake, iw, 2)
-          else
-            ave = wake%end_pan_idou(iw)
-          endif
-        endif
-        partvec = partvec + dir*ave
+!        !Right side
+!        dir = -wake%pan_w_points(:,p2,wake%nmax_pan+1)+points_end(:,p2)
+!        if (wake%pan_neigh(2,iw) .gt. 0) then
+!          ave = wake%end_pan_idou(iw) - &
+!                real(wake%pan_neigh_o(2,iw),wp)* &
+!                wake%end_pan_idou(wake%pan_neigh(2,iw))
+!          ave = ave/2.0_wp
+!        else
+!          if(sim_param%join_te) then
+!            ave = get_joined_intensity(wake, iw, 2)
+!          else
+!            ave = wake%end_pan_idou(iw)
+!          endif
+!        endif
+!        partvec = partvec + dir*ave
   
-        !End side
-        dir = points_end(:,p1) - points_end(:,p2)
-        span_side_len = norm2(dir)
-        ave = wake%end_pan_idou(iw)-wake%last_pan_idou(iw)
-        wake%last_pan_idou(iw) = wake%end_pan_idou(iw)
-        partvec = partvec + dir*ave
+!        !End side
+!        dir = points_end(:,p1) - points_end(:,p2)
+!        span_side_len = norm2(dir)
+!        ave = wake%end_pan_idou(iw)-wake%last_pan_idou(iw)
+!        wake%last_pan_idou(iw) = wake%end_pan_idou(iw)
+!        partvec = partvec + dir*ave
 
-        ! centre of parent panel
-        pos_p = (points_end(:,p1)+points_end(:,p2)+ &
-                wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
-                wake%pan_w_points(:,p2,wake%nmax_pan+1) )/4.0_wp
+!        ! centre of parent panel
+!        pos_p = (points_end(:,p1)+points_end(:,p2)+ &
+!                wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
+!                wake%pan_w_points(:,p2,wake%nmax_pan+1) )/4.0_wp
                 
-        ! ghost panel
-        cen_parent(:,iwc) = pos_p-(wake%pan_w_points(:,p1,wake%nmax_pan+1)-&
-                      wake%pan_w_points(:,p2,wake%nmax_pan+1))
-        mag_parent(iwc) = 0.0_wp
-        dir_parent(:,iwc) = 0.0_wp
-        iwc = iwc + 1 ! added ghost panel
+!        ! ghost panel
+!        cen_parent(:,iwc) = pos_p-(wake%pan_w_points(:,p1,wake%nmax_pan+1)-&
+!                      wake%pan_w_points(:,p2,wake%nmax_pan+1))
+!        mag_parent(iwc) = 0.0_wp
+!        dir_parent(:,iwc) = 0.0_wp
+!        iwc = iwc + 1 ! added ghost panel
      
-        ! ghost panel from previous row
-        cen_parent(:,iwc) = wake%wake_panels(iw,wake%nmax_pan)%cen-&
-               (wake%pan_w_points(:,p1,wake%nmax_pan)-wake%pan_w_points(:,p2,wake%nmax_pan)) 
-        mag_parent(iwc) = 0.0_wp
-        dir_parent(:,iwc) = 0.0_wp
-        iwc = iwc + 1 ! added ghost panel 
+!        ! ghost panel from previous row
+!        cen_parent(:,iwc) = wake%wake_panels(iw,wake%nmax_pan)%cen-&
+!               (wake%pan_w_points(:,p1,wake%nmax_pan)-wake%pan_w_points(:,p2,wake%nmax_pan)) 
+!        mag_parent(iwc) = 0.0_wp
+!        dir_parent(:,iwc) = 0.0_wp
+!        iwc = iwc + 1 ! added ghost panel 
         
-        ! parent panel
-        cen_parent(:,iwc) = pos_p
-        mag_parent(iwc) = norm2(partvec)
-        if(mag_parent(iwc) .gt. 1.0e-13_wp) then
-          dir_parent(:,iwc) = partvec/mag_parent(iwc)
-        else
-          dir_parent(:,iwc) = partvec
-        endif
-        iwc = iwc +1 ! added parent panel
+!        ! parent panel
+!        cen_parent(:,iwc) = pos_p
+!        mag_parent(iwc) = norm2(partvec)
+!        if(mag_parent(iwc) .gt. 1.0e-13_wp) then
+!          dir_parent(:,iwc) = partvec/mag_parent(iwc)
+!        else
+!          dir_parent(:,iwc) = partvec
+!        endif
+!        iwc = iwc +1 ! added parent panel
        
-        ! parent panel from previous row
-        !Left side
-        dir = wake%pan_w_points(:,p1,wake%nmax_pan)-wake%pan_w_points(:,p1,wake%nmax_pan+1)
-        if (wake%pan_neigh(1,iw) .gt. 0) then
-          ave = wake%wake_panels(iw,wake%nmax_pan)%mag- &
-                real(wake%pan_neigh_o(1,iw),wp)* &
-                wake%wake_panels(wake%pan_neigh(1,iw),wake%nmax_pan)%mag
-          ave = ave/2.0_wp
-        else !has no fixed neighbour
-            ! TODO join_te?
-            ave = wake%wake_panels(iw,wake%nmax_pan)%mag
-        endif
-        partvec = partvec + dir*ave
+!        ! parent panel from previous row
+!        !Left side
+!        dir = wake%pan_w_points(:,p1,wake%nmax_pan)-wake%pan_w_points(:,p1,wake%nmax_pan+1)
+!        if (wake%pan_neigh(1,iw) .gt. 0) then
+!          ave = wake%wake_panels(iw,wake%nmax_pan)%mag- &
+!                real(wake%pan_neigh_o(1,iw),wp)* &
+!                wake%wake_panels(wake%pan_neigh(1,iw),wake%nmax_pan)%mag
+!          ave = ave/2.0_wp
+!        else !has no fixed neighbour
+!            ! TODO join_te?
+!            ave = wake%wake_panels(iw,wake%nmax_pan)%mag
+!        endif
+!        partvec = partvec + dir*ave
   
-        !Right side
-        dir = -wake%pan_w_points(:,p2,wake%nmax_pan)+wake%pan_w_points(:,p2,wake%nmax_pan+1)
-        if (wake%pan_neigh(2,iw) .gt. 0) then
-          ave = wake%wake_panels(iw,wake%nmax_pan)%mag- &
-                real(wake%pan_neigh_o(2,iw),wp)* &
-                wake%wake_panels(wake%pan_neigh(2,iw),wake%nmax_pan)%mag
-          ave = ave/2.0_wp
-        else
-            ave = wake%wake_panels(iw,wake%nmax_pan)%mag
-        endif
-        partvec = partvec + dir*ave
+!        !Right side
+!        dir = -wake%pan_w_points(:,p2,wake%nmax_pan)+wake%pan_w_points(:,p2,wake%nmax_pan+1)
+!        if (wake%pan_neigh(2,iw) .gt. 0) then
+!          ave = wake%wake_panels(iw,wake%nmax_pan)%mag- &
+!                real(wake%pan_neigh_o(2,iw),wp)* &
+!                wake%wake_panels(wake%pan_neigh(2,iw),wake%nmax_pan)%mag
+!          ave = ave/2.0_wp
+!        else
+!            ave = wake%wake_panels(iw,wake%nmax_pan)%mag
+!        endif
+!        partvec = partvec + dir*ave
   
-        !End side
-        dir = wake%pan_w_points(:,p2,wake%nmax_pan+1)-wake%pan_w_points(:,p2,wake%nmax_pan+1)
-        ave = wake%wake_panels(iw,wake%nmax_pan)%mag-wake%end_pan_idou(iw) ! TODO check if it's not identically 0 
-        partvec = partvec + dir*ave
+!        !End side
+!        dir = wake%pan_w_points(:,p2,wake%nmax_pan+1)-wake%pan_w_points(:,p2,wake%nmax_pan+1)
+!        ave = wake%wake_panels(iw,wake%nmax_pan)%mag-wake%end_pan_idou(iw) ! TODO check if it's not identically 0 
+!        partvec = partvec + dir*ave
 
-        cen_parent(:,iwc) = wake%wake_panels(iw,wake%nmax_pan)%cen
-        mag_parent(iwc) = norm2(partvec)
-        if(mag_parent(iwc) .gt. 1.0e-13_wp) then
-          dir_parent(:,iwc) = partvec/mag_parent(iwc)
-        else
-          dir_parent(:,iwc) = partvec
-        endif
+!        cen_parent(:,iwc) = wake%wake_panels(iw,wake%nmax_pan)%cen
+!        mag_parent(iwc) = norm2(partvec)
+!        if(mag_parent(iwc) .gt. 1.0e-13_wp) then
+!          dir_parent(:,iwc) = partvec/mag_parent(iwc)
+!        else
+!          dir_parent(:,iwc) = partvec
+!        endif
         
-        ! values for subparts
-        if ( chord_side_len .ge. span_side_len) then
-            ! chord side is longer
-            max_side = chord_side_len
-            min_side = span_side_len
-            n_chord = ceiling(max_side/(min_side/real(wake%k_refine,wp)))
-            n_span = wake%k_refine
-            step_chord = max_side/real(n_chord,wp)
-            step_span = min_side/real(n_span,wp)
-        else
-            ! span side is longer
-            max_side = span_side_len
-            min_side = chord_side_len
-            n_chord = wake%k_refine
-            n_span = ceiling(max_side/(min_side/real(wake%k_refine,wp)))
-            step_chord = min_side/real(n_chord,wp)
-            step_span = max_side/real(n_span,wp)
-        end if
+!        ! values for subparts
+!        if ( chord_side_len .ge. span_side_len) then
+!            ! chord side is longer
+!            max_side = chord_side_len
+!            min_side = span_side_len
+!            n_chord = ceiling(max_side/(min_side/real(wake%k_refine,wp)))
+!            n_span = wake%k_refine
+!            step_chord = max_side/real(n_chord,wp)
+!            step_span = min_side/real(n_span,wp)
+!        else
+!            ! span side is longer
+!            max_side = span_side_len
+!            min_side = chord_side_len
+!            n_chord = wake%k_refine
+!            n_span = ceiling(max_side/(min_side/real(wake%k_refine,wp)))
+!            step_chord = min_side/real(n_chord,wp)
+!            step_span = max_side/real(n_span,wp)
+!        end if
         
-        do ic = 1, n_chord
-          do is = 1, n_span   
-            cen_sbprt(:,isp+(ic-1)*n_span+is) = wake%pan_w_points(:,p1,wake%nmax_pan+1)+& ! top left corner
-                    (real(ic,wp)-0.5_wp)/real(n_chord,wp)*& ! move chordwise
-                    (points_end(:,p1)-wake%pan_w_points(:,p1,wake%nmax_pan+1))+& 
-                    (real(is,wp)-0.5_wp)/real(n_span,wp)*& ! move spanwise
-                    (wake%pan_w_points(:,p2,wake%nmax_pan+1)-wake%pan_w_points(:,p1,wake%nmax_pan+1)) 
-          enddo
-        enddo
-        area_sbprt(1:n_chord*n_span) = step_chord*step_span ! TODO refine it
-        !mag_sbprt(1:n_chord*n_span) = mag_parent(iwc)
-        do ic = 1,3
-          dir_sbprt(ic,1:n_chord*n_span) = dir_parent(ic,iwc)
-        enddo
-        isp = isp + n_chord*n_span ! added subparticles
+!        do ic = 1, n_chord
+!          do is = 1, n_span   
+!            cen_sbprt(:,isp+(ic-1)*n_span+is) = wake%pan_w_points(:,p1,wake%nmax_pan+1)+& ! top left corner
+!                    (real(ic,wp)-0.5_wp)/real(n_chord,wp)*& ! move chordwise
+!                    (points_end(:,p1)-wake%pan_w_points(:,p1,wake%nmax_pan+1))+& 
+!                    (real(is,wp)-0.5_wp)/real(n_span,wp)*& ! move spanwise
+!                    (wake%pan_w_points(:,p2,wake%nmax_pan+1)-wake%pan_w_points(:,p1,wake%nmax_pan+1)) 
+!          enddo
+!        enddo
+!        area_sbprt(1:n_chord*n_span) = step_chord*step_span ! TODO refine it
+!        !mag_sbprt(1:n_chord*n_span) = mag_parent(iwc)
+!        do ic = 1,3
+!          dir_sbprt(ic,1:n_chord*n_span) = dir_parent(ic,iwc)
+!        enddo
+!        isp = isp + n_chord*n_span ! added subparticles
 
-        iwc = iwc+1 ! added parent panel
+!        iwc = iwc+1 ! added parent panel
                
-        ! loop over all the other panels until component ends
-        do while (wake%pan_neigh(1,iw) .gt. 0)
-          iw = iw + 1 ! move to next panel
+!        ! loop over all the other panels until component ends
+!        do while (wake%pan_neigh(1,iw) .gt. 0)
+!          iw = iw + 1 ! move to next panel
           
-          p1 = wake%i_start_points(1,iw)
-          p2 = wake%i_start_points(2,iw)
-          partvec = 0.0_wp
-          !Left side
-          dir = wake%pan_w_points(:,p1,wake%nmax_pan+1)-points_end(:,p1)
-          chord_side_len = norm2(dir)
-          if (wake%pan_neigh(1,iw) .gt. 0) then
-            ave = wake%end_pan_idou(iw) - &
-                  real(wake%pan_neigh_o(1,iw),wp)* &
-                  wake%end_pan_idou(wake%pan_neigh(1,iw))
-            ave = ave/2.0_wp
-          else !has no fixed neighbour
-            if(sim_param%join_te) then
-              ave = get_joined_intensity(wake, iw, 1)
-            else
-              ave = wake%end_pan_idou(iw)
-            endif
-          endif
-          partvec = partvec + dir*ave
+!          p1 = wake%i_start_points(1,iw)
+!          p2 = wake%i_start_points(2,iw)
+!          partvec = 0.0_wp
+!          !Left side
+!          dir = wake%pan_w_points(:,p1,wake%nmax_pan+1)-points_end(:,p1)
+!          chord_side_len = norm2(dir)
+!          if (wake%pan_neigh(1,iw) .gt. 0) then
+!            ave = wake%end_pan_idou(iw) - &
+!                  real(wake%pan_neigh_o(1,iw),wp)* &
+!                  wake%end_pan_idou(wake%pan_neigh(1,iw))
+!            ave = ave/2.0_wp
+!          else !has no fixed neighbour
+!            if(sim_param%join_te) then
+!              ave = get_joined_intensity(wake, iw, 1)
+!            else
+!              ave = wake%end_pan_idou(iw)
+!            endif
+!          endif
+!          partvec = partvec + dir*ave
     
-          !Right side
-          dir = -wake%pan_w_points(:,p2,wake%nmax_pan+1)+points_end(:,p2)
-          if (wake%pan_neigh(2,iw) .gt. 0) then
-            ave = wake%end_pan_idou(iw) - &
-                  real(wake%pan_neigh_o(2,iw),wp)* &
-                  wake%end_pan_idou(wake%pan_neigh(2,iw))
-            ave = ave/2.0_wp
-          else
-            if(sim_param%join_te) then
-              ave = get_joined_intensity(wake, iw, 2)
-            else
-              ave = wake%end_pan_idou(iw)
-            endif
-          endif
-          partvec = partvec + dir*ave
+!          !Right side
+!          dir = -wake%pan_w_points(:,p2,wake%nmax_pan+1)+points_end(:,p2)
+!          if (wake%pan_neigh(2,iw) .gt. 0) then
+!            ave = wake%end_pan_idou(iw) - &
+!                  real(wake%pan_neigh_o(2,iw),wp)* &
+!                  wake%end_pan_idou(wake%pan_neigh(2,iw))
+!            ave = ave/2.0_wp
+!          else
+!            if(sim_param%join_te) then
+!              ave = get_joined_intensity(wake, iw, 2)
+!            else
+!              ave = wake%end_pan_idou(iw)
+!            endif
+!          endif
+!          partvec = partvec + dir*ave
     
-          !End side
-          dir = points_end(:,p1) - points_end(:,p2)
-          span_side_len = norm2(dir)
-          ave = wake%end_pan_idou(iw)-wake%last_pan_idou(iw)
-          wake%last_pan_idou(iw) = wake%end_pan_idou(iw)
-          partvec = partvec + dir*ave
+!          !End side
+!          dir = points_end(:,p1) - points_end(:,p2)
+!          span_side_len = norm2(dir)
+!          ave = wake%end_pan_idou(iw)-wake%last_pan_idou(iw)
+!          wake%last_pan_idou(iw) = wake%end_pan_idou(iw)
+!          partvec = partvec + dir*ave
   
-          ! centre of parent panel
-          pos_p = (points_end(:,p1)+points_end(:,p2)+ &
-                  wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
-                  wake%pan_w_points(:,p2,wake%nmax_pan+1) )/4.0_wp
+!          ! centre of parent panel
+!          pos_p = (points_end(:,p1)+points_end(:,p2)+ &
+!                  wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
+!                  wake%pan_w_points(:,p2,wake%nmax_pan+1) )/4.0_wp
                            
-          ! parent panel
-          cen_parent(:,iwc) = pos_p
-          mag_parent(iwc) = norm2(partvec)
-          if(mag_parent(iwc) .gt. 1.0e-13_wp) then
-            dir_parent(:,iwc) = partvec/mag_parent(iwc)
-          else
-            dir_parent(:,iwc) = partvec
-          endif
+!          ! parent panel
+!          cen_parent(:,iwc) = pos_p
+!          mag_parent(iwc) = norm2(partvec)
+!          if(mag_parent(iwc) .gt. 1.0e-13_wp) then
+!            dir_parent(:,iwc) = partvec/mag_parent(iwc)
+!          else
+!            dir_parent(:,iwc) = partvec
+!          endif
                     
-          ! values for subparts
-          if ( chord_side_len .ge. span_side_len) then
-              ! chord side is longer
-              max_side = chord_side_len
-              min_side = span_side_len
-              n_chord = ceiling(max_side/(min_side/real(wake%k_refine,wp)))
-              n_span = wake%k_refine
-              step_chord = max_side/real(n_chord,wp)
-              step_span = min_side/real(n_span,wp)
-          else
-              ! span side is longer
-              max_side = span_side_len
-              min_side = chord_side_len
-              n_chord = wake%k_refine
-              n_span = ceiling(max_side/(min_side/real(wake%k_refine,wp)))
-              step_chord = min_side/real(n_chord,wp)
-              step_span = max_side/real(n_span,wp)
-          end if
+!          ! values for subparts
+!          if ( chord_side_len .ge. span_side_len) then
+!              ! chord side is longer
+!              max_side = chord_side_len
+!              min_side = span_side_len
+!              n_chord = ceiling(max_side/(min_side/real(wake%k_refine,wp)))
+!              n_span = wake%k_refine
+!              step_chord = max_side/real(n_chord,wp)
+!              step_span = min_side/real(n_span,wp)
+!          else
+!              ! span side is longer
+!              max_side = span_side_len
+!              min_side = chord_side_len
+!              n_chord = wake%k_refine
+!              n_span = ceiling(max_side/(min_side/real(wake%k_refine,wp)))
+!              step_chord = min_side/real(n_chord,wp)
+!              step_span = max_side/real(n_span,wp)
+!          end if
        
-          do ic = 1, n_chord
-            do is = 1, n_span   
-              cen_sbprt(:,isp+(ic-1)*n_span+is) = wake%pan_w_points(:,p1,wake%nmax_pan+1)+& ! top left corner
-                      (real(ic,wp)-0.5_wp)/real(n_chord,wp)*& ! move chordwise
-                      (points_end(:,p1)-wake%pan_w_points(:,p1,wake%nmax_pan+1))+& 
-                      (real(is,wp)-0.5_wp)/real(n_span,wp)*& ! move spanwise
-                      (wake%pan_w_points(:,p2,wake%nmax_pan+1)-wake%pan_w_points(:,p1,wake%nmax_pan+1)) 
-            enddo
-          enddo
-          ! in the following, note that +1 is because isp started at 0 (cfr isp+ic above)
-          area_sbprt(isp+1:isp+n_chord*n_span) = step_chord*step_span ! TODO refine it
-          !mag_sbprt(isp+1:isp+n_chord*n_span) = mag_parent(iwc)
-          do ic = 1,3
-            dir_sbprt(ic,isp+1:isp+n_chord*n_span) = dir_parent(ic,iwc)
-          enddo
-          isp = isp + n_chord*n_span ! added subparticles
+!          do ic = 1, n_chord
+!            do is = 1, n_span   
+!              cen_sbprt(:,isp+(ic-1)*n_span+is) = wake%pan_w_points(:,p1,wake%nmax_pan+1)+& ! top left corner
+!                      (real(ic,wp)-0.5_wp)/real(n_chord,wp)*& ! move chordwise
+!                      (points_end(:,p1)-wake%pan_w_points(:,p1,wake%nmax_pan+1))+& 
+!                      (real(is,wp)-0.5_wp)/real(n_span,wp)*& ! move spanwise
+!                      (wake%pan_w_points(:,p2,wake%nmax_pan+1)-wake%pan_w_points(:,p1,wake%nmax_pan+1)) 
+!            enddo
+!          enddo
+!          ! in the following, note that +1 is because isp started at 0 (cfr isp+ic above)
+!          area_sbprt(isp+1:isp+n_chord*n_span) = step_chord*step_span ! TODO refine it
+!          !mag_sbprt(isp+1:isp+n_chord*n_span) = mag_parent(iwc)
+!          do ic = 1,3
+!            dir_sbprt(ic,isp+1:isp+n_chord*n_span) = dir_parent(ic,iwc)
+!          enddo
+!          isp = isp + n_chord*n_span ! added subparticles
           
-          iwc = iwc+1 ! added parent panel
+!          iwc = iwc+1 ! added parent panel
            
-          ! parent panel from previous row
-          !Left side
-          dir = wake%pan_w_points(:,p1,wake%nmax_pan)-wake%pan_w_points(:,p1,wake%nmax_pan+1)
-          if (wake%pan_neigh(1,iw) .gt. 0) then
-            ave = wake%wake_panels(iw,wake%nmax_pan)%mag- &
-                  real(wake%pan_neigh_o(1,iw),wp)* &
-                  wake%wake_panels(wake%pan_neigh(1,iw),wake%nmax_pan)%mag
-            ave = ave/2.0_wp
-          else !has no fixed neighbour
-              ! TODO join_te?
-              ave = wake%wake_panels(iw,wake%nmax_pan)%mag
-          endif
-          partvec = partvec + dir*ave
+!          ! parent panel from previous row
+!          !Left side
+!          dir = wake%pan_w_points(:,p1,wake%nmax_pan)-wake%pan_w_points(:,p1,wake%nmax_pan+1)
+!          if (wake%pan_neigh(1,iw) .gt. 0) then
+!            ave = wake%wake_panels(iw,wake%nmax_pan)%mag- &
+!                  real(wake%pan_neigh_o(1,iw),wp)* &
+!                  wake%wake_panels(wake%pan_neigh(1,iw),wake%nmax_pan)%mag
+!            ave = ave/2.0_wp
+!          else !has no fixed neighbour
+!              ! TODO join_te?
+!              ave = wake%wake_panels(iw,wake%nmax_pan)%mag
+!          endif
+!          partvec = partvec + dir*ave
     
-          !Right side
-          dir = -wake%pan_w_points(:,p2,wake%nmax_pan)+wake%pan_w_points(:,p2,wake%nmax_pan+1)
-          if (wake%pan_neigh(2,iw) .gt. 0) then
-            ave = wake%wake_panels(iw,wake%nmax_pan)%mag- &
-                  real(wake%pan_neigh_o(2,iw),wp)* &
-                  wake%wake_panels(wake%pan_neigh(2,iw),wake%nmax_pan)%mag
-            ave = ave/2.0_wp
-          else
-              ave = wake%wake_panels(iw,wake%nmax_pan)%mag
-          endif
-          partvec = partvec + dir*ave
+!          !Right side
+!          dir = -wake%pan_w_points(:,p2,wake%nmax_pan)+wake%pan_w_points(:,p2,wake%nmax_pan+1)
+!          if (wake%pan_neigh(2,iw) .gt. 0) then
+!            ave = wake%wake_panels(iw,wake%nmax_pan)%mag- &
+!                  real(wake%pan_neigh_o(2,iw),wp)* &
+!                  wake%wake_panels(wake%pan_neigh(2,iw),wake%nmax_pan)%mag
+!            ave = ave/2.0_wp
+!          else
+!              ave = wake%wake_panels(iw,wake%nmax_pan)%mag
+!          endif
+!          partvec = partvec + dir*ave
     
-          !End side
-          dir = wake%pan_w_points(:,p2,wake%nmax_pan+1)-wake%pan_w_points(:,p2,wake%nmax_pan+1)
-          ave = wake%wake_panels(iw,wake%nmax_pan)%mag-wake%end_pan_idou(iw) ! TODO check if it's not identically 0 
-          partvec = partvec + dir*ave
+!          !End side
+!          dir = wake%pan_w_points(:,p2,wake%nmax_pan+1)-wake%pan_w_points(:,p2,wake%nmax_pan+1)
+!          ave = wake%wake_panels(iw,wake%nmax_pan)%mag-wake%end_pan_idou(iw) ! TODO check if it's not identically 0 
+!          partvec = partvec + dir*ave
   
-          cen_parent(:,iwc) = wake%wake_panels(iw,wake%nmax_pan)%cen
-          mag_parent(iwc) = norm2(partvec)
-          if(mag_parent(iwc) .gt. 1.0e-13_wp) then
-            dir_parent(:,iwc) = partvec/mag_parent(iwc)
-          else
-            dir_parent(:,iwc) = partvec
-          endif
-          iwc = iwc +1 ! added parent panel
+!          cen_parent(:,iwc) = wake%wake_panels(iw,wake%nmax_pan)%cen
+!          mag_parent(iwc) = norm2(partvec)
+!          if(mag_parent(iwc) .gt. 1.0e-13_wp) then
+!            dir_parent(:,iwc) = partvec/mag_parent(iwc)
+!          else
+!            dir_parent(:,iwc) = partvec
+!          endif
+!          iwc = iwc +1 ! added parent panel
            
-        enddo ! loop over panels for this component
+!        enddo ! loop over panels for this component
         
-        ! add final ghost panel
-        p1 = wake%i_start_points(1,iw-1)
-        p2 = wake%i_start_points(2,iw-1)
+!        ! add final ghost panel
+!        p1 = wake%i_start_points(1,iw-1)
+!        p2 = wake%i_start_points(2,iw-1)
 
-        cen_parent(:,iwc) = pos_p+(wake%pan_w_points(:,p1,wake%nmax_pan+1)-&
-                      wake%pan_w_points(:,p2,wake%nmax_pan+1))
-        mag_parent(iwc) = 0.0_wp
-        dir_parent(:,iwc) = 0.0_wp      
-        iwc = iwc + 1 ! added ghost panel 
+!        cen_parent(:,iwc) = pos_p+(wake%pan_w_points(:,p1,wake%nmax_pan+1)-&
+!                      wake%pan_w_points(:,p2,wake%nmax_pan+1))
+!        mag_parent(iwc) = 0.0_wp
+!        dir_parent(:,iwc) = 0.0_wp      
+!        iwc = iwc + 1 ! added ghost panel 
     
-        ! ghost panel from previous row
-        cen_parent(:,iwc) = wake%wake_panels(iw,wake%nmax_pan)%cen+&
-               (wake%pan_w_points(:,p1,wake%nmax_pan)-wake%pan_w_points(:,p2,wake%nmax_pan)) 
-        mag_parent(iwc) = 0.0_wp
-        dir_parent(:,iwc) = 0.0_wp
+!        ! ghost panel from previous row
+!        cen_parent(:,iwc) = wake%wake_panels(iw,wake%nmax_pan)%cen+&
+!               (wake%pan_w_points(:,p1,wake%nmax_pan)-wake%pan_w_points(:,p2,wake%nmax_pan)) 
+!        mag_parent(iwc) = 0.0_wp
+!        dir_parent(:,iwc) = 0.0_wp
 
-        ! perform interpolation, only passing actual number of parent panels and subparts
-        call infinite_plate_spline(cen_sbprt(:,1:isp), cen_parent(:,1:iwc), W)
+!        ! perform interpolation, only passing actual number of parent panels and subparts
+!        call infinite_plate_spline(cen_sbprt(:,1:isp), cen_parent(:,1:iwc), W)
         
-        ! array of weights
-        allocate(w_i(isp))
+!        ! array of weights
+!        allocate(w_i(isp))
 
-        ! mag
-        w_i = matmul(W,mag_parent)/maxval(mag_parent)
-        mag_sbprt = w_i*sum(mag_parent)/sum(w_i)
+!        ! mag
+!        w_i = matmul(W,mag_parent)/maxval(mag_parent)
+!        mag_sbprt = w_i*sum(mag_parent)/sum(w_i)
         
-        ! dir ! TODO check normalization
-        ! will be used below in the insertion loop
-        !w_i = matmul(W,norm2(dir_sbprt,1))/max(norm2(dir_sbprt,1))
+!        ! dir ! TODO check normalization
+!        ! will be used below in the insertion loop
+!        !w_i = matmul(W,norm2(dir_sbprt,1))/max(norm2(dir_sbprt,1))
         
-        deallocate(W, w_i)        
+!        deallocate(W, w_i)        
         
-        ! actually insert particles
-        do ic = 1,isp
+!        ! actually insert particles
+!        do ic = 1,isp
         
-          pos_p = cen_sbprt(:,ic)
+!          pos_p = cen_sbprt(:,ic)
           
+!          if(all(pos_p .ge. wake%part_box_min) .and. &
+!              all(pos_p .le. wake%part_box_max)) then
+    
+!            do ip = k, size(wake%wake_parts)
+!              if (wake%wake_parts(ip)%free) then
+!                wake%wake_parts(ip)%free = .false.
+!                k = ip+1
+!                wake%n_prt = wake%n_prt+1
+!                wake%wake_parts(ip)%mag = mag_sbprt(ic)
+!                wake%wake_parts(ip)%dir = dir_sbprt(:,ic)  
+!                wake%wake_parts(ip)%cen = pos_p
+!              if (sim_param%KVortexRad .ge. 1e-10_wp) then ! Variable vortex rad
+!                wake%wake_parts(ip)%r_Vortex = sim_param%KVortexRad*&
+!                              sqrt(2.0_wp*area_sbprt(ic)) ! k*radius of the circumscribed circle
+!                else ! revert to sim_param vortex rad
+!                  wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
+!                end if
+!                wake%wake_parts(ip)%r_cutoff  = sim_param%CutoffRad
+!                wake%wake_parts(ip)%vel = 0.5_wp * &
+!                                  ( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
+!                                    wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
+!                exit
+!              endif
+!            enddo
+      
+!            if (ip .gt. wake%nmax_prt) then
+!              write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
+!                wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
+!                &restarting with a higher number of maximum wake particles'
+      
+!              call error(this_sub_name, this_mod_name, trim(msg))
+!            endif !max number of particles
+!          endif !inside the box
+!        enddo ! insert particles
+      
+!      iw = iw + 1 ! move to next panel (first of next component)
+      
+!      enddo ! iw, finished all wake
+      
+!      deallocate(cen_sbprt, area_sbprt, mag_sbprt, dir_sbprt)
+!      deallocate(cen_parent, mag_parent, dir_parent)
+    
+!    else ! old behaviour, possibly with refined wake
+      
+    if (wake%refine_wake) then ! wake refinement
+      ! each wake panel is converted in multiple particles
+      ! all particles have the same intensity, but different radius
+      
+      k = 1
+      do iw = 1,wake%n_pan_stripes
+        
+        ! compute the quantites of the wake panel
+        call compute_partvec(wake, iw, partvec, pos_p, area, vertices)
+        wake%last_pan_idou(iw) = wake%end_pan_idou(iw)
+        
+        ! divide the panel in multiple particles by tessellating it with triangles
+        call tessellate(vertices, wake%k_refine, wake%tol_refine, cen_sbprt, rad_sbprt)
+
+        n_sbprt = size(rad_sbprt)
+       
+        ! insert the particles at points cen_sbprt and with radius rad_sbprt
+        do ic = 1, n_sbprt
+          pos_p = cen_sbprt(:,ic)
+
+          !Add the particle (if it is in the box)
           if(all(pos_p .ge. wake%part_box_min) .and. &
               all(pos_p .le. wake%part_box_max)) then
     
@@ -1779,12 +1847,18 @@ subroutine complete_wake(wake, geo, elems, te)
                 wake%wake_parts(ip)%free = .false.
                 k = ip+1
                 wake%n_prt = wake%n_prt+1
-                wake%wake_parts(ip)%mag = mag_sbprt(ic)
-                wake%wake_parts(ip)%dir = dir_sbprt(:,ic)  
+                ! mag of the particle is mag_panel/n_subpart
+                wake%wake_parts(ip)%mag = norm2(partvec)/real(n_sbprt,wp)
+    
+                if(norm2(partvec) .gt. 1.0e-13_wp) then
+                  wake%wake_parts(ip)%dir = partvec/norm2(partvec)
+                else
+                  wake%wake_parts(ip)%dir = partvec
+                endif
+    
                 wake%wake_parts(ip)%cen = pos_p
               if (sim_param%KVortexRad .ge. 1e-10_wp) then ! Variable vortex rad
-                wake%wake_parts(ip)%r_Vortex = sim_param%KVortexRad*&
-                              sqrt(2.0_wp*area_sbprt(ic)) ! k*radius of the circumscribed circle
+                wake%wake_parts(ip)%r_Vortex = sim_param%KVortexRad*rad_sbprt(ic) ! k*radius of the circumscribed circle
                 else ! revert to sim_param vortex rad
                   wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
                 end if
@@ -1804,150 +1878,23 @@ subroutine complete_wake(wake, geo, elems, te)
               call error(this_sub_name, this_mod_name, trim(msg))
             endif !max number of particles
           endif !inside the box
-        enddo ! insert particles
-      
-      iw = iw + 1 ! move to next panel (first of next component)
-      
-      enddo ! iw, finished all wake
-      
-      deallocate(cen_sbprt, area_sbprt, mag_sbprt, dir_sbprt)
-      deallocate(cen_parent, mag_parent, dir_parent)
-    
-    else ! old behaviour, possibly with refined wake
+        enddo !ic
+        deallocate(cen_sbprt, rad_sbprt) ! allocated in tessellation  
+      enddo !iw  
+
+    else !classical behaviour
+      ! each wake panel is converted to one particle
       k = 1
       do iw = 1,wake%n_pan_stripes
-        p1 = wake%i_start_points(1,iw)
-        p2 = wake%i_start_points(2,iw)
-        partvec = 0.0_wp
-        !Left side
-        dir = wake%pan_w_points(:,p1,wake%nmax_pan+1)-points_end(:,p1)
-        chord_side_len = norm2(dir)
-        if (wake%pan_neigh(1,iw) .gt. 0) then
-          ave = wake%end_pan_idou(iw) - &
-                real(wake%pan_neigh_o(1,iw),wp)* &
-                wake%end_pan_idou(wake%pan_neigh(1,iw))
-          ave = ave/2.0_wp
-        else !has no fixed neighbour
-          if(sim_param%join_te) then
-            ave = get_joined_intensity(wake, iw, 1)
-          else
-            ave = wake%end_pan_idou(iw)
-          endif
-        endif
-        partvec = partvec + dir*ave
-  
-        !Right side
-        dir = -wake%pan_w_points(:,p2,wake%nmax_pan+1)+points_end(:,p2)
-        if (wake%pan_neigh(2,iw) .gt. 0) then
-          ave = wake%end_pan_idou(iw) - &
-                real(wake%pan_neigh_o(2,iw),wp)* &
-                wake%end_pan_idou(wake%pan_neigh(2,iw))
-          ave = ave/2.0_wp
-        else
-          if(sim_param%join_te) then
-            ave = get_joined_intensity(wake, iw, 2)
-          else
-            ave = wake%end_pan_idou(iw)
-          endif
-        endif
-        partvec = partvec + dir*ave
-  
-        !End side
-        dir = points_end(:,p1) - points_end(:,p2)
-        span_side_len = norm2(dir)
-        ave = wake%end_pan_idou(iw)-wake%last_pan_idou(iw)
+      
+        ! compute the quantites of the wake panel
+        call compute_partvec(wake, iw, partvec, pos_p, area)
         wake%last_pan_idou(iw) = wake%end_pan_idou(iw)
-        partvec = partvec + dir*ave
-  
-      if (wake%refine_wake) then
-        
-        if ( chord_side_len .ge. span_side_len) then
-            ! chord side is longer
-            max_side = chord_side_len
-            min_side = span_side_len
-            n_chord = ceiling(max_side/(min_side/real(wake%k_refine,wp)))
-            n_span = wake%k_refine
-            step_chord = max_side/real(n_chord,wp)
-            step_span = min_side/real(n_span,wp)
-  
-        else
-            ! span side is longer
-            max_side = span_side_len
-            min_side = chord_side_len
-            n_chord = wake%k_refine
-            n_span = ceiling(max_side/(min_side/real(wake%k_refine,wp)))
-            step_chord = min_side/real(n_chord,wp)
-            step_span = max_side/real(n_span,wp)
-            
-        end if
-  
-        do ic = 1, n_chord
-          do is = 1, n_span
-            ! find centre of the subpanel by starting from top left of the panel and
-            ! move half steps chord- and span-wise
-            pos_p = wake%pan_w_points(:,p1,wake%nmax_pan+1)+& ! top left corner
-                    (real(ic,wp)-0.5_wp)/real(n_chord,wp)*& ! move chordwise
-                    (points_end(:,p1)-wake%pan_w_points(:,p1,wake%nmax_pan+1))+& 
-                    (real(is,wp)-0.5_wp)/real(n_span,wp)*& ! move spanwise
-                    (wake%pan_w_points(:,p2,wake%nmax_pan+1)-wake%pan_w_points(:,p1,wake%nmax_pan+1)) 
-  
-            area = step_chord*step_span ! TODO refine it
-  
-            !Add the particle (if it is in the box)
-            if(all(pos_p .ge. wake%part_box_min) .and. &
-                all(pos_p .le. wake%part_box_max)) then
       
-              do ip = k, size(wake%wake_parts)
-                if (wake%wake_parts(ip)%free) then
-                  wake%wake_parts(ip)%free = .false.
-                  k = ip+1
-                  wake%n_prt = wake%n_prt+1
-                  ! mag of the particle is 1/n_subpart * mag_panel
-                  wake%wake_parts(ip)%mag = norm2(partvec)/real(n_span*n_chord,wp) ! TODO generalize n_subpart
-      
-                  if(norm2(partvec) .gt. 1.0e-13_wp) then
-                    wake%wake_parts(ip)%dir = partvec/norm2(partvec)
-                  else
-                    wake%wake_parts(ip)%dir = partvec
-                  endif
-      
-                  wake%wake_parts(ip)%cen = pos_p
-                if (sim_param%KVortexRad .ge. 1e-10_wp) then ! Variable vortex rad
-                  wake%wake_parts(ip)%r_Vortex = sim_param%KVortexRad*sqrt(2.0_wp*area) ! k*radius of the circumscribed circle
-                  else ! revert to sim_param vortex rad
-                    wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
-                  end if
-                  wake%wake_parts(ip)%r_cutoff  = sim_param%CutoffRad
-                  wake%wake_parts(ip)%vel = 0.5_wp * &
-                                    ( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
-                                      wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
-                  exit
-                endif
-              enddo
-        
-              if (ip .gt. wake%nmax_prt) then
-                write(msg,'(A,I0,A)') 'Exceeding the maximum number of ', &
-                  wake%nmax_prt, ' wake particles introduced. Stopping. Consider &
-                  &restarting with a higher number of maximum wake particles'
-        
-                call error(this_sub_name, this_mod_name, trim(msg))
-              endif !max number of particles
-            endif !inside the box
-          enddo !is
-        enddo !ic
-        
-      else !classical behaviour
-        !Calculate the center
-        pos_p = (points_end(:,p1)+points_end(:,p2)+ &
-                wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
-                wake%pan_w_points(:,p2,wake%nmax_pan+1) )/4.0_wp
-        ! A = 1/2 [()        
-        area = norm2(cross(points_end(:,p1)- wake%pan_w_points(:,p2,wake%nmax_pan+1),&
-                     points_end(:,p2)-wake%pan_w_points(:,p2,wake%nmax_pan+1)))
         !Add the particle (if it is in the box)
         if(all(pos_p .ge. wake%part_box_min) .and. &
             all(pos_p .le. wake%part_box_max)) then
-  
+
           do ip = k, size(wake%wake_parts)
             if (wake%wake_parts(ip)%free) then
               wake%wake_parts(ip)%free = .false.
@@ -1983,10 +1930,8 @@ subroutine complete_wake(wake, geo, elems, te)
             call error(this_sub_name, this_mod_name, trim(msg))
           endif !max number of particles
         endif !inside the box
-        
-      endif !refine_wake
       enddo !iw
-    endif !interp_parts
+    endif !refine_wake
   endif !full wake
 
   if(wake%full_rings) then
@@ -2121,6 +2066,82 @@ subroutine complete_wake(wake, geo, elems, te)
   endif
 
 end subroutine complete_wake
+
+!----------------------------------------------------------------------
+
+! Given a wake panel computes quantites for the particle it will be converted into
+subroutine compute_partvec(wake, iw, partvec, pos_p, area, vertices)
+  
+  type(t_wake), intent(in)        :: wake
+  integer, intent(in)             :: iw
+  
+  real(wp), intent(out)           :: partvec(3) ! resultant vorticity vector
+  real(wp), intent(out)           :: pos_p(3) ! centre of the panel
+  real(wp), intent(out)           :: area ! area of the panel
+  real(wp), intent(out), optional :: vertices(3,4) ! vertices of the panel, needed for refinement
+  
+  integer                         :: p1, p2
+  real(wp)                        :: ave, dir(3)
+  
+  p1 = wake%i_start_points(1,iw)
+  p2 = wake%i_start_points(2,iw)     
+  partvec = 0.0_wp
+  
+  if (present(vertices)) then
+    vertices(:,1) = wake%pan_w_points(:,p1,wake%nmax_pan+1)
+    vertices(:,2) = wake%pan_w_points(:,p2,wake%nmax_pan+1)
+    vertices(:,3) = points_end(:,p2)
+    vertices(:,4) = points_end(:,p1)
+  endif
+  
+  !Left side
+  dir = wake%pan_w_points(:,p1,wake%nmax_pan+1)-points_end(:,p1)
+
+  if (wake%pan_neigh(1,iw) .gt. 0) then
+    ave = wake%end_pan_idou(iw) - &
+          real(wake%pan_neigh_o(1,iw),wp)* &
+          wake%end_pan_idou(wake%pan_neigh(1,iw))
+    ave = ave/2.0_wp
+  else !has no fixed neighbour
+    if(sim_param%join_te) then
+      ave = get_joined_intensity(wake, iw, 1)
+    else
+      ave = wake%end_pan_idou(iw)
+    endif
+  endif
+  partvec = partvec + dir*ave
+  
+  !Right side
+  dir = -wake%pan_w_points(:,p2,wake%nmax_pan+1)+points_end(:,p2)
+  if (wake%pan_neigh(2,iw) .gt. 0) then
+    ave = wake%end_pan_idou(iw) - &
+          real(wake%pan_neigh_o(2,iw),wp)* &
+          wake%end_pan_idou(wake%pan_neigh(2,iw))
+    ave = ave/2.0_wp
+  else
+    if(sim_param%join_te) then
+      ave = get_joined_intensity(wake, iw, 2)
+    else
+      ave = wake%end_pan_idou(iw)
+    endif
+  endif
+  partvec = partvec + dir*ave
+  
+  !End side
+  dir = points_end(:,p1) - points_end(:,p2)
+
+  ave = wake%end_pan_idou(iw)-wake%last_pan_idou(iw)
+  partvec = partvec + dir*ave
+  
+  !Calculate the center
+  pos_p = (points_end(:,p1)+points_end(:,p2)+ &
+            wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
+            wake%pan_w_points(:,p2,wake%nmax_pan+1) )/4.0_wp
+  ! A = cross product of diagonals       
+  area = norm2(cross(points_end(:,p1)- wake%pan_w_points(:,p2,wake%nmax_pan+1),&
+              points_end(:,p2)-wake%pan_w_points(:,p1,wake%nmax_pan+1)))
+              
+end subroutine compute_partvec
 
 !----------------------------------------------------------------------
 

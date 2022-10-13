@@ -57,7 +57,8 @@ use mod_handling, only: &
 implicit none
 
 public :: dot, cross , linear_interp , compute_qr, &
-          rotation_vector_combination, sort_vector_real, unique, infinite_plate_spline
+          rotation_vector_combination, sort_vector_real, & 
+          unique, infinite_plate_spline, tessellate
 
 private
 
@@ -455,6 +456,206 @@ subroutine infinite_plate_spline(pos_interp, pos_ref, W)
   deallocate(Y_r, eye)
   
 end subroutine infinite_plate_spline
+
 ! ----------------------------------------------------------------------
+! Tessellate a given quadrilateral into triangles
+! Firstly divides the sides in multiples of the shortest side and creates 
+! triangles with the resulting points
+! The following n_steps steps are midpoint tessellations
+! Returns centres of triangles and radius of each circumscribed circle
+!
+! Midpoint tessellation based on: 
+!   https://lindenreidblog.com/2017/12/03/simple-mesh-tessellation-triangulation-tutorial/
+!   and adapted to C by Stefano Colli
+subroutine tessellate(vertices, n_steps, tol, cen_sbprt, rad_sbprt)
+  real(wp), intent(in)               :: vertices(:,:) ! coordinates of quadri vertices
+  integer, intent(in)                :: n_steps ! number of midpoint triangulation steps
+  real(wp), intent(in)               :: tol ! tolerance for quadri initial division
+  real(wp), allocatable, intent(out) :: cen_sbprt(:,:), rad_sbprt(:) ! centre coords and radius of subparticles
+  
+  real(wp), allocatable :: tex(:,:,:) ! stores the tessellation 
+  integer               :: i, j, n_tri_tot
+  
+  ! variables for initial division
+  real(wp)              :: lengths(4), min_side_len, succ(3,4), mid(3), abc(3,3)
+  real(wp), allocatable :: division_points(:,:), init_tri(:,:,:)
+  integer               :: n_div(4), n_init_tri, i_min_side, ip, first_v(4), a, b, c, abcmax
+  
+  ! variables for triforce
+  real(wp) :: mid_ab(3), mid_bc(3), mid_ca(3)
+  integer  ::  n_tri_used, idx_glob, idx_loc, offset
+  
+  
+  ! Initial division
+  succ = cshift(vertices,1,2) ! array of successive points to vertices
+  lengths = norm2(succ-vertices,1) ! length of each side of quadri
+  min_side_len = minval(lengths) ! minimum side length
+  i_min_side = minloc(lengths,1) ! which side is minimum
+  ! compute how many times the min side is into each side
+  n_div = max(floor(lengths/min_side_len+tol),1) ! number of subdivision for each side
+    
+  ! arrays to hold points and triangles for initial subdivision
+  allocate(division_points(3,sum(n_div)), init_tri(3,3,sum(n_div*2)-4))
+  
+  ! start subdivision: cycle over all sides and if it is longer than min side
+  ! divide it in parts equal to the min side
+  ip = 1 ! points index
+  do i = 1,4 ! for all 4 sides
+    first_v(i) = ip ! index of first vertex of side
+    division_points(:,ip) = vertices(:,i) ! first point is the vertex
+    ip = ip + 1
+    if (n_div(i) .gt. 1) then ! if side is too long
+      do j = 1,n_div(i)-1 ! divide it 
+        ! linear combination of side vertices
+        division_points(:,ip) = (real(j,wp)/real(n_div(i),wp))*succ(:,i) + &
+                         (1.0_wp-real(j,wp)/real(n_div(i),wp))*vertices(:,i)
+        ip = ip +1
+      enddo
+    endif
+  enddo
+  ip = ip-1 ! ip now is the total number of points
+
+  ! Starting from min side, connect the points alternately creating triangles
+  ! and actually divide this triangles in half (to get a clean behaviour with squares)
+  n_init_tri = 0 ! counter for tri
+  ! first point of min side
+  b = first_v(i_min_side)
+  ! second point of min side
+  a = modd(b+1,ip)
+
+  do i = 1,ip-2
+    ! third point, alternate between opposite sides as we move along
+    c = mod(i,2)*modd(a+1,ip) + mod(i-1,2)*modd(a-1,ip)
+    
+    ! coordinates of the points of the triangle
+    abc(:,1) = division_points(:,a)
+    abc(:,2) = division_points(:,b)
+    abc(:,3) = division_points(:,c)
+    
+    ! which side of the tri is max      
+    abcmax = maxloc(norm2(cshift(abc,1,2)-abc,1),1)
+    
+    ! divide in half max side
+    mid = (abc(:,abcmax)+abc(:,modd(abcmax+1,3)))/2
+    
+    ! split the tri in two tris with the midpoint
+    n_init_tri = n_init_tri+1
+    init_tri(:,1,n_init_tri) = mid
+    init_tri(:,2,n_init_tri) = abc(:,modd(abcmax+2,3))
+    init_tri(:,3,n_init_tri) = abc(:,modd(abcmax,3))
+    
+    n_init_tri = n_init_tri+1
+    init_tri(:,1,n_init_tri) = mid
+    init_tri(:,2,n_init_tri) = abc(:,modd(abcmax+2,3))
+    init_tri(:,3,n_init_tri) = abc(:,modd(abcmax+1,3))
+    
+    a = b
+    b = c
+  enddo  
+  
+  ! compute the total number of tri in the tessellation
+  n_tri_tot = n_init_tri
+  ! inital tris + n_steps of triforce
+  do i=1,n_steps
+    n_tri_tot = n_tri_tot + 4**i*n_init_tri
+  end do
+  
+  ! allocate array of tris for the tessellation
+  ! new tris will be appended to it
+  allocate(tex(3,3,n_tri_tot))
+  tex = 0.0_wp
+  ! fill it with the tris we already have
+  do i = 1,n_init_tri
+    tex(:,:,i) = init_tri(:,:,i)
+  enddo
+  
+  deallocate(division_points, init_tri)
+  
+  ! Midpoint division
+  ! each tri is now divided in 4 by taking its sides' midpoints
+  ! process is repeated n_steps times
+  n_tri_used = 0  
+  do i=1,n_steps
+    offset = 1
+    do j=1,n_init_tri*4**(i-1)
+      ! idx_glob is the index for where the new tris are going in the tex array
+      ! idx_loc is the index for which tri to divide in 4
+      idx_glob = n_tri_used + n_init_tri*4**(i-1) + offset
+      idx_loc = n_tri_used + j
+            
+      mid_ab = (tex(:,1,idx_loc)+tex(:,2,idx_loc))/2
+      mid_bc = (tex(:,2,idx_loc)+tex(:,3,idx_loc))/2
+      mid_ca = (tex(:,3,idx_loc)+tex(:,1,idx_loc))/2
+     
+      tex(:,1,idx_glob) = tex(:,1,idx_loc) ! tri.a
+      tex(:,2,idx_glob) = mid_ab
+      tex(:,3,idx_glob) = mid_ca
+      
+      tex(:,1,idx_glob+1) = tex(:,2,idx_loc) ! tri.b
+      tex(:,2,idx_glob+1) = mid_ab
+      tex(:,3,idx_glob+1) = mid_bc
+      
+      tex(:,1,idx_glob+2) = tex(:,3,idx_loc) ! tri.c
+      tex(:,2,idx_glob+2) = mid_bc
+      tex(:,3,idx_glob+2) = mid_ca
+      
+      tex(:,1,idx_glob+3) = mid_ab
+      tex(:,2,idx_glob+3) = mid_bc
+      tex(:,3,idx_glob+3) = mid_ca
+              
+      offset = offset+4
+    enddo
+    n_tri_used = n_tri_used+n_init_tri*4**(i-1)
+  enddo
+              
+  ! compute cen and area
+  ! only the tris generated in the last step are used
+  allocate(cen_sbprt(3,n_init_tri*4**n_steps), rad_sbprt(n_init_tri*4**n_steps))
+
+  do i = 1, n_init_tri*4**n_steps
+    cen_sbprt(:,i) = (tex(:,1,n_tri_tot-i+1)+tex(:,2,n_tri_tot-i+1)+tex(:,3,n_tri_tot-i+1))/3.0_wp
+    rad_sbprt(i) = circumradius(tex(:,:,n_tri_tot-i+1))
+  enddo
+
+  deallocate(tex)
+  
+end subroutine
+
+
+! ----------------------------------------------------------------------
+! Computes radius of circumscribed circle of a triangle 
+real(wp) function circumradius(vertices)
+  
+  real(wp), intent(in) :: vertices(3,3) ! triangle vertices, xyz for three points
+  real(wp) :: a, b, c, p, area
+  
+  a = norm2(vertices(:,1)-vertices(:,2))
+  b = norm2(vertices(:,2)-vertices(:,3))
+  c = norm2(vertices(:,3)-vertices(:,1))
+  
+  p = (a+b+c)/2
+  
+  area = sqrt(p*(p-a)*(p-b)*(p-c)) ! Heron's formula for area
+  
+  circumradius = a*b*c/(4*area)    
+  
+  return 
+  
+end function circumradius
+
+! ----------------------------------------------------------------------
+! Modified modulo function to cycle arrays 
+! Substitutes 0 with last element
+! Eg (1,2,3) +1 mod 3  -> (2,0,1)
+!    (1,2,3) +1 modd 3 -> (2,3,1)
+integer function modd(a,b)
+
+    integer, intent(in) :: a,b
+    
+    modd = mod(a,b)
+    if (modd .eq. 0) modd = b
+    return 
+  
+end function
 
 end module mod_math
