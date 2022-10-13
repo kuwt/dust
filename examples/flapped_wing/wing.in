@@ -6,7 +6,7 @@ symmetry_point   = (/0.0 , 0.0,  0.0/)
 symmetry_normal = (/0.0 , 1.0,  0.0/)
 
 nelem_chord = 15
-type_chord = cosineLE   ! uniform  cosineLE  cosineTE
+type_chord = cosine   ! uniform  cosineLE  cosineTE
 starting_point = (/0.0,0.0,0.0/)
 reference_chord_fraction = 0.25
 

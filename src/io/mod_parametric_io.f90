@@ -128,6 +128,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   real(wp), allocatable                     :: delta_x(:), delta_x_no_off(:), csi_adim(:) 
   integer, allocatable                      :: point_region(:)
   real(wp)                                  :: merge_tol = 0.0_wp
+  logical                                   :: adaptive_mesh 
   !> Regions  
   integer , allocatable, intent(out)        :: nelem_span_list(:)
   real(wp), allocatable                     :: span_list(:) 
@@ -344,9 +345,16 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   ! get chordwise division
   allocate(chord_fraction(nelem_chord+1))
   type_chord = getstr(pmesh_prs,'type_chord')
+  
+  adaptive_mesh = .false. 
+  do ih = 1, n_hinges
+    if (hinges(ih)%adaptive_mesh) then
+      adaptive_mesh = .true.
+    endif
+  enddo
 
   !> build adaptive mesh for hinged case   
-  if (n_hinges .ge. 1 ) then 
+  if ((n_hinges .ge. 1) .and. adaptive_mesh) then 
     
     !> allocate surface points for the component 
     allocate(rrv_le(2,nSections));  rrv_le = 0.0_wp 
@@ -354,7 +362,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     !> allocate aerodynamic center line for the component 
     allocate(ac_line(2,nSections));  ac_line = 0.0_wp 
     !> initialize first section 
-    if (mesh_mirror .or. mesh_symmetry) then 
+    if (mesh_mirror) then 
       rrv_le (1,nRegions + 1) = -chord_list(nRegions + 1)*ref_chord_fraction
       rrv_te (1,nRegions + 1) = chord_list(nRegions + 1)*(1 - ref_chord_fraction)
     else
@@ -363,7 +371,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     endif     
     do iRegion = 1, nRegions
       !> aerodynamic center line      
-      if (mesh_mirror .or. mesh_symmetry) then 
+      if (mesh_mirror) then 
         ac_line(1, iRegion + 1) = span_list(iRegion)*sin(sweep_list(iRegion)*pi/180.0_wp) + ac_line(1, iRegion)
         ac_line(2, iRegion + 1) = -(span_list(iRegion) + ac_line(2, iRegion))
       else 
@@ -372,7 +380,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       endif 
     enddo
 
-    if (mesh_mirror .or. mesh_symmetry) then  
+    if (mesh_mirror) then  
       ac_line(:, nRegions+1:1:-1) = ac_line
       chord_list(nRegions+1:1:-1) = chord_list
 
@@ -400,7 +408,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     rrv_le(1,:)   = ref_point(1) + rrv_le(1,:) 
     rrv_te(1,:)   = ref_point(1) + rrv_te(1,:) 
     ac_line(1,:)  = ref_point(1) + ac_line(1,:) 
-    if ((mesh_mirror .or. mesh_symmetry)) then
+
+    if (mesh_mirror) then
       rrv_le(2,:)   = -ref_point(2) + rrv_le(2,:) 
       rrv_te(2,:)   = -ref_point(2) + rrv_te(2,:) 
       ac_line(2,:)  = -ref_point(2) + ac_line(2,:)       
@@ -412,7 +421,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
     do iRegion = 1, nRegions
       do ih = 1, n_hinges
-        if ((mesh_mirror .or. mesh_symmetry) .and. hinges(ih)%adaptive_mesh ) then 
+        if (mesh_mirror .and. hinges(ih)%adaptive_mesh ) then 
           if ((hinges(ih)%node2(2) .le. ac_line(2, iRegion + 1)) .and. & 
               (hinges(ih)%node2(2) .ge. ac_line(2, iRegion))) then 
 
@@ -491,16 +500,16 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
               hinges(ih)%csi2 = (hinges(ih)%node2(1) - hinges(ih)%le2(1)) / hinges(ih)%chord2 
           endif          
         endif 
-        if (hinges(ih)%csi1 .gt. 1.0_wp .or. hinges(ih)%csi2 .gt. 1.0_wp) then
-          call error(this_sub_name, this_mod_name, '"Hinge '//trim(hinges(ih)%tag)// & 
-                    ' outside of the chord"' ) 
-        endif  
+        !if (hinges(ih)%csi1 .gt. 1.0_wp .or. hinges(ih)%csi2 .gt. 1.0_wp) then !> TODO check
+        !  call error(this_sub_name, this_mod_name, '"Hinge '//trim(hinges(ih)%tag)// & 
+        !            ' outside of the chord"' ) 
+        !endif  
 
       enddo
     enddo
     
     !> cast all the adimensional location into a single vector  
-    allocate(csi_hinge_not_unique(2*size(hinges))); csi_hinge_not_unique = 0.0_wp 
+    allocate(csi_hinge_not_unique(2*size(hinges)+1)); csi_hinge_not_unique = 0.0_wp 
     do ih = 1, size(hinges)
       csi_hinge_not_unique(ih) = hinges(ih)%csi1
       csi_hinge_not_unique(ih+2) = hinges(ih)%csi2      
@@ -590,7 +599,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
       thickness_section1(iRegion) = thickness_section2(iRegion-1)      
 
     else   ! first section                      ! build points
-      !write(*,*) 'chord_fraction' , chord_fraction
       call define_section(chord_list(iRegion), trim(adjustl(airfoil_list(iRegion))), &
                           twist_list(iRegion), ElType, nelem_chord,              &
                           type_chord , chord_fraction, ref_chord_fraction,       &
@@ -607,8 +615,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
     end if
 
 
-    ! === new-2019-02-06 ===
-    ! now, it is possible to define the airfoils on some of the sections only.
+    ! It is possible to define the airfoils on some of the sections only.
     !  When the shape of the airfoil is not defined on a section, it is interpolated
     if ( trim(adjustl(airfoil_list(iRegion + 1))) .ne. 'interp' ) then  ! read the field 'airfoil'
 
@@ -665,7 +672,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
 
     end if
 
-    ! === new-2019-02-06 ===
     if ( abs( sweep_list(iRegion) ) .gt. 60.0_wp ) then
       call warning(this_sub_name, this_mod_name, 'Requested a sweep angle of &
         &more than 60 degrees. Are you sure of this input?')
@@ -1239,8 +1245,9 @@ subroutine read_airfoil (filen, ElType , nelems_chord , csi_half, rr, thickness 
       ! split suction and lower side
       rr_up = rr_pan(:,nelems_chord+1:2*nelems_chord+1)
       rr_low = rr_pan(:,1:nelems_chord+1)
+
       ! y-coordinates of the mean line
-      y_mean(1,:) = (rr_up(2,:) + rr_low(2,:))/2.0_wp
+      y_mean(1,:) = (rr_up(2,:) + rr_low(2,size(rr_low(1,:)):1:-1))/2.0_wp
       rr(1,:) = rr_up(1,:)
       rr(2,:) = y_mean(1,:)
       
@@ -1300,7 +1307,7 @@ subroutine define_division(type_mesh, nelem, division)
   integer :: iPoint
 
   division = 0.0_wp
-  step = 1.0_wp/real(nelem,wp)
+  step = 1.0_wp/(real(nelem,wp) + 1e-12_wp)
 
   select case (trim(type_mesh))
   case ("uniform")

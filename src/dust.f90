@@ -608,8 +608,11 @@ it = 1
   
   !> If the simulation is restarted the solution part can be skipped 
   ! since it's loaded from the restart file
+  ! TODO: not working for coupled simulations, so far
+#if USE_PRECICE
+#else
   if(.not. already_solv_restart) then
-    
+#endif    
     !>-------------- Assemble the system ------
     t0 = dust_time()
     sel = size(elems) ! total number of elements
@@ -1015,8 +1018,11 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     endif
   
   !> if the simulation has been restarted it should jump here because
-  ! the solution comes from the restart file
+  ! the solution comes from the restart file 
+#if USE_PRECICE
+#else
   endif ! already solved because restarted
+#endif
   already_solv_restart = .false.
 
     !> Viscous Effects and Flow Separations 
