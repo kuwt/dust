@@ -467,14 +467,17 @@ end subroutine infinite_plate_spline
 ! Midpoint tessellation based on: 
 !   https://lindenreidblog.com/2017/12/03/simple-mesh-tessellation-triangulation-tutorial/
 !   and adapted to C by Stefano Colli
-subroutine tessellate(vertices, n_steps, tol, cen_sbprt, rad_sbprt)
+subroutine tessellate(vertices, n_steps, tol, cen_sbprt, rad_sbprt, n_sbprt, dry_run_in)
   real(wp), intent(in)               :: vertices(:,:) ! coordinates of quadri vertices
   integer, intent(in)                :: n_steps ! number of midpoint triangulation steps
   real(wp), intent(in)               :: tol ! tolerance for quadri initial division
   real(wp), allocatable, intent(out) :: cen_sbprt(:,:), rad_sbprt(:) ! centre coords and radius of subparticles
+  integer, intent(out)               :: n_sbprt ! number of generated subparts
+  logical, intent(in), optional      :: dry_run_in
   
   real(wp), allocatable :: tex(:,:,:) ! stores the tessellation 
   integer               :: i, j, n_tri_tot
+  logical               :: dry_run
   
   ! variables for initial division
   real(wp)              :: lengths(4), min_side_len, succ(3,4), mid(3), abc(3,3)
@@ -485,6 +488,11 @@ subroutine tessellate(vertices, n_steps, tol, cen_sbprt, rad_sbprt)
   real(wp) :: mid_ab(3), mid_bc(3), mid_ca(3)
   integer  ::  n_tri_used, idx_glob, idx_loc, offset
   
+  if (present(dry_run_in)) then
+    dry_run = dry_run_in
+  else
+    dry_run = .false.
+  endif
   
   ! Initial division
   succ = cshift(vertices,1,2) ! array of successive points to vertices
@@ -493,6 +501,12 @@ subroutine tessellate(vertices, n_steps, tol, cen_sbprt, rad_sbprt)
   i_min_side = minloc(lengths,1) ! which side is minimum
   ! compute how many times the min side is into each side
   n_div = max(floor(lengths/min_side_len+tol),1) ! number of subdivision for each side
+  
+  n_sbprt = (sum(n_div*2)-4)*4**n_steps
+  
+  if (dry_run) then ! return only n_sbprt *CAUTION* other arrays are not allocated
+    return
+  endif  
     
   ! arrays to hold points and triangles for initial subdivision
   allocate(division_points(3,sum(n_div)), init_tri(3,3,sum(n_div*2)-4))
@@ -612,6 +626,11 @@ subroutine tessellate(vertices, n_steps, tol, cen_sbprt, rad_sbprt)
   ! only the tris generated in the last step are used
   allocate(cen_sbprt(3,n_init_tri*4**n_steps), rad_sbprt(n_init_tri*4**n_steps))
 
+  if(size(rad_sbprt,1) .ne. n_sbprt) then
+    write(*,*) "ERROR n_sbprt", size(rad_sbprt,1), n_sbprt
+    stop
+  endif
+  
   do i = 1, n_init_tri*4**n_steps
     cen_sbprt(:,i) = (tex(:,1,n_tri_tot-i+1)+tex(:,2,n_tri_tot-i+1)+tex(:,3,n_tri_tot-i+1))/3.0_wp
     rad_sbprt(i) = circumradius(tex(:,:,n_tri_tot-i+1))
