@@ -386,10 +386,27 @@ subroutine infinite_plate_spline(pos_interp, pos_ref, W)
   real(wp), allocatable                 :: R_r(:,:), R_i(:,:), Z_r(:,:), Z_ir(:,:), Y_r(:,:)
   real(wp), allocatable                 :: ipiv(:), work(:), eye(:,:)
   integer                               :: info                     
-  real(wp)                              :: nrm                   
+  real(wp)                              :: nrm 
+!  real(wp)                              :: theta, Wnorm(3,3), node_rot(3,3), dist(3)                   
   
   n_r = size(pos_ref,2)
   n_i = size(pos_interp,2)
+  
+!  ! anisotropy matrix: section is rigid chordwise
+!  Wnorm = 0.0_wp
+!  Wnorm(1,1) = 1e-3_wp
+!  Wnorm(2,2) = 1e+0_wp
+!  Wnorm(3,3) = 1e-3_wp
+  
+!  theta = acos(dot(pos_ref(:,n_r-1)-pos_ref(:,1), Wnorm(1,:)))
+!  node_rot = 0.0_wp
+!  node_rot(1,1) = cos(theta)
+!  node_rot(1,2) = -sin(theta)
+!  node_rot(2,1) = sin(theta)
+!  node_rot(2,2) = cos(theta)
+!  node_rot(3,3) = 1.0_wp
+  
+!  Wnorm = matmul(transpose(node_rot),(matmul(Wnorm,node_rot)))
 
   allocate(R_r(n_r,4))
   allocate(R_i(n_i,4))
@@ -406,6 +423,8 @@ subroutine infinite_plate_spline(pos_interp, pos_ref, W)
         Z_r(i,j) = 0.0_wp
       else
         nrm = norm2(pos_ref(:,i)-pos_ref(:,j))
+        !dist = pos_ref(:,i)-pos_ref(:,j)
+        !nrm = norm2(dist*matmul(Wnorm,dist))
         Z_r(i,j) = nrm**2*log(nrm)
       endif
     enddo
@@ -414,6 +433,8 @@ subroutine infinite_plate_spline(pos_interp, pos_ref, W)
   do i=1,n_i
     do j=1,n_r
       nrm = norm2(pos_interp(:,i)-pos_ref(:,j))
+      !dist = pos_interp(:,i)-pos_ref(:,j)
+      !nrm = norm2(dist*matmul(Wnorm,dist))
       if (nrm .le. 1e-10_wp) then
         Z_ir(i,j) = 0.0_wp
       else
@@ -450,7 +471,7 @@ subroutine infinite_plate_spline(pos_interp, pos_ref, W)
   W = matmul((matmul(R_i,matmul(Y_r,transpose(R_r))) + &
          matmul(Z_ir,(eye-matmul(Z_r,matmul(R_r,matmul(Y_r,transpose(R_r))))))),Z_r)
 
-  deallocate( R_i)
+  deallocate(R_i)
   deallocate(R_r)
   deallocate(Z_r, Z_ir)
   deallocate(Y_r, eye)
@@ -656,8 +677,12 @@ real(wp) function circumradius(vertices)
   
   area = sqrt(p*(p-a)*(p-b)*(p-c)) ! Heron's formula for area
   
-  circumradius = a*b*c/(4*area)    
-  
+  if (area .ge. 1e-9_wp) then
+    circumradius = a*b*c/(4*area)    
+  else
+    circumradius = 1e-9_wp
+  endif
+    
   return 
   
 end function circumradius

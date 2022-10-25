@@ -1399,6 +1399,8 @@ subroutine complete_wake(wake, geo, elems, te)
       ! cycle all panels to find n_sbprt
       
       do iw = 1,wake%n_pan_stripes
+        p1 = wake%i_start_points(1,iw)
+        p2 = wake%i_start_points(2,iw)    
         vertices(:,1) = wake%pan_w_points(:,p1,wake%nmax_pan+1)
         vertices(:,2) = wake%pan_w_points(:,p2,wake%nmax_pan+1)
         vertices(:,3) = points_end(:,p2)
@@ -1418,7 +1420,7 @@ subroutine complete_wake(wake, geo, elems, te)
           sbprt_count = 0
         endif
       enddo
-   
+      
       ! the following quantities are accumulated only within one component, then particles are generated
       ! and the cycle repeats for the next component. Since we don't want to keep track of components, we
       ! allocate for the max size, ie for the biggest component
@@ -1427,11 +1429,10 @@ subroutine complete_wake(wake, geo, elems, te)
       allocate(rad_sbprt(n_max_sbprt_comp))
       allocate(mag_sbprt(n_max_sbprt_comp))
       allocate(dir_sbprt(3,n_max_sbprt_comp))
-      ! +2 accounts for ghost panels
-      ! *2 because we also take the previous row of panels
-      allocate(cen_parent(3,n_max_pan_comp*2)) 
-      allocate(mag_parent(n_max_pan_comp*2))
-      allocate(dir_parent(3,n_max_pan_comp*2))
+      ! *3 because we also take the previous row of panels and a fake successive row
+      allocate(cen_parent(3,n_max_pan_comp*3)) 
+      allocate(mag_parent(n_max_pan_comp*3))
+      allocate(dir_parent(3,n_max_pan_comp*3))
       
       ! cycle again all panels to compute ave and dir, cen and cen_ref
       iw = 1 ! global parent panel index
@@ -1439,20 +1440,6 @@ subroutine complete_wake(wake, geo, elems, te)
       do while (iw .lt. wake%n_pan_stripes)
         iwc = 1 ! local component parent panel index
         isp = 0 ! subparts index
-        
-        ! ghost panel
-!        call compute_partvec(wake, iw, partvec, pos_p, area, 1) ! ghost panel
-!        cen_parent(:,iwc) = pos_p
-!        mag_parent(iwc) = 0.0_wp        
-!        dir_parent(:,iwc) = 0.0_wp
-!        iwc = iwc + 1 ! added ghost panel
-     
-        ! ghost panel from previous row
-!        call compute_partvec(wake, iw, partvec, pos_p, area, 3) ! ghost panel
-!        cen_parent(:,iwc) = pos_p
-!        mag_parent(iwc) = 0.0_wp
-!        dir_parent(:,iwc) = 0.0_wp
-!        iwc = iwc + 1 ! added ghost panel 
         
         ! parent panel
         call compute_partvec(wake, iw, partvec, pos_p, area, 1, vertices)
@@ -1479,12 +1466,22 @@ subroutine complete_wake(wake, geo, elems, te)
         ! parent panel from previous row
         call compute_partvec(wake, iw, partvec, pos_p, area, 4) ! parent panel
         cen_parent(:,iwc) = pos_p
-        mag_parent(iwc) = norm2(partvec)
+        !mag_parent(iwc) = norm2(partvec)
+        mag_parent(iwc) = mag_parent(iwc-1) ! force no interpolation chordwise
         if(mag_parent(iwc) .gt. 1.0e-13_wp) then
           dir_parent(:,iwc) = partvec/mag_parent(iwc)
         else
           dir_parent(:,iwc) = partvec
         endif
+
+        iwc = iwc+1 ! added parent panel
+
+        ! parent panel from succ row
+        call compute_partvec(wake, iw, partvec, pos_p, area, 7) ! parent panel
+        cen_parent(:,iwc) = pos_p
+        !mag_parent(iwc) = norm2(partvec)
+        mag_parent(iwc) = mag_parent(iwc-1)
+        dir_parent(:,iwc) = dir_parent(:,iwc-1)
 
         iwc = iwc+1 ! added parent panel
                
@@ -1517,33 +1514,29 @@ subroutine complete_wake(wake, geo, elems, te)
           ! parent panel from previous row
           call compute_partvec(wake, iw, partvec, pos_p, area, 4) ! parent panel
           cen_parent(:,iwc) = pos_p
-          mag_parent(iwc) = norm2(partvec)
+          !mag_parent(iwc) = norm2(partvec)
+          mag_parent(iwc) = mag_parent(iwc-1) ! force no interpolation chordwise
           if(mag_parent(iwc) .gt. 1.0e-13_wp) then
             dir_parent(:,iwc) = partvec/mag_parent(iwc)
           else
             dir_parent(:,iwc) = partvec
           endif
   
-          !iwc = iwc +1 ! added parent panel
+          iwc = iwc +1 ! added parent panel
+          
+          ! parent panel from succ row
+          call compute_partvec(wake, iw, partvec, pos_p, area, 7) ! parent panel
+          cen_parent(:,iwc) = pos_p
+          !mag_parent(iwc) = norm2(partvec)
+          mag_parent(iwc) = mag_parent(iwc-1)
+          dir_parent(:,iwc) = dir_parent(:,iwc-1)
+  
+          iwc = iwc+1 ! added parent panel
            
         enddo ! loop over panels for this component
         
-!        ! add final ghost panel
-!        p1 = wake%i_start_points(1,iw-1)
-!        p2 = wake%i_start_points(2,iw-1)
-
-!        cen_parent(:,iwc) = pos_p+(wake%pan_w_points(:,p1,wake%nmax_pan+1)-&
-!                      wake%pan_w_points(:,p2,wake%nmax_pan+1))
-!        mag_parent(iwc) = 0.0_wp
-!        dir_parent(:,iwc) = 0.0_wp      
-!        iwc = iwc + 1 ! added ghost panel 
-    
-!        ! ghost panel from previous row
-!        cen_parent(:,iwc) = wake%wake_panels(iw,wake%nmax_pan)%cen+&
-!               (wake%pan_w_points(:,p1,wake%nmax_pan)-wake%pan_w_points(:,p2,wake%nmax_pan)) 
-!        mag_parent(iwc) = 0.0_wp
-!        dir_parent(:,iwc) = 0.0_wp
-
+        iwc = iwc - 1
+            
         ! perform interpolation, only passing actual number of parent panels and subparts
         call infinite_plate_spline(cen_sbprt(:,1:isp), cen_parent(:,1:iwc), W)
         
@@ -1889,11 +1882,21 @@ subroutine compute_partvec(wake, iw, partvec, pos_p, area, typ_in, vertices_out)
     vertices(:,2) = wake%pan_w_points(:,p2,wake%nmax_pan+1)
     vertices(:,3) = points_end(:,p2)
     vertices(:,4) = points_end(:,p1)
-  else ! previous row
+  elseif (typ .le. 6) then ! previous row
     vertices(:,1) = wake%pan_w_points(:,p1,wake%nmax_pan)
     vertices(:,2) = wake%pan_w_points(:,p2,wake%nmax_pan)
     vertices(:,3) = wake%pan_w_points(:,p2,wake%nmax_pan+1)
     vertices(:,4) = wake%pan_w_points(:,p1,wake%nmax_pan+1)
+  endif
+  
+  if (typ .eq. 7) then
+    vertices(:,1) = wake%pan_w_points(:,p1,wake%nmax_pan+1)
+    vertices(:,2) = wake%pan_w_points(:,p2,wake%nmax_pan+1)
+    vertices(:,3) = points_end(:,p2)
+    vertices(:,4) = points_end(:,p1)
+  
+    pos_p = sum(vertices,2)/4.0_wp + 0.5_wp*(vertices(:,4)+vertices(:,3)) - 0.5_wp*(vertices(:,1)+vertices(:,2))
+    return
   endif
   
   !Left side
