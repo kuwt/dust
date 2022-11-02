@@ -108,9 +108,6 @@ use mod_octree, only: &
   t_octree, sort_particles, calculate_multipole, apply_multipole, &
   apply_multipole_panels
 
-!$ use omp_lib, only: &
-!$   omp_get_thread_num, omp_get_num_threads
-
 use mod_wind, only: &
   variable_wind
 !----------------------------------------------------------------------
@@ -776,21 +773,6 @@ subroutine load_wake(filename, wake, elems)
                     wake%pan_w_points(:,p2,wake%pan_wake_len+1)/), (/3,2/)))
     enddo
   endif
-
-!!!  !If there are particles and the multipole is employed, i
-!!!  !need to pre-compute the particles induced velocity now
-!!!  if(sim_param%use_fmm .and. wake%n_prt .gt. 0) then
-!!!!!$omp parallel do private(ie, ip, vel)
-!!!    do ie = 1, size(elems)
-!!!      elems(ie)%p%uvort = 0.0
-!!!      do ip = 1,wake%n_prt
-!!!        call wake%part_p(ip)%p%compute_vel(elems(ie)%p%cen, &
-!!!                                               sim_param%u_inf, vel)
-!!!         elems(ie)%p%uvort = elems(ie)%p%uvort + vel/(4.0_wp*pi)
-!!!      enddo
-!!!    enddo
-!!!!!$omp end parallel do
-!!!  endif
 
 
 end subroutine load_wake
@@ -1499,10 +1481,10 @@ subroutine complete_wake(wake, geo, elems, te)
         mag_parent(iwc) = 0.0_wp
         dir_parent(:,iwc) = 0.0_wp
         iwc = iwc + 1 ! added ghost panel
-     
+
         ! ghost panel from previous row
         cen_parent(:,iwc) = wake%wake_panels(iw,wake%nmax_pan)%cen-&
-               (wake%pan_w_points(:,p1,wake%nmax_pan)-wake%pan_w_points(:,p2,wake%nmax_pan)) 
+              (wake%pan_w_points(:,p1,wake%nmax_pan)-wake%pan_w_points(:,p2,wake%nmax_pan)) 
         mag_parent(iwc) = 0.0_wp
         dir_parent(:,iwc) = 0.0_wp
         iwc = iwc + 1 ! added ghost panel 
@@ -1516,7 +1498,7 @@ subroutine complete_wake(wake, geo, elems, te)
           dir_parent(:,iwc) = partvec
         endif
         iwc = iwc +1 ! added parent panel
-       
+
         ! parent panel from previous row
         !Left side
         dir = wake%pan_w_points(:,p1,wake%nmax_pan)-wake%pan_w_points(:,p1,wake%nmax_pan+1)
@@ -1592,7 +1574,7 @@ subroutine complete_wake(wake, geo, elems, te)
         isp = isp + n_chord*n_span ! added subparticles
 
         iwc = iwc+1 ! added parent panel
-               
+
         ! loop over all the other panels until component ends
         do while (wake%pan_neigh(1,iw) .gt. 0)
           iw = iw + 1 ! move to next panel
@@ -1644,7 +1626,7 @@ subroutine complete_wake(wake, geo, elems, te)
           pos_p = (points_end(:,p1)+points_end(:,p2)+ &
                   wake%pan_w_points(:,p1,wake%nmax_pan+1) + &
                   wake%pan_w_points(:,p2,wake%nmax_pan+1) )/4.0_wp
-                           
+
           ! parent panel
           cen_parent(:,iwc) = pos_p
           mag_parent(iwc) = norm2(partvec)
@@ -1672,7 +1654,7 @@ subroutine complete_wake(wake, geo, elems, te)
               step_chord = min_side/real(n_chord,wp)
               step_span = max_side/real(n_span,wp)
           end if
-       
+
           do ic = 1, n_chord
             do is = 1, n_span   
               cen_sbprt(:,isp+(ic-1)*n_span+is) = wake%pan_w_points(:,p1,wake%nmax_pan+1)+& ! top left corner
@@ -1691,7 +1673,7 @@ subroutine complete_wake(wake, geo, elems, te)
           isp = isp + n_chord*n_span ! added subparticles
           
           iwc = iwc+1 ! added parent panel
-           
+
           ! parent panel from previous row
           !Left side
           dir = wake%pan_w_points(:,p1,wake%nmax_pan)-wake%pan_w_points(:,p1,wake%nmax_pan+1)
@@ -1731,7 +1713,7 @@ subroutine complete_wake(wake, geo, elems, te)
             dir_parent(:,iwc) = partvec
           endif
           iwc = iwc +1 ! added parent panel
-           
+
         enddo ! loop over panels for this component
         
         ! add final ghost panel
@@ -1746,7 +1728,7 @@ subroutine complete_wake(wake, geo, elems, te)
     
         ! ghost panel from previous row
         cen_parent(:,iwc) = wake%wake_panels(iw,wake%nmax_pan)%cen+&
-               (wake%pan_w_points(:,p1,wake%nmax_pan)-wake%pan_w_points(:,p2,wake%nmax_pan)) 
+              (wake%pan_w_points(:,p1,wake%nmax_pan)-wake%pan_w_points(:,p2,wake%nmax_pan)) 
         mag_parent(iwc) = 0.0_wp
         dir_parent(:,iwc) = 0.0_wp
 

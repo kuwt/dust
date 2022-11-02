@@ -44,6 +44,7 @@
 !!          Davide Montagnani
 !!          Matteo Tugnoli
 !!          Alberto Savino
+!!          Alessandro Cocco
 !!=========================================================================
 
 
@@ -132,8 +133,6 @@ contains
   procedure, pass(this) ::  compute_dforce   => compute_dforce_surfpan
   procedure, pass(this) ::  calc_geo_data    => calc_geo_data_surfpan
   procedure, pass(this) ::  get_vort_vel     => get_vort_vel_surfpan
-  procedure, pass(this) ::  correct_pressure_kutta => &
-                            correct_pressure_kutta_surfpan
 
   procedure, pass(this) ::  create_local_velocity_stencil => &
                             create_local_velocity_stencil_surfpan
@@ -459,7 +458,6 @@ subroutine build_row_static_surfpan(this, elems, expl_elems, linsys, &
   real(wp) :: b1
 
   linsys%b(ie) = 0.0_wp
-  !linsys%b_static(:,ie) = 0.0_wp
 
   !Cycle just all the static elements, ista and iend will be the beginning of
   !the result vector. Then save the rhs in b_static
@@ -468,7 +466,6 @@ subroutine build_row_static_surfpan(this, elems, expl_elems, linsys, &
     call elems(j1)%p%compute_pot( linsys%A(ie,j1), b1,  &
                                   this%cen, ie, j1 )
 
-    !linsys%b_static(:,ie) = linsys%b_static(:,ie) + b1
     linsys%b_static(ie,j1)  = b1
 
   end do
@@ -536,55 +533,6 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
   end do
 
 end subroutine add_wake_surfpan
-
-!----------------------------------------------------------------------
-
-! Remove Kutta contribution to obtain the matrix of Bernoulli lin.sys. from
-! the matrix of the \phi lin.sys.
-! This routine removes the extra terms added in add_wake_surfpan.
-! -> OBS: the input IE is already the panel id in the surfpan numeration
-subroutine correct_pressure_kutta_surfpan(this, wake_elems, impl_wake_ind, &
-                linsys, ie,ista, iend)
-
-  class(t_surfpan), intent(inout) :: this
-  type(t_pot_elem_p), intent(in)      :: wake_elems(:)
-  integer, intent(in)             :: impl_wake_ind(:,:)
-  type(t_linsys), intent(inout)   :: linsys
-  integer, intent(in)             :: ie
-  integer, intent(in)             :: ista
-  integer, intent(in)             :: iend
-
-  integer :: j1, ind1, ind2
-  real(wp) :: a, b
-  integer :: n_impl
-
-  !Count the number of implicit wake contributions
-  n_impl = size(impl_wake_ind,2)
-
-  !Remove the contribution of the implicit wake panels to the linear system
-  !Implicitly we assume that the first set of wake panels are the implicit
-  !ones since are at the beginning of the list
-  do j1 = 1 , n_impl
-    ind1 = impl_wake_ind(1,j1); ind2 = impl_wake_ind(2,j1)
-    if ((ind1.ge.ista .and. ind1.le.iend) .and. &
-        (ind2.ge.ista .and. ind2.le.iend)) then
-
-      ! in linsys%idSurfPanG2L, an element is different from zero if it identifies
-      ! a surfpan elements. We need to remove only the TE contribution of wake elements
-      ! originating from surfpan elements
-
-        call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
-
-        linsys%A_pres(ie,linsys%idSurfPanG2L(ind1)) = &
-                        linsys%A_pres(ie,linsys%idSurfPanG2L(ind1)) - a
-        linsys%A_pres(ie,linsys%idSurfPanG2L(ind2)) = &
-                        linsys%A_pres(ie,linsys%idSurfPanG2L(ind2)) + a
-
-    endif
-
-  end do
-
-end subroutine correct_pressure_kutta_surfpan
 
 !----------------------------------------------------------------------
 
@@ -746,9 +694,8 @@ end subroutine compute_grad_surfpan
 subroutine compute_pres_surfpan(this, R_g)
   class(t_surfpan) , intent(inout) :: this
   real(wp)         , intent(in)    :: R_g(3,3)
-  !type(t_elem_p),   intent(in)    :: elems(:)
 
-  real(wp) :: vel_phi(3), force_pres
+  real(wp) :: vel_phi(3)
   real(wp) :: f(5)    ! <- max n_ver of a surfpan = 4 ; +1 for the constraint eqn
 
   integer :: i_e , n_neigh
@@ -756,41 +703,10 @@ subroutine compute_pres_surfpan(this, R_g)
   real(wp) :: wind(3)
 
 ! This routine contains the velocity update as well. TODO, move to a dedicated routine
-! Two methods have been implemented for surface velocity computation:
-! 1. stencil relying on a FV approx of the surface: pot_vel_stencil
-! 2. stencil relying on a CHTLS* method
+! Method implemented for surface velocity computation:
+! stencil relying on a CHTLS* method
 ! *CHTLS: Constrained Hermite Taylor series Least Square method
 
-!   ! 1. FV approx
-!   ! perturbation velocity, u ---------------------------------
-!   ! Compute velocity from the potential (mu = -phi), exploiting the stencil
-!   ! contained in pot_vel_stencil.
-!   ! ''Tangential component'' from the surface stencil
-!   !   Normal component       from the boundary conditions U.n = b.n
-!
-!   ! tangential part
-!   vel_phi_t = 0.0_wp
-!   do i_e = 1 , this%n_ver
-!     if ( associated(this%neigh(i_e)%p) ) then !  .and. &
-!       vel_phi_t = vel_phi_t + &
-!         this%pot_vel_stencil(:,i_e) * (this%neigh(i_e)%p%mag - this%mag)
-!     end if
-!   end do
-!
-! ! vel_phi_t = - vel_phi_t    ! mu = - phi
-!   vel_phi_t = matmul( R_g , vel_phi_t ) ! transpose(R_g) ???
-!   vel_phi_t = - vel_phi_t + sum(vel_phi_t*this%nor) * this%nor
-!   vel_phi = vel_phi_t +  &
-!         sum(this%nor*(this%ub-sim_param%u_inf-this%uvort)) * this%nor
-!
-!   ! velocity, U = u_t \hat{t} + u_n \hat{n} + U_inf ----------
-!   this%surf_vel = sim_param%u_inf + vel_phi + this%uvort
-! ! old and wrong
-! ! this%surf_vel = vel_phi - sum(vel_phi*this%nor)*this%nor + &
-! !      this%nor * sum(this%nor * (-sim_param%u_inf-this%uvort+this%ub) ) + &
-! !            sim_param%u_inf + this%uvort
-
-  ! 2. CHTLS method
   n_neigh = 0 ; f = 0.0_wp
   do i_e = 1 , this%n_ver
     if ( associated(this%neigh(i_e)%p) ) then
@@ -809,59 +725,26 @@ subroutine compute_pres_surfpan(this, R_g)
 
   vel_phi = matmul( (R_g) , vel_phi )
 
-  ! Rotation of the result =====================================
   this%surf_vel = wind + vel_phi + this%uvort
 
-  ! pressure -------------------------------------------------
-  ! unsteady problems  : P = P_inf + 0.5*rho_inf*V_inf^2
-  !                                - 0.5*rho_inf*V^2 - rho_inf*dphi/dt
-  !                                     + rho * ub.u_phi
-  ! with idou = -phi
-  !  this%pres  = sim_param%P_inf &
-  !! reduced equation after some manipulation
-  !!   - 0.5 * sim_param%rho_inf * norm2(vel_phi+this%uvort)**2.0_wp &
-  !!         - sim_param%rho_inf * sum( &
-  !!            (sim_param%u_inf-this%ub)*(vel_phi+this%uvort) ) &
-  !!         + sim_param%rho_inf * this%didou_dt
-  !! full equation
-  !    + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
-  !    - 0.5_wp * sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp  &
-  !             + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
-  !             + sim_param%rho_inf * this%didou_dt
+  !> pressure -------------------------------------------------
+  ! unsteady problems  : P =   P_inf 
+  !                          + 0.5*rho_inf*V_inf^2
+  !                          - 0.5*rho_inf*V^2 
+  !                          + rho * ub.u_phi
+  !                          - rho_inf*dphi/dt                                     
+  
+  this%pres =   sim_param%P_inf &
+              + 0.5_wp * sim_param%rho_inf * norm2(wind)**2.0_wp &
+              - 0.5_wp * sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp  &
+              + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
+              + sim_param%rho_inf * this%didou_dt
 
-
-  ! === Using result of the Uhlman's equation for pressure ===
-  ! See linsys/mod_pressure_equation.f90:assemble_pressure_linsys
-  ! as a reference for the 2 different implementations
-  !> (a.1) original implementation ===
-  ! this%pres = this%pres_sol - 0.5_wp*sim_param%rho_inf * &
-  !             norm2(this%surf_vel)**2.0_wp
-  !> (a.2) trick of setting B_inf = P_inf + 0.5 * rhoinf * uinf^2.0 ===
-  this%pres = this%pres_sol &
-            - 0.5_wp*sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp &
-            + 0.5_wp*sim_param%rho_inf * norm2(wind)**2.0_wp &
-            + sim_param%P_inf
-            
   ! Prandt -- Glauert correction for compressibility effect
-  mach = abs(norm2(wind) / sim_param%a_inf)          
+  mach = abs(norm2(wind - this%ub) / sim_param%a_inf)  
   this%pres = this%pres  / sqrt(1 - mach**2) 
-
-  if (this%moving) then
-    ! old computation of the loads, expoliting Bernoulli
-    ! TODO: to be updated and treated w/ Uhlman's equation formulation
-    force_pres  = sim_param%P_inf &
-      - 0.5_wp * sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp  &
-      + 0.5_wp * sim_param%rho_inf * norm2(wind)**2.0_wp &
-               + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
-               + sim_param%rho_inf * this%didou_dt
-
-  else
-
-    force_pres = this%pres
-
-  endif
-
-  this%dforce = - (force_pres - sim_param%P_inf) * this%area * this%nor
+  ! compute dforce
+  this%dforce = - (this%pres - sim_param%P_inf) * this%area * this%nor
 
 end subroutine compute_pres_surfpan
 
