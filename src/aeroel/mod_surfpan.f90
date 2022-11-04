@@ -719,12 +719,7 @@ subroutine compute_pres_surfpan(this, R_g)
 
   vel_phi = matmul( this%chtls_stencil , f(1:n_neigh+1) )
 
-  ! Rotation of the result =====================================
-  ! - The stencil is computed in the local ref.sys. at the beginning of the code
-  ! - The velocity is computed at each timestep
-
   vel_phi = matmul( (R_g) , vel_phi )
-
   this%surf_vel = wind + vel_phi + this%uvort
 
   !> pressure -------------------------------------------------
@@ -744,26 +739,18 @@ subroutine compute_pres_surfpan(this, R_g)
   mach = abs(norm2(wind - this%ub) / sim_param%a_inf)  
   this%pres = this%pres  / sqrt(1 - mach**2) 
   ! compute dforce
-  this%dforce = - (this%pres - sim_param%P_inf) * this%area * this%nor
+  call compute_dforce_surfpan(this)
 
 end subroutine compute_pres_surfpan
 
 !----------------------------------------------------------------------
 
 !> Compute the elementary force on the on the actual element
-
-!! WARNING: at the moment this is completely bypassed, due to the
-!! different treatment of stationary and moving elements.
-!! Its functionalities were moved into compute_pres_surfpan
+!!  computing the eleent force from the pressure
 subroutine compute_dforce_surfpan(this)
   class(t_surfpan), intent(inout) :: this
-  !type(t_elem_p), intent(in) :: elems(:)
 
-  ! first rough approximation
-  ! vec{F} = - this%pres * vec{n}
-
-  !this%dforce = - this%pres * this%area * this%nor
-
+  this%dforce = - (this%pres - sim_param%P_inf) * this%area * this%nor
 
 end subroutine compute_dforce_surfpan
 
@@ -779,33 +766,12 @@ subroutine create_local_velocity_stencil_surfpan ( this , R_g )
   class(t_surfpan)  , intent(inout) :: this
   real(wp)          , intent(in)    :: R_g(3,3)
 
- real(wp) :: bubble_surf
- integer  :: i_v
+  real(wp) :: bubble_surf
+  integer  :: i_v
 
   if ( .not. allocated(this%pot_vel_stencil) ) then
     allocate(this%pot_vel_stencil(3,this%n_ver) )
   end if
-
-!  ! method #1: very sensitive to dimension gradient of neighbouring elements
-!  bubble_surf = this%area
-!
-!  do i_v = 1 , this%n_ver
-!
-!    ! Update surf_bubble
-!    !sum the contribuition only if the neighbour is really present
-!    if(associated(this%neigh(i_v)%p)) then
-!
-!        bubble_surf = bubble_surf + &
-!           this%neigh(i_v)%p%area / real(this%neigh(i_v)%p%n_ver,wp)
-!
-!    endif
-!
-!    this%pot_vel_stencil(:,i_v) = &
-!             cross( this%edge_vec(:,i_v) , this%nor )
-!
-!  end do
-!
-!  this%pot_vel_stencil = this%pot_vel_stencil / bubble_surf
 
   ! method #2: w/o averaging on neighbouring elements ; 0.5 factor added
   bubble_surf = this%area
@@ -816,30 +782,6 @@ subroutine create_local_velocity_stencil_surfpan ( this , R_g )
      0.5_wp * cross( this%edge_vec(:,i_v) , this%nor )
 
   end do
-
-!   ! method #3: w/o averaging on neighbouring elements ; 0.5 factor added ;
-!   ! taking into account curvature !!!
-!   bubble_surf = this%area
-!
-!   do i_v = 1 , this%n_ver
-!
-! !   write(*,*) ' this%id ' , this%id
-! !   write(*,*) ' this%nor' , this%nor
-!     if ( associated(this%neigh(i_v)%p) ) then
-! !     write(*,*) ' shape(this%neigh(i_v)) : ' , shape(this%neigh(i_v))
-!       n_vect = 0.5_wp * ( this%nor + this%neigh(i_v)%p%nor )
-!       n_vect = n_vect / norm2(n_vect)
-!     else
-!       n_vect = this%nor
-!     end if
-!     this%pot_vel_stencil(:,i_v) = &
-!      0.5_wp * cross( this%edge_vec(:,i_v) , n_vect )
-!
-!     this%pot_vel_stencil(:,i_v) = &
-!                       this%pot_vel_stencil(:,i_v) &
-!      - this%nor * sum(this%pot_vel_stencil(:,i_v)*this%nor)
-!
-!   end do
 
   this%pot_vel_stencil = this%pot_vel_stencil / bubble_surf
 
@@ -944,11 +886,11 @@ end subroutine create_chtls_stencil_surfpan
 !! The subroutine calculates all the relevant geometrical quantities of a
 !! surface panel
 subroutine calc_geo_data_surfpan(this,vert)
- class(t_surfpan), intent(inout) :: this
- real(wp), intent(in) :: vert(:,:)
+  class(t_surfpan), intent(inout) :: this
+  real(wp), intent(in) :: vert(:,:)
 
- integer :: nsides, is
- real(wp):: nor(3), tanl(3)
+  integer :: nsides, is
+  real(wp):: nor(3), tanl(3)
 
   this%ver = vert
   nsides = this%n_ver
@@ -1017,7 +959,7 @@ end subroutine calc_geo_data_surfpan
 !> Calculat the vorticity induced velocity from vortical elements
 subroutine get_vort_vel_surfpan(this, vort_elems)
   class(t_surfpan), intent(inout)   :: this
-  type(t_vort_elem_p), intent(in)    :: vort_elems(:)
+  type(t_vort_elem_p), intent(in)   :: vort_elems(:)
 
   integer :: iv
   real(wp) :: vel(3)

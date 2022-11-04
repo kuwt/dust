@@ -2144,7 +2144,7 @@ subroutine compute_vel_from_all(elems, wake, pos, vel)
   !calculate the influence of particles
   do ie=1,size(wake%part_p)
     call wake%part_p(ie)%p%compute_vel(pos, v)
-    vel = vel+ v/(4*pi)
+    vel = vel + v/(4*pi)
   enddo
 
 end subroutine compute_vel_from_all
