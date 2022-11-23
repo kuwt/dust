@@ -241,7 +241,6 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
       ! Save the points of this iteration for the average visualization
         allocate(points_ave(size(points_exp,1),size(points_exp,2)))
         points_ave = points
-      endif
     endif
 
     !Load the results ! TODO: check this routine and the content of the files to be read
