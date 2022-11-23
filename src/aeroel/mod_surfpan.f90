@@ -699,7 +699,7 @@ subroutine compute_pres_surfpan(this, R_g)
   real(wp) :: f(5)    ! <- max n_ver of a surfpan = 4 ; +1 for the constraint eqn
 
   integer :: i_e , n_neigh
-  real(wp) :: mach, P_inf_tot, P_dyn, pg_coeff, k
+  real(wp) :: mach
   real(wp) :: wind(3)
 
 ! This routine contains the velocity update as well. TODO, move to a dedicated routine
@@ -731,21 +731,15 @@ subroutine compute_pres_surfpan(this, R_g)
 
   ! Prandt -- Glauert correction for compressibility effect
   ! it applies to the dynamic pressure terms only
-  ! P_corr = P_tot - pg_coeff*P_dyn
-  ! pg_coeff is such that P_corr = P_noncorr/sqrt(1-M^2)
+  ! so that only the *relative* static pressure is affected
   mach = abs(norm2(wind - this%ub) / sim_param%a_inf)
   
-  k =  1/sqrt(1 - mach**2)
-  
-  P_inf_tot = sim_param%P_inf + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp
-  P_dyn = 0.5_wp * sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp - &
-          sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) + &
-          sim_param%rho_inf * this%didou_dt
+  this%pres = sim_param%P_inf + &
+             (0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
+              -0.5_wp * sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp &
+              +sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
+              -sim_param%rho_inf * this%didou_dt)/sqrt(1 - mach**2)
 
-  pg_coeff = 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp/P_dyn*(1-k) + k
-  
-  this%pres = P_inf_tot - pg_coeff*P_dyn
-  
   ! compute dforce
   call compute_dforce_surfpan(this)
 
