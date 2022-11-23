@@ -534,6 +534,7 @@ subroutine create_param_post(prms, sbprms, bxprms)
   call sbprms%CreateIntOption('end_res', 'Final result of the analysis')
   call sbprms%CreateIntOption('step_res', 'Result stride of the analysis')
   call sbprms%CreateLogicalOption('average', 'Perform time averaging','F')
+  call sbprms%CreateIntOption('avg_res', 'Result for the average visualization')
   call sbprms%CreateLogicalOption('wake', 'Output also the wake for &
                                   &visualization','T')
   call sbprms%CreateLogicalOption('separate_wake', 'Output the wake in a separate &
