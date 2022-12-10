@@ -905,7 +905,7 @@ subroutine update_wake(wake, elems, octree)
 #if USE_PRECICE
   ! pan_w_points is overwritten at every precice iteration, the actual old
   ! points have been saved to old_second_row (the old first row is useless)
-  point_old(:,:,wake%n_pan_points-1) = wake%old_second_row
+  point_old(:,:,2) = wake%old_second_row
 #endif
 
   !calculate the velocities at the old positions of the points and then

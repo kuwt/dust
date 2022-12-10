@@ -1260,7 +1260,7 @@ subroutine update_near_field_wake( this, geo, wake, te )
   ! Store old wake points to use in complete_wake
   if (wake%update_old_second_row) then
     
-    wake%old_second_row = wake%pan_w_points(:,:,wake%n_pan_points-1)
+    wake%old_second_row = wake%pan_w_points(:,:,2)
     !write(*,*) wake%old_second_row
     wake%update_old_second_row = .false.
   end if
