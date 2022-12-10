@@ -1,0 +1,31 @@
+basename =     Postpro/test_coupled
+data_basename = Output/test_coupled
+
+analysis = {
+  name = vl
+  type = Viz
+
+  format = vtk !tecplot ! vtk ! tecplot
+
+  start_res = 1
+  end_res = 100
+  step_res = 1
+  wake = T
+  separate_wake = T
+  variable = Vorticity
+  variable = Pressure
+}
+
+
+Analysis = {
+
+Type = integral_loads
+Name = wing
+StartRes = 1
+EndRes   = 100
+StepRes  = 1
+Format   = dat
+
+Reference_Tag = 0
+
+}
