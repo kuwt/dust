@@ -1259,7 +1259,9 @@ subroutine update_near_field_wake( this, geo, wake, te )
 
   ! Store old wake points to use in complete_wake
   if (wake%update_old_second_row) then
-    wake%old_second_row = wake%pan_w_points(:,:,2)
+    
+    wake%old_second_row = wake%pan_w_points(:,:,wake%n_pan_points-1)
+    !write(*,*) wake%old_second_row
     wake%update_old_second_row = .false.
   end if
 
@@ -1388,7 +1390,7 @@ subroutine update_near_field_wake( this, geo, wake, te )
 
   ! Calculate geometrical quantities of first 2 rows
   do ip = 1,wake%n_pan_stripes
-    do ir = 1, min(2, wake%pan_wake_len)
+    do ir = 1, wake%pan_wake_len
       p1 = wake%i_start_points(1,ip)
       p2 = wake%i_start_points(2,ip)
       call wake%wake_panels(ip,ir)%calc_geo_data( &

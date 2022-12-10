@@ -492,7 +492,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
 
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1 , wake%n_pan_points
-  !dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
+
     call calc_node_vel( wake%w_start_points(:,ip), &
             geo%refs(wake%pan_gen_ref(ip))%G_g, &
             geo%refs(wake%pan_gen_ref(ip))%f_g, &
@@ -556,9 +556,11 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   allocate(wake%prt_ivort(wake%nmax_prt))
   wake%n_prt = 0
   allocate(wake%part_p(0))
+
   do ip = 1,wake%nmax_prt
     wake%wake_parts(ip)%mag => wake%prt_ivort(ip)
   enddo
+
   wake%part_box_min = sim_param%particles_box_min
   wake%part_box_max = sim_param%particles_box_max
 
@@ -903,7 +905,7 @@ subroutine update_wake(wake, elems, octree)
 #if USE_PRECICE
   ! pan_w_points is overwritten at every precice iteration, the actual old
   ! points have been saved to old_second_row (the old first row is useless)
-  point_old(:,:,2) = wake%old_second_row
+  point_old(:,:,wake%n_pan_points-1) = wake%old_second_row
 #endif
 
   !calculate the velocities at the old positions of the points and then
