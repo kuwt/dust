@@ -229,19 +229,24 @@ subroutine potential_calc_sou_surfpan(this, sou, dou, pos)
 
       den = R1+R2-this%edge_len(i1)
       if ( den < 1e-6_wp ) then
-        write(msg(1),'(A)') 'Too small denominator in &
-        &source computation with point projection, using actual &
-        &points instead.'
-        write(msg(2),'(A,F12.6,F12.6,F12.6)') 'Computing sources on point: ',&
-        pos(1),pos(2),pos(3)
-        write(msg(3),'(A)')'This is most likely due to severely warped &
-        &quadrilateral elements adjacent to small elements.'//nl//&
-        &'      === CHECK MESH QUALITY! ==='
 
-        call warning(this_sub_name, this_mod_name, msg)
+        if(sim_param%debug_level .ge.5) then
+          write(msg(1),'(A)') 'Too small denominator in &
+          &source computation with point projection, using actual &
+          &points instead.'
+          write(msg(2),'(A,F12.6,F12.6,F12.6)') 'Computing sources on point: ',&
+          pos(1),pos(2),pos(3)
+          write(msg(3),'(A)')'This is most likely due to severely warped &
+          &quadrilateral elements adjacent to small elements.'//nl//&
+          &'      === CHECK MESH QUALITY! ==='
+
+          call warning(this_sub_name, this_mod_name, msg)
+        endif
+
         R1 = norm2( pos - this%ver(:,i1) )
         R2 = norm2( pos - this%ver(:,indp1) )
         den = R1+R2-this%edge_len(i1)
+
       end if
 
       souLog = log( (R1+R2+this%edge_len(i1)) / (den) )
