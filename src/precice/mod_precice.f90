@@ -66,7 +66,7 @@ use mod_aeroel, only: &
   t_pot_elem_p
 
 use mod_wake, only: &
-  t_wake
+  t_wake, join_first_panels
 
 use mod_liftlin, only: &
   t_liftlin, t_liftlin_p
@@ -1383,6 +1383,15 @@ subroutine update_near_field_wake( this, geo, wake, te )
     end if
 
   enddo
+
+  !==> Check if the panels need to be joined
+  if(sim_param%join_te) then
+
+    wake%joined_tes(:,:,2:wake%nmax_pan+1) = &
+          wake%joined_tes(:,:,1:wake%nmax_pan)
+    wake%joined_tes(:,:,1) = 0
+    call join_first_panels(wake,sim_param%join_te_factor)
+  endif  
 
   ! Calculate geometrical quantities of first 2 rows
   do ip = 1,wake%n_pan_stripes

@@ -115,7 +115,7 @@ use mod_wind, only: &
 implicit none
 
 public :: t_wake, initialize_wake, update_wake, &
-          prepare_wake, complete_wake, load_wake, destroy_wake
+          prepare_wake, complete_wake, load_wake, destroy_wake, join_first_panels
 
 private
 
@@ -1285,6 +1285,7 @@ subroutine complete_wake(wake, geo, elems, te)
 
   !==> Check if the panels need to be joined
   if(sim_param%join_te) then
+
     wake%joined_tes(:,:,2:wake%nmax_pan+1) = &
           wake%joined_tes(:,:,1:wake%nmax_pan)
     wake%joined_tes(:,:,1) = 0
