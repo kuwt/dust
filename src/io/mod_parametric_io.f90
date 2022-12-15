@@ -1361,12 +1361,14 @@ subroutine define_thickness(rr_geo, thickness)
     x_geo_shift(i) = rr_geo(1,i+1) - rr_geo(1,i)
   end do 
 
+  id_change = 0
   !> get id where the sign change 
-  do i = 1, size(x_geo_shift) -1
-    if (x_geo_shift(i) .lt. 0.0_wp .and. x_geo_shift(i+1) .gt. 0.0_wp) then 
+  do i = 1, size(x_geo_shift) - 1
+    if (x_geo_shift(i) .lt. 1e-10_wp .and. x_geo_shift(i+1) .gt. 1e-10_wp) then 
       id_change = i 
     endif
   enddo 
+
   len_low = id_change + 1 
   len_up = size(rr_geo,2)-id_change + 1
 
@@ -1376,7 +1378,7 @@ subroutine define_thickness(rr_geo, thickness)
   rr_low = rr_geo(:,1:len_low)
   rr_up = rr_geo(:,len_low:size(rr_geo,2))
   
-  do i = 1, size(x_coor) 
+  do i = 2, size(x_coor) 
     call linear_interp(rr_up(2,:), rr_up(1,:), x_coor(i), y_up_interp(i))
     call linear_interp(rr_low(2,len_low:1:-1), rr_low(1,len_low:1:-1), x_coor(i), y_low_interp(i))
   enddo 
