@@ -859,8 +859,9 @@ end subroutine prepare_wake
 !! Note: at this subroutine is passed the whole array of elements,
 !! comprising both the implicit panels and the explicit (ll)
 !! elements
-subroutine update_wake(wake, elems, octree)
+subroutine update_wake(wake, geo, elems, octree)
   type(t_wake), intent(inout), target :: wake
+  type(t_geo), intent(in)             :: geo
   type(t_pot_elem_p), intent(in)      :: elems(:)
   type(t_octree), intent(inout)       :: octree
 
@@ -1247,9 +1248,6 @@ subroutine complete_wake(wake, geo, elems, te)
   character(len=max_char_len)            :: msg
   character(len=*), parameter            :: this_sub_name='prepare_wake'
 
-#if USE_PRECICE
-  ! first and second row of the wake were already taken care of by update_near_field_wake
-#else
   !==> Panels: update the first rows of panels
 
   !first row  of new points comes from geometry
@@ -1260,6 +1258,10 @@ subroutine complete_wake(wake, geo, elems, te)
 
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1,wake%n_pan_points
+#if USE_PRECICE
+    ! Coupled components were already taken care of in precice update nfw
+    if ( .not. geo%components( wake%pan_gen_icomp(ip) )%coupling ) then
+#endif
     dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
     call calc_node_vel( wake%w_start_points(:,ip), &
             geo%refs(wake%pan_gen_ref(ip))%G_g, &
@@ -1280,9 +1282,13 @@ subroutine complete_wake(wake, geo, elems, te)
                   sim_param%min_vel_at_te* &
                   sim_param%dt*real(sim_param%ndt_update_wake,wp) / norm2(dist)
     end if
-
+#if USE_PRECICE
+  endif
+#endif
   enddo
-
+#if USE_PRECICE
+! TEs already joined
+#else 
   !==> Check if the panels need to be joined
   if(sim_param%join_te) then
 
@@ -1291,11 +1297,14 @@ subroutine complete_wake(wake, geo, elems, te)
     wake%joined_tes(:,:,1) = 0
     call join_first_panels(wake,sim_param%join_te_factor)
   endif
-
+#endif
   !==> Panels:  update the panels geometrical quantities of all the panels,
   !      the first two row of points have just been updated, the other
   !      rows of points were updated at the end of the last iteration
   do ipan = 1,wake%pan_wake_len
+#if USE_PRECICE
+  if ( .not. geo%components( wake%pan_gen_icomp(ipan) )%coupling ) then
+#endif  
     do iw = 1,wake%n_pan_stripes
       p1 = wake%i_start_points(1,iw)
       p2 = wake%i_start_points(2,iw)
@@ -1304,8 +1313,11 @@ subroutine complete_wake(wake, geo, elems, te)
                     wake%pan_w_points(:,p2,ipan+1), wake%pan_w_points(:,p1,ipan+1)/),&
                                                                       (/3,4/)))
     enddo
+#if USE_PRECICE
+  endif
+#endif      
   enddo
-#endif
+
 
   !==> Particles: update the position and intensity in time, avoid penetration
   !               and chech if remain into the boundaries

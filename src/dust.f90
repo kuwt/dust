@@ -1068,7 +1068,7 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     
     t0 = dust_time()
     if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
-      call update_wake(wake, elems_tot, octree)
+      call update_wake(wake, geo, elems_tot, octree)
     end if
     t1 = dust_time()
 
