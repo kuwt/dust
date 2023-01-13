@@ -165,7 +165,7 @@ type(t_parse), pointer                    :: sbprms , bxprms
 integer                                   :: n_analyses, ia             
 character(len=max_char_len)               :: basename, data_basename
 character(len=max_char_len)               :: an_name, an_type
-integer                                   :: an_start, an_end, an_step
+integer                                   :: an_start, an_end, an_step, an_avg
 integer                                   :: n_comp, i_comp 
 integer                                   :: n_hinge, i_hinge
 character(len=max_char_len), allocatable  :: hinge_tag(:)
@@ -222,17 +222,23 @@ do ia = 1, n_analyses
   !> Get general parameter for the analysis
   call getsuboption(prms,'Analysis',sbprms)
   an_type  = getstr(sbprms,'type')
-  
   call LowCase(an_type)
+  
   an_name  = getstr(sbprms,'name')
   out_frmt = getstr(sbprms,'format')
-  
   call LowCase(out_frmt)
+  
   an_start = getint(sbprms,'start_res')
   an_end   = getint(sbprms,'end_res')
   an_step  = getint(sbprms,'step_res')
   average  = getlogical(sbprms, 'average')
-
+  
+  if (countoption(sbprms, 'avg_res') .eq. 0) then
+    an_avg = an_start
+  else
+    an_avg  = getint(sbprms,'avg_res')
+  endif
+  
   !> Check if we are analysing all the components or just some
   all_comp = .false.
   n_comp = countoption(sbprms, 'component')
@@ -290,7 +296,7 @@ do ia = 1, n_analyses
     case('viz')
       call post_viz( sbprms , basename , data_basename , an_name , ia , &
                     out_frmt , components_names , all_comp , &
-                    an_start , an_end , an_step, average )
+                    an_start , an_end , an_step, average, an_avg )
 
     !> Domain probes
     case('probes')

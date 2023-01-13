@@ -480,7 +480,7 @@ subroutine create_param_main(prms)
   call prms%CreateStringOption('gust_type','Gust model','AMC')
   call prms%CreateRealArrayOption('gust_origin','Gust origin point')
   call prms%CreateRealArrayOption('gust_front_direction','Gust front direction vector')
-  call prms%CreateRealArrayOption('gust_front_speed','Gust front speed')
+  call prms%CreateRealOption('gust_front_speed','Gust front speed')
   call prms%CreateRealOption('gust_u_des','Design gust velocity')
   call prms%CreateRealArrayOption('gust_perturbation_direction','Gust perturbation &
                                 &direction vector','(/0.0, 0.0, 1.0/)')
@@ -537,6 +537,7 @@ subroutine create_param_post(prms, sbprms, bxprms)
   call sbprms%CreateIntOption('end_res', 'Final result of the analysis')
   call sbprms%CreateIntOption('step_res', 'Result stride of the analysis')
   call sbprms%CreateLogicalOption('average', 'Perform time averaging','F')
+  call sbprms%CreateIntOption('avg_res', 'Result for the average visualization')
   call sbprms%CreateLogicalOption('wake', 'Output also the wake for &
                                   &visualization','T')
   call sbprms%CreateLogicalOption('separate_wake', 'Output the wake in a separate &
@@ -828,6 +829,7 @@ subroutine init_sim_param(sim_param, prms, nout, output_start)
     
     if(countoption(prms,'gust_front_speed') .gt. 0) then
       sim_param%gust_front_speed          = getreal(prms, 'gust_front_speed')
+      write(*,*) 'sim_param%gust_front_speed', sim_param%gust_front_speed
     else
       sim_param%gust_front_speed          = norm2(sim_param%u_inf)
     end if

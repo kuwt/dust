@@ -43,6 +43,8 @@
 !!          Federico Fonte
 !!          Davide Montagnani
 !!          Matteo Tugnoli
+!!          Alberto Savino
+!!          Alessandro Cocco
 !!=========================================================================
 
 
@@ -58,9 +60,6 @@ use mod_param, only: &
 
 use mod_handling, only: &
   error, warning, printout
-
-!use mod_aero_elements, only: &
-!  c_elem, t_elem_p
 
 use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
@@ -115,34 +114,32 @@ type, extends(c_impl_elem) :: t_surfpan
   real(wp), pointer :: pres_sol
 
   !> boundary layer and flow separation
-  real(wp) :: h_bl      ! height of the surface (boundary??) layer
-  real(wp) :: al_free   ! ratio: shed vorticity / total vorticity
+  real(wp) :: h_bl         ! height of the surface (boundary??) layer
+  real(wp) :: al_free      ! ratio: shed vorticity / total vorticity
   real(wp) :: surf_vort(3) ! free vorticity
   real(wp) :: free_vort(3) ! free vorticity
 
 contains
 
-  procedure, pass(this) :: build_row        => build_row_surfpan
-  procedure, pass(this) :: build_row_static => build_row_static_surfpan
-  procedure, pass(this) :: add_wake         => add_wake_surfpan
-  procedure, pass(this) :: add_expl         => add_expl_surfpan
-  procedure, pass(this) :: compute_pot      => compute_pot_surfpan
-  procedure, pass(this) :: compute_vel      => compute_vel_surfpan
-  procedure, pass(this) :: compute_grad     => compute_grad_surfpan
-  procedure, pass(this) :: compute_psi      => compute_psi_surfpan
-  procedure, pass(this) :: compute_pres     => compute_pres_surfpan
-  procedure, pass(this) :: compute_dforce   => compute_dforce_surfpan
-  procedure, pass(this) :: calc_geo_data    => calc_geo_data_surfpan
-  procedure, pass(this) :: get_vort_vel     => get_vort_vel_surfpan
-  procedure, pass(this) :: correct_pressure_kutta => &
-                           correct_pressure_kutta_surfpan
+  procedure, pass(this) ::  build_row        => build_row_surfpan
+  procedure, pass(this) ::  build_row_static => build_row_static_surfpan
+  procedure, pass(this) ::  add_wake         => add_wake_surfpan
+  procedure, pass(this) ::  add_expl         => add_expl_surfpan
+  procedure, pass(this) ::  compute_pot      => compute_pot_surfpan
+  procedure, pass(this) ::  compute_vel      => compute_vel_surfpan
+  procedure, pass(this) ::  compute_grad     => compute_grad_surfpan
+  procedure, pass(this) ::  compute_psi      => compute_psi_surfpan
+  procedure, pass(this) ::  compute_pres     => compute_pres_surfpan
+  procedure, pass(this) ::  compute_dforce   => compute_dforce_surfpan
+  procedure, pass(this) ::  calc_geo_data    => calc_geo_data_surfpan
+  procedure, pass(this) ::  get_vort_vel     => get_vort_vel_surfpan
 
-  procedure, pass(this) :: create_local_velocity_stencil => &
-                           create_local_velocity_stencil_surfpan
-  procedure, pass(this) :: create_chtls_stencil => &
-                           create_chtls_stencil_surfpan
+  procedure, pass(this) ::  create_local_velocity_stencil => &
+                            create_local_velocity_stencil_surfpan
+  procedure, pass(this) ::  create_chtls_stencil => &
+                            create_chtls_stencil_surfpan
 
-  procedure, pass(this) :: get_bernoulli_source => get_bernoulli_source_surfpan
+  procedure, pass(this) ::  get_bernoulli_source => get_bernoulli_source_surfpan
 
 end type
 
@@ -164,7 +161,6 @@ subroutine initialize_surfpan()
 end subroutine initialize_surfpan
 
 !----------------------------------------------------------------------
-
 !> compute AIC of panel <this>, on the control point <pos>
 !! Compute I_ik : velocity potential in <pos>_i induced by a (-4*pi)
 !!   -intensity surface source  on the panel <this>_k.         ^---------
@@ -175,94 +171,94 @@ end subroutine initialize_surfpan
 !!   S_ik = -(1/(4*pi)) * I_ik
 !!
 subroutine potential_calc_sou_surfpan(this, sou, dou, pos)
- class(t_surfpan), intent(inout) :: this
- real(wp), intent(out) :: sou
- real(wp), intent(in)  :: dou
- real(wp), intent(in) :: pos(:)
+  class(t_surfpan), intent(inout) :: this
+  real(wp), intent(out) :: sou
+  real(wp), intent(in)  :: dou
+  real(wp), intent(in) :: pos(:)
 
- real(wp) :: radius
+  real(wp) :: radius
 
- real(wp), dimension(3) :: e3
- real(wp) :: zQ , souLog , vi , R1 , R2
- real(wp), dimension(3) :: Qp
- integer :: indm1 , indp1
- real(wp) :: den
+  real(wp), dimension(3) :: e3
+  real(wp) :: zQ , souLog , vi , R1 , R2
+  real(wp), dimension(3) :: Qp
+  integer :: indm1 , indp1
+  real(wp) :: den
 
- real(wp), parameter :: eps_sou  = 1.0e-6_wp
- real(wp), parameter :: ff_ratio = 10.0_wp
+  real(wp), parameter :: eps_sou  = 1.0e-6_wp
+  real(wp), parameter :: ff_ratio = 10.0_wp
 
- integer :: i1
- character(len=*), parameter :: this_sub_name = 'potential_calc_sou_surfpan'
+  integer :: i1
+  character(len=*), parameter :: this_sub_name = 'potential_calc_sou_surfpan'
 
- radius = norm2(pos-this%cen)
+  radius = norm2(pos-this%cen)
 
- if ( radius .gt. ff_ratio * maxval(this%edge_len) ) then
-   ! far-field approximation (1)
+  if ( radius .gt. ff_ratio * maxval(this%edge_len) ) then
+    
+    ! far-field approximation (1)
+    sou = this%area / radius
 
-   sou = this%area / radius
+    if ( sou .ne. sou ) then
+      call error(this_sub_name, this_mod_name, 'Divide by zero in sources &
+        &far field approximation')
+    end if
 
-   !if ( isnan(sou) ) then
-   !workaround to use only standard fortran: by definition a NaN is not equal
-   !even to itself
-   if ( sou .ne. sou ) then
-     call error(this_sub_name, this_mod_name, 'Divide by zero in sources &
-      &far field approximation')
-   end if
+  else
 
- else
+    ! initialisation
+    sou = 0.0_wp
 
-   ! initialisation
-   sou = 0.0_wp
+    ! unit normal
+    e3 = this%nor
 
-   ! unit normal
-   e3 = this%nor
+    ! Control point (Q)
+    zQ = sum( (pos-this%cen) * e3 )
+    Qp = pos - zQ * e3
 
-   ! Control point (Q)
-   zQ = sum( (pos-this%cen) * e3 )
-   Qp = pos - zQ * e3
+    do i1 = 1 , this%n_ver
 
-   do i1 = 1 , this%n_ver
+      if ( this%n_ver .eq. 3 ) then
+        indm1 = prev_tri(i1)
+        indp1 = next_tri(i1)
+      else if ( this%n_ver .eq. 4 ) then
+        indm1 = prev_qua(i1)
+        indp1 = next_qua(i1)
+      end if
 
-     if ( this%n_ver .eq. 3 ) then
-       indm1 = prev_tri(i1)
-       indp1 = next_tri(i1)
-     else if ( this%n_ver .eq. 4 ) then
-       indm1 = prev_qua(i1)
-       indp1 = next_qua(i1)
-     end if
+      R1 = norm2( pos - this%verp(:,i1) )
+      R2 = norm2( pos - this%verp(:,indp1) )
 
-     R1 = norm2( pos - this%verp(:,i1) )
-     R2 = norm2( pos - this%verp(:,indp1) )
+      den = R1+R2-this%edge_len(i1)
+      if ( den < 1e-6_wp ) then
 
-     den = R1+R2-this%edge_len(i1)
-     if ( den < 1e-6_wp ) then
-       write(msg(1),'(A)') 'Too small denominator in &
-       &source computation with point projection, using actual &
-       &points instead.'
-       write(msg(2),'(A,F12.6,F12.6,F12.6)') 'Computing sources on point: ',&
-       pos(1),pos(2),pos(3)
-       write(msg(3),'(A)')'This is most likely due to severely warped &
-       &quadrilateral elements adjacent to small elements.'//nl//&
-       &'      === CHECK MESH QUALITY! ==='
+        if(sim_param%debug_level .ge.5) then
+          write(msg(1),'(A)') 'Too small denominator in &
+          &source computation with point projection, using actual &
+          &points instead.'
+          write(msg(2),'(A,F12.6,F12.6,F12.6)') 'Computing sources on point: ',&
+          pos(1),pos(2),pos(3)
+          write(msg(3),'(A)')'This is most likely due to severely warped &
+          &quadrilateral elements adjacent to small elements.'//nl//&
+          &'      === CHECK MESH QUALITY! ==='
 
-       call warning(this_sub_name, this_mod_name, msg)
-       R1 = norm2( pos - this%ver(:,i1) )
-       R2 = norm2( pos - this%ver(:,indp1) )
-       den = R1+R2-this%edge_len(i1)
-     end if
+          call warning(this_sub_name, this_mod_name, msg)
+        endif
 
-     souLog = log( (R1+R2+this%edge_len(i1)) / (den) )
+        R1 = norm2( pos - this%ver(:,i1) )
+        R2 = norm2( pos - this%ver(:,indp1) )
+        den = R1+R2-this%edge_len(i1)
 
+      end if
 
+      souLog = log( (R1+R2+this%edge_len(i1)) / (den) )
 
-     vi = - sum( cross( Qp-this%verp(:,i1), this%edge_vec(:,i1) ) * e3 ) / this%edge_len(i1)
-     sou = sou + vi * souLog
+      vi = - sum( cross( Qp-this%verp(:,i1), this%edge_vec(:,i1) ) * e3 ) / this%edge_len(i1)
+      sou = sou + vi * souLog
 
-   end do
+    end do
 
-   sou = sou - zQ * dou
+    sou = sou - zQ * dou
 
- end if
+  end if
 
 end subroutine potential_calc_sou_surfpan
 
@@ -275,95 +271,93 @@ end subroutine potential_calc_sou_surfpan
 !! V^{sou}_ik = grad_{r_i} { int_{S_k} { 1 / |r_i - r| } }
 !!
 subroutine velocity_calc_sou_surfpan(this, vel, pos)
- class(t_surfpan), intent(in) :: this
- real(wp), intent(out) :: vel(3)
- real(wp), intent(in) :: pos(:)
+  class(t_surfpan), intent(in) :: this
+  real(wp), intent(out) :: vel(3)
+  real(wp), intent(in) :: pos(:)
 
- real(wp) :: phix , phiy , pdou
- real(wp) :: R1 , R2 , souLog
+  real(wp) :: phix , phiy , pdou
+  real(wp) :: R1 , R2 , souLog
 
- real(wp), parameter :: ff_ratio = 10.0_wp
- real(wp) :: radius_v(3)
- real(wp) :: radius
+  real(wp), parameter :: ff_ratio = 10.0_wp
+  real(wp) :: radius_v(3)
+  real(wp) :: radius
 
- integer :: indm1 , indp1
- integer :: i1
- character(len=max_char_len) :: message
- character(len=*), parameter :: this_sub_name='velocity_calc_sou_surfpan'
+  integer :: indm1 , indp1
+  integer :: i1
+  character(len=max_char_len) :: message
+  character(len=*), parameter :: this_sub_name='velocity_calc_sou_surfpan'
 
- radius_v = pos-this%cen
- radius   = norm2(radius_v)
+  radius_v = pos-this%cen
+  radius   = norm2(radius_v)
 
- if ( radius .gt. ff_ratio * maxval(this%edge_len) ) then ! far-field approximation (1)
+  if ( radius .gt. ff_ratio * maxval(this%edge_len) ) then ! far-field approximation (1)
 
-   phix = - this%area * sum( radius_v*this%tang(:,1) ) / radius**3.0_wp
-   phiy = - this%area * sum( radius_v*this%tang(:,2) ) / radius**3.0_wp
-   pdou = - this%area * sum( radius_v*this%nor       ) / radius**3.0_wp
+    phix = - this%area * sum( radius_v*this%tang(:,1) ) / radius**3.0_wp
+    phiy = - this%area * sum( radius_v*this%tang(:,2) ) / radius**3.0_wp
+    pdou = - this%area * sum( radius_v*this%nor       ) / radius**3.0_wp
 
- else
+  else
 
-   phix = 0.0_wp
-   phiy = 0.0_wp
+    phix = 0.0_wp
+    phiy = 0.0_wp
 
-   do i1 = 1 , this%n_ver
+    do i1 = 1 , this%n_ver
 
-     if ( this%n_ver .eq. 3 ) then
-       indm1 = prev_tri(i1)
-       indp1 = next_tri(i1)
-     else if ( this%n_ver .eq. 4 ) then
-       indm1 = prev_qua(i1)
-       indp1 = next_qua(i1)
-     end if
+      if ( this%n_ver .eq. 3 ) then
+        indm1 = prev_tri(i1)
+        indp1 = next_tri(i1)
+      else if ( this%n_ver .eq. 4 ) then
+        indm1 = prev_qua(i1)
+        indp1 = next_qua(i1)
+      end if
 
-     R1 = norm2( pos - this%verp(:,i1) )
-     R2 = norm2( pos - this%verp(:,indp1) )
-     ! si = this%edge_len(i1)
-     if(sim_param%debug_level .ge.5) then
-     if ( abs(R1+R2-this%edge_len(i1)) .lt. 1e-6_wp ) then
-      call warning(this_sub_name, this_mod_name, &
-        'too small denominator in calculation of velocity')
-      write(message,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
-      call printout(message)
-     end if
-     if ( abs(this%edge_len(i1) ) .lt. 1e-6_wp ) then
-      call warning(this_sub_name, this_mod_name, &
-        'too small edge length in calculation of velocity')
-      write(message,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
-      call printout(message)
-     end if
-     if ( abs(R1+R2+this%edge_len(i1)) .lt. 1e-6_wp ) then
-      call warning(this_sub_name, this_mod_name, &
-        'too small numerator in calculation of velocity')
-      write(message,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
-      call printout(message)
-     end if
-     endif
+      R1 = norm2( pos - this%verp(:,i1) )
+      R2 = norm2( pos - this%verp(:,indp1) )
 
-     if ( R1+R2-this%edge_len(i1) .lt. 1e-12_wp ) then
-       souLog = 0.0_wp
-     else
-       souLog = log( (R1+R2+this%edge_len(i1)) / (R1+R2-this%edge_len(i1)) )
-     endif
+      if(sim_param%debug_level .ge.5) then
+      if ( abs(R1+R2-this%edge_len(i1)) .lt. 1e-6_wp ) then
+        call warning(this_sub_name, this_mod_name, &
+          'too small denominator in calculation of velocity')
+        write(message,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
+        call printout(message)
+      end if
+      if ( abs(this%edge_len(i1) ) .lt. 1e-6_wp ) then
+        call warning(this_sub_name, this_mod_name, &
+          'too small edge length in calculation of velocity')
+        write(message,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
+        call printout(message)
+      end if
+      if ( abs(R1+R2+this%edge_len(i1)) .lt. 1e-6_wp ) then
+        call warning(this_sub_name, this_mod_name, &
+          'too small numerator in calculation of velocity')
+        write(message,*) ' R1,R2,this%edge_len,i1',R1,R2,this%edge_len(i1),i1
+        call printout(message)
+      end if
+      endif
 
+      if ( R1+R2-this%edge_len(i1) .lt. 1e-12_wp ) then
+        souLog = 0.0_wp
+      else
+        souLog = log( (R1+R2+this%edge_len(i1)) / (R1+R2-this%edge_len(i1)) )
+      endif
 
-     phix = phix + this%sinTi(i1) * souLog
-     phiy = phiy - this%cosTi(i1) * souLog
+      phix = phix + this%sinTi(i1) * souLog
+      phiy = phiy - this%cosTi(i1) * souLog
 
-   end do
+    end do
 
-   call potential_calc_doublet(this, pdou, pos)
+    call potential_calc_doublet(this, pdou, pos)
 
-   ! debug : it seems that ONLY the near-field formulas had the wrong sign !!! CHECK it again !!!
-   phix = - phix ! * ( -1.0_wp )
-   phiy = - phiy ! * ( -1.0_wp )
-   pdou = - pdou ! * ( -1.0_wp )
+    phix = - phix 
+    phiy = - phiy 
+    pdou = - pdou 
 
- end if
+  end if
 
- ! vsou = (/ phix , phiy , pdou /)
- vel(1) = this%tang(1,1)*phix + this%tang(1,2)*phiy + this%nor(1)* pdou
- vel(2) = this%tang(2,1)*phix + this%tang(2,2)*phiy + this%nor(2)* pdou
- vel(3) = this%tang(3,1)*phix + this%tang(3,2)*phiy + this%nor(3)* pdou
+  ! vsou = (/ phix , phiy , pdou /)
+  vel(1) = this%tang(1,1)*phix + this%tang(1,2)*phiy + this%nor(1)* pdou
+  vel(2) = this%tang(2,1)*phix + this%tang(2,2)*phiy + this%nor(2)* pdou
+  vel(3) = this%tang(3,1)*phix + this%tang(3,2)*phiy + this%nor(3)* pdou
 
 end subroutine velocity_calc_sou_surfpan
 
@@ -371,11 +365,11 @@ end subroutine velocity_calc_sou_surfpan
 !> TODO: compute the gradient of the velocity induced by a source and
 !        write this routine
 subroutine gradient_calc_sou_surfpan(this, grad, pos)
- class(t_surfpan), intent(in) :: this
- real(wp), intent(out) :: grad(3,3)
- real(wp), intent(in) :: pos(:)
+  class(t_surfpan), intent(in) :: this
+  real(wp), intent(out) :: grad(3,3)
+  real(wp), intent(in) :: pos(:)
 
- grad = 0.0_wp
+  grad = 0.0_wp
 
 end subroutine gradient_calc_sou_surfpan
 
@@ -387,24 +381,24 @@ end subroutine gradient_calc_sou_surfpan
 !! the rest of the system was already built in the \ref build_row_static
 !! subroutine.
 subroutine build_row_surfpan(this, elems, linsys, ie, ista, iend)
- class(t_surfpan), intent(inout) :: this
- type(t_impl_elem_p), intent(in)      :: elems(:)
- type(t_linsys), intent(inout)   :: linsys
- integer, intent(in)             :: ie
- integer, intent(in)             :: ista, iend
+  class(t_surfpan), intent(inout) :: this
+  type(t_impl_elem_p), intent(in)      :: elems(:)
+  type(t_linsys), intent(inout)   :: linsys
+  integer, intent(in)             :: ie
+  integer, intent(in)             :: ista, iend
 
- integer :: j1 , ipres
- real(wp) :: b1
- real(wp) :: wind(3)
+  integer :: j1 , ipres
+  real(wp) :: b1
+  real(wp) :: wind(3)
 
-! RHS for \phi equation --------------------------
+  ! RHS for \phi equation --------------------------
   linsys%b(ie) = 0.0_wp
+
   !Components not moving, no body velocity in the boundary condition
   !linsys%b(ie) = sum(linsys%b_static(:,ie) * (-uinf))
-! RHS for Bernoulli polynomial equation ----------
+  ! RHS for Bernoulli polynomial equation ----------
   ipres = linsys%idSurfPanG2L(ie)
   linsys%b_pres(ipres) = 0.0_wp
-
 
   ! Static part ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   ! + \phi equation ------------------------------
@@ -440,15 +434,12 @@ subroutine build_row_surfpan(this, elems, linsys, ie, ista, iend)
     !Add the contribution to the rhs
 
     select type( el => elems(j1)%p ) ; class is(t_surfpan)
-      linsys%b_pres( ipres ) = &
-               linsys%b_pres( ipres ) + &
-               b1* el%bernoulli_source
+      linsys%b_pres( ipres ) =  linsys%b_pres( ipres )    + &
+                                b1* el%bernoulli_source
 
     end select
 
-
   end do
-
 
 end subroutine build_row_surfpan
 
@@ -461,18 +452,17 @@ end subroutine build_row_surfpan
 !! coefficients for te static part and the static contribution to the rhs
 subroutine build_row_static_surfpan(this, elems, expl_elems, linsys, &
                                     ie, ista, iend)
- class(t_surfpan), intent(inout) :: this
- type(t_impl_elem_p), intent(in)      :: elems(:)
- type(t_expl_elem_p), intent(in)      :: expl_elems(:)
- type(t_linsys), intent(inout)   :: linsys
- integer, intent(in)             :: ie
- integer, intent(in)             :: ista, iend
+  class(t_surfpan), intent(inout) :: this
+  type(t_impl_elem_p), intent(in)      :: elems(:)
+  type(t_expl_elem_p), intent(in)      :: expl_elems(:)
+  type(t_linsys), intent(inout)   :: linsys
+  integer, intent(in)             :: ie
+  integer, intent(in)             :: ista, iend
 
- integer :: j1
- real(wp) :: b1
+  integer :: j1
+  real(wp) :: b1
 
   linsys%b(ie) = 0.0_wp
-  !linsys%b_static(:,ie) = 0.0_wp
 
   !Cycle just all the static elements, ista and iend will be the beginning of
   !the result vector. Then save the rhs in b_static
@@ -481,23 +471,9 @@ subroutine build_row_static_surfpan(this, elems, expl_elems, linsys, &
     call elems(j1)%p%compute_pot( linsys%A(ie,j1), b1,  &
                                   this%cen, ie, j1 )
 
-    !linsys%b_static(:,ie) = linsys%b_static(:,ie) + b1
     linsys%b_static(ie,j1)  = b1
 
   end do
-
-  !!Now build the static contribution from the lifting line elements
-  !do j1 = 1,linsys%nstatic_ll
-  !  call expl_elems(j1)%p%compute_pot( linsys%L_static(ie,j1), b1,  &
-  !                                this%cen, 1, 2 )
-  !enddo
-
-  !!Now build the static contribution from the actuator disk elements
-  !do j1 = 1,linsys%nstatic_ad
-  !  call ad_elems(j1)%p%compute_pot( linsys%D_static(ie,j1), b1,  &
-  !                                this%cen, 1, 2 )
-  !enddo
-
 
   !Now build the static contribution from the explicit elements
   do j1 = 1,linsys%nstatic_expl
@@ -517,17 +493,17 @@ end subroutine build_row_static_surfpan
 !! the contribution of potential due to the wake
 subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
                             ie,ista, iend)
- class(t_surfpan), intent(inout) :: this
- type(t_pot_elem_p), intent(in)      :: wake_elems(:)
- integer, intent(in)             :: impl_wake_ind(:,:)
- type(t_linsys), intent(inout)   :: linsys
- integer, intent(in)             :: ie
- integer, intent(in)             :: ista
- integer, intent(in)             :: iend
+  class(t_surfpan), intent(inout) :: this
+  type(t_pot_elem_p), intent(in)      :: wake_elems(:)
+  integer, intent(in)             :: impl_wake_ind(:,:)
+  type(t_linsys), intent(inout)   :: linsys
+  integer, intent(in)             :: ie
+  integer, intent(in)             :: ista
+  integer, intent(in)             :: iend
 
- integer :: j1, ind1, ind2
- real(wp) :: a, b
- integer :: n_impl
+  integer :: j1, ind1, ind2
+  real(wp) :: a, b
+  integer :: n_impl
 
   !Count the number of implicit wake contributions
   n_impl = size(impl_wake_ind,2)
@@ -562,59 +538,6 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
   end do
 
 end subroutine add_wake_surfpan
-
-!----------------------------------------------------------------------
-
-! Remove Kutta contribution to obtain the matrix of Bernoulli lin.sys. from
-! the matrix of the \phi lin.sys.
-! This routine removes the extra terms added in add_wake_surfpan.
-! -> OBS: the input IE is already the panel id in the surfpan numeration
-subroutine correct_pressure_kutta_surfpan(this, wake_elems, impl_wake_ind, &
-                 linsys, ie,ista, iend)
-
- class(t_surfpan), intent(inout) :: this
- type(t_pot_elem_p), intent(in)      :: wake_elems(:)
- integer, intent(in)             :: impl_wake_ind(:,:)
- type(t_linsys), intent(inout)   :: linsys
- integer, intent(in)             :: ie
- integer, intent(in)             :: ista
- integer, intent(in)             :: iend
-
- integer :: j1, ind1, ind2
- real(wp) :: a, b
- integer :: n_impl
-
-  !Count the number of implicit wake contributions
-  n_impl = size(impl_wake_ind,2)
-
-  !Remove the contribution of the implicit wake panels to the linear system
-  !Implicitly we assume that the first set of wake panels are the implicit
-  !ones since are at the beginning of the list
-  do j1 = 1 , n_impl
-    ind1 = impl_wake_ind(1,j1); ind2 = impl_wake_ind(2,j1)
-    if ((ind1.ge.ista .and. ind1.le.iend) .and. &
-        (ind2.ge.ista .and. ind2.le.iend)) then
-
-      ! in linsys%idSurfPanG2L, an element is different from zero if it identifies
-      ! a surfpan elements. We need to remove only the TE contribution of wake elements
-      ! originating from surfpan elements
-
-!     if ( ( linsys%idSurfPanG2L(ind1) .ne. 0 ) .and. &
-!          ( linsys%idSurfPanG2L(ind2) .ne. 0 )         ) then
-        !todo: find a more elegant solution to avoid i=j
-        call wake_elems(j1)%p%compute_pot( a, b, this%cen, 1, 2 )
-
-        linsys%A_pres(ie,linsys%idSurfPanG2L(ind1)) = &
-                         linsys%A_pres(ie,linsys%idSurfPanG2L(ind1)) - a
-        linsys%A_pres(ie,linsys%idSurfPanG2L(ind2)) = &
-                         linsys%A_pres(ie,linsys%idSurfPanG2L(ind2)) + a
-!     endif
-
-    endif
-
-  end do
-
-end subroutine correct_pressure_kutta_surfpan
 
 !----------------------------------------------------------------------
 
@@ -670,7 +593,7 @@ subroutine compute_pot_surfpan(this, A, b, pos , i , j )
   if ( i .ne. j ) then
     call potential_calc_doublet(this, dou, pos)
   else
-!   AIC (doublets) = 0.0   -> dou = 0
+  ! AIC (doublets) = 0.0   -> dou = 0
     dou = -2.0_wp*pi
   end if
 
@@ -699,15 +622,13 @@ subroutine compute_psi_surfpan(this, A, b, pos, nor, i , j )
 
   real(wp) :: vdou(3) , vsou(3)
 
-
   call velocity_calc_doublet(this, vdou, pos)
 
-  ! TODO: check coefficients 1/4*pi, ...
   A = sum(vdou * nor)
 
   call velocity_calc_sou_surfpan(this, vsou, pos)
 
-! b = ... (sources from doublets)
+  ! b = ... (sources from doublets)
   b =   sum(-vsou * nor )
 
 end subroutine compute_psi_surfpan
@@ -738,7 +659,6 @@ subroutine compute_vel_surfpan(this, pos, vel )
 
   wind = variable_wind(this%cen, sim_param%time)
   vel = vdou*this%mag - vsou*( sum(this%nor*(this%ub-wind-this%uvort)) )
-  ! vel = - vsou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
 
 end subroutine compute_vel_surfpan
 
@@ -768,9 +688,7 @@ subroutine compute_grad_surfpan(this, pos, grad )
 
   wind = variable_wind(this%cen,sim_param%time)
   grad = grad_dou*this%mag &
-       - grad_sou*( sum(this%nor*(this%ub-wind-this%uvort)) )
-
-  ! vel = - vsou*( sum(this%nor*(this%ub-uinf-this%uvort)) )
+        - grad_sou*( sum(this%nor*(this%ub-wind-this%uvort)) )
 
 end subroutine compute_grad_surfpan
 
@@ -781,9 +699,8 @@ end subroutine compute_grad_surfpan
 subroutine compute_pres_surfpan(this, R_g)
   class(t_surfpan) , intent(inout) :: this
   real(wp)         , intent(in)    :: R_g(3,3)
-  !type(t_elem_p),   intent(in)    :: elems(:)
 
-  real(wp) :: vel_phi(3), force_pres
+  real(wp) :: vel_phi(3)
   real(wp) :: f(5)    ! <- max n_ver of a surfpan = 4 ; +1 for the constraint eqn
 
   integer :: i_e , n_neigh
@@ -791,41 +708,10 @@ subroutine compute_pres_surfpan(this, R_g)
   real(wp) :: wind(3)
 
 ! This routine contains the velocity update as well. TODO, move to a dedicated routine
-! Two methods have been implemented for surface velocity computation:
-! 1. stencil relying on a FV approx of the surface: pot_vel_stencil
-! 2. stencil relying on a CHTLS* method
+! Method implemented for surface velocity computation:
+! stencil relying on a CHTLS* method
 ! *CHTLS: Constrained Hermite Taylor series Least Square method
 
-!   ! 1. FV approx
-!   ! perturbation velocity, u ---------------------------------
-!   ! Compute velocity from the potential (mu = -phi), exploiting the stencil
-!   ! contained in pot_vel_stencil.
-!   ! ''Tangential component'' from the surface stencil
-!   !   Normal component       from the boundary conditions U.n = b.n
-!
-!   ! tangential part
-!   vel_phi_t = 0.0_wp
-!   do i_e = 1 , this%n_ver
-!     if ( associated(this%neigh(i_e)%p) ) then !  .and. &
-!       vel_phi_t = vel_phi_t + &
-!         this%pot_vel_stencil(:,i_e) * (this%neigh(i_e)%p%mag - this%mag)
-!     end if
-!   end do
-!
-! ! vel_phi_t = - vel_phi_t    ! mu = - phi
-!   vel_phi_t = matmul( R_g , vel_phi_t ) ! transpose(R_g) ???
-!   vel_phi_t = - vel_phi_t + sum(vel_phi_t*this%nor) * this%nor
-!   vel_phi = vel_phi_t +  &
-!         sum(this%nor*(this%ub-sim_param%u_inf-this%uvort)) * this%nor
-!
-!   ! velocity, U = u_t \hat{t} + u_n \hat{n} + U_inf ----------
-!   this%surf_vel = sim_param%u_inf + vel_phi + this%uvort
-! ! old and wrong
-! ! this%surf_vel = vel_phi - sum(vel_phi*this%nor)*this%nor + &
-! !      this%nor * sum(this%nor * (-sim_param%u_inf-this%uvort+this%ub) ) + &
-! !            sim_param%u_inf + this%uvort
-
-  ! 2. CHTLS method
   n_neigh = 0 ; f = 0.0_wp
   do i_e = 1 , this%n_ver
     if ( associated(this%neigh(i_e)%p) ) then
@@ -838,95 +724,40 @@ subroutine compute_pres_surfpan(this, R_g)
 
   vel_phi = matmul( this%chtls_stencil , f(1:n_neigh+1) )
 
-  ! Rotation of the result =====================================
-  ! - The stencil is computed in the local ref.sys. at the beginning of the code
-  ! - The velocity is computed at each timestep
-
   vel_phi = matmul( (R_g) , vel_phi )
-
-  !write(*,*) 'vel_phi', vel_phi
-
-  ! Rotation of the result =====================================
-
-  ! vel = u_inf + vel_phi + vel_rot
   this%surf_vel = wind + vel_phi + this%uvort
 
-  ! pressure -------------------------------------------------
-  ! unsteady problems  : P = P_inf + 0.5*rho_inf*V_inf^2
-  !                                - 0.5*rho_inf*V^2 - rho_inf*dphi/dt
-  !                                     + rho * ub.u_phi
-  ! with idou = -phi
-!!!  this%pres  = sim_param%P_inf &
-!!!! reduced equation after some manipulation
-!!!!   - 0.5 * sim_param%rho_inf * norm2(vel_phi+this%uvort)**2.0_wp &
-!!!!         - sim_param%rho_inf * sum( &
-!!!!            (sim_param%u_inf-this%ub)*(vel_phi+this%uvort) ) &
-!!!!         + sim_param%rho_inf * this%didou_dt
-!!!! full equation
-!!!    + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
-!!!    - 0.5_wp * sim_param%rho_inf * norm2(this%surf_vel)**2.0_wp  &
-!!!             + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
-!!!             + sim_param%rho_inf * this%didou_dt
-
-
-  ! === Using result of the Uhlman's equation for pressure ===
-  ! See linsys/mod_pressure_equation.f90:assemble_pressure_linsys
-  ! as a reference for the 2 different implementations
-  !> (a.1) original implementation ===
-  ! this%pres = this%pres_sol - 0.5_wp*sim_param%rho_inf * &
-  !             norm2(this%surf_vel)**2.0_wp
-  !> (a.2) trick of setting B_inf = P_inf + 0.5 * rhoinf * uinf^2.0 ===
-  this%pres = this%pres_sol &
-            - 0.5_wp*sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp &
-            + 0.5_wp*sim_param%rho_inf * norm2(wind)**2.0_wp &
-            + sim_param%P_inf
-
-  if (this%moving) then
-    ! old computation of the loads, expoliting Bernoulli
-    ! TODO: to be updated and treated w/ Uhlman's equation formulation
-    force_pres  = sim_param%P_inf &
-      - 0.5_wp * sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp  &
-      + 0.5_wp * sim_param%rho_inf * norm2(wind)**2.0_wp &
-               + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
-               + sim_param%rho_inf * this%didou_dt
-
-  else
-    force_pres = this%pres
-  endif
-
-! ! OLD PRESSURE EVALUATION
-! ! Bernoulli-based pressure for all the components
-! force_pres  = sim_param%P_inf &
-!   - 0.5_wp * sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp  &
-!   + 0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
-!            + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
-!            + sim_param%rho_inf * this%didou_dt
-!
-! this%pres = force_pres
+  !> pressure -------------------------------------------------
+  ! unsteady problems  : P =   P_inf 
+  !                          + 0.5*rho_inf*V_inf^2
+  !                          +(- 0.5*rho_inf*V^2 
+  !                          + rho * ub.u_phi
+  !                          - rho_inf*dphi/dt)         
 
   ! Prandt -- Glauert correction for compressibility effect
-  mach = abs(norm2(wind) / sim_param%a_inf)
+  ! it applies to the dynamic pressure terms only
+  ! so that only the *relative* static pressure is affected
+  mach = abs(norm2(wind - this%ub) / sim_param%a_inf)
+  
+  this%pres = sim_param%P_inf + &
+             (0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
+              -0.5_wp * sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp &
+              +sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
+              -sim_param%rho_inf * this%didou_dt)/sqrt(1 - mach**2)
 
-  this%dforce = - (force_pres - sim_param%P_inf) * this%area * this%nor / sqrt(1 - mach**2)
+  ! compute dforce
+  call compute_dforce_surfpan(this)
 
 end subroutine compute_pres_surfpan
 
 !----------------------------------------------------------------------
 
 !> Compute the elementary force on the on the actual element
-!!
-!! WARNING: at the moment this is completely bypassed, due to the
-!! different treatment of stationary and moving elements.
-!! Its functionalities were moved into compute_pres_surfpan
+!!  computing the eleent force from the pressure
 subroutine compute_dforce_surfpan(this)
   class(t_surfpan), intent(inout) :: this
-  !type(t_elem_p), intent(in) :: elems(:)
 
-  ! first rough approximation
-  ! vec{F} = - this%pres * vec{n}
-
-  !this%dforce = - this%pres * this%area * this%nor
-
+  this%dforce = - (this%pres - sim_param%P_inf) * this%area * this%nor
 
 end subroutine compute_dforce_surfpan
 
@@ -940,38 +771,14 @@ end subroutine compute_dforce_surfpan
 !!  matrix is needed.
 subroutine create_local_velocity_stencil_surfpan ( this , R_g )
   class(t_surfpan)  , intent(inout) :: this
-! type(t_pot_elem_p), intent(in)    :: elems(:)
   real(wp)          , intent(in)    :: R_g(3,3)
 
- real(wp) :: bubble_surf
- integer  :: i_v
-
- !real(wp) :: n_vect(3)
+  real(wp) :: bubble_surf
+  integer  :: i_v
 
   if ( .not. allocated(this%pot_vel_stencil) ) then
     allocate(this%pot_vel_stencil(3,this%n_ver) )
   end if
-
-!  ! method #1: very sensitive to dimension gradient of neighbouring elements
-!  bubble_surf = this%area
-!
-!  do i_v = 1 , this%n_ver
-!
-!    ! Update surf_bubble
-!    !sum the contribuition only if the neighbour is really present
-!    if(associated(this%neigh(i_v)%p)) then
-!
-!        bubble_surf = bubble_surf + &
-!           this%neigh(i_v)%p%area / real(this%neigh(i_v)%p%n_ver,wp)
-!
-!    endif
-!
-!    this%pot_vel_stencil(:,i_v) = &
-!             cross( this%edge_vec(:,i_v) , this%nor )
-!
-!  end do
-!
-!  this%pot_vel_stencil = this%pot_vel_stencil / bubble_surf
 
   ! method #2: w/o averaging on neighbouring elements ; 0.5 factor added
   bubble_surf = this%area
@@ -982,30 +789,6 @@ subroutine create_local_velocity_stencil_surfpan ( this , R_g )
      0.5_wp * cross( this%edge_vec(:,i_v) , this%nor )
 
   end do
-
-!   ! method #3: w/o averaging on neighbouring elements ; 0.5 factor added ;
-!   ! taking into account curvature !!!
-!   bubble_surf = this%area
-!
-!   do i_v = 1 , this%n_ver
-!
-! !   write(*,*) ' this%id ' , this%id
-! !   write(*,*) ' this%nor' , this%nor
-!     if ( associated(this%neigh(i_v)%p) ) then
-! !     write(*,*) ' shape(this%neigh(i_v)) : ' , shape(this%neigh(i_v))
-!       n_vect = 0.5_wp * ( this%nor + this%neigh(i_v)%p%nor )
-!       n_vect = n_vect / norm2(n_vect)
-!     else
-!       n_vect = this%nor
-!     end if
-!     this%pot_vel_stencil(:,i_v) = &
-!      0.5_wp * cross( this%edge_vec(:,i_v) , n_vect )
-!
-!     this%pot_vel_stencil(:,i_v) = &
-!                       this%pot_vel_stencil(:,i_v) &
-!      - this%nor * sum(this%pot_vel_stencil(:,i_v)*this%nor)
-!
-!   end do
 
   this%pot_vel_stencil = this%pot_vel_stencil / bubble_surf
 
@@ -1110,11 +893,11 @@ end subroutine create_chtls_stencil_surfpan
 !! The subroutine calculates all the relevant geometrical quantities of a
 !! surface panel
 subroutine calc_geo_data_surfpan(this,vert)
- class(t_surfpan), intent(inout) :: this
- real(wp), intent(in) :: vert(:,:)
+  class(t_surfpan), intent(inout) :: this
+  real(wp), intent(in) :: vert(:,:)
 
- integer :: nsides, is
- real(wp):: nor(3), tanl(3)
+  integer :: nsides, is
+  real(wp):: nor(3), tanl(3)
 
   this%ver = vert
   nsides = this%n_ver
@@ -1124,11 +907,11 @@ subroutine calc_geo_data_surfpan(this,vert)
 
   ! unit normal and area
   if ( nsides .eq. 4 ) then
-    nor = cross( this%ver(:,3) - this%ver(:,1) , &
-                 this%ver(:,4) - this%ver(:,2)     )
+    nor = cross(this%ver(:,3) - this%ver(:,1) , &
+                this%ver(:,4) - this%ver(:,2)     )
   else if ( nSides .eq. 3 ) then
-    nor = cross( this%ver(:,3) - this%ver(:,2) , &
-                 this%ver(:,1) - this%ver(:,2)     )
+    nor = cross(this%ver(:,3) - this%ver(:,2) , &
+                this%ver(:,1) - this%ver(:,2)     )
   end if
 
   this%area = 0.5_wp * norm2(nor)
@@ -1176,26 +959,25 @@ subroutine calc_geo_data_surfpan(this,vert)
   this%dforce = 0.0_wp
   this%dmom   = 0.0_wp
 
-
 end subroutine calc_geo_data_surfpan
 
 !----------------------------------------------------------------------
 
 !> Calculat the vorticity induced velocity from vortical elements
 subroutine get_vort_vel_surfpan(this, vort_elems)
- class(t_surfpan), intent(inout)   :: this
- type(t_vort_elem_p), intent(in)    :: vort_elems(:)
+  class(t_surfpan), intent(inout)   :: this
+  type(t_vort_elem_p), intent(in)   :: vort_elems(:)
 
- integer :: iv
- real(wp) :: vel(3)
+  integer :: iv
+  real(wp) :: vel(3)
 
- !> Initialize to zero, before accumulation
- this%uvort = 0.0_wp
+  !> Initialize to zero, before accumulation
+  this%uvort = 0.0_wp
 
- do iv=1,size(vort_elems)
-   call vort_elems(iv)%p%compute_vel(this%cen, vel)
-   this%uvort = this%uvort + vel/(4*pi)
- enddo
+  do iv=1,size(vort_elems)
+    call vort_elems(iv)%p%compute_vel(this%cen, vel)
+    this%uvort = this%uvort + vel/(4*pi)
+  enddo
 
 end subroutine
 

@@ -1068,7 +1068,7 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     
     t0 = dust_time()
     if ( mod( it, sim_param%ndt_update_wake ) .eq. 0 ) then
-      call update_wake(wake, elems_tot, octree)
+      call update_wake(wake, geo, elems_tot, octree)
     end if
     t1 = dust_time()
 
@@ -1089,13 +1089,13 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
 
 #if USE_PRECICE
     !> Update geo_data()
-do i_el = 1, size(elems_tot)
-  call elems_tot(i_el)%p%calc_geo_data( &
-                        geo%points(:,elems_tot(i_el)%p%i_ver) )
-end do
+    do i_el = 1, size(elems_tot)
+      call elems_tot(i_el)%p%calc_geo_data( &
+                            geo%points(:,elems_tot(i_el)%p%i_ver) )
+    end do
 
-!> Update near-field wake
-call precice%update_near_field_wake( geo, wake, te )
+    !> Update near-field wake
+    call precice%update_near_field_wake( geo, wake, te )
 #endif
 
     t0 = dust_time()

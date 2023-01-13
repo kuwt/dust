@@ -106,9 +106,6 @@ use mod_octree, only: &
   t_octree, sort_particles, calculate_multipole, apply_multipole, &
   apply_multipole_panels
 
-!$ use omp_lib, only: &
-!$   omp_get_thread_num, omp_get_num_threads
-
 use mod_wind, only: &
   variable_wind
 !----------------------------------------------------------------------
@@ -116,7 +113,7 @@ use mod_wind, only: &
 implicit none
 
 public :: t_wake, initialize_wake, update_wake, &
-          prepare_wake, complete_wake, load_wake, destroy_wake
+          prepare_wake, complete_wake, load_wake, destroy_wake, join_first_panels
 
 private
 
@@ -496,7 +493,7 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
 
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1 , wake%n_pan_points
-  !dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
+
     call calc_node_vel( wake%w_start_points(:,ip), &
             geo%refs(wake%pan_gen_ref(ip))%G_g, &
             geo%refs(wake%pan_gen_ref(ip))%f_g, &
@@ -560,9 +557,11 @@ subroutine initialize_wake(wake, geo, te,  npan, nrings, nparts)
   allocate(wake%prt_ivort(wake%nmax_prt))
   wake%n_prt = 0
   allocate(wake%part_p(0))
+
   do ip = 1,wake%nmax_prt
     wake%wake_parts(ip)%mag => wake%prt_ivort(ip)
   enddo
+
   wake%part_box_min = sim_param%particles_box_min
   wake%part_box_max = sim_param%particles_box_max
 
@@ -779,21 +778,6 @@ subroutine load_wake(filename, wake, elems)
     enddo
   endif
 
-!!!  !If there are particles and the multipole is employed, i
-!!!  !need to pre-compute the particles induced velocity now
-!!!  if(sim_param%use_fmm .and. wake%n_prt .gt. 0) then
-!!!!!$omp parallel do private(ie, ip, vel)
-!!!    do ie = 1, size(elems)
-!!!      elems(ie)%p%uvort = 0.0
-!!!      do ip = 1,wake%n_prt
-!!!        call wake%part_p(ip)%p%compute_vel(elems(ie)%p%cen, &
-!!!                                               sim_param%u_inf, vel)
-!!!         elems(ie)%p%uvort = elems(ie)%p%uvort + vel/(4.0_wp*pi)
-!!!      enddo
-!!!    enddo
-!!!!!$omp end parallel do
-!!!  endif
-
 
 end subroutine load_wake
 
@@ -877,8 +861,9 @@ end subroutine prepare_wake
 !! Note: at this subroutine is passed the whole array of elements,
 !! comprising both the implicit panels and the explicit (ll)
 !! elements
-subroutine update_wake(wake, elems, octree)
+subroutine update_wake(wake, geo, elems, octree)
   type(t_wake), intent(inout), target :: wake
+  type(t_geo), intent(in)             :: geo
   type(t_pot_elem_p), intent(in)      :: elems(:)
   type(t_octree), intent(inout)       :: octree
 
@@ -1266,9 +1251,6 @@ subroutine complete_wake(wake, geo, elems, te)
   character(len=max_char_len)           :: msg
   character(len=*), parameter           :: this_sub_name='prepare_wake'
 
-#if USE_PRECICE
-  ! first and second row of the wake were already taken care of by update_near_field_wake
-#else
   !==> Panels: update the first rows of panels
 
   !first row  of new points comes from geometry
@@ -1279,6 +1261,10 @@ subroutine complete_wake(wake, geo, elems, te)
 
   !Second row of points: first row + 0.3*|uinf|*t with t = R*t0
   do ip=1,wake%n_pan_points
+#if USE_PRECICE
+    ! Coupled components were already taken care of in precice update nfw
+    if ( .not. geo%components( wake%pan_gen_icomp(ip) )%coupling ) then
+#endif
     dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
     call calc_node_vel( wake%w_start_points(:,ip), &
             geo%refs(wake%pan_gen_ref(ip))%G_g, &
@@ -1299,21 +1285,29 @@ subroutine complete_wake(wake, geo, elems, te)
                   sim_param%min_vel_at_te* &
                   sim_param%dt*real(sim_param%ndt_update_wake,wp) / norm2(dist)
     end if
-
+#if USE_PRECICE
+  endif
+#endif
   enddo
-
+#if USE_PRECICE
+! TEs already joined
+#else 
   !==> Check if the panels need to be joined
   if(sim_param%join_te) then
+
     wake%joined_tes(:,:,2:wake%nmax_pan+1) = &
           wake%joined_tes(:,:,1:wake%nmax_pan)
     wake%joined_tes(:,:,1) = 0
     call join_first_panels(wake,sim_param%join_te_factor)
   endif
-
+#endif
   !==> Panels:  update the panels geometrical quantities of all the panels,
   !      the first two row of points have just been updated, the other
   !      rows of points were updated at the end of the last iteration
   do ipan = 1,wake%pan_wake_len
+#if USE_PRECICE
+  if ( .not. geo%components( wake%pan_gen_icomp(ipan) )%coupling ) then
+#endif  
     do iw = 1,wake%n_pan_stripes
       p1 = wake%i_start_points(1,iw)
       p2 = wake%i_start_points(2,iw)
@@ -1322,8 +1316,11 @@ subroutine complete_wake(wake, geo, elems, te)
                     wake%pan_w_points(:,p2,ipan+1), wake%pan_w_points(:,p1,ipan+1)/),&
                                                                       (/3,4/)))
     enddo
+#if USE_PRECICE
+  endif
+#endif      
   enddo
-#endif
+
 
   !==> Particles: update the position and intensity in time, avoid penetration
   !               and chech if remain into the boundaries
@@ -1484,7 +1481,7 @@ subroutine complete_wake(wake, geo, elems, te)
         dir_parent(:,iwc) = dir_parent(:,iwc-1)
 
         iwc = iwc+1 ! added parent panel
-               
+
         ! loop over all the other panels until component ends
         do while (wake%pan_neigh(1,iw) .gt. 0)
           iw = iw + 1 ! move to next panel
@@ -1510,7 +1507,7 @@ subroutine complete_wake(wake, geo, elems, te)
           isp = isp + n_sbprt ! added subparticles
   
           iwc = iwc+1 ! added parent panel
-           
+
           ! parent panel from previous row
           call compute_partvec(wake, iw, partvec, pos_p, area, 4) ! parent panel
           cen_parent(:,iwc) = pos_p
@@ -1994,7 +1991,7 @@ subroutine compute_vel_from_all(elems, wake, pos, vel)
   !calculate the influence of particles
   do ie=1,size(wake%part_p)
     call wake%part_p(ie)%p%compute_vel(pos, v)
-    vel = vel+ v/(4*pi)
+    vel = vel + v/(4*pi)
   enddo
 
 end subroutine compute_vel_from_all

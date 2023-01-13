@@ -108,7 +108,7 @@ contains
 
 subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                       out_frmt , components_names , all_comp , &
-                      an_start , an_end , an_step, average)
+                      an_start , an_end , an_step, average, an_avg)
   type(t_parse), pointer                                    :: sbprms
   character(len=*) , intent(in)                             :: basename
   character(len=*) , intent(in)                             :: data_basename
@@ -117,7 +117,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   character(len=*) , intent(in)                             :: out_frmt
   character(len=max_char_len), allocatable , intent(inout)  :: components_names(:)
   logical , intent(in)                                      :: all_comp
-  integer , intent(in)                                      :: an_start , an_end , an_step
+  integer , intent(in)                                      :: an_start , an_end , an_step, an_avg
   logical, intent(in)                                       :: average
 
   type(t_geo_component), allocatable                        :: comps(:)
@@ -237,13 +237,10 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                                filen = trim(filename) )
     !expand the actuator disks
     call expand_actdisk_postpro(comps, points, points_exp, elems)
-    if(average) then
-      if( .not. allocated(points_ave)) then
+    if(average .and. it .eq. an_avg) then
+      ! Save the points of this iteration for the average visualization
         allocate(points_ave(size(points_exp,1),size(points_exp,2)))
-        points_ave = 0.0_wp
-      endif
-      points_ave = points_ave*(real(ires-1,wp)/real(ires,wp)) + &
-                   points_exp/real(ires,wp)
+        points_ave = points
     endif
 
     !Load the results ! TODO: check this routine and the content of the files to be read
@@ -455,6 +452,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     end select
     call clear_output_vars(ave_out_vars)
     deallocate(ave_out_vars)
+    deallocate(points_ave)
   endif
 
   deallocate(points)

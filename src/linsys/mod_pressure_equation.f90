@@ -155,19 +155,6 @@ subroutine assemble_pressure_sys(linsys, geo, elems, wake)
 
   ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++
 
-  !This should have been done in the linear system assembling
-  !!! Slicing --------------------
-  !!linsys%A_pres = linsys%A( geo%idSurfPan , geo%idSurfPan )
-  !!! Remove Kutta condtion ------
-  !!do ie = 1 , geo%nSurfpan
-  !!  select type( el => elems(geo%idSurfPan(ie))%p ) ; class is(t_surfpan)
-  !!    call el%correct_pressure_kutta( &
-  !!          (/wake%pan_p, wake%rin_p/), wake%pan_gen_elems_id, linsys,uinf,ie,1,ntot)
-  !!  end select
-  !!end do
-
-  ! rhs: ....
-
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !
   ! Assemble the RHS of the linear system for the Bernoulli polynomial     !
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !
@@ -191,11 +178,9 @@ subroutine assemble_pressure_sys(linsys, geo, elems, wake)
 
           dist = wake%part_p(iw)%p%cen - elcen
           linsys%b_pres(ie) = linsys%b_pres(ie) + &
-            sum( dist * cross( wake%part_p(iw)%p%dir , wake%part_p(iw)%p%vel ) ) * &
-                 wake%part_p(iw)%p%mag / ( (sqrt(sum(dist**2)+wake%part_p(iw)%p%r_Vortex**2))**3.0_wp )
-! singular  >>>  wake%part_p(iw)%p%mag / ( norm2(dist)**3.0_wp )
-! Rosenhead >>>  wake%part_p(iw)%p%mag / ( (sqrt(sum(dist**2)+sim_param%VortexRad**2))**3.0_wp )
-                 !EXPERIMENTAL: adding vortex rosenhead regularization
+            sum(dist * cross( wake%part_p(iw)%p%dir , wake%part_p(iw)%p%vel ) ) * &
+                wake%part_p(iw)%p%mag / ( (sqrt(sum(dist**2)+wake%part_p(iw)%p%r_Vortex**2))**3.0_wp )
+
         end if
       end do
     end if
@@ -212,8 +197,8 @@ subroutine assemble_pressure_sys(linsys, geo, elems, wake)
         dist2 = wake%end_vorts(iw)%ver(:,2) - elcen
         linsys%b_pres(ie) = linsys%b_pres(ie) - &
           0.5_wp * wake%end_vorts(iw)%mag * sum( wake%end_vorts(iw)%edge_vec * &
-               ( cross(dist , wake%end_vorts(iw)%ver_vel(:,1) ) /(norm2(dist )**3.0_wp) + &
-                 cross(dist2, wake%end_vorts(iw)%ver_vel(:,2) ) /(norm2(dist2)**3.0_wp) ) )
+              ( cross(dist , wake%end_vorts(iw)%ver_vel(:,1) ) /(norm2(dist )**3.0_wp) + &
+                cross(dist2, wake%end_vorts(iw)%ver_vel(:,2) ) /(norm2(dist2)**3.0_wp) ) )
       end if
     end do
     ! (c.3) constant surface doublets = vortex rings ( wake_panels )
@@ -234,15 +219,8 @@ subroutine assemble_pressure_sys(linsys, geo, elems, wake)
 
           linsys%b_pres(ie) = linsys%b_pres(ie) - &
             0.5_wp * wake%wake_panels(iw,ip)%mag * sum( wake%wake_panels(iw,ip)%edge_vec(:,is) * &
-                 ( cross(dist , wake%pan_w_vel(:,iww(is   ),ipp(is   )) ) /(norm2(dist )**3.0_wp) + &
-                   cross(dist2, wake%pan_w_vel(:,iww(inext),ipp(inext)) ) /(norm2(dist2)**3.0_wp) ) )
-!           ! old ----
-!           0.5_wp * wake%end_vorts(iw)%mag * sum( wake%wake_panels(iw2,iw)%edge_vec(:,is) * &
-!                ( cross(dist , wake%wake_panels(iw2,iw)%ver_vel(:,is   ) ) /(norm2(dist )**3.0_wp) + &
-!                  cross(dist2, wake%wake_panels(iw2,iw)%ver_vel(:,inext) ) /(norm2(dist2)**3.0_wp) ) )
-!                ( cross(dist , wake%pan_w_vel(:,iw2  , ) ) /(norm2(dist )**3.0_wp) + &
-!                  cross(dist2, wake%pan_w_vel(:,iw2+1, ) ) /(norm2(dist2)**3.0_wp) ) )
-!           ! old ----
+                ( cross(dist , wake%pan_w_vel(:,iww(is   ),ipp(is   )) ) /(norm2(dist )**3.0_wp) + &
+                  cross(dist2, wake%pan_w_vel(:,iww(inext),ipp(inext)) ) /(norm2(dist2)**3.0_wp) ) )
 
         end do
       end do
@@ -256,19 +234,10 @@ subroutine assemble_pressure_sys(linsys, geo, elems, wake)
   end do
 !$omp end parallel do
 
-  ! (a) far field contribution
-  !> (a.1) original implementation ===
-  ! linsys%b_pres = linsys%b_pres + &
-  !     4.0_wp*pi * ( Pinf + 0.5_wp * rhoinf * norm2(uinf) ** 2.0_wp ) ! H_inf
-  !> (a.2) trick of setting B_inf = P_inf + 0.5 * rhoinf * uinf^2 = 0 ===
-  ! with the proper value of dPres to be subtracted and added to the Pressure
-  ! field.
-  linsys%b_pres = linsys%b_pres + 0.0_wp    ! <- useless line!
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !
   ! END Assemble the RHS of the linear system for the Bernoulli polynomial !
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ !
 
-  ! Pressure integral equation +++++++++++++++++++++++++++++++++++++++++
 end subroutine assemble_pressure_sys
 
 !----------------------------------------------------------------------
@@ -280,11 +249,11 @@ end subroutine assemble_pressure_sys
 !! completed by the decomposition of the dynamic part and the factorized
 !! system is solved
 subroutine solve_pressure_sys(linsys)
- type(t_linsys), intent(inout) :: linsys
+  type(t_linsys), intent(inout) :: linsys
 
- integer              :: INFO
- character(len=max_char_len) :: msg
- character(len=*), parameter :: this_sub_name = 'solve_linsys_pressure'
+  integer              :: INFO
+  character(len=max_char_len) :: msg
+  character(len=*), parameter :: this_sub_name = 'solve_linsys_pressure'
 
   ! Operations on the side band matrices: done only if the system is
   ! mixed static/dynamic and those matrices exists
@@ -326,13 +295,13 @@ subroutine solve_pressure_sys(linsys)
           linsys%A_pres(1:linsys%nstatic_sp,1:linsys%nstatic_sp), &
           linsys%nstatic_sp,  &
           linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%nstatic_sp),&
-           linsys%nmoving_sp)
+          linsys%nmoving_sp)
 #elif (DUST_PRECISION==2)
     call dtrsm('R','U','N','N',linsys%nmoving_sp,linsys%nstatic_sp,1.0d+0,   &
           linsys%A_pres(1:linsys%nstatic_sp,1:linsys%nstatic_sp), &
           linsys%nstatic_sp,  &
           linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%nstatic_sp),&
-           linsys%nmoving_sp)
+          linsys%nmoving_sp)
 #endif /*DUST_PRECISION*/
 
     !==>Modify the dynamic square block
@@ -385,14 +354,14 @@ subroutine solve_pressure_sys(linsys)
   !==> Permute the lower mixed bloc
 #if (DUST_PRECISION==1)
   call slaswp(linsys%nstatic_sp, &
-         linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%nstatic_sp), &
-         linsys%nmoving_sp,1,linsys%nmoving_sp,&
-         linsys%P_pres(linsys%nstatic_sp+1:linsys%n_sp),1)
+              linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%nstatic_sp), &
+              linsys%nmoving_sp,1,linsys%nmoving_sp,&
+              linsys%P_pres(linsys%nstatic_sp+1:linsys%n_sp),1)
 #elif (DUST_PRECISION==2)
   call dlaswp(linsys%nstatic_sp, &
-         linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%nstatic_sp), &
-         linsys%nmoving_sp,1,linsys%nmoving_sp,&
-         linsys%P_pres(linsys%nstatic_sp+1:linsys%n_sp),1)
+              linsys%A_pres(linsys%nstatic_sp+1:linsys%n_sp,1:linsys%nstatic_sp), &
+              linsys%nmoving_sp,1,linsys%nmoving_sp,&
+              linsys%P_pres(linsys%nstatic_sp+1:linsys%n_sp),1)
 #endif /*DUST_PRECISION*/
   endif
 
@@ -404,10 +373,10 @@ subroutine solve_pressure_sys(linsys)
   linsys%res_pres = linsys%b_pres
 #if (DUST_PRECISION==1)
   call sgetrs('N',linsys%n_sp,1,linsys%A_pres,linsys%n_sp,linsys%P_pres, &
-         linsys%res_pres, linsys%n_sp,info)
+              linsys%res_pres, linsys%n_sp,info)
 #elif (DUST_PRECISION==2)
   call dgetrs('N',linsys%n_sp,1,linsys%A_pres,linsys%n_sp,linsys%P_pres, &
-         linsys%res_pres, linsys%n_sp,info)
+              linsys%res_pres, linsys%n_sp,info)
 #endif /*DUST_PRECISION*/
   if ( info .ne. 0 ) then
     write(msg,*) 'error while solving the factorized pressure system &
@@ -425,22 +394,20 @@ end subroutine solve_pressure_sys
 !!  surfpan to be used in the source rhs of the Bernoulli integral equation.
 !! surf_vel_SurfPan_old should be saved at the end of the time step
 subroutine press_normvel_der(geo, elems, surf_vel_SurfPan_old)
- type(t_geo), intent(in) :: geo
- type(t_impl_elem_p), intent(inout) :: elems(:)
- real(wp), intent(in) :: surf_vel_SurfPan_old(:,:)
+  type(t_geo), intent(in) :: geo
+  type(t_impl_elem_p), intent(inout) :: elems(:)
+  real(wp), intent(in) :: surf_vel_SurfPan_old(:,:)
 
- integer :: i_el, i_e
- real(wp) :: GradS_Un(3), DivS_U
- character(len=*), parameter :: this_sub_name = 'press_normvel_der'
+  integer :: i_el, i_e
+  real(wp) :: GradS_Un(3), DivS_U
+  character(len=*), parameter :: this_sub_name = 'press_normvel_der'
 
   do i_el = 1 , geo%nSurfPan
 
     select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
 
-      el%dUn_dt = sum( el%nor * ( el%ub - &
-             surf_vel_SurfPan_old( i_el , : ) ) ) / sim_param%dt
-
-!            surf_vel_SurfPan_old( geo%idSurfPanG2L(i_el) , : ) ) ) / sim_param%dt ! <<< mod-2018-12-21
+      el%dUn_dt = sum(el%nor * ( el%ub - &
+                      surf_vel_SurfPan_old( i_el , : ) ) ) / sim_param%dt
 
       ! Compute GradS_Un
       GradS_Un = 0.0_wp
@@ -453,15 +420,14 @@ subroutine press_normvel_der(geo, elems, surf_vel_SurfPan_old)
                   sum(el%nor* (el_neigh%surf_vel - el%surf_vel) ) ) )
           end select
         else
-!         select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
+
             GradS_Un = GradS_Un + &
               matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g , &
                el%pot_vel_stencil(:,i_e) * ( &
                   sum(el%nor* ( - 2.0_wp * el%surf_vel) ) ) )
-!         end select
+
         end if
       end do
-!     GradS_Un = GradS_Un - el%nor * sum(el%nor*GradS_Un) ! tangential projection
 
       ! Compute DivS_U
       DivS_U = 0.0_wp
@@ -469,26 +435,26 @@ subroutine press_normvel_der(geo, elems, surf_vel_SurfPan_old)
         if ( associated(el%neigh(i_e)%p) ) then !  .and. &
           select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
             DivS_U = DivS_U + &
-               sum( &
-                 matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g ,   &
+                      sum( &
+                      matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g ,   &
                                                             el%pot_vel_stencil(:,i_e) ) * &
-                    ( el_neigh%surf_vel - el%surf_vel )   )
+                            ( el_neigh%surf_vel - el%surf_vel )   )
           end select
         else
-!         select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
-            DivS_U = DivS_U + &
-              sum( &
-                matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g ,   &
-                                                           el%pot_vel_stencil(:,i_e) ) * &
-                   ( - 2.0_wp * el%surf_vel ) )
-!         end select
+
+          DivS_U = DivS_U + &
+            sum( &
+              matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g ,   &
+                                                         el%pot_vel_stencil(:,i_e) ) * &
+                 ( - 2.0_wp * el%surf_vel ) )
+
         end if
       end do
 
       ! Compute "source intensity" of Bernoulli equations
-      el%bernoulli_source = + el%dUn_dt & !    n . DU/Dt
-         - sum( GradS_Un * ( el%ub ))   & !  - GradS_Un . el%ub
-         + DivS_U * sum(el%ub*el%nor)     !  + Un * Div_S U
+      el%bernoulli_source = + el%dUn_dt &                    !    n . DU/Dt
+                            - sum( GradS_Un * ( el%ub ))   & !  - GradS_Un . el%ub
+                            + DivS_U * sum(el%ub*el%nor)     !  + Un * Div_S U
 
     end select
   end do
@@ -500,26 +466,26 @@ end subroutine press_normvel_der
 !!
 !! TODO: consider moving these functionalities to the i/o modules
 subroutine dump_linsys_pres(linsys , filen_A , filen_b )
- type(t_linsys), intent(in) :: linsys
- character(len=*) , intent(in) :: filen_A , filen_b
+  type(t_linsys), intent(in) :: linsys
+  character(len=*) , intent(in) :: filen_A , filen_b
 
- integer :: fid
- integer :: i1
+  integer :: fid
+  integer :: i1
 
 
- fid = 23
- open(unit=fid, file=trim(adjustl(filen_A)) )
- do i1 = 1 , size(linsys%A_pres,1)
-  write(fid,*) linsys%A_pres(i1,:)
- end do
- close(fid)
+  fid = 23
+  open(unit=fid, file=trim(adjustl(filen_A)) )
+  do i1 = 1 , size(linsys%A_pres,1)
+    write(fid,*) linsys%A_pres(i1,:)
+  end do
+  close(fid)
 
- fid = 24
- open(unit=fid, file=trim(adjustl(filen_b)) )
- do i1 = 1 , size(linsys%b_pres,1)
-  write(fid,*) linsys%b_pres(i1)
- end do
- close(fid)
+  fid = 24
+  open(unit=fid, file=trim(adjustl(filen_b)) )
+  do i1 = 1 , size(linsys%b_pres,1)
+    write(fid,*) linsys%b_pres(i1)
+  end do
+  close(fid)
 
 end subroutine dump_linsys_pres
 
