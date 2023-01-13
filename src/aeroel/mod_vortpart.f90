@@ -137,28 +137,14 @@ end subroutine initialize_vortpart
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 subroutine compute_vel_vortpart (this, pos, vel)
- class(t_vortpart), intent(in) :: this
- real(wp), intent(in) :: pos(:)
- real(wp), intent(out) :: vel(3)
+  class(t_vortpart), intent(in) :: this
+  real(wp), intent(in) :: pos(:)
+  real(wp), intent(out) :: vel(3)
 
- !real(wp) :: vvort(3)
- real(wp) :: dist(3), distn, c, d
+  real(wp) :: dist(3), distn, c, d
 
 
   dist = pos-this%cen
-
-  !Rosenhead kernel regularized velocity
-  !vvort =  cross(this%dir,dist) / (sqrt(sum(dist**2)+r_Vortex**2))**3
-  !vel = vvort*this%mag
-
-  !Rankine velocity
-  !distn = norm2(dist)
-  !if ( distn .gt. r_Vortex ) then
-  !  vvort =  cross(this%dir,dist) / distn**3
-  !else
-  !  vvort =  cross(this%dir,dist)  / r_Vortex**3
-  !end if
-  !vel = vvort*this%mag
 
   !generic
   distn = norm2(dist)
@@ -166,17 +152,16 @@ subroutine compute_vel_vortpart (this, pos, vel)
   vel = c * cross(dist, this%dir)*this%mag
 
 
-
 end subroutine compute_vel_vortpart
 
 !----------------------------------------------------------------------
 
 subroutine compute_grad_vortpart(this, pos, grad)
- class(t_vortpart), intent(in) :: this
- real(wp), intent(in) :: pos(:)
- real(wp), intent(out) :: grad(3,3)
+  class(t_vortpart), intent(in) :: this
+  real(wp), intent(in) :: pos(:)
+  real(wp), intent(out) :: grad(3,3)
 
- grad = 0.0_wp
+  grad = 0.0_wp
 
 end subroutine compute_grad_vortpart
 
@@ -189,13 +174,13 @@ end subroutine compute_grad_vortpart
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 subroutine compute_stretch_vortpart (this, pos, alpha, r_Vortex_p, stretch)
- class(t_vortpart), intent(in) :: this
- real(wp), intent(in) :: pos(:)
- real(wp), intent(in) :: alpha(3)
- real(wp), intent(out) :: stretch(3)
- real(wp), intent(in)          :: r_Vortex_p ! vortex rad of the particle p (induced on)
- real(wp) :: dist(3), distn, vecprod(3), c, d !, Sr, dSr
- real(wp) :: r_ave
+  class(t_vortpart), intent(in) :: this
+  real(wp), intent(in) :: pos(:)
+  real(wp), intent(in) :: alpha(3)
+  real(wp), intent(out) :: stretch(3)
+  real(wp), intent(in)          :: r_Vortex_p ! vortex rad of the particle p (induced on)
+  real(wp) :: dist(3), distn, vecprod(3), c, d !, Sr, dSr
+  real(wp) :: r_ave
   !TODO: add far field approximations
 
   dist = pos-this%cen
@@ -249,23 +234,18 @@ end subroutine compute_stretch_vortpart
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 subroutine compute_rotu_vortpart (this, pos, alpha, r_Vortex_p, rotu)
- class(t_vortpart), intent(in) :: this
- real(wp), intent(in) :: pos(:)
- real(wp), intent(in) :: alpha(3)
- real(wp), intent(out) :: rotu(3)
- real(wp), intent(in)          :: r_Vortex_p ! vortex rad of the particle p (induced on)
- real(wp) :: dist(3), distn, c, d
- real(wp) :: r_ave
+  class(t_vortpart), intent(in) :: this
+  real(wp), intent(in) :: pos(:)
+  real(wp), intent(in) :: alpha(3)
+  real(wp), intent(out) :: rotu(3)
+  real(wp), intent(in)          :: r_Vortex_p ! vortex rad of the particle p (induced on)
+  real(wp) :: dist(3), distn, c, d
+  real(wp) :: r_ave
   !TODO: add far field approximations
 
   dist = pos-this%cen
   distn = norm2(dist)
   r_ave = (this%r_Vortex + r_Vortex_p)*0.5_wp
-  !rosenhead
-  !distn = sqrt(sum(dist**2)+r_Vortex**2)
-
-  !rotu = 2.0_wp*this%dir*this%mag/(distn)**3 &
-  !     +3.0_wp/(distn)**5 * cross(dist, cross(dist, this%dir*this%mag))
 
   !generic
   call kernel_coeffs(this%r_Vortex, distn, c, d)
@@ -278,10 +258,10 @@ end subroutine compute_rotu_vortpart
 !----------------------------------------------------------------------
 !> Compute kernel derivatives coefficients
 subroutine kernel_coeffs(r_vort, rr, c, d)
- real(wp), intent(in) :: r_vort, rr
- real(wp), intent(out) :: c,d
+  real(wp), intent(in) :: r_vort, rr
+  real(wp), intent(out) :: c,d
 
- real(wp) :: distn, r
+  real(wp) :: distn, r
 
   r = rr
 
@@ -291,29 +271,30 @@ subroutine kernel_coeffs(r_vort, rr, c, d)
   d = 3.0_wp/distn**5
 
   !Rankine
-  !if (r .ge. r_Vortex) then
+  !if (r .ge. r_vort) then
   !  c = -1.0_wp/r**3
   !  d = 3.0_wp/r**5
   !else
-  !  c = -1.0_wp/r_Vortex**3
+  !  c = -1.0_wp/r_vort**3
   !  d = 0.0_wp
   !endif
 
   !Gaussian from Alvarez
   !if(r.gt.1e-13_wp) then
-  !c = -erf(r/(sqrt(2.0_wp)*r_Vortex))/r**3 + &
-  !     2.0_wp/(r**2 * sqrt(2.0_wp*pi) * r_Vortex) * exp(-r**2/(2.0_wp * r_Vortex**2))
-  !d = 3.0_wp/r**5 * erf(r/(sqrt(2.0_wp)*r_Vortex)) + exp(-r**2/(2.0_wp * r_Vortex**2)) * &
-  !    (-6.0_wp/(r**4*r_Vortex*sqrt(2.0_wp*pi)) - 2.0_wp/(r**2*r_Vortex**3*sqrt(2.0_wp*pi)))
+  !c = -erf(r/(sqrt(2.0_wp)*r_vort))/r**3 + &
+  !     2.0_wp/(r**2 * sqrt(2.0_wp*pi) * r_vort) * exp(-r**2/(2.0_wp * r_vort**2))
+  !d = 3.0_wp/r**5 * erf(r/(sqrt(2.0_wp)*r_vort)) + exp(-r**2/(2.0_wp * r_vort**2)) * &
+  !    (-6.0_wp/(r**4*r_vort*sqrt(2.0_wp*pi)) - 2.0_wp/(r**2*r_vort**3*sqrt(2.0_wp*pi)))
   !else
   !  c=0.0
   !  d=0.0
   !endif
 
   !!High Order Algebraic
-  !distn = sqrt(r**2+r_Vortex**2)
-  !c = -(r**2+2.5_wp*r_Vortex**2)/distn**5
-  !d = -2.0_wp/distn**5 + 5.0_wp*(r**2+2.5_wp*r_Vortex**2)/distn**7
+  !distn = sqrt(r**2+r_vort**2)
+  !c = -(r**2+2.5_wp*r_vort**2)/distn**5
+  !d = -2.0_wp/distn**5 + 5.0_wp*(r**2+2.5_wp*r_vort**2)/distn**7
+
 
 end subroutine
 
@@ -345,9 +326,9 @@ end subroutine compute_diffusion_vortpart
 !----------------------------------------------------------------------
 
 function etaeps(dist, eps) result(eta)
- real(wp), intent(in) :: dist
- real(wp), intent(in) :: eps
- real(wp) :: eta
+  real(wp), intent(in) :: dist
+  real(wp), intent(in) :: eps
+  real(wp) :: eta
 
   eta = 105.0_wp/(8.0_wp*pi) / ((dist/eps)**2+1)**(9.0_wp/2.0_wp)
   eta = eta/(eps**3)
@@ -355,8 +336,8 @@ function etaeps(dist, eps) result(eta)
 end function etaeps
 !----------------------------------------------------------------------
 subroutine calc_geo_data_vortpart(this, vert)
- class(t_vortpart), intent(inout) :: this
- real(wp), intent(in) :: vert(:)
+  class(t_vortpart), intent(inout) :: this
+  real(wp), intent(in) :: vert(:)
 
   ! center, it is the only coordinate available
   this%cen = vert

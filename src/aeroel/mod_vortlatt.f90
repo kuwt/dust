@@ -538,8 +538,7 @@ subroutine compute_dforce_jukowski_vortlatt(this, correction)
   this%dforce = this%dforce &
               - sim_param%rho_inf * this%area * ( &
                 this%didou_dt * this%nor)
-  !write(*,*) 'this%didou_dt   ', this%didou_dt
-  !write(*,*) 'this%dforce     ', this%dforce
+
 
 end subroutine compute_dforce_jukowski_vortlatt
 
@@ -591,7 +590,7 @@ subroutine get_vel_ctr_pt_vortlatt(this, elems, wake_elems, vort_elems)
   wind = variable_wind(this%cen, sim_param%time)
   this%vel_ctr_pt = this%vel_ctr_pt/(4.0_wp * pi) &
                     + wind - this%ub
-  
+
 end subroutine get_vel_ctr_pt_vortlatt
 
 !!!----------------------------------------------------------------------
@@ -670,7 +669,6 @@ subroutine calc_geo_data_vortlatt(this, vert)
 end subroutine calc_geo_data_vortlatt
 
 !> Calc geo data of the stripe: equivalent to calc_geo_data_liftlin 
-
 
 
 !----------------------------------------------------------------------

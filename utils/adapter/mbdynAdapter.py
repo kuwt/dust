@@ -23,34 +23,32 @@ class MBDynAdapter:
 
 
   def __init__(self, mbdInterface, \
-               config_file_name = './../precice-config.xml' ):
+              config_file_name = './../precice-config.xml'):
 
     self.debug = True
 
     #> Initialize PreCICE participant dictionary, p for participant
     self.p = { \
-               'name':'MBDyn', \
-               'mesh':{ \
+              'name':'MBDyn', \
+              'mesh':{ \
                   'name':'MBDynNodes', 'id':[], 'node_ids':[], \
                   'nodes':[], 'nnodes':[], 'dim':[] }, \
-               'fields':{}  \
-             }
+              'fields':{}  \
+              }
     field_dict = { 'name':'field_name', 'id':[], 'data':[],
-             'type':'scalar/vector', 'io':'read/write' }
+                'type':'scalar/vector', 'io':'read/write' }
   
     #> Use MBDyn interface, containing info about MBDyn-mbc_py
-
     self.mbd = mbdInterface
-        
+
     # All the data that can be exchanged with MBDyn
-    # TODO#1: move in MBDyn interface
     fieldlist = [ 'Position', 'Velocity', 'Rotation', \
                   'AngularVelocity', 'Force', 'Moment' ]
     typelist  = [ 'vector', 'vector', 'vector', \
                   'vector', 'vector', 'vector'  ]
     iolist    = [ 'write', 'write', 'write', 'write', 'read', \
                   'read' ]
-     
+    
     #> === PreCICE interface ====================================
     comm_rank = 0; comm_size = 1   
     
@@ -65,8 +63,6 @@ class MBDynAdapter:
 
     #> === Fields ===============================================
     # get_data_id
-    # TODO#2: improve it, after having redefined the fields that can
-    # be used for communications (see TODO#1)
     for i in np.arange( len(fieldlist) ):
       fieldn = fieldlist[i]
       if ( self.interface.has_data( fieldn, self.p['mesh']['id'] ) ):
@@ -77,25 +73,27 @@ class MBDynAdapter:
         field['type'] = self.mbd.data[fieldn]['type']
         field['io']   = self.mbd.data[fieldn]['io']
         self.p['fields'][field['name']] = field
-
+    
     #> === Mesh =================================================
     #> Nodes: set_mesh_vertices
-    # new: read from file the reference configuration needed for
-    # PreCICE communication
-    self.p['mesh']['nodes'] = self.mbd.refConfigNodes()
+    self.p['mesh']['nodes'] = self.mbd.rr 
+    
     # old: initial configuration as the reference configuration
     self.p['mesh']['nnodes'] = np.size( self.mbd.data['Position']['data'], 0 )
     self.p['mesh']['dim']    = np.size( self.mbd.data['Position']['data'], 1 )
     self.p['mesh']['node_id'] = self.interface.set_mesh_vertices( \
                     self.p['mesh']['id'], self.p['mesh']['nodes'] )
-
+    
+    print('self.mbd.socket.nnodes',self.mbd.socket.nnodes)
     if ( self.debug ): 
       for i in np.arange(self.mbd.socket.nnodes):
         print('  ', i,': ', self.p['mesh']['node_id'][i],' , ', \
                             self.p['mesh']['nodes'][i,:] )
-
+    
     #> === Initialize ===========================================
+    
     self.dt_precice = self.interface.initialize()
+    
     self.is_ongoing = self.interface.is_coupling_ongoing()
     if ( self.debug ): 
       print(' interface.is_coupling_ongoing: \033[0;32m ▶ %s' % self.is_ongoing )
@@ -123,7 +121,7 @@ class MBDynAdapter:
   def runPreCICE(self, dt_set):
 
     n = self.mbd.socket.nnodes; nd = 3
-
+    
     cowic = precice.action_write_iteration_checkpoint()
     coric = precice.action_read_iteration_checkpoint()
 
@@ -146,7 +144,7 @@ class MBDynAdapter:
         rot_t = self.mbd.data['Rotation']['data'][:,:] 
         ome_t = self.mbd.data['AngularVelocity']['data'][:,:]
         self.interface.mark_action_fulfilled( cowic )
-   
+
       #> Set MBDyn nodal values of forces and moments
       for i in np.arange(n):
         self.mbd.nodal.n_f[i*nd:(i+1)*nd] = self.mbd.data['Force' ]['data'][i,:] 
@@ -157,7 +155,7 @@ class MBDynAdapter:
       #> === Communication with MBDyn ===========================
       if ( self.mbd.nodal.send(False) ):
         break
-     
+
       # Receive data from MBDyn
       if ( self.mbd.nodal.recv() ):
         print('**** break, after nodal.recv() ****'); break
@@ -226,7 +224,5 @@ class MBDynAdapter:
     
     #> ~~~ PreCICE coupling between mbdyn and aero solver ~~~~~~~~~~~   
     self.mbd.nodal.destroy()
-
-        
 
 

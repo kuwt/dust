@@ -96,7 +96,13 @@ in most Linux distributions.
 
 ## Coupling with preCICE-MBDyn
 
-Compile DUST with **$WITH_PRECICE**=**ON**.
+Compile DUST with **$WITH_PRECICE**=**ON** and include the MBDyn Adapter and Interface to your Python path.
+
+For example, add these line to your ~/.bashrc file:
+
+  ```bash
+  $ export PYTHONPATH="/path/to/dust/utils/adapter":$PYTHONPATH
+  ```
 
 <details>
   <summary markdown="span">preCICE</summary>

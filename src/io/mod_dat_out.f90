@@ -56,8 +56,9 @@ use mod_handling, only: &
 !---------------------------------------------------------------------
 implicit none
 
-public :: dat_out_probes_header, dat_out_loads_header, dat_out_hinge_header,  dat_out_aa_header, &
-          dat_out_sectional, dat_out_sectional_ll, dat_out_sectional_vl, dat_out_aa
+public :: dat_out_probes_header, dat_out_loads_header, dat_out_hinge_header, dat_out_aa_header, &
+          dat_out_sectional, dat_out_sectional_ll, dat_out_sectional_vl, dat_out_aa, &
+          dat_out_chordwise 
 
 private
 
@@ -130,37 +131,39 @@ end subroutine dat_out_hinge_header
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_aa_header ( fid , t)
+subroutine dat_out_aa_header ( fid , num_el, t, p_inf, rho_inf, a_inf, mu_inf, u_inf)
   integer , intent(in) :: fid
   real(wp), intent(in) :: t
+  real(wp), intent(in) :: p_inf, rho_inf, a_inf, mu_inf
+  real(wp), intent(in) :: u_inf(3)
+  integer,  intent(in) :: num_el
 
   write(fid,'(A)') '# Aeroacoustic Data'
 
-  write(fid,'(A)') '# Time'
-  write(fid,'('//ascii_real//')') t
+  write(fid,'(A)') '# Element, Time, Pressure, Density, Sound speed, Dynamic viscosity, Flow velocity'
+  write(fid,'(I0,8'//ascii_real//')') num_el, t, p_inf, rho_inf, a_inf, mu_inf, u_inf
 
-  write(fid,'(A)') '# Element Center (3), Element Normal (3), &
-                &Element Center Velocity (3), Element Area (1), &
-                &Force Acting on Element (3)'
-
+  write(fid,'(A)') '# cx, cy, cz, nx, ny, nz, area, rho, pressure, rhoux, rhouy, rhouz, svx, svy, svz'
+  
 end subroutine dat_out_aa_header
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_aa ( fid , cen, n, vel, area, f)
+subroutine dat_out_aa ( fid , cen, n, vel, area, pres, rho_inf)
   integer , intent(in) :: fid
-  real(wp), intent(in) :: cen(3), n(3), vel(3), area, f(3)
+  real(wp), intent(in) :: cen(3), n(3), vel(3), area, pres, rho_inf
 
-  write(fid,'(13'//ascii_real//')') cen, n, vel, area, f
+  write(fid,'(15'//ascii_real//')') cen, n, area, rho_inf, pres, vel*rho_inf, vel
 
 end subroutine dat_out_aa
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_probes_header ( fid , rr_probes , vars_str )
-  integer , intent(in) :: fid
-  real(wp), intent(in) :: rr_probes(:,:)
+subroutine dat_out_probes_header ( fid , rr_probes , vars_str, nt )
+  integer , intent(in)         :: fid
+  real(wp), intent(in)         :: rr_probes(:,:)
   character(len=*), intent(in) :: vars_str
+  integer                      :: nt
 
   character(len=max_char_len) :: istr
   integer :: n_probes , ic
@@ -181,18 +184,20 @@ subroutine dat_out_probes_header ( fid , rr_probes , vars_str )
   end do
 
   write(istr,'(I0)') n_probes
-  write(fid,*) '#    t     '//trim(istr)//'( '//trim(vars_str)//' )'
+  write(fid,'(A,I0)') '# n_time: ', nt
+  write(fid,'(A,A,A,A,A)') '#    t     '//trim(istr)//' ('//trim(vars_str)//' )'
 
 end subroutine dat_out_probes_header
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_sectional (basename, compname, y_cen, y_span, time, &
+subroutine dat_out_sectional (basename, compname, y_cen, y_span, chord, time, &
                               sec_loads, ref_mat, off_mat, average )
   character(len=*) , intent(in) :: basename
   character(len=*) , intent(in) :: compname
   real(wp) , intent(in) :: y_cen(:)
   real(wp) , intent(in) :: y_span(:)
+  real(wp) , intent(in) :: chord(:)
   real(wp) , intent(in) :: time(:)
   real(wp) , intent(in) :: sec_loads(:,:,:)
   real(wp) , intent(in) :: ref_mat(:,:)
@@ -238,10 +243,12 @@ subroutine dat_out_sectional (basename, compname, y_cen, y_span, time, &
     ! Header -----------
     write(fid,'(A)') '# Sectional load '//trim(load_str(i1))//&
                     &' of component: '//trim(compname)
-    write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(sec_loads,2) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
+    write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(sec_loads,2) , ' ; n_time : ' , nt , & 
+                                          &'. Next lines: y_cen , y_span, chord'
     write(nnum,'(I0)') size(y_cen)
     write(fid,'('//trim(nnum)//ascii_real//')') y_cen
     write(fid,'('//trim(nnum)//ascii_real//')') y_span
+    write(fid,'('//trim(nnum)//ascii_real//')') chord
 
     if(average) then
       write(fid,'(A)') '#sec(n_sec)'
@@ -265,12 +272,13 @@ end subroutine dat_out_sectional
 
 !---------------------------------------------------------------------
 
-subroutine dat_out_sectional_ll (basename, compname, y_cen, y_span, time, &
+subroutine dat_out_sectional_ll (basename, compname, y_cen, y_span, chord, time, &
                                 ll_sec, average )
   character(len=*) , intent(in) :: basename
   character(len=*) , intent(in) :: compname
   real(wp) , intent(in)         :: y_cen(:)
   real(wp) , intent(in)         :: y_span(:)
+  real(wp) , intent(in)         :: chord(:)  
   real(wp) , intent(in)         :: time(:)
   real(wp) , intent(in)         :: ll_sec(:,:,:)
   logical,   intent(in)         :: average
@@ -326,11 +334,12 @@ subroutine dat_out_sectional_ll (basename, compname, y_cen, y_span, time, &
     !> Header 
     write(fid,'(A)') '# Sectional '//trim(description_str(il))//&
                     &' of component: '//trim(compname)
-    write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(y_cen) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
+    write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(y_cen) , ' ; n_time : ' , nt , & 
+                    &'. Next lines: y_cen , y_span, chord'
     write(nnum,'(I0)') size(y_cen)
     write(fid,'('//trim(nnum)//ascii_real//')') y_cen
     write(fid,'('//trim(nnum)//ascii_real//')') y_span
-
+    write(fid,'('//trim(nnum)//ascii_real//')') chord 
     if(average) then
       write(fid,'(A)') '# '//trim(load_str(il))//'(n_sec)'
       write(nnum,'(I0)') size(y_cen)
@@ -349,13 +358,15 @@ subroutine dat_out_sectional_ll (basename, compname, y_cen, y_span, time, &
 end subroutine dat_out_sectional_ll
 
 
-subroutine dat_out_sectional_vl (basename, compname, y_cen, y_span, time, &
-  vl_sec, average )
+subroutine dat_out_sectional_vl (basename, compname, y_cen, y_span, chord, time, &
+                                vl_sec, average )
 
   character(len=*) , intent(in) :: basename
   character(len=*) , intent(in) :: compname
   real(wp) , intent(in)         :: y_cen(:)
   real(wp) , intent(in)         :: y_span(:)
+  real(wp) , intent(in)         :: chord(:)
+  
   real(wp) , intent(in)         :: time(:)
   real(wp) , intent(in)         :: vl_sec(:,:,:)
   logical,   intent(in)         :: average
@@ -409,13 +420,15 @@ subroutine dat_out_sectional_vl (basename, compname, y_cen, y_span, time, &
     endif
     open(unit=fid,file=trim(filename))
     ! Header -----------
-    write(fid,'(A)') '# Sectional '//trim(description_str(il))//&
-    &' of component: '//trim(compname)
-    write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(y_cen) , ' ; n_time : ' , nt , '. Next lines: y_cen , y_span'
+    write(fid,'(A)') '# Sectional '//trim(description_str(il))// &
+                                &' of component: '//trim(compname)
+    write(fid,'(A,I0,A,I0,A)') '# n_sec : ' , size(y_cen) , ' ; n_time : ' , nt , &
+                                &'. Next lines: y_cen , y_span, chord'
     write(nnum,'(I0)') size(y_cen)
     write(fid,'('//trim(nnum)//ascii_real//')') y_cen
     write(fid,'('//trim(nnum)//ascii_real//')') y_span
-
+    write(fid,'('//trim(nnum)//ascii_real//')') chord
+    
     if(average) then
       write(fid,'(A)') '# '//trim(load_str(il))//'(n_sec)'
       write(nnum,'(I0)') size(y_cen)
@@ -433,6 +446,152 @@ subroutine dat_out_sectional_vl (basename, compname, y_cen, y_span, time, &
 end subroutine dat_out_sectional_vl
 
 !---------------------------------------------------------------------
+subroutine dat_out_chordwise (basename, compname, time, &
+                              force_int, tang_int, nor_int, cen_int, pres_int, & 
+                              cp_int, average, n_station, station, chord_length)
+  character(len=*) , intent(in) :: basename
+  character(len=*) , intent(in) :: compname
+  real(wp), intent(in)          :: time(:)
+  real(wp), intent(in)          :: force_int(:,:,:,:)
+  real(wp), intent(in)          :: tang_int(:,:,:,:)
+  real(wp), intent(in)          :: nor_int(:,:,:,:)
+  real(wp), intent(in)          :: cen_int(:,:,:,:)
+  real(wp), intent(in)          :: pres_int(:,:,:)
+  real(wp), intent(in)          :: cp_int(:,:,:)
+  logical,  intent(in)          :: average
+  integer,  intent(in)          :: n_station 
+  real(wp), intent(in)          :: station(:) 
+  real(wp), intent(in)          :: chord_length(:)  
+  
+  character(len=8)              :: nnum
+  character(len=max_char_len)   :: filename
+  integer                       :: it, ista, icase, nt, fid 
+  character(len=5)              :: load_str(10)
+  character(len=max_char_len)   :: description_str(10)
 
+  load_str(1) = 'Pres' 
+  load_str(2) = 'Cp'
+  load_str(3) = 'dFx'
+  load_str(4) = 'dFz'
+  load_str(5) = 'dNx'
+  load_str(6) = 'dNz'
+  load_str(7) = 'dTx'
+  load_str(8) = 'dTz' 
+  load_str(9) = 'x_cen'
+  load_str(10) = 'z_cen'
+  
+  description_str(1) = 'Panel pressure'
+  description_str(2) = 'Panel coefficient of pressure'
+  description_str(3) = 'Panel force per unit length in chordwise direction'
+  description_str(4) = 'Panel force per unit length in flapwise direction'
+  description_str(5) = 'Panel local normal in chordwise direction'
+  description_str(6) = 'Panel local normal in flapwise direction'
+  description_str(7) = 'Panel local tangent in chordwise direction'
+  description_str(8) = 'Panel local tangent in flapwise direction'
+  description_str(9) = 'Panel center chordwise coordinate'
+  description_str(10) = 'Panel center flapwise coordinate'
+  
+
+  nt = size(time)
+
+  ! Print out .dat files
+  fid = 21
+  do icase = 1, 10
+    do ista = 1, n_station 
+      if(average) then
+        write(filename,'(A,I0,A)') trim(basename)//'_', ista, '_'//trim(load_str(icase))//'_ave.dat'
+      else
+        write(filename,'(A,I0,A)') trim(basename)//'_', ista, '_'//trim(load_str(icase))//'.dat'
+      endif
+
+      open(unit=fid,file=trim(filename))
+      ! Header -----------
+      write(fid,'(A)') '# Chordwise load of component: '//trim(compname)
+      write(fid,'(A,F5.3,A,F5.3)') '# spanwise_location: ', station(ista), ' ; chord_length: ',  &
+                                    chord_length(ista)
+      write(fid,'(A,I0,A,I0,A)') '# n_chord : ' ,size(cen_int,3) , ' ; n_time : ' , nt ,& 
+                                & '. Next lines: x_chord , z_chord'
+      write(nnum,'(I0)') size(cen_int,3)
+      write(fid,'('//trim(nnum)//ascii_real//')') cen_int(1,ista,:,1)
+      write(fid,'('//trim(nnum)//ascii_real//')') cen_int(1,ista,:,3)
+    
+      select case(trim(load_str(icase)))
+        case('Pres')
+          write(fid,'(A)') '# t, Pres'
+          ! Dump data --------
+          do it = 1 , nt
+            write(nnum,'(I0)') 1 + size(cen_int,3)
+            write(fid,'('//trim(nnum)//ascii_real//')') time(it), pres_int(it,ista,:) 
+          end do
+        case('Cp')
+          write(fid,'(A)') '# t, Cp'
+          ! Dump data --------
+          do it = 1 , nt
+            write(nnum,'(I0)') 1 + size(cen_int,3)
+            write(fid,'('//trim(nnum)//ascii_real//')') time(it), cp_int(it,ista,:) 
+          end do
+        case('dFx')
+          write(fid,'(A)') '# t, dFz'
+          ! Dump data --------
+          do it = 1 , nt
+            write(nnum,'(I0)') 1+size(cen_int,3)
+            write(fid,'('//trim(nnum)//ascii_real//')') time(it), force_int(it,ista,:,1)            
+          end do
+        case('dFz')
+          write(fid,'(A)') '# t, dFz'
+          ! Dump data --------
+          do it = 1 , nt
+            write(nnum,'(I0)') 1+size(cen_int,3)
+            write(fid,'('//trim(nnum)//ascii_real//')') time(it), force_int(it,ista,:,3)            
+          end do
+        case('dNx')
+          write(fid,'(A)') '# t, dNx'
+          ! Dump data --------
+          do it = 1 , nt
+            write(nnum,'(I0)') 1+size(cen_int,3)
+            write(fid,'('//trim(nnum)//ascii_real//')') time(it), nor_int(it,ista,:,1)            
+          end do
+        case('dNz')
+          write(fid,'(A)') '# t, dNz'
+          ! Dump data --------
+          do it = 1 , nt
+            write(nnum,'(I0)') 1+size(cen_int,3)
+            write(fid,'('//trim(nnum)//ascii_real//')') time(it), nor_int(it,ista,:,3)            
+          end do
+        case('dTx')
+            write(fid,'(A)') '# t, dTx'
+          ! Dump data --------
+          do it = 1 , nt
+            write(nnum,'(I0)') 1+size(cen_int,3)
+            write(fid,'('//trim(nnum)//ascii_real//')') time(it), tang_int(it,ista,:,1)            
+          end do
+        case('dTz')
+          write(fid,'(A)') '# t, dTz'
+          ! Dump data --------
+          do it = 1 , nt
+            write(nnum,'(I0)') 1+size(cen_int,3)
+            write(fid,'('//trim(nnum)//ascii_real//')') time(it), tang_int(it,ista,:,3)            
+          end do
+        case('x_cen')
+          write(fid,'(A)') '# t, x_cen'
+          ! Dump data --------
+          do it = 1 , nt
+            write(nnum,'(I0)') 1+size(cen_int,3)
+            write(fid,'('//trim(nnum)//ascii_real//')') time(it), cen_int(it,ista,:,1)      
+          end do
+        case('z_cen')
+          write(fid,'(A)') '# t, z_cen'
+          ! Dump data --------
+          do it = 1 , nt
+            write(nnum,'(I0)') 1+size(cen_int,3)
+            write(fid,'('//trim(nnum)//ascii_real//')') time(it), cen_int(it,ista,:,3)      
+          end do
+        end select
+      close(fid)
+    end do 
+  end do
+
+
+end subroutine dat_out_chordwise 
 
 end module mod_dat_out

@@ -21,7 +21,7 @@
 \usepackage[rightcaption]{sidecap} %%Defines environments called SCfigure and SCtable (analogous to figure and table) to typeset captions sideways
 \usepackage{cite} %%The package supports compressed, sorted lists of numerical citations, and also deals with various punctuation and other issues of representation, including comprehensive management of break points
 \usepackage[]{acronym} %%This package ensures that all acronyms used in the text are spelled out in full at least once. It also provides an environment to build a list of acronyms used
-\usepackage[pdftex,scale={.8,.8}]{geometry} %%The package provides an easy and flexible user interface to customize page layout, implementing auto-centering and auto-balancing mechanisms so that the users have only to give the least description for the page layout. For example, if you want to set each margin 2cm without header space, what you need is just \usepackage[margin=2cm,nohead]{geometry}.
+\usepackage[pdftex,scale={.8,.8}]{geometry} 
 \usepackage{layout} %%The package defines a command \layout, which will show a summary of the layout of the current document
 \usepackage{subfigure} %%Provides support for the manipulation and reference of small or ‘sub’ figures and tables within a single figure or table environment.
 \usepackage[toc]{glossaries} %%The glossaries package supports acronyms and multiple glossaries, and has provision for operation in several languages (using the facilities of either babel or polyglossia).
@@ -52,13 +52,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \usepackage{listings}
 \usepackage{xcolor}
-%\definecolor{pblue}{rgb}{0.13,0.13,1}
-%\definecolor{pgreen}{rgb}{0,0.5,0}
-%\definecolor{pred}{rgb}{0.9,0,0}
 \definecolor{pgrey}{rgb}{0.46,0.45,0.48}
 \definecolor{bggrey}{HTML}{E0E0E0}
-%\usepackage{inconsolata}
-%\usepackage{bearmono}
 % style for input files
 \lstdefinestyle{inputfile}{%
   language=Fortran,
@@ -167,7 +162,7 @@
 \newcommand{\DUST}{DUST}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                                %% DOCUMENT
+%% DOCUMENT
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{document}
 
@@ -178,16 +173,16 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Version table insertion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\input{base/history}
+%\input{base/history}
 
-%\input{base/disclaimer}
+\input{base/disclaimer}
 \newpage
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Table of contents
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
- \tableofcontents
- 
- \input{base/acronyms}
+\tableofcontents
+
+\input{base/acronyms}
 
 \pagestyle{long}
 

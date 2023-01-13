@@ -48,7 +48,7 @@
 module mod_precice
 
 use mod_param, only: &
-  wp, pi, nl
+  wp, pi, nl, max_char_len
 
 use mod_sim_param, only: &
   sim_param
@@ -66,7 +66,7 @@ use mod_aeroel, only: &
   t_pot_elem_p
 
 use mod_wake, only: &
-  t_wake
+  t_wake, join_first_panels
 
 use mod_liftlin, only: &
   t_liftlin, t_liftlin_p
@@ -84,7 +84,7 @@ private
 public :: t_precice
 
 !> Parameters
-integer, parameter :: precice_mcl = 50 ! precice_max_char_len
+integer, parameter :: precice_mcl = max_char_len
 
 !> PreCICE mesh -------------------------------------------------
 type :: t_precice_mesh
@@ -759,6 +759,7 @@ subroutine update_elems( this, geo, elems, te )
         !  quantities, w/o considering rotations of the hinges
         do i = 1, size(comp%i_points)
 
+
           ip = comp%i_points(i)
           
           do iw = 1, size(comp%rbf%nod%ind,1)
@@ -803,7 +804,6 @@ subroutine update_elems( this, geo, elems, te )
           end do
 
         end do
-
 
         !> Center of panel 
         !> Reset, before accumulation, only nodes belonging to the component
@@ -1257,6 +1257,12 @@ subroutine update_near_field_wake( this, geo, wake, te )
   integer :: icomp
   integer :: ip, ir, p1, p2, j, j_rot, iw, i
 
+  ! Store old wake points to use in complete_wake
+  if (wake%update_old_second_row) then
+    wake%old_second_row = wake%pan_w_points(:,:,2)
+    wake%update_old_second_row = .false.
+  end if
+
   ! Find rotation and angular velocity field id
   j_rot = 0
   do j = 1, size(this%fields)
@@ -1296,14 +1302,14 @@ subroutine update_near_field_wake( this, geo, wake, te )
 
         if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-             dist*wake%pan_gen_scaling(ip)* &
-             norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &
-             real(sim_param%ndt_update_wake,wp)
+              dist*wake%pan_gen_scaling(ip)* &
+              norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &
+              real(sim_param%ndt_update_wake,wp)
         else
           wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
-             dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
-             sim_param%min_vel_at_te*sim_param%dt * &
-             real(sim_param%ndt_update_wake,wp)
+              dist*wake%pan_gen_scaling(ip) * & ! next line may be commented
+              sim_param%min_vel_at_te*sim_param%dt * &
+              real(sim_param%ndt_update_wake,wp)
         end if
 
       elseif (trim(geo%components( wake%pan_gen_icomp(ip) )%coupling_type) &
@@ -1313,8 +1319,8 @@ subroutine update_near_field_wake( this, geo, wake, te )
         !> Rotation
         icomp = wake%pan_gen_icomp(ip)
         associate( comp => geo%components(icomp) )
-
-          iw = wake%pan_gen_points(1,ip) - minval(comp%i_points) + 1 ! trailing edge points ID
+          ! trailing edge points ID in component index 
+          iw = wake%pan_gen_points(1,ip) - minval(comp%i_points) + 1          
           ! find if the trailing edge node belongs to a hinge
           ! if so, it has already been rotated in update_geometry
           ! and we can use t_hinged
@@ -1328,29 +1334,27 @@ subroutine update_near_field_wake( this, geo, wake, te )
               end if
             end do
           else
+            ! *** to do ***
+            ! So far, t_te inherits orientation ONLY from the closest coupling node,
+            ! without interpolation with rbf coefficients
+            n_rot = this%fields(j_rot)%fdata(:, &
+                    comp%i_points_precice( comp%rbf%nod%ind(1,iw) ) )
+            theta = norm2( n_rot )
 
-
-
-          ! *** to do ***
-          ! So far, t_te inherits orientation ONLY from the closest coupling node,
-          ! without interpolation with rbf coefficients
-          n_rot = this%fields(j_rot)%fdata(:, &
-                  comp%i_points_precice( comp%rbf%nod%ind(1,iw) ) )
-          theta = norm2( n_rot )
-
-          if ( theta .lt. eps ) then
-            n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
-            theta = 0.0_wp
-          else
-            n_rot = n_rot / theta
-          end if
+            if ( theta .lt. eps ) then
+              n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
+              theta = 0.0_wp
+            else
+              n_rot = n_rot / theta
+            end if
 
                dist =  cos(theta) * wake%pan_gen_dir(:,ip) + &
                        sin(theta) * cross( n_rot, wake%pan_gen_dir(:,ip) ) + &
                      ( 1.0_wp - cos(theta) ) * sum( wake%pan_gen_dir(:,ip)*n_rot ) * n_rot
           end if
+          ! trailing edge velocity (global numbering)
+          vel_te = geo%points_vel(:, wake%pan_gen_points(1,ip))
 
-          vel_te = geo%points_vel(:, wake%pan_gen_icomp(ip))
           wind = variable_wind(geo%points(:,wake%pan_gen_icomp),sim_param%time)
         
           if ( norm2(wind-vel_te) .gt. sim_param%min_vel_at_te ) then
@@ -1380,9 +1384,18 @@ subroutine update_near_field_wake( this, geo, wake, te )
 
   enddo
 
+  !==> Check if the panels need to be joined
+  if(sim_param%join_te) then
+
+    wake%joined_tes(:,:,2:wake%nmax_pan+1) = &
+          wake%joined_tes(:,:,1:wake%nmax_pan)
+    wake%joined_tes(:,:,1) = 0
+    call join_first_panels(wake,sim_param%join_te_factor)
+  endif  
+
   ! Calculate geometrical quantities of first 2 rows
   do ip = 1,wake%n_pan_stripes
-    do ir = 1, min(2, wake%pan_wake_len)
+    do ir = 1, wake%pan_wake_len
       p1 = wake%i_start_points(1,ip)
       p2 = wake%i_start_points(2,ip)
       call wake%wake_panels(ip,ir)%calc_geo_data( &
@@ -1393,7 +1406,5 @@ subroutine update_near_field_wake( this, geo, wake, te )
   enddo
 
 end subroutine update_near_field_wake
-!----------------------------------------------------------------
-
 
 end module mod_precice

@@ -19,7 +19,7 @@ The solver requires, among other inputs, the geometry file result of the preproc
 If such file is not found the solver attempts to run the preprocessor by executing 
 the preprocessor with default input file (command \ref{command:dus_pre_default}). 
 
-\section{input file}
+\section{Input file}
 \label{sec:Solver_InputFile}
 
 The input file which should be provided to the solver is used to set all t
@@ -74,6 +74,8 @@ rigid_wake = F
 rigid_wake_vel = (/1.0, 0.0, 0.0/)
 join_te = F
 join_te_factor = 1.0
+refine_wake = T
+k_refine = 1
 
 ! --- model parameters ---
 far_field_ratio_doublet = 10.0
@@ -664,6 +666,15 @@ Ratio between the time spent in the particle to particle computations in the
 leaves of the octree with respect to the rest of the fast multipole computations 
 that triggers the increase of the octree levels.
 
+\item \param{refine_wake}: \textit{required:} no. 
+\textit{multiple:} no. \textit{type:} logical. \textit{default:} T. 
+
+Allow splitting the wake panel into subparticles with a division that is sub-multiple of the shortest panel edge.   
+
+\item \param{k_refine}: \textit{required:} no. \textit{multiple:} no. \textit{type:} integer. \textit{default:} 1. 
+
+Number of subdivision of the shortest panel edge if \param{refine_wake} is T. 
+
 \item \param{ll_solver}: \textit{required:} no. \textit{multiple:} no. 
 \textit{default:} \opt{GammaMethod}. \textit{type:} string.
 
@@ -797,10 +808,18 @@ Max number of iteration for correction of vortex lattice
 \textit{default:} 1 \textit{type:} integer. 
 Time step to start correcting the vortex lattice element
 
-\item \param{vl_dynstall}: \textit{required:} no. \textit{multiple:} no. \textit{default:} F \textit{type:} logical. 
+\item \param{vl_dynstall}: \textit{required:} no. \textit{multiple:} no. 
+\textit{default:} F \textit{type:} logical. 
 Activate Boeing\footnote{\url{https://apps.dtic.mil/sti/pdfs/AD0767240.pdf}} 
-dynamic stall on the corrected \param{v} element.   (not yet released)
+dynamic stall on the corrected \param{v} element.  (Still experimental)
 
+\item \param{vl_average}: \textit{required:} no. \textit{multiple:} no. 
+\textit{default:} F \textit{type:} logical. 
+Average the solution between the iteration: this may further stabilize the solution in stalled conditions
+
+\item \param{vl_average_iter}: \textit{required:} no. \textit{multiple:} no. 
+\textit{default:} 10 \textit{type:} integer. 
+Number of iteration on which the average is computed. 
 
 \end{itemize}
 
@@ -1015,7 +1034,7 @@ Is the reference frame multiple?
 Is the reference frame moving with respect to the parent? 
 \end{itemize}
 
-\section{moving reference frames}
+\section{Moving reference frames}
 Special input is required when a reference frame is moving or is multiple, 
 in which case a special grouping keyword is required. 
 As shown in file \ref{file:references_moving.in} if the parameter \param{moving} 
@@ -1235,7 +1254,7 @@ Grouping keyword containing the specification of the rotation, which parameters 
 \label{fig:references2}
 \end{figure}
 
-\section{multiple reference frames}
+\section{Multiple reference frames}
 To ease the setup of rotors in terms of reference frames and motions, 
 a special set of instructions have been developed for the reference frames. 
 Declaring a reference frame multiple, a single component is replicated n times 

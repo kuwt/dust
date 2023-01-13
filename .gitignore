@@ -31,4 +31,7 @@ build/
 *.synctex.gz
 CMakeCache.txt
 CMakeFiles/ 
-*.dat 
+*.dat
+*.nc
+*.out 
+__pycache__

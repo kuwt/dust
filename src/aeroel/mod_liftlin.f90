@@ -711,12 +711,13 @@ subroutine solve_liftlin_piszkin( &
 !   if ( diff .le. 0.1_wp * pi/180.0_wp ) exit ! convergence
 
   enddo !solver iterations
-  if(ic .ge. fp_maxIter) then
-    write(msg,'(A,I0,A)') 'Lifting lines iterative solution NOT CONVERGED &
-                            &after ',fp_maxIter,' iterations'
-    call warning(this_sub_name, this_mod_name, msg)
+  if(sim_param%debug_level .ge.5) then
+    if(ic .ge. fp_maxIter) then
+      write(msg,'(A,I0,A)') 'Lifting lines iterative solution NOT CONVERGED &
+                              &after ',fp_maxIter,' iterations'
+      call warning(this_sub_name, this_mod_name, msg)
+    endif
   endif
-
   ! Overwrite a_v, a_v = alpha_avg_v, because load computation uses a_v
   a_v = alpha_avg_v * pi/180.0_wp ! - ((-el%chord/2_wp) * 0.01_wp/norm2(uinf))
 

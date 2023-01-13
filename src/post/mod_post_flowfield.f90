@@ -451,7 +451,7 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
                   & rho*(pot_probe-pot_probe_old)/(t-t_old)
                   
             if (probe_cp) then ! output pressure coefficient
-              if (norm2(u_inf) .gt. 1e-6) then
+              if (norm2(u_inf) .gt. 1e-6_wp) then
                 vars(i_var_v+1,ipp) = (pres_probe - P_inf)/(0.5_wp*rho*norm2(u_inf)**2)
               else ! todo add u_ref
                 call error(this_mod_name,this_sub_name,'Pressure coefficient requested, but u_inf =0')
@@ -579,7 +579,7 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
   call destroy_elements(comps)
   deallocate(comps,components_names)
   call destroy_elements(comps_old)
-  deallocate(comps_old)
+  if (allocated(comps_old))  deallocate(comps_old)
 
   write(msg,'(A,I0,A)') nl//'++++++++++ Flowfield done'//nl
   call printout(trim(msg))

@@ -61,22 +61,15 @@ use mod_parse, only: &
   countoption
 
 use mod_hdf5_io, only: &
-!  initialize_hdf5, destroy_hdf5, &
-   h5loc, &
-!  new_hdf5_file, &
-   open_hdf5_file, &
-   close_hdf5_file, & ! , &
-!  new_hdf5_group, &
-   open_hdf5_group, &
-   close_hdf5_group, &
-!  write_hdf5, &
-   read_hdf5
-!  read_hdf5_al, &
-!  check_dset_hdf5
+  h5loc, &
+  open_hdf5_file, &
+  close_hdf5_file, & 
+  open_hdf5_group, &
+  close_hdf5_group, &
+  read_hdf5
 
 use mod_stringtools, only: &
   LowCase, isInList
-! LowCase, isInList, stricmp
 
 use mod_geometry, only: &
   t_geo, t_geo_component, destroy_elements
@@ -86,10 +79,10 @@ use mod_geo_postpro, only: &
   expand_actdisk_postpro
 
 use mod_tecplot_out, only: &
-  tec_out_viz ! , tec_out_probes, tec_out_box, tec_out_loads
+  tec_out_viz
 
 use mod_vtk_out, only: &
-  vtk_out_viz ! , vtr_write
+  vtk_out_viz
 
 use mod_post_load, only: &
   load_refs, load_res, load_wake_viz , check_if_components_exist
@@ -115,47 +108,49 @@ contains
 
 subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                       out_frmt , components_names , all_comp , &
-                      an_start , an_end , an_step, average )
-  type(t_parse), pointer :: sbprms
-  character(len=*) , intent(in) :: basename
-  character(len=*) , intent(in) :: data_basename
-  character(len=*) , intent(in) :: an_name
-  integer          , intent(in) :: ia
-  character(len=*) , intent(in) :: out_frmt
-  character(len=max_char_len), allocatable , intent(inout) :: components_names(:)
-  logical , intent(in) :: all_comp
-  integer , intent(in) :: an_start , an_end , an_step
-  logical, intent(in) :: average
+                      an_start , an_end , an_step, average, an_avg)
+  type(t_parse), pointer                                    :: sbprms
+  character(len=*) , intent(in)                             :: basename
+  character(len=*) , intent(in)                             :: data_basename
+  character(len=*) , intent(in)                             :: an_name
+  integer          , intent(in)                             :: ia
+  character(len=*) , intent(in)                             :: out_frmt
+  character(len=max_char_len), allocatable , intent(inout)  :: components_names(:)
+  logical , intent(in)                                      :: all_comp
+  integer , intent(in)                                      :: an_start , an_end , an_step, an_avg
+  logical, intent(in)                                       :: average
 
-  type(t_geo_component), allocatable :: comps(:)
-  character(len=max_char_len) :: filename
-  integer(h5loc) :: floc , ploc
-  logical :: out_vort, out_vort_vec, out_vel, out_cp, out_press , out_wake, out_surfvel, out_vrad
-  logical :: out_turbvisc
-  logical :: separate_wake
-  integer :: n_var , i_var
-  character(len=max_char_len), allocatable :: var_names(:)
-  real(wp), allocatable :: points(:,:), points_exp(:,:) , wpoints(:,:)
-  real(wp), allocatable :: vppoints(:,:), vpvort(:), vpvort_v(:,:), vpturbvisc(:), v_rad(:)
-  integer , allocatable :: elems(:,:) , welems(:,:)
-  integer :: nelem , nelem_w, nelem_vp
+  type(t_geo_component), allocatable                        :: comps(:)
+  character(len=max_char_len)                               :: filename
+  integer(h5loc)                                            :: floc , ploc
+  logical                                                   :: out_vort, out_vort_vec, out_vel, out_cp, out_press
+  logical                                                   :: out_wake, out_surfvel, out_vrad
+  logical                                                   :: out_turbvisc
+  logical                                                   :: separate_wake
+  integer                                                   :: n_var , i_var
+  character(len=max_char_len), allocatable                  :: var_names(:)
+  real(wp), allocatable                                     :: points(:,:), points_exp(:,:) , wpoints(:,:)
+  real(wp), allocatable                                     :: vppoints(:,:), vpvort(:)
+  real(wp), allocatable                                     :: vpvort_v(:,:), vpturbvisc(:), v_rad(:)
+  integer , allocatable                                     :: elems(:,:) , welems(:,:)
+  integer                                                   :: nelem , nelem_w, nelem_vp
 
-  real(wp), allocatable :: points_ave(:,:)
+  real(wp), allocatable                                     :: points_ave(:,:)
 
-  real(wp) :: u_inf(3)
-  real(wp) :: P_inf , rho
+  real(wp)                                                  :: u_inf(3)
+  real(wp)                                                  :: P_inf , rho
 
-  real(wp), allocatable :: refs_R(:,:,:), refs_off(:,:)
-  real(wp), allocatable :: vort(:), cp(:), vel(:), press(:), surfvel(:,:)
-  real(wp), allocatable :: wvort(:)
+  real(wp), allocatable                                     :: refs_R(:,:,:), refs_off(:,:)
+  real(wp), allocatable                                     :: vort(:), cp(:), vel(:), press(:), surfvel(:,:)
+  real(wp), allocatable                                     :: wvort(:)
 
-  type(t_output_var), allocatable :: out_vars(:), ave_out_vars(:)
-  type(t_output_var), allocatable :: out_vars_w(:), out_vars_vp(:)
-  integer :: nprint , nprint_w, nelem_out
+  type(t_output_var), allocatable                           :: out_vars(:), ave_out_vars(:)
+  type(t_output_var), allocatable                           :: out_vars_w(:), out_vars_vp(:)
+  integer                                                   :: nprint , nprint_w, nelem_out
 
-  integer :: it, ires
-  real(wp) :: t
-  character(len=*), parameter :: this_sub_name='post_viz'
+  integer                                                   :: it, ires
+  real(wp)                                                  :: t
+  character(len=*), parameter                               :: this_sub_name='post_viz'
 
   write(msg,'(A,I0,A)') nl//'++++++++++ Analysis: ',ia,' visualization'//nl
   call printout(trim(msg))
@@ -171,15 +166,17 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   do i_var = 1, n_var
     var_names(i_var) = getstr(sbprms, 'variable') ; call LowCase(var_names(i_var))
   enddo
-  out_vort = isInList('vorticity',var_names) ! Always lower case string in the code !
-  out_vort_vec = isInList('vorticity_vector',var_names) ! Always lower case string in the code !
-  out_vel  = isInList('velocity' ,var_names)
-  out_surfvel= isInList('surface_velocity' ,var_names)
-  out_press= isInList('pressure' ,var_names)
-  out_cp   = isInList('cp'       ,var_names)
+  out_vort     = isInList('vorticity',          var_names) ! Always lower case string in the code !
+  out_vort_vec = isInList('vorticity_vector',   var_names) ! Always lower case string in the code !
+  out_vel      = isInList('velocity' ,          var_names)
+  out_surfvel  = isInList('surface_velocity',   var_names)
+  out_press    = isInList('pressure' ,          var_names)
+  out_cp       = isInList('cp'       ,          var_names)
   out_turbvisc = isInList('turbulent_viscosity',var_names)
-  out_vrad = isInList('vortex_rad',var_names)
+  out_vrad     = isInList('vortex_rad',         var_names)
+
   nprint = 0; nprint_w = 0
+
   if(out_vort)  nprint = nprint+1
   if(out_vort_vec)  nprint = nprint+1
   if(out_cp)    nprint = nprint+1
@@ -188,6 +185,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
   if(out_press) nprint = nprint+1  !<--- *** TODO ***
   if(out_turbvisc) nprint = nprint+1
   if(out_vrad) nprint = nprint+1
+  
   allocate(out_vars(nprint))
   if(average) allocate(ave_out_vars(nprint))
   !for the wake
@@ -239,13 +237,10 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
                                filen = trim(filename) )
     !expand the actuator disks
     call expand_actdisk_postpro(comps, points, points_exp, elems)
-    if(average) then
-      if( .not. allocated(points_ave)) then
+    if(average .and. it .eq. an_avg) then
+      ! Save the points of this iteration for the average visualization
         allocate(points_ave(size(points_exp,1),size(points_exp,2)))
-        points_ave = 0.0_wp
-      endif
-      points_ave = points_ave*(real(ires-1,wp)/real(ires,wp)) + &
-                   points_exp/real(ires,wp)
+        points_ave = points
     endif
 
     !Load the results ! TODO: check this routine and the content of the files to be read
@@ -457,6 +452,7 @@ subroutine post_viz( sbprms , basename , data_basename , an_name , ia , &
     end select
     call clear_output_vars(ave_out_vars)
     deallocate(ave_out_vars)
+    deallocate(points_ave)
   endif
 
   deallocate(points)

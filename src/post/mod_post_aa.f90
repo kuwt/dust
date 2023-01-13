@@ -119,14 +119,16 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
   character(len=max_char_len)         :: filename
   integer(h5loc)                      :: floc , ploc
   real(wp), allocatable               :: points(:,:)
-  integer                             :: nelem
+  integer                             :: nelem, n_time
   real(wp)                            :: time
+  real(wp)                            :: p_inf, a_inf, rho_inf, mu_inf
+  real(wp)                            :: u_inf(3)
   integer                             :: fid_out, fid_time
   integer                             :: i_comp, ie, ierr
   real(wp), allocatable               :: refs_R(:,:,:), refs_off(:,:)
   real(wp), allocatable               :: refs_G(:,:,:), refs_f(:,:)
   real(wp), allocatable               :: vort(:), press(:), surfvel(:,:)
-  integer                             :: it, ires, imult
+  integer                             :: it, ires, imult, num_el
   real(wp)                            :: t
   logical                             :: mult, isopen
   character(len=max_char_len)         :: comp_root, last_mult, compname
@@ -159,6 +161,7 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
 
   ! Time loop
   ires = 0
+  n_time = (an_end-an_start)/an_step + 1 ! int general eger division 
   do it = an_start, an_end, an_step
     ires = ires+1
 
@@ -169,6 +172,12 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
     ! Load free-stream parameters
     call open_hdf5_group(floc,'Parameters',ploc)
     call read_hdf5(time,'time',floc)
+    call read_hdf5(rho_inf, 'rho_inf', ploc)
+    call read_hdf5(mu_inf, 'mu_inf', ploc)
+    call read_hdf5(u_inf, 'u_inf', ploc)
+    call read_hdf5(a_inf, 'a_inf', ploc)
+    call read_hdf5(p_inf, 'P_inf', ploc)   
+
     call close_hdf5_group(ploc)
 
     write(fid_time, '('//ascii_real//')') time
@@ -182,49 +191,35 @@ subroutine post_aeroacoustics( sbprms, basename, data_basename, an_name, ia, &
 
     !Load the results
     call load_res(floc, comps, vort, press, t, surfvel)
+    ! num_el is the total number of elements (lines of the dat file, useful for parsing)
+    num_el = 0
+    do i_comp = 1,size(comps)   
+      num_el = num_el + size(comps(i_comp)%el)
+    enddo 
 
-
-    last_mult = 'A very unlikely multiple component'
     !cycle on components
     do i_comp = 1,size(comps)
     associate(comp => comps(i_comp))
-      ! this is a not-so-clean hack, the multiple components are identified
-      ! by the two trailing underscores and number, and cycled until finished
-      ! the ones with that name
-      mult = is_multiple(comp%comp_name, comp_root, imult)
-      if (mult) then
-        compname = trim(comp_root)
-      else
-        compname = trim(comp%comp_name)
-        imult = 0
-      endif
 
-      if (.not. mult .or. &
-                (mult .and. (trim(comp_root) .ne. trim(last_mult) ))) then
-        ! Output filename
-        write(filename,'(A,I0,A)') trim(basename)//'_'//trim(an_name)//&
-          '_'//trim(compname)//'-',it,'.dat'
         ! check if the file unit is still open from a previous file
         last_mult = trim(compname)
-        inquire(unit=fid_out, opened=isopen)
-        if (isopen) close(fid_out)
+
         !open the file
-        call new_file_unit(fid_out, ierr)
-        open(unit=fid_out,file=trim(filename))
+        if (i_comp .eq. 1) then
+          ! Output filename
+          write(filename,'(A,I0,A)') trim(basename)//'_'//trim(an_name)//&
+          '-',it,'.dat'
+          call new_file_unit(fid_out, ierr)
+          open(unit=fid_out,file=trim(filename))
+          !write the header here
+          call dat_out_aa_header( fid_out, num_el, time, p_inf, rho_inf, a_inf, mu_inf, u_inf)
 
-        !write the header here
-        call dat_out_aa_header( fid_out, time )
-      endif
+        endif
 
-      !write(fid_out, '(A,I3.3)') trim(compname)//' ',imult
-      write(fid_out, '(A,I3.3)') 'Comp ',imult
       !cycle on elements
       do ie = 1,size(comp%el)
-        !GFORTRAN BUG: the associate is much cleaner, but crashes gfortran 5.4
-        !associate(el => comp%el(ie))
         call dat_out_aa( fid_out, comp%el(ie)%cen, comp%el(ie)%nor, &
-                comp%el(ie)%ub, comp%el(ie)%area, comp%el(ie)%dforce )
-        !end associate
+                comp%el(ie)%ub, comp%el(ie)%area, comp%el(ie)%pres, rho_inf)
       enddo
     end associate
     enddo

@@ -102,6 +102,10 @@ Please see the [installation guidelines](install.md)
 
 * A. Savino, A. Cocco, A. Zanoni, A. De Gaspari, A. Zanotti, J. Cardoso, D. Carvalhais and V. Muscarello. <i>Design and Optimization of Innovative Tiltrotor Wing Control Surfaces Through Coupled Multibody-Mid-Fidelity Aerodynamics Simulations</i>. In the Vertical Flight Society’s 78th Annual Forum Technology Display, Ft. Worth, Texas, USA, May 2022. 
 
+* A. Cocco, A. Savino, A. Colli, P. Masarati, A. Zanotti. <i>A non-linear unsteady vortex lattice method for aeroelastic rotor loads
+evaluation</i>. In 48th European Rotorcraft Forum, Winterthur, CH, September 2022. 
+
+* A. Savino, A. Cocco, A. Zanotti, V. Muscarello. <i>Numerical investigation of wing-propeller aerodynamic interaction through a vortex particle-based aerodynamic solver</i>. In 48th European Rotorcraft Forum, Winterthur, CH, September 2022. 
 
 </details>
 </p>

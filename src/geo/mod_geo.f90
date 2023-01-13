@@ -242,7 +242,8 @@ type :: t_geo_component
   !> Id of the airfoil elements (index in airfoil_list char array)
   integer ,allocatable :: i_airfoil_e(:,:)
   character(len=5) :: aero_correction
-  !real(wp), allocatable :: curv_ac(:,:)
+  !> airfoil thickness for dynamic stall 
+  real(wp), allocatable :: thickness(:,:)
   type(t_stripe), allocatable :: stripe(:)
 
 #if USE_PRECICE
@@ -565,7 +566,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   i_corr = 0 
 
   do i_comp = 1,size(geo%components)
-
+    
     if (trim(geo%components(i_comp)%comp_el_type) .eq. 'p') then ! panels, implicit and not corrected
       do j = 1,size(geo%components(i_comp)%el)
         i_tot = i_tot+1
@@ -578,6 +579,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
         elems_non_corr(i_non_corr)%p => geo%components(i_comp)%el(j)
       enddo
     elseif (trim(geo%components(i_comp)%comp_el_type) .eq. 'v') then ! vortex lattice, implicit, can be corrected or not
+
       do j = 1,size(geo%components(i_comp)%el)
         i_tot = i_tot+1
         elems_tot(i_tot)%p => geo%components(i_comp)%el(j)
@@ -811,7 +813,7 @@ subroutine load_components(geo, in_file, out_file, te)
   integer , allocatable                 :: neigh(:,:)
   !> Aerotable correction for vl 
   character(len=5)                      :: aero_table
-  !real(wp), allocatable                 :: curv_ac(:,:)
+  real(wp), allocatable                 :: thickness(:,:)
   !> Lifting Line elements
   real(wp), allocatable                 :: normalised_coord_e(:,:), theta_e(:)
   integer                 , allocatable :: i_airfoil_e(:,:)
@@ -1098,11 +1100,11 @@ subroutine load_components(geo, in_file, out_file, te)
         call read_hdf5(aero_table,  'aero_table',  geo_loc)
 
         if (trim(aero_table) .eq. 'true') then 
-          
+
           call read_hdf5_al(airfoil_list      ,'airfoil_list'      ,geo_loc)
           call read_hdf5_al(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
           call read_hdf5_al(normalised_coord_e,'normalised_coord_e',geo_loc)
-          !call read_hdf5_al(curv_ac           ,'curv_ac'           ,geo_loc)
+          call read_hdf5_al(thickness          ,'thickness'       ,geo_loc)
 
           allocate(geo%components(i_comp)%airfoil_list(size(airfoil_list)))
           geo%components(i_comp)%airfoil_list = airfoil_list
@@ -1115,12 +1117,14 @@ subroutine load_components(geo, in_file, out_file, te)
                 size(normalised_coord_e,1),size(normalised_coord_e,2)))
           geo%components(i_comp)%normalised_coord_e = normalised_coord_e
           
-          !allocate(geo%components(i_comp)%curv_ac( &
-          !          size(curv_ac,1),size(curv_ac,2)))
-          !geo%components(i_comp)%curv_ac = curv_ac
+          allocate(geo%components(i_comp)%thickness( &
+                    size(thickness,1),size(thickness,2)))
+          geo%components(i_comp)%thickness = thickness
           
           geo%components(i_comp)%aero_correction = trim(aero_table)
           sim_param%vl_correction = .true. 
+        else
+          geo%components(i_comp)%aero_correction = 'false'
         endif
 
       else if (comp_el_type(1:1) .eq. 'a') then
@@ -1421,7 +1425,12 @@ subroutine load_components(geo, in_file, out_file, te)
           call write_hdf5(theta_e           ,'theta_e'           ,geo_loc)
         elseif (comp_el_type(1:1) .eq. 'v' ) then
           call write_hdf5(trim(aero_table)  ,'aero_table'        ,geo_loc)          
-
+          if (trim(aero_table) .eq. 'true') then
+            call write_hdf5(airfoil_list      ,'airfoil_list'      ,geo_loc)
+            call write_hdf5(i_airfoil_e       ,'i_airfoil_e'       ,geo_loc)
+            call write_hdf5(normalised_coord_e,'normalised_coord_e',geo_loc)
+            call write_hdf5(thickness          ,'thickness'       ,geo_loc)
+          endif
         else if (comp_el_type(1:1) .eq. 'a') then
           call write_hdf5(trac,'Traction',cloc2)
           call write_hdf5(rad,'Radius',cloc2)
@@ -2222,7 +2231,7 @@ subroutine create_strip_connectivity(geo)
             comp%stripe(i_s)%n_ver = 4 ! hardcoded, but stripe should be always a quadrilateral element
             comp%stripe(i_s)%csi_cen = 0.5_wp * sum(comp%normalised_coord_e(:,i_s))  
             comp%stripe(i_s)%i_airfoil =  comp%i_airfoil_e(:,i_s)
-            
+            comp%stripe(i_s)%thickness = 0.5_wp * sum(comp%thickness(:,i_s))
             !> stripe verteces 
             comp%stripe(i_s)%ver(:,1) = comp%el(1+(i_s-1)*n_c)%ver(:,1) 
             comp%stripe(i_s)%ver(:,2) = comp%el(1+(i_s-1)*n_c)%ver(:,2)
@@ -2238,7 +2247,7 @@ subroutine create_strip_connectivity(geo)
             
             comp%stripe(i_s)%nor = nor/norm2(nor) 
             
-            tanl = 0.5_wp * ( comp%stripe(i_s)%ver(:,4) + comp%stripe(i_s)%ver(:,4) ) - &
+            tanl = 0.5_wp * ( comp%stripe(i_s)%ver(:,4) + comp%stripe(i_s)%ver(:,1) ) - &
                             comp%stripe(i_s)%cen
             
             comp%stripe(i_s)%tang(:,1) = tanl / norm2(tanl)
@@ -2258,7 +2267,14 @@ subroutine create_strip_connectivity(geo)
             do i = 1,4
               comp%stripe(i_s)%edge_uni(:,i) = comp%stripe(i_s)%edge_vec(:,i) / comp%stripe(i_s)%edge_len(i)
             end do
-            
+
+            !> Area 
+            n_pan = size(comp%stripe(i_s)%panels)
+            comp%stripe(i_s)%area = 0.0_wp 
+            do i = 1, n_pan
+              comp%stripe(i_s)%area = comp%stripe(i_s)%area + comp%stripe(i_s)%panels(i)%p%area 
+            end do
+
             comp%stripe(i_s)%tang_cen = comp%stripe(i_s)%edge_uni(:,2) - comp%stripe(i_s)%edge_uni(:,4)
             comp%stripe(i_s)%tang_cen = comp%stripe(i_s)%tang_cen / norm2(comp%stripe(i_s)%tang_cen)
   
@@ -2266,18 +2282,10 @@ subroutine create_strip_connectivity(geo)
             comp%stripe(i_s)%bnorm_cen = comp%stripe(i_s)%bnorm_cen / norm2(comp%stripe(i_s)%bnorm_cen)
             comp%stripe(i_s)%chord = sum(comp%stripe(i_s)%edge_len((/2,4/)))*0.5_wp
             
-            n_pan = size(comp%stripe(i_s)%panels)
-            comp%stripe(i_s)%area = 0.0_wp 
-            do i = 1, n_pan
-              comp%stripe(i_s)%area = comp%stripe(i_s)%area + comp%stripe(i_s)%panels(i)%p%area 
-            end do
-
-            comp%stripe(i_s)%ctr_pt = comp%stripe(i_s)%cen -  & 
+            comp%stripe(i_s)%ctr_pt = comp%stripe(i_s)%cen +  & 
                                       comp%stripe(i_s)%tang_cen * comp%stripe(i_s)%chord / 2.0_wp
             
-            !comp%stripe(i_s)%curv_ac = sum(comp%curv_ac(:,i_s))/2 
             !> Update velocity 
-
             call calc_node_vel(comp%stripe(i_s)%ctr_pt, geo%refs(comp%ref_id)%G_g, &
                                 geo%refs(comp%ref_id)%f_g, comp%stripe(i_s)%ub)
             

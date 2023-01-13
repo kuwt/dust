@@ -708,7 +708,7 @@ subroutine load_wake_post(floc, wake, wake_p)
   call open_hdf5_group(floc, 'ParticleWake', gloc)
   call read_hdf5_al(vppoints,'WakePoints',gloc)
   call read_hdf5_al(vpvort,'WakeVort',gloc)
-  call read_hdf5_al(v_rad,'v_rad',gloc)
+  call read_hdf5_al(v_rad,'VortexRad',gloc)
   call close_hdf5_group(gloc)
 
   wake%n_prt = size(vpvort,2)

@@ -208,6 +208,7 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
   real(wp), allocatable                    :: normalised_coord_e(:,:)
   real(wp)                                 :: trac, radius, length
   logical                                  :: aero_table
+  real(wp), allocatable                    :: thickness(:,:)
   !> Section names for CGNS
   integer                                  :: nSections, iSection
   character(len=max_char_len), allocatable :: sectionNamesCGNS(:)
@@ -663,29 +664,75 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     if ( coupled_comp ) then
       write(*,*) ' coupling_type: ', trim(coupling_type)
 
-      if ( mesh_mirror ) then
-        select case (trim(mesh_file_type))
-          case('cgns', 'basic', 'revolution' )  ! TODO: check basic
-            call mirror_mesh(ee, rr, mirror_point, mirror_normal)
-          case default
-            call error(this_sub_name, this_mod_name,&
-                'Mirror routines implemented for MeshFileType = &
-                & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
-                'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
-        end select
+      if ( trim(coupling_type) .eq. 'rigid' ) then
+        !> Rigid coupling between a rigid component and a "structural" node,
+        ! defined as an input, coupling_node. This node represents the
+        ! reference configuration for data communication between the aerodynamic
+        ! and the structural solvers
 
-      elseif ( mesh_symmetry ) then
-        select case (trim(mesh_file_type))
-          case('cgns')  
-            call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
-          case default
-            call error(this_sub_name, this_mod_name,&
-                'Symmetry routines implemented for MeshFileType = &
-                & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
-                'MeshFileType = '//trim(mesh_file_type))
-        end select
+        allocate(c_ref_p(3, size(rr,2))); c_ref_p = 0.0_wp
+
+        do i =1, size(c_ref_p,2)
+
+          !> Offset
+          c_ref_p(:,i) = rr(:,i) - coupling_node
+
+          !> Orientation
+          c_ref_p(:,i) = matmul(transpose(coupling_node_rot), &
+                                c_ref_p(:,i))
+
+        end do
+
+        allocate(c_ref_c(3, size(ee,2))); c_ref_c = 0.0_wp
+        do i =1, size(c_ref_c,2)
+          n_non_zero = 0
+          do j = 1, 4
+            if ( ee(j,i) .ne. 0 ) then
+              n_non_zero = n_non_zero + 1
+              c_ref_c(:,i) = c_ref_c(:,i) + rr(:,ee(j,i))
+            end if
+          end do
+          !> Offset
+          c_ref_c(:,i) = c_ref_c(:,i)/dble(n_non_zero) - coupling_node
+
+          !> Orientation
+          c_ref_c(:,i) = matmul( transpose(coupling_node_rot), &
+                                c_ref_c(:,i) )
+        end do
+
+        !> Write to hdf5 geo file
+        call write_hdf5(c_ref_p,'c_ref_p',geo_loc)
+        call write_hdf5(c_ref_c,'c_ref_c',geo_loc)
+
+      elseif ( trim(coupling_type) .eq. 'rbf' ) then
+        call write_hdf5( coupling_nodes,'CouplingNodes',geo_loc)        
+        rr = matmul( transpose(coupling_node_rot), rr )
       end if
     end if
+
+    if ( mesh_mirror ) then
+      select case (trim(mesh_file_type))
+        case('cgns', 'basic', 'revolution' )  ! TODO: check basic
+          call mirror_mesh(ee, rr, mirror_point, mirror_normal)
+        case default
+          call error(this_sub_name, this_mod_name,&
+              'Mirror routines implemented for MeshFileType = &
+              & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
+              'MeshFileType = '//trim(mesh_file_type)//'. Stop.')
+      end select
+
+    elseif ( mesh_symmetry ) then
+      select case (trim(mesh_file_type))
+        case('cgns')  
+          call symmetry_mesh(ee, rr, symmetry_point, symmetry_normal)
+        case default
+          call error(this_sub_name, this_mod_name,&
+              'Symmetry routines implemented for MeshFileType = &
+              & "cgns", "pointwise", "parametric", "basic", "revolution".'//nl// &
+              'MeshFileType = '//trim(mesh_file_type))
+      end select
+    end if
+    
 #endif
 
   case('revolution')
@@ -770,24 +817,25 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call read_mesh_parametric(trim(mesh_file), ee, rr, &
                               npoints_chord_tot, nelems_span, hinges, n_hinges, mesh_mirror, mesh_symmetry,&
                               nelem_span_list, airfoil_list, i_airfoil_e, normalised_coord_e, &
-                              aero_table)  
+                              aero_table, thickness)  
 
       !> Write additional fields for vl correction
       if (aero_table) then 
 
         if ( mesh_symmetry ) then
           call symmetry_update_vl_lists( nelem_span_list , &
-                i_airfoil_e , normalised_coord_e )
+                i_airfoil_e , normalised_coord_e, thickness)
         end if
         if ( mesh_mirror ) then
           call mirror_update_vl_lists( nelem_span_list , &
-                  i_airfoil_e , normalised_coord_e )
+                  i_airfoil_e , normalised_coord_e, thickness )
         end if
   
         call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)
         call write_hdf5(i_airfoil_e,        'i_airfoil_e',        geo_loc)
         call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)
         call write_hdf5('true',             'aero_table',         geo_loc)        
+        call write_hdf5(thickness,          'thickness',         geo_loc)
       else
         call write_hdf5('false',            'aero_table',         geo_loc)
       endif
@@ -963,13 +1011,14 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
       call read_mesh_pointwise(trim(mesh_file), ee, rr, &
                               npoints_chord_tot, nelems_span, &
                               airfoil_list, i_airfoil_e, normalised_coord_e, &
-                              aero_table)  
+                              aero_table, thickness)  
       !> Write additional fields for vl correction
       if (aero_table) then 
         call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)
         call write_hdf5(i_airfoil_e,        'i_airfoil_e',        geo_loc)
         call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)        
         call write_hdf5('true',             'aero_table',         geo_loc)
+        call write_hdf5(thickness,          'thickness',         geo_loc)        
       else
         call write_hdf5('false',            'aero_table',         geo_loc)
       endif
@@ -2419,15 +2468,18 @@ end subroutine mirror_update_ll_lists
 !----------------------------------------------------------------------
 !> Updates lifting lines fields in case of symmetry
 subroutine symmetry_update_vl_lists ( nelem_span_list , &
-                       i_airfoil_e , normalised_coord_e )
+                       i_airfoil_e , normalised_coord_e , thickness)
 
   integer , allocatable , intent(inout) :: nelem_span_list(:)
   integer , allocatable , intent(inout) :: i_airfoil_e(:,:)
   real(wp), allocatable , intent(inout) :: normalised_coord_e(:,:)
+  real(wp), allocatable , intent(inout) :: thickness(:,:)
 
   integer , allocatable :: nelem_span_list_tmp(:)
   integer , allocatable :: i_airfoil_e_tmp(:,:)
   real(wp), allocatable :: normalised_coord_e_tmp(:,:)
+  real(wp), allocatable :: thickness_tmp(:,:)
+  
   integer :: nelem_span_section
   integer :: nelems
   integer :: npts   ! nelem + 1
@@ -2461,11 +2513,19 @@ subroutine symmetry_update_vl_lists ( nelem_span_list , &
     normalised_coord_e_tmp( 1:2 , siz-i+1 ) = 1.0_wp - normalised_coord_e( 2:1:-1 , i )
   end do
 
+  allocate(thickness_tmp( 2, nelems ))
+  siz = size(thickness,2)
+  do i = 1 , siz
+    thickness_tmp( 1:2 , siz+i   ) = thickness( 1:2    , i )
+    thickness_tmp( 1:2 , siz-i+1 ) = thickness( 2:1:-1 , i )
+  end do
 
   ! Move_alloc to the original arrays -------------------------
   call move_alloc(    nelem_span_list_tmp ,     nelem_span_list )
   call move_alloc(        i_airfoil_e_tmp ,         i_airfoil_e )
   call move_alloc( normalised_coord_e_tmp ,  normalised_coord_e )
+  call move_alloc( thickness_tmp ,  thickness )
+  
   
 
 end subroutine symmetry_update_vl_lists
@@ -2474,16 +2534,17 @@ end subroutine symmetry_update_vl_lists
 
 !> Updates lifting lines fields in case of mirroring
 subroutine mirror_update_vl_lists ( nelem_span_list , &
-  i_airfoil_e , normalised_coord_e )
+  i_airfoil_e , normalised_coord_e, thickness)
 
   integer , allocatable , intent(inout) :: nelem_span_list(:)
   integer , allocatable , intent(inout) :: i_airfoil_e(:,:)
   real(wp), allocatable , intent(inout) :: normalised_coord_e(:,:)
-
+  real(wp), allocatable , intent(inout) :: thickness(:,:)
 
   integer , allocatable :: nelem_span_list_tmp(:)
   integer , allocatable :: i_airfoil_e_tmp(:,:)
   real(wp), allocatable :: normalised_coord_e_tmp(:,:)
+  real(wp), allocatable :: thickness_tmp(:,:) 
 
   integer :: nelem_span_section
   integer :: nelem
@@ -2515,12 +2576,17 @@ subroutine mirror_update_vl_lists ( nelem_span_list , &
     normalised_coord_e_tmp( 1:2 , siz-i+1 ) = 1.0_wp - normalised_coord_e( 2:1:-1 , i )
   end do
 
+  allocate(thickness_tmp( 2, size(thickness,2) ))
+  do i = 1 , siz
+    thickness_tmp( 1:2 , siz-i+1 ) = thickness( 2:1:-1 , i )
+  end do
   
   ! Move_alloc to the original arrays -------------------------
   call move_alloc(    nelem_span_list_tmp ,     nelem_span_list )
   call move_alloc(        i_airfoil_e_tmp ,         i_airfoil_e )
   call move_alloc( normalised_coord_e_tmp ,  normalised_coord_e )
-  
+  call move_alloc( thickness_tmp ,  thickness )
+
 end subroutine mirror_update_vl_lists
 
 
