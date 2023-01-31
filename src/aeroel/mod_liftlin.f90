@@ -1138,12 +1138,13 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
   enddo !solver iterations
   
-  if(ic .ge. fp_maxIter) then
-    write(msg,'(A,I0,A)') 'Lifting lines iterative solution NOT CONVERGED &
-                            &after ',fp_maxIter,' iterations'
-    call warning(this_sub_name, this_mod_name, msg)
+  if(sim_param%debug_level .ge.5) then
+    if(ic .ge. fp_maxIter) then
+      write(msg,'(A,I0,A)') 'Lifting lines iterative solution NOT CONVERGED &
+                              &after ',fp_maxIter,' iterations'
+      call warning(this_sub_name, this_mod_name, msg)
+    endif
   endif
-
   ! === Update dGamma_dt field ===
   do i_l = 1,size(elems_ll)
     elems_ll(i_l)%p%dGamma_dt = ( elems_ll(i_l)%p%mag - elems_ll(i_l)%p%Gamma_old) / &
