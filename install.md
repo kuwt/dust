@@ -97,8 +97,7 @@ in most Linux distributions.
 ## Coupling with preCICE-MBDyn
 
 Compile DUST with **$WITH_PRECICE**=**ON** and include the MBDyn Adapter and Interface to your Python path.
-
-For example, add these line to your ~/.bashrc file:
+The adapters are located in the *utils/adapter* folder. To add to the system path, for example, add these line to your ~/.bashrc file:
 
   ```bash
   $ export PYTHONPATH="/path/to/dust/utils/adapter":$PYTHONPATH
@@ -108,7 +107,16 @@ For example, add these line to your ~/.bashrc file:
   <summary markdown="span">preCICE</summary>
 
 #### preCICE
-Visit <https://precice.org/quickstart.html>
+For some systems, preCICE is available in form of a pre-build package or a package recipe.
+Visit:
+
+<https://precice.org/installation-packages.html>
+
+After installing the library, you need to get the python binding for preCICE with:
+
+  ```bash
+  $ pip install pyprecice
+  ```
 
 </details>
 
@@ -116,10 +124,9 @@ Visit <https://precice.org/quickstart.html>
   <summary markdown="span">MBDyn</summary>
 
 #### MBDyn
-Visit <https://www.mbdyn.org/?Software_Installation>. 
+Visit <https://www.mbdyn.org/Installation.html>. 
 
-MBDyn must be compiled on branch **develop** with 
-the following configure command:
+MBDyn must be compiled on branch **develop**. During the configuration phase enable the following options:
  ```bash
   $ ./configure --enable-netcdf --with-lapack --enable-python
   ```
