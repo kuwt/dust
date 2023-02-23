@@ -274,13 +274,17 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   allocate(chord_fraction(nelem_chord+1))
   call define_division(type_chord, nelem_chord, chord_fraction)
 
-  allocate(thickness(2,size(points))); thickness = 0.0_wp
+  if (present(thickness)) then 
+    allocate(thickness(2,size(points)))
+    thickness = 0.0_wp
+  endif
+  
   !> first point
   call define_section( points(1)%chord , trim(adjustl(points(1)%airfoil)) , &
                       points(1)%theta , ElType , nelem_chord             , &
                       type_chord , chord_fraction , ref_chord_fraction   , &
                       (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(1)%xy, thickness_section)
-  thickness(1,1) = thickness_section 
+  if (present(thickness)) thickness(1,1) = thickness_section 
   if ( points(1)%flip_sec ) call flip_section( ElType , points(1)%xy )
 
   !> last point
@@ -290,7 +294,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
                       points(i)%theta , ElType , nelem_chord             , &
                       type_chord , chord_fraction , ref_chord_fraction   , &
                       (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy, thickness_section)
-  thickness(1,i) = thickness_section 
+  if (present(thickness)) thickness(1,i) = thickness_section 
   if ( points(i)%flip_sec ) call flip_section( ElType , points(i)%xy ) 
 
   do i = 2 , size(points)-1
@@ -301,7 +305,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
                           points(i)%theta , ElType , nelem_chord             , &
                           type_chord , chord_fraction , ref_chord_fraction   , &
                           (/ 0.0_wp , 0.0_wp , 0.0_wp /) , points(i)%xy, thickness_section )
-      thickness(1,i) = thickness_section
+      if (present(thickness)) thickness(1,i) = thickness_section
       if ( points(i)%flip_sec ) call flip_section( ElType , points(i)%xy   )
 
     else ! points of the section must be interpolated
