@@ -34,7 +34,7 @@ in most Linux distributions.
 
 #### Compilers
   ```bash
-  $ sudo apt install gcc g++ gfortran
+  sudo apt install gcc g++ gfortran
   ```
 </details>
 
@@ -43,7 +43,7 @@ in most Linux distributions.
 
 #### Libraries
   ```bash
-  $ sudo apt install liblapack-dev libblas-dev libopenblas-dev libopenblas0 libcgns-dev libhdf5-dev
+  sudo apt install liblapack-dev libblas-dev libopenblas-dev libopenblas0 libcgns-dev libhdf5-dev
   ```
 </details>
 
@@ -55,13 +55,13 @@ in most Linux distributions.
 - Create a build folder inside this folder (can be "build" or anything else) and move into it:
 
   ```bash
-  $ mkdir build && cd build
+  mkdir build && cd build
   ```
 
 - Configure cmake with standard options:
 
   ```bash
-  $ cmake -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DWITH_PRECICE=$WITH_PRECICE ../
+  cmake -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DWITH_PRECICE=$WITH_PRECICE ../
   ```
   where:
   - **$CMAKE_BUILD_TYPE** can be **Release** or **Debug**
@@ -73,19 +73,19 @@ in most Linux distributions.
   ```
   then: 
   ```bash
-  $ cmake -DDUST_MKL=YES ../ 
+  cmake -DDUST_MKL=YES ../ 
   ``` 
   
 - Build DUST:
 
   ```bash
-  $ make
+  make
   ```
 
 - Install DUST (with root privileges if needed):
 
   ```bash
-  $ sudo make install
+  sudo make install
   ```
   The default install folder should be /usr/local/bin
 
@@ -101,7 +101,7 @@ Compile DUST with **$WITH_PRECICE**=**ON** and include the MBDyn Adapter and Int
 For example, add these line to your ~/.bashrc file:
 
   ```bash
-  $ export PYTHONPATH="/path/to/dust/utils/adapter":$PYTHONPATH
+  export PYTHONPATH="/path/to/dust/utils/adapter":$PYTHONPATH
   ```
 
 <details>
@@ -116,12 +116,12 @@ Visit <https://precice.org/quickstart.html>
   <summary markdown="span">MBDyn</summary>
 
 #### MBDyn
-Visit <https://www.mbdyn.org/?Software_Installation>. 
+Visit <https://www.mbdyn.org/Installation.html>. 
 
 MBDyn must be compiled on branch **develop** with 
 the following configure command:
  ```bash
-  $ ./configure --enable-netcdf --with-lapack --enable-python
+  ./configure --enable-netcdf --with-lapack --enable-python
   ```
 </details>
 
