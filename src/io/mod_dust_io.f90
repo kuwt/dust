@@ -225,6 +225,7 @@ subroutine save_status(geo, wake, it, time, run_id)
     !> Output the lifting lines data
     if ( trim( geo%components(icomp)%comp_el_type ) .eq. 'l' ) then
       allocate(alpha(ne), vel_2d(ne), vel_outplane(ne))
+      allocate(up_x(ne), up_y(ne), up_z(ne))
       allocate(alpha_isolated(ne), vel_2d_isolated(ne), &
                 vel_outplane_isolated(ne))
       allocate(aero_coeff(3,ne))
@@ -250,8 +251,8 @@ subroutine save_status(geo, wake, it, time, run_id)
       call write_hdf5(alpha,                  'alpha',                  gloc3)
       call write_hdf5(vel_2d,                 'vel_2d',                 gloc3)
       call write_hdf5(up_x,                   'up_x',                   gloc3)
-      call write_hdf5(up_y,                   'up_x',                   gloc3)
-      call write_hdf5(up_z,                   'up_x',                   gloc3)
+      call write_hdf5(up_y,                   'up_y',                   gloc3)
+      call write_hdf5(up_z,                   'up_z',                   gloc3)
       call write_hdf5(vel_outplane,           'vel_outplane',           gloc3)
       call write_hdf5(alpha_isolated,         'alpha_isolated',         gloc3)
       call write_hdf5(vel_2d_isolated,        'vel_2d_isolated',        gloc3)
