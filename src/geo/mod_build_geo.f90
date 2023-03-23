@@ -1014,7 +1014,6 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
                               aero_table, thickness)  
       !> Write additional fields for vl correction
       if (aero_table) then 
-        write(*,*) 'ciao'
         call write_hdf5(airfoil_list,       'airfoil_list',       geo_loc)
         call write_hdf5(i_airfoil_e,        'i_airfoil_e',        geo_loc)
         call write_hdf5(normalised_coord_e, 'normalised_coord_e', geo_loc)        

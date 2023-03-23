@@ -94,6 +94,7 @@ type :: t_point
   integer                 :: id
   real(wp)                :: coord(3)
   character(max_char_len) :: airfoil
+  character(max_char_len) :: airfoil_table
   real(wp)                :: chord       !
   real(wp)                :: theta       ! deg
   character(max_char_len) :: sec_nor_str
@@ -204,7 +205,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   aero_table = getlogical(pmesh_prs, 'airfoil_table_correction')
   
   !> Read points and lines
-  call read_points ( 'p' , pmesh_prs , point_prs , points )
+  call read_points ( ElType, pmesh_prs , point_prs , points , aero_table)
   call read_lines  (       pmesh_prs ,  line_prs , lines  , nelem_span_tot )
   
   !> Set dimensions of ee, rr mat
@@ -407,7 +408,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
       if ( trim(points(i)%airfoil) .ne. 'interp' ) then
 
         iAirfoil  = iAirfoil + 1
-        airfoil_list_actual(iAirfoil) = trim( points(i)%airfoil )
+        airfoil_list_actual(iAirfoil) = trim( points(i)%airfoil_table )
         airfoil_list_actual_s(iAirfoil) = s_in( i ) ! curvilinear coord. of a sec.
                                                     ! where an airfoil is defined
 
@@ -496,7 +497,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
   integer  ,              intent(out) :: npoints_chord_tot, nelem_span_tot
   real(wp) , allocatable, intent(out) :: chord_p(:),theta_p(:),theta_e(:)
   real(wp) :: s_cen_e 
-
+  logical :: aero_table 
   ! parser and sub-parsers
   type(t_parse) :: pmesh_prs
   type(t_parse) , pointer :: point_prs , line_prs
@@ -532,7 +533,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
 
   character(len=*), parameter :: this_sub_name = 'read_mesh_pointwise_ll'
 
-
+  aero_table = .false. 
   ! === Reference line, by points and lines as in read_mesh_pointwise ===
   !> Prepare parser and sub-parsers
   ! pass "p" for <panel> or <vortlat> elems that contain "airfoil" field,
@@ -561,7 +562,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
   end if 
 
   !> Read points and lines
-  call read_points ( 'l' , pmesh_prs , point_prs , points )
+  call read_points ( 'l' , pmesh_prs , point_prs , points , aero_table)
   call read_lines  (       pmesh_prs ,  line_prs , lines  , nelem_span_tot )
 
   ! check: only  "interp" attribute allowed for inner points of splines for LL
@@ -1369,25 +1370,32 @@ end subroutine fill_line_tan_vec
 
 !----------------------------------------------------------------------
 !> fill point structure
-subroutine read_points ( eltype , pmesh_prs , point_prs , points )
+subroutine read_points ( eltype , pmesh_prs , point_prs , points, aero_table )
   character                   , intent(in)    :: eltype
+  logical                     , intent(in)    :: aero_table
   type(t_parse)               , intent(inout) :: pmesh_prs
   type(t_parse) , pointer     , intent(inout) :: point_prs
   type(t_point) , allocatable , intent(out)   :: points(:)
 
   integer :: nPoints , i 
-
+  
   ! === Read point groups ===
-  nPoints = countoption(pmesh_prs,'point') ; allocate( points(nPoints) )
-
+  nPoints = countoption(pmesh_prs,'point') ; allocate( points(nPoints) ) 
   ! loop over Point groups
   do i = 1 , nPoints
 
     call getsuboption( pmesh_prs , 'Point' , point_prs )
     points(i) % id          = getint(      point_prs, 'Id')
     points(i) % coord       = getrealarray(point_prs, 'Coordinates',3)
-    if ( ( eltype .eq. 'p' ) .or. ( eltype .eq. 'v' ) ) then
+    if ( ( eltype .eq. 'p' )) then
       points(i) % airfoil     = getstr(      point_prs, 'airfoil')
+    elseif ( ( eltype .eq. 'v' )) then
+      if (aero_table) then
+        points(i) % airfoil_table     = getstr( point_prs, 'airfoil_table')
+        points(i) % airfoil     = getstr(      point_prs, 'airfoil')
+      else
+        points(i) % airfoil     = getstr(      point_prs, 'airfoil')
+      endif 
     else if ( eltype .eq. 'l' ) then
       points(i) % airfoil     = getstr(      point_prs, 'airfoil_table')
     else
@@ -1527,9 +1535,8 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
 
   if ( ( eltype .eq. 'p' ) .or. ( eltype .eq. 'v' ) ) then
     call point_prs%CreateStringOption( 'airfoil', 'section airfoil' ) 
-    !call pmesh_prs%CreateStringOption( 'airfoil_table', 'airfoil table path', &
-    !            multiple=.true.);
-  elseif ( eltype .eq. 'l' .or. ( eltype .eq. 'v' )) then
+    call point_prs%CreateStringOption(  'airfoil_table', 'section airfoil' )
+  elseif ( eltype .eq. 'l') then
     call point_prs%CreateStringOption(  'airfoil_table', 'section airfoil' )
   endif
 
