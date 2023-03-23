@@ -923,14 +923,14 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
                               geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce
             end do
 
-            !> update cl and cd            
-            e_l = nor * cos(a_v) - tang_cen * sin(a_v)
-            e_d = nor * sin(a_v) + tang_cen * cos(a_v)
-            e_l = e_l / norm2(e_l)
-            e_d = e_d / norm2(e_d)
+            !!> update cl and cd            
+            !e_l = nor * cos(a_v) - tang_cen * sin(a_v)
+            !e_d = nor * sin(a_v) + tang_cen * cos(a_v)
+            !e_l = e_l / norm2(e_l)
+            !e_d = e_d / norm2(e_d)
 
-            geo%components(i_c)%stripe(i_s)%aero_coeff(1) = dot(dforce_stripe,e_l) / q_inf 
-            geo%components(i_c)%stripe(i_s)%aero_coeff(2) = dot(dforce_stripe,e_d) / q_inf
+            !geo%components(i_c)%stripe(i_s)%aero_coeff(1) = dot(dforce_stripe,e_l) / q_inf 
+            !geo%components(i_c)%stripe(i_s)%aero_coeff(2) = dot(dforce_stripe,e_d) / q_inf
             
           end do
         end if 

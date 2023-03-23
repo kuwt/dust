@@ -106,6 +106,9 @@ type, extends(c_expl_elem) :: t_liftlin
   real(wp)              :: alpha
   real(wp)              :: alpha_ll
   real(wp)              :: vel_2d
+  real(wp)              :: up_x
+  real(wp)              :: up_y
+  real(wp)              :: up_z
   real(wp)              :: vel_outplane
   real(wp)              :: aero_coeff(3)
   real(wp)              :: alpha_isolated
@@ -432,7 +435,7 @@ subroutine solve_liftlin_piszkin( &
  ! arrays used for force projection
  real(wp) , allocatable :: a_v(:)   
  real(wp) , allocatable :: c_m(:,:) 
- real(wp) , allocatable :: u_v(:)   
+ real(wp) , allocatable :: u_v(:), up_x(:), up_y(:), up_z(:)   
  real(wp) , allocatable :: ui_v(:,:) 
  real(wp) , allocatable :: dcl_v(:) 
 
@@ -535,6 +538,10 @@ subroutine solve_liftlin_piszkin( &
 
   ! allocate array containing aoa, aero coeffs and relative velocity
   allocate(  a_v( size(elems_ll)  )) ;   a_v = 0.0_wp
+  allocate(  up_x( size(elems_ll)  )) ;   up_x = 0.0_wp
+  allocate(  up_y( size(elems_ll)  )) ;   up_y = 0.0_wp
+  allocate(  up_z( size(elems_ll)  )) ;   up_z = 0.0_wp
+  
   allocate(  c_m( size(elems_ll),3)) ;   c_m = 0.0_wp
   allocate(  u_v( size(elems_ll)  )) ;   u_v = 0.0_wp
   allocate( ui_v( size(elems_ll),3)) ;  ui_v = 0.0_wp
@@ -546,24 +553,6 @@ subroutine solve_liftlin_piszkin( &
 
   ! Remove the "out-of-plane" component of the relative velocity:
   ! 2d-velocity to enter the airfoil look-up-tables
-  ! IS THIS LOOP USED? (u_v) seems to be overwritten few lines down)
-!$omp parallel do private(i_l, el, wind) schedule(dynamic,4)
-  do i_l=1,size(elems_ll)
-   !select type(el => elems_ll(i_l)%p)
-   !type is(t_liftlin)
-   wind = variable_wind(el%cen,sim_param%time)
-     el => elems_ll(i_l)%p
-     u_v(i_l) = norm2((wind-el%ub) - &
-         el%bnorm_cen*sum(el%bnorm_cen*(wind-el%ub)))
-     el%vel_2d_isolated = norm2((wind-el%ub) - &
-                          el%bnorm_cen*sum(el%bnorm_cen*(wind-el%ub)))
-     el%vel_outplane_isolated = sum(el%bnorm_cen*(wind-el%ub))
-     el%alpha_isolated = atan2(sum((wind-el%ub)*el%nor), &
-                               sum((wind-el%ub)*el%tang_cen))*180.0_wp/pi
-   !end select
-  end do
-!$omp end parallel do
-
   ! ==============================
   ! === Fixed-Point iterations ===
   ! ==============================
@@ -666,6 +655,9 @@ subroutine solve_liftlin_piszkin( &
         vel = vel/(4.0_wp*pi) + wind - el%ub + vel_w(:,i_l)
         ! "effective" velocity = proj. of vel in the n-t plane
         up =  el%nor*sum(el%nor*vel) + el%tang_cen*sum(el%tang_cen*vel)
+        up_x(i_l) = up(1)
+        up_y(i_l) = up(2)
+        up_z(i_l) = up(3)
         u_v(i_l) = norm2(up)
         unorm = u_v(i_l)      ! velocity w/o induced velocity
 
@@ -830,6 +822,9 @@ subroutine solve_liftlin_piszkin( &
     ! a_v updated by AVLloads, in compute_dforce_jukowski
     el%alpha = a_v(i_l) * 180_wp/pi
     el%vel_2d = u_v(i_l)
+    el%up_x = up_x(i_l)
+    el%up_y = up_y(i_l)    
+    el%up_z = up_z(i_l)
     el%aero_coeff = c_m(i_l,:)
 
     !end select
@@ -878,9 +873,9 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   ! mach and reynolds number for each el
   real(wp) :: mach , reynolds
   ! arrays used for force projection
-  real(wp) , allocatable :: a_v(:)   ! size(elems_ll)
-  real(wp) , allocatable :: c_m(:,:) ! size(elems_ll) , 3
-  real(wp) , allocatable :: u_v(:)   ! size(elems_ll)
+  real(wp) , allocatable :: a_v(:)   
+  real(wp) , allocatable :: c_m(:,:) 
+  real(wp) , allocatable :: u_v(:), up_x(:), up_y(:), up_z(:)   
 
   !> sim_param
   ! fixed point algorithm for ll
@@ -976,23 +971,25 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   allocate( a_v( size(elems_ll)  )) ;   a_v = 0.0_wp
   allocate( c_m( size(elems_ll),3)) ;   c_m = 0.0_wp
   allocate( u_v( size(elems_ll)  )) ;   u_v = 0.0_wp
-
+  allocate( up_x( size(elems_ll)  )) ;   up_x = 0.0_wp
+  allocate( up_y( size(elems_ll)  )) ;   up_y = 0.0_wp
+  allocate( up_z( size(elems_ll)  )) ;   up_z = 0.0_wp
   ! Remove the "out-of-plane" component of the relative velocity:
   ! 2d-velocity to enter the airfoil look-up-tables
   ! IS THIS LOOP USED? (u_v) seems to be overwritten few lines down)
-!$omp parallel do private(i_l, el, wind) schedule(dynamic,4)
-  do i_l=1,size(elems_ll)
-      el => elems_ll(i_l)%p
-      wind = variable_wind(el%cen,sim_param%time)
-      u_v(i_l) = norm2((wind-el%ub) - &
-            el%bnorm_cen*sum(el%bnorm_cen*(wind-el%ub)))
-      el%vel_2d_isolated = norm2((wind-el%ub) - &
-                          el%bnorm_cen*sum(el%bnorm_cen*(wind-el%ub)))
-      el%vel_outplane_isolated = sum(el%bnorm_cen*(wind-el%ub))
-      el%alpha_isolated = atan2(sum((wind-el%ub)*el%nor), &
-                                sum((wind-el%ub)*el%tang_cen))*180.0_wp/pi
-  end do
-!$omp end parallel do
+!!$omp parallel do private(i_l, el, wind) schedule(dynamic,4)
+!  do i_l=1,size(elems_ll)
+!      el => elems_ll(i_l)%p
+!      wind = variable_wind(el%cen,sim_param%time)
+!      u_v(i_l) = norm2((wind-el%ub) - &
+!            el%bnorm_cen*sum(el%bnorm_cen*(wind-el%ub)))
+!      el%vel_2d_isolated = norm2((wind-el%ub) - &
+!                          el%bnorm_cen*sum(el%bnorm_cen*(wind-el%ub)))
+!      el%vel_outplane_isolated = sum(el%bnorm_cen*(wind-el%ub))
+!      el%alpha_isolated = atan2(sum((wind-el%ub)*el%nor), &
+!                                sum((wind-el%ub)*el%tang_cen))*180.0_wp/pi
+!  end do
+!!$omp end parallel do
 
   do ic = 1, fp_maxIter
     diff = 0.0_wp             ! max diff ("norm \infty")
@@ -1024,6 +1021,9 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       ! "effective" velocity = proj. of vel in the n-t plane
       up =  el%nor*sum(el%nor*vel) + el%tang_cen*sum(el%tang_cen*vel)
       u_v(i_l) = norm2(up)
+      up_x(i_l) = up(1)
+      up_y(i_l) = up(2)
+      up_z(i_l) = up(3)
       unorm = u_v(i_l)      ! velocity w/o induced velocity
       ! Angle of incidence (full velocity)
       alpha = atan2(sum(up*el%nor), sum(up*el%tang_cen))
@@ -1245,6 +1245,9 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
     el%alpha = a_v(i_l) * 180_wp/pi
     el%vel_2d = u_v(i_l)
+    el%up_x = up_x(i_l)
+    el%up_y = up_y(i_l)    
+    el%up_z = up_z(i_l)
     el%aero_coeff = c_m(i_l,:)
 
     !end select

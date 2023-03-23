@@ -112,6 +112,10 @@ module mod_stripe
     real(wp) :: bnorm_cen(3)
     !> Norm of stripe velocity
     real(wp) :: vel_2d
+    !> Components of the stripe velocity (for inflow calculation)
+    real(wp) :: up_x
+    real(wp) :: up_y
+    real(wp) :: up_z
     !> Drag coefficient 
     real(wp) :: cd
     !> Lift coefficient (from c81)
@@ -204,11 +208,7 @@ module mod_stripe
     
     this%alpha_isolated = atan2(dot((wind-this%ub), this%nor), & 
                               dot((wind-this%ub), this%tang_cen))*180.0_wp/pi
-    !write(*,*) 'i_s        ', i_s
-    !write(*,*) 'this%vel  ', this%vel
-    !write(*,*) 'wind      ', wind
-    !write(*,*) 'this%ub   ', this%ub
-    !write(*,*) 'this%vel_w', this%vel_w
+
     this%vel = this%vel + wind - this%ub + this%vel_w
 
     this%vel_outplane = dot(this%bnorm_cen,this%vel)
@@ -216,7 +216,10 @@ module mod_stripe
     ! "effective" velocity = proj. of vel in the n-t plane
     up = this%nor*dot(this%nor,this%vel) + this%tang_cen*dot(this%tang_cen,this%vel)
     unorm = norm2(up)      ! velocity w/o induced velocity
-    this%vel_2d = unorm
+    this%vel_2d = unorm    
+    this%up_x = up(1)
+    this%up_y = up(2)
+    this%up_z = up(3)
     
     mag_inv = this%mag_inv 
     !> Local Mach number 

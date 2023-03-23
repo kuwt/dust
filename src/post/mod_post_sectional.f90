@@ -158,7 +158,7 @@ real(wp) , allocatable                                  :: sec_loads(:,:,:)
 real(wp) , allocatable                                  :: sec_loads_ave(:,:,:)
 integer                                                 :: is                                 
 integer, parameter                                      :: n_loads = 4   ! F and moment around an axis
-integer, parameter                                      :: n_ll_data = 9, n_vl_data = 9
+integer, parameter                                      :: n_ll_data = 12, n_vl_data = 12
 real(wp) , allocatable                                  :: ref_mat(:,:) , off_mat(:,:)
 real(wp) , allocatable                                  :: y_cen(:) , y_span(:), chord(:)
 real(wp) , parameter                                    :: tol_y_cen = 1.0e-3_wp
@@ -392,6 +392,9 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
     call printout(trim(msg))
 
     ! allocate tmp array to store the results --------------
+    if (an_end .lt. an_start) then 
+      call error('dust_post', 'Wrong definition in time vector')
+    endif
     n_time = (an_end-an_start)/an_step + 1 ! int general eger division
     allocate( sec_loads(n_time,n_sect,n_loads) )
     sec_loads = -333.0_wp ! initialisation for DEBUG

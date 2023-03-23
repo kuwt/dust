@@ -714,7 +714,7 @@ average = F
 component = wing
 
 axis_nod = (/ 0.0, 0.0, 0.0 /)
-axis_dir = (/ 0.0, 0.1, 0.0 /)
+axis_dir = (/ 0.0, 1.0, 0.0 /)
 
 lifting_line_data = F
 vortex_lattice_data = F
@@ -1021,6 +1021,9 @@ are set to \param{T} the following quantities are printed:
     in the plane identified by the normal and tangential unit vectors 
     $\mathbf{\hat{n}}$, $\mathbf{\hat{t}}$, as represented in figure \ref{fig:ll_output},
     $v_{2d} = | \mathbf{v}_{rel} \cdot \mathbf{\hat{b}}|$.
+    \item \texttt{up\_x}: \texttt{x}-component of \texttt{vel\_2d} 
+    \item \texttt{up\_y}: \texttt{y}-component of \texttt{vel\_2d}
+    \item \texttt{up\_z}: \texttt{z}-component of \texttt{vel\_2d}  
     \item \texttt{vel\_outplane}: magnitude of the out-of-plane velocity, 
     $\mathbf{v}_{rel} \cdot \mathbf{\hat{b}}$, where 
     $\mathbf{\hat{b}} = \mathbf{\hat{n}} \times \mathbf{\hat{t}}$ 

@@ -1527,9 +1527,9 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
 
   if ( ( eltype .eq. 'p' ) .or. ( eltype .eq. 'v' ) ) then
     call point_prs%CreateStringOption( 'airfoil', 'section airfoil' ) 
-    call pmesh_prs%CreateStringOption( 'airfoil_table', 'airfoil table path', &
-                multiple=.true.);
-  elseif ( eltype .eq. 'l' ) then
+    !call pmesh_prs%CreateStringOption( 'airfoil_table', 'airfoil table path', &
+    !            multiple=.true.);
+  elseif ( eltype .eq. 'l' .or. ( eltype .eq. 'v' )) then
     call point_prs%CreateStringOption(  'airfoil_table', 'section airfoil' )
   endif
 

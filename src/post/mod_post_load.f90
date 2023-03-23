@@ -307,7 +307,7 @@ subroutine load_ll(floc, comps, ll_data)
   do icomp = 1, ncomps
 
     nelems_comp = comps(icomp)%nelems
-    allocate(ll_data_read(nelems_comp,9))
+    allocate(ll_data_read(nelems_comp, 12))
     write(cname,'(A,I3.3)') 'Comp',comps(icomp)%comp_id
     call open_hdf5_group(gloc1,trim(cname),gloc2)
     call open_hdf5_group(gloc2,'Solution',gloc3)
@@ -315,9 +315,12 @@ subroutine load_ll(floc, comps, ll_data)
     call read_hdf5(ll_data_read(:,4),'alpha',gloc3)
     call read_hdf5(ll_data_read(:,5),'alpha_isolated',gloc3)
     call read_hdf5(ll_data_read(:,6),'vel_2d',gloc3)
-    call read_hdf5(ll_data_read(:,7),'vel_2d_isolated',gloc3)
-    call read_hdf5(ll_data_read(:,8),'vel_outplane',gloc3)
-    call read_hdf5(ll_data_read(:,9),'vel_outplane_isolated',gloc3)
+    call read_hdf5(ll_data_read(:,7),'up_x',gloc3)
+    call read_hdf5(ll_data_read(:,8),'up_y',gloc3)
+    call read_hdf5(ll_data_read(:,9),'up_z',gloc3)
+    call read_hdf5(ll_data_read(:,10),'vel_2d_isolated',gloc3)
+    call read_hdf5(ll_data_read(:,11),'vel_outplane',gloc3)
+    call read_hdf5(ll_data_read(:,12),'vel_outplane_isolated',gloc3)
 
     call close_hdf5_group(gloc3)
     call close_hdf5_group(gloc2)
@@ -369,7 +372,7 @@ subroutine load_vl(floc, comps, vl_data)
   offset = 0
   do icomp = 1, ncomps
     nelems_comp = comps(icomp)%parametric_nelems_span
-    allocate(vl_data_read(nelems_comp,9))
+    allocate(vl_data_read(nelems_comp,12))
     write(cname,'(A,I3.3)') 'Comp',comps(icomp)%comp_id
     call open_hdf5_group(gloc1,trim(cname),gloc2)
     call open_hdf5_group(gloc2,'Solution',gloc3)
@@ -377,9 +380,12 @@ subroutine load_vl(floc, comps, vl_data)
     call read_hdf5(vl_data_read(:,4),'alpha_vl',gloc3)
     call read_hdf5(vl_data_read(:,5),'alpha_isolated_vl',gloc3)
     call read_hdf5(vl_data_read(:,6),'vel_2d_vl',gloc3)
-    call read_hdf5(vl_data_read(:,7),'vel_2d_isolated_vl',gloc3)
-    call read_hdf5(vl_data_read(:,8),'vel_outplane_vl',gloc3)
-    call read_hdf5(vl_data_read(:,9),'vel_outplane_isolated_vl',gloc3)
+    call read_hdf5(vl_data_read(:,7),'up_x_vl',    gloc3)
+    call read_hdf5(vl_data_read(:,8),'up_y_vl',    gloc3)
+    call read_hdf5(vl_data_read(:,9),'up_z_vl',    gloc3)
+    call read_hdf5(vl_data_read(:,10),'vel_2d_isolated_vl',gloc3)
+    call read_hdf5(vl_data_read(:,11),'vel_outplane_vl',gloc3)
+    call read_hdf5(vl_data_read(:,12),'vel_outplane_isolated_vl',gloc3)
     call close_hdf5_group(gloc3)
     call close_hdf5_group(gloc2)
 
