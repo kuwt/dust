@@ -2468,7 +2468,7 @@ end subroutine mirror_update_ll_lists
 !----------------------------------------------------------------------
 !> Updates lifting lines fields in case of symmetry
 subroutine symmetry_update_vl_lists ( nelem_span_list , &
-                       i_airfoil_e , normalised_coord_e , thickness)
+                        i_airfoil_e , normalised_coord_e , thickness)
 
   integer , allocatable , intent(inout) :: nelem_span_list(:)
   integer , allocatable , intent(inout) :: i_airfoil_e(:,:)

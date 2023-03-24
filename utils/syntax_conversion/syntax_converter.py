@@ -54,12 +54,12 @@ import csv
 import re
 
 info_text = 'This script converts the syntax used in DUST files. It can be used on input (.in) or source (.f90) files.\
-             Starting from the specified folder, it searches recursively all subfolders for the files with the appropriate extension\
-             and it replaces all the strings in each file as described in the input dictionary file. The dictionary file is\
-             a CSV file containing for each row a couple of strings in the format \'new_string,old_string\'; the script\
-             replaces every occurrence of \'old_string\' with \'new_string\'.\n WARNING! USE WITH CAUTION: the script operates\
-             on ALL files and folders with the specified extension or name, regardless whether they are actually DUST-related.\
-             It is the user\'s responsibility to check for unwanted behaviour; for this, a dry run option is provided.'
+            Starting from the specified folder, it searches recursively all subfolders for the files with the appropriate extension\
+            and it replaces all the strings in each file as described in the input dictionary file. The dictionary file is\
+            a CSV file containing for each row a couple of strings in the format \'new_string,old_string\'; the script\
+            replaces every occurrence of \'old_string\' with \'new_string\'.\n WARNING! USE WITH CAUTION: the script operates\
+            on ALL files and folders with the specified extension or name, regardless whether they are actually DUST-related.\
+            It is the user\'s responsibility to check for unwanted behaviour; for this, a dry run option is provided.'
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description='converts DUST input files syntax according to the key pairs in dictionary file',\
@@ -112,7 +112,7 @@ if args.delete_backup: # Delete backup folders
                     shutil.rmtree(bak_dir)
     print('\nFinished. Exiting...')
     exit()   
-             
+
 elif args.dictionary is None: # Check if dictionary file is specified
     print('ERROR: dictionary file not specified. Exiting...')
     exit()
@@ -125,7 +125,7 @@ else: # Perform substitution
     # Import key pairs from file
     with open(dict_name, 'r') as f:
         keys = [tuple(line) for line in csv.reader(f)]
-   
+
     if args.no_backup: # Ask for confirmation
         print('WARNING: no backup of the files will be created.')
         flag = input('Continue? [y/N] ')
@@ -159,7 +159,7 @@ else: # Perform substitution
             backup_file = backup_folder.joinpath(str(file.name)+'.bak')
             if not args.dry_run:
                 shutil.copy(file,backup_file)     
-                           
+
         # Read input file and replace keys, store into string list
         content = []
         with open(file,'r') as f:
@@ -177,12 +177,12 @@ else: # Perform substitution
                     modify_source_line = args.source and ('%Create' in line or '=get' in line.replace(' ','') or\
                     'countoption' in line or 'check_opt_consistency' in line)
                     if not args.source or (args.source and modify_source_line):
-                       if args.invert: # inverse behaviour, replace new key with old
-                           #line = line.replace(new, old)
-                           line = re.sub(regexp_new, old, line)
-                       else: # normal behaviour, replace old key with new
-                           line = re.sub(regexp_old, new, line)
-                           #line = line.replace(old, new)
+                        if args.invert: # inverse behaviour, replace new key with old
+                            #line = line.replace(new, old)
+                            line = re.sub(regexp_new, old, line)
+                        else: # normal behaviour, replace old key with new
+                            line = re.sub(regexp_old, new, line)
+                            #line = line.replace(old, new)
                 content.append(line)
                             
         # Overwrite input file

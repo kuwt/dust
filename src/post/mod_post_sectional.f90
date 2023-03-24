@@ -307,7 +307,243 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
 
 
   select case( trim(comp_input) )
+  
 
+  case ( 'pointwise')
+    
+    !! Some assumptions ---------------
+    !id_comp = 1   ! 1. only one component is loaded
+    !ax_coor = 2   ! 2. the parametric elements is defined
+    !              !    along the y-axis
+!
+    !nelem_span = comps(id_comp)%n_s
+    !nelem_chor = comps(id_comp)%n_c
+    !write(*,*) 'nelem_span', nelem_span
+    !write(*,*) 'nelem_chor', nelem_chor
+    !
+    !n_sect = nelem_span
+!
+    !do i1 = 1, size(comps(id_comp)%loc_points, 2) 
+    !  comps(id_comp)%loc_points(:, i1) = matmul(comps(id_comp)%coupling_node_rot,comps(id_comp)%loc_points(:,i1))
+    !end do
+    !
+    !! ######################################################################
+    !! Find the coordinates of the reference points in the local reference frame
+!
+    !! Find the coordinate along the axis of the sections -------------------
+    !! the <ax_coor> coordinate y_cen of each section is built with the first
+    !! panel in chord. Then the distance between the <ax_coor> of the centre
+    !! of the other panels and y_cen is checked
+    !!TODO: find y-coord is general enough for all the 'parametric' components
+    !
+    !allocate(y_cen(n_sect),y_span(n_sect),chord(n_sect))
+    !ie = 0
+    !chord_start = 0
+    !chord_end = 0
+    !ii = 0
+    !do is = 1 , n_sect
+    !  
+    !  ie = ie + 1
+    !  ii = ii + 1
+    !  chord_start = (ii-1)*(nelem_chor + 1) + 1
+    !  chord_end = ii*(nelem_chor + 1) 
+    !  y_cen(is) = &
+    !  sum(comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver)) / &
+    !              real(comps(id_comp)%el(ie)%n_ver,wp)
+    !  y_span(is) = &
+    !  abs ( comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver(1) )&
+    !  - comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver(2) ) )
+    !  !> local chord as projection of the profile on x-z plane
+    !  chord(is) = sqrt((abs(minval(comps(id_comp)%loc_points(ax_coor - 1,chord_start:chord_end))) + & 
+    !                    abs(maxval(comps(id_comp)%loc_points(ax_coor - 1,chord_start:chord_end))))**2 + &
+    !                    (abs(minval(comps(id_comp)%loc_points(ax_coor + 1,chord_start:chord_end))) + & 
+    !                    abs(maxval(comps(id_comp)%loc_points(ax_coor + 1,chord_start:chord_end))))**2)
+    !  do ic = 2 , nelem_chor ! check
+    !    ie = ie + 1
+    !    if (abs( y_cen(is) - &
+    !      sum(comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver))&
+    !        / real(comps(id_comp)%el(ie)%n_ver,wp) ) &
+    !        .gt. tol_y_cen ) then
+    !      call error(this_sub_name,this_mod_name,'Wrong section definition &
+    !      &for component '//trim(comps(id_comp)%comp_name)//' for sectional&
+    !      & loads analysis.')
+    !    end if
+    !  end do
+    !end do
+!
+    !! Find the coordinate of the reference points on the axis --------------
+    !!  ( with coord. y_cen )
+    !if ( abs(axis_dir(2)) .lt. 1e-6_wp ) then
+    !  call error('dust_post','','Wrong definition of the axis in&
+    !        & sectional_loads analysis: abs(axis_dir(2)) .lt. 1e-6.&
+    !        & STOP')
+    !end if
+!
+    !allocate(r_axis(3,n_sect), r_axis_bas(3,n_sect))
+    !do is = 1 , n_sect
+    !  r_axis(:,is) = axis_nod + &
+    !          ( y_cen(is) - axis_nod(ax_coor) )/axis_dir(ax_coor) * axis_dir
+    !end do
+    !! only initialisation here:
+    !! - r_axis: coordinates in the local ref.frame
+    !! - r_axis_bas: coordinates in the base ref.frame
+    !r_axis_bas = r_axis
+!
+    !! Find the ref_id or the reference frame where loads are projected -----
+    !ref_id = comps(id_comp)%ref_id
+    !write(msg,'(A,I0,A)') '   Employing the local reference frame for moment &
+    !  &and force projection.'//nl//'   Reference tag: '&
+    !  //trim(comps(id_comp)%ref_tag)//'  (ID: ',ref_id,')'
+    !call printout(trim(msg))
+!
+    !! allocate tmp array to store the results --------------
+    !if (an_end .lt. an_start) then 
+    !  call error('dust_post', 'Wrong definition in time vector')
+    !endif
+    !n_time = (an_end-an_start)/an_step + 1 ! int general eger division
+    !allocate( sec_loads(n_time,n_sect,n_loads) )
+    !sec_loads = -333.0_wp ! initialisation for DEBUG
+    !allocate( time(n_time) ) ; time = -333.0_wp
+    !allocate( ref_mat(n_time,9) , off_mat(n_time,3) )
+!
+    !if(print_ll) then  
+    !  allocate(ll_data(n_time,n_sect,n_ll_data))
+    !elseif (print_vl) then  
+    !    allocate(vl_data(n_time,n_sect,n_vl_data))
+    !endif 
+  !
+    !ires = 0
+    !do it = an_start, an_end, an_step
+    !  ires = ires + 1
+!
+    !  ! Open the file:
+    !  write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_',it,'.h5'
+    !  call open_hdf5_file(trim(filename),floc)
+!
+    !  ! Load the references and move the points ---
+    !  call load_refs(floc,refs_R,refs_off)
+    !  ! Move the points ---------------------------
+    !  call update_points_postpro(comps, points, refs_R, refs_off, &
+    !                              filen = trim(filename) )
+    !  ! Load the results --------------------------
+    !  call load_res(floc, comps, vort, cp, t)
+    !  
+    !  if(print_ll) then  
+    !    call load_ll(floc, comps, ll_data(ires,:,:))
+    !  elseif(print_vl) then  
+    !    call load_vl(floc, comps, vl_data(ires,:,:))
+    !  endif 
+!
+    !  call close_hdf5_file(floc)
+!
+    !  ! from local coordinates to coordinates in the base ref.frame
+    !  do is = 1 , n_sect
+    !    r_axis_bas(:,is) = matmul( refs_R(:,:,ref_id) , r_axis(:,is) ) + &
+    !                      refs_off(:,ref_id)
+    !  end do
+!
+    !  ! compute sectional loads. Loop over the panels of each section
+    !  ie = 0
+    !  do is = 1 , n_sect ! loop over sections
+    !    ! force
+    !    F_bas = 0.0_wp ; M_bas = 0.0_wp
+    !    do ic = 1 , nelem_chor ! loop over chord
+    !      ie = ie + 1
+    !      F_bas1 = comps(id_comp)%el(ie)%dforce
+    !      F_bas  = F_bas + F_bas1
+    !      M_bas  = M_bas + cross( comps(id_comp)%el(ie)%cen &
+    !                    - r_axis_bas(:,is) , F_bas1 )      &
+    !                    + comps(id_comp)%el(ie)%dmom ! updated 2018-07-12
+    !    end do ! loop over chord
+!
+    !    ! From global to local coordinates of forces and moments
+    !    sec_loads(ires,is,1:3) = matmul( &
+    !        transpose( refs_R(:,:, ref_id) ) , F_bas ) / y_span(is)
+    !    ! moment ( only the component around the <ax_coord> )
+    !    M_bas = matmul( &
+    !            transpose( refs_R(:,:, ref_id) ) , M_bas )
+    !    sec_loads(ires,is,4) = M_bas(ax_coor) / y_span(is)
+!
+    !  end do ! loop over sections
+!
+    !  ref_mat(ires,:) = reshape(refs_R(:,:,ref_id),(/ 9 /))
+    !  off_mat(ires,:) = refs_off(:,ref_id)
+    !  time(ires) = t
+!
+    !end do
+!
+    !if(average) then
+    !  allocate(sec_loads_ave(1,size(sec_loads,2),size(sec_loads,3)))
+    !  sec_loads_ave(1,:,:) = sum(sec_loads, 1)/real(size(sec_loads,1),wp)
+    !  if (print_ll) then
+    !    allocate(ll_data_ave(1,size(ll_data,2),size(ll_data,3)))
+    !    ll_data_ave(1,:,:) = sum(ll_data, 1)/real(size(ll_data,1),wp)
+    !  elseif (print_vl) then
+    !    allocate(vl_data_ave(1,size(vl_data,2),size(vl_data,3)))
+    !    vl_data_ave(1,:,:) = sum(vl_data, 1)/real(size(vl_data,1),wp)
+    !  endif 
+!
+    !  select case(trim(out_frmt))
+    !    case('dat')
+    !        write(filename,'(A)') trim(basename)//'_'//trim(an_name)
+    !        call dat_out_sectional ( filename, components_names(1), y_cen, &
+    !                                y_span, chord, time(1:1), sec_loads_ave, ref_mat, &
+    !                                off_mat, average )
+    !      if(print_ll) then 
+    !        call dat_out_sectional_ll(filename, components_names(1), &
+    !                                y_cen, y_span, chord, time(1:1), ll_data_ave, average)
+    !      elseif(print_vl) then
+    !        call dat_out_sectional_vl(filename, components_names(1), &
+    !                                y_cen, y_span, chord, time(1:1), vl_data_ave, average)
+    !      endif 
+    !      
+    !    case('tecplot')
+    !      write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'_ave.plt'
+    !      if (print_ll) then
+    !        call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
+    !                                y_span, chord, ll_data_ave)
+    !      elseif (print_vl) then
+    !        call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
+    !                                y_span, chord, vl_data_ave)
+    !      else 
+    !        call tec_out_sectional (filename, time(1:1), sec_loads_ave, y_cen, &
+    !                                                                  y_span, chord )
+    !      endif
+    !    end select
+    !  deallocate(sec_loads_ave)
+    !else
+    !  select case(trim(out_frmt))
+    !    case('dat')
+    !      write(filename,'(A)') trim(basename)//'_'//trim(an_name)
+    !      call dat_out_sectional ( filename, components_names(1), y_cen, &
+    !                              y_span, chord, time, sec_loads, &
+    !                              ref_mat, off_mat, average )
+    !      if(print_ll) then 
+    !        call dat_out_sectional_ll (filename, components_names(1),&
+    !                                    y_cen, y_span, chord, time, ll_data, average )
+    !      elseif (print_vl) then 
+    !        call dat_out_sectional_vl (filename, components_names(1),&
+    !                                    y_cen, y_span, chord, time, vl_data, average )
+    !      endif 
+    !    case('tecplot')
+    !      write(filename,'(A)') trim(basename)//'_'//trim(an_name)//'.plt'
+    !      if (print_ll) then
+    !        call tec_out_sectional (filename, time, sec_loads, y_cen, y_span, chord, &
+    !                                ll_data)
+    !      elseif (print_vl) then 
+    !        call tec_out_sectional (filename, time, sec_loads, y_cen, y_span, chord, &
+    !                                vl_data)
+    !      else
+    !        call tec_out_sectional ( filename, time, sec_loads, y_cen, y_span, chord)
+    !      endif
+    !  end select
+    !endif
+!
+    !deallocate(r_axis,r_axis_bas)
+    !deallocate(y_cen, y_span)
+    !deallocate(sec_loads, time, ref_mat, off_mat)
+!
+!
   case ( 'parametric' )
 
     ! Some assumptions ---------------
@@ -739,92 +975,91 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
         ! nCoord of the vertices of the elem ( (r-refPoi(1))\cdot nVec )
         do iv = 1 , nver
           nCoordVert(iv) = &
-             sum ( ( comps(id_comp)%loc_points(:, &
+              sum ( ( comps(id_comp)%loc_points(:, &
                                       comps(id_comp)%el(ie)%i_ver(iv) ) &
                      - refPoiLateralFaces(:,1) ) * nVec )
         end do
 
         ! elems with at least one point s.t. nCoor \in (nCoorMix,nCoorMax)
         if ( ( maxval(nCoordVert) .ge. 0.0_wp ) .and. &
-             ( minval(nCoordVert) .le. nCoordMax-nCoordMin ) ) then
+            ( minval(nCoordVert) .le. nCoordMax-nCoordMin ) ) then
 
-           ! find the sections where the ver of the elem belong -------------
-           ! !!! if the one vert is outside the box, secVert keep 0 value !!!
-           do iv = 1 , nver
-             if ( nCoordVert(iv) - nCoordSec(n_sect+1) .gt. 0.0_wp  ) then
-                 secVert(iv) = n_sect + 1
-             elseif ( nCoordVert(iv) - nCoordSec(1) .le. 0.0_wp  ) then
-                 secVert(iv) = 0
-             else
-               do is = 1 , n_sect !TODO: improve this loop; exit when found
-                 if ( ( nCoordVert(iv) - nCoordSec(is)   .gt. 0.0_wp ) .and. &
-                      ( nCoordVert(iv) - nCoordSec(is+1) .le. 0.0_wp ) ) then
-                   secVert(iv) = is
-                 end if
-               end do
-             end if
-           end do
+            ! find the sections where the ver of the elem belong -------------
+            ! !!! if the one vert is outside the box, secVert keep 0 value !!!
+            do iv = 1 , nver
+              if ( nCoordVert(iv) - nCoordSec(n_sect+1) .gt. 0.0_wp  ) then
+                  secVert(iv) = n_sect + 1
+              elseif ( nCoordVert(iv) - nCoordSec(1) .le. 0.0_wp  ) then
+                  secVert(iv) = 0
+              else
+                do is = 1 , n_sect !TODO: improve this loop; exit when found
+                  if ( ( nCoordVert(iv) - nCoordSec(is)   .gt. 0.0_wp ) .and. &
+                        ( nCoordVert(iv) - nCoordSec(is+1) .le. 0.0_wp ) ) then
+                    secVert(iv) = is
+                  end if
+                end do
+              end if
+            end do
 
-           ! If the elements belong to: -------------------------------------
-           ! (a) .gt. 2 sections ----> error.
-           ! (b) .eq. 1 section  ----> easy
-           ! (c) .eq. 2 section  ----> find intersections and partial contributions
-           !                          to the sections
+            ! If the elements belong to: -------------------------------------
+            ! (a) .gt. 2 sections ----> error.
+            ! (b) .eq. 1 section  ----> easy
+            ! (c) .eq. 2 section  ----> find intersections and partial contributions
+            !                          to the sections
 
-           ! (a) check if the elements belong to less than three sections --> otherwise ERROR
-           if ( maxval(secVert(1:nver) ) &
-              - minval(secVert(1:nver) ) .gt. 1 ) then
-             write(msg,'(A)') 'The analyzed component '&
-              &//comps(id_comp)%comp_name//' has an element which spans more &
-              &than two sections, this cannot be handled. This generally means &
-              &that an element is significantly wider than the section spacing,&
-              & try reducing the number of sections'
-             call error(this_mod_name,this_sub_name,msg)
-           end if
-           ! (b)
-           if ( all(  secVert .eq. secVert(1) ) ) then
-             box_secloads(secVert(1))%nelems = box_secloads(secVert(1))%nelems + 1
-             box_secloads(secVert(1))%elems(box_secloads(secVert(1))%nelems) = ie
-             box_secloads(secVert(1))%fracs(box_secloads(secVert(1))%nelems) = 1.0_wp
-             box_secloads(secVert(1))%cen(:,box_secloads(secVert(1))%nelems) = &
-                                                            comps(id_comp)%el(ie)%cen
-           else !(c)
+            ! (a) check if the elements belong to less than three sections --> otherwise ERROR
+            if ( maxval(secVert(1:nver) ) &
+                - minval(secVert(1:nver) ) .gt. 1 ) then
+                write(msg,'(A)') 'The analyzed component '&
+                &//comps(id_comp)%comp_name//' has an element which spans more &
+                &than two sections, this cannot be handled. This generally means &
+                &that an element is significantly wider than the section spacing,&
+                & try reducing the number of sections'
+              call error(this_mod_name,this_sub_name,msg)
+            end if
+            ! (b)
+            if ( all(  secVert .eq. secVert(1) ) ) then
+              box_secloads(secVert(1))%nelems = box_secloads(secVert(1))%nelems + 1
+              box_secloads(secVert(1))%elems(box_secloads(secVert(1))%nelems) = ie
+              box_secloads(secVert(1))%fracs(box_secloads(secVert(1))%nelems) = 1.0_wp
+              box_secloads(secVert(1))%cen(:,box_secloads(secVert(1))%nelems) = &
+                                                              comps(id_comp)%el(ie)%cen
+            else !(c)
 
-             !TODO: treat elements partially belonging to the box.  if ( ... )
+              !TODO: treat elements partially belonging to the box.  if ( ... )
 
-             ! Find intersections with the plane delimiting the sections ----
-             do iv = 1 , nver
+              ! Find intersections with the plane delimiting the sections ----
+              do iv = 1 , nver
 
-               index2 = mod(iv,comps(id_comp)%el(ie)%n_ver)+1 ! following node
+                index2 = mod(iv,comps(id_comp)%el(ie)%n_ver)+1 ! following node
 
-               ! if two consecutive nodes belong to different sections
-               !  ---> find intersection
-               if ( secVert( index2 ) .ne. secVert(iv) ) then
-                 nInterSect = nInterSect + 1
-                 node1 = comps(id_comp)%loc_points(:, comps(id_comp)%el(ie)%i_ver(iv) )
-                 node2 = comps(id_comp)%loc_points(:, comps(id_comp)%el(ie)%i_ver(index2) )
-                 interSectPoints(:,nInterSect) = node1 + (node2-node1) * &
-                      ( nCoordSec( max( secVert(iv), secVert(index2) ) ) - nCoordVert(iv) ) / &
-                      ( nCoordVert(index2) - nCoordVert(iv) )  ! ^---- max(.,.): id. of the section
+                ! if two consecutive nodes belong to different sections
+                !  ---> find intersection
+                if ( secVert( index2 ) .ne. secVert(iv) ) then
+                  nInterSect = nInterSect + 1
+                  node1 = comps(id_comp)%loc_points(:, comps(id_comp)%el(ie)%i_ver(iv) )
+                  node2 = comps(id_comp)%loc_points(:, comps(id_comp)%el(ie)%i_ver(index2) )
+                  interSectPoints(:,nInterSect) = node1 + (node2-node1) * &
+                        (nCoordSec( max( secVert(iv), secVert(index2) ) ) - nCoordVert(iv) ) / &
+                        (nCoordVert(index2) - nCoordVert(iv) )  ! ^---- max(.,.): id. of the section
 
-                 if ( secVert(iv) .eq. secVert(1) ) then ! sec.1
-                   nNodeInt(1,nInterSect) = iv     ; nNodeInt(2,nInterSect) = index2
-                 else ! sec.2
-                   nNodeInt(1,nInterSect) = index2 ; nNodeInt(2,nInterSect) = iv
-                 end if
+                  if ( secVert(iv) .eq. secVert(1) ) then ! sec.1
+                    nNodeInt(1,nInterSect) = iv     ; nNodeInt(2,nInterSect) = index2
+                  else ! sec.2
+                    nNodeInt(1,nInterSect) = index2 ; nNodeInt(2,nInterSect) = iv
+                  end if
+                end if
+              end do
 
-               end if
-             end do
-
-             ! Count the nodes belonging to the splitted elem ---------------
-             iSec1 = secVert(1) ; sec1_nVer = 1 ; sec2_nVer = 0
-             do iv = 2 , comps(id_comp)%el(ie)%n_ver
-               if ( secVert(iv) .ne. iSec1 ) then
-                 iSec2 = secVert(iv) ; sec2_nVer = sec2_nVer + 1
-               else
-                 sec1_nVer = sec1_nVer + 1
-               end if
-             end do
+              ! Count the nodes belonging to the splitted elem ---------------
+              iSec1 = secVert(1) ; sec1_nVer = 1 ; sec2_nVer = 0
+              do iv = 2 , comps(id_comp)%el(ie)%n_ver
+                if ( secVert(iv) .ne. iSec1 ) then
+                  iSec2 = secVert(iv) ; sec2_nVer = sec2_nVer + 1
+                else
+                  sec1_nVer = sec1_nVer + 1
+                end if
+              end do
 
               ! Compute the area of the subelem with the minimum n.of points -
               !  (since it could be only TRI or QUAD) and compute the area of
@@ -872,14 +1107,14 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
 
               if ( sec2_nVer .eq. 1 ) then
                 interSectCen(:,2) = ( interSectPoints(:,1) + interSectPoints(:,2) + &
-                     comps(id_comp)%loc_points(:, &
-                           comps(id_comp)%el(ie)%i_ver(nNodeInt(2,1)) ) ) / 3.0_wp
+                      comps(id_comp)%loc_points(:, &
+                            comps(id_comp)%el(ie)%i_ver(nNodeInt(2,1)) ) ) / 3.0_wp
               elseif ( sec2_nVer .eq. 2 ) then
                 interSectCen(:,2) = ( interSectPoints(:,1) + interSectPoints(:,2) + &
-                     comps(id_comp)%loc_points(:, &
-                           comps(id_comp)%el(ie)%i_ver(nNodeInt(2,1)) ) + &
-                     comps(id_comp)%loc_points(:, &
-                           comps(id_comp)%el(ie)%i_ver(nNodeInt(2,2)) ) ) / 4.0_wp
+                      comps(id_comp)%loc_points(:, &
+                            comps(id_comp)%el(ie)%i_ver(nNodeInt(2,1)) ) + &
+                      comps(id_comp)%loc_points(:, &
+                            comps(id_comp)%el(ie)%i_ver(nNodeInt(2,2)) ) ) / 4.0_wp
               else
               end if
               interSectCen(:,1) = ( comps(id_comp)%el(ie)%area * comps(id_comp)%el(ie)%cen - &
@@ -898,7 +1133,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
             box_secloads(isec2)%cen(:,box_secloads(isec2)%nelems) = interSectCen(:,2)
 
 
-           end if
+          end if
 
         end if ! elems with at least one point s.t. nCoor in (nCoorMix,nCoorMax)
 

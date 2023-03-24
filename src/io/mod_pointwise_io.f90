@@ -760,7 +760,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
                             this_mod_name)
     end if
   end do
- 
+
 
   !> i_airfoil_e, normalised_coord_e
   allocate(i_airfoil_e       (2,nelem_span_tot)) ; i_airfoil_e        = 0
@@ -771,7 +771,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
   do i = 1 , nelem_span_tot ! loop over the elements in the spanwise direction
 
     s_cen_e = 0.5_wp * ( ref_line_interp_s_all(i) + ref_line_interp_s_all(i+1) )
- 
+
     ! scan airfoil_list_actual_s and update j, index of the lower bound for interpolation
     if  ( s_cen_e .gt. airfoil_list_actual_s(j+1) ) then
       j = j + 1
@@ -1160,13 +1160,13 @@ subroutine check_point_line_inputs( points , lines )
   !> if first or last lines are Splines, the user must provide the
   !  initial or final direction
   if ( ( trim(lines(1)%l_type) .eq. 'Spline' ) .and. &
-       ( .not. allocated(lines(1)%t_vec1) ) ) then
+      ( .not. allocated(lines(1)%t_vec1) ) ) then
     write(*,*) ' error in check_point_lines_input: the first line is a Spline and &
                 &has no TangentVec1 provided as an input. Stop ' ; stop
   end if
 
   if ( ( trim(lines(n_lines)%l_type) .eq. 'Spline' ) .and. &
-       ( .not. allocated(lines(n_lines)%t_vec2) ) ) then
+      ( .not. allocated(lines(n_lines)%t_vec2) ) ) then
     write(*,*) ' error in check_point_lines_input: the last line is a Spline and &
                 &has no TangentVec2 provided as an input. Stop. ' ; stop
   end if
@@ -1174,7 +1174,7 @@ subroutine check_point_line_inputs( points , lines )
   !> no consecutive splines are allowed so far
   do i = 1 , n_lines-1
     if ( ( trim(lines(i  )%l_type) .eq. 'Spline' ) .and. &
-         ( trim(lines(i+1)%l_type) .eq. 'Spline' ) ) then
+        ( trim(lines(i+1)%l_type) .eq. 'Spline' ) ) then
       write(*,*) ' error in check_point_lines_input: two consecutive splines are not &
                   &allowed so far. '
       write(*,*) ' In future release, this could not be true anymore: '
@@ -1213,84 +1213,84 @@ subroutine update_ref_line_normal( points , ref_line_normal   , &
   integer :: i
 
 
- !> set points(...)%sec_nor
- do i = 1 , size(points)
-   if ( trim(points(i)%sec_nor_str) .eq. 'referenceLine' ) then
-     points(i)%sec_nor = nor_in(i,:)
-   elseif ( trim(points(i)%sec_nor_str) .eq. 'yAxis'    ) then
-     points(i)%sec_nor = (/ 0.0_wp , 1.0_wp , 0.0_wp /)
-   elseif ( trim(points(i)%sec_nor_str) .eq. 'yAxisNeg' ) then
-     points(i)%sec_nor = (/ 0.0_wp ,-1.0_wp , 0.0_wp /)
-   elseif ( trim(points(i)%sec_nor_str) .eq. 'vector' ) then
-     ! % sec_nor assigned during reading in read_points()
-   else
-     write(*,*) ' Error in mod_pointwise_io.f90: '
-     write(*,*) ' points(',i,')%sec_nor_str : ' , trim(points(i)%sec_nor_str)
-     write(*,*) ' while the possible inputs are: "referenceLine" (default), '
-     write(*,*) ' "yAxis", "yAxisNeg" , "vector". Stop. ' ; stop
-   endif
- end do
+  !> set points(...)%sec_nor
+  do i = 1 , size(points)
+    if ( trim(points(i)%sec_nor_str) .eq. 'referenceLine' ) then
+      points(i)%sec_nor = nor_in(i,:)
+    elseif ( trim(points(i)%sec_nor_str) .eq. 'yAxis'    ) then
+      points(i)%sec_nor = (/ 0.0_wp , 1.0_wp , 0.0_wp /)
+    elseif ( trim(points(i)%sec_nor_str) .eq. 'yAxisNeg' ) then
+      points(i)%sec_nor = (/ 0.0_wp ,-1.0_wp , 0.0_wp /)
+    elseif ( trim(points(i)%sec_nor_str) .eq. 'vector' ) then
+      ! % sec_nor assigned during reading in read_points()
+    else
+      write(*,*) ' Error in mod_pointwise_io.f90: '
+      write(*,*) ' points(',i,')%sec_nor_str : ' , trim(points(i)%sec_nor_str)
+      write(*,*) ' while the possible inputs are: "referenceLine" (default), '
+      write(*,*) ' "yAxis", "yAxisNeg" , "vector". Stop. ' ; stop
+    endif
+  end do
 
 
- !> set ref_line_normal vector
- do i = 1 , size(ref_line_normal,1)
+  !> set ref_line_normal vector
+  do i = 1 , size(ref_line_normal,1)
 
-   str1 = trim( points( ref_line_interp_p(i,1) ) %sec_nor_str )
-   str2 = trim( points( ref_line_interp_p(i,2) ) %sec_nor_str )
+    str1 = trim( points( ref_line_interp_p(i,1) ) %sec_nor_str )
+    str2 = trim( points( ref_line_interp_p(i,2) ) %sec_nor_str )
 
-   if (     trim(str1) .eq. 'yAxis'         ) then
-     nor1 = (/ 0.0_wp , 1.0_wp , 0.0_wp /)
-   elseif ( trim(str1) .eq. 'yAxisNeg'      ) then
-     nor1 = (/ 0.0_wp ,-1.0_wp , 0.0_wp /)
-   elseif ( trim(str1) .eq. 'vector'        ) then
-     nor1 = points( ref_line_interp_p(i,1) )%sec_nor
-   elseif ( trim(str1) .eq. 'referenceLine' ) then
-     nor1 = ref_line_normal(i,:)
-   end if
-   if (     trim(str2) .eq. 'yAxis'         ) then
-     nor2 = (/ 0.0_wp , 1.0_wp , 0.0_wp /)
-   elseif ( trim(str2) .eq. 'yAxisNeg'      ) then
-     nor2 = (/ 0.0_wp ,-1.0_wp , 0.0_wp /)
-   elseif ( trim(str2) .eq. 'vector'        ) then
-     nor2 = points( ref_line_interp_p(i,2) )%sec_nor
-   elseif ( trim(str2) .eq. 'referenceLine' ) then
-     nor2 = ref_line_normal(i,:)
-   end if
+    if (     trim(str1) .eq. 'yAxis'         ) then
+      nor1 = (/ 0.0_wp , 1.0_wp , 0.0_wp /)
+    elseif ( trim(str1) .eq. 'yAxisNeg'      ) then
+      nor1 = (/ 0.0_wp ,-1.0_wp , 0.0_wp /)
+    elseif ( trim(str1) .eq. 'vector'        ) then
+      nor1 = points( ref_line_interp_p(i,1) )%sec_nor
+    elseif ( trim(str1) .eq. 'referenceLine' ) then
+      nor1 = ref_line_normal(i,:)
+    end if
+    if (     trim(str2) .eq. 'yAxis'         ) then
+      nor2 = (/ 0.0_wp , 1.0_wp , 0.0_wp /)
+    elseif ( trim(str2) .eq. 'yAxisNeg'      ) then
+      nor2 = (/ 0.0_wp ,-1.0_wp , 0.0_wp /)
+    elseif ( trim(str2) .eq. 'vector'        ) then
+      nor2 = points( ref_line_interp_p(i,2) )%sec_nor
+    elseif ( trim(str2) .eq. 'referenceLine' ) then
+      nor2 = ref_line_normal(i,:)
+    end if
 
-   nor1 = nor1 / norm2(nor1)
-   nor2 = nor2 / norm2(nor2)
+    nor1 = nor1 / norm2(nor1)
+    nor2 = nor2 / norm2(nor2)
 
-   if ( norm2( nor1+nor2 ) .gt. tol ) then
+    if ( norm2( nor1+nor2 ) .gt. tol ) then
 
-     w1 = ( s_in( ref_line_interp_p(i,2) ) - ref_line_interp_s_all(i)       ) / &
+      w1 = ( s_in( ref_line_interp_p(i,2) ) - ref_line_interp_s_all(i)       ) / &
           ( s_in( ref_line_interp_p(i,2) ) - s_in( ref_line_interp_p(i,1) ) )
-     w2 = ( ref_line_interp_s_all(i)       - s_in( ref_line_interp_p(i,1) ) ) / &
+      w2 = ( ref_line_interp_s_all(i)       - s_in( ref_line_interp_p(i,1) ) ) / &
           ( s_in( ref_line_interp_p(i,2) ) - s_in( ref_line_interp_p(i,1) ) )
 
-     ref_line_normal(i,:) = nor1 * w1 +  nor2 * w2
+      ref_line_normal(i,:) = nor1 * w1 +  nor2 * w2
 
-   else
+    else
 
-     nor0 = points( ref_line_interp_p(i,2) ) % coord - &
-            points( ref_line_interp_p(i,1) ) % coord
+      nor0 = points( ref_line_interp_p(i,2) ) % coord - &
+             points( ref_line_interp_p(i,1) ) % coord
 
-     !> non-dimensional coord \in (-1,1)
-     ds = ( ref_line_interp_s_all(i) - &
+      !> non-dimensional coord \in (-1,1)
+      ds = (ref_line_interp_s_all(i) - &
             0.5_wp * ( s_in( ref_line_interp_p(i,2) ) + s_in( ref_line_interp_p(i,1) ) ) ) * &
             2.0_wp / ( s_in( ref_line_interp_p(i,2) ) - s_in( ref_line_interp_p(i,1) ) )
 
-     w1 = 0.5_wp * ds * ( ds-1.0_wp)
-     w2 = 0.5_wp * ds * ( ds+1.0_wp)
-     w0 = (1.0_wp - ds)*(1.0_wp + ds)
+      w1 = 0.5_wp * ds * ( ds-1.0_wp)
+      w2 = 0.5_wp * ds * ( ds+1.0_wp)
+      w0 = (1.0_wp - ds)*(1.0_wp + ds)
 
-     ref_line_normal(i,:) = nor1 * w1 +  nor2 * w2 + w0 * nor0
+      ref_line_normal(i,:) = nor1 * w1 +  nor2 * w2 + w0 * nor0
 
-   end if
+    end if
 
-   !> normalisation
-   ref_line_normal(i,:) = ref_line_normal(i,:) / norm2(ref_line_normal(i,:))
+    !> normalisation
+    ref_line_normal(i,:) = ref_line_normal(i,:) / norm2(ref_line_normal(i,:))
 
- end do
+  end do
 
 end subroutine update_ref_line_normal
 
@@ -1571,7 +1571,7 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
   call line_prs%CreateRealOption('Bias', &
                 'bias factor for the spline', '0.0' )
   call line_prs%CreateStringOption('type_span', 'type of span-wise division: &
-                &uniform, cosine, cosineIB, cosineOB', &
+                &uniform, cosine, cosineIB, cosineOB, equalarea', &
                 'uniform' ) ! defualt
   !> TangentVec1,2: in the code:
   ! straight lines: useles input -> tan vec computed

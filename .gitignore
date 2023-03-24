@@ -15,6 +15,9 @@ src/general/mod_version.f90
 *.frc
 *.ine
 *.vtr
+*.act
+*.mov
+*.rfm
 build/
 *.h5
 !test/
