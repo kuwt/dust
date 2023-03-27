@@ -322,7 +322,8 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       call read_hdf5_al(ee   ,'ee'   ,geo_loc)
       call read_hdf5_al(rr   ,'rr'   ,geo_loc)
 
-      if ( trim(comps(i_comp)%comp_input) .eq. 'parametric' ) then
+      if ( trim(comps(i_comp)%comp_input) .eq. 'parametric' .or. & 
+          trim(comps(i_comp)%comp_input) .eq. 'pointwise') then
         call read_hdf5( parametric_nelems_span ,'parametric_nelems_span',geo_loc)
         call read_hdf5( parametric_nelems_chor ,'parametric_nelems_chor',geo_loc)
         comps(i_comp)%parametric_nelems_span = parametric_nelems_span

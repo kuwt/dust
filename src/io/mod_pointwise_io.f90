@@ -966,7 +966,6 @@ subroutine straight_line( mesh_file, r1 , r2 , nelems , type_span , rr , nor , s
 
   integer :: i
 
-  ! allocate(rr(nelems+1,3))
 
   nor_v = r2 - r1
   leng = norm2(nor_v)
@@ -993,12 +992,11 @@ subroutine straight_line( mesh_file, r1 , r2 , nelems , type_span , rr , nor , s
                 ( r2 - r1 ) * &
                 cos( 0.5_wp*real(i-1,wp)*pi/ real(nelems,wp) )
     elseif ( trim(type_span) .eq. 'equalarea' ) then 
+      ! equalarea spacing in span 
         rr(i,2) = sqrt(r1(2)**2.0_wp + (r2(2)**2.0_wp - r1(2)**2.0_wp) * &
                   (real(i-1,wp))/(real(nelems,wp))) 
-        rr(i,1) = r1(1) + (rr(i,2) - r1(2))*&
-                  ( r2(1) - r1(1) )/( r2(2) - r1(2) )
-        rr(i,3) = r1(3) + (rr(i,2) - r1(2))*&
-                          ( r2(3) - r1(3) )/( r2(2) - r1(2) )
+        rr(i,1) = r1(1) + (rr(i,2) - r1(2))*( r2(1) - r1(1) )/( r2(2) - r1(2) )
+        rr(i,3) = r1(3) + (rr(i,2) - r1(2))*( r2(3) - r1(3) )/( r2(2) - r1(2) )
     else
       write(*,*) ' Mesh file   : ' , trim(mesh_file)
       write(*,*) ' type_span   : ' , trim(type_span)
@@ -1264,7 +1262,7 @@ subroutine update_ref_line_normal( points , ref_line_normal   , &
     else
 
       nor0 = points( ref_line_interp_p(i,2) ) % coord - &
-             points( ref_line_interp_p(i,1) ) % coord
+              points( ref_line_interp_p(i,1) ) % coord
 
       !> non-dimensional coord \in (-1,1)
       ds = (ref_line_interp_s_all(i) - &
@@ -1376,35 +1374,35 @@ subroutine read_points ( eltype , pmesh_prs , point_prs , points, aero_table )
   ! loop over Point groups
   do i = 1 , nPoints
 
-    call getsuboption( pmesh_prs , 'Point' , point_prs )
-    points(i) % id          = getint(      point_prs, 'Id')
-    points(i) % coord       = getrealarray(point_prs, 'Coordinates',3)
-    if ( ( eltype .eq. 'p' )) then
-      points(i) % airfoil     = getstr(      point_prs, 'airfoil')
-    elseif ( ( eltype .eq. 'v' )) then
+    call getsuboption(pmesh_prs, 'Point', point_prs)
+    points(i)%id = getint(point_prs, 'Id')
+    points(i)%coord = getrealarray(point_prs, 'Coordinates',3)
+    if ((eltype .eq. 'p' )) then
+      points(i)%airfoil     = getstr(point_prs, 'airfoil')
+    elseif ((eltype .eq. 'v' )) then
       if (aero_table) then
-        points(i) % airfoil_table     = getstr( point_prs, 'airfoil_table')
-        points(i) % airfoil     = getstr(      point_prs, 'airfoil')
+        points(i)%airfoil_table = getstr( point_prs, 'airfoil_table')
+        points(i)%airfoil = getstr(point_prs, 'airfoil')
       else
-        points(i) % airfoil     = getstr(      point_prs, 'airfoil')
+        points(i)%airfoil = getstr(point_prs, 'airfoil')
       endif 
-    else if ( eltype .eq. 'l' ) then
-      points(i) % airfoil     = getstr(      point_prs, 'airfoil_table')
+    else if (eltype .eq. 'l') then
+      points(i)%airfoil = getstr(point_prs, 'airfoil_table')
     else
       write(*,*) ' Error in read_points (Internal error: some of the programmers &
-                  &did it bad): eltype must be either "p","v","l". Stop' ; stop
+                  &did it bad): eltype must be either "p", "v", "l". Stop' ; stop
     end if
-    points(i) % chord       = getreal(     point_prs, 'chord')
-    points(i) % theta       = getreal(     point_prs, 'twist')
-    points(i) % sec_nor_str = getstr(      point_prs, 'section_normal')
+    points(i)%chord = getreal(point_prs, 'chord')
+    points(i)%theta = getreal(point_prs, 'twist')
+    points(i)%sec_nor_str = getstr(point_prs, 'section_normal')
     if ( trim(points(i)%sec_nor_str) .eq. 'vector' ) then
-      points(i) % sec_nor = getrealarray(  point_prs, 'section_normal_vector',3)
+      points(i)%sec_nor = getrealarray(  point_prs, 'section_normal_vector',3)
     end if
     !> flipSection for 'p' or 'v'
-    if ( ( eltype .eq. 'p' ) .or. ( eltype .eq. 'v' ) .or. ( eltype .eq. 'l' ) ) then
-      points(i) % flip_sec  = getlogical(  point_prs, 'flip_section', 'F' )
+    if ((eltype .eq. 'p') .or. (eltype .eq. 'v') .or. (eltype .eq. 'l')) then
+      points(i)%flip_sec = getlogical(point_prs, 'flip_section', 'F')
     else
-      points(i) % flip_sec    = .false.
+      points(i)%flip_sec = .false.
     end if
   
     point_prs => null()
@@ -1431,18 +1429,18 @@ subroutine read_lines ( pmesh_prs , line_prs , lines  , nelems_span_tot)
 
     call getsuboption( pmesh_prs , 'Line' , line_prs )
 
-    lines(i) % l_type     = getstr(      line_prs , 'type'   )
-    lines(i) % end_points = getintarray( line_prs , 'end_points' , 2 )
-    lines(i) % nelems     = getint(      line_prs , 'Nelems' )
-    lines(i) % type_span  = getstr(      line_prs , 'type_span')
+    lines(i)%l_type     = getstr(      line_prs , 'type'   )
+    lines(i)%end_points = getintarray( line_prs , 'end_points' , 2 )
+    lines(i)%nelems     = getint(      line_prs , 'Nelems' )
+    lines(i)%type_span  = getstr(      line_prs , 'type_span')
 
     !> tension , bias parameters
     if ( trim(lines(i)%l_type) .eq. 'Spline' ) then
-      lines(i) % tension = getreal(line_prs , 'Tension')
-      lines(i) % bias    = getreal(line_prs , 'Bias'   )
+      lines(i)%tension = getreal(line_prs , 'Tension')
+      lines(i)%bias    = getreal(line_prs , 'Bias'   )
     else
-      lines(i) % tension = 0.0_wp
-      lines(i) % bias    = 0.0_wp
+      lines(i)%tension = 0.0_wp
+      lines(i)%bias    = 0.0_wp
     end if
 
     !> allocate tvec for spline if they are provided as a input
@@ -1513,9 +1511,6 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
                   'F', &
                   multiple=.false.)
   end if
-
-  !> no need for a starting point
-  !...
 
   ! === Point subparser ===
   call pmesh_prs%CreateSubOption('point','Point group',point_prs, &

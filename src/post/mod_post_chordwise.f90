@@ -272,7 +272,7 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
   comp_input = trim(comps(1)%comp_input ) 
   select case( trim(comp_input) )
 
-  case ( 'parametric' )
+  case ( 'parametric', 'pointwise')
     ! Some assumptions ---------------
     id_comp = 1   ! 1. only one component is loaded
     ax_coor = 2   ! 2. the parametric elements is defined
@@ -531,14 +531,11 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
                               cp_int, n_station, span_station, chord_int)
       end select 
     endif 
-  
 
-  case('pointwise')
-    call error(this_sub_name,this_mod_name, 'case pointwise not implemented so far')
   case('cgns') 
-    call error(this_sub_name,this_mod_name, 'case cgns not implemented so far')
+    call error(this_sub_name, this_mod_name, 'case cgns not implemented so far')
   case default
-    call error(this_sub_name,this_mod_name, 'type not known')   
+    call error(this_sub_name, this_mod_name, 'type not known')   
   end select 
   
     

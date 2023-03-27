@@ -1344,7 +1344,8 @@ subroutine load_components(geo, in_file, out_file, te)
 
       !> For PARAMETRIC elements only:
       !  parametric_nelems_span , parametric_nelems_chor
-      if ( trim(comp_input) .eq. 'parametric' ) then
+      if ( trim(comp_input) .eq. 'parametric' .or. &
+          trim(comp_input) .eq. 'pointwise') then
         call read_hdf5(par_nelems_span,'parametric_nelems_span',geo_loc)
         call read_hdf5(par_nelems_chor,'parametric_nelems_chor',geo_loc)
       end if
@@ -1437,7 +1438,8 @@ subroutine load_components(geo, in_file, out_file, te)
 
         endif
 
-        if ( trim(comp_input) .eq. 'parametric' ) then
+        if (trim(comp_input) .eq. 'parametric' .or. & 
+            trim(comp_input) .eq. 'pointwise') then
           !> Write HDF5 fields
           call write_hdf5(par_nelems_span,'parametric_nelems_span',geo_loc)
           call write_hdf5(par_nelems_chor,'parametric_nelems_chor',geo_loc)
