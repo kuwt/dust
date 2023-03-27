@@ -101,6 +101,9 @@ use mod_dat_out, only: &
 
 use mod_wind, only: &
   variable_wind
+  
+use mod_surfpan, only: &
+  t_surfpan
 
 implicit none
 
@@ -139,7 +142,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
   real(wp), allocatable                                    :: rr_probes(:,:)
   logical                                                  :: probe_vel , probe_p , probe_vort, probe_cp
   integer                                                  :: fid_out , i_var , nprint
-  integer                                                  :: ie , ip , ic , it , ires, it_old
+  integer                                                  :: ie , ip , ic , it , ires, it_old, nelems_comp
   integer(h5loc)                                           :: floc , ploc
   character(len=max_char_len)                              :: filename
   real(wp), allocatable                                    :: points(:,:), points_old(:,:)
@@ -347,6 +350,17 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 
         call load_wake_post(floc, wake_old, wake_elems_old)
         call close_hdf5_file(floc)
+        
+        ! Re-compute u_vort from loaded old wake
+        do ic = 1,size(comps_old)
+          nelems_comp = comps_old(ic)%nelems
+          do ie = 1, nelems_comp
+            select type(el =>comps_old(ic)%el(ie))
+              type is(t_surfpan)
+                call el%get_vort_vel(wake_old%vort_p)
+            end select
+          end do
+        end do
       !end if
     end if    
     
@@ -373,6 +387,17 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 
     call load_wake_post(floc, wake, wake_elems)
     call close_hdf5_file(floc)
+    
+    ! Re-compute u_vort from loaded wake
+    do ic = 1,size(comps)
+      nelems_comp = comps(ic)%nelems
+      do ie = 1, nelems_comp
+        select type(el =>comps(ic)%el(ie))
+          type is(t_surfpan)
+            call el%get_vort_vel(wake%vort_p)
+        end select
+      end do
+    end do
 
     time(ires) = t
     
@@ -529,8 +554,11 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 
   call destroy_elements(comps)
   deallocate(comps, points,components_names)
-  call destroy_elements(comps_old)
-  if (allocated(comps_old)) deallocate(comps_old)
+  
+  if (allocated(comps_old)) then 
+    call destroy_elements(comps_old)
+    deallocate(comps_old)
+  end if
   if (allocated(points_old)) deallocate(points_old)
 
   write(msg,'(A,I0,A)') nl//'++++++++++ Probes done'//nl

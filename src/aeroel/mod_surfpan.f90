@@ -656,7 +656,7 @@ subroutine compute_vel_surfpan(this, pos, vel )
 
   ! source ----
   call velocity_calc_sou_surfpan(this, vsou, pos)
-
+  
   wind = variable_wind(this%cen, sim_param%time)
   vel = vdou*this%mag - vsou*( sum(this%nor*(this%ub-wind-this%uvort)) )
 
