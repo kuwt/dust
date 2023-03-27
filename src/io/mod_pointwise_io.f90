@@ -467,8 +467,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   if (present(aero_table_out)) then
     aero_table_out = aero_table
   end if
-  !> end parser reading (it could be done before, but it really
-  !  doesn't matter, does it?)
+
   call finalizeParameters(pmesh_prs)
 
 
@@ -566,22 +565,8 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
   call read_points ( 'l' , pmesh_prs , point_prs , points , aero_table)
   call read_lines  (       pmesh_prs ,  line_prs , lines  , nelem_span_tot )
 
-  ! check: only  "interp" attribute allowed for inner points of splines for LL
-  do i = 1 , size(lines)
-    if ( trim(lines(i)%l_type) .eq. 'Spline' ) then
-      do j = lines(i)%end_points(1)+1 , lines(i)%end_points(2)-1
-        if ( trim(points(j)%airfoil) .ne. 'interp' ) then
-          write(*,*) ' Error in read_mesh_pointwise_ll: so far, only "interp" '
-          write(*,*) ' attribute of the field "airfoil" is allowed for inner  '
-          write(*,*) ' points of a spline. Stop. ' ; stop
-        end if
-      end do
-    end if
-  end do
-
   npoint_chord_tot = nelem_chord_tot + 1
   npoint_span_tot  = nelem_span_tot  + 1
-
 
   !> === build ee, rr arrays (and all the remaining variables) ===
   do i = 1 , size(points)
@@ -642,12 +627,6 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
   allocate(chord_p(npoint_span_tot)) ; chord_p = 0.0_wp
   allocate(theta_p(npoint_span_tot)) ; theta_p = 0.0_wp
   allocate(theta_e(nelem_span_tot )) ; theta_e = 0.0_wp  
-
-  !! -- 0.75 chord -- look for other "0.75 chord" tag
-  !! set the TE 0.75*chord far from the ll
-  !do i = 1 , size(points)
-  !  points(i)%chord = points(i)%chord * 0.75_wp
-  !end do
 
 
   ! === define the coordinates of the sections at all the input points ===
@@ -806,10 +785,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
 
   ! optional output ----
   npoints_chord_tot = npoint_chord_tot
-  ! optional output ----
 
-  !> end parser reading (it could be done before, but it really
-  !  doesn't matter, does it?)
   call finalizeParameters(pmesh_prs)
 
 end subroutine read_mesh_pointwise_ll
@@ -995,7 +971,6 @@ subroutine straight_line( mesh_file, r1 , r2 , nelems , type_span , rr , nor , s
   nor_v = r2 - r1
   leng = norm2(nor_v)
   nor_v = nor_v / leng
-  write(*,*) 'shape(rr)', shape(rr)
   
   do i = 1, nelems + 1
 
@@ -1598,9 +1573,6 @@ subroutine set_parser_pointwise( eltype , pmesh_prs , point_prs , line_prs )
                 'assign tangent vector to the line at its first point' )
   call line_prs%CreateRealArrayOption('tangent_vec_2' , &
                 'assign tangent vector to the line at its first point' )
-
-
-
 
 end subroutine set_parser_pointwise
 
