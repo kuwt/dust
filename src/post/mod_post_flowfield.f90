@@ -366,12 +366,14 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
     ! Re-compute u_vort from loaded wake
     do ic = 1,size(comps)
       nelems_comp = comps(ic)%nelems
+      !$omp parallel do private(ie) 
       do ie = 1, nelems_comp
         select type(el =>comps(ic)%el(ie))
           type is(t_surfpan)
             call el%get_vort_vel(wake%vort_p)
         end select
       end do
+      !$omp end parallel do
     end do
     
     
@@ -400,12 +402,14 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
       ! Re-compute u_vort from loaded old wake
       do ic = 1,size(comps_old)
         nelems_comp = comps_old(ic)%nelems
+        !$omp parallel do private(ie) 
         do ie = 1, nelems_comp
           select type(el =>comps_old(ic)%el(ie))
             type is(t_surfpan)
               call el%get_vort_vel(wake_old%vort_p)
           end select
         end do
+        !$omp end parallel do
       end do
       
     end if
