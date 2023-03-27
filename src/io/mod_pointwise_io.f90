@@ -139,53 +139,54 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
                               aero_table_out, thickness)
 
 
-  character(len=*), intent(in)          :: mesh_file
-  integer  , allocatable, intent(out)   :: ee(:,:)
-  real(wp) , allocatable, intent(out)   :: rr(:,:)
-  integer  , intent(out), optional      :: npoints_chord_tot, nelem_span_tot
+  character(len=*), intent(in)                                      :: mesh_file
+  integer  , allocatable, intent(out)                               :: ee(:,:)
+  real(wp) , allocatable, intent(out)                               :: rr(:,:)
+  integer,  allocatable, intent(out), optional                      :: i_airfoil_e(:,:)
+  real(wp), allocatable, intent(out), optional                      :: normalised_coord_e(:,:)
+  character(len=max_char_len), allocatable , intent(out), optional  :: airfoil_list_actual(:)
+  integer  , intent(out), optional                                  :: npoints_chord_tot, nelem_span_tot
 
   !> Parser and sub-parsers
-  type(t_parse)                         :: pmesh_prs
-  type(t_parse) , pointer               :: point_prs , line_prs
-  logical, intent(out), optional        :: aero_table_out
-  logical                               :: aero_table
-  integer                               :: nelem_chord
-  character(max_char_len)               :: type_chord
-  character                             :: ElType
-  real(wp)                              :: ref_chord_fraction
+  type(t_parse)                                                     :: pmesh_prs
+  type(t_parse) , pointer                                           :: point_prs , line_prs
+  logical, intent(out), optional                                    :: aero_table_out
+  logical                                                           :: aero_table
+  integer                                                           :: nelem_chord
+  character(max_char_len)                                           :: type_chord
+  character                                                         :: ElType
+  real(wp)                                                          :: ref_chord_fraction
 
-  real(wp), allocatable                 :: chord_fraction(:)
-  real(wp), allocatable, intent(out), optional :: thickness(:,:) 
-  real(wp)                              :: thickness_section                             
+  real(wp), allocatable                                             :: chord_fraction(:)
+  real(wp), allocatable, intent(out), optional                      :: thickness(:,:) 
+  real(wp)                                                          :: thickness_section                             
   !> Point and line structures
-  type(t_point) , allocatable           :: points(:)
-  type(t_line ) , allocatable           :: lines(:)
+  type(t_point) , allocatable                                       :: points(:)
+  type(t_line ) , allocatable                                       :: lines(:)
 
   !> ee, rr size
-  integer                               :: nelem_chord_tot, npoint_chord_tot, npoint_span_tot
-  integer                               :: ee_size , rr_size
-  integer                               :: i_ch , i_sp , i_point , i_elem
+  integer                                                           :: nelem_chord_tot, npoint_chord_tot, npoint_span_tot
+  integer                                                           :: ee_size , rr_size
+  integer                                                           :: i_ch , i_sp , i_point , i_elem
 
-  real(wp) , allocatable                :: ref_line_points(:,:)
-  real(wp) , allocatable                :: ref_line_normal(:,:)
-  integer  , allocatable                :: ref_line_interp_p(:,:)
-  real(wp) , allocatable                :: ref_line_interp_s(:)
-  real(wp) , allocatable                :: ref_line_interp_s_all(:)
-  real(wp) , allocatable                :: s_in(:) , nor_in(:,:)
+  real(wp) , allocatable                                            :: ref_line_points(:,:)
+  real(wp) , allocatable                                            :: ref_line_normal(:,:)
+  integer  , allocatable                                            :: ref_line_interp_p(:,:)
+  real(wp) , allocatable                                            :: ref_line_interp_s(:)
+  real(wp) , allocatable                                            :: ref_line_interp_s_all(:)
+  real(wp) , allocatable                                            :: s_in(:) , nor_in(:,:)
 
-  real(wp) , allocatable                :: xy1(:,:) , xy2(:,:) , xy(:,:)
-  real(wp) , allocatable                :: rr_s(:,:)
-  real(wp)                              :: twist_rad , theta
+  real(wp) , allocatable                                            :: xy1(:,:) , xy2(:,:) , xy(:,:)
+  real(wp) , allocatable                                            :: rr_s(:,:)
+  real(wp)                                                          :: twist_rad , theta
 
-  real(wp)                              :: w1 , w2
-  integer                               :: i , i1 , i2, j
-  integer                                   :: iAirfoil, nAirfoils 
-  real(wp) , allocatable :: airfoil_list_actual_s(:)
-  integer,  allocatable, intent(out), optional :: i_airfoil_e(:,:)
-  real(wp), allocatable, intent(out), optional :: normalised_coord_e(:,:)
-  character(len=max_char_len), allocatable , intent(out), optional :: airfoil_list_actual(:)
-  real(wp)                              :: s_cen_e
-  character(len=*), parameter :: this_sub_name = 'read_mesh_pointwise'
+  real(wp)                                                          :: w1 , w2
+  integer                                                           :: i , i1 , i2, j
+  integer                                                           :: iAirfoil, nAirfoils 
+  real(wp) , allocatable                                            :: airfoil_list_actual_s(:)
+
+  real(wp)                                                          :: s_cen_e
+  character(len=*), parameter                                       :: this_sub_name = 'read_mesh_pointwise'
   
   aero_table = .false.
 
@@ -244,7 +245,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
   call fill_line_tan_vec( points , lines )
 
   !>
-  call build_reference_line( npoint_span_tot   , &
+  call build_reference_line(mesh_file, npoint_span_tot   , &
                             points , lines    , &
                             ref_line_points   , &
                             ref_line_normal   , &
@@ -433,7 +434,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
       if  ( s_cen_e .gt. airfoil_list_actual_s(j+1) ) then
         j = j + 1
         if ( j .eq. size(airfoil_list_actual_s) ) then
-          write(*,*) ' error in read_mesh_pointwise_ll: &
+          write(*,*) ' error in read_mesh_pointwise: &
                         &out of bounds while scanning line sectons; stop ' ; stop
         endif
       end if
@@ -442,7 +443,7 @@ subroutine read_mesh_pointwise ( mesh_file , ee , rr , &
       if ( ( ref_line_interp_s_all(i  ) .lt. airfoil_list_actual_s(j  ) ) .and. &
             ( ref_line_interp_s_all(i+1) .gt. airfoil_list_actual_s(j+1) ) ) then
             
-        write(*,*) ' error in read_mesh_pointwise_ll: '
+        write(*,*) '  warning in read_mesh_pointwise: '
         write(*,*) '  element i =', i , ' belongs to more than 2 sections: '
         write(*,*) '  centre of the el.            : ' , s_cen_e
         write(*,*) '  ref_line_interp_s_all(',i,':',i+1,') : ' , ref_line_interp_s_all(i:i+1)
@@ -487,51 +488,51 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
                         npoints_chord_tot , nelem_span_tot  , &
                         chord_p,theta_p,theta_e )
 
-  character(len=*), intent(in) :: mesh_file
-  integer  , allocatable, intent(out) :: ee(:,:)
-  real(wp) , allocatable, intent(out) :: rr(:,:)
-  character(len=max_char_len), allocatable , intent(out) :: airfoil_list_actual(:)
-  integer  , allocatable, intent(out) :: nelem_span_list(:)
-  integer  , allocatable, intent(out) :: i_airfoil_e(:,:)
-  real(wp) , allocatable, intent(out) :: normalised_coord_e(:,:)
-  integer  ,              intent(out) :: npoints_chord_tot, nelem_span_tot
-  real(wp) , allocatable, intent(out) :: chord_p(:),theta_p(:),theta_e(:)
-  real(wp) :: s_cen_e 
-  logical :: aero_table 
+  character(len=*), intent(in)                              :: mesh_file
+  integer  , allocatable, intent(out)                       :: ee(:,:)
+  real(wp) , allocatable, intent(out)                       :: rr(:,:)
+  character(len=max_char_len), allocatable , intent(out)    :: airfoil_list_actual(:)
+  integer  , allocatable, intent(out)                       :: nelem_span_list(:)
+  integer  , allocatable, intent(out)                       :: i_airfoil_e(:,:)
+  real(wp) , allocatable, intent(out)                       :: normalised_coord_e(:,:)
+  integer  ,              intent(out)                       :: npoints_chord_tot, nelem_span_tot
+  real(wp) , allocatable, intent(out)                       :: chord_p(:),theta_p(:),theta_e(:)
+
+  real(wp)                                                  :: s_cen_e 
+  logical                                                   :: aero_table 
   ! parser and sub-parsers
-  type(t_parse) :: pmesh_prs
-  type(t_parse) , pointer :: point_prs , line_prs
+  type(t_parse)                                             :: pmesh_prs
+  type(t_parse), pointer                                    :: point_prs, line_prs
   !>
-  integer   :: nelem_chord
-  character :: ElType
-  logical   :: mesh_flat 
+  integer                                                   :: nelem_chord
+  character                                                 :: ElType
+  logical                                                   :: mesh_flat 
 
   !> point and line structures
-  type(t_point) , allocatable :: points(:)
-  type(t_line ) , allocatable :: lines(:)
+  type(t_point) , allocatable                               :: points(:)
+  type(t_line ) , allocatable                               :: lines(:)
 
-  integer ::  nelem_chord_tot, npoint_chord_tot, npoint_span_tot
-  integer :: ee_size , rr_size
-  integer :: i_ch , i_sp , i_point , i_elem
-
-  !>
-  real(wp) , allocatable :: ref_line_points(:,:)
-  real(wp) , allocatable :: ref_line_normal(:,:)
-  integer  , allocatable :: ref_line_interp_p(:,:)
-  real(wp) , allocatable :: ref_line_interp_s(:)
-  real(wp) , allocatable :: ref_line_interp_s_all(:)
-  real(wp) , allocatable :: s_in(:) , nor_in(:,:)
-  real(wp) , allocatable :: airfoil_list_actual_s(:)
-
-  real(wp) , allocatable :: rr_s(:,:)
-  real(wp) :: twist_rad , theta
+  integer                                                   :: nelem_chord_tot, npoint_chord_tot, npoint_span_tot
+  integer                                                   :: ee_size, rr_size
+  integer                                                   :: i_ch, i_sp, i_point, i_elem
 
   !>
-  integer :: nAirfoils , iAirfoil
+  real(wp), allocatable                                     :: ref_line_points(:,:)
+  real(wp), allocatable                                     :: ref_line_normal(:,:)
+  integer , allocatable                                     :: ref_line_interp_p(:,:)
+  real(wp), allocatable                                     :: ref_line_interp_s(:)
+  real(wp), allocatable                                     :: ref_line_interp_s_all(:)
+  real(wp), allocatable                                     :: s_in(:), nor_in(:,:)
+  real(wp), allocatable                                     :: airfoil_list_actual_s(:)
 
-  integer :: i , i1 , i2 , j
+  real(wp), allocatable                                     :: rr_s(:,:)
+  real(wp)                                                  :: twist_rad, theta
 
-  character(len=*), parameter :: this_sub_name = 'read_mesh_pointwise_ll'
+  !>
+  integer                                                   :: nAirfoils, iAirfoil
+  integer                                                   :: i, i1, i2, j
+
+  character(len=*), parameter                               :: this_sub_name = 'read_mesh_pointwise_ll'
 
   aero_table = .false. 
   ! === Reference line, by points and lines as in read_mesh_pointwise ===
@@ -615,7 +616,7 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
   call fill_line_tan_vec( points , lines )
 
   !>
-  call build_reference_line( npoint_span_tot   , &
+  call build_reference_line(mesh_file, npoint_span_tot   , &
                             points , lines    , &
                             ref_line_points   , &
                             ref_line_normal   , &
@@ -803,20 +804,9 @@ subroutine read_mesh_pointwise_ll(mesh_file,ee,rr, &
 
   end do
 
-
-! ! -- 0.75 chord -- look for other "0.75 chord" tag
-! ! set the TE 0.75*chord far from the ll
-! do i = 1 , size(points)
-!   points(i)%chord = points(i)%chord / 0.75_wp
-! end do
-! do i = 1 , size(chord_p)
-!   chord_p(i) = chord_p(i) / 0.75_wp
-! end do
-
   ! optional output ----
   npoints_chord_tot = npoint_chord_tot
   ! optional output ----
-
 
   !> end parser reading (it could be done before, but it really
   !  doesn't matter, does it?)
@@ -826,13 +816,14 @@ end subroutine read_mesh_pointwise_ll
 
 !----------------------------------------------------------------------
 !> build reference line
-subroutine build_reference_line( npoint_span_tot   , points, lines     , &
+subroutine build_reference_line(mesh_file, npoint_span_tot   , points, lines     , &
                                 ref_line_points   , ref_line_normal   , &
                                 ref_line_interp_p , ref_line_interp_s , &
                                 ref_line_interp_s_all ,                 &
                                 s_in , nor_in )
 
   integer                     , intent(in)    :: npoint_span_tot
+  character(len=*), intent(in)                :: mesh_file
   type(t_point)               , intent(inout) :: points(:)
   type(t_line )               , intent(inout) :: lines( :)
   real(wp)      , allocatable , intent(out)   :: ref_line_points(:,:)
@@ -845,8 +836,8 @@ subroutine build_reference_line( npoint_span_tot   , points, lines     , &
 
   real(wp)      , allocatable                 :: ref_line_spline_s(:)
 
-  integer       , allocatable :: ip(:,:)
-  real(wp)      , allocatable :: s_in_1(:) , nor_in_1(:,:)
+  integer       , allocatable                 :: ip(:,:)
+  real(wp)      , allocatable                 :: s_in_1(:) , nor_in_1(:,:)
 
   type(t_spline) :: spl
 
@@ -872,14 +863,15 @@ subroutine build_reference_line( npoint_span_tot   , points, lines     , &
     i2 = i1 + lines(i)%nelems
     ref_line_points(i2,:) = points( lines(i)%end_points(2) ) % coord
 
-    if (      trim(lines(i)%l_type) .eq. 'Straight' ) then
+    if (trim(lines(i)%l_type) .eq. 'Straight') then
 
       !> points for interpolation
       do j = i1 , i2
         ref_line_interp_p(j,:) = lines(i)%end_points(:)
       end do
 
-      call straight_line( points( lines(i)%end_points(1) )%coord , &
+      call straight_line( mesh_file                              , &
+                          points( lines(i)%end_points(1) )%coord , &
                           points( lines(i)%end_points(2) )%coord , &
                           lines(i)%nelems                        , &
                           lines(i)%type_span                     , &
@@ -932,7 +924,7 @@ subroutine build_reference_line( npoint_span_tot   , points, lines     , &
       if ( allocated(nor_in_1) ) deallocate(nor_in_1) ; allocate(nor_in_1(n,3))
 
       !> compute ref_line_points on the spline
-      call hermite_spline( spl, lines(i)%nelems           , &
+      call hermite_spline( mesh_file, spl, lines(i)%nelems           , &
                                 lines(i)%tension          , &
                                 lines(i)%bias             , &
                                 lines(i)%type_span        , &
@@ -983,16 +975,17 @@ end subroutine build_reference_line
 
 !----------------------------------------------------------------------
 !> straight_line subdivision
-subroutine straight_line( r1 , r2 , nelems , type_span , rr , nor , s , &
+subroutine straight_line( mesh_file, r1 , r2 , nelems , type_span , rr , nor , s , &
                           leng )
-  real(wp)                , intent(in) :: r1(3) , r2(3)
-  integer                 , intent(in) :: nelems
-  character(max_char_len) , intent(in) :: type_span
+  character(len=*)        , intent(in)    :: mesh_file
+  real(wp)                , intent(in)    :: r1(3) , r2(3)
+  integer                 , intent(in)    :: nelems
+  character(max_char_len) , intent(in)    :: type_span
   real(wp)                , intent(inout) :: rr(:,:)
   real(wp)                , intent(inout) ::nor(:,:)
   real(wp)                , intent(inout) ::  s(:)
-  real(wp)                , intent(out) :: leng
-
+  real(wp)                , intent(out)   :: leng
+  character(len=*), parameter             :: this_sub_name = 'straight_line'
   real(wp) :: nor_v(3)
 
   integer :: i
@@ -1002,16 +995,40 @@ subroutine straight_line( r1 , r2 , nelems , type_span , rr , nor , s , &
   nor_v = r2 - r1
   leng = norm2(nor_v)
   nor_v = nor_v / leng
-
-  do i = 1 , nelems+1
+  write(*,*) 'shape(rr)', shape(rr)
+  
+  do i = 1, nelems + 1
 
     !> rr
     if ( trim(type_span) .eq. 'uniform' ) then !> uniform spacing
-      rr(i,:) = r1 * real(nelems+1-i,wp)/real(nelems,wp) + &
-                r2 * real(       i-1,wp)/real(nelems,wp)
+      rr(i,:) = r1 + real(i - 1,wp)/real(nelems,wp) * ( r2 - r1 )
+    elseif ( trim(type_span) .eq. 'cosine' ) then
+      ! cosine  spacing in span
+      rr(i,:) = 0.5_wp * ( r1 + r2 ) - &
+                0.5_wp * ( r2 - r1 ) * &
+                cos( real(i-1,wp)*pi/ real(nelems,wp) )
+    elseif ( trim(type_span) .eq. 'cosineOB' ) then
+      ! cosine  spacing in span: outboard refinement
+      rr(i,:) = r1 + &
+                ( r2 - r1 ) * &
+                sin( 0.5_wp*real(i-1,wp)*pi/ real(nelems,wp) )
+    elseif ( trim(type_span) .eq. 'cosineIB' ) then
+      ! cosine  spacing in span: inboard refinement
+      rr(i,:) = r2 - &
+                ( r2 - r1 ) * &
+                cos( 0.5_wp*real(i-1,wp)*pi/ real(nelems,wp) )
+    elseif ( trim(type_span) .eq. 'equalarea' ) then 
+        rr(i,2) = sqrt(r1(2)**2.0_wp + (r2(2)**2.0_wp - r1(2)**2.0_wp) * &
+                  (real(i-1,wp))/(real(nelems,wp))) 
+        rr(i,1) = r1(1) + (rr(i,2) - r1(2))*&
+                  ( r2(1) - r1(1) )/( r2(2) - r1(2) )
+        rr(i,3) = r1(3) + (rr(i,2) - r1(2))*&
+                          ( r2(3) - r1(3) )/( r2(2) - r1(2) )
     else
-      write(*,*) ' error in straight_line. Only uniform spacing '
-      write(*,*) ' implemented so far. Stop ' ; stop
+      write(*,*) ' Mesh file   : ' , trim(mesh_file)
+      write(*,*) ' type_span   : ' , trim(type_span)
+      call error(this_sub_name, this_mod_name, 'Incorrect input: &
+            & type_span must be equal to uniform, cosine, cosineIB, cosineOB, equalarea.')
     end if
 
     !> nor

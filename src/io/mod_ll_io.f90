@@ -82,49 +82,47 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
                         npoints_chord_tot , nelem_span_tot  , &
                                             chord_p,theta_p,theta_e)
 
- character(len=*), intent(in) :: mesh_file
- integer  , allocatable, intent(out) :: ee(:,:)
- real(wp) , allocatable, intent(out) :: rr(:,:)
- character(len=max_char_len), allocatable , intent(out) :: airfoil_list_actual(:)
- character(len=max_char_len), allocatable               :: airfoil_list(:)
- integer  , allocatable, intent(out) :: nelem_span_list(:)
- integer  , allocatable, intent(out) :: i_airfoil_e(:,:)
- real(wp) , allocatable, intent(out) :: normalised_coord_e(:,:)
- integer  ,              intent(out) :: npoints_chord_tot, nelem_span_tot
- real(wp) , allocatable, intent(out) :: chord_p(:),theta_p(:),theta_e(:)
+  character(len=*), intent(in)                            :: mesh_file
+  integer  , allocatable, intent(out)                     :: ee(:,:)
+  real(wp) , allocatable, intent(out)                     :: rr(:,:)
+  character(len=max_char_len), allocatable , intent(out)  :: airfoil_list_actual(:)
+  character(len=max_char_len), allocatable                :: airfoil_list(:)
+  integer  , allocatable, intent(out)                     :: nelem_span_list(:)
+  integer  , allocatable, intent(out)                     :: i_airfoil_e(:,:)
+  real(wp) , allocatable, intent(out)                     :: normalised_coord_e(:,:)
+  integer  ,              intent(out)                     :: npoints_chord_tot, nelem_span_tot
+  real(wp) , allocatable, intent(out)                     :: chord_p(:),theta_p(:),theta_e(:)
 
- type(t_parse) :: pmesh_prs
+  type(t_parse)                                           :: pmesh_prs
 
- logical :: twist_linear_interp
- integer :: nelem_chord, nelem_chord_tot ! , nelem_span_tot <--- moved as an output
- integer :: npoint_chord_tot, npoint_span_tot
- integer :: nRegions, nSections, nAirfoils, rr_size , ee_size , ispace
- integer :: iRegion , iSection , iAirfoil , iChord , iElement , iPoint
- real(wp):: ref_chord_fraction
- real(wp), allocatable :: ref_point(:)
- ! data read from file
- ! sections ---
- real(wp)         , allocatable :: chord_list(:) , twist_list(:)
-!character(len=max_str_len), allocatable , intent(out) :: airfoil_list(:)
- ! regions  ---
-!integer , allocatable , intent(out) :: nelem_span_list(:)
- real(wp), allocatable :: span_list(:) , sweep_list(:) , dihed_list(:)
- character(len=max_char_len), allocatable :: type_span_list(:)
- integer :: n_type_span
- character :: ElType
- logical :: symmetry, mesh_flat
- ! Sections 1. 2.
- real(wp), allocatable :: rrSection1(:,:) , rrSection2(:,:)
-!real(wp) :: th1 , th2 , ch1 , ch2
- real(wp) :: dx_ref , dy_ref , dz_ref
- integer :: ista , iend , ich
+  logical                                                 :: twist_linear_interp
+  integer                                                 :: nelem_chord, nelem_chord_tot 
+  integer                                                 :: npoint_chord_tot, npoint_span_tot
+  integer                                                 :: nRegions, nSections, nAirfoils 
+  integer                                                 :: rr_size , ee_size , ispace
+  integer                                                 :: iRegion, iSection, iAirfoil, iChord, iElement, iPoint
+  real(wp)                                                :: ref_chord_fraction
+  real(wp), allocatable                                   :: ref_point(:)
+  !> data read from file
+  ! sections ---
+  real(wp), allocatable                                   :: chord_list(:), twist_list(:)
+  ! regions  ---
+  real(wp), allocatable                                   :: span_list(:), sweep_list(:), dihed_list(:)
+  character(len=max_char_len), allocatable                :: type_span_list(:)
+  integer                                                 :: n_type_span
+  character                                               :: ElType
+  logical                                                 :: symmetry, mesh_flat
+  !> Sections 1. 2.
+  real(wp), allocatable                                   :: rrSection1(:,:) , rrSection2(:,:)
+  real(wp)                                                :: dx_ref , dy_ref , dz_ref
+  integer                                                 :: ista , iend , ich
 
- ! Linear interpolation of the twist angle
- real(wp) :: w1, w2
+  ! Linear interpolation of the twist angle
+  real(wp)                                                :: w1, w2
 
- integer :: i_aero1, i_aero2, iSpan, i
+  integer :: i_aero1, i_aero2, iSpan, i
 
- character(len=*), parameter :: this_sub_name = 'read_mesh_parametric'
+  character(len=*), parameter :: this_sub_name = 'read_mesh_parametric'
 
 
   !Prepare all the parameters to be read in the file
@@ -135,27 +133,18 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
                 'symmetry yes/no','F' )
   call pmesh_prs%CreateLogicalOption('mesh_flat', &
                 'flat mesh yes/no','F' )
-! !!! USELESS !!! for LIFTING LINE components !!!!!!!!!!!!
-! call pmesh_prs%CreateIntOption('nelem_chord',&
-!               'number of chord-wise elements', &
-!               multiple=.false.);
-! call pmesh_prs%CreateStringOption('type_chord',&
-!               'type of chord-wise division: uniform, cosine, cosineLE, cosineTE',&
-!               'uniform', &
-!               multiple=.false.);
-! !!! USELESS !!! for LIFTING LINE components !!!!!!!!!!!!
   call pmesh_prs%CreateRealArrayOption('starting_point',&
-               'Starting point (inboard TE), (x, y, z)', &
-               '(/0.0, 0.0, 0.0/)',&
-               multiple=.false.);
+                'Starting point (inboard TE), (x, y, z)', &
+                '(/0.0, 0.0, 0.0/)',&
+                multiple=.false.);
   call pmesh_prs%CreateRealOption('reference_chord_fraction',&
-               'Reference chord fraction', &
-               '0.0',&
-               multiple=.false.);
+                'Reference chord fraction', &
+                '0.0',&
+                multiple=.false.);
   call pmesh_prs%CreateLogicalOption('twist_linear_interpolation',&
-               'Linear interpolation of the twist angle, for the whole component',&
-               'F',&
-               multiple=.false.);
+                'Linear interpolation of the twist angle, for the whole component',&
+                'F',&
+                multiple=.false.);
   ! TODO: do we really need to allow the user to define the parameter above?
   ! the reference chord fraction is a number in the range [0,1] that defines
   ! - where the reference point is located in the root chord
@@ -164,9 +153,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
 
   ! Section parameters
-! already there (few lines above) as a characteristic of the whole component !!!
-! call pmesh_prs%CreateRealOption('ref_point_chord', 'reference point of the section (as a fraction of the chord)',&
-!               multiple=.true.);
   call pmesh_prs%CreateRealOption(     'chord', 'section chord', &
                 multiple=.true.);
   call pmesh_prs%CreateRealOption(     'twist', 'section twist angle',&
@@ -183,22 +169,23 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
                 multiple=.true.);
   call pmesh_prs%CreateIntOption( 'nelem_span', 'number of span-wise elements in the region',&
                 multiple=.true.);
-  call pmesh_prs%CreateStringOption('type_span', 'type of span-wise division: uniform, cosine, cosineIB, cosineOB', &
+  call pmesh_prs%CreateStringOption('type_span', 'type of span-wise division: &
+                                    uniform, cosine, cosineIB, cosineOB, equalarea', &
                 multiple=.true.);
 
 
   !read the parameters
   call pmesh_prs%read_options(mesh_file,printout_val=.true.)
 
-  nelem_chord     = 1          !  getint(pmesh_prs,'nelem_chord')   !!! USELESS !!!
-  nelem_chord_tot = 1          !  getint(pmesh_prs,'nelem_chord')   !!! USELESS !!!
+  nelem_chord     = 1          
+  nelem_chord_tot = 1          
   ElType  = getstr(pmesh_prs,'el_type')
   symmetry= getlogical(pmesh_prs,'mesh_symmetry')
   mesh_flat= getlogical(pmesh_prs,'mesh_flat')
 
   if ( mesh_flat .and. trim(ElType) .ne. 'l' ) then
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-         &flat mesh option is available only for lifting line elements.')
+          &flat mesh option is available only for lifting line elements.')
   end if
 
   nSections = countoption(pmesh_prs,'chord')
@@ -210,7 +197,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   ! Check that nSections = nRegion + 1
   if ( nSections .ne. nRegions + 1 ) then
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-         &number of sections different from number of regions + 1.')
+          &number of sections different from number of regions + 1.')
   end if
 
   ref_chord_fraction = getreal(pmesh_prs,'reference_chord_fraction')
@@ -221,19 +208,19 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   !Check the number of inputs
   if(countoption(pmesh_prs,'nelem_span') .ne. nRegions ) &
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-         &number of "nelem_span" different from number of regions.')
+          &number of "nelem_span" different from number of regions.')
   if(countoption(pmesh_prs,'dihed') .ne. nRegions ) &
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-         &number of "dihed" different from number of regions.')
+          &number of "dihed" different from number of regions.')
   if(countoption(pmesh_prs,'sweep') .ne. nRegions ) &
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-         &number of "sweep" different from number of regions.')
+          &number of "sweep" different from number of regions.')
   if(countoption(pmesh_prs,'twist') .ne. nSections ) &
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-         &number of "twist" different from number of sections.')
+          &number of "twist" different from number of sections.')
   if(countoption(pmesh_prs,'airfoil_table') .ne. nSections ) &
     call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-         &number of "airfoil_table" different from number of sections.')
+          &number of "airfoil_table" different from number of sections.')
 
   ! Get total number of elements and initialize arrays
   allocate(nelem_span_list(nRegions));   nelem_span_list = 0
@@ -262,11 +249,11 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
       type_span_list(iRegion) = getstr(pmesh_prs,'type_span')
     end do
   else
-   write(*,*) ' mesh_file   : ' , trim(mesh_file)
-   write(*,*) ' n_type_span : ' , n_type_span
-   write(*,*) ' nRegions    : ' , nRegions
-   call error(this_sub_name, this_mod_name, 'Inconsistent input: &
-         &number of type_span different from number of regions.')
+    write(*,*) ' mesh_file   : ' , trim(mesh_file)
+    write(*,*) ' n_type_span : ' , n_type_span
+    write(*,*) ' nRegions    : ' , nRegions
+    call error(this_sub_name, this_mod_name, 'Inconsistent input: &
+          &number of type_span different from number of regions.')
   end if
 
   allocate(chord_list  (nSections))  ; chord_list = 0.0_wp
@@ -278,13 +265,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     twist_list(iSection)   = getreal(pmesh_prs,'twist')
     airfoil_list(iSection) = getstr(pmesh_prs,'airfoil_table')
   enddo
-
-! ! -- 0.75 chord -- look for other "0.75 chord" tag
-! ! set the te 0.75*chord far from the ll
-! do iSection= 1,nSections
-!   chord_list(iSection)   = chord_list(iSection) * 0.75_wp
-! end do
-
 
   npoint_chord_tot = nelem_chord_tot + 1
   npoint_span_tot  = nelem_span_tot  + 1
@@ -312,15 +292,10 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   allocate(i_airfoil_e       (2,nelem_span_tot)) ; i_airfoil_e        = 0
   allocate(normalised_coord_e(2,nelem_span_tot)) ; normalised_coord_e = 0.0_wp
   allocate(theta_e           (  nelem_span_tot)) ; theta_e            = 0.0_wp
-! old
-! allocate(airfoil_table_p (2,npoint_span_tot)) ;
-! allocate(normalised_coord_p(npoint_span_tot)) ; normalised_coord_p = 0.0_wp
 
 ! ! Initialize the span division to the maximum dimension
   allocate(rrSection1(3,npoint_chord_tot)) ; rrSection1 = 0.0_wp
   allocate(rrSection2(3,npoint_chord_tot)) ; rrSection2 = 0.0_wp
-! allocate(rrSection1(3,nRegions)) ; rrSection1 = 0.0_wp
-! allocate(rrSection2(3,nRegions)) ; rrSection2 = 0.0_wp
 
   ! Initialise dr_ref for the definition of the actual reference_point
   !  of each bay (by updating)
@@ -358,13 +333,6 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
       chord_p(ich) = chord_list(1)
       theta_p(ich) = twist_list(1)
 
-! The following lines should not have existed even before 2019-02-06:
-! fields overwritten at the end of the outer do loop
-! === old-2019-02-06 === !
-!      i_airfoil_e(1,ich) = iRegion
-!      i_airfoil_e(2,ich) = iRegion+1
-! === old-2019-02-06 === !
-
       ! Update rr
       rr(:,ista:iend) = rrSection1
 
@@ -383,13 +351,16 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
     else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then
       ispace = 3
 
+    else if ( trim(type_span_list(iRegion)) .eq. 'equalarea' ) then
+      ispace = 4
+
     else
       write(*,*) ' mesh_file   : ' , trim(mesh_file)
       write(*,*) ' type_span_list(',iRegion,') : ' , &
                     trim(type_span_list(iRegion))
       call error(this_sub_name, this_mod_name, 'Inconsistent input: &
             & type_span must be equal to uniform, cosine, cosineIB,&
-            & cosineOB.')
+            & cosineOB, equalarea.')
     end if
 
     !> save before update
@@ -456,21 +427,14 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
 
       if ( mesh_flat ) then
         theta_e(ich-1) = 0.5_wp*(w1*twist_list(iRegion) + w2*twist_list(iRegion+1)) &
-                       + 0.5_wp*theta_p(ich)
+                        + 0.5_wp*theta_p(ich)
       endif
 
     end do
 
   end do
 
-! ! -- 0.75 chord -- look for other "0.75 chord" tag
-! ! correct the chord value ----
-! do ich = 1 , size(chord_p)
-!   chord_p(ich) = chord_p(ich) / 0.75_wp
-! end do
 
-
-! === new-2019-02-06 ===
 ! Save the fields related to the definition of actual airfoils
 ! airfoil_list(i) may be equal to 'interp' --> no def. of airfoil on the i-th section
 !                                              --> inteprolation
@@ -496,7 +460,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
       iAirfoil = iAirfoil + 1
       airfoil_list_actual(iAirfoil) = trim(airfoil_list(i))
       call check_file_exists(airfoil_list_actual(iAirfoil), this_sub_name, &
-           this_mod_name)
+            this_mod_name)
     end if
   end do
 
@@ -564,33 +528,37 @@ end subroutine read_mesh_ll
 !!   ISPACE = 1    cosine spacing
 !!   ISPACE = 2    left cosine spacing
 !!   ISPACE = 3    right cosine spacing
+!!   ISPACE = 4    equalarea spacing
 
 function spacing_weights ( itype, i, n ) result(w)
 
- integer,      intent(in)  :: itype, i, n
- real(wp)                  :: w
+  integer,      intent(in)  :: itype, i, n
+  real(wp)                  :: w
 
 
   select case (itype)
 
-  case(1)
+  case(1) ! cosine
     w = 0.5_wp - 0.5_wp * cos( real(i,wp)*pi/ real(n,wp) )
 
-  case(2)
+  case(2) ! left cosine 
     w = sin( 0.5_wp*real(i,wp)*pi/ real(n,wp) )
 
-  case(3)
+  case(3) ! right cosine
     w = 1.0_wp - cos( 0.5_wp*real(i,wp)*pi/ real(n,wp) )
 
-  case default
-    w = real(i,wp) / real(n,wp)
+  case(4) ! equalarea 
+    w =  sqrt(real(i,wp)/real(n,wp)) 
 
+  case default ! uniform
+    w = real(i,wp) / real(n,wp)
+    write(*,*) w
   end select
 
 end function spacing_weights
 
 !----------------------------------------------------------------------
-!> Set offset between xac and the structural coupling node
+!> Set offset between xac and the structural coupling node (useless)
 subroutine read_xac_offset( filen, rr, xac )
   character(len=*)     , intent(in)  :: filen
   real(wp)             , intent(in)  :: rr(:,:)
@@ -638,10 +606,10 @@ subroutine read_xac_offset( filen, rr, xac )
   do i = 2, np-1
     do j = 1, ny-1
       if ( ( y_coord(i)-yin(j)   .gt. 0.0_wp ) .and. &
-           ( y_coord(i)-yin(j+1) .le. 0.0_wp ) ) then
-        xac(i) = ( xacin(j+1) - xacin(j) ) / &
-                 (   yin(j+1) -   yin(j) ) * &
-                 ( y_coord(i) -   yin(j) ) + xacin(j)
+            ( y_coord(i)-yin(j+1) .le. 0.0_wp ) ) then
+        xac(i) = (xacin(j+1) - xacin(j)) / &
+                  (yin(j+1) - yin(j)) * &
+                  (y_coord(i) - yin(j)) + xacin(j)
       end if
     end do
   end do
