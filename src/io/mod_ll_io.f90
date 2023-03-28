@@ -170,7 +170,7 @@ subroutine read_mesh_ll(mesh_file,ee,rr, &
   call pmesh_prs%CreateIntOption( 'nelem_span', 'number of span-wise elements in the region',&
                 multiple=.true.);
   call pmesh_prs%CreateStringOption('type_span', 'type of span-wise division: &
-                                    uniform, cosine, cosineIB, cosineOB, equalarea', &
+                                    & uniform, cosine, cosineIB, cosineOB, equalarea', &
                 multiple=.true.);
 
 

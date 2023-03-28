@@ -1284,29 +1284,29 @@ multiplicity = {
   dof = {
     hinge_type = Flap
     hinge_offset = (/ 0.0 , 0.032432 , 0.0 /)
-    Collective  =  3.0     ! deg
+    collective  =  3.0     ! deg
     cyclic_ampl =  0.0     ! deg
     cyclic_phas =  0.0     ! deg
   }
   dof = {
     hinge_type = Lag
     hinge_offset = (/ 0.0 , 0.021622 , 0.0 /)
-    Collective  = -10.0
+    collective  = -10.0
     cyclic_ampl =  0.0
     cyclic_phas =  0.0
   }
   dof = {
     hinge_type = Pitch
     hinge_offset = (/ 0.0 , 0.086486 , 0.0 /)
-    Collective  = 12.0
+    collective  = 12.0
     cyclic_ampl =  0.0
     cyclic_phas =  0.0
   }
 
-}
-
-
+} 
 \end{inputfile}
+
+
 Note that the rotor reference frame in file \ref{file:references_rotor.in} 
 is set as not moving. This means that the starting reference frame is stationary 
 (with respect to its parent) however all the other reference frames that are 
@@ -1365,40 +1365,129 @@ required in the multiplicity are:
     a chain according to the order in which are defined. A representation of 
     the chain of degrees of freedom is presented in figure \ref{fig:multiple_refs}.
     
+    \item \param{harmonic\_input}: \textit{required:} no, \textit{type:} logical. 
+    
+    Enable the possibility to prescribe the hinge motion through the multiblade degrees of freedom. 
+    This possibility is shown in \ref{file:references_rotor.in}. 
+    
+    \item \param{n\_harmonics}: \textit{required:} yes if \param{harmonic\_input} is true. 
+    \textit{multiple:} not inside each \param{multiplicity} group. \textit{type:} integer.
+
+    Number of expected harmonics: currently each \param{dof} must have the same number of harmonic for each rotor. 
+    
     \begin{itemize}
-    \item \param{hinge\_Type}: \textit{required:} yes. \textit{multiple:} 
+    \item \param{hinge\_type}: \textit{required:} yes. \textit{multiple:} 
     not inside each \param{dof} group. \textit{type:} string.
     
     type of hinge considered, affecting the axis of rotation of the hinge 
     movement with respect to the rotor axis, can be \opt{Flap},\opt{Lag}, or \opt{Pitch}.
     
-    \item \param{hinge\_Offset}: \textit{required:} yes. \textit{multiple:} 
+    \item \param{hinge\_offset}: \textit{required:} yes. \textit{multiple:} 
     not inside each \param{dof} group. \textit{type:} real array of length 3.
     
     offset of the hinge rotation axis with respect to the previous hinge or 
     the rotor hub (axis + hub offset).
     
-    \item \param{Collective}: \textit{required:} yes. \textit{multiple:} not 
+    \item \param{collective}: \textit{required:} yes. \textit{multiple:} not 
     inside each \param{dof} group. \textit{type:} real.
     
     Collective (constant during rotation) angle of rotation (in degrees) of 
-    the degree of freedom.
+    the degree of freedom. If \param{harmonic\_input} is \opt{true}, then this is equivalent to the 
+    $\beta_0$ harmonic.  
     
-    \item \param{Cyclic\_Ampl}: \textit{required:} yes. \textit{multiple:} 
+    \item \param{cyclic\_ampl}: \textit{required:} yes if \param{harmonic_input} is false. \textit{multiple:} 
     not inside each \param{dof} group. \textit{type:} real.
-    
+
     Cyclic (sinusoidal during rotation) angle of rotation (in degrees) of 
     the degree of freedom.
     
-    \item \param{Cyclic\_Phas}: \textit{required:} yes. \textit{multiple:} 
-    not inside each \param{dof} group. \textit{type:} real.
+    \item \param{cyclic\_phas}: \textit{required:} yes if \param{harmonic_input} is false.
+    \textit{multiple:} not inside each \param{dof} group. \textit{type:} real.
     
     phase of the cyclic movement, in degrees, with respect to the rotor rotation. 
+    
+    \item \param{collective_dot}: \textit{required:} yes \param{harmonic_input} is true. 
+    \textit{multiple:} not inside each \param{dof} group. \textit{type:} real. 
+
+    Velocity of the collective component: $\dot{\beta}_0$.
+
+    \item \param{cosine}: \textit{required:} yes \param{harmonic_input} is true. 
+    \textit{multiple:} not inside each \param{dof} group. \textit{type:} real. 
+
+    Vector containing all the harmonics for the cosine cyclic component: $\beta_{nc}$. 
+
+    \item \param{cosine\_dot}: \textit{required:} yes \param{harmonic_input} is true. 
+    \textit{multiple:} not inside each \param{dof} group. \textit{type:} real. 
+
+    Vector containing all the harmonics for the cosine cyclic velocity component: $\dot{\beta}_{nc}$. 
+    
+    \item \param{sine}: \textit{required:} yes \param{harmonic_input} is true. 
+    \textit{multiple:} not inside each \param{dof} group. \textit{type:} real. 
+
+    Vector containing all the harmonics for the sine cyclic component: $\beta_{ns}$. 
+
+    \item \param{sine\_dot}: \textit{required:} yes \param{harmonic_input} is true. 
+    \textit{multiple:} not inside each \param{dof} group. \textit{type:} real. 
+
+    Vector containing all the harmonics for the sine cyclic velocity component: $\dot{\beta}_{ns}$. 
+
+    \item \param{reactionless}: \textit{required:} yes \param{harmonic_input} is true. 
+    \textit{multiple:} not inside each \param{dof} group. \textit{type:} real. 
+
+    Vector containing all the harmonics for the reactionless cyclic component: $\beta_{N/2}$. 
+
+    \item \param{reactionless\_dot}: \textit{required:} yes \param{harmonic_input} is true. 
+    \textit{multiple:} not inside each \param{dof} group. \textit{type:} real. 
+
+    Vector containing all the harmonics for the reactionless cyclic velocity component: $\dot{\beta}_{N/2}$. 
     
     \end{itemize}
 \end{itemize}
 
-\begin{figure}
+If the \param{harmonic\_input} is true, then for each degree of freedom the motion will be:
+\begin{equation}
+    \beta^{m} = \beta_0 + \sum_{n = 1}^{n_\mathrm{harm}} \Big[\beta_{nc}\cos{n\psi_m} + \beta_{ns}\sin{n\psi_m}\Big] + \beta_{N/2}(-1)^{m}  
+\end{equation}
+and the angular velocity will be: 
+\begin{align} 
+    \dot{\beta}^{m} = \dot{\beta_0} + \sum_{n = 1}^{n_\mathrm{harm}} \Big[\big(\dot{\beta}_{nc} + n\Omega\beta_{ns}\big) \cos{n\psi_m} + 
+                                    \big(\dot{\beta}_{ns} - n\Omega\beta_{nc}\big) \sin{n\psi_m}\Big]  +  \dot{\beta}_{N/2}(-1)^{m} 
+\end{align}
+
+\begin{inputfile}[frame=single, caption={references\_rotor_mbc.in}, label={file:references_rotor_mbc.in}]
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    reference_tag = Rotor01
+    parent_tag = Root
+    origin = (/0.0, 0.0, 0.0/)
+    orientation = (/1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0/)
+    moving = F
+    multiple = T
+    multiplicity = {
+      mult_type = rotor
+      n_blades = 4
+      rot_axis = (/0.0, 0.0, 1.0/)
+      rot_rate = 6.28318530717959 !2*pi, T=1
+      psi_0 = 0.0
+      hub_offset = 0.0
+      harmonic_input = T 
+      n_harmonics = 3 
+      n_dofs = 1
+      dof = {
+        hinge_type = Flap
+        hinge_offset = (/ 0.0 , 0.032432 , 0.0 /)
+        collective = 3.0            ! deg
+        collective_dot = 0.         ! deg/s
+        cosine = (/1.0, 2.0/)       ! deg
+        cosine_dot = (/2.0, 0.0/)   ! deg
+        sine = (/2.0, 1.0/)         ! deg/s
+        sine_dot = (/3.0, 1.1/)     ! deg/s
+        reactionless = 5.0          ! deg/s
+        reactionless_dot = 5.0      ! deg/s
+      }
+    }
+    
+    \end{inputfile}
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=.7\textwidth]{rotor_scheme}
 \caption{multiple reference frames in a rotor}

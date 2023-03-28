@@ -293,6 +293,15 @@ subroutine build_references(refs, reference_file)
   character(len=max_char_len)                 :: transient_fun
   real(wp)                                    :: transient_time, init_rot_rate
 
+  !> Harmonics dof options
+  integer                                     :: n_harmonics, i_harm
+  logical                                     :: harmonic_input
+  real                                        :: cos_npsi, sin_npsi
+  real(wp), allocatable                       :: collective_mbc(:), collective_mbc_dot(:) 
+  real(wp), allocatable                       :: reactionless_mbc(:), reactionless_mbc_dot(:)
+  real(wp), allocatable                       :: cosine_mbc(:,:), cosine_mbc_dot(:,:) 
+  real(wp), allocatable                       :: sine_mbc(:,:), sine_mbc_dot(:,:)
+  
   integer                                     :: i1
 
 
@@ -380,13 +389,24 @@ subroutine build_references(refs, reference_file)
   call sbprms%CreateRealOption('psi_0', 'Starting rotation angle')
   call sbprms%CreateIntOption('n_dofs', 'Number of dofs for each blade')
   ! for complex rotor configurations ---------
-  call sbprms%CreateSubOption('dof','Definition of a hinge dof', sbprms_hin,multiple=.true.)
+  call sbprms%CreateSubOption('dof', 'Definition of a hinge dof', sbprms_hin, multiple=.true.)
   call sbprms_hin%CreateStringOption('hinge_type', 'Char to define the rotation axis: it can be Flap, Pitch, Lag')
   call sbprms_hin%CreateRealArrayOption('hinge_offset', 'Position of the hinge')
-  call sbprms_hin%CreateRealOption('Collective', 'Amplitude of the collective motion')
-  call sbprms_hin%CreateRealOption('cyclic_ampl', 'Amplitude of the cyclic motion')
-  call sbprms_hin%CreateRealOption('cyclic_phas', 'Phase of the cyclic motion')
-
+  !> input some trim angle in mbc taken from trim analysis 
+  call sbprms%CreateLogicalOption('harmonic_input', 'Definition of harmonic components', 'F') 
+  call sbprms%CreateIntOption('n_harmonics', 'Number of harmonics', '0')
+  call sbprms_hin%CreateRealOption('collective', 'Collective component of the rotation, e. i. beta_0', '0.')
+  call sbprms_hin%CreateRealArrayOption('cosine', 'Cosine component of the rotation, e. i. beta_1c', '(/0./)')
+  call sbprms_hin%CreateRealArrayOption('sine', 'Sine component of the rotation, e. i. beta_1s', '(/0./)')
+  call sbprms_hin%CreateRealOption('reactionless', 'Reactionless component of the rotation, e. i. beta_N/2', '0.')
+  !> 1st derivative 
+  call sbprms_hin%CreateRealOption('collective_dot', 'Collective component of the angular velocity, e. i. dot(beta_0)', '0.')
+  call sbprms_hin%CreateRealArrayOption('cosine_dot', 'Cosine component of the angular velocity, e. i. dot(beta_1c)', '(/0./)')
+  call sbprms_hin%CreateRealArrayOption('sine_dot', 'Sine component of the angular velocity, e. i. dot(beta_1s)', '(/0./)')
+  call sbprms_hin%CreateRealOption('reactionless_dot', 'Reactionless component of the angular velocity, e. i. dot(beta_N/2)', '0.0')
+  !> old input (still valid)
+  call sbprms_hin%CreateRealOption('cyclic_ampl', 'Amplitude of the cyclic motion', '0.')
+  call sbprms_hin%CreateRealOption('cyclic_phas', 'Phase of the cyclic motion', '0.')
   ! End Multiple sub-parser -------------------------------------------
 
 
@@ -997,7 +1017,7 @@ subroutine build_references(refs, reference_file)
 
         !3) for each new reference insert all the parameters
         prev_id = refs(iref)%id
-        do i_mult_ref=1,n_mult_refs
+        do i_mult_ref=1, n_mult_refs
           iref = iref+1
           refs(iref)%id = iref
           refs(iref)%multiple = .false.
@@ -1022,12 +1042,13 @@ subroutine build_references(refs, reference_file)
           refs(iref)%self_moving = .true.
           refs(iref)%moving = .false. !standard, will be checked later
 
-          allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps))
-          allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps))
-          allocate(refs(iref)%pol_tim(  sim_param%n_timesteps))
-          allocate(refs(iref)%rot_pos(  sim_param%n_timesteps))
-          allocate(refs(iref)%rot_vel(  sim_param%n_timesteps))
-          allocate(refs(iref)%rot_tim(  sim_param%n_timesteps))
+          allocate(refs(iref)%pol_pos(3, sim_param%n_timesteps))
+          allocate(refs(iref)%pol_vel(3, sim_param%n_timesteps))
+          allocate(refs(iref)%pol_tim(   sim_param%n_timesteps))
+          allocate(refs(iref)%rot_pos(   sim_param%n_timesteps))
+          allocate(refs(iref)%rot_vel(   sim_param%n_timesteps))
+          allocate(refs(iref)%rot_tim(   sim_param%n_timesteps))
+
           do it = 1,sim_param%n_timesteps
             refs(iref)%pol_pos(:,it) = refs(iref)%pole
             refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
@@ -1047,15 +1068,19 @@ subroutine build_references(refs, reference_file)
 
           n_mult_blades = getint(sbprms,'n_blades')
           refs(iref)%n_mult = n_mult_blades
-          n_dofs   = getint(sbprms,'n_dofs')
-
+          n_dofs            = getint(sbprms,'n_dofs') 
+          
           if ( n_dofs .lt. 0 ) then
             call warning(this_sub_name, this_mod_name, ' Warning in the input file&
                   & N_Dofs is set to 0, since it was .lt. 0')
             n_dofs = 0
           end if
+
           ! check if countoption(Dof) .eq. N_Dofs
-          count_dofs = countoption(sbprms,'dof')
+
+          count_dofs = countoption(sbprms, 'dof')
+          
+          
           if ( count_dofs .ne. n_dofs ) then
             write(*,*) " number of degrees of freedom specified: " , count_dofs
             write(*,*) " number of degrees of freedom declared:  " , n_dofs
@@ -1097,29 +1122,68 @@ subroutine build_references(refs, reference_file)
 
           psi_0 = getreal(sbprms,'psi_0')
           hub_offset = getreal(sbprms,'hub_offset')
-
+          harmonic_input = getlogical(sbprms, 'harmonic_input') 
+          write(*,*) 'harmonic_input', harmonic_input 
           ! read and allocate some tmp arrays to describe the motion around the hinges
           if ( n_dofs .gt. 0 ) then
             allocate(hinge_type(n_dofs  ))
-            allocate(hinge_offs(n_dofs,3)) ; hinge_offs = 0.0_wp
-            allocate(hinge_coll(n_dofs  )) ; hinge_coll = 0.0_wp
-            allocate(hinge_cyAm(n_dofs  )) ; hinge_cyAm = 0.0_wp
-            allocate(hinge_cyPh(n_dofs  )) ; hinge_cyPh = 0.0_wp
+            allocate(hinge_offs(n_dofs,3))        ; hinge_offs = 0.0_wp
+            
+            if (harmonic_input) then 
+              n_harmonics = getint(sbprms, 'n_harmonics') 
+              allocate(collective_mbc(n_dofs));              collective_mbc = 0.0_wp
+              allocate(collective_mbc_dot(n_dofs));          collective_mbc_dot = 0.0_wp
+              allocate(reactionless_mbc(n_dofs));            reactionless_mbc = 0.0_wp
+              allocate(reactionless_mbc_dot(n_dofs));        reactionless_mbc_dot = 0.0_wp
+              allocate(cosine_mbc(n_dofs, n_harmonics));     cosine_mbc = 0.0_wp
+              allocate(cosine_mbc_dot(n_dofs, n_harmonics)); cosine_mbc_dot = 0.0_wp
+              allocate(sine_mbc(n_dofs, n_harmonics));       sine_mbc = 0.0_wp 
+              allocate(sine_mbc_dot(n_dofs, n_harmonics));   sine_mbc_dot = 0.0_wp 
+            else
+              allocate(hinge_coll(n_dofs)); hinge_coll = 0.0_wp
+              allocate(hinge_cyAm(n_dofs)); hinge_cyAm = 0.0_wp
+              allocate(hinge_cyPh(n_dofs)); hinge_cyPh = 0.0_wp
+            endif
+            
             do i_dof = 1 , n_dofs
               call getsuboption(sbprms,'Dof',sbprms_hin)
               hinge_type(i_dof  ) = getstr(sbprms_hin,'hinge_type')
-              hinge_offs(i_dof,:) = getrealarray(sbprms_hin,'hinge_offset',3)
-              hinge_coll(i_dof  ) = getreal(sbprms_hin,'Collective')
-              hinge_cyAm(i_dof  ) = getreal(sbprms_hin,'cyclic_ampl')
-              hinge_cyPh(i_dof  ) = getreal(sbprms_hin,'cyclic_phas')
-
-              ! from deg to rad
-              hinge_coll(i_dof) = hinge_coll(i_dof) * pi / 180.0_wp
-              hinge_cyAm(i_dof) = hinge_cyAm(i_dof) * pi / 180.0_wp
-              hinge_cyPh(i_dof) = hinge_cyPh(i_dof) * pi / 180.0_wp
-
-            end do
-          end if
+              hinge_offs(i_dof,:) = getrealarray(sbprms_hin,'hinge_offset',3)              
+              
+              if (harmonic_input) then                 
+                collective_mbc(i_dof) = getreal(sbprms_hin, 'collective') 
+                collective_mbc_dot(i_dof) = getreal(sbprms_hin, 'collective_dot') 
+                reactionless_mbc(i_dof) = getreal(sbprms_hin, 'reactionless') 
+                reactionless_mbc_dot(i_dof) = getreal(sbprms_hin, 'reactionless_dot')
+                cosine_mbc(i_dof, :) = getrealarray(sbprms_hin, 'cosine', n_harmonics)
+                cosine_mbc_dot(i_dof, :) = getrealarray(sbprms_hin, 'cosine_dot', n_harmonics)
+                sine_mbc(i_dof, :) = getrealarray(sbprms_hin, 'sine', n_harmonics) 
+                sine_mbc_dot(i_dof, :) = getrealarray(sbprms_hin, 'sine_dot', n_harmonics)          
+                !> check reactionless input (appears only for even n_blade)  
+                if (mod(n_mult_blades,2) .eq. 1) then
+                  reactionless_mbc(i_dof) = 0.0_wp 
+                  reactionless_mbc_dot(i_dof) = 0.0_wp
+                endif 
+                !> from deg to rad
+                collective_mbc(i_dof) = collective_mbc(i_dof)*pi/180.0_wp
+                collective_mbc_dot(i_dof) = collective_mbc_dot(i_dof)*pi/180.0_wp
+                reactionless_mbc(i_dof) = reactionless_mbc(i_dof)*pi/180.0_wp
+                reactionless_mbc_dot(i_dof) = reactionless_mbc_dot(i_dof)*pi/180.0_wp
+                cosine_mbc(i_dof, :) = cosine_mbc(i_dof, :)*pi/180.0_wp
+                cosine_mbc_dot(i_dof, :) = cosine_mbc_dot(i_dof, :)*pi/180.0_wp
+                sine_mbc(i_dof, :) = sine_mbc(i_dof, :)*pi/180.0_wp
+                sine_mbc_dot(i_dof, :) = sine_mbc_dot(i_dof, :)*pi/180.0_wp
+              else 
+                hinge_coll(i_dof) = getreal(sbprms_hin,'collective') 
+                hinge_cyAm(i_dof) = getreal(sbprms_hin,'cyclic_ampl')
+                hinge_cyPh(i_dof) = getreal(sbprms_hin,'cyclic_phas')
+                !> from deg to rad
+                hinge_cyAm(i_dof) = hinge_cyAm(i_dof)*pi/180.0_wp
+                hinge_cyPh(i_dof) = hinge_cyPh(i_dof)*pi/180.0_wp
+                hinge_coll(i_dof) = hinge_coll(i_dof)*pi/180.0_wp
+              endif 
+            enddo 
+          endif 
 
           !3) for each new reference insert all the parameters
           hub_id = refs(iref)%id
@@ -1136,7 +1200,6 @@ subroutine build_references(refs, reference_file)
 
               ! tag of the ref.sys.----
               ! for the postpro, the "last" ref.sys. must be <hub_refsys>__<i_mult_blades>
-              !TODO: rationalise tag logics (driven by postpro routines)
               if ( i_dof .eq. n_dofs ) then
                 write(msg,'(A,I2.2)') trim(refs(hub_id)%tag)//'__',i_mult_blades
               else
@@ -1272,12 +1335,12 @@ subroutine build_references(refs, reference_file)
                 refs(iref)%self_moving = .true.
                 refs(iref)%moving = .false. !standard, will be checked later
 
-                allocate(refs(iref)%pol_pos(3,sim_param%n_timesteps))
-                allocate(refs(iref)%pol_vel(3,sim_param%n_timesteps))
-                allocate(refs(iref)%pol_tim(  sim_param%n_timesteps))
-                allocate(refs(iref)%rot_pos(  sim_param%n_timesteps))
-                allocate(refs(iref)%rot_vel(  sim_param%n_timesteps))
-                allocate(refs(iref)%rot_tim(  sim_param%n_timesteps))
+                allocate(refs(iref)%pol_pos(3, sim_param%n_timesteps))
+                allocate(refs(iref)%pol_vel(3, sim_param%n_timesteps))
+                allocate(refs(iref)%pol_tim(   sim_param%n_timesteps))
+                allocate(refs(iref)%rot_pos(   sim_param%n_timesteps))
+                allocate(refs(iref)%rot_vel(   sim_param%n_timesteps))
+                allocate(refs(iref)%rot_tim(   sim_param%n_timesteps))
 
                 do it = 1,sim_param%n_timesteps
                   ! position of the pole ---------
@@ -1285,14 +1348,38 @@ subroutine build_references(refs, reference_file)
                   refs(iref)%pol_vel(:,it) = (/ 0.0_wp , 0.0_wp , 0.0_wp /)
                   refs(iref)%pol_tim(  it) = sim_param%time_vec(it)
                   ! rotation ---------------------
-                  refs(iref)%rot_tim(  it) = sim_param%time_vec(it)
+                  refs(iref)%rot_tim( it) = sim_param%time_vec(it)
                   if ( refs(iref)%Omega .ne. 0 ) then
-                    refs(iref)%rot_pos(  it) = hinge_coll(i_dof) + hinge_cyAm(i_dof) * &
-                       cos( refs(iref)%Omega * refs(iref)%rot_tim(it) &
-                          + refs(iref)%psi_0 - hinge_cyPh(i_dof) )
-                    refs(iref)%rot_vel(  it) = -refs(iref)%Omega * hinge_cyAm(i_dof) * &
-                       sin( refs(iref)%Omega * refs(iref)%rot_tim(it) &
-                          + refs(iref)%psi_0 - hinge_cyPh(i_dof) )
+                    if (harmonic_input) then ! harmonic input
+                      !> cyclic components (sum over the harmonics)
+                      do i_harm = 1, n_harmonics
+                        cos_npsi = cos(real(i_harm, wp)*(refs(iref)%Omega*refs(iref)%rot_tim(it) + refs(iref)%psi_0))
+                        sin_npsi = sin(real(i_harm, wp)*(refs(iref)%Omega*refs(iref)%rot_tim(it) + refs(iref)%psi_0)) 
+                        !> position
+                        refs(iref)%rot_pos(it) = refs(iref)%rot_pos(it) + &  
+                          cosine_mbc(i_dof, i_harm)*cos_npsi + sine_mbc(i_dof, i_harm)*sin_npsi 
+                        !> velocity 
+                        refs(iref)%rot_vel(it) = refs(iref)%rot_vel(it) + &
+                          (cosine_mbc_dot(i_dof, i_harm) + real(i_harm, wp)*refs(iref)%Omega*sine_mbc(i_dof, i_harm))*cos_npsi + &
+                          (sine_mbc_dot(i_dof, i_harm) - real(i_harm, wp)*refs(iref)%Omega*cosine_mbc(i_dof, i_harm))*sin_npsi  
+                      enddo
+                      !> collective and reactionless components 
+                      refs(iref)%rot_pos(it) = refs(iref)%rot_pos(it) + &
+                                              collective_mbc(i_dof) + &
+                                              reactionless_mbc(i_dof)*(-1.0_wp)**(real(i_mult_blades,wp))
+                      refs(iref)%rot_vel(it) = refs(iref)%rot_pos(it) + &
+                                              collective_mbc_dot(i_dof) + &
+                                              reactionless_mbc_dot(i_dof)*(-1.0_wp)**(real(i_mult_blades,wp))
+
+                      
+                    else ! standard input 
+                      refs(iref)%rot_pos(it) = hinge_coll(i_dof) + hinge_cyAm(i_dof) * &
+                                                  cos( refs(iref)%Omega * refs(iref)%rot_tim(it) &
+                                                  + refs(iref)%psi_0 - hinge_cyPh(i_dof) )
+                      refs(iref)%rot_vel(it) = -refs(iref)%Omega * hinge_cyAm(i_dof) * &
+                                                sin( refs(iref)%Omega * refs(iref)%rot_tim(it) &
+                                                + refs(iref)%psi_0 - hinge_cyPh(i_dof) )
+                    endif 
                   else
                     refs(iref)%rot_pos(  it) = hinge_coll(i_dof)
                     refs(iref)%rot_vel(  it) = 0.0_wp
@@ -1309,12 +1396,24 @@ subroutine build_references(refs, reference_file)
 
           end do ! loop over the blades
 
-          if ( n_dofs .gt. 0 ) then
+          if ( n_dofs .gt. 0 ) then   
             deallocate(hinge_type)
-            deallocate(hinge_offs)
-            deallocate(hinge_coll)
-            deallocate(hinge_cyAm)
-            deallocate(hinge_cyPh)
+            deallocate(hinge_offs)         
+            
+            if (harmonic_input) then 
+              deallocate(collective_mbc)
+              deallocate(collective_mbc_dot)
+              deallocate(reactionless_mbc)
+              deallocate(reactionless_mbc_dot)
+              deallocate(cosine_mbc)
+              deallocate(cosine_mbc_dot)
+              deallocate(sine_mbc)
+              deallocate(sine_mbc_dot)
+            else
+              deallocate(hinge_coll)
+              deallocate(hinge_cyAm)
+              deallocate(hinge_cyPh)
+            endif 
           end if
 
 

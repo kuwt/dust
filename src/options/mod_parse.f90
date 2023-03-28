@@ -524,14 +524,15 @@ end subroutine CreateRealArrayOption
 
 !> Count number of occurrence of option with given name.
 function CountOption_(this, name) result(count)
- class(t_parse),intent(inout) :: this    !< class(t_parse)
- character(len=*),intent(in)     :: name  !< Search for this keyword in ini file
- integer                         :: count !< number of found occurences of keyword
+  class(t_parse),intent(inout)      :: this    !< class(t_parse)
+  character(len=*),intent(in)       :: name    !< Search for this keyword in ini file
+  integer                           :: count   !< number of found occurences of keyword
 
- type(t_link),pointer :: current
+  type(t_link),pointer :: current
   count = 0
   ! iterate over all options and compare names
   current => this%firstLink
+  
   do while (associated(current))
     if (current%opt%nameequals(name)) then
       if (current%opt%isSet) count = count + 1
@@ -1160,12 +1161,12 @@ end function constructor_Link
 !! in case of multiple parameters. This only calls the internal
 !! function countoption_ of the parameters class.
 function CountOption(prms,name) result(no)
-!TODO: remove this ugly call
-use MOD_Options
- class(t_parse),intent(inout) :: prms  !< class(t_parse)
- character(len=*),intent(in) :: name  !< parameter name
- integer                     :: no    !< number of parameters
-  no = prms%CountOption_(name)
+  !TODO: remove this ugly call
+  use MOD_Options
+    class(t_parse),intent(inout) :: prms  !< class(t_parse)
+    character(len=*),intent(in) :: name  !< parameter name
+    integer                     :: no    !< number of parameters
+      no = prms%CountOption_(name)
 end function CountOption
 
 !----------------------------------------------------------------------
