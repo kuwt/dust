@@ -170,7 +170,7 @@ subroutine post_integral( sbprms, basename, data_basename, an_name , ia , &
 
   write(filename,'(A,I4.4,A)') trim(data_basename)//'_res_', an_start,'.h5'
   call open_hdf5_file(trim(filename),floc)
-  call load_refs(floc,refs_R,refs_off,refs_G,refs_f,refs_tag)
+  call load_refs(floc, refs_R, refs_off, refs_G,refs_f,refs_tag)
   call close_hdf5_file(floc)
 
   ref_id = -333  ! check input

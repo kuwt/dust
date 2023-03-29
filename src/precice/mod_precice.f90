@@ -238,11 +238,9 @@ subroutine initialize_mesh( this, geo )
   end do
 
   !> Allocate participant%mesh fields ===========================
-  ! *** to do ***
-  ! dust may need two grids:
+  ! dust needs two grids:
   ! - node-centered for reading position from MBDyn
   ! - cell-centered for writing force to MBDyn
-  ! *** to do ***
   allocate(this%mesh%node_ids(nnodes)); this%mesh%node_ids = 0
   allocate(this%mesh%nodes( this%mesh%ndim, nnodes ))
   nnodes = 0
@@ -426,7 +424,7 @@ subroutine update_force( this, geo, elems )
                               comp%c_ref_p(:,2* i   +1) )
             chord_rot =  cos(theta) * chord + &
                          sin(theta) * cross( n_rot, chord ) + &
-                       ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
+                       ( 1.0_wp - cos(theta) ) * sum( chord* n_rot ) * n_rot
 
             this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) + &
               comp%el(i)%dmom + &
@@ -810,6 +808,7 @@ subroutine update_elems( this, geo, elems, te )
         do i = 1, size(comp%el)
           comp%el(i)%cen = 0.0_wp
           comp%el(i)%ub = 0.0_wp
+          comp%el(i)%ori = 0.0_wp
         end do
 
         !> Update surface quantities, as the weighted averages of the structure
@@ -825,6 +824,7 @@ subroutine update_elems( this, geo, elems, te )
             vel   = this%fields(j_vel)%fdata(:, comp%i_points_precice(comp%rbf%cen%ind(iw,i)))
             !> Rotation
             n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(comp%rbf%cen%ind(iw,i)))
+
             theta = norm2( n_rot )
             if ( theta .lt. eps ) then
               n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
@@ -834,8 +834,10 @@ subroutine update_elems( this, geo, elems, te )
             end if
             !> Angular velocity of the structural point
             omega = this%fields(j_ome)%fdata(:, comp%i_points_precice(comp%rbf%cen%ind(iw,i)))
+            
             !> Reference difference
             chord = comp%loc_cen(:,i) - comp%rbf%nodes(:,comp%rbf%cen%ind(iw,i))
+
             !> Rotated position difference
             chord_rot = cos(theta) * chord + &
                         sin(theta) * cross(n_rot, chord ) + &
@@ -845,9 +847,14 @@ subroutine update_elems( this, geo, elems, te )
             comp%el(i)%cen = comp%el(i)%cen + &
                                 comp%rbf%cen%wei(iw,i) * (pos + chord_rot)
             
+            !> Orientation 
+            comp%el(i)%ori = comp%el(i)%ori + &
+                                comp%rbf%cen%wei(iw,i) * n_rot * theta  
+
             !> Velocity
             comp%el(i)%ub = comp%el(i)%ub + &
                                 comp%rbf%cen%wei(iw,i) * (vel + cross(omega, chord_rot))
+            
           end do
 
         end do

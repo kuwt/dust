@@ -691,14 +691,30 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   call create_strip_connectivity(geo)
 
   !> Initialisation of the field surf_vel to zero (for surfpan only)
-  do i=1,geo%nelem_impl
+  do i=1, geo%nelem_impl
     select type(el=>elems_impl(i)%p) ; class is(t_surfpan)
       el%surf_vel = 0.0_wp
+#if USE_PRECICE
+    if (geo%components(el%comp_id)%coupling) then
+        call el%create_local_velocity_stencil( &    
+                geo%components(el%comp_id)%coupling_node_rot)
+        !> chtls stencil
+        call el%create_chtls_stencil( &             
+                geo%components(el%comp_id)%coupling_node_rot)
+    else 
+      call el%create_local_velocity_stencil( &    
+                geo%refs(geo%components(el%comp_id)%ref_id)%R_g)
+        !> chtls stencil
+        call el%create_chtls_stencil( &             
+                geo%refs(geo%components(el%comp_id)%ref_id)%R_g)
+    endif 
+#else 
         call el%create_local_velocity_stencil( &    
                 geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
         !> chtls stencil
         call el%create_chtls_stencil( &             
                 geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
+#endif 
     end select
   end do
 

@@ -434,7 +434,7 @@ subroutine save_status(geo, wake, it, time, run_id)
   call new_hdf5_group(floc, 'References', gloc1)
   nref = size(geo%refs)
   call write_hdf5(nref, 'NReferences', gloc1)
-  do iref = 0,nref-1
+  do iref = 0, nref-1
     write(ref_name,'(A,I3.3)')'Ref',iref
     call new_hdf5_group(gloc1, trim(ref_name), gloc2)
 

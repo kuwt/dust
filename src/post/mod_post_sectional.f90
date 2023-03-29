@@ -416,7 +416,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
       call open_hdf5_file(trim(filename),floc)
 
       ! Load the references and move the points ---
-      call load_refs(floc,refs_R,refs_off)
+      call load_refs(floc, refs_R, refs_off)
       ! Move the points ---------------------------
       call update_points_postpro(comps, points, refs_R, refs_off, &
                                   filen = trim(filename) )

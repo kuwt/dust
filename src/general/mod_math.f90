@@ -49,7 +49,7 @@
 module mod_math
 
 use mod_param, only: &
-  wp
+  wp, eps
 
 use mod_handling, only: &
   error, warning
@@ -58,7 +58,8 @@ implicit none
 
 public :: dot, cross , linear_interp , compute_qr, &
           rotation_vector_combination, sort_vector_real, & 
-          unique, infinite_plate_spline, tessellate
+          unique, infinite_plate_spline, tessellate, & 
+          vec2mat, mat2vec 
 
 private
 
@@ -248,6 +249,66 @@ subroutine compute_qr ( A , Q , R )
 
 end subroutine compute_qr
 
+
+!> convert an orientation matrix into an orientation vector 
+subroutine mat2vec(R, theta)
+  real(wp), intent(in)  :: R(3,3)
+  real(wp), intent(out) :: theta(3) 
+  
+  real(wp)              :: n_sintheta(3), ax_R(3)
+  real(wp)              :: trace_R, sintheta, costheta, ntheta 
+  real(wp)              :: RR(3, 3) 
+
+  !> take the axial of the rotation matrix 
+  RR = (R - transpose(R))/2.0_wp 
+  ax_R = (/RR(3, 2), RR(1, 3), RR(2, 1)/) 
+
+  !> take the trace of the rotation matrix 
+  trace_R = R(1, 1) + R(2, 2) + R(3, 3) 
+
+  n_sintheta = ax_R
+  sintheta = norm2(n_sintheta)
+  costheta = (trace_R - 1.0_wp)/2.0_wp
+  ntheta = atan2(sintheta, costheta) 
+
+  if (sintheta .lt.  1e-6_wp) then
+    theta = n_sintheta
+  else 
+    theta = (ntheta/sintheta)*n_sintheta
+  endif 
+
+end subroutine
+
+!> convert an orientation vector into an orientation matrix
+subroutine vec2mat(theta, R)
+  real(wp), intent(in)  :: theta(3)
+  real(wp), intent(out) :: R(3,3) 
+  
+  real(wp)              :: t, a, b
+  real(wp)              :: thcross(3,3), eye(3,3)
+  integer               :: i 
+  
+  eye = 0.0_wp
+  do i = 1, 3
+    eye(i,i)  =  1.0_wp
+  end do
+
+  t = norm2(theta)
+  if (t .ge. 1e-6_wp) then 
+    a = sin(t)/t 
+    b = (1 - cos(t)) / t**2 
+    thcross(1,:) = (/0.0_wp,  -theta(3), theta(2)/)
+    thcross(2,:) = (/theta(3), 0.0_wp,  -theta(1)/)
+    thcross(3,:) = (/-theta(2), theta(1), 0.0_wp /)
+
+    R = eye + a*thcross + b*matmul(thcross,thcross)
+    
+  else 
+    R = eye  
+  endif 
+
+
+end subroutine
 !----------------------------------------------------------------
 !> Combination of two rotations, provided as rotation vectors r1, r2
 ! x: original vector
@@ -387,27 +448,10 @@ subroutine infinite_plate_spline(pos_interp, pos_ref, W)
   real(wp), allocatable                 :: ipiv(:), work(:), eye(:,:)
   integer                               :: info                     
   real(wp)                              :: nrm 
-!  real(wp)                              :: theta, Wnorm(3,3), node_rot(3,3), dist(3)                   
   
   n_r = size(pos_ref,2)
   n_i = size(pos_interp,2)
   
-!  ! anisotropy matrix: section is rigid chordwise
-!  Wnorm = 0.0_wp
-!  Wnorm(1,1) = 1e-3_wp
-!  Wnorm(2,2) = 1e+0_wp
-!  Wnorm(3,3) = 1e-3_wp
-  
-!  theta = acos(dot(pos_ref(:,n_r-1)-pos_ref(:,1), Wnorm(1,:)))
-!  node_rot = 0.0_wp
-!  node_rot(1,1) = cos(theta)
-!  node_rot(1,2) = -sin(theta)
-!  node_rot(2,1) = sin(theta)
-!  node_rot(2,2) = cos(theta)
-!  node_rot(3,3) = 1.0_wp
-  
-!  Wnorm = matmul(transpose(node_rot),(matmul(Wnorm,node_rot)))
-
   allocate(R_r(n_r,4))
   allocate(R_i(n_i,4))
   ! matrixes R [1|x|y|z]
@@ -449,7 +493,7 @@ subroutine infinite_plate_spline(pos_interp, pos_ref, W)
   call dgetrf(n_r,n_r,Z_r,n_r,ipiv,info)
   call dgetri(n_r,Z_r,n_r,ipiv,work,n_r,info)
   deallocate(ipiv, work)
- 
+
   allocate(Y_r(4,4))  
   
   ! inverse matrix (NB the inverse is overwritten into Y_r)
@@ -469,7 +513,7 @@ subroutine infinite_plate_spline(pos_interp, pos_ref, W)
 
   allocate(W(n_i,n_r))
   W = matmul((matmul(R_i,matmul(Y_r,transpose(R_r))) + &
-         matmul(Z_ir,(eye-matmul(Z_r,matmul(R_r,matmul(Y_r,transpose(R_r))))))),Z_r)
+      matmul(Z_ir,(eye-matmul(Z_r,matmul(R_r,matmul(Y_r,transpose(R_r))))))),Z_r)
 
   deallocate(R_i)
   deallocate(R_r)
@@ -543,7 +587,7 @@ subroutine tessellate(vertices, n_steps, tol, cen_sbprt, rad_sbprt, n_sbprt, dry
       do j = 1,n_div(i)-1 ! divide it 
         ! linear combination of side vertices
         division_points(:,ip) = (real(j,wp)/real(n_div(i),wp))*succ(:,i) + &
-                         (1.0_wp-real(j,wp)/real(n_div(i),wp))*vertices(:,i)
+                          (1.0_wp-real(j,wp)/real(n_div(i),wp))*vertices(:,i)
         ip = ip +1
       enddo
     endif
@@ -621,7 +665,7 @@ subroutine tessellate(vertices, n_steps, tol, cen_sbprt, rad_sbprt, n_sbprt, dry
       mid_ab = (tex(:,1,idx_loc)+tex(:,2,idx_loc))/2
       mid_bc = (tex(:,2,idx_loc)+tex(:,3,idx_loc))/2
       mid_ca = (tex(:,3,idx_loc)+tex(:,1,idx_loc))/2
-     
+
       tex(:,1,idx_glob) = tex(:,1,idx_loc) ! tri.a
       tex(:,2,idx_glob) = mid_ab
       tex(:,3,idx_glob) = mid_ca
@@ -701,5 +745,9 @@ integer function modd(a,b)
     return 
   
 end function
+
+
+
+
 
 end module mod_math

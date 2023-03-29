@@ -547,15 +547,15 @@ end subroutine add_wake_surfpan
 !! the contribution of potential due to the lifting lines
 subroutine add_expl_surfpan(this, expl_elems, linsys, &
                             ie,ista, iend)
- class(t_surfpan), intent(inout) :: this
- type(t_expl_elem_p), intent(in)      :: expl_elems(:)
- type(t_linsys), intent(inout)   :: linsys
- integer, intent(in)             :: ie
- integer, intent(in)             :: ista
- integer, intent(in)             :: iend
+  class(t_surfpan), intent(inout) :: this
+  type(t_expl_elem_p), intent(in) :: expl_elems(:)
+  type(t_linsys), intent(inout)   :: linsys
+  integer, intent(in)             :: ie
+  integer, intent(in)             :: ista
+  integer, intent(in)             :: iend
 
- integer :: j1
- real(wp) :: a, b
+  integer                         :: j1
+  real(wp)                        :: a, b
 
   !Static part: take what was already computed
   do  j1 = 1, ista-1
@@ -583,12 +583,12 @@ end subroutine add_expl_surfpan
 !! to its rhs
 subroutine compute_pot_surfpan(this, A, b, pos , i , j )
   class(t_surfpan), intent(inout) :: this
-  real(wp), intent(out) :: A
-  real(wp), intent(out) :: b
-  real(wp), intent(in) :: pos(:)
-  integer , intent(in) :: i , j
+  real(wp), intent(out)           :: A
+  real(wp), intent(out)           :: b
+  real(wp), intent(in)            :: pos(:)
+  integer , intent(in)            :: i, j
 
-  real(wp) :: dou , sou
+  real(wp)                        :: dou, sou
 
   if ( i .ne. j ) then
     call potential_calc_doublet(this, dou, pos)
@@ -614,13 +614,13 @@ end subroutine compute_pot_surfpan
 !! contribution to its rhs
 subroutine compute_psi_surfpan(this, A, b, pos, nor, i , j )
   class(t_surfpan), intent(inout) :: this
-  real(wp), intent(out) :: A
-  real(wp), intent(out) :: b
-  real(wp), intent(in) :: pos(:)
-  real(wp), intent(in) :: nor(:)
-  integer , intent(in) :: i , j
+  real(wp), intent(out)           :: A
+  real(wp), intent(out)           :: b
+  real(wp), intent(in)            :: pos(:)
+  real(wp), intent(in)            :: nor(:)
+  integer , intent(in)            :: i, j
 
-  real(wp) :: vdou(3) , vsou(3)
+  real(wp)                        :: vdou(3), vsou(3)
 
   call velocity_calc_doublet(this, vdou, pos)
 
@@ -644,11 +644,11 @@ end subroutine compute_psi_surfpan
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 subroutine compute_vel_surfpan(this, pos, vel )
-  class(t_surfpan), intent(in) :: this
-  real(wp), intent(in) :: pos(:)
-  real(wp), intent(out) :: vel(3)
+  class(t_surfpan), intent(in)  :: this
+  real(wp), intent(in)          :: pos(:)
+  real(wp), intent(out)         :: vel(3)
 
-  real(wp) :: vdou(3) , vsou(3), wind(3)
+  real(wp)                      :: vdou(3), vsou(3), wind(3)
 
 
   ! doublet ---
@@ -674,11 +674,11 @@ end subroutine compute_vel_surfpan
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 subroutine compute_grad_surfpan(this, pos, grad )
   class(t_surfpan), intent(in) :: this
-  real(wp), intent(in) :: pos(:)
-  real(wp), intent(out) :: grad(3,3)
+  real(wp), intent(in)         :: pos(:)
+  real(wp), intent(out)        :: grad(3,3)
 
-  real(wp) :: grad_dou(3,3) , grad_sou(3,3)
-  real(wp) :: wind(3)
+  real(wp)                     :: grad_dou(3,3), grad_sou(3,3)
+  real(wp)                     :: wind(3)
 
   ! doublet ---
   call gradient_calc_doublet(this, grad_dou, pos)

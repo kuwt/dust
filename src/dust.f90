@@ -146,7 +146,7 @@ use mod_octree, only: &
   apply_multipole_panels
 
 use mod_math, only: & 
-  cross, dot
+  cross, dot, vec2mat
 
 #if USE_PRECICE
   use mod_precice, only: &
@@ -215,7 +215,7 @@ real(wp), allocatable             :: res_old(:)
 real(wp), allocatable             :: surf_vel_SurfPan_old(:,:)
 real(wp), allocatable             :: nor_SurfPan_old(:,:)
 real(wp), allocatable             :: al_kernel(:,:), al_v(:)
-
+real(wp)                          :: theta_cen(3), R_cen(3, 3) 
 !> VL viscous correction
 integer                           :: i_el, i_c, i_s, i, sel, i_p, i_c2, i_s2
 integer                           :: it_vl, it_stall
@@ -697,23 +697,34 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
 ! so far, select type() to keep the old formulation for t_surfpan and
 ! use AVL formula for t_vortlatt
 #if USE_PRECICE
-  !$omp parallel do private(i_el)
-    do i_el = 1 , sel
+  !$omp parallel do private(i_el, theta_cen, R_cen)
+    do i_el = 1, sel
       ! ifort bugs workaround:
       ! apparently it is not possible to call polymorphic methods inside
       ! select cases for intel, need to call these for all elements and for the
       ! vortex lattices it is going to be a dummy empty function call
-      call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
-                geo%components(elems(i_el)%p%comp_id)%coupling_node_rot)
-      call elems(i_el)%p%compute_dforce()
+      if (geo%components(elems(i_el)%p%comp_id)%coupling) then  
+        !> get orientation vector of the ref_line from precice 
+        theta_cen = elems(i_el)%p%ori 
+        !> convert the orientation vector into orientation matrix 
+        call vec2mat(theta_cen, R_cen) 
+        R_cen = matmul(geo%components(elems(i_el)%p%comp_id)%coupling_node_rot, R_cen)
+        !> calculate the pressure using the relative orientation matrix: check if 
+        !> coupling_node orientation is needed  
+        call elems(i_el)%p%compute_pres(R_cen)  ! update surf_vel field too
+      else !> non coupled component 
+        call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
+              geo%refs(geo%components(elems(i_el)%p%comp_id)%ref_id)%R_g)
+      endif  
+      call elems(i_el)%p%compute_dforce()      
     end do
   !$omp end parallel do
 #else
   !$omp parallel do private(i_el)
     do i_el = 1 , sel
       call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
-              geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g)
-      call elems(i_el)%p%compute_dforce()
+              geo%refs(geo%components(elems(i_el)%p%comp_id)%ref_id)%R_g)
+      call elems(i_el)%p%compute_dforce()  
     end do
   !$omp end parallel do
 #endif

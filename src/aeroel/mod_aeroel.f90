@@ -155,6 +155,9 @@ type, abstract, extends(c_elem) :: c_pot_elem
   !> Body velocity at the centre
   real(wp) :: ub(3)
 
+  !> Orientation vector of the center 
+  real(wp) :: ori(3)
+
   !> Vorticity induced velocity at the centre
   real(wp) :: uvort(3)
 
@@ -172,8 +175,8 @@ type, abstract, extends(c_elem) :: c_pot_elem
 
   !> Elementary force acting on the element (components in the base ref.sys.)
   real(wp)  :: dmom(3)
-  integer :: n_c, n_s
-  real(wp) :: dy
+  integer   :: n_c, n_s
+  real(wp)  :: dy
   !TODO: these three are used only by vortlatt and liftlin
   ! consider moving them there, but then change the implementation of
   ! create_strip_connectivity
