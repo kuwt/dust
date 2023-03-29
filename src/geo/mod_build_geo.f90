@@ -1266,9 +1266,9 @@ subroutine build_component(gloc, geo_file, ref_tag, comp_tag, comp_id, &
     call write_hdf5(hinges(i)%rotation_input    , 'Hinge_Rotation_Input'    , hinge_i_loc)
     !> Hinge_Rotation_Input = function:...
     ! (for other input types, dummy values, not to be used. Not a clean implementation)
-    call write_hdf5(hinges(i)%rotation_amplitude, 'Amplitude', hinge_i_loc)
-    call write_hdf5(hinges(i)%rotation_omega    , 'Omega'    , hinge_i_loc)
-    call write_hdf5(hinges(i)%rotation_phase    , 'Phase'    , hinge_i_loc)
+    call write_hdf5(hinges(i)%rotation_amplitude, 'Hinge_Rotation_Amplitude', hinge_i_loc)
+    call write_hdf5(hinges(i)%rotation_omega    , 'Hinge_Rotation_Omega'    , hinge_i_loc)
+    call write_hdf5(hinges(i)%rotation_phase    , 'Hinge_Rotation_Phase'    , hinge_i_loc)
     !> Hinge_Rotation_Input = coupling
     if ( trim(hinges(i)%rotation_input) .eq. 'coupling' ) then
         call write_hdf5(hinges(i)%coupling_nodes, 'Coupling_Nodes', hinge_i_loc )

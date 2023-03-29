@@ -1154,9 +1154,9 @@ subroutine load_components(geo, in_file, out_file, te)
         call read_hdf5( geo%components(i_comp)%hinge(ih)%input_type, 'Hinge_Rotation_Input'    , hiloc)
 
         !> Actual input only for input_type = function:..., otherwise dummy inputs
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_ampl , 'Amplitude', hiloc)
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_omega, 'Omega', hiloc)
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_phase, 'Phase', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_ampl , 'Hinge_Rotation_Amplitude', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_omega, 'Hinge_Rotation_Omega', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_phase, 'Hinge_Rotation_Phase', hiloc)
 
         if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
           call read_hdf5_al( geo%components(i_comp)%hinge(ih)%i_coupling_nodes, &
