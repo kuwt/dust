@@ -154,7 +154,7 @@ The grouping keyword  \param{analysis} specifies a single analysis,
 and the parameters contained in the group depend on the type of the analysis. 
 A series of  \param{analysis} groups can be contained in a single input file.
 
-\subsection{Visualizations}
+\section{Visualizations}
 
 Visualizations are the main form of assessment of the results, 
 they allow to see the movement of geometry and wake and the intensity 
@@ -258,7 +258,7 @@ Geometrical component to include in the visualization. More component can be inc
 If not declared, or if declared \opt{all} all the components are loaded and processed. 
 \end{itemize}
 
-\subsection{Integral loads}
+\section{Integral loads}
 
 Integral loads allow to obtain the time history of the loads acting on one 
 or more components, in one of the reference frames defined in section 
@@ -328,7 +328,7 @@ The tag of the reference frame in which the loads should be referred to.
 
 \end{itemize}
 
-\subsubsection{Output .dat file}
+\subsection{Output .dat file}
 The output file containing integral loads measurements in \param{.dat} format has 
 the following structure.
 The first 4 lines of the file constitute the header of the file. The first three 
@@ -366,7 +366,7 @@ and the origin in $(0.0,-1.0,0.0)$, these lines read
      0.000000E+000 -0.100000E+001  0.000000E+000
 \end{inputfile}
 
-\subsection{Hinge Loads}
+\section{Hinge Loads}
 
 Hinge loads allows to obtain the time history of the load acting to one control 
 surface along the hinge axis reference frame as defined in figure~\ref{fig:hingeref}. 
@@ -430,7 +430,7 @@ The tag of the control surface of the component in which the loads should be ref
 
 \end{itemize}
 
-\subsubsection{Output .dat file}
+\subsection{Output .dat file}
 The output file containing hinge loads measurements in \param{.dat} 
 format has the following structure.
 The first 4 lines of the file constitute the header of the file. 
@@ -473,7 +473,7 @@ and the origin of the hinge is $(0.25,-0.1,0.0)$, these lines read
 
 
 
-\subsection{Probes}
+\section{Probes}
 
 Probes allow to obtain a time history of some variables in some points by 
 sampling the solution at such points. 
@@ -562,7 +562,7 @@ Location and name of the file containing the list of probing points.
 
 \end{itemize}
 
-\subsubsection{Output .dat file}
+\subsection{Output .dat file}
 
 The output file containing point probe measurements in \param{.dat} format has 
 the following structure. The first line is a header containing the number of probes
@@ -595,7 +595,7 @@ these lines read
      0.216758E-002 -0.357483E-002
 \end{inputfile}
 
-\subsection{Flow Field}
+\section{Flow Field}
 
 Flow fields allow to probe systematically the domain obtaining the solution 
 probed in a structured series of points in 1-2 or 3 dimensions, allowing the 
@@ -680,7 +680,7 @@ Maximum of the coordinates of the box containing the structured sampling points.
 
 \end{itemize}
 
-\subsection{Sectional loads}
+\section{Sectional loads}
 
 Sectional loads allow to obtain the distribution of the forces along one 
 direction of a slender body, e.g. a wing or a blade. 
@@ -812,14 +812,14 @@ average = F
 component = wing
 
 box_sect = {
- ref_node = (/ -0.5 ,-0.5 , -0.3 /)
- face_vec = (/ 1.0 , 0.0 , 0.0 /)
- face_bas = (/ 2.0 , 1.0 /) 
- face_hei = (/ 1.0 , 1.0 /)
- span_vec = (/ 0.0 , 1.0 , 0.0 /)
- span_len = 3.0
- num_sect = 10
- reshape_box = T 
+  ref_node = (/ -0.5 ,-0.5 , -0.3 /)
+  face_vec = (/ 1.0 , 0.0 , 0.0 /)
+  face_bas = (/ 2.0 , 1.0 /) 
+  face_hei = (/ 1.0 , 1.0 /)
+  span_vec = (/ 0.0 , 1.0 , 0.0 /)
+  span_len = 3.0
+  num_sect = 10
+  reshape_box = T 
 } 
 
 
@@ -927,7 +927,7 @@ finer subdivision than requested)
 
 \end{itemize}
 
-\subsubsection{Output .dat file}
+\subsection{Output .dat file}
 
 The output file containing sectional loads in \param{.dat} format has 
 the following structure. The first line is a header specifying the 
@@ -964,7 +964,7 @@ sections follow. The last 12 lines contains the (first-column) unrolled
 reference frame, required to obtain the components of the loads in the 
 global reference frame from those expressed in the local reference frame,
 \begin{equation}
-   \underline{f}^G = \underline{\underline{R}} \, \underline{f}^L \ .
+  \bm{f}^G = \bm{R} \, \bm{f}^L 
 \end{equation}
 As an example, the lines collecting the fields described above of the 
 first and the last of the 100 timesteps of the analysis reads
@@ -984,7 +984,7 @@ first and the last of the 100 timesteps of the analysis reads
 The geometrical component of the example is attached to a steady 
 reference frame, whose origin has global components $( 0.0, -1.0, 0.0 )$ 
 and whose axes are aligned with those of the global reference frame, so 
-that the rotation matrix $\underline{\underline{R}}$ is equal to the 
+that the rotation matrix $\bm{R}$ is equal to the 
 identity matrix.
 
 The extra files produced if \param{lifting_line_data}  
@@ -1059,7 +1059,7 @@ are set to \param{T} the following quantities are printed:
 \label{fig:ll_output}
 \end{figure}
 
-\subsection{Chordwise Loads} 
+\section{Chordwise Loads} 
 Chordwise loads allow to obtain the distribution of the forces, pressure and the geometrical
 quantities along the chord at a specific spanwise section of a parametric component. 
 
@@ -1158,7 +1158,7 @@ The vector dimension must be the same as \param{n\_station}
 
 \end{itemize}
 
-\subsubsection{Output .dat file}
+\subsection{Output .dat file}
 
 The output file containing chordwise loads in \param{.dat} format has 
 the following structure. The first line is a header specifying the 
@@ -1189,7 +1189,7 @@ the output file reads
 The fifth line is another header file containing the fields and their 
 dimension collected in the next \param{n\_time} lines.
 \begin{inputfile}[frame=single]
-  6: # t, n\_chord
+  6: # t, n_chord
 \end{inputfile}
 The first field is the time. The chordwise loads of the \param{n\_chord} 
 sections follow. 
@@ -1216,7 +1216,7 @@ The files generated by sectional loads contain, as sectional quantity:
 \end{itemize}
 
 
-\subsection{Aeroacoustics}
+\section{Aeroacoustics}
 The aeroacoustics postprocessing is a specific analysis used to 
 extract from results all the various data required to perform an 
 aeroacoustics analysis (with an external software) on the analysed results. 
@@ -1282,7 +1282,7 @@ selected components will be included in the output file.
 
 \end{itemize}
 
-\subsubsection{Output .dat file}
+\subsection{Output .dat file}
 The output file containing aeroacustics data in \param{.dat} format has 
 the following structure. The first line is a header specifying the 
 analysis.
@@ -1300,4 +1300,12 @@ The fourth line is a header file containing the fields collected in the nextline
 \begin{inputfile}[frame=single]
   4: # cx, cy, cz, nx, ny, nz, area, rho, pressure, rhoux, rhouy, rhouz, svx, svy, svz
 \end{inputfile}
-\param{svx}, \param{svy} and \param{svz} represents the grid velocity, the velocity of the centers of each element.
+\begin{itemize} 
+  \item \param{cx}, \param{cy} and \param{cz} represents the position of the centers of each element.
+  \item \param{nx}, \param{ny} and \param{nz} represents the position of the centers of each element.
+  \item \param{area} represents the area of each element
+  \item \param{rho} represents the density of each element
+  \item \param{pressure} represents the total pressure of each element
+  \item \param{rhoux}, \param{rhouy} and \param{rhouz} represents the product between the velocity and the density 
+  \item \param{svx}, \param{svy} and \param{svz} represents the velocity of the centers of each element.
+\end{itemize}
