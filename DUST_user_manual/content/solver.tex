@@ -1035,6 +1035,12 @@ Is the reference frame moving with respect to the parent?
 \end{itemize}
 
 \section{Moving reference frames}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=.5\textwidth]{references2}
+    \caption{Velocity of relative reference frame}
+    \label{fig:references2}
+    \end{figure}
 Special input is required when a reference frame is moving or is multiple, 
 in which case a special grouping keyword is required. 
 As shown in file \ref{file:references_moving.in} if the parameter \param{moving} 
@@ -1247,12 +1253,7 @@ Grouping keyword containing the specification of the rotation, which parameters 
 
 \end{itemize}
 
-\begin{figure}
-\centering
-\includegraphics[width=.7\textwidth]{references2}
-\caption{Velocity of relative reference frame}
-\label{fig:references2}
-\end{figure}
+
 
 \section{Multiple reference frames}
 To ease the setup of rotors in terms of reference frames and motions, 
@@ -1350,7 +1351,32 @@ required in the multiplicity are:
     \textit{multiple:} not inside each \param{multiplicity} group. \textit{type:} real. 
     
     offset from the rotation pole (the origin of the multiple reference frame) of the beginning of the chain of reference frames for each blade. It is constant and does not imply any secondary motion, can be used to represent the central part of the rotor axis assembly. 
+
+    \item \param{harmonic\_input}: \textit{required:} no, \textit{type:} logical. 
     
+    Enable the possibility to prescribe the hinge motion through the multiblade degrees of freedom. 
+    This possibility is shown in \ref{file:references_rotor.in}. 
+    
+    \item \param{n\_harmonics}: \textit{required:} yes if \param{harmonic\_input} is true. 
+    \textit{multiple:} not inside each \param{multiplicity} group. \textit{type:} integer.
+
+    Number of expected harmonics: currently each \param{dof} must have the same number of harmonic for each rotor. 
+    
+    \item \param{delta\_3}: \textit{required:} no. 
+    \textit{multiple:} not inside each \param{multiplicity} group. \textit{type:} real. 
+
+    Pitch-flap coupling angle $\delta_3$. 
+
+    \item \param{delta\_2}: \textit{required:} no. 
+    \textit{multiple:} not inside each \param{multiplicity} group. \textit{type:} real. 
+
+    Pitch-lag coupling angle $\delta_2$. 
+
+    \item \param{psi\_sw}: \textit{required:} no. 
+    \textit{multiple:} not inside each \param{multiplicity} group. \textit{type:} real. 
+
+    Swashplate mixing angle $\psi_\mathrm{sw}$. 
+
     \item \param{N\_dofs}: \textit{required:} yes if \param{mult_type} is \opt{rotor}. 
     \textit{multiple:} not inside each \param{multiplicity} group. \textit{type:} integer.
     
@@ -1365,16 +1391,8 @@ required in the multiplicity are:
     a chain according to the order in which are defined. A representation of 
     the chain of degrees of freedom is presented in figure \ref{fig:multiple_refs}.
     
-    \item \param{harmonic\_input}: \textit{required:} no, \textit{type:} logical. 
-    
-    Enable the possibility to prescribe the hinge motion through the multiblade degrees of freedom. 
-    This possibility is shown in \ref{file:references_rotor.in}. 
-    
-    \item \param{n\_harmonics}: \textit{required:} yes if \param{harmonic\_input} is true. 
-    \textit{multiple:} not inside each \param{multiplicity} group. \textit{type:} integer.
 
-    Number of expected harmonics: currently each \param{dof} must have the same number of harmonic for each rotor. 
-    
+
     \begin{itemize}
     \item \param{hinge\_type}: \textit{required:} yes. \textit{multiple:} 
     not inside each \param{dof} group. \textit{type:} string.
@@ -1409,50 +1427,65 @@ required in the multiplicity are:
     \item \param{collective_dot}: \textit{required:} yes \param{harmonic_input} is true. 
     \textit{multiple:} not inside each \param{dof} group. \textit{type:} real. 
 
-    Velocity of the collective component: $\dot{\beta}_0$.
+    Velocity of the collective component: $\dot{u}_0$.
 
     \item \param{cosine}: \textit{required:} yes \param{harmonic_input} is true. 
     \textit{multiple:} not inside each \param{dof} group. \textit{type:} real. 
 
-    Vector containing all the harmonics for the cosine cyclic component: $\beta_{nc}$. 
+    Vector containing all the harmonics for the cosine cyclic component: $u_{nc}$. 
 
     \item \param{cosine\_dot}: \textit{required:} yes \param{harmonic_input} is true. 
     \textit{multiple:} not inside each \param{dof} group. \textit{type:} real. 
 
-    Vector containing all the harmonics for the cosine cyclic velocity component: $\dot{\beta}_{nc}$. 
+    Vector containing all the harmonics for the cosine cyclic velocity component: $\dot{u}_{nc}$. 
     
     \item \param{sine}: \textit{required:} yes \param{harmonic_input} is true. 
     \textit{multiple:} not inside each \param{dof} group. \textit{type:} real. 
 
-    Vector containing all the harmonics for the sine cyclic component: $\beta_{ns}$. 
+    Vector containing all the harmonics for the sine cyclic component: $u_{ns}$. 
 
     \item \param{sine\_dot}: \textit{required:} yes \param{harmonic_input} is true. 
     \textit{multiple:} not inside each \param{dof} group. \textit{type:} real. 
 
-    Vector containing all the harmonics for the sine cyclic velocity component: $\dot{\beta}_{ns}$. 
+    Vector containing all the harmonics for the sine cyclic velocity component: $\dot{u}_{ns}$. 
 
     \item \param{reactionless}: \textit{required:} yes \param{harmonic_input} is true. 
     \textit{multiple:} not inside each \param{dof} group. \textit{type:} real. 
 
-    Vector containing all the harmonics for the reactionless cyclic component: $\beta_{N/2}$. 
+    Vector containing all the harmonics for the reactionless cyclic component: $u_{N/2}$. 
 
     \item \param{reactionless\_dot}: \textit{required:} yes \param{harmonic_input} is true. 
     \textit{multiple:} not inside each \param{dof} group. \textit{type:} real. 
 
-    Vector containing all the harmonics for the reactionless cyclic velocity component: $\dot{\beta}_{N/2}$. 
+    Vector containing all the harmonics for the reactionless cyclic velocity component: $\dot{u}_{N/2}$. 
     
     \end{itemize}
 \end{itemize}
 
-If the \param{harmonic\_input} is true, then for each degree of freedom the motion will be:
-\begin{equation}
-    \beta^{m} = \beta_0 + \sum_{n = 1}^{n_\mathrm{harm}} \Big[\beta_{nc}\cos{n\psi_m} + \beta_{ns}\sin{n\psi_m}\Big] + \beta_{N/2}(-1)^{m}  
-\end{equation}
+If the \param{harmonic\_input} is true, then, for the flap $\beta$ and lag $\xi$ degrees of freedom, the motion will be:
+\begin{align}
+    &\beta^{m} = \beta_0 + \sum_{n = 1}^{n_\mathrm{harm}} \Big[\beta_{nc}\cos{n\psi_m} + \beta_{ns}\sin{n\psi_m}\Big] + \beta_{N/2}(-1)^{m} \\  
+    &\xi^{m} = \xi_0 + \sum_{n = 1}^{n_\mathrm{harm}} \Big[\xi_{nc}\cos{n\psi_m} + \xi_{ns}\sin{n\psi_m}\Big] + \xi_{N/2}(-1)^{m}   
+\end{align}
 and the angular velocity will be: 
 \begin{align} 
-    \dot{\beta}^{m} = \dot{\beta_0} + \sum_{n = 1}^{n_\mathrm{harm}} \Big[\big(\dot{\beta}_{nc} + n\Omega\beta_{ns}\big) \cos{n\psi_m} + 
-                                    \big(\dot{\beta}_{ns} - n\Omega\beta_{nc}\big) \sin{n\psi_m}\Big]  +  \dot{\beta}_{N/2}(-1)^{m} 
+    &\dot{\beta}^{m} = \dot{\beta_0} + \sum_{n = 1}^{n_\mathrm{harm}} \Big[\big(\dot{\beta}_{nc} + n\Omega\beta_{ns}\big) \cos{n\psi_m} + 
+                                    \big(\dot{\beta}_{ns} - n\Omega\beta_{nc}\big) \sin{n\psi_m}\Big]  +  \dot{\beta}_{N/2}(-1)^{m} \\
+    &\dot{\xi}^{m} = \dot{\xi_0} + \sum_{n = 1}^{n_\mathrm{harm}} \Big[\big(\dot{\xi}_{nc} + n\Omega\xi_{ns}\big) \cos{n\psi_m} + 
+                                    \big(\dot{\xi}_{ns} - n\Omega\xi_{nc}\big) \sin{n\psi_m}\Big]  +  \dot{\xi}_{N/2}(-1)^{m} \\
 \end{align}
+For the pitch degree of freedom, the motion will take into consideration the control mixing and the flap, and lag components. The input of this degree of freedom 
+are intened to be the actual swashplate input, rather than the actual pitch rotation. 
+
+The pitch root rotation will be then:
+\begin{align}
+    \theta^{m} = \theta_0 + \theta_{1c}\cos{\psi_m + \psi_\mathrm{sw}} + \theta_{1s}\sin{\psi_m + \psi_\mathrm{sw}} -\tan{\delta_3}\beta^{m} - \tan{\delta_2}\xi^{m}   
+\end{align}
+and the angular velocity will be: 
+\begin{align} 
+    \dot{\theta}^{m} = -\theta_{1c}\Omega\sin{\psi_m + \psi_\mathrm{sw}} + \theta_{1s}\Omega\cos{\psi_m + \psi_\mathrm{sw}}                                     
+\end{align}
+
 
 \begin{inputfile}[frame=single, caption={references\_rotor_mbc.in}, label={file:references_rotor_mbc.in}]
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1472,6 +1505,9 @@ and the angular velocity will be:
       harmonic_input = T 
       n_harmonics = 3 
       n_dofs = 1
+      delta_3 = -15
+      delta_2 = 0
+      psi_sw = 0 
       dof = {
         hinge_type = Flap
         hinge_offset = (/ 0.0 , 0.032432 , 0.0 /)

@@ -709,8 +709,7 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
         !> convert the orientation vector into orientation matrix 
         call vec2mat(theta_cen, R_cen) 
         R_cen = matmul(geo%components(elems(i_el)%p%comp_id)%coupling_node_rot, R_cen)
-        !> calculate the pressure using the relative orientation matrix: check if 
-        !> coupling_node orientation is needed  
+        !> calculate the pressure using the relative orientation matrix
         call elems(i_el)%p%compute_pres(R_cen)  ! update surf_vel field too
       else !> non coupled component 
         call elems(i_el)%p%compute_pres( &     ! update surf_vel field too

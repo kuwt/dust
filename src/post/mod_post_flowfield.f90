@@ -416,7 +416,7 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
 
   !> Compute fields to be plotted +++++++++++++++++++++++++++++
 !$omp parallel do collapse(3) private(iz,iy,ix,vel_probe, pres_probe, vort_probe, &
-                                   !$omp ic, ie, v, ipp, pot_probe, pot_probe_old, phi)
+                                      !$omp ic, ie, v, ipp, pot_probe, pot_probe_old, phi)
     ! Loop over the nodes of the box
     do iz = 1 , size(zbox)  ! z-coord
       do iy = 1 , size(ybox)  ! y-coord

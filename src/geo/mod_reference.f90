@@ -284,9 +284,9 @@ subroutine build_references(refs, reference_file)
   ! complex multiple components -----
   integer                                     :: i_mult_blades , n_mult_blades , count_dofs
   integer                                     :: hub_id
-  integer                                     :: i_dof , n_dofs
+  integer                                     :: i_dof, n_dofs, i_ref_flap, i_ref_lag, i_ref_pitch, i_dof_pitch
   character(len=max_char_len), allocatable    :: hinge_type(:)
-  real(wp) , allocatable                      :: hinge_offs(:,:) , hinge_coll(:) , hinge_cyAm(:) , hinge_cyPh(:)
+  real(wp) , allocatable                      :: hinge_offs(:,:), hinge_coll(:), hinge_cyAm(:), hinge_cyPh(:)
 
   !> Transient option
   logical                                     :: transient_logical
@@ -296,7 +296,7 @@ subroutine build_references(refs, reference_file)
   !> Harmonics dof options
   integer                                     :: n_harmonics, i_harm
   logical                                     :: harmonic_input
-  real                                        :: cos_npsi, sin_npsi
+  real(wp)                                    :: cos_npsi, sin_npsi, delta_2, delta_3, psi_sw, psi_mix
   real(wp), allocatable                       :: collective_mbc(:), collective_mbc_dot(:) 
   real(wp), allocatable                       :: reactionless_mbc(:), reactionless_mbc_dot(:)
   real(wp), allocatable                       :: cosine_mbc(:,:), cosine_mbc_dot(:,:) 
@@ -392,6 +392,10 @@ subroutine build_references(refs, reference_file)
   call sbprms%CreateSubOption('dof', 'Definition of a hinge dof', sbprms_hin, multiple=.true.)
   call sbprms_hin%CreateStringOption('hinge_type', 'Char to define the rotation axis: it can be Flap, Pitch, Lag')
   call sbprms_hin%CreateRealArrayOption('hinge_offset', 'Position of the hinge')
+  !> coupling angles 
+  call sbprms%CreateRealOption('delta_2', 'delta_2 angle for pitch-lag coupling', '0.')
+  call sbprms%CreateRealOption('delta_3', 'delta_3 angle for pitch-flap coupling', '0.') 
+  call sbprms%CreateRealOption('psi_sw', 'swashplate control mixing angle', '0.')  
   !> input some trim angle in mbc taken from trim analysis 
   call sbprms%CreateLogicalOption('harmonic_input', 'Definition of harmonic components', 'F') 
   call sbprms%CreateIntOption('n_harmonics', 'Number of harmonics', '0')
@@ -1092,7 +1096,7 @@ subroutine build_references(refs, reference_file)
 
 
           !1) allocate a series of extra reference frames and move-alloc everything
-          n_refs = n_refs+n_mult_blades*(n_dofs+1)
+          n_refs = n_refs + n_mult_blades*(n_dofs+1)
           allocate(refs_temp(0:n_refs))
           refs_temp(0:iref) = refs(0:iref)
           deallocate(refs)
@@ -1123,7 +1127,11 @@ subroutine build_references(refs, reference_file)
           psi_0 = getreal(sbprms,'psi_0')
           hub_offset = getreal(sbprms,'hub_offset')
           harmonic_input = getlogical(sbprms, 'harmonic_input') 
-          write(*,*) 'harmonic_input', harmonic_input 
+          !> couplings 
+          psi_sw = getreal(sbprms, 'psi_sw') 
+          delta_2 = getreal(sbprms, 'delta_2')
+          delta_3 = getreal(sbprms, 'delta_3')  
+
           ! read and allocate some tmp arrays to describe the motion around the hinges
           if ( n_dofs .gt. 0 ) then
             allocate(hinge_type(n_dofs  ))
@@ -1174,9 +1182,9 @@ subroutine build_references(refs, reference_file)
                 sine_mbc(i_dof, :) = sine_mbc(i_dof, :)*pi/180.0_wp
                 sine_mbc_dot(i_dof, :) = sine_mbc_dot(i_dof, :)*pi/180.0_wp
               else 
-                hinge_coll(i_dof) = getreal(sbprms_hin,'collective') 
-                hinge_cyAm(i_dof) = getreal(sbprms_hin,'cyclic_ampl')
-                hinge_cyPh(i_dof) = getreal(sbprms_hin,'cyclic_phas')
+                hinge_coll(i_dof) = getreal(sbprms_hin, 'collective') 
+                hinge_cyAm(i_dof) = getreal(sbprms_hin, 'cyclic_ampl')
+                hinge_cyPh(i_dof) = getreal(sbprms_hin, 'cyclic_phas')
                 !> from deg to rad
                 hinge_cyAm(i_dof) = hinge_cyAm(i_dof)*pi/180.0_wp
                 hinge_cyPh(i_dof) = hinge_cyPh(i_dof)*pi/180.0_wp
@@ -1187,7 +1195,7 @@ subroutine build_references(refs, reference_file)
 
           !3) for each new reference insert all the parameters
           hub_id = refs(iref)%id
-          do i_mult_blades = 1 , n_mult_blades ! loop over the blades
+          do i_mult_blades = 1, n_mult_blades ! loop over the blades
             ! i_dof=0, rotation around the axis
             ! i_dof=1:n_dofs, hinge dofs
             do i_dof = 0 , n_dofs ! loop over the dofs
@@ -1310,12 +1318,16 @@ subroutine build_references(refs, reference_file)
 
               else ! harmonic rotation around the hinge axis
 
-                if ( trim(hinge_type(i_dof)) .eq. 'Flap' ) then
-                  refs(iref)%axis  = (/ 1.0_wp , 0.0_wp , 0.0_wp /)
-                else if ( trim(hinge_type(i_dof)) .eq. 'Pitch' ) then
-                  refs(iref)%axis  = (/ 0.0_wp , 1.0_wp , 0.0_wp /)
-                else if ( trim(hinge_type(i_dof)) .eq. 'Lag' ) then
-                  refs(iref)%axis  = (/ 0.0_wp , 0.0_wp , 1.0_wp /)
+                if (trim(hinge_type(i_dof)) .eq. 'Flap') then
+                  refs(iref)%axis = (/ 1.0_wp, 0.0_wp, 0.0_wp/)
+                  i_ref_flap = iref 
+                elseif (trim(hinge_type(i_dof)) .eq. 'Pitch') then
+                  refs(iref)%axis = (/ 0.0_wp, 1.0_wp, 0.0_wp/)
+                  i_ref_pitch = iref
+                  i_dof_pitch = i_dof !> special case 
+                elseif (trim(hinge_type(i_dof)) .eq. 'Lag') then
+                  refs(iref)%axis = (/ 0.0_wp, 0.0_wp, 1.0_wp/)
+                  i_ref_lag = iref
                 else
                   call error(this_sub_name, this_mod_name, 'Unknown hinge type:&
                         & it must be: Flap, Pitch ot Lag')
@@ -1351,25 +1363,29 @@ subroutine build_references(refs, reference_file)
                   refs(iref)%rot_tim( it) = sim_param%time_vec(it)
                   if ( refs(iref)%Omega .ne. 0 ) then
                     if (harmonic_input) then ! harmonic input
-                      !> cyclic components (sum over the harmonics)
-                      do i_harm = 1, n_harmonics
-                        cos_npsi = cos(real(i_harm, wp)*(refs(iref)%Omega*refs(iref)%rot_tim(it) + refs(iref)%psi_0))
-                        sin_npsi = sin(real(i_harm, wp)*(refs(iref)%Omega*refs(iref)%rot_tim(it) + refs(iref)%psi_0)) 
-                        !> position
-                        refs(iref)%rot_pos(it) = refs(iref)%rot_pos(it) + &  
-                          cosine_mbc(i_dof, i_harm)*cos_npsi + sine_mbc(i_dof, i_harm)*sin_npsi 
-                        !> velocity 
-                        refs(iref)%rot_vel(it) = refs(iref)%rot_vel(it) + &
-                          (cosine_mbc_dot(i_dof, i_harm) + real(i_harm, wp)*refs(iref)%Omega*sine_mbc(i_dof, i_harm))*cos_npsi + &
-                          (sine_mbc_dot(i_dof, i_harm) - real(i_harm, wp)*refs(iref)%Omega*cosine_mbc(i_dof, i_harm))*sin_npsi  
-                      enddo
-                      !> collective and reactionless components 
-                      refs(iref)%rot_pos(it) = refs(iref)%rot_pos(it) + &
-                                              collective_mbc(i_dof) + &
-                                              reactionless_mbc(i_dof)*(-1.0_wp)**(real(i_mult_blades,wp))
-                      refs(iref)%rot_vel(it) = refs(iref)%rot_pos(it) + &
-                                              collective_mbc_dot(i_dof) + &
-                                              reactionless_mbc_dot(i_dof)*(-1.0_wp)**(real(i_mult_blades,wp))
+                      if (trim(hinge_type(i_dof)) .eq. 'Flap' .or. trim(hinge_type(i_dof)) .eq. 'Lag')  then 
+                        !> cyclic components (sum over the harmonics)
+                        do i_harm = 1, n_harmonics
+                          cos_npsi = cos(real(i_harm, wp)*(refs(iref)%Omega*refs(iref)%rot_tim(it) + refs(iref)%psi_0))
+                          sin_npsi = sin(real(i_harm, wp)*(refs(iref)%Omega*refs(iref)%rot_tim(it) + refs(iref)%psi_0)) 
+                          !> position
+                          refs(iref)%rot_pos(it) = refs(iref)%rot_pos(it) + &  
+                            cosine_mbc(i_dof, i_harm)*cos_npsi + sine_mbc(i_dof, i_harm)*sin_npsi 
+                          !> velocity 
+                          refs(iref)%rot_vel(it) = refs(iref)%rot_vel(it) + &
+                            (cosine_mbc_dot(i_dof, i_harm) + real(i_harm, wp)*refs(iref)%Omega*sine_mbc(i_dof, i_harm))*cos_npsi + &
+                            (sine_mbc_dot(i_dof, i_harm) - real(i_harm, wp)*refs(iref)%Omega*cosine_mbc(i_dof, i_harm))*sin_npsi  
+                        enddo
+                        !> collective and reactionless components 
+                        refs(iref)%rot_pos(it) = refs(iref)%rot_pos(it) + &
+                                                collective_mbc(i_dof) + &
+                                                reactionless_mbc(i_dof)*(-1.0_wp)**(real(i_mult_blades,wp))
+                        refs(iref)%rot_vel(it) = refs(iref)%rot_pos(it) + &
+                                                collective_mbc_dot(i_dof) + &
+                                                reactionless_mbc_dot(i_dof)*(-1.0_wp)**(real(i_mult_blades,wp))
+                      else  
+                        !> pitch hinge needs separate loop to take into account the couplings 
+                      endif 
 
                       
                     else ! standard input 
@@ -1393,6 +1409,33 @@ subroutine build_references(refs, reference_file)
 
 
             end do ! loop over the dofs
+
+            ! pitch hinge: it is a special case since it is considered an input  
+            ! that contains the effects of the other hinges due to the pitch-flap and pitch-lag coupling 
+            
+            do it = 1,sim_param%n_timesteps
+              if ((refs(i_ref_pitch)%Omega .ne. 0) ) then !.and. i_dof_pitch .gt. 0
+                if (harmonic_input) then ! harmonic input
+                  !> only the 1st harmonic is considered 
+                  !debug 
+                  psi_mix = refs(i_ref_pitch)%Omega*refs(i_ref_pitch)%rot_tim(it) + refs(i_ref_pitch)%psi_0 + psi_sw*180.0_wp/pi
+                  cos_npsi = cos(psi_mix)
+                  sin_npsi = sin(psi_mix) 
+
+                  refs(i_ref_pitch)%rot_pos(it) = refs(i_ref_pitch)%rot_pos(it) + & 
+                                                  collective_mbc(i_dof_pitch) + & 
+                                                  cosine_mbc(i_dof_pitch, 1)*cos_npsi + & 
+                                                  sine_mbc(i_dof_pitch, 1)*sin_npsi - & 
+                                                  tan(delta_3*pi/180.0_wp)*refs(i_ref_flap)%rot_pos(it) - & 
+                                                  tan(delta_2*pi/180.0_wp)*refs(i_ref_lag)%rot_pos(it)  
+                  
+                  refs(i_ref_pitch)%rot_vel(it) = refs(i_ref_pitch)%rot_vel(it) - & 
+                                                  cosine_mbc(i_dof_pitch, 1)*refs(i_ref_pitch)%Omega*sin(psi_mix) + & 
+                                                  sine_mbc(i_dof_pitch, 1)*refs(i_ref_pitch)%Omega*sin(psi_mix)
+                endif
+              endif 
+            enddo
+
 
           end do ! loop over the blades
 
