@@ -850,7 +850,8 @@ subroutine update_elems( this, geo, elems, te )
             !> Orientation 
             comp%el(i)%ori = comp%el(i)%ori + &
                                 comp%rbf%cen%wei(iw,i) * n_rot * theta  
-
+            ! TODO: check orientation update for the hinge elem
+                                
             !> Velocity
             comp%el(i)%ub = comp%el(i)%ub + &
                                 comp%rbf%cen%wei(iw,i) * (vel + cross(omega, chord_rot))
@@ -959,7 +960,6 @@ subroutine update_elems( this, geo, elems, te )
         endif 
 
         !!> *** to do *** move to a function: update_elems_coupled_hinges(), here in mod_precice
-        !!> *** to do *** blending regions
         !! -------------------------------------------------------------------------------
         !!>  === Add hinge motion: START ===
         ! -------------------------------------------------------------------------------
@@ -1066,7 +1066,6 @@ subroutine update_elems( this, geo, elems, te )
                       comp%hinge(ih)%i_points_precice( i ) ), &
                       -comp%hinge(ih) % hin_rot(:,i), r_drot, theta, n_drot )
 
-
               !> === Surface nodes ===
               !> 1.1. Update points: rigid rotation
               do ib = 1, size(comp%hinge(ih)%rot%n2h(i)%p2h)
@@ -1074,7 +1073,6 @@ subroutine update_elems( this, geo, elems, te )
                 !> Reference difference
                 ip = comp%hinge(ih)%rot%n2h(i)%p2h(ib)  ! Local numbering
                 chord = comp%loc_points(:,ip) - comp%hinge(ih)%nodes(:,i)
-
 
                 ip = comp%i_points(ip)  ! Local-to-global connectivity
                 !> Position: absolute position (!)
@@ -1087,14 +1085,16 @@ subroutine update_elems( this, geo, elems, te )
               !> 1.2. Chordwise blending region
               do ib = 1, size(comp%hinge(ih)%blen%n2h(i)%p2h)
 
-
                 ii = comp%hinge(ih)%blen%n2h(i)%p2h(ib)
                 ip = comp%i_points(ii)  ! Local-to-global connectivity
-                if (n_rot(2) .lt. 0) then
+
+                ! condition to identify if the hinge is moving up/down
+                if (n_drot(2) .lt. 0) then
                   th1 = theta * comp%hinge(ih)%blen%n2h(i)%s2h(ib)
                 else
                   th1 = -theta * comp%hinge(ih)%blen%n2h(i)%s2h(ib)
                 endif
+
                 if ( th1 .ne. 0.0_wp ) then
                   !> coordinate of the centre of the circle used for blending,
                   ! in the n-direction
