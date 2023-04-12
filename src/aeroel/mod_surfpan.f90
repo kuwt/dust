@@ -732,15 +732,16 @@ subroutine compute_pres_surfpan(this, R_g)
   !                          + 0.5*rho_inf*V_inf^2
   !                          +(- 0.5*rho_inf*V^2 
   !                          + rho * ub.u_phi
-  !                          + rho_inf*dphi/dt)         
-
+  !                          - rho_inf*dphi/dt)      
+  !                                     ^   
+  !!        with: idou = -phi         __|
   ! Prandt -- Glauert correction for compressibility effect
   ! it applies to the dynamic pressure terms only
   ! so that only the *relative* static pressure is affected
   mach = abs(norm2(wind - this%ub) / sim_param%a_inf)
   
   this%pres =   sim_param%P_inf &
-              +(0.5_wp * sim_param%rho_inf * norm2(wind)**2.0_wp &
+              +(0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
               - 0.5_wp * sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp  &
               + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
               + sim_param%rho_inf * this%didou_dt)/sqrt(1 - mach**2)
