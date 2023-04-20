@@ -606,16 +606,9 @@ it = 1
       select type ( el => elems(i_el)%p ) ; class is ( t_surfpan )
 #if USE_PRECICE
       if (geo%components(el%comp_id)%coupling) then
-        theta_cen = el%ori 
-        !> convert the orientation vector into orientation matrix 
-        call vec2mat(theta_cen, R_cen) 
-        R_cen = matmul(geo%components(el%comp_id)%coupling_node_rot, R_cen)
-
-        call el%create_local_velocity_stencil( &    
-                R_cen)
+        call el%create_local_velocity_stencil(el%R_cen)
         !> chtls stencil
-        call el%create_chtls_stencil( &             
-                R_cen)
+        call el%create_chtls_stencil(el%R_cen)
       else 
         call el%create_local_velocity_stencil( &    
                 geo%refs(geo%components(el%comp_id)%ref_id)%R_g)
@@ -733,13 +726,8 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
       ! select cases for intel, need to call these for all elements and for the
       ! vortex lattices it is going to be a dummy empty function call
       if (geo%components(elems(i_el)%p%comp_id)%coupling) then  
-        !> get orientation vector of the ref_line from precice 
-        theta_cen = elems(i_el)%p%ori 
-        !> convert the orientation vector into orientation matrix 
-        call vec2mat(theta_cen, R_cen) 
-        R_cen = matmul(geo%components(elems(i_el)%p%comp_id)%coupling_node_rot, R_cen)
         !> calculate the pressure using the relative orientation matrix
-        call elems(i_el)%p%compute_pres(R_cen)  ! update surf_vel field too
+        call elems(i_el)%p%compute_pres(elems(i_el)%p%R_cen)  ! update surf_vel field too
       else !> non coupled component 
           call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
               geo%refs(geo%components(elems(i_el)%p%comp_id)%ref_id)%R_g)

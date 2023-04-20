@@ -1376,6 +1376,7 @@ subroutine complete_wake(wake, geo, elems, te)
 
   !==> Particles: if the panel wake is at the end, create a particle
   if(wake%full_panels) then
+
     if(wake%interpolate_wake) then ! TODO crosscheck interp_parts .and. refine_wake
     ! WAKE INTERPOLATION
     ! general idea:
@@ -1667,7 +1668,9 @@ subroutine complete_wake(wake, geo, elems, te)
       ! each wake panel is converted to one particle
       k = 1
       do iw = 1,wake%n_pan_stripes
-      
+        
+        p1 = wake%i_start_points(1,iw)
+        p2 = wake%i_start_points(2,iw) 
         ! compute the quantites of the wake panel
         call compute_partvec(wake, iw, partvec, pos_p, area)
         wake%last_pan_idou(iw) = wake%end_pan_idou(iw)

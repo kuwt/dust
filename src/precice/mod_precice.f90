@@ -57,7 +57,7 @@ use mod_handling, only: &
   error, printout
 
 use mod_math, only: &
-  cross, rotation_vector_combination
+  cross, rotation_vector_combination, vec2mat
 
 use mod_geometry, only: &
   t_geo, t_geo_component, t_tedge
@@ -813,7 +813,7 @@ subroutine update_elems( this, geo, elems, te )
 
         !> Update surface quantities, as the weighted averages of the structure
         !  quantities, w/o considering rotations of the hinges
-         
+        
         do i = 1, size(comp%el) 
           
           do iw = 1, size(comp%rbf%cen%ind,1)
@@ -851,8 +851,7 @@ subroutine update_elems( this, geo, elems, te )
             !> Orientation 
             comp%el(i)%ori = comp%el(i)%ori + &
                                 comp%rbf%cen%wei(iw,i) * n_rot * theta  
-            !
-            ! TODO: check orientation update for the hinge elem
+
                                 
             !> Velocity
             comp%el(i)%ub = comp%el(i)%ub + &
@@ -860,7 +859,10 @@ subroutine update_elems( this, geo, elems, te )
             
           end do
 
-            !write(*,*) 'comp%el(i)%ori', comp%el(i)%ori
+            !> Orientation Matrix for surface panels 
+            call vec2mat(comp%el(i)%ori, comp%el(i)%R_cen) 
+            comp%el(i)%R_cen = matmul(comp%coupling_node_rot, comp%el(i)%R_cen)
+
         end do
 
         !> stripe ub 

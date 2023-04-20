@@ -407,14 +407,19 @@ subroutine press_normvel_der(geo, elems, surf_vel_SurfPan_old)
 
     select type ( el => elems(geo%idSurfPan(i_el))%p ) ; class is ( t_surfpan )
 
-      el%dUn_dt = sum(el%nor * ( el%ub - &
-                      surf_vel_SurfPan_old( i_el , : ) ) ) / sim_param%dt
 #if USE_PRECICE
-      call vec2mat(elems(i_el)%p%ori, R_cen) 
-      R_cen = matmul(geo%components(elems(i_el)%p%comp_id)%coupling_node_rot, R_cen)
+      if (geo%components(elems(i_el)%p%comp_id)%coupling) then
+        R_cen = el%R_cen
+      else
+        R_cen = geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g
+      endif 
 #else 
       R_cen = geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g
 #endif 
+
+      el%dUn_dt = sum(el%nor * ( el%ub - &
+                      surf_vel_SurfPan_old( i_el , : ) ) ) / sim_param%dt
+
       ! Compute GradS_Un
       GradS_Un = 0.0_wp
       do i_e = 1 , el%n_ver

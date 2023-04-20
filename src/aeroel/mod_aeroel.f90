@@ -158,6 +158,9 @@ type, abstract, extends(c_elem) :: c_pot_elem
   !> Orientation vector of the center 
   real(wp) :: ori(3)
 
+  !> Orientation matrix of the center 
+  real(wp) :: R_cen(3,3)
+
   !> Vorticity induced velocity at the centre
   real(wp) :: uvort(3)
 

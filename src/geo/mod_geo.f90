@@ -729,7 +729,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
       do i = 1, size(geo%components(i_comp)%el) 
         cen(:,i) = geo%components(i_comp)%el(i)%cen
       end do 
-      write(*,*) geo%components(i_comp)%rbf%nodes
+      
       call geo%components(i_comp)%rbf%build_connectivity(cen, geo%components(i_comp)%coupling_node_rot)
       !> transfer index and weight matrix 
       geo%components(i_comp)%rbf%cen%ind = geo%components(i_comp)%rbf%point%ind
