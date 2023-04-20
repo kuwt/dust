@@ -58,7 +58,7 @@ use mod_sim_param, only: &
   t_sim_param, sim_param
 
 use mod_math, only: &
-  cross
+  cross, vec2mat
 
 use mod_handling, only: &
   error, warning, info, printout, dust_time, t_realtime
@@ -396,6 +396,7 @@ end subroutine solve_pressure_sys
 subroutine press_normvel_der(geo, elems, surf_vel_SurfPan_old)
   type(t_geo), intent(in) :: geo
   type(t_impl_elem_p), intent(inout) :: elems(:)
+  real(wp)             :: R_cen(3,3) 
   real(wp), intent(in) :: surf_vel_SurfPan_old(:,:)
 
   integer :: i_el, i_e
@@ -408,21 +409,26 @@ subroutine press_normvel_der(geo, elems, surf_vel_SurfPan_old)
 
       el%dUn_dt = sum(el%nor * ( el%ub - &
                       surf_vel_SurfPan_old( i_el , : ) ) ) / sim_param%dt
-
+#if USE_PRECICE
+      call vec2mat(elems(i_el)%p%ori, R_cen) 
+      R_cen = matmul(geo%components(elems(i_el)%p%comp_id)%coupling_node_rot, R_cen)
+#else 
+      R_cen = geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g
+#endif 
       ! Compute GradS_Un
       GradS_Un = 0.0_wp
       do i_e = 1 , el%n_ver
         if ( associated(el%neigh(i_e)%p) ) then !  .and. &
           select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
             GradS_Un = GradS_Un + &
-              matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g , &
+              matmul(R_cen, &
                 el%pot_vel_stencil(:,i_e) * ( &
                   sum(el%nor* (el_neigh%surf_vel - el%surf_vel) ) ) )
           end select
         else
 
             GradS_Un = GradS_Un + &
-              matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g , &
+              matmul(R_cen, &
                el%pot_vel_stencil(:,i_e) * ( &
                   sum(el%nor* ( - 2.0_wp * el%surf_vel) ) ) )
 
@@ -434,17 +440,17 @@ subroutine press_normvel_der(geo, elems, surf_vel_SurfPan_old)
       do i_e = 1 , el%n_ver
         if ( associated(el%neigh(i_e)%p) ) then !  .and. &
           select type(el_neigh=>el%neigh(i_e)%p) ; class is (t_surfpan)
+            
             DivS_U = DivS_U + &
                       sum( &
-                      matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g ,   &
+                      matmul(R_cen,   &
                                                             el%pot_vel_stencil(:,i_e) ) * &
                             ( el_neigh%surf_vel - el%surf_vel )   )
           end select
         else
-
           DivS_U = DivS_U + &
             sum( &
-              matmul( geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g ,   &
+              matmul(R_cen,   &
                                                          el%pot_vel_stencil(:,i_e) ) * &
                  ( - 2.0_wp * el%surf_vel ) )
 

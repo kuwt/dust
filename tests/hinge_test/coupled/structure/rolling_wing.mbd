@@ -6,7 +6,7 @@ end: data;
 # === initial value problem =====================================
 begin: initial value;
   initial time: -0.1;
-  final time: 2.0;
+  final time: 7.0;
   time step: 0.1;
 
   max iterations: 250;
@@ -27,6 +27,7 @@ set: const integer GROUND = 0;
 set: const integer AIRCRAFT = 100;
 set: const integer FLAPERON_RIGHT = 200;
 set: const integer FLAPERON_LEFT = 300;
+set: const real ROLL = 0.*deg2rad;
 # ------------------FLAPERON--------------------
 set: const real T_START_FLAPERON_RIGHT = -0.01; 
 set: const real T_PERIOD_FLAPERON_RIGHT = 0.01; 
@@ -52,13 +53,15 @@ end: control data;
 # === reference frame ===========================================
 reference: GROUND,
   reference, global, null,
-  reference, global, eye,
+  reference, global, eye, 
   reference, global, null,
   reference, global, null;
 
 reference: AIRCRAFT,
   reference, GROUND, null,
-  reference, GROUND, eye,
+  reference, GROUND, 
+  1, 1., 0.,        0.,      
+  2, 0., cos(ROLL), sin(ROLL),
   reference, GROUND, null,
   reference, GROUND, null;
 
@@ -151,7 +154,7 @@ begin: elements;
         1,
     null,
     orientation constraint,
-        1,  # roll d.o.f.
+        0,  # roll d.o.f.
         1,
         1,
     component,
@@ -249,7 +252,7 @@ begin: elements;
       component,
       0.0,
       #0.0,
-      cosine, T_START_FLAPERON_LEFT, pi/T_PERIOD_FLAPERON_LEFT, DEG_FLAPERON_LEFT/2, half, 0.0,
+      cosine, T_START_FLAPERON_LEFT, pi/T_PERIOD_FLAPERON_LEFT, 0*DEG_FLAPERON_LEFT/2, half, 0.0,
       0.0;		
 
   joint: FLAPERON_LEFT + 2, total joint,

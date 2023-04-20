@@ -729,7 +729,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
       do i = 1, size(geo%components(i_comp)%el) 
         cen(:,i) = geo%components(i_comp)%el(i)%cen
       end do 
-
+      write(*,*) geo%components(i_comp)%rbf%nodes
       call geo%components(i_comp)%rbf%build_connectivity(cen, geo%components(i_comp)%coupling_node_rot)
       !> transfer index and weight matrix 
       geo%components(i_comp)%rbf%cen%ind = geo%components(i_comp)%rbf%point%ind
@@ -1257,7 +1257,7 @@ subroutine load_components(geo, in_file, out_file, te)
           np_precice     = np_precice_tot - n_nodes_coupling_hinges
 
           !> Allocate comp%i_points_precice()
-          allocate(geo%components(i_comp)%i_points_precice( np_precice ))
+          allocate(geo%components(i_comp)%i_points_precice(np_precice))
 
           !> Evaluate precice/dust connectivity for structural and hinge nodes
           allocate( ind_coupling( np_precice ) )
@@ -2458,7 +2458,7 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
 
         call comp%hinge(ih)%hinge_deflection(comp%i_points, rr_hinge_contig,  t, te%i, te%t_hinged )
         geo%points(:, comp%i_points) = rr_hinge_contig
-              deallocate(rr_hinge_contig)
+        deallocate(rr_hinge_contig)
 
       else
 

@@ -1265,6 +1265,8 @@ subroutine complete_wake(wake, geo, elems, te)
     ! Coupled components were already taken care of in precice update nfw
     if ( .not. geo%components( wake%pan_gen_icomp(ip) )%coupling ) then
 #endif
+    wake%pan_gen_dir(:,ip) = wake%pan_gen_dir(:,ip)/norm2(wake%pan_gen_dir(:,ip))
+    
     dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
     call calc_node_vel( wake%w_start_points(:,ip), &
             geo%refs(wake%pan_gen_ref(ip))%G_g, &

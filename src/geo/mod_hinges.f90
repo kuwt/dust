@@ -296,9 +296,9 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
   !> Coordinates in the hinge reference frame
   ! Rotation matrix, build with the local ortonormal ref.frame of
   ! the first hinge node
-  Rot(1,:) = this % ref % v(:,1)
-  Rot(2,:) = this % ref % h(:,1)
-  Rot(3,:) = this % ref % n(:,1)
+  Rot(1,:) = this%ref%v(:,1)
+  Rot(2,:) = this%ref%h(:,1)
+  Rot(3,:) = this%ref%n(:,1)
 
   allocate( rrb(3,nb) );  allocate( rrh(3,nh) )
   allocate( rrb_wei(3,nb) );
@@ -370,7 +370,7 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
         !> Weights in chordwise direction
         call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
 
-        wei_v = 1.0_wp / max( wei_v, 1e-9_wp ) **this%w_order
+        wei_v = 1.0_wp / max( wei_v, 1e-9_wp )**this%w_order
         wei_v = wei_v / sum(wei_v)
 
         !> Weights in spanwise direction
@@ -463,8 +463,8 @@ subroutine build_connectivity(this, loc_points, coupling_node_rot)
   deallocate(rrb, rrh, dist_all, wei_v, ind_v)
   deallocate(rot_node_id, rot_ind, rot_wei, rot_span_wei)
   deallocate(ble_node_id, ble_ind, ble_wei, ble_span_wei)
-  deallocate(rot_i2h, rot_p2h, rot_w2h, rot_s2h) ! *****
-  deallocate(ble_i2h, ble_p2h, ble_w2h, ble_s2h) ! *****
+  deallocate(rot_i2h, rot_p2h, rot_w2h, rot_s2h)
+  deallocate(ble_i2h, ble_p2h, ble_w2h, ble_s2h)
 
 end subroutine build_connectivity
 
@@ -537,9 +537,9 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
   ! the first hinge node
 
   !for not coupled hinge
-  Rot(1,:) = this % ref % v(:,1)
-  Rot(2,:) = this % ref % h(:,1)
-  Rot(3,:) = this % ref % n(:,1)
+  Rot(1,:) = this%ref%v(:,1)
+  Rot(2,:) = this%ref%h(:,1)
+  Rot(3,:) = this%ref%n(:,1)
 
   allocate( rrb(3,nb) );  allocate( rrh(3,nh) )
   allocate( rrb_wei(3,nb) );
@@ -579,7 +579,7 @@ subroutine build_connectivity_cen(this, rr, ee, coupling_node_rot)
   nrot = 0; nble = 0
 
   do ib = 1, nb
-    rrb_wei(:,ib) = matmul( coupling_node_rot, (loc_points(:,ib) - matmul(transpose(coupling_node_rot) ,this%ref%rr(:,1)) ))
+    rrb_wei(:,ib) = matmul(coupling_node_rot, (loc_points(:,ib) - matmul(transpose(coupling_node_rot) ,this%ref%rr(:,1)) ))
   enddo
 
   ! Loop over all the surface points

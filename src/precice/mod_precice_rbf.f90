@@ -146,7 +146,7 @@ subroutine build_connectivity(this, aero_coord, coupling_node_rot)
 
   !> From beam ref. sys to Dust ref. sys
   Wnorm = matmul(transpose(coupling_node_rot),(matmul(Wnorm,coupling_node_rot)))
-
+  
   do ip = 1, np
 
     !> Distance of the surface nodes from the structural nodes

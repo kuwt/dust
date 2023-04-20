@@ -1,19 +1,24 @@
-  Using PreCICE 
 
 >>>>>> DUST beginning >>>>>>
 
 
+Reading input parameters from file "dust.in"
+
+
 ====== Input parameters: ======
 
-
 Reading input parameters from file "dust.in"
-  sim_param%llSolver : GammaMethod
+
+Using PreCICE
 
 ====== Geometry Creation ======
 
-
 Reading input parameters from file "References.in"
 Reading geometry from file "geo_input.h5"
+ theta_hinge   0.0000000000000000     
+ theta_hinge   0.0000000000000000     
+ theta_hinge   0.0000000000000000     
+ theta_hinge   0.0000000000000000     
 
 ====== Initializing Octree ======
 
@@ -23,5 +28,9 @@ Reading geometry from file "geo_input.h5"
   is coupling ongoing:            1
   is coupling ongoing:            1
   dt_precice         :   0.10000000000000001     
+ theta_hinge   0.0000000000000000     
+ theta_hinge   0.0000000000000000     
+ theta_hinge  0.34558486971031843     
+ theta_hinge  0.34558486971031843     
 
 ////////// Performing Computations //////////

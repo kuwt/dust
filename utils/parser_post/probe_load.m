@@ -107,19 +107,19 @@ function probe_data = probe_load(file)
             if contains(line_new,'ux')
                 var = var + 3;
                 velocity = true;
-                probe_data.velocity.time = zeros(1,probe_data.n_time); 
+                probe_data.velocity.time = zeros(probe_data.n_time,1); 
                 probe_data.velocity.value = zeros(3,probe_data.n_time, probe_data.n_probe); 
             end
             if contains(line_new,'p')
                 var = var + 1;
                 pressure = true;
-                probe_data.pressure.time = zeros(1,probe_data.n_time); 
+                probe_data.pressure.time = zeros(probe_data.n_time,1); 
                 probe_data.pressure.value = zeros(1,probe_data.n_time, probe_data.n_probe); 
             end
             if contains(line_new,'cp')
                 var = var + 1;
                 cp = true;       
-                probe_data.cp.time = zeros(1,probe_data.n_time); 
+                probe_data.cp.time = zeros(probe_data.n_time, 1);
                 probe_data.cp.value = zeros(1,probe_data.n_time, probe_data.n_probe);
             end
 

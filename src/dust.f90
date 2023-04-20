@@ -404,7 +404,7 @@ if (sim_param%restart_from_file) then
   already_solv_restart = .true.
 else ! Set to zero the intensity of all the singularities
 
-  do i_el = 1 , size(elems)      ! implicit elements (vr, sp)
+  do i_el = 1 ,size(elems)      ! implicit elements (vr, sp)
       elems(i_el)%p%mag = 0.0_wp
   end do
   
@@ -602,7 +602,36 @@ it = 1
     !> Update dt--> mbdyn should take care of the dt and send it to precice (TODO)
 #else
 #endif
+  do i_el = 1 , geo%nSurfPan
+      select type ( el => elems(i_el)%p ) ; class is ( t_surfpan )
+#if USE_PRECICE
+      if (geo%components(el%comp_id)%coupling) then
+        theta_cen = el%ori 
+        !> convert the orientation vector into orientation matrix 
+        call vec2mat(theta_cen, R_cen) 
+        R_cen = matmul(geo%components(el%comp_id)%coupling_node_rot, R_cen)
 
+        call el%create_local_velocity_stencil( &    
+                R_cen)
+        !> chtls stencil
+        call el%create_chtls_stencil( &             
+                R_cen)
+      else 
+        call el%create_local_velocity_stencil( &    
+                geo%refs(geo%components(el%comp_id)%ref_id)%R_g)
+        !> chtls stencil
+        call el%create_chtls_stencil( &             
+                geo%refs(geo%components(el%comp_id)%ref_id)%R_g)
+      endif 
+#else 
+      call el%create_local_velocity_stencil( &    
+              geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
+      !> chtls stencil
+      call el%create_chtls_stencil( &             
+              geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
+#endif 
+      end select
+  end do
     !> Calculate the normal velocity derivative for the pressure equation
     call press_normvel_der(geo, elems, surf_vel_SurfPan_old)
   
@@ -712,7 +741,7 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
         !> calculate the pressure using the relative orientation matrix
         call elems(i_el)%p%compute_pres(R_cen)  ! update surf_vel field too
       else !> non coupled component 
-        call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
+          call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
               geo%refs(geo%components(elems(i_el)%p%comp_id)%ref_id)%R_g)
       endif  
       call elems(i_el)%p%compute_dforce()      

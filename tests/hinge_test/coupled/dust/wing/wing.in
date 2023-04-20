@@ -22,7 +22,7 @@ hinge = {
   n_nodes = 2
 
   hinge_ref_dir = (/ 1.0, 0.0, 0.0 /)
-  hinge_offset  = 0.01
+  hinge_offset  = 0.1
   hinge_spanwise_blending = 0.001
 
   hinge_rotation_input = coupling
@@ -32,6 +32,7 @@ hinge = {
   coupling_node_last  =  3
   }
 }
+
 !!
 hinge = {
   hinge_Tag = Flap_l
@@ -42,7 +43,7 @@ hinge = {
   n_nodes = 2
 
   hinge_ref_dir = (/ 1.0, 0.0, 0.0 /)
-  hinge_offset  = 0.01
+  hinge_offset  = 0.1
   hinge_spanwise_blending = 0.001
 
   hinge_rotation_input = coupling
@@ -56,7 +57,7 @@ hinge = {
 
 
 nelem_chord = 15
-type_chord = uniform
+type_chord = cosineLE
 ! First section
 chord = 1.0
 twist = 0.0
@@ -66,7 +67,7 @@ airfoil = NACA0012
 span = 8 
 sweep = 0.0
 dihed = 0.0
-nelem_span = 90
+nelem_span = 30
 type_span = uniform
 
 ! Second section
