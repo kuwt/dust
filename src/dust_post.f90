@@ -306,25 +306,25 @@ do ia = 1, n_analyses
 
     !> Flow Field
     case('flow_field')
-      call post_flowfield ( sbprms , basename , data_basename , an_name , ia , &
+      call post_flowfield( sbprms , basename , data_basename , an_name , ia , &
                           out_frmt , components_names , all_comp , &
                           an_start , an_end , an_step, average)
 
     !> Sectional Loads
     case('sectional_loads')
-      call post_sectional ( sbprms , bxprms , basename , data_basename , an_name , ia , &
+      call post_sectional( sbprms , bxprms , basename , data_basename , an_name , ia , &
                           out_frmt , components_names , all_comp , &
                           an_start , an_end , an_step, average )
 
     !> Chordwise Loads 
     case('chordwise_loads') 
-      call post_chordwise (sbprms, basename, data_basename, an_name, ia, &
-                            out_frmt, components_names, all_comp, &
+      call post_chordwise(sbprms, basename, data_basename, an_name, ia, &
+                          out_frmt, components_names, all_comp, &
                             an_start, an_end, an_step, average)
 
     !> Aeroacoustics
     case('aeroacoustics')
-      call post_aeroacoustics ( sbprms, basename, data_basename, &
+      call post_aeroacoustics( sbprms, basename, data_basename, &
                                 an_name, ia, out_frmt, components_names, &
                                 all_comp, an_start, an_end, an_step, average )
 
