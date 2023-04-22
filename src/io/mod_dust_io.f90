@@ -364,15 +364,14 @@ subroutine save_status(geo, wake,  it, time, run_id)
     if ( geo%components(icomp)%coupling ) then
       call new_hdf5_group(gloc2, 'Geometry', gloc3)
       call write_hdf5(geo%points(:,geo%components(icomp)%i_points), &
-                      'rr',gloc3)
+                      'rr', gloc3)
       !> get orientation for sectional loads 
       ne = size(geo%components(icomp)%el)
       allocate(ori(ne, 3))
       do ie = 1,ne
         ori(ie, :) = geo%components(icomp)%el(ie)%ori
-        write(*,*) ori(ie, :) !>check !! 
       end do
-      !call write_hdf5(ori, 'ori', gloc3)
+      call write_hdf5(ori, 'ori', gloc3)
       deallocate(ori)
       call close_hdf5_group(gloc3)
     end if
