@@ -90,7 +90,7 @@ module mod_post_chordwise
     tec_out_chordwise
 
   use mod_math, only: &
-    cross, linear_interp 
+    cross, linear_interp, vec2mat
 
   implicit none
 
@@ -155,6 +155,7 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
   integer                                                 :: chord_start, chord_end
   integer,  allocatable                                   :: id_minus(:), id_plus(:) 
   real(wp)                                                :: u_inf(3), P_inf, rho 
+  real(wp)                                                :: R_cen_minus(3,3), R_cen_plus(3,3)
   !> field to interpolate  
   real(wp)                                                :: force_minus(3) = 0.0_wp
   real(wp)                                                :: force_plus(3)  = 0.0_wp 
@@ -311,10 +312,10 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
               - comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver(2) ) )
       !> local chord as projection of the profile on x-z plane
       chord(is) = sqrt((abs(minval(comps(id_comp)%loc_points(ax_coor - 1 ,chord_start:chord_end))) + & 
-              abs(maxval(comps(id_comp)%loc_points(ax_coor - 1,chord_start:chord_end))))**2 + &
-              (abs(minval(comps(id_comp)%loc_points(ax_coor + 1,chord_start:chord_end))) + & 
-              abs(maxval(comps(id_comp)%loc_points(ax_coor + 1,chord_start:chord_end))))**2)
-
+              abs(maxval(comps(id_comp)%loc_points(ax_coor - 1,chord_start:chord_end))))**2)!! + &
+              !(abs(minval(comps(id_comp)%loc_points(ax_coor + 1,chord_start:chord_end))) + &  !remouve starting point!!
+              !abs(maxval(comps(id_comp)%loc_points(ax_coor + 1,chord_start:chord_end))))**2)
+      
       do ic = 2 , nelem_chor ! check
         ie = ie + 1
         if (abs( y_cen(is) - &
@@ -342,8 +343,7 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
           id_plus(ista) = is + 1
         elseif (y_cen_tras(is) .le. 0.0_wp .and. y_cen_tras(is + 1) .le. 0.0_wp)  then
           id_minus(ista) = is - 1
-          id_plus(ista) = is
-          
+          id_plus(ista) = is          
         endif
       enddo
       
@@ -437,28 +437,27 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
           pres_plus = comps(id_comp)%el(ipan_plus)%pres 
           cp_plus  = (pres_plus - P_inf)/& 
                                     (0.5_wp*rho*norm2(u_inf)**2) 
-
+#if USE_PRECICE
+          call vec2mat(comps(id_comp)%el(ipan_plus)%ori, R_cen_minus)
+          R_cen_minus = matmul(transpose(comps(id_comp)%coupling_node_rot), R_cen_minus) 
+          call vec2mat(comps(id_comp)%el(ipan_plus)%ori, R_cen_plus)
+          R_cen_plus = matmul(transpose(comps(id_comp)%coupling_node_rot), R_cen_plus) 
+#else     
+          R_cen_minus = refs_R(:,:, ref_id)
+          R_cen_plus = refs_R(:,:, ref_id)
+#endif
           ! From global to local coordinates of forces and moments
-          force_minus = matmul(transpose(refs_R(:,:, ref_id)), &
-                                                  force_minus) & 
-                                                  / y_span(id_minus(ista)) 
-          tang_minus = matmul(transpose( refs_R(:,:, ref_id)), &
-                                                  tang_minus)                                                   
-          nor_minus = matmul(transpose( refs_R(:,:, ref_id)), &
-                                                  nor_minus)                                                   
-          cen_minus = matmul(transpose(refs_R(:,:, ref_id)), &
-                                                  cen_minus) 
+          force_minus = matmul(transpose(R_cen_minus), force_minus) & 
+                                          / y_span(id_minus(ista)) 
+          tang_minus = matmul(transpose(R_cen_minus), tang_minus)                                                   
+          nor_minus = matmul(transpose(R_cen_minus), nor_minus)                                                   
+          cen_minus = matmul(transpose(R_cen_minus), cen_minus) 
 
-          force_plus = matmul(transpose(refs_R(:,:, ref_id)), &
-                                                  force_plus) & 
-                                                  / y_span(id_plus(ista)) 
-          tang_plus = matmul(transpose( refs_R(:,:, ref_id)), &
-                                                  tang_plus)                                                   
-          nor_plus = matmul(transpose( refs_R(:,:, ref_id)), &
-                                                  nor_plus)                                                   
-          cen_plus = matmul(transpose(refs_R(:,:, ref_id)), &
-                                                  cen_plus) 
-                                                            
+          force_plus = matmul(transpose(R_cen_plus), force_plus) & 
+                                          / y_span(id_plus(ista)) 
+          tang_plus = matmul(transpose( R_cen_plus), tang_plus)                                                   
+          nor_plus = matmul(transpose( R_cen_plus), nor_plus)                                                   
+          cen_plus = matmul(transpose(R_cen_plus), cen_plus) 
           !> interpolate  
           do idir = 1,3
             call linear_interp((/force_minus(idir), force_plus(idir)/), & 
@@ -508,7 +507,7 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
       select case(trim(out_frmt))
         case('dat')
           write(filename,'(A)') trim(basename)//'_'//trim(an_name)
-          call dat_out_chordwise (basename, components_names(1), time(1:1), &
+          call dat_out_chordwise (filename, components_names(1), time(1:1), &
                         force_ave, tang_ave, nor_ave, cen_ave, pres_ave, & 
                         cp_ave, average, n_station, span_station, chord_int)
         case('tecplot')
@@ -521,7 +520,7 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
       select case(trim(out_frmt))
         case('dat')
           write(filename,'(A)') trim(basename)//'_'//trim(an_name)
-          call dat_out_chordwise (basename, components_names(1), time, &
+          call dat_out_chordwise (filename, components_names(1), time, &
                         force_int, tang_int, nor_int, cen_int, pres_int, & 
                         cp_int, average, n_station, span_station, chord_int)
         case('tecplot')

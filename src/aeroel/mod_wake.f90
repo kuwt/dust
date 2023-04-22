@@ -1265,6 +1265,8 @@ subroutine complete_wake(wake, geo, elems, te)
     ! Coupled components were already taken care of in precice update nfw
     if ( .not. geo%components( wake%pan_gen_icomp(ip) )%coupling ) then
 #endif
+    wake%pan_gen_dir(:,ip) = wake%pan_gen_dir(:,ip)/norm2(wake%pan_gen_dir(:,ip))
+    
     dist = matmul(geo%refs(wake%pan_gen_ref(ip))%R_g,wake%pan_gen_dir(:,ip))
     call calc_node_vel( wake%w_start_points(:,ip), &
             geo%refs(wake%pan_gen_ref(ip))%G_g, &
@@ -1374,6 +1376,7 @@ subroutine complete_wake(wake, geo, elems, te)
 
   !==> Particles: if the panel wake is at the end, create a particle
   if(wake%full_panels) then
+
     if(wake%interpolate_wake) then ! TODO crosscheck interp_parts .and. refine_wake
     ! WAKE INTERPOLATION
     ! general idea:
@@ -1665,7 +1668,9 @@ subroutine complete_wake(wake, geo, elems, te)
       ! each wake panel is converted to one particle
       k = 1
       do iw = 1,wake%n_pan_stripes
-      
+        
+        p1 = wake%i_start_points(1,iw)
+        p2 = wake%i_start_points(2,iw) 
         ! compute the quantites of the wake panel
         call compute_partvec(wake, iw, partvec, pos_p, area)
         wake%last_pan_idou(iw) = wake%end_pan_idou(iw)

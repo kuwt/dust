@@ -57,7 +57,7 @@ use mod_handling, only: &
   error, printout
 
 use mod_math, only: &
-  cross, rotation_vector_combination
+  cross, rotation_vector_combination, vec2mat
 
 use mod_geometry, only: &
   t_geo, t_geo_component, t_tedge
@@ -152,7 +152,7 @@ subroutine initialize(this)
   call printout(nl//'Using PreCICE')
 
   ! *** to do *** read %config_file_name as an input
-  !> Default input for dust in a preCICE coupled simulation TODO: read as input? 
+  !> Default input for dust in a preCICE coupled simulation 
   this%config_file_name = sim_param%precice_config
   this%solver_name = 'dust'
   this%  mesh_name = 'dust_mesh'
@@ -177,13 +177,13 @@ subroutine initialize(this)
   call precicef_get_mesh_id( this%mesh%mesh_name, this%mesh%mesh_id )
 
   !> Initialize some preCICE variables
-  this % write_initial_data(1:precice_mcl)='                                                  '
-  this % read_it_checkp(    1:precice_mcl)='                                                  '
-  this % write_it_checkp(   1:precice_mcl)='                                                  '
+  this%write_initial_data(1:precice_mcl)='                                                  '
+  this%read_it_checkp(    1:precice_mcl)='                                                  '
+  this%write_it_checkp(   1:precice_mcl)='                                                  '
 
-  call precicef_action_write_initial_data(this % write_initial_data)
-  call precicef_action_read_iter_checkp(  this % read_it_checkp)
-  call precicef_action_write_iter_checkp( this %write_it_checkp)
+  call precicef_action_write_initial_data(this%write_initial_data)
+  call precicef_action_read_iter_checkp(this%read_it_checkp)
+  call precicef_action_write_iter_checkp(this%write_it_checkp)
 
 end subroutine initialize
 
@@ -503,7 +503,7 @@ subroutine update_force( this, geo, elems )
           if ( trim(comp%hinge(ih)%input_type) .eq. 'coupling' ) then
 
             !> Update structural forcing, taking into account hinges
-            call this % update_force_coupled_hinge( comp, comp%hinge(ih), j_for, j_mom )
+            call this%update_force_coupled_hinge( comp, comp%hinge(ih), j_for, j_mom )
 
           end if
         end do
@@ -610,7 +610,7 @@ subroutine update_force_coupled_hinge( this, comp, hinge, j_for, j_mom )
 
       !> Update f_h
       this%fields(j_for)%fdata(:,ip) = this%fields(j_for)%fdata(:,ip) &
-                                     + al_ah * w_ah * comp%el(a)%dforce
+                                      + al_ah*w_ah*comp%el(a)%dforce
 
       !> Update m_h
       this%fields(j_mom)%fdata(:,ip) = this%fields(j_mom)%fdata(:,ip) &
@@ -813,8 +813,9 @@ subroutine update_elems( this, geo, elems, te )
 
         !> Update surface quantities, as the weighted averages of the structure
         !  quantities, w/o considering rotations of the hinges
+        
         do i = 1, size(comp%el) 
-
+          
           do iw = 1, size(comp%rbf%cen%ind,1)
 
             ! === Coupling Node ===
@@ -850,13 +851,17 @@ subroutine update_elems( this, geo, elems, te )
             !> Orientation 
             comp%el(i)%ori = comp%el(i)%ori + &
                                 comp%rbf%cen%wei(iw,i) * n_rot * theta  
-            ! TODO: check orientation update for the hinge elem
+
                                 
             !> Velocity
             comp%el(i)%ub = comp%el(i)%ub + &
                                 comp%rbf%cen%wei(iw,i) * (vel + cross(omega, chord_rot))
             
           end do
+
+            !> Orientation Matrix for surface panels 
+            call vec2mat(comp%el(i)%ori, comp%el(i)%R_cen) 
+            comp%el(i)%R_cen = matmul(comp%coupling_node_rot, comp%el(i)%R_cen)
 
         end do
 
@@ -929,8 +934,8 @@ subroutine update_elems( this, geo, elems, te )
                 vel   = this%fields(j_vel)%fdata(:, comp%i_points_precice(comp%rbf%ctr_pt%ind(iw,i)))
                 !> Rotation
                 n_rot = this%fields(j_rot)%fdata(:, comp%i_points_precice(comp%rbf%ctr_pt%ind(iw,i)))
-                theta = norm2( n_rot )
-              
+                theta = norm2(n_rot)
+
                 if ( theta .lt. eps ) then
                   n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
                   theta = 0.0_wp
@@ -963,27 +968,24 @@ subroutine update_elems( this, geo, elems, te )
         !! -------------------------------------------------------------------------------
         !!>  === Add hinge motion: START ===
         ! -------------------------------------------------------------------------------
-    
+
         do ih = 1, comp%n_hinges
           if ( trim(comp%hinge(ih)%input_type) .eq. 'coupling' ) then
 
             !> Update hinge nodes
-            comp%hinge(ih) % act % rr = &
+            comp%hinge(ih)%act%rr = &
                 this%fields(j_pos)%fdata(:,comp%hinge(ih)%i_points_precice)
 
             !> Update hinge node reference frame attached to the non-rotating structure
-            comp%hinge(ih) % hin_rot = 0.0_wp
-
+            comp%hinge(ih)%hin_rot = 0.0_wp
+            
             do i = 1, size(comp%hinge(ih)%hin%ind,2)
               do j = 1, size(comp%hinge(ih)%hin%ind,1)
-
-
                 n_rot = this%fields(j_rot)%fdata(:, &
-                        comp%i_points_precice( comp%hinge(ih)%hin%ind(j,i)  ) )
-
-                comp%hinge(ih) % hin_rot(:,i) = comp%hinge(ih) % hin_rot(:,i) + &
-                                                comp%hinge(ih) % hin % wei(j,i) * n_rot
-
+                        comp%i_points_precice(comp%hinge(ih)%hin%ind(j,i)))
+                comp%hinge(ih)%hin_rot(:,i) = comp%hinge(ih)%hin_rot(:,i) + &
+                                                comp%hinge(ih)%hin%wei(j,i)*n_rot 
+                
               end do
 
               !> Update h,v,n reference frame attached to the non-rotating hinge nodes
@@ -996,21 +998,21 @@ subroutine update_elems( this, geo, elems, te )
                 Rot_mat(3,:) = ( 1.0_wp - cos(theta) ) * n_rot(3) * n_rot / theta**2.0_wp
 
                 Rot_mat(1,:) = Rot_mat(1,:) + &
-                  (/ cos(theta)*theta   ,-sin(theta)*n_rot(3), sin(theta)*n_rot(2) /)/theta
+                  (/ cos(theta)*theta, -sin(theta)*n_rot(3), sin(theta)*n_rot(2)/)/theta
                 Rot_mat(2,:) = Rot_mat(2,:) + &
                   (/ sin(theta)*n_rot(3), cos(theta)*theta   ,-sin(theta)*n_rot(1) /)/theta
                 Rot_mat(3,:) = Rot_mat(3,:) + &
                   (/-sin(theta)*n_rot(2), sin(theta)*n_rot(1), cos(theta)*theta    /)/theta
 
-                comp%hinge(ih) % act % h = matmul( Rot_mat, comp%hinge(ih) % ref % h )
+                comp%hinge(ih)%act%h = matmul(Rot_mat, comp%hinge(ih)%ref%h )
   
-                comp%hinge(ih) % act % v = matmul( Rot_mat, comp%hinge(ih) % ref % v )
-                comp%hinge(ih) % act % n = matmul( Rot_mat, comp%hinge(ih) % ref % n )
+                comp%hinge(ih)%act%v = matmul(Rot_mat, comp%hinge(ih)%ref%v )
+                comp%hinge(ih)%act%n = matmul(Rot_mat, comp%hinge(ih)%ref%n )
 
               else
-                comp%hinge(ih) % act % h = comp%hinge(ih) % ref % h
-                comp%hinge(ih) % act % v = comp%hinge(ih) % ref % v
-                comp%hinge(ih) % act % n = comp%hinge(ih) % ref % n
+                comp%hinge(ih)%act%h = comp%hinge(ih)%ref%h
+                comp%hinge(ih)%act%v = comp%hinge(ih)%ref%v
+                comp%hinge(ih)%act%n = comp%hinge(ih)%ref%n
 
               end if
 
@@ -1018,7 +1020,7 @@ subroutine update_elems( this, geo, elems, te )
 
             !> 0. Update node position and velocity, before update with coupled hinge motion,
             !   r = ( 1 - alpha ) * r_beam + alpha * r_hinge =
-            !     = r_beam + alpha * ( r_hinge - r_beam ) = r_beam + alpha * dr
+            !     = r_beam + alpha * ( r_hinge - r_beam ) = r_bea m + alpha * dr
             !   v = ( 1 - alpha ) * v_beam + alpha * v_hinge =
             !     = v_beam + alpha * ( v_hinge - v_beam ) = v_beam + alpha * dv
             ! where:
@@ -1026,16 +1028,17 @@ subroutine update_elems( this, geo, elems, te )
             ! - r,v_beam  the position and the velocity due to the motion of the structural
             !   part of the model,
             ! - r,v_hinge the position and the velocity due to the motion of the hinge nodes
-            do i = 1, size( comp%hinge(ih)%rot %node_id )
+            
+            do i = 1, size( comp%hinge(ih)%rot%node_id )
               ip = comp%i_points( comp%hinge(ih)%rot%node_id(i) )
               geo%points(:,ip)     = geo%points(:,ip) * &
-                                    ( 1.0_wp - comp%hinge(ih)%rot %span_wei(i) )
+                                    ( 1.0_wp - comp%hinge(ih)%rot%span_wei(i))
               geo%points_vel(:,ip) = geo%points_vel(:,ip) * &
-                                    ( 1.0_wp - comp%hinge(ih)%rot %span_wei(i) )
+                                    ( 1.0_wp - comp%hinge(ih)%rot%span_wei(i))
             end do
 
             !> From motion of hinge nodes to surface motion
-            ! ... see ~ geo/mod_hinges/himge_deflection()
+            ! ... see ~ geo/mod_hinges/hinge_deflection()
             !> 1. Update position
             do i = 1, comp%hinge(ih)%n_nodes ! hinge nodes
 
@@ -1043,9 +1046,9 @@ subroutine update_elems( this, geo, elems, te )
               !> Rotation vector and rotation matrix
               n_rot = this%fields(j_rot)%fdata(:,comp%hinge(ih)%i_points_precice(i))
               theta = norm2(n_rot)
-
               if ( theta .lt. eps ) then
-                n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /); theta = 0.0_wp
+                n_rot = (/ 1.0_wp, 0.0_wp, 0.0_wp /)
+                theta = 0.0_wp
               else
                 n_rot = n_rot / theta
               end if
@@ -1064,7 +1067,7 @@ subroutine update_elems( this, geo, elems, te )
               call rotation_vector_combination( &
                       this%fields(j_rot)%fdata(:, &
                       comp%hinge(ih)%i_points_precice( i ) ), &
-                      -comp%hinge(ih) % hin_rot(:,i), r_drot, theta, n_drot )
+                      -comp%hinge(ih)%hin_rot(:,i), r_drot, theta, n_drot )
 
               !> === Surface nodes ===
               !> 1.1. Update points: rigid rotation
@@ -1098,8 +1101,8 @@ subroutine update_elems( this, geo, elems, te )
                 if ( th1 .ne. 0.0_wp ) then
                   !> coordinate of the centre of the circle used for blending,
                   ! in the n-direction
-                  yc = cos(th1)/sin(th1) * comp%hinge(ih)%offset * ( 1.0_wp + cos(th1) ) + &
-                                           comp%hinge(ih)%offset * sin(th1)
+                  yc = cos(th1)/sin(th1)*comp%hinge(ih)%offset*(1.0_wp + cos(th1)) + &
+                                        comp%hinge(ih)%offset*sin(th1)
                   !> Some auxiliary quantities
                   xq = sum( ( geo%points(:,ip) - comp%hinge(ih)%act%rr(:,i) ) * &
                                                 comp%hinge(ih)%act%v( :,i) )

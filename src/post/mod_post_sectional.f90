@@ -92,7 +92,7 @@ use mod_tecplot_out, only: &
   tec_out_sectional
 
 use mod_math, only: &
-  cross
+  cross, vec2mat
 
 implicit none
 
@@ -137,6 +137,7 @@ type(t_geo_component), allocatable                      :: comps(:)
 character(len=max_char_len)                             :: cname
 integer(h5loc)                                          :: floc, gloc, cloc
 real(wp), allocatable                                   :: refs_R(:,:,:), refs_off(:,:)
+real(wp)                                                :: R_cen(3,3)
 real(wp), allocatable                                   :: vort(:), cp(:)
 real(wp), allocatable                                   :: ll_data(:,:,:), ll_data_ave(:,:,:)
 real(wp), allocatable                                   :: vl_data(:,:,:), vl_data_ave(:,:,:)
@@ -326,7 +327,7 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
     ! ######################################################################
     ! Find the coordinates of the reference points in the local reference frame
 
-    ! Find the coordinate along the axis of the sections -------------------
+    ! Find the coordinate along the axis of the sections -----------  --------
     ! the <ax_coor> coordinate y_cen of each section is built with the first
     ! panel in chord. Then the distance between the <ax_coor> of the centre
     ! of the other panels and y_cen is checked
@@ -350,9 +351,9 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
       - comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver(2) ) )
       !> local chord as projection of the profile on x-z plane
       chord(is) = sqrt((abs(minval(comps(id_comp)%loc_points(ax_coor - 1,chord_start:chord_end))) + & 
-                        abs(maxval(comps(id_comp)%loc_points(ax_coor - 1,chord_start:chord_end))))**2 + &
-                        (abs(minval(comps(id_comp)%loc_points(ax_coor + 1,chord_start:chord_end))) + & 
-                        abs(maxval(comps(id_comp)%loc_points(ax_coor + 1,chord_start:chord_end))))**2)
+                        abs(maxval(comps(id_comp)%loc_points(ax_coor - 1,chord_start:chord_end))))**2) !+ &
+                        !(abs(minval(comps(id_comp)%loc_points(ax_coor + 1,chord_start:chord_end))) + & 
+                        !abs(maxval(comps(id_comp)%loc_points(ax_coor + 1,chord_start:chord_end))))**2)
       do ic = 2 , nelem_chor ! check
         ie = ie + 1
         if (abs( y_cen(is) - &
@@ -446,19 +447,36 @@ character(len=*), parameter :: this_sub_name = 'post_sectional'
           ie = ie + 1
           F_bas1 = comps(id_comp)%el(ie)%dforce
           F_bas  = F_bas + F_bas1
+#if USE_PRECICE
+          call vec2mat(comps(id_comp)%el(ie)%ori, R_cen)
+          R_cen = matmul(comps(id_comp)%coupling_node_rot, R_cen)
+          M_bas  = M_bas + cross( matmul(transpose(R_cen), &
+                          comps(id_comp)%el(ie)%cen) , F_bas1 )      &
+                        + comps(id_comp)%el(ie)%dmom !FIX axis!
+#else 
           M_bas  = M_bas + cross( comps(id_comp)%el(ie)%cen &
                         - r_axis_bas(:,is) , F_bas1 )      &
                         + comps(id_comp)%el(ie)%dmom ! updated 2018-07-12
+#endif 
         end do ! loop over chord
 
         ! From global to local coordinates of forces and moments
+#if USE_PRECICE
+        call vec2mat(comps(id_comp)%el(ie)%ori, R_cen)
+        R_cen = matmul(comps(id_comp)%coupling_node_rot, R_cen)
+        sec_loads(ires,is,1:3) = matmul( &
+            transpose( R_cen), F_bas ) / y_span(is)
+        ! moment ( only the component around the <ax_coord> )
+        M_bas = matmul( transpose(R_cen) , M_bas)
+        sec_loads(ires,is,4) = M_bas(ax_coor) / y_span(is)
+#else 
         sec_loads(ires,is,1:3) = matmul( &
             transpose( refs_R(:,:, ref_id) ) , F_bas ) / y_span(is)
         ! moment ( only the component around the <ax_coord> )
         M_bas = matmul( &
                 transpose( refs_R(:,:, ref_id) ) , M_bas )
         sec_loads(ires,is,4) = M_bas(ax_coor) / y_span(is)
-
+#endif 
       end do ! loop over sections
 
       ref_mat(ires,:) = reshape(refs_R(:,:,ref_id),(/ 9 /))

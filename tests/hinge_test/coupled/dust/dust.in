@@ -6,7 +6,7 @@ geometry_file = geo_input.h5
 reference_file = References.in 
 
 ! Timings ---------------------
-tstart = -0.1
+tstart = 0.0
 tend = 2.0
 dt = 0.1
 dt_out = 0.1
@@ -33,4 +33,4 @@ vortstretch = F
 diffusion = F
 penetration_avoidance = T
 ! wake parameters  -------------
-n_wake_panels = 3
+n_wake_panels = 1

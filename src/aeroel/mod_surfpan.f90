@@ -710,7 +710,8 @@ subroutine compute_pres_surfpan(this, R_g)
 ! This routine contains the velocity update as well. TODO, move to a dedicated routine
 ! Method implemented for surface velocity computation:
 ! stencil relying on a CHTLS* method
-! *CHTLS: Constrained Hermite Taylor series Least Square method
+! *CHTLS: Constrained Hermite Taylor series Least Square method Constrained Hermite TLS for Mesh-free Derivative
+! Estimation Near and On Boundaries  https://digitalcommons.calpoly.edu/cgi/viewcontent.cgi?article=1095&context=aero_fac
 
   n_neigh = 0 ; f = 0.0_wp
   do i_e = 1 , this%n_ver
@@ -725,6 +726,7 @@ subroutine compute_pres_surfpan(this, R_g)
   vel_phi = matmul( this%chtls_stencil , f(1:n_neigh+1) )
 
   vel_phi = matmul( (R_g) , vel_phi )
+  
   this%surf_vel = wind + vel_phi + this%uvort
 
   !> pressure -------------------------------------------------
@@ -806,20 +808,18 @@ end subroutine create_local_velocity_stencil_surfpan
 !  matrix of the "local" reference system
 subroutine create_chtls_stencil_surfpan( this , R_g )
   class(t_surfpan)  , intent(inout) :: this
-! type(t_pot_elem_p), intent(in)    :: elems(:)
   real(wp)          , intent(in)    :: R_g(3,3)
 
-  real(wp), allocatable :: A(:,:) , B(:,:) , W(:,:) , V(:,:)
-  real(wp) :: dx(3)
-  real(wp), allocatable :: C(:,:) , CQ(:,:)
-  real(wp), allocatable :: Cls_tilde(:,:) , iCls_tilde(:,:) , chtls_tmp(:,:)
-  real(wp) :: det_cls
-  real(wp) :: r1
+  real(wp), allocatable             :: A(:,:), B(:,:), W(:,:), V(:,:)
+  real(wp)                          :: dx(3)
+  real(wp), allocatable             :: C(:,:), CQ(:,:)
+  real(wp), allocatable             :: Cls_tilde(:,:), iCls_tilde(:,:), chtls_tmp(:,:)
+  real(wp)                          :: det_cls
+  real(wp)                          :: r1
+  real(wp), allocatable             :: Q(:,:), R(:,:)
 
-  real(wp), allocatable :: Q(:,:) , R(:,:)
-
-  integer :: n_neigh
-  integer :: i_n , i_nn
+  integer                           :: n_neigh
+  integer                           :: i_n , i_nn
 
   ! # of neighbouring elements
   n_neigh = 0
@@ -830,16 +830,17 @@ subroutine create_chtls_stencil_surfpan( this , R_g )
   end do
 
   ! arrays A (differences), B (constraints), W (weights) -----------
-  allocate( A(n_neigh,3) , W(n_neigh+1,n_neigh+1) ) ; W = 0.0_wp
-  allocate( B(1,3) ) ; B(1,:) = this%nor
+  allocate(A(n_neigh,3) , W(n_neigh+1,n_neigh+1)); W = 0.0_wp
+  allocate(B(1,3));                                B(1,:) = this%nor
+  
   i_n = 0
   do i_nn = 1 , this%n_ver
     if ( associated(this%neigh(i_nn)%p) ) then ! the neighbouring element exists
       i_n = i_n + 1
       dx = this%neigh(i_nn)%p%cen - this%cen
       A(i_n, : ) = dx
-      W(i_n,i_n) = 1.0_wp / norm2(dx) * &
-               max( 0.0_wp , abs( sum( this%nor * this%neigh(i_nn)%p%nor ) ) )
+      W(i_n,i_n) = 1.0_wp/norm2(dx) * &
+                    max(0.0_wp, abs(sum(this%nor*this%neigh(i_nn)%p%nor)))
     end if
   end do
   W(n_neigh+1,n_neigh+1) = sum( W ) / real(n_neigh,wp)

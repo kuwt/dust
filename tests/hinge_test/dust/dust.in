@@ -1,18 +1,18 @@
 ! Simulation names 
-basename = ./Output/test
-
+basename = ./Output/test_hinge
+debug_level = 50
 ! Geometry input -----------------
 geometry_file = geo_input.h5 
 reference_file = References.in 
 
 ! Timings ---------------------
 tstart = 0.0
-tend = 2.0
+tend = 0.4
 dt = 0.1
 dt_out = 0.1
 output_start = T 
 ndt_update_wake = 1 
-debug_level = 1 
+output_detailed_geo = T 
 ! Reference values ---------------------
 rho_inf = 1.225000 
 u_inf = (/1, 0., 0./)
