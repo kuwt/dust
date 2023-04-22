@@ -311,10 +311,10 @@ subroutine post_chordwise(sbprms, basename, data_basename, an_name, &
               abs ( comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver(1) )&
               - comps(id_comp)%loc_points(ax_coor,comps(id_comp)%el(ie)%i_ver(2) ) )
       !> local chord as projection of the profile on x-z plane
-      chord(is) = sqrt((abs(minval(comps(id_comp)%loc_points(ax_coor - 1 ,chord_start:chord_end))) + & 
-              abs(maxval(comps(id_comp)%loc_points(ax_coor - 1,chord_start:chord_end))))**2)!! + &
-              !(abs(minval(comps(id_comp)%loc_points(ax_coor + 1,chord_start:chord_end))) + &  !remouve starting point!!
-              !abs(maxval(comps(id_comp)%loc_points(ax_coor + 1,chord_start:chord_end))))**2)
+      chord(is) = sqrt((minval(comps(id_comp)%loc_points(ax_coor - 1,chord_start:chord_end)) - & 
+                        maxval(comps(id_comp)%loc_points(ax_coor - 1,chord_start:chord_end)))**2  + &
+                        (minval(comps(id_comp)%loc_points(ax_coor + 1,chord_start:chord_end)) - &  
+                        maxval(comps(id_comp)%loc_points(ax_coor + 1,chord_start:chord_end)))**2)
       
       do ic = 2 , nelem_chor ! check
         ie = ie + 1
