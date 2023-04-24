@@ -90,35 +90,23 @@ type t_aero_2d_tab
   real(wp) , allocatable            :: clstall_neg(:) , clstall_pos(:)
   real(wp) , allocatable            :: alstall_neg(:) , alstall_pos(:)
 
-  !!> cl(a,M,Re) 3d-data (extrapolation on Re or no dependence from Re)
-  !real(wp) , allocatable :: cl(:,:)
-  !type(t_aero_par) :: cl_par
-  !
-  !!> cd(a,M,Re) 3d-data
-  !real(wp) , allocatable :: cd(:,:)
-  !type(t_aero_par) :: cd_par
-  !
-  !!> cm(a,M,Re) 3d-data
-  !real(wp) , allocatable :: cm(:,:)
-  !type(t_aero_par) :: cm_par
-
 end type t_aero_2d_tab
 
 !-----------------------------------
 
 !> Tables containing aerodynamic coefficients
-!!
-!! Tabulated data for lifting line elements
+
+! Tabulated data for lifting line elements
 type t_aero_tab
 
- !> airfoil file
- character(len=max_char_len) :: airfoil_file
+  !> airfoil file
+  character(len=max_char_len) :: airfoil_file
 
- !> airfoil data id
- integer :: id
+  !> airfoil data id
+  integer :: id
 
- !> tables cl(a,M) for each Re number
- type(t_aero_2d_tab) , allocatable :: aero_coeff(:)
+  !> tables cl(a,M) for each Re number
+  type(t_aero_2d_tab) , allocatable :: aero_coeff(:)
 
 end type t_aero_tab
 
@@ -148,7 +136,6 @@ subroutine read_c81_table ( filen , coeff )
   integer , parameter :: n_coeff = 3   ! cl , cd , cm
 
   ! Reynolds effect corrections ---
-  !real(wp) , parameter :: alMin = -5.0_wp , alMax = 5.0_wp
   real(wp) , parameter :: alMin = -180.0_wp , alMax = 180.0_wp
   real(wp) :: alcl0tmp, alcl0
   integer :: iAl , iMa
@@ -185,9 +172,9 @@ subroutine read_c81_table ( filen , coeff )
       do i1 = 1 , iRe-1
         if ( coeff%aero_coeff(i1)%Re .ge. Re ) then
           write(msg,*) ' in file: ' , trim(adjustl(filen)) , ' Reynolds number used to define'// &
-                     ' .c81 tables must be in increasing order, but ',nl, &
-                     ' -> Re(', iRe , '): ' , Re, nl,&
-                     ' -> Re(', i1  , '): ' , coeff%aero_coeff(i1)%Re
+                      ' .c81 tables must be in increasing order, but ',nl, &
+                      ' -> Re(', iRe , '): ' , Re, nl,&
+                      ' -> Re(', i1  , '): ' , coeff%aero_coeff(i1)%Re
           call error(this_sub_name, this_mod_name, msg)
         end if
       end do
@@ -248,9 +235,9 @@ subroutine read_c81_table ( filen , coeff )
         alcl0 = alMin
         do iAl = 1 , cl1
           if ( ( coeff%aero_coeff(iRe)%coeff(1)%par1(iAl) .ge. alMin ) .and. &
-               ( coeff%aero_coeff(iRe)%coeff(1)%par1(iAl) .lt. alMax ) ) then
+                ( coeff%aero_coeff(iRe)%coeff(1)%par1(iAl) .lt. alMax ) ) then
             if ( coeff%aero_coeff(iRe)%coeff(1)%cf(iAl  ,iMa) * &
-                 coeff%aero_coeff(iRe)%coeff(1)%cf(iAl+1,iMa) .le. 0.0_wp ) then
+                coeff%aero_coeff(iRe)%coeff(1)%cf(iAl+1,iMa) .le. 0.0_wp ) then
 
               al1 = coeff%aero_coeff(iRe)%coeff(1)%par1(iAl)
               al2 = coeff%aero_coeff(iRe)%coeff(1)%par1(iAl+1)
@@ -267,7 +254,7 @@ subroutine read_c81_table ( filen , coeff )
           end if
         end do ! alpha
         coeff%aero_coeff(iRe)%alcl0(iMa) = alcl0
-       
+
         ! --- cdmin --- cd = coeff(2)
         coeff%aero_coeff(iRe)%cdmin(iMa) = minval( coeff%aero_coeff(iRe)%coeff(2)%cf(:,iMa) )
         
@@ -278,19 +265,19 @@ subroutine read_c81_table ( filen , coeff )
 
         ! ---
         do while ( ( istallp+1 .lt. cl1 ) .and. &
-                   ( coeff%aero_coeff(iRe)%coeff(1)%cf(istallp+1,iMa) .gt. &
-                     coeff%aero_coeff(iRe)%coeff(1)%cf(istallp  ,iMa) ) .and. &
-                   ( stall_found .eq. 0 ) &
-                   )
+                    ( coeff%aero_coeff(iRe)%coeff(1)%cf(istallp+1,iMa) .gt. &
+                      coeff%aero_coeff(iRe)%coeff(1)%cf(istallp  ,iMa) ) .and. &
+                    ( stall_found .eq. 0 ) &
+                    )
           istallp = istallp + 1
 
         end do
         ! negative stall
         stall_found = 0
         do while ( ( istallm-1 .gt. 1 ) .and. &
-                   ( coeff%aero_coeff(iRe)%coeff(1)%cf(istallm-1,iMa) .lt. &
-                     coeff%aero_coeff(iRe)%coeff(1)%cf(istallm  ,iMa) ) .and. &
-                   ( stall_found .eq. 0 ) )
+                  ( coeff%aero_coeff(iRe)%coeff(1)%cf(istallm-1,iMa) .lt. &
+                    coeff%aero_coeff(iRe)%coeff(1)%cf(istallm  ,iMa) ) .and. &
+                  ( stall_found .eq. 0 ) )
           istallm = istallm - 1
 
         end do
@@ -320,8 +307,8 @@ end subroutine read_c81_table
 !       clear implementation
 !       ...
 subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
-                               aero_par_in, aero_coeff , &
-                                                     dcl_da )
+                              aero_par_in, aero_coeff , &
+                                                    dcl_da )
   type(t_aero_tab) , intent(in) :: airfoil_data(:)
   real(wp) , intent(in) :: csi
   integer  , intent(in) :: airfoil_id(2)
@@ -389,7 +376,7 @@ subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
       if ( nRe .eq. 1 ) then ! .c81 defined just for one Reynolds number
 
         call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(1)%coeff , &
-                                                   aero_par(1:2) , coeff1 , &
+                                                    aero_par(1:2) , coeff1 , &
                                                                   dcl_da1 )
 
         if ( .not. allocated(coeff_airfoil) ) then
@@ -431,14 +418,14 @@ subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
 
         call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(irey  )%coeff , &
                                                         aero_par(1:2) , coeff1 , &
-                                                                       dcl_da1 )
+                                                                        dcl_da1 )
         call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(irey+1)%coeff , &
                                                         aero_par(1:2) , coeff2 , &
-                                                                       dcl_da2 )
+                                                                        dcl_da2 )
 
         if ( .not. allocated(coeff_airfoil) ) allocate(coeff_airfoil(2,size(coeff1)))
         coeff_airfoil(i_a,:) = ( coeff1 * ( reyn2 - reyn ) + coeff2 * ( reyn - reyn1 ) ) /  &
-                               ( reyn2 - reyn1 )
+                              ( reyn2 - reyn1 )
 
         ! === dcl_da derivative ===
         if ( present( dcl_da ) ) then
@@ -477,7 +464,7 @@ subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
         mach1   = airfoil_data(id_a)%aero_coeff(irey)%coeff(1)%par2(imach)
         machend = airfoil_data(id_a)%aero_coeff(irey)%coeff(1)%par2(nmach)
         do while ( (  mach .ge. mach1 ) .and. &
-                   ( imach .lt. nmach  ) )
+                    ( imach .lt. nmach  ) )
           imach = imach + 1
           mach1 = airfoil_data(id_a)%aero_coeff(irey)%coeff(1)%par2(imach)
         end do
@@ -495,7 +482,7 @@ subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
         aero_par_re(1) = ( aero_par(1) - al01 ) / k_fact + al01
         call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(irey)%coeff , &
                                                         aero_par_re , coeff1 , &
-                                                                     dcl_da1 )
+                                                                      dcl_da1 )
 
         if ( .not. allocated( coeff_airfoil) )  allocate( coeff_airfoil(2,size(coeff1)))
         if ( .not. allocated(dcl_da_airfoil) )  allocate(dcl_da_airfoil(2))
@@ -525,8 +512,8 @@ subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
         imach = 1
         mach1   = airfoil_data(id_a)%aero_coeff(irey)%coeff(1)%par2(imach)
         machend = airfoil_data(id_a)%aero_coeff(irey)%coeff(1)%par2(nmach)
-        do while ( (  mach .ge. mach1 ) .and. &
-                   ( imach .lt. nmach  ) )
+        do while ( ( mach .ge. mach1 ) .and. &
+                  ( imach .lt. nmach  ) )
           imach = imach + 1
           mach1 = airfoil_data(id_a)%aero_coeff(irey)%coeff(1)%par2(imach)
         end do
@@ -545,7 +532,7 @@ subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
         
         call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(irey)%coeff , &
                                                         aero_par_re , coeff1 , &
-                                                                     dcl_da1 )
+                                                                      dcl_da1 )
 
         if ( .not. allocated( coeff_airfoil) )  allocate(coeff_airfoil(2,size(coeff1)))
         if ( .not. allocated(dcl_da_airfoil) )  allocate(dcl_da_airfoil(2))
@@ -553,7 +540,7 @@ subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
 
         ! --- cd , cm ---
         call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(irey)%coeff , &
-                                                   aero_par(1:2) , coeff1    )
+                                                    aero_par(1:2) , coeff1    )
 
         coeff1(2) = coeff1(2) / k_fact  ! cd correction
         coeff_airfoil(i_a,2:3) = coeff1(2:3)
@@ -578,14 +565,14 @@ subroutine interp_aero_coeff ( airfoil_data ,  csi , airfoil_id , &
 
         call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(irey  )%coeff , &
                                                         aero_par(1:2) , coeff1 , &
-                                                                       dcl_da1 )
+                                                                        dcl_da1 )
         call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(irey+1)%coeff , &
                                                         aero_par(1:2) , coeff2 , &
-                                                                       dcl_da2 )
+                                                                        dcl_da2 )
 
         if ( .not. allocated(coeff_airfoil) )  allocate(coeff_airfoil(2,size(coeff1)))
         coeff_airfoil(i_a,:) = ( coeff1 * ( reyn2 - reyn ) + coeff2 * ( reyn - reyn1 ) ) /  &
-                               ( reyn2 - reyn1 )
+                                ( reyn2 - reyn1 )
 
         ! === dcl_da derivative ===
         if ( present( dcl_da ) ) then
@@ -626,199 +613,105 @@ end subroutine interp_aero_coeff
 !-----------------------------------
 !
 subroutine interp2d_aero_coeff ( aero_coeff , x , c , dcl_da )
- type(t_aero_2d_par) , intent(in) :: aero_coeff(:)
- real(wp), intent(in)  :: x(:)     ! aero_par (al,M,Re)
- real(wp), allocatable , intent(out) :: c(:)
- real(wp), optional    , intent(out) :: dcl_da
+  type(t_aero_2d_par) , intent(in) :: aero_coeff(:)
+  real(wp), intent(in)  :: x(:)     ! aero_par (al,M,Re)
+  real(wp), allocatable , intent(out) :: c(:)
+  real(wp), optional    , intent(out) :: dcl_da
 
- integer  :: n1 , n2 , nc
- real(wp) :: csi1 , csi2
- real(wp) :: phi1 , phi2 , phi3 , phi4
+  integer  :: n1 , n2 , nc
+  real(wp) :: csi1 , csi2
+  real(wp) :: phi1 , phi2 , phi3 , phi4
 
- integer :: ic , i1 , i2
+  integer :: ic , i1 , i2
 
- character(len=*), parameter :: this_sub_name='interp2d_aero_coeff'
+  character(len=*), parameter :: this_sub_name='interp2d_aero_coeff'
 
 
 
- nc = size(aero_coeff)
+  nc = size(aero_coeff)
 
- allocate(c(nc)) ; c = 0.0_wp
+  allocate(c(nc)) ; c = 0.0_wp
 
- ! only 2d parameters are allowed (al,M)
- if ( size(x) .ne. 2 ) then
-   call error(this_sub_name, this_mod_name, 'Attempting to 2D interpolate&
-   & data with more dimensions')
- end if
+  ! only 2d parameters are allowed (al,M)
+  if ( size(x) .ne. 2 ) then
+    call error(this_sub_name, this_mod_name, 'Attempting to 2D interpolate&
+    & data with more dimensions')
+  end if
 
- ! Do it once ...
- ! Check dimensions ---------
- do ic = 1 , nc
+  ! Do it once ...
+  ! Check dimensions ---------
+  do ic = 1 , nc
 
-   n1 = size(aero_coeff(ic)%par1)
-   n2 = size(aero_coeff(ic)%par2)
+    n1 = size(aero_coeff(ic)%par1)
+    n2 = size(aero_coeff(ic)%par2)
 
-   if ( (size(aero_coeff(ic)%cf,1).ne.n1) .or. &
+    if ( (size(aero_coeff(ic)%cf,1).ne.n1) .or. &
         (size(aero_coeff(ic)%cf,2).ne.n2)) then
-     write(msg,*) 'Error in the aerodynamic coefficients tables, force &
+      write(msg,*) 'Error in the aerodynamic coefficients tables, force &
                 &coefficient matrix size',shape(aero_coeff(ic)%cf), 'different&
                 & from corresponding alpha and mach vectors sizes',n1,n2
-     call error(this_sub_name, this_mod_name, msg)
-   end if
+      call error(this_sub_name, this_mod_name, msg)
+    end if
 
-   ! Check range of parameters the parameters are supposed to be defined in an
-   ! increasing order
-   if ( x(1) .lt. aero_coeff(ic)%par1(1) .or. &
+    ! Check range of parameters the parameters are supposed to be defined in an
+    ! increasing order
+    if ( x(1) .lt. aero_coeff(ic)%par1(1) .or. &
         x(1) .gt. aero_coeff(ic)%par1(n1) ) then
         write(msg,*) 'Trying to interpolate aerodynamic coefficients at an &
         &angle ',x(1),' which is outside the table span of angles from ', &
         aero_coeff(ic)%par1(1),'to',aero_coeff(ic)%par1(n1)
         call error(this_sub_name, this_mod_name, msg)
-   endif
-   if ( x(2) .lt. aero_coeff(ic)%par2(1) .or. &
+    endif
+    if ( x(2) .lt. aero_coeff(ic)%par2(1) .or. &
         x(2) .gt. aero_coeff(ic)%par2(n2) ) then
         write(msg,*) 'Trying to interpolate aerodynamic coefficients at a &
         &Mach number ',x(2),' which is outside the table span of Mach numbers &
         &from ', aero_coeff(ic)%par2(1),'to',aero_coeff(ic)%par2(n2)
         call error(this_sub_name, this_mod_name, msg)
-   endif
-   ! Check dimensions ---------
+    endif
+    ! Check dimensions ---------
 
-   i1 = 1
-   do while ( (aero_coeff(ic)%par1(i1) .le. x(1)) )
-     i1 = i1 + 1
-   end do
-   i2 = 1
-   do while ( (aero_coeff(ic)%par2(i2) .le. x(2)) )
-     i2 = i2 + 1
-   end do
+    i1 = 1
+    do while ( (aero_coeff(ic)%par1(i1) .le. x(1)) )
+      i1 = i1 + 1
+    end do
+    i2 = 1
+    do while ( (aero_coeff(ic)%par2(i2) .le. x(2)) )
+      i2 = i2 + 1
+    end do
 
-   ! par1: alpha , par2: Mach
-   csi1 = 2.0_wp * ( x(1) - 0.5_wp*(aero_coeff(ic)%par1(i1-1)+aero_coeff(ic)%par1(i1)) ) / &
-         (aero_coeff(ic)%par1(i1)-aero_coeff(ic)%par1(i1-1))
+    ! par1: alpha , par2: Mach
+    csi1 = 2.0_wp * ( x(1) - 0.5_wp*(aero_coeff(ic)%par1(i1-1)+aero_coeff(ic)%par1(i1)) ) / &
+          (aero_coeff(ic)%par1(i1)-aero_coeff(ic)%par1(i1-1))
 
-   csi2 = 2.0_wp * ( x(2) - 0.5_wp*(aero_coeff(ic)%par2(i2-1)+aero_coeff(ic)%par2(i2)) ) / &
-         (aero_coeff(ic)%par2(i2)-aero_coeff(ic)%par2(i2-1))
+    csi2 = 2.0_wp * ( x(2) - 0.5_wp*(aero_coeff(ic)%par2(i2-1)+aero_coeff(ic)%par2(i2)) ) / &
+          (aero_coeff(ic)%par2(i2)-aero_coeff(ic)%par2(i2-1))
 
-   phi1 =   0.25_wp * ( 1.0_wp + csi1 ) * ( 1.0_wp + csi2 )
-   phi2 =   0.25_wp * ( 1.0_wp - csi1 ) * ( 1.0_wp + csi2 )
-   phi3 =   0.25_wp * ( 1.0_wp - csi1 ) * ( 1.0_wp - csi2 )
-   phi4 =   0.25_wp * ( 1.0_wp + csi1 ) * ( 1.0_wp - csi2 )
+    phi1 =   0.25_wp * ( 1.0_wp + csi1 ) * ( 1.0_wp + csi2 )
+    phi2 =   0.25_wp * ( 1.0_wp - csi1 ) * ( 1.0_wp + csi2 )
+    phi3 =   0.25_wp * ( 1.0_wp - csi1 ) * ( 1.0_wp - csi2 )
+    phi4 =   0.25_wp * ( 1.0_wp + csi1 ) * ( 1.0_wp - csi2 )
 
-   c(ic) = phi1 * aero_coeff(ic)%cf(i1  ,i2  ) + &
-           phi2 * aero_coeff(ic)%cf(i1-1,i2  ) + &
-           phi3 * aero_coeff(ic)%cf(i1-1,i2-1) + &
-           phi4 * aero_coeff(ic)%cf(i1  ,i2-1)
+    c(ic) = phi1 * aero_coeff(ic)%cf(i1  ,i2  ) + &
+            phi2 * aero_coeff(ic)%cf(i1-1,i2  ) + &
+            phi3 * aero_coeff(ic)%cf(i1-1,i2-1) + &
+            phi4 * aero_coeff(ic)%cf(i1  ,i2-1)
 
-   ! === Compute dcl_da derivative (rad), if required for Jacobian matrix ===
-   if ( present(dcl_da) ) then
-     if ( ic .eq. 1 ) then ! cl table -> compute dcl_da
-       dcl_da = ( aero_coeff(ic)%cf( i1  ,i2 ) + aero_coeff(ic)%cf( i1  ,i2-1) &
+    ! === Compute dcl_da derivative (rad), if required for Jacobian matrix ===
+    if ( present(dcl_da) ) then
+      if ( ic .eq. 1 ) then ! cl table -> compute dcl_da
+        dcl_da = ( aero_coeff(ic)%cf( i1  ,i2 ) + aero_coeff(ic)%cf( i1  ,i2-1) &
                 - aero_coeff(ic)%cf( i1-1,i2 ) - aero_coeff(ic)%cf( i1-1,i2-1) ) / &
                 ( 2.0_wp * ( aero_coeff(ic)%par1( i1 ) - aero_coeff(ic)%par1( i1-1 ) ) * &
-                           pi / 180.0_wp )
-     end if
-   end if
+                            pi / 180.0_wp )
+      end if
+    end if
 
- end do
+  end do
 
-
-
-
-!  i1 = 1
-!  do while ( (x1(i1) .lt. x(1)) )
-!    i1 = i1 + 1
-!  end do
-!  i2 = 1
-!  do while ( (x2(i2) .lt. x(2)) )
-!    i2 = i2 + 1
-!  end do
-!
-!  csi1 = 2.0_wp * ( x(1) - 0.5_wp*(x1(i1-1)+x1(i1)) ) / (x1(i1)+x1(i1-1))
-!  csi2 = 2.0_wp * ( x(2) - 0.5_wp*(x2(i2-1)+x2(i2)) ) / (x2(i2)+x2(i2-1))
-!
-!  phi1 =   0.25_wp * ( 1 + csi1 ) * ( 1 + csi2 )
-!  phi2 =   0.25_wp * ( 1 - csi1 ) * ( 1 + csi2 )
-!  phi3 =   0.25_wp * ( 1 - csi1 ) * ( 1 - csi2 )
-!  phi4 =   0.25_wp * ( 1 + csi1 ) * ( 1 - csi2 )
-!
-!  allocate(c(nc)) ; c = 0.0_wp
-!  do ic = 1 , nc
-!    c(ic) = phi1 * coeff(ic)%Mat(i1  ,i2  ) + &
-!            phi2 * coeff(ic)%Mat(i1-1,i2  ) + &
-!            phi3 * coeff(ic)%Mat(i1-1,i2-1) + &
-!            phi4 * coeff(ic)%Mat(i1  ,i2-1)
-!  end do
 
 end subroutine interp2d_aero_coeff
 
 !-----------------------------------
 
-
 end module mod_c81
-
-
-
-
-! ! --- old --------------
-!   ! Find the aerodynamic profiles to be interpolated in order to obtain
-!   ! the aerodynamic characteristics of the wing section
-!   do i_a = 1 , 2
-!
-!    id_a = airfoil_id(i_a)
-!    nRe = size(airfoil_data(id_a)%aero_coeff)
-!
-!    ! Some checks ----
-!    if ( nRe .eq. 1 ) then ! .c81 defined just for one Reynolds number
-!
-!      call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(1)%coeff , &
-!                                                   aero_par(1:2) , coeff1 )
-!
-!      if ( .not. allocated(coeff_airfoil) ) then
-!        allocate(coeff_airfoil(2,size(coeff1)))
-!      end if
-!
-!      coeff_airfoil(i_a,:) = coeff1
-!
-!    else ! .c81 defined for more than one Reynolds number
-!
-!      ! Some checks ----
-!      if ( reyn .lt. airfoil_data(id_a)%aero_coeff(1)%Re ) then
-!        reyn1 = airfoil_data(id_a)%aero_coeff(1)%Re
-!        reyn2 = airfoil_data(id_a)%aero_coeff(2)%Re
-!        irey  = 1
-!      else if ( reyn .gt. airfoil_data(id_a)%aero_coeff(nRe)%Re ) then
-!        reyn1 = airfoil_data(id_a)%aero_coeff(nRe-1)%Re
-!        reyn2 = airfoil_data(id_a)%aero_coeff(nRe)%Re
-!        irey  = nRe-1
-!      else
-!
-!        irey  = 1
-!        reyn1 = airfoil_data(id_a)%aero_coeff(irey)%Re
-!        do while ( ( reyn .ge. reyn1 ) .and. ( irey .lt. nRe ) )
-!          irey = irey + 1
-!          reyn1 = airfoil_data(id_a)%aero_coeff(irey)%Re
-!        end do
-!        irey = irey - 1
-!        reyn1 = airfoil_data(id_a)%aero_coeff(irey)%Re
-!        reyn2 = airfoil_data(id_a)%aero_coeff(irey+1)%Re
-!
-!      end if
-!      ! Some checks ----
-!
-!      call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(irey)%coeff , &
-!                                                   aero_par(1:2) , coeff1 )
-!      call interp2d_aero_coeff ( airfoil_data(id_a)%aero_coeff(irey+1)%coeff , &
-!                                                   aero_par(1:2) , coeff2 )
-!
-!      if ( .not. allocated(coeff_airfoil) ) then
-!        allocate(coeff_airfoil(2,size(coeff1)))
-!      end if
-!
-!      coeff_airfoil(i_a,:) = ( coeff1 * ( reyn2 - reyn ) + coeff2 * ( reyn - reyn1 ) ) /  &
-!                             ( reyn2 - reyn1 )
-!
-!    end if
-!
-!   end do
-! ! --- old --------------

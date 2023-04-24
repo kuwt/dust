@@ -131,6 +131,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   logical                                   :: adaptive_mesh 
   !> Regions  
   integer , allocatable, intent(out)        :: nelem_span_list(:)
+  real(wp)                                  :: rr_sta
+  real(wp), allocatable                     :: rr_adim(:)
   real(wp), allocatable                     :: span_list(:) 
   real(wp), allocatable                     :: sweep_list(:) 
   real(wp), allocatable                     :: dihed_list(:)
@@ -138,13 +140,13 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   integer                                   :: n_type_span
   character                                 :: ElType
   !> Sections 1. 2.
-  real(wp), allocatable :: xySection1(:,:) , xySection2(:,:) , xyAirfoil2(:,:)
-  real(wp), allocatable :: rrSection1(:,:) , rrSection2(:,:) , xyAirfoil1(:,:)
+  real(wp), allocatable :: xySection1(:,:), xySection2(:,:), xyAirfoil2(:,:)
+  real(wp), allocatable :: rrSection1(:,:), rrSection2(:,:), xyAirfoil1(:,:)
   real(wp)                                  :: dx_ref , dy_ref , dz_ref
-  integer                                   :: ista , iend, i
+  integer                                   :: ista, iend, i, j
 
   !> Linear interpolation of the twist angle
-  real(wp), allocatable :: rr_tw(:,:) , rr_tw_1(:,:) , rr_tw_2(:,:)
+  real(wp), allocatable                     :: rr_tw(:,:) , rr_tw_1(:,:) , rr_tw_2(:,:)
   real(wp)                                  :: dx_ref_1, dy_ref_1, dz_ref_1
   real(wp)                                  :: interp_weight
   real(wp), allocatable                     :: chord_fraction(:)
@@ -218,7 +220,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   call pmesh_prs%CreateIntOption( 'nelem_span', 'number of span-wise elements in the region',&
                 multiple=.true.);
   call pmesh_prs%CreateStringOption('type_span', 'type of span-wise division: &
-                &uniform, cosine, cosineIB, cosineOB', multiple=.true.);
+                &uniform, cosine, cosineIB, cosineOB, equalarea', multiple=.true.);
   
   !> Read the parameters
   call pmesh_prs%read_options(mesh_file,printout_val=.true.)
@@ -298,9 +300,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   allocate(airfoil_list(nSections))
   allocate(airfoil_table_list(nSections))
 
-  !allocate(thickness_out(2,nelem_span_tot)); thickness_out = 0.0_wp
-  
-  
   allocate(thickness_section1(nRegions)); thickness_section1 = 0.0_wp
   allocate(thickness_section2(nRegions)); thickness_section2 = 0.0_wp
 
@@ -316,7 +315,7 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
   enddo
 
   if (ElType.eq.'p') then
-    nelem_chord_tot = 2 * nelem_chord
+    nelem_chord_tot = 2*nelem_chord
   else
     nelem_chord_tot = nelem_chord
   endif
@@ -500,11 +499,6 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
               hinges(ih)%csi2 = (hinges(ih)%node2(1) - hinges(ih)%le2(1)) / hinges(ih)%chord2 
           endif          
         endif 
-        !if (hinges(ih)%csi1 .gt. 1.0_wp .or. hinges(ih)%csi2 .gt. 1.0_wp) then !> TODO check
-        !  call error(this_sub_name, this_mod_name, '"Hinge '//trim(hinges(ih)%tag)// & 
-        !            ' outside of the chord"' ) 
-        !endif  
-
       enddo
     enddo
     
@@ -705,27 +699,33 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
           rr(:,ista:iend) = rrSection1 + real(i1,wp) / &
                             real(nelem_span_list(iRegion),wp) * &
                             ( rrSection2 - rrSection1 )
-          
-        else if ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then
+        elseif ( trim(type_span_list(iRegion)) .eq. 'cosine' ) then
           ! cosine  spacing in span
           rr(:,ista:iend) = 0.5_wp * ( rrSection1 + rrSection2 ) - &
                             0.5_wp * ( rrSection2 - rrSection1 ) * &
                       cos( real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
-        else if ( trim(type_span_list(iRegion)) .eq. 'cosineOB' ) then
+        elseif ( trim(type_span_list(iRegion)) .eq. 'cosineOB' ) then
           ! cosine  spacing in span: outboard refinement
           rr(:,ista:iend) = rrSection1 + &
                           ( rrSection2 - rrSection1 ) * &
               sin( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
-        else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then
+        elseif ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then
           ! cosine  spacing in span: inboard refinement
           rr(:,ista:iend) = rrSection2 - &
                           ( rrSection2 - rrSection1 ) * &
               cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
+        elseif ( trim(type_span_list(iRegion)) .eq. 'equalarea' ) then 
+            rr(2, ista:iend) = sqrt(rrSection1(2,:)**2.0_wp + (rrSection2(2,:)**2.0_wp - rrSection1(2,:)**2.0_wp) * &
+                                  (real(i1,wp))/(real(nelem_span_list(iRegion),wp)))
+            rr(1,ista:iend) = rrSection1(1,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
+                              ( rrSection2(1,:) - rrSection1(1,:) )/( rrSection2(2,:) - rrSection1(2,:) )
+            rr(3,ista:iend) = rrSection1(3,:) + (rr(2, ista:iend) - rrSection1(2,:))*&
+                              ( rrSection2(3,:) - rrSection1(3,:) )/( rrSection2(2,:) - rrSection1(2,:) )
         else
           write(*,*) ' Mesh file   : ' , trim(mesh_file)
           write(*,*) ' type_span   : ' , trim(type_span_list(iRegion))
           call error(this_sub_name, this_mod_name, 'Incorrect input: &
-                & type_span must be equal to uniform, cosine, cosineIB, cosineOB.')
+                & type_span must be equal to uniform, cosine, cosineIB, cosineOB, equalarea.')
         end if
 
       else !-> linear interpolation of the twist angle
@@ -765,6 +765,8 @@ subroutine read_mesh_parametric(mesh_file,ee,rr, &
           interp_weight = sin( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
         else if ( trim(type_span_list(iRegion)) .eq. 'cosineIB' ) then
           interp_weight = 1.0_wp - cos( 0.5_wp*real(i1,wp)*pi/ real(nelem_span_list(iRegion),wp) )
+        else if ( trim(type_span_list(iRegion)) .eq. 'equalarea' ) then
+          interp_weight = sqrt(real(i1,wp)/real(nelem_span_list(iRegion),wp)) 
         else
           write(*,*) ' Mesh file   : ' , trim(mesh_file)
           write(*,*) ' type_span   : ' , trim(type_span_list(iRegion))

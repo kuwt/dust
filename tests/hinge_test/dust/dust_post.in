@@ -1,5 +1,5 @@
-basename =     Postpro/test
-data_basename = Output/test
+basename =     Postpro/test_hinge
+data_basename = Output/test_hinge
 
 analysis = {
   name = vl
@@ -8,7 +8,7 @@ analysis = {
   format = vtk !tecplot ! vtk ! tecplot
 
   start_res = 1
-  end_res = 21
+  end_res = 71
   step_res = 1
   wake = T
   separate_wake = T

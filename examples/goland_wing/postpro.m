@@ -2,7 +2,7 @@
 clear; close all; clc; 
 
 % nc file name and path
-file_nc = fullfile('structure','Output', 'goland_test.nc');
+file_nc = fullfile('structure','Output.nc');
 
 % forces and moments in the first clamped node (wing root)
 force  = ncread(file_nc, 'elem.joint.0.F');

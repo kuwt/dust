@@ -205,6 +205,7 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
     phiy = rati * sum(radius_v * this%tang(:,2))
     pdou = this%area * ( - radius**2.0_wp + 3.0_wp*sum(radius_v*this%nor)**2.0_wp ) / radius**5.0_wp
 
+    ! vdou = matmul((/tang(:,:), nor/), (/phix, phiy, pdou/)) 
     v_dou(1) = this%tang(1,1)*phix + this%tang(1,2)*phiy + this%nor(1)* pdou
     v_dou(2) = this%tang(2,1)*phix + this%tang(2,2)*phiy + this%nor(2)* pdou
     v_dou(3) = this%tang(3,1)*phix + this%tang(3,2)*phiy + this%nor(3)* pdou
@@ -214,9 +215,10 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
     ! === Original DUST regularisation ===
     do i1 = 1 , this%n_ver
 
-      !> This is ugly but should be general and work...
-      indp1 = 1+mod(i1,this%n_ver) 
-      indm1 = this%n_ver - mod(this%n_ver-i1+1, this%n_ver)
+      !> index of next vertex (/2, 3, 4, 1/)
+      indp1 = 1+mod(i1,this%n_ver)  
+      !> index of the previous vertex (/4, 1, 2, 3/)
+      indm1 = this%n_ver - mod(this%n_ver-i1+1, this%n_ver) 
 
       !> use this%ver instead of its projection this%verp
       av = pos-this%ver(:,i1)
@@ -229,7 +231,6 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
       ! === TEST THRESHOLDS ===
       !> Relative threshold ---
       if ( hi .gt. this%edge_len(i1)*r_Rankine ) then
-        !> Absolute threshold ---
         v_dou = v_dou + ( (this%edge_len(i1)-ai)/r2 + ai/r1 )/(hi**2.0_wp) * &
                         cross(this%edge_uni(:,i1),hv)
       else

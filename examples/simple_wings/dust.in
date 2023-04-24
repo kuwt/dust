@@ -4,13 +4,13 @@ basename       = ./Output/wings
 
 ! Timings ---------------------
 tstart = 0.0
-tend = 30.0
-dt = 0.50
-dt_out = 0.5 
+tend = 0.6250
+dt = 0.006250
+dt_out = 0.006250
 output_start = T
 
 ! reference values ---------------------
-u_inf = (/0.1, 0.0, 0.0/)
+u_inf = (/10.0, 0.0, 0.0/)
 
 ! geometry input -----------------
 geometry_file = geo_input.h5
@@ -23,3 +23,4 @@ diffusion = F
 
 ! wake parameters  -------------
 n_wake_panels = 65
+n_wake_particles = 10000000

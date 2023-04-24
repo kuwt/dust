@@ -146,7 +146,7 @@ use mod_octree, only: &
   apply_multipole_panels
 
 use mod_math, only: & 
-  cross, dot
+  cross, dot, vec2mat
 
 #if USE_PRECICE
   use mod_precice, only: &
@@ -215,7 +215,7 @@ real(wp), allocatable             :: res_old(:)
 real(wp), allocatable             :: surf_vel_SurfPan_old(:,:)
 real(wp), allocatable             :: nor_SurfPan_old(:,:)
 real(wp), allocatable             :: al_kernel(:,:), al_v(:)
-
+real(wp)                          :: theta_cen(3), R_cen(3, 3) 
 !> VL viscous correction
 integer                           :: i_el, i_c, i_s, i, sel, i_p, i_c2, i_s2
 integer                           :: it_vl, it_stall
@@ -404,7 +404,7 @@ if (sim_param%restart_from_file) then
   already_solv_restart = .true.
 else ! Set to zero the intensity of all the singularities
 
-  do i_el = 1 , size(elems)      ! implicit elements (vr, sp)
+  do i_el = 1 ,size(elems)      ! implicit elements (vr, sp)
       elems(i_el)%p%mag = 0.0_wp
   end do
   
@@ -602,7 +602,29 @@ it = 1
     !> Update dt--> mbdyn should take care of the dt and send it to precice (TODO)
 #else
 #endif
-
+  do i_el = 1 , geo%nSurfPan
+      select type ( el => elems(i_el)%p ) ; class is ( t_surfpan )
+#if USE_PRECICE
+      if (geo%components(el%comp_id)%coupling) then
+        call el%create_local_velocity_stencil(el%R_cen)
+        !> chtls stencil
+        call el%create_chtls_stencil(el%R_cen)
+      else 
+        call el%create_local_velocity_stencil( &    
+                geo%refs(geo%components(el%comp_id)%ref_id)%R_g)
+        !> chtls stencil
+        call el%create_chtls_stencil( &             
+                geo%refs(geo%components(el%comp_id)%ref_id)%R_g)
+      endif 
+#else 
+      call el%create_local_velocity_stencil( &    
+              geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
+      !> chtls stencil
+      call el%create_chtls_stencil( &             
+              geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
+#endif 
+      end select
+  end do
     !> Calculate the normal velocity derivative for the pressure equation
     call press_normvel_der(geo, elems, surf_vel_SurfPan_old)
   
@@ -697,23 +719,28 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
 ! so far, select type() to keep the old formulation for t_surfpan and
 ! use AVL formula for t_vortlatt
 #if USE_PRECICE
-  !$omp parallel do private(i_el)
-    do i_el = 1 , sel
+  !$omp parallel do private(i_el, theta_cen, R_cen)
+    do i_el = 1, sel
       ! ifort bugs workaround:
       ! apparently it is not possible to call polymorphic methods inside
       ! select cases for intel, need to call these for all elements and for the
       ! vortex lattices it is going to be a dummy empty function call
-      call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
-                geo%components(elems(i_el)%p%comp_id)%coupling_node_rot)
-      call elems(i_el)%p%compute_dforce()
+      if (geo%components(elems(i_el)%p%comp_id)%coupling) then  
+        !> calculate the pressure using the relative orientation matrix
+        call elems(i_el)%p%compute_pres(elems(i_el)%p%R_cen)  ! update surf_vel field too
+      else !> non coupled component 
+          call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
+              geo%refs(geo%components(elems(i_el)%p%comp_id)%ref_id)%R_g)
+      endif  
+      call elems(i_el)%p%compute_dforce()      
     end do
   !$omp end parallel do
 #else
   !$omp parallel do private(i_el)
     do i_el = 1 , sel
       call elems(i_el)%p%compute_pres( &     ! update surf_vel field too
-              geo%refs( geo%components(elems(i_el)%p%comp_id)%ref_id )%R_g)
-      call elems(i_el)%p%compute_dforce()
+              geo%refs(geo%components(elems(i_el)%p%comp_id)%ref_id)%R_g)
+      call elems(i_el)%p%compute_dforce()  
     end do
   !$omp end parallel do
 #endif
@@ -923,14 +950,14 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
                               geo%components(i_c)%stripe(i_s)%panels(i_p)%p%dforce
             end do
 
-            !> update cl and cd            
-            e_l = nor * cos(a_v) - tang_cen * sin(a_v)
-            e_d = nor * sin(a_v) + tang_cen * cos(a_v)
-            e_l = e_l / norm2(e_l)
-            e_d = e_d / norm2(e_d)
+            !!> update cl and cd            
+            !e_l = nor * cos(a_v) - tang_cen * sin(a_v)
+            !e_d = nor * sin(a_v) + tang_cen * cos(a_v)
+            !e_l = e_l / norm2(e_l)
+            !e_d = e_d / norm2(e_d)
 
-            geo%components(i_c)%stripe(i_s)%aero_coeff(1) = dot(dforce_stripe,e_l) / q_inf 
-            geo%components(i_c)%stripe(i_s)%aero_coeff(2) = dot(dforce_stripe,e_d) / q_inf
+            !geo%components(i_c)%stripe(i_s)%aero_coeff(1) = dot(dforce_stripe,e_l) / q_inf 
+            !geo%components(i_c)%stripe(i_s)%aero_coeff(2) = dot(dforce_stripe,e_d) / q_inf
             
           end do
         end if 

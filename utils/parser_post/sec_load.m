@@ -45,6 +45,8 @@
 % This matlab function parse the sectional loads. 
 % The input is the same as the one required in the filed "basename" in the 
 % dust_post.in file. 
+% sec_data = sec_load(file_out, short_data)
+% file_out: fullpath of the output.dat files without extension and attributes  
 % If short_data is true,  then the parsed fields are Fx, Fy, Fz, Mo. 
 % The output is a data structure of the form: 
 %   sec_data.<field>.time     => simulation time 
@@ -68,6 +70,9 @@ function sec_data = sec_load(file_out, short_data)
         'vel_outplane';
         'vel_2d_isolated';
         'vel_2d';
+        'up_x';
+        'up_y';
+        'up_z';
         'Mo';
         'Fz';
         'Fy';
@@ -82,8 +87,8 @@ function sec_data = sec_load(file_out, short_data)
     
 
     % name file
-    sec_data = struct('n_time',[],'n_sec',[],'sec',[],'l_sec',[],'chord',[], ...
-        'vel_outplane',[], 'vel_outplane_isolated',[],'vel_2d_isolated',[],'vel_2d',[], ...
+    sec_data = struct('n_time', [], 'n_sec', [], 'sec', [], 'l_sec', [], 'chord', [], 'vel_outplane', [] ...
+        , 'vel_outplane_isolated', [], 'vel_2d_isolated', [], 'vel_2d', [], 'up_x', [], 'up_y', [], 'up_z', [], ...
         'Mo',[],'Fx',[],'Fy',[],'Fz',[],'Cm',[],'Cl',[],'Cd',[],'alpha_isolated',[],'alpha',[]);
 
     for i = 1:numel(field)

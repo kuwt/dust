@@ -101,9 +101,11 @@ begin: nodes;
     reference, BLADE_1, null,
     reference, BLADE_1, null;
 
-  structural:  BLADE_2, dynamic,  # dynamic,
+  structural:  BLADE_2, dynamic,  # dynamic, (different orientation to the coupling node orientation)
     reference, BLADE_2, null,
-    reference, BLADE_2, eye,
+    reference, BLADE_2, 
+      1, 0., 1., 0., 
+      3, 0., 0., 1., 
     reference, BLADE_2, null,
     reference, BLADE_2, null;
 

@@ -66,9 +66,6 @@ use mod_parse, only: &
   getstr, getlogical, getintarray, getrealarray, &
   countoption
 
-use mod_aeroel, only: &
-  t_elem_p
-
 use mod_wake, only: &
   t_wake
 
@@ -103,13 +100,16 @@ use mod_aeroel, only: &
   c_elem, c_pot_elem, c_vort_elem, c_impl_elem, c_expl_elem, &
   t_elem_p, t_pot_elem_p, t_vort_elem_p, t_impl_elem_p, t_expl_elem_p  
 
+use mod_surfpan, only: &
+  t_surfpan
+
 implicit none
 
 public :: post_flowfield
 
 private
 
-character(len=max_char_len), parameter :: this_mod_name = 'mod_post_flowfield'
+character(len=*), parameter :: this_mod_name = 'mod_post_flowfield'
 character(len=max_char_len) :: msg
 
 contains
@@ -170,14 +170,14 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
   real(wp), allocatable                                    :: ave_vars(:,:)
   integer                                                  :: i_var_v , i_var_p , i_var_w
 
-  integer                                                  :: ip , ipp, ic , ie , i1 , it, itave
+  integer                                                  :: ip , ipp, ic , ie , i1 , it, itave, nelems_comp
   
   logical                                                  :: ex
   real(wp)                                                 :: dummy 
 
   character(len=max_char_len)                              :: str_a, var_name
   character(len=max_char_len)                              :: filename
-  character(len=max_char_len), parameter                   :: this_sub_name = 'post_flowfield'
+  character(len=*), parameter                              :: this_sub_name = 'post_flowfield'
 
   write(msg,'(A,I0,A)') nl//'++++++++++ Analysis: ',ia,' flowfield'//nl
   call printout(trim(msg))
@@ -229,8 +229,19 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
 
   ! Prepare_geometry_postpro
   call prepare_geometry_postpro(comps)
-
+  
+  if (probe_p) then
+    ! Prepare also comp_old etc for previous timestep solution
+    call open_hdf5_file(trim(data_basename)//'_geo.h5', floc)
+    call load_components_postpro(comps_old, points_old, nelem,  floc, &
+                                components_names,  all_comp)  
+    call close_hdf5_file(floc)
+    call prepare_geometry_postpro(comps_old)    
+  end if
+  
+  
   ! Allocate and point to sol
+  ! TODO check if unused
   allocate(sol(nelem)) ; sol = 0.0_wp
   ip = 0
   do ic = 1 , size(comps)
@@ -349,7 +360,23 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
 
     ! Load the wake -----------------------------
     call load_wake_post(floc, wake, wake_elems)
+    
     call close_hdf5_file(floc)
+    
+    ! Re-compute u_vort from loaded wake
+    do ic = 1,size(comps)
+      nelems_comp = comps(ic)%nelems
+      !$omp parallel do private(ie) 
+      do ie = 1, nelems_comp
+        select type(el =>comps(ic)%el(ie))
+          type is(t_surfpan)
+            call el%get_vort_vel(wake%vort_p)
+        end select
+      end do
+      !$omp end parallel do
+    end do
+    
+    
     
     if (probe_p) then ! load also previous timestep for unsteady contribution
       ! Open the result file ----------------------
@@ -357,7 +384,7 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
                                           '_res_',it-1,'.h5'
       inquire(file=filename, exist=ex)
       if (.not. ex) then
-        call error(this_mod_name,this_sub_name,'Output data '//filename//&
+        call error(this_mod_name,this_sub_name,'Output data '//trim(filename)//&
                   &' from the previous step is not available, cannot compute&
                   & unsteady contribution to pressure.')
       end if                                    
@@ -371,10 +398,25 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
 
       call load_wake_post(floc, wake_old, wake_elems_old)
       call close_hdf5_file(floc)
+      
+      ! Re-compute u_vort from loaded old wake
+      do ic = 1,size(comps_old)
+        nelems_comp = comps_old(ic)%nelems
+        !$omp parallel do private(ie) 
+        do ie = 1, nelems_comp
+          select type(el =>comps_old(ic)%el(ie))
+            type is(t_surfpan)
+              call el%get_vort_vel(wake_old%vort_p)
+          end select
+        end do
+        !$omp end parallel do
+      end do
+      
     end if
 
   !> Compute fields to be plotted +++++++++++++++++++++++++++++
-!$omp parallel do collapse(3) private(iz,iy,ix,vel_probe, pres_probe, vort_probe, ic, ie, v, ipp, pot_probe, phi)
+!$omp parallel do collapse(3) private(iz,iy,ix,vel_probe, pres_probe, vort_probe, &
+                                      !$omp ic, ie, v, ipp, pot_probe, pot_probe_old, phi)
     ! Loop over the nodes of the box
     do iz = 1 , size(zbox)  ! z-coord
       do iy = 1 , size(ybox)  ! y-coord
@@ -385,8 +427,7 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
           if ( probe_vel .or. probe_p ) then
 
             ! Compute velocity
-            vel_probe = 0.0_wp ; pres_probe = 0.0_wp ; vort_probe = 0.0_wp ; pot_probe = 0
-
+            vel_probe = 0.0_wp ; pres_probe = 0.0_wp ; vort_probe = 0.0_wp ; pot_probe = 0.0_wp; pot_probe_old = 0.0_wp
             ! body
             do ic = 1,size(comps) ! Loop on components
               do ie = 1 , size( comps(ic)%el ) ! Loop on elems of the comp
@@ -578,8 +619,11 @@ subroutine post_flowfield( sbprms, basename, data_basename, an_name, ia, &
   ! TODO deallocate points?
   call destroy_elements(comps)
   deallocate(comps,components_names)
-  call destroy_elements(comps_old)
-  if (allocated(comps_old))  deallocate(comps_old)
+  
+  if (allocated(comps_old)) then
+    call destroy_elements(comps_old)
+    deallocate(comps_old)
+  end if
 
   write(msg,'(A,I0,A)') nl//'++++++++++ Flowfield done'//nl
   call printout(trim(msg))

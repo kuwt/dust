@@ -156,6 +156,7 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
   integer                                           :: i1 , i2, i3
   integer, allocatable                              :: ee(:,:)
   real(wp), allocatable                             :: rr(:,:)
+  real(wp), allocatable                             :: ori(:,:)
   character(len=max_char_len)                       :: comp_el_type, comp_name
   character(len=max_char_len)                       :: comp_input, comp_name_stripped
   integer                                           :: points_offset, n_vert
@@ -321,8 +322,8 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       call open_hdf5_group(cloc,'Geometry',geo_loc)
       call read_hdf5_al(ee   ,'ee'   ,geo_loc)
       call read_hdf5_al(rr   ,'rr'   ,geo_loc)
-
-      if ( trim(comps(i_comp)%comp_input) .eq. 'parametric' ) then
+      if ( trim(comps(i_comp)%comp_input) .eq. 'parametric' .or. & 
+          trim(comps(i_comp)%comp_input) .eq. 'pointwise') then
         call read_hdf5( parametric_nelems_span ,'parametric_nelems_span',geo_loc)
         call read_hdf5( parametric_nelems_chor ,'parametric_nelems_chor',geo_loc)
         comps(i_comp)%parametric_nelems_span = parametric_nelems_span
@@ -456,6 +457,10 @@ subroutine load_components_postpro(comps, points, nelem, floc, &
       !cleanup
       deallocate(ee,rr)
 
+      if (allocated(ori)) then
+        deallocate(ori) 
+      endif 
+
     endif !load the element because in list
 
     call close_hdf5_group(cloc)
@@ -527,12 +532,12 @@ end subroutine prepare_geometry_postpro
 !! The subroutine calculates all the relevant geometrical quantities of a
 !! panel element (vortex ring or surface panel)
 subroutine calc_geo_data_postpro(elem,vert)
- class(c_pot_elem), intent(inout) :: elem
- real(wp), intent(in) :: vert(:,:)
+  class(c_pot_elem), intent(inout) :: elem
+  real(wp), intent(in) :: vert(:,:)
 
- integer :: nsides, is
- real(wp):: nor(3), tanl(3)
- integer :: nxt
+  integer :: nsides, is
+  real(wp):: nor(3), tanl(3)
+  integer :: nxt
 
   nsides = size(vert,2)
 
@@ -647,6 +652,7 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
 
 #if USE_PRECICE
   real(wp), allocatable                  :: rr(:,:)
+  real(wp), allocatable                  :: ori(:,:)
 #endif
   character(len=*), optional, intent(in) :: filen
   character(max_char_len)                :: cname
@@ -678,9 +684,13 @@ subroutine update_points_postpro(comps, points, refs_R, refs_off, &
     write(cname,'(A,I3.3)') 'Comp', comp%comp_id
     call open_hdf5_group( gloc, trim(cname), cloc )
     call open_hdf5_group( cloc, 'Geometry', rloc )
-    call read_hdf5_al(rr, 'rr', rloc)
+    call read_hdf5_al(rr,  'rr', rloc)
+    call read_hdf5_al(ori, 'ori', rloc)
+    
     points(:,comp%i_points) = rr
-
+    do ie = 1, size(comp%el)
+      comp%el(ie)%ori = ori(ie,:)
+    enddo 
     !> Quite dirty: open and close for each component
     call close_hdf5_group(rloc)
     call close_hdf5_group(cloc)

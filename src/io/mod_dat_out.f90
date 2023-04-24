@@ -287,8 +287,8 @@ subroutine dat_out_sectional_ll (basename, compname, y_cen, y_span, chord, time,
   character(len=max_char_len)   :: filename
   integer                       :: it , nt , fid , ierr, il
   character(len=*), parameter   :: this_sub_name = 'dat_out_sectional_ll'
-  character(len=21)             :: load_str(9)
-  character(len=max_char_len)   :: description_str(9)
+  character(len=21)             :: load_str(12)
+  character(len=max_char_len)   :: description_str(12)
 
   load_str(1) = 'Cl' 
   load_str(2) = 'Cd' 
@@ -296,19 +296,25 @@ subroutine dat_out_sectional_ll (basename, compname, y_cen, y_span, chord, time,
   load_str(4) = 'alpha'
   load_str(5) = 'alpha_isolated'
   load_str(6) = 'vel_2d'
-  load_str(7) = 'vel_2d_isolated'
-  load_str(8) = 'vel_outplane'
-  load_str(9) = 'vel_outplane_isolated'
+  load_str(7) = 'up_x'
+  load_str(8) = 'up_y'
+  load_str(9) = 'up_z'
+  load_str(10) = 'vel_2d_isolated'
+  load_str(11) = 'vel_outplane'
+  load_str(12) = 'vel_outplane_isolated'
   
   description_str(1) = 'lift coefficient'
   description_str(2) = 'drag coefficient'
   description_str(3) = 'moment coefficient'
   description_str(4) = 'angle of attack'
   description_str(5) = 'isolated angle of attack'
-  description_str(6) = 'in section plane velocity'
-  description_str(7) = 'in section plane velocity isolated'
-  description_str(8) = 'out of section (spanwise) velocity'
-  description_str(9) = 'out of section (spanwise) isolated velocity'
+  description_str(6) = 'in section plane velocity (module)'
+  description_str(7) = 'in section plane velocity x component'
+  description_str(8) = 'in section plane velocity y component'
+  description_str(9) = 'in section plane velocity z component'
+  description_str(10) = 'in section plane velocity isolated'
+  description_str(11) = 'out of section (spanwise) velocity'
+  description_str(12) = 'out of section (spanwise) isolated velocity'
 
   nt = size(time)
 
@@ -375,8 +381,8 @@ subroutine dat_out_sectional_vl (basename, compname, y_cen, y_span, chord, time,
   character(len=max_char_len)   :: filename
   integer                       :: it , nt , fid , ierr, il
   character(len=*), parameter   :: this_sub_name = 'dat_out_sectional_vl'
-  character(len=21)             :: load_str(9)
-  character(len=max_char_len)   :: description_str(9)
+  character(len=21)             :: load_str(12)
+  character(len=max_char_len)   :: description_str(12)
 
   load_str(1) = 'Cl'; 
   load_str(2) = 'Cd'; 
@@ -384,19 +390,25 @@ subroutine dat_out_sectional_vl (basename, compname, y_cen, y_span, chord, time,
   load_str(4) = 'alpha'; 
   load_str(5) = 'alpha_isolated'
   load_str(6) = 'vel_2d'; 
-  load_str(7) = 'vel_2d_isolated'
-  load_str(8) = 'vel_outplane'; 
-  load_str(9) = 'vel_outplane_isolated'
+  load_str(7) = 'up_x'
+  load_str(8) = 'up_y'
+  load_str(9) = 'up_z'
+  load_str(10) = 'vel_2d_isolated'
+  load_str(11) = 'vel_outplane'; 
+  load_str(12) = 'vel_outplane_isolated'
 
   description_str(1) = 'lift coefficient'
   description_str(2) = 'drag coefficient'
   description_str(3) = 'moment coefficient'
   description_str(4) = 'angle of attack'
   description_str(5) = 'isolated angle of attack'
-  description_str(6) = 'in section plane velocity'
-  description_str(7) = 'in section plane velocity isolated'
-  description_str(8) = 'out of section (spanwise) velocity'
-  description_str(9) = 'out of section (spanwise) isolated velocity'
+  description_str(6) = 'in section plane velocity (module)'
+  description_str(7) = 'in section plane velocity x component'
+  description_str(8) = 'in section plane velocity y component'
+  description_str(9) = 'in section plane velocity z component'
+  description_str(10) = 'in section plane velocity isolated'
+  description_str(11) = 'out of section (spanwise) velocity'
+  description_str(12) = 'out of section (spanwise) isolated velocity'
 
   nt = size(time)
 

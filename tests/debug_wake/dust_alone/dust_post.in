@@ -29,3 +29,33 @@ Format   = dat
 Reference_Tag = 0
 
 }
+
+analysis = {
+
+    type = sectional_loads
+    name = sl01
+    start_res = 1
+    end_res = 100
+    step_res = 1
+    format = dat
+    average = F
+    component = Wing__01
+    axis_nod = (/ 0.0, 0.0, 0.0 /)
+    axis_dir = (/ 0.0, 1.0, 0.0 /)    
+}
+
+analysis = {
+
+    type = sectional_loads
+    name = sl02
+    start_res = 1
+    end_res = 100
+    step_res = 1
+    format = dat
+    average = F
+    component = Wing__02
+    axis_nod = (/ 0.0, 0.0, 0.0 /)
+    axis_dir = (/ 0.0, 1.0, 0.0 /)
+
+    
+}

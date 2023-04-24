@@ -46,7 +46,7 @@ joint: FLAP_RIGHT + 1, total joint,
         #  T_START_FLAP_RIGHT + T_PERIOD_FLAPRIGHT,
         #  DEG_FLAP_RIGHT,
         #  0.0,
-        sine, T_START_FLAP_RIGHT, pi/T_PERIOD_FLAP_RIGHT, DEG_FLAP_RIGHT/2, forever, 0.0,
+        cosine, T_START_FLAP_RIGHT, pi/T_PERIOD_FLAP_RIGHT, DEG_FLAP_RIGHT/2, half, 0.0,
         0.0,
         0.0;		
 
@@ -116,7 +116,7 @@ joint: FLAP_LEFT + 1, total joint,
         #  T_START_FLAP_LEFT + T_PERIOD_FLAPLEFT,
         #  DEG_FLAP_LEFT,
         #  0.0,
-        sine, T_START_FLAP_LEFT, pi/T_PERIOD_FLAP_LEFT, DEG_FLAP_LEFT/2, forever, 0.0,
+        cosine, T_START_FLAP_LEFT, pi/T_PERIOD_FLAP_LEFT, DEG_FLAP_LEFT/2, half, 0.0,
         0.0,
         0.0;		
 

@@ -547,15 +547,15 @@ end subroutine add_wake_surfpan
 !! the contribution of potential due to the lifting lines
 subroutine add_expl_surfpan(this, expl_elems, linsys, &
                             ie,ista, iend)
- class(t_surfpan), intent(inout) :: this
- type(t_expl_elem_p), intent(in)      :: expl_elems(:)
- type(t_linsys), intent(inout)   :: linsys
- integer, intent(in)             :: ie
- integer, intent(in)             :: ista
- integer, intent(in)             :: iend
+  class(t_surfpan), intent(inout) :: this
+  type(t_expl_elem_p), intent(in) :: expl_elems(:)
+  type(t_linsys), intent(inout)   :: linsys
+  integer, intent(in)             :: ie
+  integer, intent(in)             :: ista
+  integer, intent(in)             :: iend
 
- integer :: j1
- real(wp) :: a, b
+  integer                         :: j1
+  real(wp)                        :: a, b
 
   !Static part: take what was already computed
   do  j1 = 1, ista-1
@@ -583,12 +583,12 @@ end subroutine add_expl_surfpan
 !! to its rhs
 subroutine compute_pot_surfpan(this, A, b, pos , i , j )
   class(t_surfpan), intent(inout) :: this
-  real(wp), intent(out) :: A
-  real(wp), intent(out) :: b
-  real(wp), intent(in) :: pos(:)
-  integer , intent(in) :: i , j
+  real(wp), intent(out)           :: A
+  real(wp), intent(out)           :: b
+  real(wp), intent(in)            :: pos(:)
+  integer , intent(in)            :: i, j
 
-  real(wp) :: dou , sou
+  real(wp)                        :: dou, sou
 
   if ( i .ne. j ) then
     call potential_calc_doublet(this, dou, pos)
@@ -614,13 +614,13 @@ end subroutine compute_pot_surfpan
 !! contribution to its rhs
 subroutine compute_psi_surfpan(this, A, b, pos, nor, i , j )
   class(t_surfpan), intent(inout) :: this
-  real(wp), intent(out) :: A
-  real(wp), intent(out) :: b
-  real(wp), intent(in) :: pos(:)
-  real(wp), intent(in) :: nor(:)
-  integer , intent(in) :: i , j
+  real(wp), intent(out)           :: A
+  real(wp), intent(out)           :: b
+  real(wp), intent(in)            :: pos(:)
+  real(wp), intent(in)            :: nor(:)
+  integer , intent(in)            :: i, j
 
-  real(wp) :: vdou(3) , vsou(3)
+  real(wp)                        :: vdou(3), vsou(3)
 
   call velocity_calc_doublet(this, vdou, pos)
 
@@ -644,11 +644,11 @@ end subroutine compute_psi_surfpan
 !! the equations is multiplied by 4*pi, to obtain the actual velocity the
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 subroutine compute_vel_surfpan(this, pos, vel )
-  class(t_surfpan), intent(in) :: this
-  real(wp), intent(in) :: pos(:)
-  real(wp), intent(out) :: vel(3)
+  class(t_surfpan), intent(in)  :: this
+  real(wp), intent(in)          :: pos(:)
+  real(wp), intent(out)         :: vel(3)
 
-  real(wp) :: vdou(3) , vsou(3), wind(3)
+  real(wp)                      :: vdou(3), vsou(3), wind(3)
 
 
   ! doublet ---
@@ -656,7 +656,7 @@ subroutine compute_vel_surfpan(this, pos, vel )
 
   ! source ----
   call velocity_calc_sou_surfpan(this, vsou, pos)
-
+  
   wind = variable_wind(this%cen, sim_param%time)
   vel = vdou*this%mag - vsou*( sum(this%nor*(this%ub-wind-this%uvort)) )
 
@@ -674,11 +674,11 @@ end subroutine compute_vel_surfpan
 !! result of the present subroutine MUST be DIVIDED by 4*pi
 subroutine compute_grad_surfpan(this, pos, grad )
   class(t_surfpan), intent(in) :: this
-  real(wp), intent(in) :: pos(:)
-  real(wp), intent(out) :: grad(3,3)
+  real(wp), intent(in)         :: pos(:)
+  real(wp), intent(out)        :: grad(3,3)
 
-  real(wp) :: grad_dou(3,3) , grad_sou(3,3)
-  real(wp) :: wind(3)
+  real(wp)                     :: grad_dou(3,3), grad_sou(3,3)
+  real(wp)                     :: wind(3)
 
   ! doublet ---
   call gradient_calc_doublet(this, grad_dou, pos)
@@ -710,7 +710,8 @@ subroutine compute_pres_surfpan(this, R_g)
 ! This routine contains the velocity update as well. TODO, move to a dedicated routine
 ! Method implemented for surface velocity computation:
 ! stencil relying on a CHTLS* method
-! *CHTLS: Constrained Hermite Taylor series Least Square method
+! *CHTLS: Constrained Hermite Taylor series Least Square method Constrained Hermite TLS for Mesh-free Derivative
+! Estimation Near and On Boundaries  https://digitalcommons.calpoly.edu/cgi/viewcontent.cgi?article=1095&context=aero_fac
 
   n_neigh = 0 ; f = 0.0_wp
   do i_e = 1 , this%n_ver
@@ -725,6 +726,7 @@ subroutine compute_pres_surfpan(this, R_g)
   vel_phi = matmul( this%chtls_stencil , f(1:n_neigh+1) )
 
   vel_phi = matmul( (R_g) , vel_phi )
+  
   this%surf_vel = wind + vel_phi + this%uvort
 
   !> pressure -------------------------------------------------
@@ -732,18 +734,19 @@ subroutine compute_pres_surfpan(this, R_g)
   !                          + 0.5*rho_inf*V_inf^2
   !                          +(- 0.5*rho_inf*V^2 
   !                          + rho * ub.u_phi
-  !                          - rho_inf*dphi/dt)         
-
+  !                          - rho_inf*dphi/dt)      
+  !                                     ^   
+  !!        with: idou = -phi         __|
   ! Prandt -- Glauert correction for compressibility effect
   ! it applies to the dynamic pressure terms only
   ! so that only the *relative* static pressure is affected
   mach = abs(norm2(wind - this%ub) / sim_param%a_inf)
   
-  this%pres = sim_param%P_inf + &
-             (0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
-              -0.5_wp * sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp &
-              +sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
-              -sim_param%rho_inf * this%didou_dt)/sqrt(1 - mach**2)
+  this%pres =   sim_param%P_inf &
+              +(0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
+              - 0.5_wp * sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp  &
+              + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
+              + sim_param%rho_inf * this%didou_dt)/sqrt(1 - mach**2)
 
   ! compute dforce
   call compute_dforce_surfpan(this)
@@ -805,20 +808,18 @@ end subroutine create_local_velocity_stencil_surfpan
 !  matrix of the "local" reference system
 subroutine create_chtls_stencil_surfpan( this , R_g )
   class(t_surfpan)  , intent(inout) :: this
-! type(t_pot_elem_p), intent(in)    :: elems(:)
   real(wp)          , intent(in)    :: R_g(3,3)
 
-  real(wp), allocatable :: A(:,:) , B(:,:) , W(:,:) , V(:,:)
-  real(wp) :: dx(3)
-  real(wp), allocatable :: C(:,:) , CQ(:,:)
-  real(wp), allocatable :: Cls_tilde(:,:) , iCls_tilde(:,:) , chtls_tmp(:,:)
-  real(wp) :: det_cls
-  real(wp) :: r1
+  real(wp), allocatable             :: A(:,:), B(:,:), W(:,:), V(:,:)
+  real(wp)                          :: dx(3)
+  real(wp), allocatable             :: C(:,:), CQ(:,:)
+  real(wp), allocatable             :: Cls_tilde(:,:), iCls_tilde(:,:), chtls_tmp(:,:)
+  real(wp)                          :: det_cls
+  real(wp)                          :: r1
+  real(wp), allocatable             :: Q(:,:), R(:,:)
 
-  real(wp), allocatable :: Q(:,:) , R(:,:)
-
-  integer :: n_neigh
-  integer :: i_n , i_nn
+  integer                           :: n_neigh
+  integer                           :: i_n , i_nn
 
   ! # of neighbouring elements
   n_neigh = 0
@@ -829,16 +830,17 @@ subroutine create_chtls_stencil_surfpan( this , R_g )
   end do
 
   ! arrays A (differences), B (constraints), W (weights) -----------
-  allocate( A(n_neigh,3) , W(n_neigh+1,n_neigh+1) ) ; W = 0.0_wp
-  allocate( B(1,3) ) ; B(1,:) = this%nor
+  allocate(A(n_neigh,3) , W(n_neigh+1,n_neigh+1)); W = 0.0_wp
+  allocate(B(1,3));                                B(1,:) = this%nor
+  
   i_n = 0
   do i_nn = 1 , this%n_ver
     if ( associated(this%neigh(i_nn)%p) ) then ! the neighbouring element exists
       i_n = i_n + 1
       dx = this%neigh(i_nn)%p%cen - this%cen
       A(i_n, : ) = dx
-      W(i_n,i_n) = 1.0_wp / norm2(dx) * &
-               max( 0.0_wp , abs( sum( this%nor * this%neigh(i_nn)%p%nor ) ) )
+      W(i_n,i_n) = 1.0_wp/norm2(dx) * &
+                    max(0.0_wp, abs(sum(this%nor*this%neigh(i_nn)%p%nor)))
     end if
   end do
   W(n_neigh+1,n_neigh+1) = sum( W ) / real(n_neigh,wp)

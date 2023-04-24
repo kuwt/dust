@@ -46,40 +46,45 @@
 module mod_spline
 
 use mod_param, only: &
-  wp, max_char_len
+  wp, max_char_len, pi
 
+use mod_handling, only: &
+  error, warning, info, printout, new_file_unit, check_file_exists
+  
 implicit none
 
 public :: t_spline , hermite_spline , deallocate_spline
 
 private
 
+character(len=*), parameter :: this_mod_name = 'mod_spline' 
 ! ----------------------------------------------------------------------
 !> spline type
 type :: t_spline
- real(wp) , allocatable  :: rr(:,:)  ! points to be interpolate ( n_d , n_points)
- real(wp) , allocatable  :: dp(:,:)  ! derivative at int. points( n_d , n_points)
- real(wp) , allocatable  :: t(:)     ! array of the param describing the spline
- real(wp) , allocatable  :: dt(:)    ! dt between two points of the spline
- character(max_char_len) :: e_bc(2)  ! bc: 'der', 'free'
- real(wp) , allocatable  :: d0(:)    ! derivative at the first point
- real(wp) , allocatable  :: d1(:)    ! derivative at the end point
+  real(wp) , allocatable  :: rr(:,:)  ! points to be interpolate ( n_d , n_points)
+  real(wp) , allocatable  :: dp(:,:)  ! derivative at int. points( n_d , n_points)
+  real(wp) , allocatable  :: t(:)     ! array of the param describing the spline
+  real(wp) , allocatable  :: dt(:)    ! dt between two points of the spline
+  character(max_char_len) :: e_bc(2)  ! bc: 'der', 'free'
+  real(wp) , allocatable  :: d0(:)    ! derivative at the first point
+  real(wp) , allocatable  :: d1(:)    ! derivative at the end point
 end type t_spline
 
 ! ----------------------------------------------------------------------
 contains
 ! ----------------------------------------------------------------------
 !> build hermite_spline
-subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
-                                           type_span , rr_spl , nn_spl , &
-                                                       ip_spl , ss_spl , &
-                                                       spl_spl  , &
-                                                       leng , s_in , nor_in )
+subroutine hermite_spline ( mesh_file, spl, nelems , par_tension , par_bias      , &
+                            type_span, rr_spl , nn_spl , &
+                            ip_spl, ss_spl , &
+                            spl_spl, &
+                            leng, s_in , nor_in )
   type(t_spline)               , intent(inout) :: spl
   integer                      , intent(in)    :: nelems
   real(wp)                     , intent(in)    :: par_tension
   real(wp)                     , intent(in)    :: par_bias
-  character(max_char_len)      , intent(in)    :: type_span
+  character(len=*)             , intent(in)    :: type_span
+  character(len=*)             , intent(in)    :: mesh_file
   real(wp)                     , intent(out)   :: rr_spl(:,:)
   real(wp)                     , intent(out)   :: nn_spl(:,:)
   integer                      , intent(out)   :: ip_spl(:,:)
@@ -88,7 +93,7 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
   real(wp)                     , intent(out)   :: leng
   real(wp)                     , intent(out)   ::   s_in(:)
   real(wp)                     , intent(out)   :: nor_in(:,:)
-
+  character(len=*), parameter                  :: this_sub_name = 'hermite_spline'
   integer :: n_d , n_points , n_splines
   real(wp) , allocatable :: ll(:)  ! useless with this def of %t
 
@@ -164,7 +169,7 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
 
   elseif ( trim( spl%e_bc(1) ) .eq. 'free'       ) then
     spl%dp(1,:) = 0.5_wp * ( - spl%dp(2,:) + 3.0_wp / spl%dt(1) * &
-                             ( spl%rr(2,:) - spl%rr(1,:) ) ) ;
+                            ( spl%rr(2,:) - spl%rr(1,:) ) ) ;
   else
     write(*,*) ' hermite_spline. Wrong b.c. '
     write(*,*) ' Only "derivative" implemented so far. Stop.' ; stop
@@ -239,10 +244,20 @@ subroutine hermite_spline ( spl , nelems , par_tension , par_bias      , &
   !  allocate(rr_spl(nelems+1,3)) <- passed as an input
   allocate(s_spl(nelems+1)) ! curvilinear coord of the output points
   if ( trim(type_span) .eq. 'uniform' ) then
-    s_spl = (/ ( real(j,wp) , j = 0,nelems ) /) / real(nelems,wp)
-  else
-    write(*,*) ' error in hermite_spline. Only type_span = uniform '
-    write(*,*) ' implemented so far. Stop. ' ; stop
+    s_spl = (/ ( real(j,wp) , j = 0, nelems ) /) / real(nelems,wp)
+  elseif ( trim(type_span) .eq. 'cosine' ) then
+    s_spl = 0.5_wp * ( 1.0_wp - cos( (/ (real(j,wp) , j = 0, nelems) /)*pi/ real(nelems,wp) ) )
+  elseif ( trim(type_span) .eq. 'cosineOB' ) then
+    s_spl = sin( 0.5_wp*(/(real(j,wp) , j = 0, nelems)/)*pi/ real(nelems,wp) )
+  elseif ( trim(type_span) .eq. 'cosineIB' ) then
+    s_spl = 1.0_wp - cos(0.5_wp*(/(real(j,wp) , j = 0, nelems)/)*pi/ real(nelems,wp) )
+  elseif ( trim(type_span) .eq. 'equalarea' ) then
+    s_spl = sqrt((/(real(j,wp) , j = 0, nelems)/)/real(nelems,wp)) 
+  else 
+    write(*,*) ' Mesh file   : ' , trim(mesh_file)
+    write(*,*) ' type_span   : ' , trim(type_span)
+    call error(this_sub_name, this_mod_name, 'Incorrect input: &
+          & type_span must be equal to uniform, cosine, cosineIB, cosineOB.')
   end if
 
   !> first and last points

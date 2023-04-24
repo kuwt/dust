@@ -1,6 +1,6 @@
 !> === Mesh and elements types ===
 mesh_file_type = parametric
-el_type       = v
+el_type       = p
 !> === coupled with external structural solver (T/F) ===
 coupled      = F
 coupling_type = rbf
@@ -68,7 +68,7 @@ airfoil = NACA0012
 span = 8 
 sweep = 0.0
 dihed = 0.0
-nelem_span = 90
+nelem_span = 30
 type_span = uniform
 
 ! Second section

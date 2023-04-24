@@ -691,14 +691,30 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   call create_strip_connectivity(geo)
 
   !> Initialisation of the field surf_vel to zero (for surfpan only)
-  do i=1,geo%nelem_impl
+  do i=1, geo%nelem_impl
     select type(el=>elems_impl(i)%p) ; class is(t_surfpan)
       el%surf_vel = 0.0_wp
+#if USE_PRECICE
+    if (geo%components(el%comp_id)%coupling) then
+        call el%create_local_velocity_stencil( &    
+                geo%components(el%comp_id)%coupling_node_rot)
+        !> chtls stencil
+        call el%create_chtls_stencil( &             
+                geo%components(el%comp_id)%coupling_node_rot)
+    else 
+      call el%create_local_velocity_stencil( &    
+                geo%refs(geo%components(el%comp_id)%ref_id)%R_g)
+        !> chtls stencil
+        call el%create_chtls_stencil( &             
+                geo%refs(geo%components(el%comp_id)%ref_id)%R_g)
+    endif 
+#else 
         call el%create_local_velocity_stencil( &    
                 geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
         !> chtls stencil
         call el%create_chtls_stencil( &             
                 geo%refs(geo%components(el%comp_id)%ref_id)%R_g )
+#endif 
     end select
   end do
 
@@ -713,7 +729,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
       do i = 1, size(geo%components(i_comp)%el) 
         cen(:,i) = geo%components(i_comp)%el(i)%cen
       end do 
-
+      
       call geo%components(i_comp)%rbf%build_connectivity(cen, geo%components(i_comp)%coupling_node_rot)
       !> transfer index and weight matrix 
       geo%components(i_comp)%rbf%cen%ind = geo%components(i_comp)%rbf%point%ind
@@ -1154,9 +1170,9 @@ subroutine load_components(geo, in_file, out_file, te)
         call read_hdf5( geo%components(i_comp)%hinge(ih)%input_type, 'Hinge_Rotation_Input'    , hiloc)
 
         !> Actual input only for input_type = function:..., otherwise dummy inputs
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_ampl , 'Amplitude', hiloc)
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_omega, 'Omega', hiloc)
-        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_phase, 'Phase', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_ampl , 'Hinge_Rotation_Amplitude', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_omega, 'Hinge_Rotation_Omega', hiloc)
+        call read_hdf5( geo%components(i_comp)%hinge(ih)%f_phase, 'Hinge_Rotation_Phase', hiloc)
 
         if ( trim(geo%components(i_comp)%hinge(ih)%input_type) .eq. 'coupling' ) then
           call read_hdf5_al( geo%components(i_comp)%hinge(ih)%i_coupling_nodes, &
@@ -1241,7 +1257,7 @@ subroutine load_components(geo, in_file, out_file, te)
           np_precice     = np_precice_tot - n_nodes_coupling_hinges
 
           !> Allocate comp%i_points_precice()
-          allocate(geo%components(i_comp)%i_points_precice( np_precice ))
+          allocate(geo%components(i_comp)%i_points_precice(np_precice))
 
           !> Evaluate precice/dust connectivity for structural and hinge nodes
           allocate( ind_coupling( np_precice ) )
@@ -1344,7 +1360,8 @@ subroutine load_components(geo, in_file, out_file, te)
 
       !> For PARAMETRIC elements only:
       !  parametric_nelems_span , parametric_nelems_chor
-      if ( trim(comp_input) .eq. 'parametric' ) then
+      if ( trim(comp_input) .eq. 'parametric' .or. &
+          trim(comp_input) .eq. 'pointwise') then
         call read_hdf5(par_nelems_span,'parametric_nelems_span',geo_loc)
         call read_hdf5(par_nelems_chor,'parametric_nelems_chor',geo_loc)
       end if
@@ -1437,7 +1454,8 @@ subroutine load_components(geo, in_file, out_file, te)
 
         endif
 
-        if ( trim(comp_input) .eq. 'parametric' ) then
+        if (trim(comp_input) .eq. 'parametric' .or. & 
+            trim(comp_input) .eq. 'pointwise') then
           !> Write HDF5 fields
           call write_hdf5(par_nelems_span,'parametric_nelems_span',geo_loc)
           call write_hdf5(par_nelems_chor,'parametric_nelems_chor',geo_loc)
@@ -2440,7 +2458,7 @@ subroutine update_geometry(geo, te, t, update_static, time_cycle)
 
         call comp%hinge(ih)%hinge_deflection(comp%i_points, rr_hinge_contig,  t, te%i, te%t_hinged )
         geo%points(:, comp%i_points) = rr_hinge_contig
-              deallocate(rr_hinge_contig)
+        deallocate(rr_hinge_contig)
 
       else
 
