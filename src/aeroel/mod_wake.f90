@@ -1244,7 +1244,7 @@ subroutine complete_wake(wake, geo, elems, te)
   real(wp), allocatable                 :: cen_tess(:,:), rad_tess(:)
   real(wp), allocatable                 :: cen_sbprt(:,:), area_sbprt(:), mag_sbprt(:), dir_sbprt(:,:), rad_sbprt(:)
   real(wp), allocatable                 :: W(:,:), w_i(:)
-  real(wp)                              :: vertices(3,4)
+  real(wp)                              :: vel_part(3), vertices(3,4)
   ! flow separation variables
   integer                               :: i_comp , i_elem , n_elem
 
@@ -1442,7 +1442,7 @@ subroutine complete_wake(wake, geo, elems, te)
         isp = 0 ! subparts index
         
         ! parent panel
-        call compute_partvec(wake, iw, partvec, pos_p, area, 1, vertices)
+        call compute_partvec(wake, iw, partvec, pos_p, area, vel_part, 1, vertices)
         cen_parent(:,iwc) = pos_p
         mag_parent(iwc) = norm2(partvec)
         if(mag_parent(iwc) .gt. 1.0e-13_wp) then
@@ -1464,7 +1464,7 @@ subroutine complete_wake(wake, geo, elems, te)
         iwc = iwc +1 ! added parent panel     
            
         ! parent panel from previous row
-        call compute_partvec(wake, iw, partvec, pos_p, area, 4) ! parent panel
+        call compute_partvec(wake, iw, partvec, pos_p, area, vel_part, 4) ! parent panel
         cen_parent(:,iwc) = pos_p
         !mag_parent(iwc) = norm2(partvec)
         mag_parent(iwc) = mag_parent(iwc-1) ! force no interpolation chordwise
@@ -1477,7 +1477,7 @@ subroutine complete_wake(wake, geo, elems, te)
         iwc = iwc+1 ! added parent panel
 
         ! parent panel from succ row
-        call compute_partvec(wake, iw, partvec, pos_p, area, 7) ! parent panel
+        call compute_partvec(wake, iw, partvec, pos_p, area, vel_part, 7) ! parent panel
         cen_parent(:,iwc) = pos_p
         !mag_parent(iwc) = norm2(partvec)
         mag_parent(iwc) = mag_parent(iwc-1)
@@ -1489,7 +1489,7 @@ subroutine complete_wake(wake, geo, elems, te)
         do while (wake%pan_neigh(1,iw) .gt. 0)
           iw = iw + 1 ! move to next panel
           
-          call compute_partvec(wake, iw, partvec, pos_p, area, 1, vertices)
+          call compute_partvec(wake, iw, partvec, pos_p, area, vel_part, 1, vertices)
           
           cen_parent(:,iwc) = pos_p
           mag_parent(iwc) = norm2(partvec)
@@ -1512,7 +1512,7 @@ subroutine complete_wake(wake, geo, elems, te)
           iwc = iwc+1 ! added parent panel
 
           ! parent panel from previous row
-          call compute_partvec(wake, iw, partvec, pos_p, area, 4) ! parent panel
+          call compute_partvec(wake, iw, partvec, pos_p, area, vel_part, 4) ! parent panel
           cen_parent(:,iwc) = pos_p
           !mag_parent(iwc) = norm2(partvec)
           mag_parent(iwc) = mag_parent(iwc-1) ! force no interpolation chordwise
@@ -1525,7 +1525,7 @@ subroutine complete_wake(wake, geo, elems, te)
           iwc = iwc +1 ! added parent panel
           
           ! parent panel from succ row
-          call compute_partvec(wake, iw, partvec, pos_p, area, 7) ! parent panel
+          call compute_partvec(wake, iw, partvec, pos_p, area, vel_part, 7) ! parent panel
           cen_parent(:,iwc) = pos_p
           !mag_parent(iwc) = norm2(partvec)
           mag_parent(iwc) = mag_parent(iwc-1)
@@ -1576,9 +1576,7 @@ subroutine complete_wake(wake, geo, elems, te)
                   wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
                 end if
                 wake%wake_parts(ip)%r_cutoff  = sim_param%CutoffRad
-                wake%wake_parts(ip)%vel = 0.5_wp * &
-                                  ( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
-                                    wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
+                wake%wake_parts(ip)%vel = vel_part
                 exit
               endif
             enddo
@@ -1610,7 +1608,7 @@ subroutine complete_wake(wake, geo, elems, te)
       do iw = 1,wake%n_pan_stripes
         
         ! compute the quantites of the wake panel
-        call compute_partvec(wake, iw, partvec, pos_p, area, 1, vertices)
+        call compute_partvec(wake, iw, partvec, pos_p, area, vel_part, 1, vertices)
         wake%last_pan_idou(iw) = wake%end_pan_idou(iw)
                
         ! divide the panel in multiple particles by tessellating it with triangles
@@ -1645,9 +1643,7 @@ subroutine complete_wake(wake, geo, elems, te)
                   wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
                 end if
                 wake%wake_parts(ip)%r_cutoff  = sim_param%CutoffRad
-                wake%wake_parts(ip)%vel = 0.5_wp * &
-                                  ( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
-                                    wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
+                wake%wake_parts(ip)%vel = vel_part
                 exit
               endif
             enddo
@@ -1668,11 +1664,9 @@ subroutine complete_wake(wake, geo, elems, te)
       ! each wake panel is converted to one particle
       k = 1
       do iw = 1,wake%n_pan_stripes
-        
-        p1 = wake%i_start_points(1,iw)
-        p2 = wake%i_start_points(2,iw) 
+
         ! compute the quantites of the wake panel
-        call compute_partvec(wake, iw, partvec, pos_p, area)
+        call compute_partvec(wake, iw, partvec, pos_p, area, vel_part)
         wake%last_pan_idou(iw) = wake%end_pan_idou(iw)
       
         !Add the particle (if it is in the box)
@@ -1699,9 +1693,7 @@ subroutine complete_wake(wake, geo, elems, te)
                 wake%wake_parts(ip)%r_Vortex = sim_param%VortexRad
               end if
               wake%wake_parts(ip)%r_cutoff  = sim_param%CutoffRad
-              wake%wake_parts(ip)%vel = 0.5_wp * &
-                                ( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
-                                  wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
+              wake%wake_parts(ip)%vel = vel_part
               exit
             endif
           enddo
@@ -1854,7 +1846,7 @@ end subroutine complete_wake
 !----------------------------------------------------------------------
 
 ! Given a wake panel computes quantites for the particle it will be converted into
-subroutine compute_partvec(wake, iw, partvec, pos_p, area, typ_in, vertices_out)
+subroutine compute_partvec(wake, iw, partvec, pos_p, area, vel, typ_in, vertices_out)
   
   type(t_wake), intent(in)        :: wake
   integer, intent(in)             :: iw
@@ -1863,6 +1855,7 @@ subroutine compute_partvec(wake, iw, partvec, pos_p, area, typ_in, vertices_out)
   real(wp), intent(out)           :: partvec(3) ! resultant vorticity vector
   real(wp), intent(out)           :: pos_p(3) ! centre of the panel
   real(wp), intent(out)           :: area ! area of the panel
+  real(wp), intent(out)           :: vel(3) ! velocity of the particle(s)
   real(wp), intent(out), optional :: vertices_out(3,4) ! vertices of the panel, needed for refinement
   
   integer                         :: p1, p2
@@ -1949,6 +1942,9 @@ subroutine compute_partvec(wake, iw, partvec, pos_p, area, typ_in, vertices_out)
   ! A = cross product of diagonals       
   area = norm2(cross(points_end(:,p1)- wake%pan_w_points(:,p2,wake%nmax_pan+1),&
               points_end(:,p2)-wake%pan_w_points(:,p1,wake%nmax_pan+1)))
+  
+  vel = 0.5_wp*( wake%pan_w_vel(:,p1,wake%nmax_pan+1) + &
+                 wake%pan_w_vel(:,p2,wake%nmax_pan+1) )
   
   if (present(vertices_out)) then
     vertices_out = vertices
