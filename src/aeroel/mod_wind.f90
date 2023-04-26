@@ -79,7 +79,7 @@ function variable_wind(pos, time) result(wind)
 
   if (sim_param%use_gust) then
     select case(trim(sim_param%GustType))
-      case('ACM')
+      case('AMC')
         gust_origin = sim_param%gust_origin
         gust_front_direction = sim_param%gust_front_direction/ &
                                             norm2(sim_param%gust_front_direction)

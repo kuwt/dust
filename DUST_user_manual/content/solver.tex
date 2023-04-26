@@ -278,7 +278,7 @@ to set a non zero reference velocity (e.g. the blade tip velocity)
     
     \item \param{gust_type}: \textit{required:} no. \textit{multiple:} no. \textit{default:} AMC \textit{type:} string.
     
-    Select the gust type: \opt{ACM} or \opt{linear}.
+    Select the gust type: \opt{AMC} or \opt{linear}.
     \begin{equation}
         \vec{s} = -\sum \big[\vec{x} - \big(\vec{O} + U_{des}\vec{v}(t-\tau)\big)\vec]\vec{v}
     \end{equation}
@@ -287,10 +287,12 @@ to set a non zero reference velocity (e.g. the blade tip velocity)
         \vec{U} = \vec{U}  + \dfrac{U_{des}}{2}\bigg(1-\cos{\frac{\pi s}{H}}\bigg)    
     \end{equation}
     
+    $\vec{x}$: Position of the point whose airstream velocity is being computed.
+    
     \item \param{gust_origin}: \textit{required:} yes. \textit{multiple:} no. 
     \textit{type:} real array of length 3.
-    
-    $\vec{0}$: Position of the point  whose airstream velocity is being computed. 
+        
+    $\vec{O}$: Position of the origin point of the gust. 
     
     \item \param{gust_front_direction}: \textit{required:} yes. \textit{multiple:} no. 
     \textit{type:} real array of length 3.
@@ -1107,8 +1109,8 @@ not inside each \param{motion} group.
 Grouping keyword containing the specification of the pole motion, 
 the pole motion parameters are
 
-	\begin{itemize}
-	\item \param{input}: \textit{required:} yes. \textit{multiple:} 
+    \begin{itemize}
+    \item \param{input}: \textit{required:} yes. \textit{multiple:} 
     not inside each \param{pole} group. \textit{type:} string.
     
     In which way motion is imposed, can be \opt{position} or \opt{velocity}
@@ -1175,15 +1177,15 @@ the pole motion parameters are
     Starting position of the pole in the three component, considered only if 
     \param{input} is \opt{velocity}
     
-	\end{itemize}
+    \end{itemize}
 
 \item \param{rotation}: \textit{required:} yes. \textit{multiple:} not inside each 
 \param{motion} group.
 
 Grouping keyword containing the specification of the rotation, which parameters are:
 
-	\begin{itemize}
-	\item \param{input}: \textit{required:} yes. \textit{multiple:} not inside each 
+    \begin{itemize}
+    \item \param{input}: \textit{required:} yes. \textit{multiple:} not inside each 
     \param{rotation} group. \textit{type:} string.
     
     In which way the rotation is imposed, can be \opt{position} for imposing an angle  
@@ -1249,7 +1251,7 @@ Grouping keyword containing the specification of the rotation, which parameters 
     
     Starting angle of the rotation, considered only if \param{input} is \opt{velocity}
     
-	\end{itemize}
+    \end{itemize}
 
 \end{itemize}
 
@@ -1318,10 +1320,10 @@ is set to true, it must be followed by a grouping keyword, \param{multiplicity},
 which must contain the details of the multiplicity. The detailed parameters 
 required in the multiplicity are:
 \begin{itemize}
-	\item \param{mult_type}: \textit{required:} yes. \textit{multiple:} 
+    \item \param{mult_type}: \textit{required:} yes. \textit{multiple:} 
     not inside each \param{multiplicity} group. \textit{type:} string.
     
-	type of multiplicity. At the moment only \opt{rotor} is enabled.
+    type of multiplicity. At the moment only \opt{rotor} is enabled.
     
     \item \param{N\_Blades}: \textit{required:} yes if \param{mult_type} 
     is \opt{rotor}. \textit{multiple:} not inside each \param{multiplicity} group. 
