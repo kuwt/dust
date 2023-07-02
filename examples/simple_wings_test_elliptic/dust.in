@@ -1,0 +1,26 @@
+
+! Simulation names
+basename       = ./Output/wings
+
+! Timings ---------------------
+tstart = 0.0
+tend = 0.6250
+dt = 0.006250
+dt_out = 0.006250
+output_start = T
+
+! reference values ---------------------
+u_inf = (/100.0, 0.0, 3/)
+
+! geometry input -----------------
+geometry_file = geo_input.h5
+reference_file = References.in
+
+! Model parameters -------------------
+fmm = F
+vortstretch = T
+diffusion = T
+
+! wake parameters  -------------
+n_wake_panels = 1
+n_wake_particles = 10000000
