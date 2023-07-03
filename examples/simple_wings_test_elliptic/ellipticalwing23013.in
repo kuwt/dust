@@ -1,0 +1,98 @@
+mesh_file_type = parametric
+el_type = l
+
+nelem_chord = 15
+type_chord = cosineLE   ! uniform  cosineLE  cosineTE
+starting_point = (/0.0,0.0,0.0/)
+reference_chord_fraction = 0.0
+
+mesh_symmetry = T
+symmetry_point = (/0,0,0/)
+symmetry_normal = (/0,1,0/)
+
+! First section
+chord = 2
+twist = 0
+airfoil = NACA0012
+airfoil_table = ./airfoil_table/naca23012.c81
+
+! region
+span = 0.667
+sweep = 0.0
+dihed = 0.0
+nelem_span = 4
+type_span = uniform
+
+! section
+chord = 1.972
+twist = 0
+airfoil = NACA0012
+airfoil_table = ./airfoil_table/naca23012.c81
+
+! region
+span = 0.667
+sweep = 0.0
+dihed = 0.0
+nelem_span = 4
+type_span = uniform
+
+! section
+chord = 1.886
+twist = 0
+airfoil = NACA0012
+airfoil_table = ./airfoil_table/naca23012.c81
+
+! region
+span = 0.667
+sweep = 0.0
+dihed = 0.0
+nelem_span = 4
+type_span = uniform
+
+! section
+chord = 1.732
+twist = 0
+airfoil = NACA0012
+airfoil_table = ./airfoil_table/naca23012.c81
+
+! region
+span = 0.667
+sweep = 0.0
+dihed = 0.0
+nelem_span = 4
+type_span = uniform
+
+! section
+chord = 1.491
+twist = 0
+airfoil = NACA0012
+airfoil_table = ./airfoil_table/naca23012.c81
+
+! region
+span = 0.667
+sweep = 0.0
+dihed = 0.0
+nelem_span = 4
+type_span = uniform
+
+! section
+chord = 1.106
+twist = 0
+airfoil = NACA0012
+airfoil_table = ./airfoil_table/naca23012.c81
+
+! region
+span = 0.667
+sweep = 0.0
+dihed = 0.0
+nelem_span = 4
+type_span = uniform
+
+! section
+chord = 0.444
+twist = 0
+airfoil = NACA0012
+airfoil_table = ./airfoil_table/naca23012.c81
+
+
+
