@@ -43,7 +43,6 @@ ELSE()
   MESSAGE(ERROR "Unknown choice for WITH_PRECICE")
 ENDIF()
 
-
 # =========== COMPILER ========================
 
 find_package(OpenMP)
@@ -53,7 +52,7 @@ if (OPENMP_FOUND)
 endif()
 
 IF (NOT CMAKE_BUILD_TYPE)
-  SET (CMAKE_BUILD_TYPE Release CACHE STRING
+  SET (CMAKE_BUILD_TYPE Debug CACHE STRING
       "Choose the type of build, options are: Debug Release."
       FORCE)
   SET_PROPERTY(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release)
@@ -76,6 +75,12 @@ ELSE()
   message(ERROR "Unknown compiler")
 ENDIF()
 
+include(CMakePrintHelpers)
+cmake_print_variables(CMAKE_BUILD_TYPE)
+cmake_print_variables(CMAKE_Fortran_FLAGS)
+cmake_print_variables(CMAKE_Fortran_COMPILER_ID)
+cmake_print_variables(CMAKE_Fortran_FLAGS_DEBUG)
+cmake_print_variables(CMAKE_Fortran_FLAGS_RELEASE)
 
 #> Lapack -------------------------------------------------------
 OPTION(DUST_MKL "Use MKL libraries instead of BLAS/LAPACK" OFF)
@@ -102,8 +107,11 @@ LIST(APPEND linkedlibs ${HDF5_LIBRARIES})
 
 #> CGNS ---------------------------------------------------------
 # Add CGNS installation (for the moment could not make it look for it autonomously)
-SET(CGNS_INC "/usr/include" CACHE STRING "Include path for cgns headers") 
-SET(CGNS_LIB "/usr/lib" CACHE STRING "Path of the cgns library") 
+#SET(CGNS_INC "/usr/include" CACHE STRING "Include path for cgns headers") 
+#SET(CGNS_LIB "/usr/lib" CACHE STRING "Path of the cgns library") 
+# !!!! important !!!! this path is hard coded. the path depends on where cgns is located in your system. 
+SET(CGNS_INC "/HTOpt/libs/cgns/4.3.0_gcc11.2/include" CACHE STRING "Include path for cgns headers") 
+SET(CGNS_LIB "/HTOpt/libs/cgns/4.3.0_gcc11.2/lib" CACHE STRING "Path of the cgns library") 
 LIST(APPEND linkedlibs cgns)
 
 #> PreCICE ------------------------------------------------------
