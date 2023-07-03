@@ -1,5 +1,5 @@
 mesh_file_type = parametric
-el_type = p
+el_type = l
 
 nelem_chord = 15
 type_chord = cosineLE   ! uniform  cosineLE  cosineTE
@@ -9,8 +9,8 @@ reference_chord_fraction = 0.0
 ! First section
 chord = 1
 twist = 5.0
-airfoil = NACA0012
-!airfoil_table = ./airfoil_table/naca0012.c81
+!airfoil = NACA0012
+airfoil_table = ./airfoil_table/naca0012.c81
 
 ! First region
 span = 4.0
@@ -22,5 +22,5 @@ type_span = uniform
 ! Second section
 chord = 1.0
 twist = 5.0
-airfoil = NACA0012
-!airfoil_table = ./airfoil_table/naca0012.c81
+!airfoil = NACA0012
+airfoil_table = ./airfoil_table/naca0012.c81
