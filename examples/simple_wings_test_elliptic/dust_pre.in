@@ -1,0 +1,6 @@
+comp_name = left_wing
+geo_file = ellipticalwing_few_elem.in
+ref_tag = Left
+
+file_name = geo_input.h5 
+
