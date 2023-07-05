@@ -18,7 +18,7 @@ analysis = {
 
 }
 
-analysis = {
+! analysis = {
 type = sectional_loads
 name = sl01
 start_res = 1
@@ -30,4 +30,42 @@ component = left_wing
 axis_nod = (/ 0.0, 0.0, 0.0 /)
 axis_dir = (/ 0.0, 1.0, 0.0 /)
 lifting_line_data = F
+}
+
+
+analysis = {
+type = probes
+name = prb01
+start_res = 1
+end_res = 200
+step_res = 1
+format = tecplot !dat
+
+variable = Velocity
+input_type = point_list
+point = (/ 0.25, -3.83525, 0 /)
+point = (/ 0.25, -3.50175, 0 /)
+point = (/ 0.25, -3.16825, 0 /)
+point = (/ 0.25, -2.83475, 0 /)
+point = (/ 0.25, -2.50125, 0 /)
+point = (/ 0.25, -2.16775, 0 /)
+point = (/ 0.25, -1.83425, 0 /)
+point = (/ 0.25, -1.50075, 0 /)
+point = (/ 0.25, -1.16725, 0 /)
+point = (/ 0.25, -0.83375, 0 /)
+point = (/ 0.25, -0.50025, 0 /)
+point = (/ 0.25, -0.16675, 0 /)
+point = (/ 0.25, 0.16675, 0 /)
+point = (/ 0.25, 0.50025, 0 /)
+point = (/ 0.25, 0.83375, 0 /)
+point = (/ 0.25, 1.16725, 0 /)
+point = (/ 0.25, 1.50075, 0 /)
+point = (/ 0.25, 1.83425, 0 /)
+point = (/ 0.25, 2.16775, 0 /)
+point = (/ 0.25, 2.50125, 0 /)
+point = (/ 0.25, 2.83475, 0 /)
+point = (/ 0.25, 3.16825, 0 /)
+point = (/ 0.25, 3.50175, 0 /)
+point = (/ 0.25, 3.83525, 0 /)
+
 }
