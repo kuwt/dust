@@ -8,11 +8,10 @@ timestep = 150
 
 ############# utility ###############
 def readlineIntoFloats(line):
-    content = line.split(" ")
+    content = line.split()
     content_temp = []
     for elem in content:
-        if elem != '' and elem != '\n' :
-            content_temp.append(float(elem))
+        content_temp.append(float(elem))
     content = content_temp
     return content
 ##############################
