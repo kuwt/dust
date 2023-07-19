@@ -11,6 +11,7 @@ step_res  = 1
 format = vtk
 
 wake = T
+separate_wake = T
 component = Rotor 
 component = Fuselage 
 
