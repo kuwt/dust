@@ -5,7 +5,7 @@ basename       = ./Output/wings
 ! Timings ---------------------
 tstart = 0.0
 !tend = 0.6250
-tend = 12.5000
+tend = 1.25000
 dt = 0.006250
 dt_out = 0.06250
 output_start = T
