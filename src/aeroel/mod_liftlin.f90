@@ -1333,6 +1333,7 @@ subroutine calc_geo_data_liftlin(this, vert)
 
   ! -- 0.75 chord -- look for other "0.75 chord" tag
 ! this%area = 0.5_wp * norm2(nor) / 0.75_wp
+! (Since nor comes from diagonal lines cross product instead of adjacent sides, the magnitude of the nor is approximately double of the true area)
   this%area = 0.5_wp * norm2(nor)
   this%nor = nor / norm2(nor)   ! then overwritten
 
