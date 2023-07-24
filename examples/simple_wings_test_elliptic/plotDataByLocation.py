@@ -3,7 +3,7 @@ import os
 import matplotlib.pyplot as plt
 ############ input ##################
 pointprobes = 24
-timestep = 150
+timestep = 0
 
 
 ############# utility ###############
@@ -25,6 +25,7 @@ with open('Postprocessing/post_prb01.dat','r') as file:
     y_position = content
     
     ########## read the information at the selected time step #########
+    timestep = timestep + 7 # offset because of the organization of the file post_prbxx.dat
     line = listOfLines[timestep]
     content = readlineIntoFloats(line)
     
