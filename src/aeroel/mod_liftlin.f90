@@ -870,7 +870,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   real(wp), allocatable              :: aero_coeff(:)
   real(wp), allocatable              :: dou_temp(:)
   real(wp), allocatable              :: alpha_temp(:)
-
+  real(wp), allocatable              :: debug_temp_value(:)
+  real(wp), allocatable              :: debug_temp_value_v(:,:)
   ! mach and reynolds number for each el
   real(wp)                           :: mach , reynolds
   ! arrays used for force projection
@@ -918,7 +919,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   !> allocate temporary arrays
   allocate(dou_temp(size(elems_ll))) ; dou_temp = 0.0_wp
   allocate(alpha_temp(size(elems_ll))) ; alpha_temp = 0.0_wp
-
+  allocate(debug_temp_value(size(elems_ll))) ; debug_temp_value = 0.0_wp
+  allocate(debug_temp_value_v(3,size(elems_ll))) ; debug_temp_value_v = 0.0_wp
   !=== Compute the velocity from all the elements except for liftling elems ===
   ! and store it outside the loop, since it is constant
   allocate(vel_w     (3,size(elems_ll))) ; vel_w      = 0.0_wp
@@ -936,10 +938,11 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     do j = 1,size(elems_wake) ! wake panels
       call elems_wake(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)
       vel_w(:,i_l) = vel_w(:,i_l) + v
+      debug_temp_value_v(:,i_l) = v
     enddo
     do j = 1,size(elems_vort) ! wake vort
       call elems_vort(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)
-      vel_w     (:,i_l) = vel_w(:,i_l) + v
+      vel_w     (:,i_l) = vel_w(:,i_l) + v  ! test_20230724
       vel_w_vort(:,i_l) = vel_w_vort(:,i_l) + v
     enddo
 
@@ -965,8 +968,8 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
   enddo
 !$omp end parallel do
 
-  vel_w = vel_w/(4.0_wp*pi)
-
+  !vel_w = vel_w/(4.0_wp*pi)
+  vel_w = 0	  ! test_20230725
   ! allocate array containing aoa, aero coeffs and relative velocity
   allocate(a_v(size(elems_ll)));    a_v  = 0.0_wp
   allocate(c_m(size(elems_ll),3));  c_m  = 0.0_wp
@@ -992,9 +995,9 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
         else
           call elems_ll(j)%p%compute_vel(elems_ll(i_l)%p%cen,v)
         endif
-        vel = vel + v
+        !vel = vel + v ! test_20230724
       enddo
-
+      debug_temp_value_v(:,i_l) = vel
       !select type(el => elems_ll(i_l)%p) ; type is(t_liftlin)
       el => elems_ll(i_l)%p
 
@@ -1018,9 +1021,11 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       ! angle of incidence needs to be modified, introducing a "2D correction"
       !
       !> "2D correction" of the induced angle
-      alpha_2d = el%mag / ( pi * el%chord * unorm ) *180.0_wp/pi
+      alpha_2d = 0 
+      !alpha_2d = el%mag / ( pi * el%chord * unorm ) *180.0_wp/pi ! test_20230724
+      
       alpha = alpha - alpha_2d
-
+      debug_temp_value(i_l) = alpha_2d
       ! =========================================================
       ! compute local Reynolds and Mach numbers for the section
       ! needed to enter the LUT (.c81) of aerodynamic loads (2d airfoil)
@@ -1110,8 +1115,9 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
 
     ! === Update ll intensity ===
     do i_l = 1,size(elems_ll)
-      elems_ll(i_l)%p%mag = ( dou_temp(i_l)+ fp_damp*elems_ll(i_l)%p%mag )&
+      debug_temp_value(i_l) = ( dou_temp(i_l)+ fp_damp*elems_ll(i_l)%p%mag )&
                               /(1.0_wp+fp_damp)
+      elems_ll(i_l)%p%mag = debug_temp_value(i_l)
       max_mag_ll = max(max_mag_ll,abs(elems_ll(i_l)%p%mag))
     enddo
 

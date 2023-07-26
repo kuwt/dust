@@ -623,7 +623,7 @@ subroutine load_wake_post(floc, wake, wake_p)
   integer                                   :: ip , iw, id, ir, iconn, i
   integer                                   :: npt_disk
   integer, allocatable                      :: disk_pts(: )
-
+  logical                                   :: got_dset
   !=== Panels ===
   call open_hdf5_group(floc,'PanelWake',gloc)
   call read_hdf5_al(wpoints_pan,'WakePoints',gloc)
@@ -711,11 +711,12 @@ subroutine load_wake_post(floc, wake, wake_p)
   enddo
 
   !=== Particles + Line vortex ===
-  call open_hdf5_group(floc, 'ParticleWake', gloc)
-  call read_hdf5_al(vppoints,'WakePoints',gloc)
-  call read_hdf5_al(vpvort,'WakeVort',gloc)
-  call read_hdf5_al(v_rad,'VortexRad',gloc)
-  call close_hdf5_group(gloc)
+
+      call open_hdf5_group(floc, 'ParticleWake', gloc)
+      call read_hdf5_al(vppoints,'WakePoints',gloc)
+      call read_hdf5_al(vpvort,'WakeVort',gloc)
+      call read_hdf5_al(v_rad,'VortexRad',gloc)
+      call close_hdf5_group(gloc)
 
   wake%n_prt = size(vpvort,2)
   wake%nmax_prt = size(vpvort,2)

@@ -105,6 +105,12 @@ use mod_wind, only: &
 use mod_surfpan, only: &
   t_surfpan
 
+use mod_vortpart, only: &
+  t_vortpart
+  
+use mod_vortline, only: &
+  t_vortline
+
 implicit none
 
 public :: post_probes
@@ -418,7 +424,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 !$omp parallel do private(ie, v) reduction(+:vel_probe)
         do ie = 1 , size( comps(ic)%el )
           call comps(ic)%el(ie)%compute_vel( rr_probes(:,ip) , v )
-          vel_probe = vel_probe + v/(4*pi)
+          !vel_probe = vel_probe + v/(4*pi)
 
         end do
 !$omp end parallel do
@@ -426,8 +432,11 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
 
 !$omp parallel do private( ie, v) reduction(+:vel_probe)
       do ie = 1, size(wake_elems)
-        call wake_elems(ie)%p%compute_vel( rr_probes(:,ip) , v )
-        vel_probe = vel_probe + v/(4*pi)
+      select type(el => wake_elems(ie)%p)
+          class is (t_vortpart)
+		call wake_elems(ie)%p%compute_vel( rr_probes(:,ip) , v )
+		vel_probe = vel_probe + v/(4*pi)
+	end select
       enddo
 !$omp end parallel do
 
