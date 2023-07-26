@@ -4,7 +4,7 @@ el_type = l
 nelem_chord = 15
 type_chord = cosineLE   ! uniform  cosineLE  cosineTE
 starting_point = (/0.0,0.0,0.0/)
-reference_chord_fraction = 0.0
+reference_chord_fraction = 0.25
 
 mesh_symmetry = T
 symmetry_point = (/0,0,0/)

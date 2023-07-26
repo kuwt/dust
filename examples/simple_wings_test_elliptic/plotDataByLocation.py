@@ -3,7 +3,7 @@ import os
 import matplotlib.pyplot as plt
 ############ input ##################
 pointprobes = 24
-timestep = 150
+timestep = 180
 
 
 ############# utility ###############
@@ -25,6 +25,7 @@ with open('Postprocessing/post_prb01.dat','r') as file:
     y_position = content
     
     ########## read the information at the selected time step #########
+    timestep = timestep + 7 # offset because of the organization of the file post_prbxx.dat
     line = listOfLines[timestep]
     content = readlineIntoFloats(line)
     
@@ -41,12 +42,14 @@ with open('Postprocessing/post_prb01.dat','r') as file:
         uy_table.append(uy)
         uz_table.append(uz)
     
+    plt.figure(0)
     plt.plot(y_position,ux_table)
     plt.plot(y_position,uy_table)
     plt.plot(y_position,uz_table)
     plt.legend(["ux","uy", "uz"])
-    plt.show()
+    plt.savefig("all.jpg")
     
+    plt.figure(1)
     plt.plot(y_position,uz_table)
     plt.legend(["uz"])
-    plt.show()
+    plt.savefig("uz.jpg")

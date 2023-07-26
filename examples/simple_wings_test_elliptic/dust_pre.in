@@ -1,5 +1,6 @@
 comp_name = left_wing
-geo_file = ellipticalwing_24elem_2chord.in
+geo_file = ellipticalwing_24elem_valentin.in
+!geo_file = wing.in
 ref_tag = Left
 
 file_name = geo_input.h5 
