@@ -7,7 +7,7 @@ starting_point = (/0.0,0.0,0.0/)
 reference_chord_fraction = 0.25
 
 ! First section
-chord = 2
+chord = 1.0
 twist = 0.0
 !airfoil = NACA0012
 airfoil_table = ./airfoil_table/naca0012.c81
@@ -20,7 +20,7 @@ nelem_span = 24
 type_span = uniform
 
 ! Second section
-chord = 2.0
+chord = 1.0
 twist = 0.0
 !airfoil = NACA0012
 airfoil_table = ./airfoil_table/naca0012.c81
