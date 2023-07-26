@@ -211,7 +211,7 @@ subroutine velocity_calc_doublet(this, v_dou, pos)
     v_dou(3) = this%tang(3,1)*phix + this%tang(3,2)*phiy + this%nor(3)* pdou
 
   else
-
+    !treat the 4 sides of a panel as individual vortex lines that contribute to the velocity at the ctr pt using Biot-Savart law, commented by kuwingto
     ! === Original DUST regularisation ===
     do i1 = 1 , this%n_ver
 

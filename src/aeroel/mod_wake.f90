@@ -1827,6 +1827,7 @@ subroutine complete_wake(wake, geo, elems, te)
 
 
   !If the wake is full, attach the end vortex
+  ! What is end vortex, reference? commented by kuwingto
   if (wake%full_panels) then
     do iw = 1,wake%n_pan_stripes
       !wake%end_vorts(iw)%mag => wake%wake_panels(iw,wake%pan_wake_len)%mag

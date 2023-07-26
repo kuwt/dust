@@ -425,7 +425,7 @@ subroutine post_probes( sbprms , basename , data_basename , an_name , ia , &
       end do
 
 !$omp parallel do private( ie, v) reduction(+:vel_probe)
-      do ie = 1, size(wake_elems)
+      do ie = 1, size(wake_elems)    !wake_panel, end vortex, particles are all included here, commented by kuwingto
         call wake_elems(ie)%p%compute_vel( rr_probes(:,ip) , v )
         vel_probe = vel_probe + v/(4*pi)
       enddo

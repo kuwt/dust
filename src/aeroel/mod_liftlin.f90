@@ -984,6 +984,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
     do i_l = 1,size(elems_ll)
 
       ! compute velocity
+      ! The velocity contributed by the lifting line is involved in the solving of lifting line, but according to Katz, they should not. commented by kuwingto
       vel = 0.0_wp
       do j = 1, size(elems_ll)
         if (ic .eq. 1) then
@@ -1018,6 +1019,7 @@ subroutine solve_liftlin(elems_ll, elems_tot, &
       ! angle of incidence needs to be modified, introducing a "2D correction"
       !
       !> "2D correction" of the induced angle
+      ! the 2D correction is indeed the effect of bound vortex, interesting. commented by kuwingto
       alpha_2d = el%mag / ( pi * el%chord * unorm ) *180.0_wp/pi
       alpha = alpha - alpha_2d
 
