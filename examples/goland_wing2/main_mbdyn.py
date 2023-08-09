@@ -16,11 +16,45 @@ sys.path.append('/usr/local/mbdyn/libexec/mbpy')
 from mbc_py_interface import mbcNodal
 
 
-#> MBDyn model parameters 
+##############################################
+# Input parameters
+###############################################
 dt_input = 0.001
 path2mbdyn = os.path.join('structure') 
 path2precice = os.path.join('')
 
+class CouplingTemporaryDataStorage :
+    def __init__(self):
+      self.namelist = [] 
+      self.typelist = []  # currently only vector supported
+      self.iolist = []
+      self.dataDictionary = {}
+
+      self.addField('Position','vector','write')
+      self.addField('Velocity','vector','write')
+      self.addField('Rotation','vector','write')
+      self.addField('AngularVelocity','vector','write')
+      self.addField('Force','vector','read')
+      self.addField('Moment','vector','read')
+
+    def addField(self, name, data_type, io_type):
+      self.namelist.append(name)
+      self.typelist.append(data_type)
+      self.iolist.append(io_type)
+      
+    def setData(self, name, data):
+      if name in self.namelist:
+        self.dataDictionary[name] = data
+      else:
+        print("Error setting {}. No such item".format(name))
+        
+    def getData(self, name):
+      if name in self.namelist:
+        return self.dataDictionary.get(name)
+      else:
+        print("Error getting {}. No such item".format(name))
+        return []
+        
 ###################################################
 # cleanup previous .log and cached files
 ####################################################
@@ -59,7 +93,7 @@ os.chdir(path2mbdyn)
 sp.run('mbdyn ' + mbdyn_model + ' -o ' + 'Output' + ' 2>&1 &' , shell=True)
 
 ###################################################
-# run precice
+# precice setup
 ####################################################
 
 ########### load coupling nodes #############3
@@ -105,35 +139,8 @@ fid = open('./../nnodes.dat', "w")
 fid.write('%d' % ( socketData.nnodes ) )
 fid.close()
 
-############ CouplingData structure for temporary data storge #################
-class CouplingData :
-    def __init__(self):
-      self.namelist = [] 
-      self.typelist = []  # currently only vector supported
-      self.iolist = []
-      self.dataDictionary = {}
-
-      self.addField('Position','vector','write')
-      self.addField('Velocity','vector','write')
-      self.addField('Rotation','vector','write')
-      self.addField('AngularVelocity','vector','write')
-      self.addField('Force','vector','read')
-      self.addField('Moment','vector','read')
-
-    def addField(self, name, data_type, io_type):
-      self.namelist.append(name)
-      self.typelist.append(data_type)
-      self.iolist.append(io_type)
-      
-    def setData(self, name, data):
-      self.dataDictionary[name] = data
-
-    def getData(self, name):
-      return self.dataDictionary.get(name)
-
-
-
-couplingData = CouplingData()
+############# init Temporary data storage ###################
+couplingData = CouplingTemporaryDataStorage()
 
 n = socketData.nnodes; nd = 3
 couplingData.setData("Position",np.reshape( nodal.n_x , (n, nd) ))
@@ -153,8 +160,6 @@ precice_interface = precice.Interface( participant_name, precice_config_file_nam
 mesh_id = precice_interface.get_mesh_id( 'MBDynNodes')
 vertex_ids = precice_interface.set_mesh_vertices( mesh_id, rr )
 
-
-############# initialize precice #######################
 dt_precice = precice_interface.initialize()
 precice_interface.initialize_data()
 
@@ -188,7 +193,7 @@ while ( is_ongoing ):
   
   dt = min( dt_input, dt_precice )
 
-  #> === Communication with MBDyn ===========================
+  #> Communication with MBDyn 
   if ( nodal.send(False) ):
     break
 
@@ -202,7 +207,7 @@ while ( is_ongoing ):
   couplingData.setData("Rotation",np.reshape( nodal.n_theta , (n, nd) ))
   couplingData.setData("AngularVelocity",np.reshape( nodal.n_omega , (n, nd) ))
 
-  #> Write to AeroSolver
+  #> Write to precice (i.e. AeroSolver)
   data_id = precice_interface.get_data_id( 'Position', mesh_id )
   precice_interface.write_block_vector_data( data_id, vertex_ids,couplingData.getData("Position"))
   data_id = precice_interface.get_data_id( 'Velocity', mesh_id )
@@ -212,11 +217,11 @@ while ( is_ongoing ):
   data_id = precice_interface.get_data_id( 'AngularVelocity', mesh_id )
   precice_interface.write_block_vector_data( data_id, vertex_ids,couplingData.getData("AngularVelocity"))
 
-  #> advance steo
+  #> advance step
   is_ongoing = precice_interface.is_coupling_ongoing()
   dt_precice = precice_interface.advance(dt)
 
-  #> Receive data from AeroSolver and set nodal.n_f field
+  #> Receive data from precice (i.e. AeroSolver) and then set nodal.n_f field
   data_id = precice_interface.get_data_id( 'Force', mesh_id )
   data = precice_interface.read_block_vector_data( data_id, vertex_ids)
   couplingData.setData("Force",data)
