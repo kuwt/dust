@@ -282,7 +282,7 @@ subroutine initialize_mesh( this, geo )
   !> Initialize mesh ============================================
   !> Nodes
   call precicef_set_vertices( this%mesh%mesh_id, nnodes,  &
-                              this%mesh%nodes, this%mesh%node_ids )
+                              this%mesh%nodes, this%mesh%node_ids )   !> node_ids is the result return. This information is for sending or receiving data. commented by kuwingto
   this%mesh%nnodes = nnodes
 
 end subroutine initialize_mesh
@@ -474,7 +474,7 @@ subroutine update_force( this, geo, elems )
         do i = 1, size(comp%el)
           do iw = 1, size(comp%rbf%cen%ind,1)
 
-            ip = comp%i_points_precice( comp%rbf%cen%ind(iw,i) )
+            ip = comp%i_points_precice( comp%rbf%cen%ind(iw,i) )   !> a coupling point can be affected by many elements(commented by kuwingto)
 
             !> Force
             this%fields(j_for)%fdata(:,ip) = this%fields(j_for)%fdata(:,ip) + &
@@ -760,7 +760,7 @@ subroutine update_elems( this, geo, elems, te )
 
           ip = comp%i_points(i)
           
-          do iw = 1, size(comp%rbf%nod%ind,1)
+          do iw = 1, size(comp%rbf%nod%ind,1)  !< weighting iterator, commented by kuwingto
 
             ! === Coupling Node ===
             !> Position of MBDyn nodes  
@@ -786,7 +786,7 @@ subroutine update_elems( this, geo, elems, te )
 
             ! === Grid nodes of the components ===
             !> Reference difference
-            chord = comp%loc_points(:,i) - comp%rbf%nodes(:,comp%rbf%nod%ind(iw,i))
+            chord = comp%loc_points(:,i) - comp%rbf%nodes(:,comp%rbf%nod%ind(iw,i))  !> vector from coupling node to aero element corners, commented by kuwingto
             
             !> Rotated position difference
             chord_rot =  cos(theta) * chord + &
@@ -1371,7 +1371,7 @@ subroutine update_near_field_wake( this, geo, wake, te )
 
             wake%pan_w_points(:,ip,2) = wake%pan_w_points(:,ip,1) +  &
                                         dist*wake%pan_gen_scaling(ip)* &
-                                        norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &
+                                        norm2(wind-vel_te)*sim_param%dt / norm2(dist) * &  !here it is divided by the magnitude of dist but for the else case it is not. commented by kuwingto
                                         real(sim_param%ndt_update_wake,wp)
           
           else
@@ -1403,7 +1403,7 @@ subroutine update_near_field_wake( this, geo, wake, te )
     call join_first_panels(wake,sim_param%join_te_factor)
   endif  
 
-  ! Calculate geometrical quantities of first 2 rows
+  ! Calculate geometrical quantities of first 2 rows, (updated the wake panel geo data by using the just updated first two rows pan_w_points)
   do ip = 1,wake%n_pan_stripes
     do ir = 1, wake%pan_wake_len
       p1 = wake%i_start_points(1,ip)

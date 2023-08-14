@@ -88,7 +88,7 @@ type :: t_precice_rbf
   type(t_rbf_conn) :: cen
   !> Ac stripe connectivity (for vl corrected) 
   type(t_rbf_conn) :: ctr_pt 
-  !> Generic point 
+  !> Generic point  !> just for temporary storage, result will pass to nod or cen, commented by kuwingto
   type(t_rbf_conn) :: point
 
   !> --- Parameters of rbf interpolation ---
@@ -161,7 +161,7 @@ subroutine build_connectivity(this, aero_coord, coupling_node_rot)
       dist_all(is) = sqrt(mat_dist_all(is,is))
     end do
 
-    call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )
+    call sort_vector_real( dist_all, this%n_wei, wei_v, ind_v )  ! find the smallest n_wei elements within the dist_all matrix
 
     wei_v = 1.0_wp / max( wei_v, 1e-9_wp )**this%w_order
     wei_v = wei_v / sum(wei_v)

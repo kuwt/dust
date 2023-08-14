@@ -200,7 +200,7 @@ type :: t_geo_component
   integer, allocatable :: i_points(:)
 
 #if USE_PRECICE
-  !> Global PreCICE indices of the points for coupling
+  !> Global PreCICE indices of the points for coupling (means coupling points, commented by kuwingto)
   integer, allocatable :: i_points_precice(:)
 
 
@@ -517,7 +517,7 @@ subroutine create_geometry(geo_file_name, ref_file_name, in_file_name,  geo, &
   !> Calculate the geometric quantities
   !  already update the geometry for the first time to get the right
   !  starting geometrical condition
-  call prepare_geometry(geo)
+  call prepare_geometry(geo) ! do some allocation, commented by kuwingto
   call update_geometry(geo, te, tstart, update_static=.true., time_cycle = .false. )
 
   if(sim_param%debug_level .ge. 3) then

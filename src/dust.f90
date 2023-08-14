@@ -462,7 +462,9 @@ end if
     end if
   end do
 
-  !> Update dust geometry ( elems and first wake panels )
+  !> Update dust geometry ( elems and first wake panels )   
+  !> Information of Elements are only updated partially, some elements type specified info are updated by calc_geo_data
+  !> geo%points are also updated here, commented by kuwingto
   call precice%update_elems( geo, elems_tot, te )
 
   !> Update geo_data()
@@ -994,7 +996,7 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
 
     call precicef_ongoing(precice%is_ongoing)
     if (precice%is_ongoing .eq. 1) then
-      call precicef_advance( precice%dt_precice )
+      call precicef_advance( precice%dt_precice )   ! advance before write, why? commented by kuwingto
       !write(*,*) ' ++++ dt_precice: ', precice%dt_precice
     end if
 
