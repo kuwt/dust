@@ -524,8 +524,8 @@ it = 1
       call printout(message)
     endif
 
-#if USE_PRECICE
-    if ( precice_convergence ) then
+#if USE_PRECICE  
+    if ( precice_convergence ) then  ! here only one #if USE_PRECICE should be enough, commented by kuwingto
 #endif
 
     call init_timestep(time)
@@ -1023,7 +1023,15 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     call precicef_action_required( precice%read_it_checkp, bool )
     if ( bool .eq. 1 ) then 
       !> timestep not converged
-      !> Reload checkpoint state
+      !> Reload checkpoint state   
+      !> (Actually this reload and the save are not needed. )
+      !> (if the solver works like )
+      !> (internal_state, coupling_output = solver(internal_state,coupling_input))
+      !> (We should save the internal_state, but not the coupling_ouput, since the )
+      !> (right coupling_output can be computed again by a right internal_state and a right)
+      !> (coupling_input. But if the internal_state is not saved, it is lost.)
+      !> (Here in DUST, the write data is the coupling_ouput, while the wake is the internal_state.)
+      !> (Since the wake is updated only when convergence, the save/load checkout logic is already handled. Commented by kuwingto)
       do j = 1, size(precice%fields)
         if ( trim(precice%fields(j)%fio) .eq. 'write' ) then
           precice%fields(j)%fdata = precice%fields(j)%cdata

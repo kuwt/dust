@@ -281,6 +281,9 @@ type :: t_wake
 #if USE_PRECICE  
   !> In order to correctly build the wake we need to esplicitly store
   ! the end points of the last step...
+  ! (The reason why we do not need to store it in the non coupling case)
+  ! (is because the geometry only moves after update_wake() is called)
+  ! (Why this treatment is important for correctly building the wake is unknown. Commented by kuwingto)
   real(wp), allocatable :: old_second_row(:,:)
   !> ... but not within precice iterations
   logical :: update_old_second_row

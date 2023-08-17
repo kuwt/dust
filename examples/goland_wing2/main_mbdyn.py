@@ -179,6 +179,7 @@ while ( is_ongoing ):
     start = time.time()
   print('\033[0m   Iteration ▶ ', niter)
   
+  #> save the data for reloading purpose
   if ( precice_interface.is_action_required( cowic ) ):
     pos_t = couplingData.getData("Position")
     vel_t = couplingData.getData("Velocity")
@@ -230,7 +231,7 @@ while ( is_ongoing ):
   couplingData.setData("Moment",data)
 
   #> Check convergence: iterate or finalize the timestep
-  if ( precice_interface.is_action_required( coric ) ): # dt not converged
+  if ( precice_interface.is_action_required( coric ) ): # dt not converged, reload
     couplingData.setData("Position",pos_t)
     couplingData.setData("Velocity",vel_t)
     couplingData.setData("Rotation",rot_t)
