@@ -405,7 +405,7 @@ subroutine build_row_surfpan(this, elems, linsys, ie, ista, iend)
   do j1 = 1,ista-1
     wind = variable_wind(elems(j1)%p%cen, sim_param%time)
     linsys%b(ie) = linsys%b(ie) + &
-          linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-wind-elems(j1)%p%uvort))
+          linsys%b_static(ie,j1) *sum(elems(j1)%p%nor*(-wind-elems(j1)%p%uvort))  !> This sum term is the source magnitude, sigma. Commented by kuwingto. 
   enddo
 
   ! + Bernoulli polynomial equation --------------
@@ -722,8 +722,8 @@ subroutine compute_pres_surfpan(this, R_g)
   end do
   wind = variable_wind(this%cen, sim_param%time)
   f(n_neigh+1) = sum(this%nor * (-wind - this%uvort + this%ub) )
-
-  vel_phi = matmul( this%chtls_stencil , f(1:n_neigh+1) )
+  !> from Katz Chapter 3, doublet derivative is related to tangential velocity. The normal velocity is zero of course due to boundary condition. Commented by kuwingto.
+  vel_phi = matmul( this%chtls_stencil , f(1:n_neigh+1) )    
 
   vel_phi = matmul( (R_g) , vel_phi )
   
@@ -745,7 +745,7 @@ subroutine compute_pres_surfpan(this, R_g)
   this%pres =   sim_param%P_inf &
               +(0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
               - 0.5_wp * sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp  &
-              + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &
+              + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &    ! are there any reference for this term? commented by kuwingto
               + sim_param%rho_inf * this%didou_dt)/sqrt(1 - mach**2)
 
   ! compute dforce
