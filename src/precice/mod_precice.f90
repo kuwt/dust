@@ -788,7 +788,7 @@ subroutine update_elems( this, geo, elems, te )
             !> Reference difference
             chord = comp%loc_points(:,i) - comp%rbf%nodes(:,comp%rbf%nod%ind(iw,i))  !> vector from coupling node to aero element corners, commented by kuwingto
             
-            !> Rotated position difference
+            !> Rotated position difference    !> It is Rodrigues'rotation formula
             chord_rot =  cos(theta) * chord + &
                          sin(theta) * cross( n_rot, chord ) + &
                        ( 1.0_wp - cos(theta) ) * sum( chord*n_rot ) * n_rot
