@@ -729,7 +729,7 @@ subroutine compute_pres_surfpan(this, R_g)
   
   this%surf_vel = wind + vel_phi + this%uvort
 
-  !> pressure -------------------------------------------------
+  !> pressure ------------------------------------------------- !> Bernoulli equation in the unsteady form, commented by kuwingto
   ! unsteady problems  : P =   P_inf 
   !                          + 0.5*rho_inf*V_inf^2
   !                          +(- 0.5*rho_inf*V^2 
