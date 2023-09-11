@@ -1,6 +1,6 @@
 !> === Mesh and elements types ===
 mesh_file_type = parametric
-el_type       = p
+el_type       = l
 !> === coupled with external structural solver (T/F) ===
 coupled      = T
 coupling_type = rbf
@@ -16,6 +16,7 @@ type_chord = cosineLE
 chord = 0.18 
 twist = 0
 airfoil = NACA0012
+airfoil_table = ./airfoils/naca0012.c81
 
 ! First region
 span = 1.6
@@ -28,3 +29,4 @@ type_span = uniform
 chord = 0.18 
 twist = 0
 airfoil = NACA0012
+airfoil_table = ./airfoils/naca0012.c81
