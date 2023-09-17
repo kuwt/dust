@@ -15,7 +15,7 @@ ndt_update_wake = 1
 debug_level = 0 
 
 ! Reference values ---------------------
-rho_inf = 1.020000 
+rho_inf = 1.225 
 u_inf = (/50.0, 0., 0./)
 ! Model parameters -------------------
 particles_box_min = (/  -1, -1, -4 /)
