@@ -22,7 +22,7 @@ airfoil_table = ./airfoils/naca0012.c81
 span = 1.6
 sweep = 0.0
 dihed = 0.0
-nelem_span = 30
+nelem_span = 80
 type_span = uniform
 
 ! Second section
