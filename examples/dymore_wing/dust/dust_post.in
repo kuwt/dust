@@ -8,7 +8,7 @@ analysis = {
   format = vtk !tecplot
 
   start_res = 1
-  end_res = 5
+  end_res = 15
   step_res = 1
   wake = T
   separate_wake = T
