@@ -68,7 +68,7 @@
     </participant>
 
     <!-- === Communication ================================== -->
-    <m2n:sockets exchange-directory="/home/HT/ge59yus/Documents/precicetempfile" from="Dymore" to="dust"/>
+    <m2n:sockets exchange-directory="/home/k/Share/temp" from="Dymore" to="dust"/>
 
     <!-- === Coupling scheme ================================ -->
     <coupling-scheme:serial-implicit>
