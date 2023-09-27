@@ -1,0 +1,10 @@
+comp_name = left_wing
+!geo_file = ellipticalwing_48elem_2chord.in  !things become unphysical 
+!geo_file = ellipticalwing_24elem_2chord.in  
+!geo_file = rectangularwing_48elem_2chord.in  !things become unphysical 
+!geo_file = rectangularwing_24elem_2chord.in 
+geo_file = rectangularwing_48elem_1chord.in 
+ref_tag = Left
+
+file_name = geo_input.h5 
+
