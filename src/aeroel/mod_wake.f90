@@ -936,7 +936,7 @@ subroutine update_wake(wake, geo, elems, octree)
       wake%pan_w_vel(   :,iw,ipan) = vel_p
       if ( ipan .ne. 3 ) then
         wake%pan_w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + &
-                                      vel_p*sim_param%dt*real(sim_param%ndt_update_wake,wp)
+                                      vel_p*sim_param%dt*real(sim_param%ndt_update_wake,wp)  !Why there is a difference for 4th row onwards is for speed optimization, commented by kuwingto
       else
         wake%pan_w_points(:,iw,ipan) = point_old(:,iw,ipan-1) + &
                                       vel_p*sim_param%dt
