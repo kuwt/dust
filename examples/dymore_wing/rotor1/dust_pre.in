@@ -1,0 +1,18 @@
+
+comp_name = blade1
+geo_file  = wing.in
+ref_tag   = WingRef
+
+comp_name = blade2
+geo_file  = wing.in
+ref_tag   = WingRef
+
+comp_name = blade3
+geo_file  = wing.in
+ref_tag   = WingRef
+
+comp_name = blade4
+geo_file  = wing.in
+ref_tag   = WingRef
+file_name = geo_input.h5 
+
