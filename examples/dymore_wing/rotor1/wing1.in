@@ -4,7 +4,7 @@ el_type = l
 !> === coupled with external structural solver (T/F) ===
 coupled      = T
 coupling_type = rbf
-coupling_node_file = coupling_nodes0.in 
+coupling_node_file = coupling_nodes1.in 
 coupling_node_orientation = (/ 1.0,0.0,0.0, 0.0,1.0,0.0,  0.0,0.0,1.0 /)
 !> === Geometry definition ===
 starting_point = (/ 0.0 , 0.0 , 0.0/)
