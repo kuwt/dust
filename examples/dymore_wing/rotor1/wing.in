@@ -7,7 +7,7 @@ coupling_type = rbf
 coupling_node_file = coupling_nodes0.in 
 coupling_node_orientation = (/ 1.0,0.0,0.0, 0.0,1.0,0.0,  0.0,0.0,1.0 /)
 !> === Geometry definition ===
-starting_point = (/ 0.0 , 0.0 , 0.0/)
+starting_point = (/ 0.0 , 1.080690 , 0.0/)
 reference_chord_fraction = 0.25
 nelem_chord = 30
 type_chord = cosineLE
