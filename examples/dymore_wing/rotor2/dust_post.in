@@ -1,0 +1,35 @@
+basename =     Postpro/post
+data_basename = Output/wings
+
+analysis = {
+  name = vl
+  type = Viz
+
+  format = vtk !tecplot
+
+  start_res = 1
+  end_res = 142
+  step_res = 1
+  wake = T
+  separate_wake = T
+  variable = Velocity
+  variable = Vorticity
+  variable = Pressure
+}
+
+!analysis = {
+
+type = flow_field
+name = ff01
+start_res = 5
+end_res   = 5
+step_res  = 1
+format   = vtk
+average = F
+variable = Velocity  
+
+n_xyz = (/80,100, 20/)
+min_xyz = (/ -0.2, -0.2, -0.2 /)
+max_xyz = (/ 0.4, 1.8, 0.2 /)
+
+}
