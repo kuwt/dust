@@ -6,7 +6,7 @@ analysis = {
 type = viz  
 name = viz  
 start_res = 1
-end_res   = 41
+end_res   = 820
 step_res  = 1
 format = vtk
 

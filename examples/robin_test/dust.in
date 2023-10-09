@@ -1,8 +1,9 @@
 basename       = ./Output/robin
 
 ! free-stream conditions ---------------
-u_inf   = (/ 27.0 , 0.0 , 0.0 /)
-
+!u_inf   = (/ 27.0 , 0.0 , 0.0 /)
+u_inf   = (/ 0 , 0.0 , 0.0 /)
+u_ref = 169
 ! Time ---------------------------------
 tstart = 0.0
 tend = 0.630063
@@ -32,11 +33,11 @@ penetration_avoidance = T
 n_wake_panels = 1
 n_wake_particles = 100000
 particles_box_min = (/ -2.0, -2.0, -7.0/)
-particles_box_max = (/  6.0,  2.0,  1.0/)
-
+!particles_box_max = (/  6.0,  2.0,  1.0/)
+particles_box_max = (/  6.0,  6.0,  1.0/)
 ! octree parameters--------------------
 box_length = 4
-n_box = (/2,1,2/)
+n_box = (/2,2,2/)
 octree_origin = (/-2.0, -2.0, -7.0/)
 n_octree_levels = 6
 min_octree_part = 5
