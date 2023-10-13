@@ -252,7 +252,7 @@ type :: t_wake
   !> Bounding box
   real(wp) :: part_box_min(3), part_box_max(3)
 
-  !> This is the array of pointer to wake elements, including particles and wake panels, commented by kuwingto
+  !> This is the array of pointer to wake elements, including particles and end vortices, commented by kuwingto
   type(t_vort_elem_p), allocatable :: vort_p(:)
 
   !> Last vortex intensity from removed panels
