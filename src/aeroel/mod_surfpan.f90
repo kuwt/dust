@@ -498,8 +498,8 @@ subroutine add_wake_surfpan(this, wake_elems, impl_wake_ind, linsys, &
   integer, intent(in)             :: impl_wake_ind(:,:)
   type(t_linsys), intent(inout)   :: linsys
   integer, intent(in)             :: ie
-  integer, intent(in)             :: ista
-  integer, intent(in)             :: iend
+  integer, intent(in)             :: ista  !If the wake panels trailing neighbours are within ista and iend, update the corresponding ie^{th} row  of linsys%A, commented by kuwingto
+  integer, intent(in)             :: iend  
 
   integer :: j1, ind1, ind2
   real(wp) :: a, b
@@ -723,7 +723,7 @@ subroutine compute_pres_surfpan(this, R_g)
   wind = variable_wind(this%cen, sim_param%time)
   f(n_neigh+1) = sum(this%nor * (-wind - this%uvort + this%ub) )
   !> from Katz Chapter 3, doublet derivative is related to tangential velocity. The normal velocity is zero of course due to boundary condition. Commented by kuwingto.
-  vel_phi = matmul( this%chtls_stencil , f(1:n_neigh+1) )    
+  vel_phi = matmul( this%chtls_stencil , f(1:n_neigh+1) )        ! This vel_phi might not contain the contribution from wake panel or other elements like lifting line. Is that ok to apply this to the unsteadt Bernoulli equation. commented by kuwingto
 
   vel_phi = matmul( (R_g) , vel_phi )
   
@@ -745,7 +745,7 @@ subroutine compute_pres_surfpan(this, R_g)
   this%pres =   sim_param%P_inf &
               +(0.5_wp * sim_param%rho_inf * norm2(sim_param%u_inf)**2.0_wp &
               - 0.5_wp * sim_param%rho_inf * norm2(  this%surf_vel)**2.0_wp  &
-              + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &    ! are there any reference for this term? commented by kuwingto
+              + sim_param%rho_inf * sum(this%ub*(vel_phi+this%uvort)) &    ! are there any reference for this term? See Alberto Savino's thesis . from commented by kuwingto
               + sim_param%rho_inf * this%didou_dt)/sqrt(1 - mach**2)
 
   ! compute dforce
