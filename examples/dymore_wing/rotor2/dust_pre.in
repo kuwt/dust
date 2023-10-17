@@ -1,10 +1,10 @@
 
 comp_name = blade0
-geo_file  = wing.in
+geo_file  = wing_p.in
 ref_tag   = WingRef
 
 comp_name = blade1
-geo_file  = wing1.in
+geo_file  = wing1_p.in
 ref_tag   = WingRef
 
 file_name = geo_input.h5 

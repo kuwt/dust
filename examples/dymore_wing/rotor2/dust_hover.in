@@ -16,8 +16,8 @@ debug_level = 1
 
 ! Reference values ---------------------
 rho_inf = 1.225 
-u_inf = (/66.11, 0.0, -1.0e-99/)
-!u_ref = 200.9646
+u_inf = (/0, 0., 0./)
+u_ref = 200.9646
 ! Model parameters -------------------
 particles_box_min = (/ -6.0, -6.0, -7.0/)
 particles_box_max = (/  6.0,  6.0,  3.0/)
