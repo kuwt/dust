@@ -120,7 +120,7 @@ type, extends(c_expl_elem) :: t_liftlin
   !> new field for load computations
   real(wp) :: vel_ctr_pt(3)
   real(wp) ::  al_ctr_pt
-
+  real(wp) :: inflowvel_ctr_pt(3)
   !> time derivative of the LL intensity (for unsteady loads)
   real(wp) :: dGamma_dt
 
@@ -138,7 +138,7 @@ contains
   procedure, pass(this) :: get_vel_ctr_pt   => get_vel_ctr_pt_liftlin
   procedure, pass(this) :: compute_dforce_jukowski => &
                            compute_dforce_jukowski_liftlin
-
+  procedure , pass(this) :: get_inflowvel_ctr_pt => get_inflowvel_ctr_pt_liftlin
 end type
 
 character(len=*), parameter :: this_mod_name='mod_liftlin'
@@ -1313,6 +1313,30 @@ subroutine get_vel_ctr_pt_liftlin(this, elems, wake_elems)
 
 end subroutine get_vel_ctr_pt_liftlin
 
+subroutine get_inflowvel_ctr_pt_liftlin(this, wake_elems)
+  class(t_liftlin), intent(inout) :: this
+  type(t_pot_elem_p),intent(in):: wake_elems(:)
+
+  real(wp) :: v(3),x0(3), wind(3)
+  integer :: j
+
+  ! Initialisation to zero
+  this%inflowvel_ctr_pt = 0.0_wp
+
+  ! Control point at 1/4-fraction of the chord
+  x0 = 0.5_wp*( this%ver(:,1) + this%ver(:,2) )
+
+  !=== Compute the velocity from all the elements ===
+  do j = 1,size(wake_elems)  ! wake panels
+
+    call wake_elems(j)%p%compute_vel(x0,v)
+    this%inflowvel_ctr_pt = this%inflowvel_ctr_pt + v
+
+  enddo
+
+  this%inflowvel_ctr_pt = this%inflowvel_ctr_pt/(4.0_wp*pi) +this%uvort - this%ub
+
+end subroutine get_inflowvel_ctr_pt_liftlin
 !----------------------------------------------------------------------
 
 subroutine calc_geo_data_liftlin(this, vert)

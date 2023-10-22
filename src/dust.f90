@@ -480,6 +480,16 @@ end if
   wake%old_second_row = wake%pan_w_points(:,:,2)
 #endif
 
+!> Log lifting line inflow, by kuwingto
+if (size(elems_ll) .gt. 0) then
+ open(unit = 67, file = 'inflow.dat', status = 'replace')  
+   do i_el = 1, size(elems_ll)
+    write(67,'(f9.5)',advance='no') elems_ll(i_el)%p%ctr_pt(1)
+    write(67,'(f9.5)',advance='no') elems_ll(i_el)%p%ctr_pt(2)
+    write(67,'(f9.5)',advance='no') elems_ll(i_el)%p%ctr_pt(3)
+  enddo
+  write(67,*)  " "
+endif
 
 !=========================== Time Cycle ==============================
 !> General overview:
@@ -715,6 +725,17 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     end if
   end if
 
+!> log inflow, by kuwingto
+ if ( size(elems_ll) .gt. 0 ) then
+  write(67,'(f9.5)',advance='no')  time
+  do i_el = 1, size(elems_ll)
+    call elems_ll(i_el)%p%get_inflowvel_ctr_pt( (/ wake%pan_p, wake%rin_p/))
+    write(67,'(f9.5)',advance='no') elems_ll(i_el)%p%inflowvel_ctr_pt(1)
+    write(67,'(f9.5)',advance='no') elems_ll(i_el)%p%inflowvel_ctr_pt(2)
+    write(67,'(f9.5)',advance='no') elems_ll(i_el)%p%inflowvel_ctr_pt(3)
+  enddo
+  write(67,*)  " "
+end if
 !------ Compute loads -------
 ! Implicit elements: vortex rings and 3d-panels
 ! 2019-07-23: D.Isola suggested to implement AVL formula for VL elements
@@ -1211,6 +1232,11 @@ call destroy_linsys(linsys)
 call destroy_elements(geo)
 !call destroy_geometry(geo, elems_tot)
 call destroy_hdf5()
+
+!> Log lifting line inflow, by kuwingto
+if (size(elems_ll) .gt. 0) then
+ close(unit = 67)  
+endif
 
 t22 = dust_time()
 !> Debug
