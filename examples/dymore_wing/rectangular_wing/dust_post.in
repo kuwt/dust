@@ -2,17 +2,67 @@ basename =     Postpro/post
 data_basename = Output/wings
 
 analysis = {
-  name = vl
+  name = vl1
   type = Viz
 
   format = vtk !tecplot
 
   start_res = 1
-  end_res = 150
+  end_res = 1
   step_res = 1
   wake = T
   separate_wake = T
   variable = Velocity
   variable = Vorticity
   variable = Pressure
+}
+
+analysis = {
+  name = vl2
+  type = Viz
+
+  format = vtk !tecplot
+
+  start_res = 198
+  end_res = 198
+  step_res = 1
+  wake = T
+  separate_wake = T
+  variable = Velocity
+  variable = Vorticity
+  variable = Pressure
+}
+
+
+analysis = {
+  name = vl3
+  type = Viz
+
+  format = vtk !tecplot
+
+  start_res = 400
+  end_res = 400
+  step_res = 1
+  wake = T
+  separate_wake = T
+  variable = Velocity
+  variable = Vorticity
+  variable = Pressure
+}
+
+!analysis = {
+
+type = flow_field
+name = ff01
+start_res = 495
+end_res   = 495
+step_res  = 1
+format   = vtk
+average = F
+variable = Velocity  
+
+n_xyz = (/400,100, 20/)
+min_xyz = (/ -0.2, -0.2, -0.2 /)
+max_xyz = (/ 6.0, 1.8, 0.2 /)
+
 }
