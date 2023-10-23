@@ -733,6 +733,7 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     write(67,'(f9.5)',advance='no') elems_ll(i_el)%p%inflowvel_ctr_pt(1)
     write(67,'(f9.5)',advance='no') elems_ll(i_el)%p%inflowvel_ctr_pt(2)
     write(67,'(f9.5)',advance='no') elems_ll(i_el)%p%inflowvel_ctr_pt(3)
+    write(67,'(f9.5)',advance='no') sum(elems_ll(i_el)%p%nor*elems_ll(i_el)%p%inflowvel_ctr_pt)
   enddo
   write(67,*)  " "
 end if
