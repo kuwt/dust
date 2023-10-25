@@ -482,13 +482,30 @@ end if
 
 !> Log lifting line inflow, by kuwingto
 if (size(elems_ll) .gt. 0) then
- open(unit = 67, file = 'inflow.dat', status = 'replace')  
-   do i_el = 1, size(elems_ll)
-    write(67,'(f9.5)',advance='no') elems_ll(i_el)%p%ctr_pt(1)
-    write(67,'(f9.5)',advance='no') elems_ll(i_el)%p%ctr_pt(2)
-    write(67,'(f9.5)',advance='no') elems_ll(i_el)%p%ctr_pt(3)
+ open(unit = 67, file = 'inflow_inertial.dat', status = 'replace')  
+ open(unit = 68, file = 'inflow.dat', status = 'replace')
+ open(unit = 69, file = 'inflow_normal.dat', status = 'replace')
+
+  do i_el = 1, size(elems_ll)
+    write(67,'(f14.5)',advance='no') elems_ll(i_el)%p%ctr_pt(1)
+    write(67,'(f14.5)',advance='no') elems_ll(i_el)%p%ctr_pt(2)
+    write(67,'(f14.5)',advance='no') elems_ll(i_el)%p%ctr_pt(3)
   enddo
   write(67,*)  " "
+
+  do i_el = 1, size(elems_ll)
+    write(68,'(f14.5)',advance='no') elems_ll(i_el)%p%ctr_pt(1)
+    write(68,'(f14.5)',advance='no') elems_ll(i_el)%p%ctr_pt(2)
+    write(68,'(f14.5)',advance='no') elems_ll(i_el)%p%ctr_pt(3)
+  enddo
+  write(68,*)  " "
+
+  do i_el = 1, size(elems_ll)
+    write(69,'(f14.5)',advance='no') elems_ll(i_el)%p%ctr_pt(1)
+    write(69,'(f14.5)',advance='no') elems_ll(i_el)%p%ctr_pt(2)
+    write(69,'(f14.5)',advance='no') elems_ll(i_el)%p%ctr_pt(3)
+  enddo
+  write(69,*)  " "
 endif
 
 !=========================== Time Cycle ==============================
@@ -725,18 +742,6 @@ if (sim_param%debug_level .ge. 20 .and. time_2_debug_out) &
     end if
   end if
 
-!> log inflow, by kuwingto
- if ( size(elems_ll) .gt. 0 ) then
-  write(67,'(f9.5)',advance='no')  time
-  do i_el = 1, size(elems_ll)
-    call elems_ll(i_el)%p%get_inflowvel_ctr_pt( (/ wake%pan_p, wake%rin_p/))
-    write(67,'(f9.5)',advance='no') elems_ll(i_el)%p%inflowvel_ctr_pt(1)
-    write(67,'(f9.5)',advance='no') elems_ll(i_el)%p%inflowvel_ctr_pt(2)
-    write(67,'(f9.5)',advance='no') elems_ll(i_el)%p%inflowvel_ctr_pt(3)
-    write(67,'(f9.5)',advance='no') sum(elems_ll(i_el)%p%nor*elems_ll(i_el)%p%inflowvel_ctr_pt)
-  enddo
-  write(67,*)  " "
-end if
 !------ Compute loads -------
 ! Implicit elements: vortex rings and 3d-panels
 ! 2019-07-23: D.Isola suggested to implement AVL formula for VL elements
@@ -1198,6 +1203,39 @@ end if
       end if
     end do 
 
+    !> log inflow, by kuwingto
+  if ( size(elems_ll) .gt. 0 ) then
+    write(67,'(f14.7)',advance='no')  time
+    write(67,'(A)',advance='no')  " "
+    write(68,'(f14.7)',advance='no')  time
+    write(68,'(A)',advance='no')  " "
+    write(69,'(f14.7)',advance='no')  time
+    write(69,'(A)',advance='no')  " "
+
+    do i_el = 1, size(elems_ll)
+      call elems_ll(i_el)%p%get_inflowvel_ctr_pt( (/ wake%pan_p, wake%rin_p/))
+      write(67,'(f14.7)',advance='no') elems_ll(i_el)%p%inflowvel_ctr_pt(1)
+      write(67,'(A)',advance='no')  " "
+      write(67,'(f14.7)',advance='no') elems_ll(i_el)%p%inflowvel_ctr_pt(2)
+      write(67,'(A)',advance='no')  " "
+      write(67,'(f14.7)',advance='no') elems_ll(i_el)%p%inflowvel_ctr_pt(3)
+      write(67,'(A)',advance='no')  " "
+      
+      write(68,'(f14.7)',advance='no') sum(elems_ll(i_el)%p%nor*elems_ll(i_el)%p%inflowvel_ctr_pt)
+      write(68,'(A)',advance='no')  " "
+      
+      write(69,'(f14.7)',advance='no') elems_ll(i_el)%p%nor(1)
+      write(69,'(A)',advance='no')  " "
+      write(69,'(f14.7)',advance='no') elems_ll(i_el)%p%nor(2)
+      write(69,'(A)',advance='no')  " "
+      write(69,'(f14.7)',advance='no') elems_ll(i_el)%p%nor(3)
+      write(69,'(A)',advance='no')  " "
+    enddo
+    write(67,*)  " "
+    write(68,*)  " "
+    write(69,*)  " "
+  end if
+
 #if USE_PRECICE
       ! *** to do *** dirty implementation. it-update moved into #if USE_PRECICE
       ! statement, to avoid double time counter update, when the code is not coupled
@@ -1237,6 +1275,8 @@ call destroy_hdf5()
 !> Log lifting line inflow, by kuwingto
 if (size(elems_ll) .gt. 0) then
  close(unit = 67)  
+ close(unit = 68)  
+ close(unit = 69)
 endif
 
 t22 = dust_time()

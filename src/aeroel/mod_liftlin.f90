@@ -1334,7 +1334,7 @@ subroutine get_inflowvel_ctr_pt_liftlin(this, wake_elems)
 
   enddo
 
-  this%inflowvel_ctr_pt = this%inflowvel_ctr_pt/(4.0_wp*pi) +this%uvort - this%ub
+  this%inflowvel_ctr_pt = this%inflowvel_ctr_pt/(4.0_wp*pi) +this%uvort
 
 end subroutine get_inflowvel_ctr_pt_liftlin
 !----------------------------------------------------------------------
