@@ -1,0 +1,7 @@
+
+comp_name = blade0
+geo_file  = wing.in
+ref_tag   = WingRef
+
+file_name = geo_input.h5 
+

@@ -1,0 +1,25 @@
+!> === Mesh and elements types ===
+mesh_file_type = parametric
+el_type = l
+
+!> === Geometry definition ===
+starting_point = (/ 0.0 , 1.080690 , 0.0/)
+reference_chord_fraction = 0.25
+nelem_chord = 30
+type_chord = cosineLE
+!> === Section and Region ===
+chord =  0.27
+twist = 0 
+airfoil = NACA23012 
+airfoil_table = ./airfoils/naca23012.c81 
+
+span =  3.821
+sweep = 0.0
+dihed = 0.0
+nelem_span = 40
+type_span = uniform
+
+chord =  0.27
+twist = 0 
+airfoil = NACA23012 
+airfoil_table = ./airfoils/naca23012.c81 
