@@ -7,12 +7,12 @@ reference_file = References.in
 
 ! Timings ---------------------
 tstart = 0.000000 
-tend = 0.128
+tend = 0.32
 dt = 0.00064
 dt_out = 0.00064
 output_start = T 
 ndt_update_wake = 1
-debug_level = 0 
+debug_level = 3 
 
 ! Reference values ---------------------
 rho_inf = 1.225 

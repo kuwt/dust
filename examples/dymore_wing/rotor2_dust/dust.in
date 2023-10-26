@@ -16,19 +16,20 @@ debug_level = 1
 
 ! Reference values ---------------------
 rho_inf = 1.225 
-!u_inf = (/66.11, 0.0, -1.0e-99/)
+u_inf = (/0, 0., 0./)
 u_ref = 200.9646
 ! Model parameters -------------------
 particles_box_min = (/ -6.0, -6.0, -7.0/)
-particles_box_max = (/  12.0,  6.0,  3.0/)
+particles_box_max = (/  6.0,  6.0,  3.0/)
 fmm = T
 
 ! llsolver
-ll_damp = 90
+!ll_solver = AlphaMethod
+ll_damp = 10
 
 ! octree parameters--------------------
 box_length = 4
-n_box = (/6, 3 , 3/)
+n_box = (/3, 3 , 3/)
 octree_origin = (/-6.0, -6.0, -7.0/)
 n_octree_levels = 6
 min_octree_part = 5

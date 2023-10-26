@@ -1,10 +1,10 @@
 !> === Mesh and elements types ===
 mesh_file_type = parametric
-el_type = p
+el_type = l
 !> === coupled with external structural solver (T/F) ===
 coupled      = T
 coupling_type = rbf
-coupling_node_file = coupling_nodes2.in 
+coupling_node_file = coupling_nodes0.in 
 coupling_node_orientation = (/ 1.0,0.0,0.0, 0.0,1.0,0.0,  0.0,0.0,1.0 /)
 !> === Geometry definition ===
 starting_point = (/ 0.0 , 1.080690 , 0.0/)
