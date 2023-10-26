@@ -3,9 +3,8 @@ import os
 import matplotlib.pyplot as plt
 import argparse
 ############ input ##################
-linerangel = 1404
-linerangeu = 1493
-periodstep = 90
+linerangel = 1
+linerangeu = 1500
 rmin = 0
 rmax = 39
 
@@ -31,8 +30,7 @@ def readlineIntoFloats(line):
 with open(filename,'r') as file:
     listOfLines = file.readlines()
     
-    thetalist = np.radians(np.arange(0,361,360/periodstep))
-    print("thetalist len = {}".format(len(thetalist)))
+    timelist = np.zeros((linerangeu-linerangel)+1)
 
     ########## read the position information  #########
     line = listOfLines[0]
@@ -64,31 +62,31 @@ with open(filename,'r') as file:
     print("rlist len = {}".format(len(rlist)))
 
     ########## read the information at the selected time step #########
-    Zlist  = np.zeros((len(thetalist),len(rlist)))
+    Zlist  = np.zeros((len(timelist),len(rlist)))
 
-    cur_theta_step = 0
+    cur_time_step = 0
     for linenum,line in enumerate(listOfLines):
         if linenum >= linerangel and linenum <= linerangeu:
             content = readlineIntoFloats(line)
             # obtain the time 
             time = content.pop(0)
-            # obtain the inflow 
+            timelist[cur_time_step] = cur_time_step
+            
             cur_r_step = 0
+            # obtain the inflow 
             while len(content) != 0:
                 value = content.pop(0)
-                Zlist[cur_theta_step][cur_r_step] = value
+                Zlist[cur_time_step][cur_r_step] = value
                 cur_r_step = cur_r_step + 1
                 if cur_r_step >rmax:
                     break
-            #print(inflow_temp)
-            cur_theta_step = cur_theta_step + 1
+            cur_time_step = cur_time_step + 1
 
-    Zlist[cur_theta_step][:] = Zlist[0][:] # stitch the front and end
     print("Zlist = {}".format(Zlist))
     print("Zlist shape= {}".format(Zlist.shape))
     ########### plot #####################
-    rmesh, thetamesh = np.meshgrid(rlist,thetalist)
-    fig, ax = plt.subplots(dpi=120,subplot_kw=dict(projection='polar'))
-    cs = ax.contourf(thetamesh, rmesh, Zlist, 300)
+    rmesh, timemesh = np.meshgrid(rlist,timelist)
+    fig, ax = plt.subplots(dpi=120)
+    cs = ax.contourf(timemesh, rmesh, Zlist, 300)
     cbar = fig.colorbar(cs)
     plt.show()
