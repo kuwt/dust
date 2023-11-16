@@ -1,21 +1,9 @@
 import numpy as np
 import os
-import matplotlib
 import matplotlib.pyplot as plt
-import argparse
-#import pdb; pdb.set_trace()
-matplotlib.rcParams.update({'font.size': 16})
+import pdb; pdb.set_trace()
 ############ input ##################
-timestep = 30
-legend = "inflow"
-
-###################################
-parser = argparse.ArgumentParser()
-parser.add_argument("-i",dest='filename',required=True)
-args = parser.parse_args()
-print(args.filename)
-filename = args.filename
-
+timestep = 10
 
 ############# utility ###############
 def readlineIntoFloats(line):
@@ -27,7 +15,7 @@ def readlineIntoFloats(line):
     return content
 ##############################
 #print(os.listdir())
-with open(filename,'r') as file:
+with open('inflow.dat','r') as file:
     listOfLines = file.readlines()
     
     ########## read the position information  #########
@@ -52,10 +40,16 @@ with open(filename,'r') as file:
     # obtain the time 
     time = content.pop(0)
     # obtain the inflow 
-    u_table = []
+    ux_table = []
+    uy_table = []
+    uz_table = []
     while len(content) != 0:
-        u = content.pop(0)
-        u_table.append(u)
+        ux = content.pop(0)
+        uy = content.pop(0)
+        uz = content.pop(0)
+        ux_table.append(ux)
+        uy_table.append(uy)
+        uz_table.append(uz)
     
     #########processing ##########################
     xdiff = np.diff(x_table)
@@ -66,9 +60,18 @@ with open(filename,'r') as file:
     pos = np.add.accumulate(posdiff)
     pos = np.insert(pos, 0, 0)
    
+    u_mag = np.sqrt(np.array(ux_table)* np.array(ux_table)+ np.array(uy_table)*np.array(uy_table) + np.array(uz_table)*np.array(uz_table))
     ####### ploting #####################
     plt.figure(0)
-    plt.plot(pos,u_table)
-    plt.legend([legend])
+    plt.plot(pos,ux_table)
+    plt.plot(pos,uy_table)
+    plt.plot(pos,uz_table)
+    plt.legend(["inflow_x","inflow_y", "inflow_z"])
+    plt.savefig("all.png")
     plt.show()
 
+    plt.figure(1)
+    plt.plot(pos,u_mag)
+    plt.legend(["inflow_mag"])
+    plt.savefig("inflow_mag.png")
+    plt.show()
